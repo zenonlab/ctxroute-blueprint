@@ -13,3 +13,4 @@ Les ADR enregistrent les décisions structurantes de FavLib.
 | [0007](0007-versioning-waves.md) | versioning et validation des waves | accepté |
 | [0008](0008-cache.md) | cache PostgreSQL multi-couche et contextualisé | accepté |
 | [0009](0009-resolution-multi-source.md) | sélection, alternatives et migration de source | accepté |
+| [0010](0010-catalogue-local-et-signaux-sortie.md) | catalogue local, alias et preuve de disponibilité | accepté |

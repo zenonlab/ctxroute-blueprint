@@ -71,6 +71,8 @@ La disponibilité, la progression observée et la confirmation future doivent re
 
 Le choix ponctuel d'une ligne ne change pas l'étoile. Une migration de domaine est présentée séparément avec sa preuve.
 
+Une sortie seulement annoncée apparaît dans le calendrier avec `Planifié` et sans bouton de lecture. Le bouton `Ouvrir` apparaît après validation d'au moins une origine.
+
 ## Tri des candidats
 
 ```text

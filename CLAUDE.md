@@ -8,6 +8,8 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Il suit mangas, manhwa, manhua et anime à partir des favoris Chrome/Google.
 - Tous les favoris URL sont examinés localement ; seuls les candidats médias nécessaires quittent l'extension.
 - AniList enrichit et aide au matching, mais ne bloque jamais une œuvre ou un import.
+- PostgreSQL maintient un catalogue canonique local de titres, synonymes, identifiants et relations ; un titre seul n'est jamais une identité unique.
+- Une annonce catalogue alimente le calendrier ; seule une origine validée par connecteur affirme qu'une sortie est disponible sur un site.
 - FavLib n'héberge, ne télécharge, n'extrait ni ne republie aucun média tiers.
 - Aucun contournement d'authentification, paywall, CAPTCHA, DRM ou protection anti-bot.
 

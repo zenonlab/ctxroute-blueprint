@@ -18,12 +18,15 @@ Décision : validée / corrigée / refusée
 
 Une sortie n'est pas validée uniquement parce qu'elle compile. Le comportement doit être observable depuis l'interface ou l'extension.
 
+Chaque wave vérifie aussi que l'OpenAPI généré correspond aux schémas Zod, que les réponses d'erreur sont stables et qu'une route personnelle refuse une session absente, révoquée ou appartenant à un autre utilisateur.
+
 ## Environnement de test local
 
 - Docker Compose identique au déploiement local ;
 - deux comptes de seed : Alice et Bob ;
 - deux installations d'extension distinctes ;
 - le jeu synthétique `fixtures/bookmarks/wave-0.synthetic.json` ;
+- le catalogue multi-alias `fixtures/catalog/wave-0.media-aliases.json` ;
 - des fixtures de sites stables ;
 - horloge et jobs déclenchables manuellement en test ;
 - boîtes de réception séparées ;
@@ -107,6 +110,10 @@ Vérifier également qu'un favori non-média ne quitte jamais l'extension, qu'un
 - manhwa classé comme manga par AniList ;
 - œuvre absente d'AniList ;
 - URL contenant un numéro sans être une sortie.
+- même œuvre en titre natif, romaji, anglais et français ;
+- alias propre à deux connecteurs ;
+- titre identique entre deux œuvres de type/année différents ;
+- suite/saison distincte reliée à l'œuvre favorite.
 
 ### Mesures
 
@@ -115,6 +122,10 @@ Vérifier également qu'un favori non-média ne quitte jamais l'extension, qu'un
 - taux envoyé à « À vérifier » ;
 - explication du score ;
 - comportement AniList indisponible ou limité.
+- hit catalogue local sans appel AniList ;
+- miss local puis hydratation AniList idempotente ;
+- rafraîchissement par statut, checkpoint et reprise ;
+- renormalisation après changement de version sans perte des graphies originales.
 
 Aucun seuil n'est validé si une liaison automatique fausse apparaît dans le corpus critique.
 
@@ -160,6 +171,12 @@ Tester également concurrence de workers, timeout, `429`, redirection interdite 
 - locale/région différente : snapshots distincts ;
 - source privée d'Alice jamais proposée à Bob ;
 - migration de domaine : alias, preuve, historique conservé et favori Chrome inchangé.
+- annonce anime sans origine : calendrier seulement, aucune notification disponible ;
+- première origine valide : rapprochement annonce/sortie et un seul événement personnel ;
+- chapitre manga/manhwa absent d'un site : aucune disponibilité déduite du catalogue ;
+- horaire AniList : vérification rapprochée puis backoff normal si la source n'a pas encore publié.
+- `resolve-open` refuse une URL libre ou une origine non rattachée à la sortie ;
+- états API `SCHEDULED` puis `AVAILABLE` conformes au contrat sans notification intermédiaire erronée.
 
 ## Wave 7
 

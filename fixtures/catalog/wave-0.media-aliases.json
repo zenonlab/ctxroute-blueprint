@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "description": "Catalogue synthétique pour tester alias, homonymes, saisons et annonces sans dépendre d'une œuvre réelle.",
+  "media": [
+    {
+      "id": "orbital-knights-s1",
+      "type": "ANIME",
+      "countryOfOrigin": "JP",
+      "format": "TV",
+      "seasonYear": 2026,
+      "externalIds": [
+        { "provider": "ANILIST", "id": "fixture-1001" },
+        { "provider": "MAL", "id": "fixture-2001" }
+      ],
+      "titles": [
+        { "text": "Orbital Knights", "language": "en", "kind": "official" },
+        { "text": "Les Chevaliers Orbitaux", "language": "fr", "kind": "synonym" },
+        { "text": "Kishidou Orbit", "language": "ja-Latn", "kind": "romaji" },
+        { "text": "軌士道オービット", "language": "ja", "kind": "native" }
+      ],
+      "sourceAliases": [
+        { "connector": "fixture-anime", "text": "orbital-knights" },
+        { "connector": "fixture-anime-alt", "text": "orbital_knights_tv" }
+      ],
+      "relations": [
+        { "target": "orbital-knights-s2", "kind": "SEQUEL" }
+      ]
+    },
+    {
+      "id": "orbital-knights-s2",
+      "type": "ANIME",
+      "countryOfOrigin": "JP",
+      "format": "TV",
+      "seasonYear": 2027,
+      "titles": [
+        { "text": "Orbital Knights Season 2", "language": "en", "kind": "official" },
+        { "text": "Kishidou Orbit 2", "language": "ja-Latn", "kind": "romaji" }
+      ]
+    },
+    {
+      "id": "paper-moon-hero",
+      "type": "MANGA",
+      "countryOfOrigin": "KR",
+      "format": "MANGA",
+      "externalIds": [
+        { "provider": "ANILIST", "id": "fixture-3001" }
+      ],
+      "titles": [
+        { "text": "Paper Moon Hero", "language": "en", "kind": "official" },
+        { "text": "Héros de la lune de papier", "language": "fr", "kind": "synonym" },
+        { "text": "종이달의 영웅", "language": "ko", "kind": "native" }
+      ]
+    },
+    {
+      "id": "reborn-anime-2024",
+      "type": "ANIME",
+      "seasonYear": 2024,
+      "titles": [
+        { "text": "Reborn", "language": "en", "kind": "official" }
+      ]
+    },
+    {
+      "id": "reborn-manga-2018",
+      "type": "MANGA",
+      "seasonYear": 2018,
+      "titles": [
+        { "text": "Reborn", "language": "en", "kind": "official" }
+      ]
+    }
+  ]
+}

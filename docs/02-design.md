@@ -46,6 +46,7 @@ Sur mobile, une barre inférieure remplace la sidebar. L'action principale est �
 - `SourceBadge` : site, santé du connecteur et dernière vérification.
 - `ProgressControl` : dernier chapitre/épisode vu et ajustement rapide.
 - `UpdateInbox` : nouveautés regroupées par œuvre, jamais par simple chronologie brute.
+- `ReleaseStateBadge` : « Planifié » vient du catalogue ; « Disponible » exige au moins une origine validée.
 - `ConnectorDiagnostic` : URL testée, méthode, dernier succès et erreur compréhensible.
 - `BookmarkCandidate` : favori détecté, site, correspondance proposée et score de confiance.
 - `BookmarkPosition` : position déduite du favori ou d'une navigation consentie, niveau de confiance, statut observé et date.

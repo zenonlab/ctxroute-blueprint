@@ -75,20 +75,24 @@ Objectif : prouver le transport robuste depuis plusieurs profils Chrome.
 
 Sortie : deux profils Chrome importent leurs favoris dans deux comptes séparés, sans doublon après réimport.
 
-## Wave 4 — tri et AniList
+## Wave 4 — tri, catalogue local et AniList
 
 Objectif : transformer l'inventaire de favoris en bibliothèque média.
 
 - normalisation URL et titres ;
+- tables `media`, alias multilingues, identifiants externes et relations ;
+- recherche PostgreSQL exacte + trigramme, avec ambiguïtés explicables ;
 - pipeline de classification versionné ;
 - service AniList avec cache et backoff ;
+- jobs de synchronisation, checkpoints et renormalisation ;
+- hydratation à la demande et préchauffage autorisé des œuvres actives ;
 - scoring explicable ;
 - catégories reconnu/ambigu/ignoré ;
 - purge des favoris ignorés ;
 - fingerprints keyed locaux invalidables par version du classifieur ;
 - calibration sur fixtures.
 
-Sortie : rapport de précision du tri et validation des ambiguïtés dans l'interface.
+Sortie : les variantes de nom convergent vers la bonne œuvre, avec rapport de précision et validation des ambiguïtés dans l'interface.
 
 ## Wave 5 — connecteur de référence sur fixtures
 
@@ -114,6 +118,8 @@ Objectif : détecter une nouvelle sortie de bout en bout.
 - caches PostgreSQL, TTL, invalidation et anti-stampede ;
 - mutualisation d'une cible entre utilisateurs ;
 - regroupement des origines par sortie logique ;
+- import des annonces anime et scheduling proche de la diffusion ;
+- séparation vérifiée entre annonce et disponibilité réelle ;
 - résolveur de source préférée et fallback ;
 - fan-out vers les inbox personnelles.
 

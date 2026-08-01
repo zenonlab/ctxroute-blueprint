@@ -74,6 +74,25 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] fingerprints keyed locaux retraitables après changement de classifieur ;
 - [ ] purge des données lisibles de favoris ignorés.
 
+## Catalogue canonique
+
+- [ ] `media` indépendant des utilisateurs et fournisseurs ;
+- [ ] titres natifs, romaji, traduits et synonymes avec langue/provenance ;
+- [ ] graphies originales conservées malgré normalisation ;
+- [ ] index exact, trigramme et formes Unicode testés ;
+- [ ] identifiants AniList/MAL/éditeur dédupliqués ;
+- [ ] alias de connecteur promu seulement après preuve forte ;
+- [ ] homonyme jamais lié sur le titre seul ;
+- [ ] relations saison, suite, préquelle, adaptation et side story ;
+- [ ] synchronisation idempotente avec checkpoint ;
+- [ ] métriques de couverture, fraîcheur, erreurs et backlog ;
+- [ ] fraîcheur et version du mapper enregistrées ;
+- [ ] priorité de rafraîchissement adaptée au statut ;
+- [ ] dernier état valide conservé si fournisseur indisponible ;
+- [ ] aucun miroir massif sans source explicitement autorisée ;
+- [ ] nouvelle saison signalable mais jamais ajoutée sans favori ;
+- [ ] second fournisseur ajoutable derrière le même contrat.
+
 ## Pages et connecteurs
 
 - [ ] type `work`, `chapter`, `episode`, `listing` ou `other` ;
@@ -133,6 +152,10 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] cible inactive vérifiée moins souvent ;
 - [ ] déclenchement manuel administrateur limité et journalisé ;
 - [ ] horloge de test contrôlable.
+- [ ] annonce catalogue distincte d'une origine disponible ;
+- [ ] horaire anime utilisé pour rapprocher les vérifications ;
+- [ ] disponibilité manga/manhwa/manhua confirmée par un connecteur ;
+- [ ] rapprochement annonce/origine sans doublon ;
 
 ## Cache
 

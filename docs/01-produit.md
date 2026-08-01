@@ -18,6 +18,8 @@ L'application répond à trois questions :
 - Chaque compte FavLib possède sa bibliothèque, sa progression et ses notifications.
 - Tous les favoris URL de chaque profil appairé sont examinés localement, sans imposer de dossier `FavLib` ; seuls les candidats médias quittent l'extension.
 - AniList est utilisé comme moteur principal d'enrichissement et de matching lorsque l'œuvre y existe.
+- Un catalogue canonique local conserve les titres natifs, translittérés, traduits, synonymes, identifiants externes et relations entre saisons.
+- Une sortie annoncée et une sortie disponible sur un site sont deux états différents.
 - L'extension fonctionne à la fois depuis les favoris et sur la page précise ouverte dans le navigateur.
 - Les pages d'origine restent l'endroit où lire ou regarder.
 
@@ -44,6 +46,7 @@ Un favori qui pointe seulement vers la fiche générale permet le suivi des nouv
 ```text
 favori = œuvre suivie + site utilisé + position éventuelle
 connecteur = sorties actuellement disponibles sur ce site
+catalogue = identité, alias, relations et sorties annoncées
 delta = sorties disponibles après la position du favori
 ```
 
@@ -72,6 +75,7 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - déduplication entre appareils/profils synchronisés ;
 - tri automatique et file d'ambiguïtés ;
 - AniList facultatif par résultat mais intégré au pipeline ;
+- catalogue local actualisable et recherche multi-alias ;
 - bibliothèque manga/anime par utilisateur ;
 - fiche détaillée de chaque œuvre ;
 - une ou plusieurs sources par œuvre ;
@@ -110,6 +114,8 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - un import interrompu peut reprendre sans doublon ;
 - un favori reconnu apparaît en moins de 30 secondes après synchronisation ;
 - une même page suivie par dix utilisateurs n'est récupérée qu'une fois par cycle ;
+- un favori utilisant un titre alternatif rejoint la bonne œuvre canonique ou passe en vérification s'il reste ambigu ;
+- une diffusion planifiée n'est jamais présentée comme disponible avant confirmation d'un connecteur ;
 - un changement de favori N → N+1 avance la bonne œuvre, jamais une homonyme ;
 - une page non rattachée à une œuvre favorite ne produit aucune progression ;
 - aucune nouveauté n'est annoncée sur un parseur devenu vide ou incohérent ;

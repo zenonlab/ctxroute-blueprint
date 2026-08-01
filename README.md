@@ -8,6 +8,8 @@ FavLib n'héberge et ne fournit aucun contenu. Il détecte les sorties, conserve
 
 Une œuvre peut regrouper plusieurs sites, langues, éditions ou groupes. FavLib met en cache uniquement métadonnées et disponibilité, puis choisit ou propose la meilleure origine au moment d'ouvrir ; aucun contenu média tiers n'est mis en cache ou servi.
 
+PostgreSQL maintient aussi un catalogue canonique local : titres natifs, romaji, traductions, synonymes, identifiants externes, saisons et relations. Une diffusion AniList est une annonce ; la disponibilité réelle d'un épisode ou chapitre est confirmée par le connecteur du site.
+
 ## Documentation
 
 - [Vision et règles produit](docs/01-produit.md)
@@ -20,6 +22,7 @@ Une œuvre peut regrouper plusieurs sites, langues, éditions ou groupes. FavLib
 - [Checklist transversale complète](docs/08-checklist-transversale.md)
 - [Wireframes Wave 0](docs/09-maquettes-wireframes.md)
 - [Exploitation locale et sauvegardes](docs/10-exploitation-locale.md)
+- [Contrat et responsabilités de l'API](docs/11-api.md)
 - [Décisions d'architecture](docs/adr/README.md)
 - [Validation de la Wave 0](docs/VALIDATION-WAVE-0.md)
 

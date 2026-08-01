@@ -98,3 +98,40 @@ Feature: Invariants FavLib Wave 0
     When a connector inspects a supported work page
     Then FavLib may retain normalized release metadata and technical validators
     But it does not retain page HTML media files cookies or reading content
+
+  Scenario: A localized title resolves to the canonical work
+    Given the local catalog links "Les Chevaliers Orbitaux" to "orbital-knights-s1"
+    When a favorite exposes that French title and compatible anime evidence
+    Then FavLib links it to "orbital-knights-s1"
+    And the decision records the matched alias and classifier version
+
+  Scenario: A native manhwa title resolves through the local catalog
+    Given the local catalog links "종이달의 영웅" to "paper-moon-hero"
+    When a Korean source exposes that title with manga evidence
+    Then FavLib links it to "paper-moon-hero"
+    And it classifies its origin country as Korea without creating another work
+
+  Scenario: An identical title stays ambiguous
+    Given one anime and one manga are both titled "Reborn"
+    When a candidate has no reliable type year or source evidence
+    Then FavLib sends the candidate to "À vérifier"
+    And it does not automatically link either work
+
+  Scenario: An announced episode is not yet available
+    Given AniList announces episode 13 of "Orbital Knights" for tomorrow
+    And no valid connector snapshot contains episode 13
+    When the catalog synchronization completes
+    Then episode 13 appears only as scheduled in the calendar
+    And no available-release notification is created
+
+  Scenario: A connector confirms an announced episode
+    Given episode 13 of "Orbital Knights" is scheduled
+    When a valid source snapshot first exposes episode 13
+    Then FavLib links the announcement and the release origin to one logical episode
+    And each subscribed user receives one personal available-release event
+
+  Scenario: A sequel relation does not bypass favorites
+    Given "orbital-knights-s2" is a sequel of Alice favorite "orbital-knights-s1"
+    When catalog synchronization discovers the sequel
+    Then FavLib may display a sequel announcement on the first work
+    But it does not add or subscribe Alice to "orbital-knights-s2"

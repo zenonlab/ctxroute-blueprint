@@ -22,8 +22,8 @@ Utilisateur A / profil Chrome A          Utilisateur B / profil Chrome B
                                                │
                  ┌─────────────────────────────┼────────────────────┐
                  ▼                             ▼                    ▼
-            PostgreSQL                   Worker planifié      AniList / sites
-       données par utilisateur       vérifications communes   connecteurs
+            PostgreSQL                   Workers planifiés     AniList / sites
+     utilisateurs + catalogue      catalogue + vérifications  fournisseurs/connecteurs
 ```
 
 ## Principe de mutualisation
@@ -53,7 +53,7 @@ La clé exacte de mutualisation est `(connector_id, connector_version, canonical
 ### API
 
 - Fastify, TypeScript, Zod et OpenAPI généré.
-- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Library, Sources, Source Resolver, Cache, Releases, Progress, Notifications et Admin.
+- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Catalog, Library, Sources, Source Resolver, Cache, Releases, Progress, Notifications et Admin.
 - contrôle d'accès systématique par `user_id`, jamais uniquement dans l'interface.
 
 ### Extension
@@ -70,6 +70,8 @@ Au moment de l'appairage, l'utilisateur fournit l'origine du serveur local, idé
 ### Worker
 
 - jobs persistants dans PostgreSQL avec Graphile Worker ;
+- synchronisation et renormalisation du catalogue par fournisseur ;
+- import des annonces de diffusion anime ;
 - verrou par cible canonique et domaine ;
 - limites par domaine, jitter et backoff ;
 - fan-out des nouvelles sorties vers les abonnements personnels ;
@@ -136,6 +138,7 @@ FavLib/
     bookmark-classifier/
     connectors/
     metadata-anilist/
+    catalog-core/
     test-kit/
     config/
   fixtures/
@@ -175,8 +178,12 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 
 | Entité | Rôle |
 |---|---|
-| `media` | œuvre canonique FavLib |
-| `external_id` | identifiant AniList ou autre |
+| `media` | œuvre canonique FavLib, indépendante d'un utilisateur |
+| `media_title` | titre natif, romaji, traduit ou synonyme avec langue/provenance |
+| `external_id` | identifiant AniList, MAL, éditeur ou autre |
+| `media_relation` | saison, suite, préquelle, adaptation ou side story |
+| `source_media_alias` | titre/slug propre à un connecteur, après validation |
+| `catalog_sync_state` | checkpoint, fraîcheur et état par fournisseur |
 | `library_item` | statut personnel de l'œuvre |
 | `source_site` | domaine et capacités d'un connecteur |
 | `source_target` | connecteur/version/URL/locale/région/mode/variante à vérifier |
@@ -187,6 +194,7 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 | `source_candidate` | alternative publique autorisée pour une œuvre |
 | `source_snapshot` | résultat minimal d'une vérification |
 | `release` | chapitre ou épisode normalisé |
+| `release_announcement` | sortie planifiée/annoncée par un fournisseur |
 | `release_origin` | disponibilité d'une sortie sur une cible |
 | `progress_observation` | position extraite d'un favori |
 | `user_progress` | progression personnelle consolidée |
@@ -204,6 +212,22 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 
 Les caches PostgreSQL n'ajoutent pas de copie média. Les clés, TTL et invalidations sont définis par [ADR 0008](adr/0008-cache.md).
 
+Le catalogue canonique, ses alias et la séparation annonce/disponibilité sont définis par [ADR 0010](adr/0010-catalogue-local-et-signaux-sortie.md).
+
+## Flux catalogue et matching
+
+```text
+favori candidat
+  → extraction titres + indices connecteur
+  → recherche dans media_title/source_media_alias
+  → candidats classés par alias + type + année + relations + source
+  → miss/ambigu : recherche AniList puis hydratation locale
+  → match fort, À vérifier ou unmatched
+  → planification du prochain catalog_refresh
+```
+
+Le rendu Web et les imports suivants interrogent d'abord PostgreSQL. AniList complète le catalogue en arrière-plan ou sur un miss contrôlé, jamais une fois par carte affichée.
+
 ## Flux de disponibilité
 
 ```text
@@ -219,6 +243,8 @@ scheduler
   → résolution préférence/fallback
   → inbox/notification par utilisateur
 ```
+
+Un second flux importe les `release_announcement` AniList pour les anime suivis. À l'heure prévue, il accélère les vérifications des sources ; il ne crée une disponibilité que lorsqu'un connecteur valide une `release_origin`.
 
 Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin d'éviter un lien obsolète. La stratégie complète est définie par [ADR 0009](adr/0009-resolution-multi-source.md).
 

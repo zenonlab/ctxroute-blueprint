@@ -25,7 +25,9 @@ favori brut dans l'extension
   → classification page œuvre/chapitre/épisode/autre
   → extraction d'un titre candidat et d'une position éventuelle
   → inspection par le connecteur du site
-  → recherche AniList ANIME ou MANGA
+  → recherche catalogue local multi-alias
+  → miss/ambigu : recherche AniList ANIME ou MANGA
+  → hydratation du catalogue local
   → score de correspondance
   → reconnu / à vérifier / ignoré
 ```
@@ -51,9 +53,11 @@ Le score et ses raisons sont conservés avec la version du classifieur pour rend
 
 Les seuils numériques seront déterminés sur un jeu de favoris anonymisé, pas choisis arbitrairement dans le code.
 
-## AniList
+## Catalogue canonique local et AniList
 
-L'[API GraphQL AniList](https://docs.anilist.co/guide/introduction) enrichit les œuvres reconnues : titres, affiche, type, format, statut, saison et calendrier disponible. Elle sert également au matching, mais n'est pas une source universelle pour savoir sur quel site une œuvre est disponible.
+PostgreSQL contient un index partagé `media` + `media_title` + `external_id` + `media_relation` + `source_media_alias`. Il permet de reconnaître le titre natif, romaji, anglais, français et les synonymes ou slugs utilisés par chaque site. Les formes normalisées servent à chercher ; les graphies originales et leur provenance restent conservées.
+
+L'[API GraphQL AniList](https://docs.anilist.co/reference/object/media) enrichit cet index : titres officiels, synonymes, type, format, statut, pays, saison, relations, affiche, identifiant MAL et prochaine diffusion lorsqu'elle existe. Elle sert au matching, mais un titre n'est pas unique et AniList n'est pas une source universelle pour savoir sur quel site une œuvre est disponible.
 
 Le service Metadata AniList doit :
 
@@ -64,7 +68,17 @@ Le service Metadata AniList doit :
 - fonctionner en mode dégradé lorsque l'API est indisponible ;
 - ne jamais bloquer l'import complet des favoris.
 
+Le catalogue est hydraté à la demande, préchauffable pour les œuvres populaires/en cours, puis rafraîchi selon statut. Un miroir intégral n'est lancé que depuis une source explicitement autorisée. Voir [ADR 0010](adr/0010-catalogue-local-et-signaux-sortie.md).
+
 Une œuvre absente d'AniList peut être créée depuis les données fiables du connecteur du site, avec le statut `unmatched`.
+
+## Annonce et disponibilité
+
+- `release_announcement` : épisode futur annoncé, utile au calendrier et au scheduling ;
+- `release_origin` : épisode ou chapitre effectivement vu par un connecteur sur un site ;
+- `notification_event` : nouveauté personnelle créée après une nouvelle origine valide et dédupliquée.
+
+Pour un anime, `nextAiringEpisode` rapproche automatiquement la prochaine vérification du site. Pour un manga, manhwa ou manhua, AniList ne remplace pas l'API, le flux ou la page de sorties du site suivi. Une annonce n'est jamais affichée comme « disponible » sans origine validée.
 
 ## Cache
 

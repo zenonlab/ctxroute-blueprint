@@ -11,6 +11,8 @@
 | Entrée | tous les favoris URL du profil appairé |
 | Dossier Chrome spécial | non requis |
 | Métadonnées | AniList intégré mais non bloquant |
+| Catalogue | index canonique PostgreSQL multi-alias, enrichi et rafraîchi par jobs |
+| Preuve de sortie | annonce catalogue distincte d'une origine disponible validée |
 | Ajout manuel | absent du parcours principal |
 | Progression | observée sur une page précise rattachée à une œuvre favorite, avec consentement |
 | Nouveautés | détectées par le connecteur de la source favorite |
@@ -38,6 +40,9 @@
 - l'arbre Chrome reste strictement en lecture seule.
 - un fallback ponctuel ne change pas la préférence permanente ;
 - les migrations de domaine conservent un alias et une preuve.
+- un titre n'est jamais utilisé comme identifiant unique ;
+- les rendus Web interrogent le catalogue local au lieu d'appeler AniList ;
+- une annonce de diffusion accélère les checks mais ne prouve pas la disponibilité.
 
 ## Points à fournir avant la Wave 8
 

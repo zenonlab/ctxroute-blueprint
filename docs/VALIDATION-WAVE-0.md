@@ -11,10 +11,12 @@
 - doctrine [CLAUDE.md](../CLAUDE.md) ;
 - décisions [ADR](adr/README.md) ;
 - corpus [favoris synthétiques](../fixtures/bookmarks/wave-0.synthetic.json) ;
+- catalogue [multi-alias synthétique](../fixtures/catalog/wave-0.media-aliases.json) ;
 - fixtures [source de référence](../fixtures/sources/reference/) ;
 - scénarios [Given/When/Then](../fixtures/scenarios/wave-0.feature) ;
 - [wireframes](09-maquettes-wireframes.md) ;
 - [roadmap](05-roadmap.md) et [tests](07-waves-et-tests.md) ;
+- [contrat API](11-api.md) ;
 - [checklist transversale](08-checklist-transversale.md).
 
 ## Corrections issues de l'audit
@@ -29,6 +31,7 @@
 | file et versioning ambigus | Graphile Worker et workflow Git par waves | corrigé par ADR 0006/0007 |
 | doctrine absente | règles obligatoires à la racine | corrigé par CLAUDE.md |
 | cache et bascule de source incomplets | cache contextualisé et résolveur explicable | corrigé par ADR 0008/0009 |
+| reconnaissance multi-nom et signal de sortie incomplets | catalogue canonique et séparation annonce/origine | corrigé par ADR 0010 |
 
 ## Checklist d'acceptation utilisateur
 
@@ -40,5 +43,6 @@
 - [ ] L'installation d'un certificat Caddy sur chaque appareil local est acceptable.
 - [ ] Le découpage des waves et les wireframes sont approuvés.
 - [ ] Le cache sans média tiers et le menu multi-source/fallback sont approuvés.
+- [ ] Le catalogue local multi-alias et la distinction « annoncé »/« disponible » sont approuvés.
 
 Une fois ces points confirmés par l'utilisateur, mettre à jour le registre de validation et créer le tag `wave-0-docs`.
