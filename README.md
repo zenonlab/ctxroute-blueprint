@@ -1,0 +1,38 @@
+# FavLib
+
+FavLib est une application privée, locale et multi-utilisateur pour suivre mangas, manhwa, manhua et anime depuis les favoris Chrome synchronisés par Google.
+
+Chaque utilisateur installe l'extension dans son profil Chrome et l'appaire à son compte FavLib. Tous ses favoris sont examinés localement par le premier niveau de tri ; seuls les candidats médias sont envoyés à l'API. Les œuvres reconnues deviennent des abonnements surveillés.
+
+FavLib n'héberge et ne fournit aucun contenu. Il détecte les sorties, conserve la progression déduite des favoris et ouvre la page d'origine.
+
+## Documentation
+
+- [Vision et règles produit](docs/01-produit.md)
+- [Design et écrans](docs/02-design.md)
+- [Architecture multi-utilisateur locale](docs/03-architecture.md)
+- [Favoris, AniList, connecteurs et scraping](docs/04-sources.md)
+- [Roadmap par waves](docs/05-roadmap.md)
+- [Décisions actées et points ouverts](docs/06-decisions.md)
+- [Plan de test de chaque wave](docs/07-waves-et-tests.md)
+- [Checklist transversale complète](docs/08-checklist-transversale.md)
+- [Wireframes Wave 0](docs/09-maquettes-wireframes.md)
+- [Exploitation locale et sauvegardes](docs/10-exploitation-locale.md)
+- [Décisions d'architecture](docs/adr/README.md)
+- [Validation de la Wave 0](docs/VALIDATION-WAVE-0.md)
+
+## Boucle métier
+
+```text
+favoris Chrome de chaque utilisateur
+  → extension appairée
+  → examen local idempotent de tous les favoris
+  → candidats médias → tri API/site + matching AniList
+  → œuvre + source suivie
+  → worker de vérification mutualisé
+  → nouvelle sortie dans l'inbox de chaque utilisateur
+```
+
+Un favori vers une fiche d'œuvre signifie « je suis cette œuvre ». Un favori vers un chapitre ou épisode précis indique également une position. Après consentement, l'extension peut aussi observer une page suivante appartenant à cette même œuvre favorite et avancer une progression marquée « observée ». La nouveauté disponible est détectée par le connecteur du site, pas par une modification du favori.
+
+Le projet reste privé. L'hébergement cloud et l'inscription publique sont hors périmètre pour le moment.

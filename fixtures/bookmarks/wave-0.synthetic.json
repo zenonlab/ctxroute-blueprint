@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "description": "Corpus synthétique Wave 0, sans favori ni domaine utilisateur réel.",
+  "cases": [
+    {
+      "id": "anime-work",
+      "title": "Orbital Knights",
+      "url": "https://fixture-anime.test/anime/orbital-knights",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "work",
+      "expectedMediaHint": "ANIME"
+    },
+    {
+      "id": "anime-episode",
+      "title": "Orbital Knights - Episode 11",
+      "url": "https://fixture-anime.test/watch/orbital-knights/episode-11",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "episode",
+      "expectedPosition": "11"
+    },
+    {
+      "id": "anime-next-episode",
+      "title": "Orbital Knights - Episode 12",
+      "url": "https://fixture-anime.test/watch/orbital-knights/episode-12?utm_source=test",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "episode",
+      "expectedPosition": "12"
+    },
+    {
+      "id": "manga-work",
+      "title": "Paper Moon Hero",
+      "url": "https://fixture-manga.test/title/paper-moon-hero",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "work",
+      "expectedMediaHint": "MANGA"
+    },
+    {
+      "id": "manga-decimal",
+      "title": "Paper Moon Hero chapitre 12.5",
+      "url": "https://fixture-manga.test/title/paper-moon-hero/chapter-12-5",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "chapter",
+      "expectedPosition": "12.5"
+    },
+    {
+      "id": "manga-part",
+      "title": "Paper Moon Hero chapitre 12a",
+      "url": "https://fixture-manga.test/title/paper-moon-hero/chapter-12a",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "chapter",
+      "expectedPosition": "12a"
+    },
+    {
+      "id": "special",
+      "title": "Orbital Knights Special 3",
+      "url": "https://fixture-anime.test/watch/orbital-knights/special-3",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "episode",
+      "expectedPosition": "SP-3"
+    },
+    {
+      "id": "unknown-media-candidate",
+      "title": "Unlisted Webtoon - Chapter 7",
+      "url": "https://unknown-media.test/series/unlisted-webtoon/chapter-7",
+      "expectedLocalDecision": "candidate",
+      "expectedServerDecision": "unmatched"
+    },
+    {
+      "id": "ordinary-article",
+      "title": "Documentation de jardinage",
+      "url": "https://ordinary-site.test/garden/guide-12",
+      "expectedLocalDecision": "non_media"
+    },
+    {
+      "id": "shopping",
+      "title": "Panier",
+      "url": "https://shop.test/cart",
+      "expectedLocalDecision": "non_media"
+    },
+    {
+      "id": "invalid-script",
+      "title": "Bookmarklet",
+      "url": "javascript:void(0)",
+      "expectedLocalDecision": "invalid_scheme"
+    },
+    {
+      "id": "browser-internal",
+      "title": "Extensions",
+      "url": "chrome://extensions/",
+      "expectedLocalDecision": "invalid_scheme"
+    }
+  ]
+}

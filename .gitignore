@@ -1,0 +1,39 @@
+# Dependencies and builds
+node_modules/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+.turbo/
+
+# Runtime configuration and secrets
+.env
+.env.*
+!.env.example
+*.secret
+secrets/
+
+# Local infrastructure data
+data/
+backups/
+dumps/
+*.dump
+*.sql
+*.sqlite*
+caddy-data/
+caddy-config/
+
+# Certificates and private keys
+*.crt
+*.cer
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
