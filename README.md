@@ -32,8 +32,9 @@ PostgreSQL maintient aussi un catalogue canonique local : titres natifs, romaji,
 favoris Chrome de chaque utilisateur
   → extension appairée
   → examen local idempotent de tous les favoris
-  → candidats médias → tri API/site + matching AniList
+  → candidats médias → tri API/site + matching catalogue local/AniList
   → œuvre + source suivie
+  → découverte bornée + validation d'alternatives
   → worker de vérification mutualisé
   → regroupement des origines par sortie
   → nouvelle sortie + alternatives dans l'inbox

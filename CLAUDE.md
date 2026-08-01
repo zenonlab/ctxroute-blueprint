@@ -17,6 +17,8 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 
 - Le favori établit l'appartenance et la source à surveiller.
 - Une origine alternative peut enrichir une œuvre déjà favorite, mais ne crée jamais seule une œuvre, un abonnement ou un favori.
+- Épingler ou accepter une alternative comme fallback peut créer sa surveillance uniquement pour une œuvre possédant encore un favori personnel actif.
+- Retirer le dernier favori d'une œuvre désactive ses abonnements et préférences personnels.
 - Le connecteur de la source détecte les sorties disponibles.
 - La progression est personnelle et distincte de la disponibilité.
 - Une page précise favorite ou une navigation consentie sur la même œuvre peut produire une observation de progression.
@@ -59,6 +61,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - La clé de mutualisation inclut connecteur, version, URL canonique, locale, région et mode d'accès.
 - Les résultats personnalisés, authentifiés ou dépendants d'une extension ne sont jamais partagés entre utilisateurs.
 - Le résolveur multi-source utilise seulement favoris personnels, cibles publiques redécouvrables et catalogues autorisés.
+- La découverte n'est pas exécutée à chaque cycle ; un résultat de recherche Web reste un indice jusqu'à validation par connecteur et matching fort.
 - Les requêtes ont délai, taille, redirections et budget par domaine limités.
 - SSRF, DNS rebinding et redirections vers IP privées sont bloqués sauf cible administrée explicitement.
 
@@ -69,6 +72,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Langue, édition, groupe et URL appartiennent à l'origine de sortie.
 - Une fusion entre origines n'est automatique qu'avec une forte confiance ; sinon les sorties restent distinctes.
 - La progression avance uniquement dans une même séquence ordonnée et sur une observation à forte confiance.
+- Par défaut, une seule notification est produite par sortie logique à la première origine compatible ; les origines suivantes enrichissent `Sources (N)`.
 
 ## Stack arrêtée
 

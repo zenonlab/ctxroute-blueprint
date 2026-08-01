@@ -27,6 +27,7 @@ Chaque wave vérifie aussi que l'OpenAPI généré correspond aux schémas Zod, 
 - deux installations d'extension distinctes ;
 - le jeu synthétique `fixtures/bookmarks/wave-0.synthetic.json` ;
 - le catalogue multi-alias `fixtures/catalog/wave-0.media-aliases.json` ;
+- les candidates `fixtures/discovery/wave-0.discovery.json` ;
 - des fixtures de sites stables ;
 - horloge et jobs déclenchables manuellement en test ;
 - boîtes de réception séparées ;
@@ -140,6 +141,10 @@ Aucun seuil n'est validé si une liaison automatique fausse apparaît dans le co
 - pagination éventuelle ;
 - résultat vide en quarantaine ;
 - changement de fixture détecté comme parseur cassé.
+- `discover()` retourne hints, preuves et domaine sans connecteur ;
+- résultat de recherche jamais promu sans `inspect()` et matching ;
+- faux positif de titre/année rejeté ;
+- transition manuelle ambiguë auditée et réversible.
 
 ## Wave 6
 
@@ -177,6 +182,13 @@ Tester également concurrence de workers, timeout, `429`, redirection interdite 
 - horaire AniList : vérification rapprochée puis backoff normal si la source n'a pas encore publié.
 - `resolve-open` refuse une URL libre ou une origine non rattachée à la sortie ;
 - états API `SCHEDULED` puis `AVAILABLE` conformes au contrat sans notification intermédiaire erronée.
+- ouverture ponctuelle sans abonnement ; épinglage avec abonnement borné au favori actif ;
+- retrait du dernier favori désactive préférences et abonnements personnels ;
+- origine supplémentaire sans seconde notification par défaut ;
+- origine préférée tardive avec événement optionnel dédupliqué ;
+- variante audio/sous-titres incompatible exclue du fallback automatique ;
+- source extension privée invisible à l'autre utilisateur ;
+- budget épuisé et domaine non approuvé sans fetch libre.
 
 ## Wave 7
 

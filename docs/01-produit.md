@@ -79,6 +79,8 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - bibliothèque manga/anime par utilisateur ;
 - fiche détaillée de chaque œuvre ;
 - une ou plusieurs sources par œuvre ;
+- découverte contrôlée d'alternatives pour une œuvre déjà favorite ;
+- épinglage ou fallback pouvant surveiller une alternative sans modifier les favoris ;
 - disponibilité et progression séparées ;
 - progression observée depuis un favori précis ou une navigation consentie sur la même œuvre favorite ;
 - inbox, calendrier et diagnostics ;
@@ -116,6 +118,8 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - une même page suivie par dix utilisateurs n'est récupérée qu'une fois par cycle ;
 - un favori utilisant un titre alternatif rejoint la bonne œuvre canonique ou passe en vérification s'il reste ambigu ;
 - une diffusion planifiée n'est jamais présentée comme disponible avant confirmation d'un connecteur ;
+- une recherche Web ne crée jamais une source disponible sans validation du connecteur ;
+- retirer le dernier favori désactive toutes les surveillances personnelles de l'œuvre ;
 - un changement de favori N → N+1 avance la bonne œuvre, jamais une homonyme ;
 - une page non rattachée à une œuvre favorite ne produit aucune progression ;
 - aucune nouveauté n'est annoncée sur un parseur devenu vide ou incohérent ;

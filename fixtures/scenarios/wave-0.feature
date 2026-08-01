@@ -135,3 +135,91 @@ Feature: Invariants FavLib Wave 0
     When catalog synchronization discovers the sequel
     Then FavLib may display a sequel announcement on the first work
     But it does not add or subscribe Alice to "orbital-knights-s2"
+
+  Scenario: Discovery requires an existing favorite work
+    Given Alice has no active favorite for "Unfavorited Knights"
+    When Alice requests source discovery for that work
+    Then the API refuses the discovery
+    And no candidate subscription or library item is created
+
+  Scenario: A search result is only a hint
+    Given Web search returns a page titled "Orbital Knights"
+    When no compatible connector can inspect that domain
+    Then the candidate state is "PENDING_CONNECTOR"
+    And the page is not advertised as monitored or available
+
+  Scenario: Strong connector evidence verifies an alternative
+    Given Alice favorites "Orbital Knights"
+    And an approved connector discovers the alternative fixture
+    When inspection confirms external identity exact alias type and year
+    Then the candidate state is "VERIFIED"
+    And Alice can see the evidence and resolution reasons
+
+  Scenario: Multiple hints merge into one canonical candidate
+    Given Alice bookmark catalog links and Web search find the same public alternative
+    When the connector canonicalizes all hints to one work URL and context
+    Then FavLib keeps one source candidate with multiple evidence records
+    And it does not merge an authenticated personal target with that public candidate
+
+  Scenario: A title-only false positive is rejected
+    Given Web search finds a similarly titled work from 1998
+    And Alice favorite work is from 2026
+    When the connector reports conflicting identity evidence
+    Then the candidate state is "REJECTED"
+    And it is never included in automatic fallback
+
+  Scenario: Pinning an alternative creates bounded monitoring
+    Given Alice has an active favorite for "Orbital Knights"
+    And a public alternative is verified
+    When Alice pins that alternative
+    Then FavLib creates Alice user subscription for its public target
+    But it does not create or modify a Chrome bookmark
+
+  Scenario: Temporary opening does not create monitoring
+    Given a verified alternative exists for Alice favorite work
+    When Alice opens it once from "Sources (2)"
+    Then no new user subscription or permanent preference is created
+
+  Scenario: Removing the last favorite disables alternative monitoring
+    Given Alice last active favorite anchors "Orbital Knights"
+    And Alice pinned an alternative source
+    When that last favorite is removed
+    Then Alice library item preferences and source subscriptions are disabled
+    But public catalog and source history remain available to the system
+
+  Scenario: An incompatible audio variant is not an automatic fallback
+    Given Alice allows only Japanese audio with French subtitles
+    And the preferred origin is broken
+    And the only healthy origin has French audio without subtitles
+    When the resolver evaluates fallback
+    Then it does not automatically open the French audio origin
+    And the UI explains the compatibility rejection
+
+  Scenario: A second compatible origin does not duplicate notification
+    Given Alice was notified when episode 13 first became available in English
+    When a second compatible origin exposes the same logical episode
+    Then "Sources (N)" is updated
+    And no second default available-release notification is created
+
+  Scenario: A preferred origin can trigger an optional delayed alert
+    Given Alice enabled preferred-origin alerts for French
+    And Alice already received the default episode 13 alert
+    When the first compatible French origin becomes available
+    Then Alice receives one "PREFERRED_ORIGIN_AVAILABLE" event
+
+  Scenario: A private source stays bound to its installation
+    Given Alice extension verifies an authenticated personal source
+    When Bob searches alternatives for the same work
+    Then Bob never receives Alice private candidate URL evidence or availability
+
+  Scenario: Discovery respects approved domains and budget
+    Given a discovery run has six network operations and four approved domains
+    When a result points to an unapproved domain or the budget is exhausted
+    Then the result is rejected or deferred with a diagnostic
+    And no unrestricted fetch is attempted
+
+  Scenario: A member domain proposal requires administration
+    Given Alice proposes "fixture-official.test"
+    When the local administrator has not approved a connector
+    Then the domain remains pending
+    And no content script worker check or scheduled discovery uses it

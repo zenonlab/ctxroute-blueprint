@@ -73,6 +73,21 @@ Le choix ponctuel d'une ligne ne change pas l'étoile. Une migration de domaine 
 
 Une sortie seulement annoncée apparaît dans le calendrier avec `Planifié` et sans bouton de lecture. Le bouton `Ouvrir` apparaît après validation d'au moins une origine.
 
+### Découverte de sources
+
+```text
+┌ Trouver d'autres sources ───────────────────────────────────────┐
+│ Recherche terminée · 4 domaines · budget 6/6                  │
+├────────────────────────────────────────────────────────────────┤
+│ Vérifié   fixture-anime-alt · EN · public   [Voir] [Épingler] │
+│ À vérifier fixture-ambiguous · titre proche       [Examiner]  │
+│ Connecteur requis fixture-official                [Détails]   │
+│ Rejeté     œuvre de 1998 · année incompatible                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+`Épingler` explique que la cible sera surveillée tant que l'œuvre possède un favori actif. `Voir` ouvre ponctuellement sans créer d'abonnement. Chaque résultat permet d'afficher les preuves et raisons.
+
 ## Tri des candidats
 
 ```text

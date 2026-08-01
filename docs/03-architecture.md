@@ -53,7 +53,7 @@ La clé exacte de mutualisation est `(connector_id, connector_version, canonical
 ### API
 
 - Fastify, TypeScript, Zod et OpenAPI généré.
-- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Catalog, Library, Sources, Source Resolver, Cache, Releases, Progress, Notifications et Admin.
+- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Catalog, Library, Sources, Source Discovery, Source Resolver, Cache, Releases, Progress, Notifications et Admin.
 - contrôle d'accès systématique par `user_id`, jamais uniquement dans l'interface.
 
 ### Extension
@@ -137,12 +137,15 @@ FavLib/
     auth/
     bookmark-classifier/
     connectors/
+    source-discovery/
     metadata-anilist/
     catalog-core/
     test-kit/
     config/
   fixtures/
     bookmarks/
+    catalog/
+    discovery/
     sources/
   docs/
   infra/
@@ -187,11 +190,14 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 | `library_item` | statut personnel de l'œuvre |
 | `source_site` | domaine et capacités d'un connecteur |
 | `source_target` | connecteur/version/URL/locale/région/mode/variante à vérifier |
-| `user_subscription` | suivi personnel d'une cible |
+| `user_subscription` | suivi personnel d'une cible favorite, épinglée ou fallback accepté |
 | `user_source_preference` | langue, source/groupe épinglé et politique de fallback |
+| `source_domain_proposal` | domaine proposé par un membre et décision administrateur |
+| `source_discovery_run` | motif, initiateur, budget, checkpoint et diagnostic |
 | `source_alias` | migration ancienne → nouvelle cible avec preuve |
 | `source_health` | succès, erreurs, fraîcheur et quarantaine |
-| `source_candidate` | alternative publique autorisée pour une œuvre |
+| `source_candidate` | alternative avec état, score, raisons et scope public/personnel |
+| `source_candidate_evidence` | preuves versionnées d'inspection et de matching |
 | `source_snapshot` | résultat minimal d'une vérification |
 | `release` | chapitre ou épisode normalisé |
 | `release_announcement` | sortie planifiée/annoncée par un fournisseur |
@@ -227,6 +233,26 @@ favori candidat
 ```
 
 Le rendu Web et les imports suivants interrogent d'abord PostgreSQL. AniList complète le catalogue en arrière-plan ou sur un miss contrôlé, jamais une fois par carte affichée.
+
+## Flux de découverte
+
+```text
+œuvre favorite + trigger autorisé
+  → autres favoris personnels
+  → liens catalogue
+  → discover() des connecteurs actifs
+  → recherche optionnelle dans les domaines approuvés
+  → hints DISCOVERED
+  → contrôles réseau + inspect()
+  → matching canonique
+  → VERIFIED / NEEDS_REVIEW / REJECTED / PENDING_CONNECTOR
+  → affichage Sources (N)
+  → abonnement seulement après épinglage ou fallback accepté
+```
+
+La découverte ne tourne pas à chaque vérification. Un domaine sans connecteur reste en attente de sa sous-wave et ne devient pas une cible surveillée. Voir [ADR 0011](adr/0011-decouverte-et-surveillance-sources.md).
+
+Une même URL canonique découverte par plusieurs méthodes produit une candidate unique par contexte complet ; les preuves sont ajoutées séparément. Les scopes public et privé restent distincts.
 
 ## Flux de disponibilité
 

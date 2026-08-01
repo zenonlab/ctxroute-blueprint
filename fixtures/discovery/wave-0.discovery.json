@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "description": "Résultats synthétiques de découverte pour Orbital Knights, sans domaine ni œuvre réelle.",
+  "run": {
+    "mediaId": "orbital-knights-s1",
+    "trigger": "USER_REQUESTED",
+    "locale": "fr",
+    "region": "FR",
+    "budget": 6,
+    "approvedDomains": [
+      "fixture-anime.test",
+      "fixture-anime-alt.test",
+      "fixture-official.test",
+      "fixture-ambiguous.test"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "personal-alt",
+      "discoveredVia": "PERSONAL_BOOKMARK",
+      "url": "https://fixture-anime-alt.test/series/orbital-knights",
+      "connector": "fixture-anime-alt",
+      "evidence": ["external-id", "exact-alias", "type", "year"],
+      "accessMode": "PUBLIC",
+      "expectedState": "VERIFIED"
+    },
+    {
+      "id": "catalog-link-without-connector",
+      "discoveredVia": "CATALOG_EXTERNAL_LINK",
+      "url": "https://fixture-official.test/watch/orbital-knights",
+      "connector": null,
+      "evidence": ["catalog-external-link"],
+      "accessMode": "PUBLIC",
+      "expectedState": "PENDING_CONNECTOR"
+    },
+    {
+      "id": "web-strong-match",
+      "discoveredVia": "WEB_SEARCH",
+      "url": "https://fixture-anime-alt.test/series/orbital-knights",
+      "connector": "fixture-anime-alt",
+      "evidence": ["exact-alias", "type", "year", "canonical-parent"],
+      "accessMode": "PUBLIC",
+      "expectedState": "VERIFIED"
+    },
+    {
+      "id": "web-title-only",
+      "discoveredVia": "WEB_SEARCH",
+      "url": "https://fixture-ambiguous.test/show/orbital-knights-1998",
+      "connector": "fixture-ambiguous",
+      "evidence": ["similar-title", "conflicting-year"],
+      "accessMode": "PUBLIC",
+      "expectedState": "REJECTED"
+    },
+    {
+      "id": "authenticated-personal-source",
+      "discoveredVia": "PERSONAL_BOOKMARK",
+      "url": "https://fixture-anime.test/account/library/orbital-knights",
+      "connector": "fixture-anime",
+      "evidence": ["personal-bookmark", "exact-alias"],
+      "accessMode": "EXTENSION_PRIVATE",
+      "expectedState": "VERIFIED",
+      "expectedScope": "USER_INSTALLATION"
+    },
+    {
+      "id": "unapproved-domain",
+      "discoveredVia": "WEB_SEARCH",
+      "url": "https://unapproved-fixture.test/anime/orbital-knights",
+      "connector": null,
+      "evidence": ["search-title"],
+      "accessMode": "PUBLIC",
+      "expectedState": "REJECTED"
+    }
+  ]
+}

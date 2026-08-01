@@ -14,3 +14,4 @@ Les ADR enregistrent les décisions structurantes de FavLib.
 | [0008](0008-cache.md) | cache PostgreSQL multi-couche et contextualisé | accepté |
 | [0009](0009-resolution-multi-source.md) | sélection, alternatives et migration de source | accepté |
 | [0010](0010-catalogue-local-et-signaux-sortie.md) | catalogue local, alias et preuve de disponibilité | accepté |
+| [0011](0011-decouverte-et-surveillance-sources.md) | découverte contrôlée, surveillance et notifications | accepté |

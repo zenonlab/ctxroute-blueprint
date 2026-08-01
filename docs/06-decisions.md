@@ -15,7 +15,7 @@
 | Preuve de sortie | annonce catalogue distincte d'une origine disponible validée |
 | Ajout manuel | absent du parcours principal |
 | Progression | observée sur une page précise rattachée à une œuvre favorite, avec consentement |
-| Nouveautés | détectées par le connecteur de la source favorite |
+| Nouveautés | détectées par le connecteur d'une source surveillée |
 | Lecture/visionnage | ouverture sur le site d'origine |
 | Livraison | waves indépendamment testables |
 | Préfiltrage | tous les favoris examinés localement, seuls les candidats envoyés |
@@ -24,6 +24,10 @@
 | Confiance | l'administrateur système local peut accéder aux volumes |
 | Cache | extension + PostgreSQL + TanStack Query, sans Redis ni média tiers |
 | Multi-source | alternatives regroupées par sortie, préférence et fallback explicable |
+| Découverte | déclenchée et bornée, Web limité aux domaines approuvés |
+| Validation source | recherche = indice ; connecteur + matching fort = preuve |
+| Surveillance alternative | après épinglage/fallback accepté, avec favori d'œuvre toujours actif |
+| Notifications multi-source | une alerte compatible par défaut, alerte préférée tardive optionnelle |
 | Comick | aucun branchement sur une API non documentée ; audit Wave 8 requis |
 
 ## Conséquences techniques
@@ -35,14 +39,17 @@
 - les vérifications publiques sont mutualisées entre utilisateurs ;
 - la progression, l'inbox et les notifications restent personnelles ;
 - le service local multi-machine utilise HTTPS ;
-- aucune dépendance directe à l'identité Google n'est nécessaire.
+- aucune dépendance directe à l'identité Google n'est nécessaire ;
 - les sorties ne sont mutualisées qu'avec connecteur/version/URL/locale/région/mode identiques ;
-- l'arbre Chrome reste strictement en lecture seule.
+- l'arbre Chrome reste strictement en lecture seule ;
 - un fallback ponctuel ne change pas la préférence permanente ;
-- les migrations de domaine conservent un alias et une preuve.
+- les migrations de domaine conservent un alias et une preuve ;
 - un titre n'est jamais utilisé comme identifiant unique ;
 - les rendus Web interrogent le catalogue local au lieu d'appeler AniList ;
-- une annonce de diffusion accélère les checks mais ne prouve pas la disponibilité.
+- une annonce de diffusion accélère les checks mais ne prouve pas la disponibilité ;
+- retirer le dernier favori désactive tous les abonnements personnels de l'œuvre ;
+- ouvrir ponctuellement une alternative ne crée ni préférence ni abonnement ;
+- un domaine sans connecteur ne peut pas être surveillé automatiquement.
 
 ## Points à fournir avant la Wave 8
 

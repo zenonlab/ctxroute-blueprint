@@ -104,12 +104,33 @@ Pour une page précise, le connecteur retourne à la fois l'œuvre parente, sa c
 type PageKind = "work" | "chapter" | "episode" | "listing" | "other";
 type Evidence = "api" | "feed" | "structured-data" | "dom" | "bookmark";
 
+interface DiscoverInput {
+  mediaId: string;
+  externalIds: Array<{ provider: string; value: string }>;
+  titles: Array<{ text: string; language?: string; kind: string }>;
+  mediaType: "ANIME" | "MANGA";
+  format?: string;
+  year?: number;
+  locale: string;
+  region: string;
+  budget: number;
+}
+
+interface DiscoveryResult {
+  url: string;
+  title?: string;
+  externalId?: { provider: string; value: string };
+  language?: string;
+  evidence: Evidence[];
+}
+
 interface SourceConnector {
   id: string;
   domains: string[];
   version: string;
   canHandle(url: URL): boolean;
   classifyUrl(url: URL): PageKind | "unknown";
+  discover?(input: DiscoverInput): Promise<DiscoveryResult[]>;
   inspect(input: InspectInput): Promise<SourceInspection>;
   check(input: CheckInput): Promise<CheckResult>;
 }
@@ -147,6 +168,14 @@ interface CheckResult {
 
 Le connecteur décrit le site. Le cœur métier décide du matching, de la progression, de la déduplication et des notifications.
 
+## Découverte d'autres sites
+
+La découverte intervient au premier matching, sur action utilisateur, après panne durable de la source préférée, lors d'une migration ou à l'activation d'un connecteur. Elle examine favoris personnels, liens catalogue, `discover()` des connecteurs puis recherche Web optionnelle limitée aux domaines approuvés.
+
+Chaque URL trouvée est d'abord un hint `DISCOVERED`. Elle devient une source affichable après contrôles réseau, `inspect()`, canonicalisation et matching fort. Un domaine inconnu reste `PENDING_CONNECTOR` jusqu'à sa sous-wave. Un résultat ambigu va dans `NEEDS_REVIEW` ; un faux positif devient `REJECTED`.
+
+Ouvrir ponctuellement une origine ne l'abonne pas. L'épingler ou l'autoriser comme fallback peut créer sa surveillance, seulement si l'œuvre reste ancrée par un favori actif. Voir [ADR 0011](adr/0011-decouverte-et-surveillance-sources.md).
+
 ## Plusieurs sites et origines
 
 Plusieurs favoris ou catalogues autorisés peuvent rattacher des pages différentes au même `media`. Les sorties équivalentes sont regroupées en `release` logique, avec une `release_origin` par site, langue, édition ou groupe.
@@ -166,7 +195,7 @@ Une alternative enrichit uniquement une œuvre déjà présente grâce aux favor
 5. extraction locale par l'extension sur une page autorisée ;
 6. navigateur headless uniquement si le site l'autorise et si la valeur est démontrée.
 
-Un moteur de recherche n'est pas interrogé à chaque cycle. L'URL à vérifier provient du favori et de sa canonicalisation.
+Un moteur de recherche n'est pas interrogé à chaque cycle. Il sert uniquement à la découverte bornée ; l'URL de surveillance provient ensuite d'un favori ou d'une candidate validée et sélectionnée.
 
 Un favori Chrome ne change pas automatiquement lorsqu'un site publie. Il indique à FavLib quelle œuvre et quelle page canonique doivent être surveillées. C'est ensuite le connecteur qui constate la nouvelle sortie.
 

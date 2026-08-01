@@ -52,6 +52,7 @@ Objectif : tester les parcours avant les connecteurs.
 - tokens et composants shadcn/ui ;
 - shell officiel shadcn/ui `dashboard-01` adapté à FavLib ;
 - accueil, bibliothèque, œuvre précise, inbox et tri ;
+- états de découverte, candidates à vérifier et raisons de sélection ;
 - utilisateurs, appareils et diagnostics admin ;
 - responsive desktop/mobile ;
 - données fictives réalistes ;
@@ -104,6 +105,7 @@ Objectif : valider le contrat sans dépendre immédiatement d'un site réel.
 - extraction de positions ;
 - releases normales, décimales et spéciales ;
 - tests de parseur vide ou cassé.
+- `discover()` synthétique avec bonnes candidates, ambiguïtés et faux positifs ;
 
 Sortie : pipeline complet déterministe sur fixtures versionnées.
 
@@ -120,6 +122,8 @@ Objectif : détecter une nouvelle sortie de bout en bout.
 - regroupement des origines par sortie logique ;
 - import des annonces anime et scheduling proche de la diffusion ;
 - séparation vérifiée entre annonce et disponibilité réelle ;
+- moteur de découverte borné, états de candidates et budgets ;
+- surveillance d'une alternative seulement après épinglage/fallback accepté ;
 - résolveur de source préférée et fallback ;
 - fan-out vers les inbox personnelles.
 
@@ -143,6 +147,8 @@ Sortie : une observation précise et consentie avance la bonne progression sans 
 Objectif : ajouter les sites un par un.
 
 - une sous-wave par domaine ;
+- proposition de domaine membre → validation administrateur ;
+- implémentation et validation de `discover()` lorsqu'une méthode autorisée existe ;
 - recherche de catalogue seulement si API/méthode autorisée ;
 - API/RSS prioritaire ;
 - fixtures et tests de non-régression ;
@@ -158,6 +164,7 @@ Objectif : rendre l'installation locale fiable.
 
 - notifications Web et ntfy ;
 - digest et déduplication ;
+- option d'alerte différée pour l'origine préférée ;
 - audits SSRF/XSS/permissions ;
 - rotation des jetons ;
 - sauvegarde et restauration complète ;

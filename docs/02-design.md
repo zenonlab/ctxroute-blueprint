@@ -52,6 +52,7 @@ Sur mobile, une barre inférieure remplace la sidebar. L'action principale est �
 - `BookmarkPosition` : position déduite du favori ou d'une navigation consentie, niveau de confiance, statut observé et date.
 - `DeviceSession` : profil/installation appairé, dernière synchronisation et révocation.
 - `SourceResolver` : préférence, fallback proposé, score et raisons du choix.
+- `SourceDiscoveryPanel` : état du run, candidates vérifiées/ambiguës, preuves et action d'épinglage.
 
 ### Fiche œuvre
 
@@ -68,6 +69,8 @@ La route `/library/:mediaId` est le centre de décision pour une œuvre précise
 - action pour ouvrir la page exacte sur le site d'origine.
 
 Le menu `Sources (N)` affiche langue, site, édition/groupe, statut officiel vérifié, fraîcheur et santé. Un fallback automatique porte toujours un badge « Alternative » et ne remplace pas silencieusement la source épinglée.
+
+L'action « Trouver d'autres sources » affiche son budget/état sans bloquer la fiche. `PENDING_CONNECTOR`, `À vérifier`, `Rejeté` et `Vérifié` sont distincts. Une source épinglée explique qu'elle sera surveillée tant que l'œuvre reste favorite.
 
 ### Extension sur une page précise
 

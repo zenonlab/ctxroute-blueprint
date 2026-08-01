@@ -192,6 +192,34 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] alternative limitée aux favoris, cibles publiques redécouvrables et catalogues autorisés ;
 - [ ] API Comick non documentée refusée.
 
+## Découverte de sources
+
+- [ ] déclencheurs bornés et motif enregistré ;
+- [ ] action utilisateur asynchrone avec diagnostic ;
+- [ ] ordre favoris → catalogue → connecteurs → recherche Web ;
+- [ ] recherche Web limitée aux domaines approuvés ;
+- [ ] fournisseur de recherche interchangeable et clé côté serveur ;
+- [ ] titre/snippet de recherche jamais considéré comme preuve ;
+- [ ] contrôles SSRF avant toute inspection ;
+- [ ] `discover()` optionnel, versionné et testé sur fixtures ;
+- [ ] états `PENDING_CONNECTOR`, `NEEDS_REVIEW`, `VERIFIED` et `REJECTED` ;
+- [ ] preuves, score, raisons et transitions auditables ;
+- [ ] même URL/contexte : candidate unique et preuves multiples ;
+- [ ] candidates publique et privée jamais fusionnées ;
+- [ ] décision manuelle réversible ;
+- [ ] candidate seule sans bibliothèque, préférence ou abonnement ;
+- [ ] ouverture ponctuelle sans abonnement ;
+- [ ] épinglage/fallback accepté avec abonnement seulement si favori actif ;
+- [ ] dernier favori retiré : abonnements et préférences désactivés ;
+- [ ] audio, sous-titres, langue, édition et région compatibles avant fallback ;
+- [ ] première origine compatible : une alerte par défaut ;
+- [ ] origine suivante : `Sources (N)` seulement ;
+- [ ] alerte d'origine préférée tardive optionnelle ;
+- [ ] source privée liée à l'installation et jamais exposée ;
+- [ ] domaine proposé soumis à validation administrateur et sous-wave ;
+- [ ] budgets utilisateur/instance/domaine et cooldown ;
+- [ ] CAPTCHA/paywall/anti-bot produit un diagnostic, jamais un contournement.
+
 ## Inbox et notifications
 
 - [ ] inbox personnelle regroupée par œuvre ;
