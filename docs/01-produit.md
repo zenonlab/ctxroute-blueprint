@@ -27,6 +27,8 @@ L'application répond à trois questions :
 
 Un favori reconnu signifie que l'utilisateur souhaite voir l'œuvre dans sa bibliothèque FavLib.
 
+Une source alternative découverte pour cette œuvre peut apparaître dans `Sources (N)`, mais elle ne crée ni nouvelle œuvre de bibliothèque, ni abonnement, ni favori Chrome. L'appartenance reste toujours ancrée par au moins un favori personnel actif.
+
 ### 2. Source
 
 Le domaine et l'URL indiquent où l'utilisateur lit ou regarde cette œuvre. Le connecteur transforme éventuellement une URL de chapitre en URL canonique de fiche série.

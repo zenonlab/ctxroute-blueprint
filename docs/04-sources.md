@@ -66,6 +66,12 @@ Le service Metadata AniList doit :
 
 Une œuvre absente d'AniList peut être créée depuis les données fiables du connecteur du site, avec le statut `unmatched`.
 
+## Cache
+
+FavLib met en cache les recherches/métadonnées AniList, inspections d'URL, snapshots de disponibilité et échecs négatifs courts dans PostgreSQL. L'extension conserve seulement fingerprints et événements minimaux ; TanStack Query conserve les vues Web personnelles.
+
+Les caches sont contextualisés, expirables et invalidés par changement de favori, connecteur, locale, région ou canonicalisation. Le dernier snapshot valide reste visible avec son âge pendant une revalidation. Aucun HTML durable, image de chapitre, vidéo ou autre média tiers n'est mis en cache. Voir [ADR 0008](adr/0008-cache.md).
+
 ## Types de pages
 
 Chaque connecteur doit reconnaître explicitement :
@@ -126,6 +132,16 @@ interface CheckResult {
 ```
 
 Le connecteur décrit le site. Le cœur métier décide du matching, de la progression, de la déduplication et des notifications.
+
+## Plusieurs sites et origines
+
+Plusieurs favoris ou catalogues autorisés peuvent rattacher des pages différentes au même `media`. Les sorties équivalentes sont regroupées en `release` logique, avec une `release_origin` par site, langue, édition ou groupe.
+
+Le résolveur préfère la source épinglée, la prochaine sortie sans rupture, la langue/région choisie, une origine officielle lorsque ce statut est vérifié, puis la santé et la fraîcheur. Si la source préférée est indisponible, il propose ou utilise un fallback selon la préférence de l'utilisateur. Il n'altère ni progression, ni favori, ni préférence permanente. Voir [ADR 0009](adr/0009-resolution-multi-source.md).
+
+Une alternative provient seulement d'un autre favori personnel, d'une cible publique redécouvrable ou d'un catalogue/API autorisé. Une API Comick non documentée n'est pas une dépendance acceptable ; Comick devra suivre la procédure normale d'une sous-wave Wave 8.
+
+Une alternative enrichit uniquement une œuvre déjà présente grâce aux favoris de cet utilisateur. Elle ne devient jamais automatiquement une entrée de bibliothèque, un abonnement ou un favori.
 
 ## Ordre des méthodes de collecte
 

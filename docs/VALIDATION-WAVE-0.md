@@ -28,6 +28,7 @@
 | ordre global par simple numéro | release et curseur structurés par séquence | corrigé par ADR 0005 |
 | file et versioning ambigus | Graphile Worker et workflow Git par waves | corrigé par ADR 0006/0007 |
 | doctrine absente | règles obligatoires à la racine | corrigé par CLAUDE.md |
+| cache et bascule de source incomplets | cache contextualisé et résolveur explicable | corrigé par ADR 0008/0009 |
 
 ## Checklist d'acceptation utilisateur
 
@@ -38,5 +39,6 @@
 - [ ] L'administrateur de la machine locale est reconnu comme autorité de confiance.
 - [ ] L'installation d'un certificat Caddy sur chaque appareil local est acceptable.
 - [ ] Le découpage des waves et les wireframes sont approuvés.
+- [ ] Le cache sans média tiers et le menu multi-source/fallback sont approuvés.
 
 Une fois ces points confirmés par l'utilisateur, mettre à jour le registre de validation et créer le tag `wave-0-docs`.

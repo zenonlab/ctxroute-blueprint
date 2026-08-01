@@ -20,6 +20,9 @@
 | Jobs | Graphile Worker sur PostgreSQL |
 | Origine locale | `https://favlib.home.arpa` derrière Caddy |
 | Confiance | l'administrateur système local peut accéder aux volumes |
+| Cache | extension + PostgreSQL + TanStack Query, sans Redis ni média tiers |
+| Multi-source | alternatives regroupées par sortie, préférence et fallback explicable |
+| Comick | aucun branchement sur une API non documentée ; audit Wave 8 requis |
 
 ## Conséquences techniques
 
@@ -33,6 +36,8 @@
 - aucune dépendance directe à l'identité Google n'est nécessaire.
 - les sorties ne sont mutualisées qu'avec connecteur/version/URL/locale/région/mode identiques ;
 - l'arbre Chrome reste strictement en lecture seule.
+- un fallback ponctuel ne change pas la préférence permanente ;
+- les migrations de domaine conservent un alias et une preuve.
 
 ## Points à fournir avant la Wave 8
 

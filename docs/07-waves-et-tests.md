@@ -147,6 +147,20 @@ And un second job identique ne crée aucun doublon
 
 Tester également concurrence de workers, timeout, `429`, redirection interdite et reprise après crash transactionnel.
 
+### Cache et résolution multi-source
+
+- cache AniList partagé, mais aucune vue/progression personnelle partagée ;
+- hit, miss, expiration et invalidation par version de connecteur ;
+- deux jobs simultanés ne déclenchent qu'une recomputation par clé ;
+- un échec conserve le dernier snapshot valide et affiche son âge ;
+- deux origines du même chapitre apparaissent sous `Sources (2)` ;
+- source épinglée saine choisie en premier ;
+- source épinglée cassée : fallback proposé ou utilisé selon préférence ;
+- fallback ponctuel sans changement de préférence permanente ;
+- locale/région différente : snapshots distincts ;
+- source privée d'Alice jamais proposée à Bob ;
+- migration de domaine : alias, preuve, historique conservé et favori Chrome inchangé.
+
 ## Wave 7
 
 ### Scénarios critiques
@@ -185,6 +199,8 @@ Chaque sous-wave de connecteur doit joindre :
 - vérification des permissions de l'extension ;
 - aucun cookie tiers dans les sauvegardes ou journaux ;
 - fonctionnement documenté après redémarrage machine et indisponibilité réseau.
+- purge et métriques des tables de cache ;
+- aucune réponse ou sauvegarde contenant un média tiers mis en cache.
 
 ## Registre de validation
 

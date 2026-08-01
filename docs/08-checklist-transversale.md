@@ -134,6 +134,41 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] déclenchement manuel administrateur limité et journalisé ;
 - [ ] horloge de test contrôlable.
 
+## Cache
+
+- [ ] cache extension limité aux fingerprints et événements minimaux ;
+- [ ] `chrome.storage.local` jamais présenté comme chiffré ;
+- [ ] cache AniList avec TTL, provenance et version de normalisation ;
+- [ ] cache d'inspection et snapshot indexés par contexte complet ;
+- [ ] cache négatif court ;
+- [ ] `Retry-After` respecté ;
+- [ ] dernier snapshot valide conservé après erreur ;
+- [ ] âge/stale visible dans l'interface ;
+- [ ] invalidation favori/connecteur/locale/région/canonicalisation ;
+- [ ] verrou anti-stampede ;
+- [ ] purge planifiée et métriques de taille ;
+- [ ] aucune progression ou vue personnelle sous une clé publique ;
+- [ ] aucun HTML durable, page, image de chapitre ou vidéo mis en cache ;
+- [ ] Redis absent sans mesure et ADR.
+
+## Changement de source
+
+- [ ] plusieurs origines regroupées sous une sortie logique ;
+- [ ] menu `Sources (N)` avec site, langue, édition/groupe et fraîcheur ;
+- [ ] source globale préférée et surcharge par œuvre ;
+- [ ] source épinglée prioritaire lorsqu'elle possède la sortie exacte ;
+- [ ] continuité avant fraîcheur brute ;
+- [ ] statut officiel utilisé seulement s'il est vérifié ;
+- [ ] fallback autorisable/refusable par utilisateur ;
+- [ ] fallback affiché et raisons consultables ;
+- [ ] fallback ponctuel sans modifier la préférence ;
+- [ ] source privée jamais mutualisée ou proposée ailleurs ;
+- [ ] changement de source sans progression automatique ;
+- [ ] migration d'URL avec alias, preuve et rollback ;
+- [ ] favori Chrome jamais réécrit ;
+- [ ] alternative limitée aux favoris, cibles publiques redécouvrables et catalogues autorisés ;
+- [ ] API Comick non documentée refusée.
+
 ## Inbox et notifications
 
 - [ ] inbox personnelle regroupée par œuvre ;

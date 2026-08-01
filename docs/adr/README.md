@@ -11,3 +11,5 @@ Les ADR enregistrent les décisions structurantes de FavLib.
 | [0005](0005-identite-sorties.md) | identité et ordre des sorties | accepté |
 | [0006](0006-file-jobs.md) | Graphile Worker sans Redis | accepté |
 | [0007](0007-versioning-waves.md) | versioning et validation des waves | accepté |
+| [0008](0008-cache.md) | cache PostgreSQL multi-couche et contextualisé | accepté |
+| [0009](0009-resolution-multi-source.md) | sélection, alternatives et migration de source | accepté |

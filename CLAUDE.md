@@ -14,6 +14,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 ## Invariants métier
 
 - Le favori établit l'appartenance et la source à surveiller.
+- Une origine alternative peut enrichir une œuvre déjà favorite, mais ne crée jamais seule une œuvre, un abonnement ou un favori.
 - Le connecteur de la source détecte les sorties disponibles.
 - La progression est personnelle et distincte de la disponibilité.
 - Une page précise favorite ou une navigation consentie sur la même œuvre peut produire une observation de progression.
@@ -21,6 +22,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Une régression de progression n'est jamais silencieuse.
 - Une sortie spéciale ou d'une autre saison n'est jamais comparée par un simple maximum numérique.
 - Une source cassée ne doit jamais être présentée comme une absence de nouveauté.
+- Un changement de source ne modifie jamais silencieusement progression, favori ou préférence permanente.
 
 ## Multi-utilisateur
 
@@ -54,6 +56,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Chaque connecteur est versionné, testé sur fixtures et activable par feature flag.
 - La clé de mutualisation inclut connecteur, version, URL canonique, locale, région et mode d'accès.
 - Les résultats personnalisés, authentifiés ou dépendants d'une extension ne sont jamais partagés entre utilisateurs.
+- Le résolveur multi-source utilise seulement favoris personnels, cibles publiques redécouvrables et catalogues autorisés.
 - Les requêtes ont délai, taille, redirections et budget par domaine limités.
 - SSRF, DNS rebinding et redirections vers IP privées sont bloqués sauf cible administrée explicitement.
 
@@ -72,6 +75,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Fastify, Zod, PostgreSQL et Drizzle ORM.
 - WXT Manifest V3 pour l'extension.
 - Graphile Worker pour les jobs PostgreSQL ; ne pas ajouter Redis sans ADR.
+- Les caches V1 utilisent extension + PostgreSQL + TanStack Query ; aucun média tiers n'est mis en cache.
 - Caddy pour le reverse proxy et le TLS local.
 - Vitest, Testing Library et Playwright pour les tests.
 

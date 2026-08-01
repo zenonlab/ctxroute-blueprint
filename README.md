@@ -6,6 +6,8 @@ Chaque utilisateur installe l'extension dans son profil Chrome et l'appaire à s
 
 FavLib n'héberge et ne fournit aucun contenu. Il détecte les sorties, conserve la progression déduite des favoris et ouvre la page d'origine.
 
+Une œuvre peut regrouper plusieurs sites, langues, éditions ou groupes. FavLib met en cache uniquement métadonnées et disponibilité, puis choisit ou propose la meilleure origine au moment d'ouvrir ; aucun contenu média tiers n'est mis en cache ou servi.
+
 ## Documentation
 
 - [Vision et règles produit](docs/01-produit.md)
@@ -30,7 +32,8 @@ favoris Chrome de chaque utilisateur
   → candidats médias → tri API/site + matching AniList
   → œuvre + source suivie
   → worker de vérification mutualisé
-  → nouvelle sortie dans l'inbox de chaque utilisateur
+  → regroupement des origines par sortie
+  → nouvelle sortie + alternatives dans l'inbox
 ```
 
 Un favori vers une fiche d'œuvre signifie « je suis cette œuvre ». Un favori vers un chapitre ou épisode précis indique également une position. Après consentement, l'extension peut aussi observer une page suivante appartenant à cette même œuvre favorite et avancer une progression marquée « observée ». La nouveauté disponible est détectée par le connecteur du site, pas par une modification du favori.

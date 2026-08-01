@@ -11,6 +11,16 @@
       "expectedMediaHint": "ANIME"
     },
     {
+      "id": "anime-work-alternative",
+      "title": "Orbital Knights (English source)",
+      "url": "https://fixture-anime-alt.test/series/orbital-knights",
+      "expectedLocalDecision": "candidate",
+      "expectedPageKind": "work",
+      "expectedMediaHint": "ANIME",
+      "expectedCanonicalMedia": "orbital-knights",
+      "expectedLocale": "en"
+    },
+    {
       "id": "anime-episode",
       "title": "Orbital Knights - Episode 11",
       "url": "https://fixture-anime.test/watch/orbital-knights/episode-11",

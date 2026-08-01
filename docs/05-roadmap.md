@@ -111,7 +111,10 @@ Objectif : détecter une nouvelle sortie de bout en bout.
 - scheduler, verrou et limites par domaine ;
 - snapshots valides et quarantaine ;
 - diff et déduplication ;
+- caches PostgreSQL, TTL, invalidation et anti-stampede ;
 - mutualisation d'une cible entre utilisateurs ;
+- regroupement des origines par sortie logique ;
+- résolveur de source préférée et fallback ;
 - fan-out vers les inbox personnelles.
 
 Sortie : une seule vérification crée la bonne nouveauté chez plusieurs abonnés, sans fuite croisée.
@@ -134,13 +137,14 @@ Sortie : une observation précise et consentie avance la bonne progression sans 
 Objectif : ajouter les sites un par un.
 
 - une sous-wave par domaine ;
+- recherche de catalogue seulement si API/méthode autorisée ;
 - API/RSS prioritaire ;
 - fixtures et tests de non-régression ;
 - feature flag ;
 - tableau de santé ;
 - validation manuelle avant le connecteur suivant.
 
-Sortie de chaque sous-wave : un site réel peut reconnaître ses pages, surveiller ses sorties et expliquer ses erreurs.
+Sortie de chaque sous-wave : un site réel peut reconnaître ses pages, surveiller ses sorties, participer au menu `Sources (N)` et expliquer ses erreurs.
 
 ## Wave 9 — notifications et durcissement
 

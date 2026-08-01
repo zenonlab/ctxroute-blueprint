@@ -49,13 +49,27 @@ Ces wireframes fixent la structure et les états à tester avant le look final s
 ├ Sources ─────────────────────────────────────────────────────────┤
 │ fixture-anime · FR · sain · vérifié il y a 2 h                  │
 ├ Sorties ─────────────────────────────────────────────────────────┤
-│ 12  Nouveau     fixture-anime                       [Ouvrir]      │
+│ 12  Nouveau     fixture-anime · Sources (2)         [Ouvrir ▾]  │
 │ 11  Observé     fixture-anime                       [Ouvrir]      │
 │ SP-3 Spécial    hors séquence principale            [Ouvrir]      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 La disponibilité, la progression observée et la confirmation future doivent rester visuellement distinctes.
+
+### Menu de sources
+
+```text
+┌ Sources pour épisode 12 ──────────────────────────────┐
+│ ★ Site favori · FR · sain · vérifié il y a 2 h       │
+│   Site officiel · EN · sain · vérifié il y a 1 h     │
+│   Alternative · FR · obsolète · vérifié hier         │
+│                                                       │
+│ Fallback automatique : autorisé                       │
+└───────────────────────────────────────────────────────┘
+```
+
+Le choix ponctuel d'une ligne ne change pas l'étoile. Une migration de domaine est présentée séparément avec sa preuve.
 
 ## Tri des candidats
 

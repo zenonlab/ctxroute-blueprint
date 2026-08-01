@@ -42,7 +42,7 @@ Sur mobile, une barre inférieure remplace la sidebar. L'action principale est �
 ### Composants essentiels
 
 - `MediaCard` : affiche, progression, statut et badge de nouveauté.
-- `ReleaseRow` : numéro, date, langue, source et action « ouvrir ».
+- `ReleaseRow` : numéro, date, source retenue, menu `Sources (N)` et action « ouvrir ».
 - `SourceBadge` : site, santé du connecteur et dernière vérification.
 - `ProgressControl` : dernier chapitre/épisode vu et ajustement rapide.
 - `UpdateInbox` : nouveautés regroupées par œuvre, jamais par simple chronologie brute.
@@ -50,6 +50,7 @@ Sur mobile, une barre inférieure remplace la sidebar. L'action principale est �
 - `BookmarkCandidate` : favori détecté, site, correspondance proposée et score de confiance.
 - `BookmarkPosition` : position déduite du favori ou d'une navigation consentie, niveau de confiance, statut observé et date.
 - `DeviceSession` : profil/installation appairé, dernière synchronisation et révocation.
+- `SourceResolver` : préférence, fallback proposé, score et raisons du choix.
 
 ### Fiche œuvre
 
@@ -60,9 +61,12 @@ La route `/library/:mediaId` est le centre de décision pour une œuvre précise
 - sites et pages canoniques détectés ;
 - position observée, origine du signal et statut de confirmation ;
 - dernière sortie disponible par source ;
+- alternatives regroupées pour chaque sortie logique ;
 - nombre de sorties après la progression ;
 - historique de détection et dernier diagnostic ;
 - action pour ouvrir la page exacte sur le site d'origine.
+
+Le menu `Sources (N)` affiche langue, site, édition/groupe, statut officiel vérifié, fraîcheur et santé. Un fallback automatique porte toujours un badge « Alternative » et ne remplace pas silencieusement la source épinglée.
 
 ### Extension sur une page précise
 

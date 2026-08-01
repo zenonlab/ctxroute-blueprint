@@ -39,6 +39,8 @@ source_target public + URL canonique
 
 Une page publique identique suivie par plusieurs comptes est récupérée une seule fois. Les favoris, positions, statuts et notifications restent personnels. Une source nécessitant une session utilisateur n'est pas récupérée par le worker commun ; seul un connecteur local d'extension peut fournir des métadonnées minimales, sans transmettre les cookies.
 
+La clé exacte de mutualisation est `(connector_id, connector_version, canonical_check_url, locale, region, access_mode, representation_variant)`. Elle est définie par [ADR 0004](adr/0004-mutualisation-sources.md).
+
 ## Composants
 
 ### Application Web
@@ -51,7 +53,7 @@ Une page publique identique suivie par plusieurs comptes est récupérée une se
 ### API
 
 - Fastify, TypeScript, Zod et OpenAPI généré.
-- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Library, Sources, Releases, Progress, Notifications et Admin.
+- modules Auth, Users, Devices, Bookmark Ingestion, Classification, Library, Sources, Source Resolver, Cache, Releases, Progress, Notifications et Admin.
 - contrôle d'accès systématique par `user_id`, jamais uniquement dans l'interface.
 
 ### Extension
@@ -179,6 +181,10 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 | `source_site` | domaine et capacités d'un connecteur |
 | `source_target` | connecteur/version/URL/locale/région/mode/variante à vérifier |
 | `user_subscription` | suivi personnel d'une cible |
+| `user_source_preference` | langue, source/groupe épinglé et politique de fallback |
+| `source_alias` | migration ancienne → nouvelle cible avec preuve |
+| `source_health` | succès, erreurs, fraîcheur et quarantaine |
+| `source_candidate` | alternative publique autorisée pour une œuvre |
 | `source_snapshot` | résultat minimal d'une vérification |
 | `release` | chapitre ou épisode normalisé |
 | `release_origin` | disponibilité d'une sortie sur une cible |
@@ -186,6 +192,17 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 | `user_progress` | progression personnelle consolidée |
 | `check_run` | diagnostic d'une vérification |
 | `notification_event` | événement personnel dédupliqué |
+
+### Cache
+
+| Entité | Rôle |
+|---|---|
+| `metadata_cache` | réponses AniList normalisées, TTL et provenance |
+| `source_inspection_cache` | canonicalisation et type de page contextualisés |
+| `source_snapshot` | dernier état valide et validators HTTP |
+| `negative_cache` | échec temporaire court avec raison |
+
+Les caches PostgreSQL n'ajoutent pas de copie média. Les clés, TTL et invalidations sont définis par [ADR 0008](adr/0008-cache.md).
 
 ## Flux de disponibilité
 
@@ -198,8 +215,12 @@ scheduler
   → diff avec dernier snapshot valide
   → transaction releases
   → fan-out user_subscription
+  → regroupement release_origin
+  → résolution préférence/fallback
   → inbox/notification par utilisateur
 ```
+
+Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin d'éviter un lien obsolète. La stratégie complète est définie par [ADR 0009](adr/0009-resolution-multi-source.md).
 
 ## Isolation et sécurité
 
