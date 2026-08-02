@@ -15,4 +15,4 @@ FROM node:24-alpine
 WORKDIR /app
 RUN apk add --no-cache age postgresql-client && corepack enable
 COPY --from=build /app ./
-CMD ["node","apps/api/dist/src/server.js"]
+CMD ["sh","-c","node apps/api/dist/src/migrate.js && exec node apps/api/dist/src/server.js"]
