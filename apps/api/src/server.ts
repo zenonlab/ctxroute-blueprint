@@ -2,7 +2,7 @@ import Fastify from 'fastify'; import cookie from '@fastify/cookie'; import { Po
 const pool = new Pool({connectionString:process.env.DATABASE_URL ?? 'postgres://favlib:favlib@localhost:5432/favlib'});
 const app=Fastify({logger:{redact:['req.headers.cookie','*.password','*.token']},bodyLimit:2*1024*1024}); await app.register(cookie);
 const origin=process.env.FAVLIB_BASE_URL ?? 'https://favlib.home.arpa';
-const pairingUrl=(id:string)=>`${origin}/pairing/extension?challenge=${encodeURIComponent(id)}`;
+const pairingUrl=(id:string)=>`${origin}/settings?pairing=${encodeURIComponent(id)}#extension`;
 app.addHook('onRequest',async(req,reply)=>{ const id=typeof req.headers['x-request-id']==='string'&&/^[A-Za-z0-9._-]{1,80}$/.test(req.headers['x-request-id'])?req.headers['x-request-id']: `req_${randomUUID()}`; reply.header('X-Request-Id',id); (req as any).requestId=id; });
 function err(reply:any,status:number,code:string,message='La requête est invalide.',fields:any[]=[]){return reply.code(status).send({error:{code,message,requestId:(reply as any).request?.requestId??'unknown',fields}})}
 async function auth(req:any,reply:any){ const raw=req.cookies['__Host-favlib_session']; if(!raw)return err(reply,401,'UNAUTHENTICATED','Authentification requise.'); const r=await pool.query('SELECT u.id,u.email,u.role,s.id session_id,s.csrf_hash FROM user_session s JOIN app_user u ON u.id=s.user_id WHERE s.token_hash=$1 AND u.active AND s.revoked_at IS NULL AND s.expires_at>now() AND s.absolute_expires_at>now()', [digest(raw)]); if(!r.rowCount)return err(reply,401,'UNAUTHENTICATED','Authentification requise.'); req.user=r.rows[0]; }
