@@ -26,8 +26,8 @@ favori brut dans l'extension
   → extraction d'un titre candidat et d'une position éventuelle
   → inspection par le connecteur du site
   → recherche catalogue local multi-alias
-  → miss/ambigu : recherche AniList ANIME ou MANGA
-  → hydratation du catalogue local
+  → miss/ambigu : fournisseur autorisé, si disponible
+  → cache fournisseur borné + enrichissement selon sa politique
   → score de correspondance
   → reconnu / à vérifier / ignoré
 ```
@@ -57,32 +57,36 @@ Les seuils numériques seront déterminés sur un jeu de favoris anonymisé, pas
 
 PostgreSQL contient un index partagé `media` + `media_title` + `external_id` + `media_relation` + `source_media_alias`. Il permet de reconnaître le titre natif, romaji, anglais, français et les synonymes ou slugs utilisés par chaque site. Les formes normalisées servent à chercher ; les graphies originales et leur provenance restent conservées.
 
-L'[API GraphQL AniList](https://docs.anilist.co/reference/object/media) enrichit cet index : titres officiels, synonymes, type, format, statut, pays, saison, relations, affiche, identifiant MAL et prochaine diffusion lorsqu'elle existe. Elle sert au matching, mais un titre n'est pas unique et AniList n'est pas une source universelle pour savoir sur quel site une œuvre est disponible.
+L'[API GraphQL AniList](https://docs.anilist.co/reference/object/media) peut fournir titres, synonymes, type, format, statut, pays, saison, relations, affiche, identifiant MAL et prochaine diffusion. Cet adaptateur reste désactivé tant que la politique FavLib n'est pas `AUTHORIZED`; l'accès technique ou le respect du rate limit ne suffit pas. AniList ne constitue ni le stockage durable de FavLib ni une source universelle de disponibilité.
 
-Le service Metadata AniList doit :
+Une fois explicitement autorisé, le service Metadata AniList doit :
 
-- mettre les résultats en cache ;
+- mettre les résultats en cache seulement si la politique l'autorise, avec son TTL maximal ;
 - regrouper les requêtes ;
 - respecter les en-têtes et limitations officielles ;
 - appliquer un backoff sur `429` ;
 - fonctionner en mode dégradé lorsque l'API est indisponible ;
 - ne jamais bloquer l'import complet des favoris.
 
-Le catalogue est hydraté à la demande, préchauffable pour les œuvres populaires/en cours, puis rafraîchi selon statut. Un miroir intégral n'est lancé que depuis une source explicitement autorisée. Voir [ADR 0010](adr/0010-catalogue-local-et-signaux-sortie.md).
+Le catalogue durable est alimenté par favoris, connecteurs approuvés, corrections auditées et datasets dont la rétention est permise. Le préchauffage, la synchronisation planifiée et la rétention AniList restent interdits sans autorisation documentée. Voir [ADR 0010](adr/0010-catalogue-local-et-signaux-sortie.md) et [ADR 0012](adr/0012-conformite-fournisseurs-metadonnees.md).
+
+La revue élargie retient les releases MADB actuelles, Wikidata CC0, la BnF et les données bibliographiques ouvertes de la NDL comme candidats du socle durable. IMDb peut ajouter une couche anime quotidienne non commerciale, isolée et facultative ; la National Library of Korea est la prochaine base à qualifier pour le coréen. TVmaze est le candidat calendrier anime et MangaUpdates le candidat de matching/signaux manga, manhwa et manhua à la demande ; ils restent séparés du noyau jusqu'à création de leur politique `AUTHORIZED`, notamment pour le ShareAlike TVmaze et l'absence de droit de miroir MangaUpdates. Les restrictions figurent dans [12-api-fournisseurs-et-stack.md](12-api-fournisseurs-et-stack.md) et les imports dans [13-jeux-de-donnees-et-imports.md](13-jeux-de-donnees-et-imports.md).
 
 Une œuvre absente d'AniList peut être créée depuis les données fiables du connecteur du site, avec le statut `unmatched`.
 
 ## Annonce et disponibilité
 
-- `release_announcement` : épisode futur annoncé, utile au calendrier et au scheduling ;
+- `release_announcement` : épisode planifié ou release déclarée par un fournisseur, utile au calendrier et au scheduling ;
 - `release_origin` : épisode ou chapitre effectivement vu par un connecteur sur un site ;
 - `notification_event` : nouveauté personnelle créée après une nouvelle origine valide et dédupliquée.
 
-Pour un anime, `nextAiringEpisode` rapproche automatiquement la prochaine vérification du site. Pour un manga, manhwa ou manhua, AniList ne remplace pas l'API, le flux ou la page de sorties du site suivi. Une annonce n'est jamais affichée comme « disponible » sans origine validée.
+Pour un anime, `nextAiringEpisode` peut rapprocher la prochaine vérification lorsque son fournisseur est autorisé. Pour un manga, manhwa ou manhua, un catalogue ne remplace pas l'API, le flux ou la page de sorties du site suivi. Une annonce n'est jamais affichée comme « disponible » sans origine validée.
+
+Un événement Chrome de favori prouve seulement que l'utilisateur a changé son favori. Il ne signale jamais que le contenu distant de la page a changé. TVmaze ou MangaUpdates peuvent déclencher une vérification anticipée, mais seul le connecteur de la source favorite produit une `release_origin` disponible.
 
 ## Cache
 
-FavLib met en cache les recherches/métadonnées AniList, inspections d'URL, snapshots de disponibilité et échecs négatifs courts dans PostgreSQL. L'extension conserve seulement fingerprints et événements minimaux ; TanStack Query conserve les vues Web personnelles.
+FavLib met en cache les réponses d'un fournisseur autorisé dans les limites de sa politique, ainsi que les inspections d'URL, snapshots de disponibilité et échecs négatifs courts dans PostgreSQL. L'extension conserve seulement fingerprints et événements minimaux ; TanStack Query conserve les vues Web personnelles.
 
 Les caches sont contextualisés, expirables et invalidés par changement de favori, connecteur, locale, région ou canonicalisation. Le dernier snapshot valide reste visible avec son âge pendant une revalidation. Aucun HTML durable, image de chapitre, vidéo ou autre média tiers n'est mis en cache. Voir [ADR 0008](adr/0008-cache.md).
 
@@ -102,7 +106,25 @@ Pour une page précise, le connecteur retourne à la fois l'œuvre parente, sa c
 
 ```ts
 type PageKind = "work" | "chapter" | "episode" | "listing" | "other";
-type Evidence = "api" | "feed" | "structured-data" | "dom" | "bookmark";
+type ExtractionEvidenceKind = "api" | "feed" | "structured-data" | "dom" | "bookmark";
+type MatchEvidenceKind =
+  | "external-id"
+  | "exact-alias"
+  | "similar-title"
+  | "type"
+  | "year"
+  | "conflicting-year"
+  | "canonical-parent"
+  | "catalog-external-link"
+  | "personal-bookmark"
+  | "search-title";
+
+interface MatchEvidence {
+  kind: MatchEvidenceKind;
+  value?: string;
+  source: "bookmark" | "catalog" | "connector" | "web-search";
+  confidence: number;
+}
 
 interface DiscoverInput {
   mediaId: string;
@@ -121,7 +143,8 @@ interface DiscoveryResult {
   title?: string;
   externalId?: { provider: string; value: string };
   language?: string;
-  evidence: Evidence[];
+  extractionEvidence: ExtractionEvidenceKind[];
+  matchEvidence: MatchEvidence[];
 }
 
 interface SourceConnector {
@@ -146,7 +169,25 @@ interface SourceInspection {
     normalized?: string;
     confidence: number;
   };
-  evidence: Evidence[];
+  extractionEvidence: ExtractionEvidenceKind[];
+  matchEvidence: MatchEvidence[];
+}
+
+interface ReleaseOriginRepresentation {
+  contentLanguage?: string;
+  audioLanguages?: string[];
+  subtitleLanguages?: string[];
+  region?: string;
+  edition?: string;
+  group?: string;
+  censorship?: string;
+  quality?: string;
+  accessMode: "public_shared" | "extension_private";
+  representationVariant: string;
+  officialStatus?: {
+    value: "OFFICIAL" | "UNOFFICIAL" | "UNKNOWN";
+    provenance?: string;
+  };
 }
 
 interface CheckResult {
@@ -157,11 +198,18 @@ interface CheckResult {
     kind: "chapter" | "episode";
     label: string;
     numberRaw?: string;
-    numberNormalized?: string;
+    sequenceKey: string;
+    volumeKey?: string;
+    numberDecimal?: string;
+    partKey?: string;
+    specialKey?: string;
+    sortKey: string;
+    identityConfidence: number;
     publishedAt?: string;
     url: string;
+    representation: ReleaseOriginRepresentation;
   }>;
-  evidence: Evidence[];
+  extractionEvidence: ExtractionEvidenceKind[];
   checkedAt: string;
 }
 ```
@@ -215,6 +263,8 @@ Si la page n'est pas favorite et ne correspond pas à l'œuvre parente d'un favo
 
 Les requêtes vers le serveur FavLib local partent du service worker de l'extension avec une permission d'hôte limitée à l'origine configurée. Les content scripts n'obtiennent jamais un proxy réseau arbitraire.
 
+Pour une cible privée, le service worker utilise une alarme coarse best effort, acquiert un lease par cycle et envoie les résultats via une file idempotente. Une page authentifiée est observée dans un onglet ouvert ou par `extension_fetch` seulement si le connecteur a prouvé ce mode compatible ; sinon elle reste `WAITING_FOR_VISIT`. Appareil hors ligne, permission manquante et authentification expirée sont affichés distinctement ; voir [ADR 0013](adr/0013-surveillance-extension-privee.md).
+
 ## Détection de progression par favori
 
 La décision complète est définie par [ADR 0001](adr/0001-progression-contextuelle.md).
@@ -243,7 +293,7 @@ Une page précise ouverte peut avancer une progression `observed` si le connecte
 ## Surveillance des sorties
 
 - cible publique vérifiée toutes les 6 à 12 heures avec jitter ;
-- priorité adaptée aux horaires de diffusion AniList lorsqu'ils existent ;
+- priorité adaptée aux horaires d'un fournisseur autorisé lorsqu'ils existent ;
 - cible terminée ou inactive vérifiée moins souvent ;
 - requêtes conditionnelles avec `ETag` et `Last-Modified` ;
 - verrou et budget réseau par domaine ;

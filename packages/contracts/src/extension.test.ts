@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { hashPairingCode, pairingCode, toMediaBookmark } from './extension.js';
+describe('Wave 3 contracts',()=>{it('uses random, eight digit, salted one-way codes',()=>{const c=pairingCode(new Uint8Array([1,2,3,4,5]));expect(c).toMatch(/^\d{8}$/);expect(hashPairingCode(c,'salt')).not.toBe(c)});it('does not export non-media bookmarks',()=>expect(toMediaBookmark({id:'1',title:'Docs',url:'https://example.test/docs'})).toBeNull());it('exports only needed metadata',()=>expect(toMediaBookmark({id:'1',title:'Anime ep 1',url:'https://example.test/watch/1'})).toMatchObject({id:'1',event:'created'}))});

@@ -7,8 +7,10 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - FavLib est privé, local et multi-utilisateur.
 - Il suit mangas, manhwa, manhua et anime à partir des favoris Chrome/Google.
 - Tous les favoris URL sont examinés localement ; seuls les candidats médias nécessaires quittent l'extension.
-- AniList enrichit et aide au matching, mais ne bloque jamais une œuvre ou un import.
+- AniList peut enrichir et aider au matching uniquement après validation de sa politique fournisseur ; il est désactivé par défaut et ne bloque jamais une œuvre ou un import.
 - PostgreSQL maintient un catalogue canonique local de titres, synonymes, identifiants et relations ; un titre seul n'est jamais une identité unique.
+- Toute métadonnée durable conserve une provenance autorisant sa rétention ; rate limit et accessibilité technique ne valent pas autorisation.
+- Tout dump est importé par release vérifiée, staging et assertions à provenance champ par champ ; il n'écrit jamais directement dans le catalogue canonique.
 - Une annonce catalogue alimente le calendrier ; seule une origine validée par connecteur affirme qu'une sortie est disponible sur un site.
 - FavLib n'héberge, ne télécharge, n'extrait ni ne republie aucun média tiers.
 - Aucun contournement d'authentification, paywall, CAPTCHA, DRM ou protection anti-bot.
@@ -26,6 +28,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Une régression de progression n'est jamais silencieuse.
 - Une sortie spéciale ou d'une autre saison n'est jamais comparée par un simple maximum numérique.
 - Une source cassée ne doit jamais être présentée comme une absence de nouveauté.
+- Une source authentifiée non vérifiable sans visite reste `WAITING_FOR_VISIT`; l'extension ne promet jamais une surveillance continue qu'elle ne peut assurer.
 - Un changement de source ne modifie jamais silencieusement progression, favori ou préférence permanente.
 
 ## Multi-utilisateur
@@ -35,6 +38,8 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - Les métadonnées et vérifications publiques peuvent être partagées uniquement avec un contexte de collecte identique.
 - L'administrateur d'infrastructure local est dans le périmètre de confiance et peut techniquement accéder à la base et aux sauvegardes. L'interface administrateur ne doit toutefois pas exposer les favoris personnels.
 - Pas d'inscription publique ; comptes par invitation administrateur.
+- Aucun compte ou mot de passe par défaut ; le bootstrap du premier administrateur est local, interactif et refusé dès qu'un compte existe.
+- Sessions Web opaques hachées côté serveur ; secrets d'installation distincts, à scopes réduits et révocables.
 
 ## Extension et favoris
 
@@ -58,8 +63,11 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 
 - Ordre obligatoire : API officielle, webhook/RSS, JSON structuré, HTML statique, extension, puis headless exceptionnel.
 - Chaque connecteur est versionné, testé sur fixtures et activable par feature flag.
+- Chaque fournisseur de métadonnées est bloqué par défaut jusqu'à une politique versionnée couvrant usages, rétention, attribution et purge.
+- Une limite fournisseur inconnue ou non vérifiée bloque les jobs planifiés ; un plafond FavLib conservateur ne remplace pas l'autorisation du fournisseur.
 - La clé de mutualisation inclut connecteur, version, URL canonique, locale, région et mode d'accès.
 - Les résultats personnalisés, authentifiés ou dépendants d'une extension ne sont jamais partagés entre utilisateurs.
+- Une surveillance `extension_private` est best effort, planifiée localement, idempotente et affichée comme périmée lorsque l'appareil ne peut pas vérifier.
 - Le résolveur multi-source utilise seulement favoris personnels, cibles publiques redécouvrables et catalogues autorisés.
 - La découverte n'est pas exécutée à chaque cycle ; un résultat de recherche Web reste un indice jusqu'à validation par connecteur et matching fort.
 - Les requêtes ont délai, taille, redirections et budget par domaine limités.
@@ -82,6 +90,7 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 - WXT Manifest V3 pour l'extension.
 - Graphile Worker pour les jobs PostgreSQL ; ne pas ajouter Redis sans ADR.
 - Les caches V1 utilisent extension + PostgreSQL + TanStack Query ; aucun média tiers n'est mis en cache.
+- Les datasets bruts restent hors Git, sont bornés en taille et activés par batch atomique avec rollback ; une licence incompatible reste isolée et purgeable.
 - Caddy pour le reverse proxy et le TLS local.
 - Vitest, Testing Library et Playwright pour les tests.
 
@@ -97,7 +106,10 @@ Ce fichier est la doctrine obligatoire du dépôt. En cas de contradiction, une 
 
 - Une seule wave de produit à la fois.
 - Chaque wave fournit migrations, seed/fixtures, tests automatiques, checklist manuelle, limites connues et retour arrière.
+- Une sauvegarde n'est saine qu'après checksum, déchiffrement et restauration réussie sur une base neuve ; créer un fichier ne suffit pas.
 - Ne jamais marquer une wave validée sans preuve de tests et validation utilisateur demandée.
+- Toute nouvelle table documente propriétaire/scope, finalité, export, rétention, purge et comportement après restauration.
+- Une restauration applique les tombstones courants avant redémarrage afin de ne pas réactiver un compte supprimé ou un secret révoqué.
 - Une sous-wave séparée est obligatoire pour chaque nouveau site réel.
 - À partir de la Wave 1, les commandes racine obligatoires sont : `pnpm lint`, `pnpm typecheck`, `pnpm test` et, lorsque pertinent, `pnpm test:e2e`.
 - Le dépôt doit rester exécutable depuis une copie propre avec les commandes documentées.

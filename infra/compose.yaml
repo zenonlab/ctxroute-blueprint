@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:18
+    environment: { POSTGRES_DB: favlib, POSTGRES_USER: favlib, POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password }
+    secrets: [postgres_password]
+    volumes: [favlib-postgres:/var/lib/postgresql]
+    healthcheck: { test: [CMD-SHELL, 'pg_isready -U favlib -d favlib'], interval: 5s, timeout: 5s, retries: 20 }
+    networks: [favlib]
+  api:
+    build: { context: .., dockerfile: apps/api/Dockerfile }
+    environment: { DATABASE_URL: postgres://favlib:change-me@postgres:5432/favlib, FAVLIB_BASE_URL: https://favlib.home.arpa, PORT: 3001 }
+    depends_on: { postgres: { condition: service_healthy } }
+    networks: [favlib]
+  web:
+    build: { context: .., dockerfile: apps/web/Dockerfile }
+    depends_on: [api]
+    networks: [favlib]
+  caddy:
+    image: caddy:2.9-alpine
+    ports: ['443:443']
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy-data:/data, caddy-config:/config]
+    depends_on: [web, api]
+    networks: [favlib]
+networks: { favlib: { driver: bridge } }
+volumes: { favlib-postgres: {}, caddy-data: {}, caddy-config: {} }
+secrets: { postgres_password: { file: ./secrets/postgres_password } }

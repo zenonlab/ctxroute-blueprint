@@ -27,4 +27,4 @@ Ce point doit être affiché pendant l'inscription à une instance locale multi-
 
 ## Conséquences
 
-L'API AniList ne reçoit que des candidats plausibles. Le coût, le risque de fuite et le volume de classification diminuent, tout en conservant la promesse que chaque favori est examiné.
+Lorsqu'un fournisseur est autorisé, son API ne reçoit que des candidats plausibles. Le coût, le risque de fuite et le volume de classification diminuent, tout en conservant la promesse que chaque favori est examiné. Sans politique `AUTHORIZED`, aucun candidat ne lui est envoyé.

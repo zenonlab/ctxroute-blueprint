@@ -6,6 +6,9 @@ coverage/
 playwright-report/
 test-results/
 .turbo/
+.wxt/
+.output/
+*.tsbuildinfo
 
 # Runtime configuration and secrets
 .env
@@ -37,3 +40,8 @@ caddy-config/
 .idea/
 .vscode/
 *.swp
+node_modules/
+.next/
+dist/
+backups/
+.env

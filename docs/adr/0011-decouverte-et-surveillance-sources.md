@@ -76,6 +76,8 @@ DISCOVERED
 
 Chaque transition conserve connecteur/version, preuves, score, raisons, auteur automatique ou humain et horodatage. Une validation ou fusion manuelle est réversible.
 
+Les preuves d'acquisition (`api`, `feed`, `structured-data`, `dom`, `bookmark`) sont distinctes des preuves de matching structurées (`kind`, `value`, `source`, `confidence`). Cette séparation empêche de confondre la manière d'extraire une donnée avec la raison qui relie une candidate à l'œuvre.
+
 La clé de candidate inclut œuvre, URL canonique, locale, région, mode d'accès, variante de représentation et scope propriétaire éventuel. Plusieurs méthodes découvrant la même clé fusionnent leurs preuves dans une seule candidate. Une cible publique et une cible privée ne sont jamais fusionnées.
 
 ## Surveillance personnelle
@@ -86,7 +88,7 @@ La clé de candidate inclut œuvre, URL canonique, locale, région, mode d'accè
 - épingler une alternative ou l'accepter comme fallback peut créer un `user_subscription`, uniquement tant que l'œuvre possède au moins un favori personnel actif ;
 - retirer le dernier favori désactive `library_item`, préférences et abonnements personnels associés, tout en conservant l'historique public ;
 - une cible publique surveillée par plusieurs personnes reste vérifiée une seule fois par contexte ADR 0004 ;
-- une cible privée/authentifiée reste liée à l'installation qui peut l'inspecter localement.
+- une cible privée/authentifiée reste liée aux installations autorisées de son propriétaire et suit le protocole best effort, lease, reprise et file idempotente de l'[ADR 0013](0013-surveillance-extension-privee.md).
 
 ## Variantes compatibles
 

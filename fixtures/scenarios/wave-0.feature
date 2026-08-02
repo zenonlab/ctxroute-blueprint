@@ -95,6 +95,7 @@ Feature: Invariants FavLib Wave 0
     And a parser failure keeps the last valid snapshot active
 
   Scenario: FavLib never caches third-party reading content
+    Given an approved connector for a supported public source
     When a connector inspects a supported work page
     Then FavLib may retain normalized release metadata and technical validators
     But it does not retain page HTML media files cookies or reading content
@@ -118,7 +119,7 @@ Feature: Invariants FavLib Wave 0
     And it does not automatically link either work
 
   Scenario: An announced episode is not yet available
-    Given AniList announces episode 13 of "Orbital Knights" for tomorrow
+    Given an authorized fixture catalog announces episode 13 of "Orbital Knights" for tomorrow
     And no valid connector snapshot contains episode 13
     When the catalog synchronization completes
     Then episode 13 appears only as scheduled in the calendar
@@ -212,6 +213,18 @@ Feature: Invariants FavLib Wave 0
     When Bob searches alternatives for the same work
     Then Bob never receives Alice private candidate URL evidence or availability
 
+  Scenario: AniList stays disabled without provider authorization
+    Given the AniList provider policy is not "AUTHORIZED"
+    When catalog matching misses locally
+    Then FavLib does not call AniList or schedule AniList jobs
+    And the favorite remains usable as unmatched or reviewable
+
+  Scenario: A private check resumes after device sleep
+    Given Alice private target became due while her device was offline
+    When Alice extension starts and recreates its alarms
+    Then the target is marked stale until one installation acquires its lease
+    And a replayed private result creates only one check and notification
+
   Scenario: Discovery respects approved domains and budget
     Given a discovery run has six network operations and four approved domains
     When a result points to an unapproved domain or the budget is exhausted
@@ -223,3 +236,131 @@ Feature: Invariants FavLib Wave 0
     When the local administrator has not approved a connector
     Then the domain remains pending
     And no content script worker check or scheduled discovery uses it
+
+  Scenario: A MangaUpdates release is a signal rather than an origin
+    Given an authorized MangaUpdates policy reports chapter 42 for Alice favorite manhwa
+    And Alice source connector does not expose chapter 42
+    When release reconciliation completes
+    Then chapter 42 state is "ANNOUNCED"
+    And no available origin button or available-release notification is created
+
+  Scenario: A TVmaze title collision requires structured matching
+    Given TVmaze contains an animation and a live action show with the same title
+    When FavLib has no compatible type year or external identifier evidence
+    Then the TVmaze announcement is sent to review
+    And it is not attached automatically to Alice favorite work
+
+  Scenario: A remote page change does not change its Chrome bookmark
+    Given Alice favorites a stable work page URL
+    When the remote site publishes a new chapter without Alice editing the bookmark
+    Then Chrome emits no bookmark change for that publication
+    And FavLib relies on the approved source connector to detect it
+
+  Scenario: A declarative connector cannot execute remote code
+    Given an administrator configures CSS XPath and regex extraction for an approved domain
+    When the configuration contains script or a second unapproved domain
+    Then FavLib rejects the connector version
+    And no remote code or unrestricted fetch is executed
+
+  Scenario: A dataset import is idempotent and atomically activated
+    Given an authorized fixture dataset release has a verified checksum
+    When its completed import is run a second time
+    Then no media title identifier or assertion is duplicated
+    And users see either the previous batch or the complete new batch
+
+  Scenario: Conflicting dataset assertions do not overwrite each other
+    Given MADB and a fixture bibliography assert different years for one candidate work
+    When the dataset resolver cannot prove which assertion is correct
+    Then both values keep their provider record provenance
+    And the candidate is sent to review without a silent canonical overwrite
+
+  Scenario: A stale historical dump can be completed by a current release
+    Given an old MADB Lab archive stops in 2023
+    When FavLib discovers a newer verified official MADB GitHub release
+    Then FavLib imports the pinned GitHub release instead of trusting the HTTP file date
+    And the active dataset version and freshness are visible to the administrator
+
+  Scenario: IMDb remains removable as a non commercial layer
+    Given IMDb assertions enrich an anime under an authorized non commercial policy
+    When that policy becomes review required and its purge runs
+    Then all IMDb provider records and assertions become unavailable
+    And the favorite media and independent MADB assertions remain usable
+
+  Scenario: An unauthorized Korean dataset is never downloaded
+    Given the National Library of Korea dataset policy has no verified reuse license
+    When a catalog synchronization becomes due
+    Then FavLib does not download or import that dataset
+    And the work can still be matched from bookmarks connectors and authorized sources
+
+  Scenario: A backup is healthy only after a successful restore
+    Given a nightly encrypted PostgreSQL dump has a valid checksum
+    When its automated restore and Alice Bob smoke checks complete successfully on a new database
+    Then FavLib marks that backup healthy with measured duration and recovery point
+    And creation of the dump alone never marks it healthy
+
+  Scenario: A corrupted backup preserves the last healthy copy
+    Given the newest encrypted backup fails checksum or decryption
+    When the backup verification job completes
+    Then FavLib reports that backup as failed without overwriting the last healthy artifact
+    And the administrator receives a recovery diagnostic
+
+  Scenario: Extension storage overflow forces reconciliation
+    Given Alice extension is near its FavLib local storage budget
+    When persisting a new bookmark event is rejected by Chrome
+    Then the extension does not acknowledge or report that event as uploaded
+    And it schedules a full bookmark reconciliation with a visible diagnostic
+
+  Scenario: An authenticated source may wait for a real visit
+    Given Alice private source requires her authenticated page context
+    And no compatible tab is open or background fetch validated
+    When the private source becomes due
+    Then its health becomes "WAITING_FOR_VISIT"
+    And no empty snapshot or no-new-release result is stored
+
+  Scenario: An unknown provider quota blocks scheduled activation
+    Given MangaUpdates has no verified numeric provider limit in its policy
+    When an administrator tries to enable scheduled production synchronization
+    Then FavLib keeps the provider review required and schedules zero calls
+    And a manual bounded prototype cannot authorize production jobs
+
+  Scenario: Administrator bootstrap works only on an empty database
+    Given FavLib has no existing account
+    When the host administrator runs the interactive bootstrap once
+    Then one administrator account is created without a default password
+    And replaying bootstrap after that account exists is refused
+
+  Scenario: Login failure does not enumerate accounts
+    Given one login names an unknown account and another names a disabled account
+    When both attempts fail and exceed the bounded account or IP budget
+    Then both responses use the same generic error shape
+    And further attempts receive a temporary cooldown without permanent account lockout
+
+  Scenario: A cross origin mutation cannot reuse Alice session
+    Given Alice has a valid secure Web session
+    When another origin submits a mutation without Alice session-bound CSRF token
+    Then FavLib rejects the mutation before changing personal data
+    And the rejection does not expose Alice session or account details
+
+  Scenario: An idempotency key cannot hide a different payload
+    Given Alice uploaded a bookmark batch with one idempotency key
+    When her installation reuses that key with a different body
+    Then FavLib returns the idempotency key reused conflict
+    And neither body is applied a second time
+
+  Scenario: Alice export contains no secret or Bob data
+    Given Alice recently reauthenticated and requests a personal export
+    When the versioned export manifest and JSON are generated
+    Then the export contains Alice personal records but no session device secret or Bob record
+    And its authenticated download expires and is purged within 24 hours
+
+  Scenario: Restoring an old backup does not resurrect a deleted account
+    Given Bob was deleted after an otherwise healthy backup was created
+    When that backup is restored with the current external tombstone journal
+    Then Bob account sessions devices and personal jobs remain deleted before API startup
+    And independently authorized shared catalog metadata remains available
+
+  Scenario: An obsolete extension preserves its offline queue
+    Given Alice extension protocol is older than the server minimum
+    When the extension tries to upload its persisted offline queue
+    Then the API returns upgrade required without interpreting the payload permissively
+    And the extension keeps the queue and shows an upgrade diagnostic

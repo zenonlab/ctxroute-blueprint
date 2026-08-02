@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "description": "Résultats synthétiques de découverte pour Orbital Knights, sans domaine ni œuvre réelle.",
   "run": {
     "mediaId": "orbital-knights-s1",
@@ -20,8 +20,14 @@
       "discoveredVia": "PERSONAL_BOOKMARK",
       "url": "https://fixture-anime-alt.test/series/orbital-knights",
       "connector": "fixture-anime-alt",
-      "evidence": ["external-id", "exact-alias", "type", "year"],
-      "accessMode": "PUBLIC",
+      "extractionEvidence": ["bookmark"],
+      "matchEvidence": [
+        { "kind": "external-id", "source": "bookmark", "confidence": 1 },
+        { "kind": "exact-alias", "source": "connector", "confidence": 0.98 },
+        { "kind": "type", "source": "connector", "confidence": 1 },
+        { "kind": "year", "source": "connector", "confidence": 0.95 }
+      ],
+      "accessMode": "public_shared",
       "expectedState": "VERIFIED"
     },
     {
@@ -29,8 +35,11 @@
       "discoveredVia": "CATALOG_EXTERNAL_LINK",
       "url": "https://fixture-official.test/watch/orbital-knights",
       "connector": null,
-      "evidence": ["catalog-external-link"],
-      "accessMode": "PUBLIC",
+      "extractionEvidence": ["api"],
+      "matchEvidence": [
+        { "kind": "catalog-external-link", "source": "catalog", "confidence": 0.8 }
+      ],
+      "accessMode": "public_shared",
       "expectedState": "PENDING_CONNECTOR"
     },
     {
@@ -38,8 +47,14 @@
       "discoveredVia": "WEB_SEARCH",
       "url": "https://fixture-anime-alt.test/series/orbital-knights",
       "connector": "fixture-anime-alt",
-      "evidence": ["exact-alias", "type", "year", "canonical-parent"],
-      "accessMode": "PUBLIC",
+      "extractionEvidence": ["api", "dom"],
+      "matchEvidence": [
+        { "kind": "exact-alias", "source": "connector", "confidence": 0.98 },
+        { "kind": "type", "source": "connector", "confidence": 1 },
+        { "kind": "year", "source": "connector", "confidence": 0.95 },
+        { "kind": "canonical-parent", "source": "connector", "confidence": 1 }
+      ],
+      "accessMode": "public_shared",
       "expectedState": "VERIFIED"
     },
     {
@@ -47,8 +62,12 @@
       "discoveredVia": "WEB_SEARCH",
       "url": "https://fixture-ambiguous.test/show/orbital-knights-1998",
       "connector": "fixture-ambiguous",
-      "evidence": ["similar-title", "conflicting-year"],
-      "accessMode": "PUBLIC",
+      "extractionEvidence": ["api", "dom"],
+      "matchEvidence": [
+        { "kind": "similar-title", "source": "web-search", "confidence": 0.55 },
+        { "kind": "conflicting-year", "source": "connector", "confidence": 1 }
+      ],
+      "accessMode": "public_shared",
       "expectedState": "REJECTED"
     },
     {
@@ -56,8 +75,12 @@
       "discoveredVia": "PERSONAL_BOOKMARK",
       "url": "https://fixture-anime.test/account/library/orbital-knights",
       "connector": "fixture-anime",
-      "evidence": ["personal-bookmark", "exact-alias"],
-      "accessMode": "EXTENSION_PRIVATE",
+      "extractionEvidence": ["bookmark", "dom"],
+      "matchEvidence": [
+        { "kind": "personal-bookmark", "source": "bookmark", "confidence": 1 },
+        { "kind": "exact-alias", "source": "connector", "confidence": 0.98 }
+      ],
+      "accessMode": "extension_private",
       "expectedState": "VERIFIED",
       "expectedScope": "USER_INSTALLATION"
     },
@@ -66,8 +89,11 @@
       "discoveredVia": "WEB_SEARCH",
       "url": "https://unapproved-fixture.test/anime/orbital-knights",
       "connector": null,
-      "evidence": ["search-title"],
-      "accessMode": "PUBLIC",
+      "extractionEvidence": ["api"],
+      "matchEvidence": [
+        { "kind": "search-title", "source": "web-search", "confidence": 0.4 }
+      ],
+      "accessMode": "public_shared",
       "expectedState": "REJECTED"
     }
   ]

@@ -5,8 +5,10 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 ## Produit et comptes
 
 - [ ] administrateur initial créé de manière sûre ;
+- [ ] aucun mot de passe par défaut et bootstrap interactif refusé sur base non vide ;
 - [ ] inscription publique désactivée ;
 - [ ] invitation unique, expirante et révocable ;
+- [ ] réinitialisation opaque, à usage unique et expirante ;
 - [ ] rôles administrateur et membre testés ;
 - [ ] changement de mot de passe et révocation des sessions ;
 - [ ] suppression/désactivation d'un compte définie ;
@@ -28,6 +30,15 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] procédure de mise à jour et retour arrière ;
 - [ ] volumes et espace disque surveillables.
 
+## Qualité du dépôt
+
+- [ ] Prettier et markdownlint exécutés par `pnpm lint` ;
+- [ ] liens documentaires et index ADR contrôlés mécaniquement ;
+- [ ] JSON, fixtures et scénarios synthétiques validés en CI locale ;
+- [ ] `git diff --check` sans erreur.
+- [ ] `./scripts/validate-wave-0.sh` passe avant validation ou modification de baseline ;
+- [ ] OpenAPI contrôlé : erreurs, pagination, limites, idempotence et versions de protocole ;
+
 ## Appairage de l'extension
 
 - [ ] code court haché, expirant et à usage unique ;
@@ -38,6 +49,9 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] appareil révoqué refusé immédiatement ;
 - [ ] nouvelle installation sans écraser les précédentes ;
 - [ ] message compréhensible si serveur inaccessible ou certificat refusé.
+- [ ] ID de l'extension stable entre builds et appairages ;
+- [ ] chargement non empaqueté documenté pour le cercle de test ;
+- [ ] distribution durable Web Store non répertoriée ou politique d'entreprise décidée avant diffusion.
 
 ## Favoris Chrome
 
@@ -49,6 +63,11 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] événements créé, modifié, déplacé et supprimé ;
 - [ ] événements en double idempotents ;
 - [ ] file hors ligne avec reprise ;
+- [ ] `chrome.storage.local` limité à 10 Mo par Chrome et budget FavLib total limité à 5 Mio ;
+- [ ] échec de quota détecté, aucune Promise rejetée ignorée et réconciliation forcée ;
+- [ ] aucune permission `unlimitedStorage` en V1 ;
+- [ ] service worker conçu pour perdre ses variables globales après suspension ;
+- [ ] migration versionnée/atomique du storage après mise à jour ;
 - [ ] réconciliation périodique après événements manqués ;
 - [ ] comparaison de fingerprints avant retransmission lisible ;
 - [ ] collisions d'IDs Chrome entre profils impossibles côté DB ;
@@ -57,7 +76,7 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] les non-médias évidents ne quittent jamais l'extension ;
 - [ ] suppression d'un favori sans suppression brutale de l'historique.
 
-## Tri et AniList
+## Tri et fournisseurs de métadonnées
 
 - [ ] normalisation prudente des titres et URLs ;
 - [ ] anime contre manga/manhwa/manhua ;
@@ -68,9 +87,29 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] classifieur versionné ;
 - [ ] seuils calibrés sur corpus ;
 - [ ] aucun faux positif automatique dans le corpus critique ;
-- [ ] cache AniList partagé sans mélanger les données personnelles ;
+- [ ] fournisseur bloqué par défaut sans politique `AUTHORIZED` ;
+- [ ] cache fournisseur partagé seulement si sa politique le permet ;
+- [ ] version des conditions, finalités, rétention, attribution et purge enregistrées ;
+- [ ] modification des conditions suspendant jobs et préchauffage ;
+- [ ] matrice des dumps avec version, fraîcheur, licence et décision revue ;
+- [ ] manifeste, checksum, taille, format et hôte officiel vérifiés avant import ;
+- [ ] ZIP Slip, archive bomb, disque insuffisant et schéma inattendu bloqués ;
+- [ ] staging, rejets, checkpoint, activation atomique et rollback testés ;
+- [ ] assertions contradictoires conservées sans écrasement silencieux ;
+- [ ] redirections/suppressions d'un fournisseur sans perte des preuves indépendantes ;
+- [ ] Wikidata CC0 importé comme sous-ensemble avec provenance ;
+- [ ] MADB importé depuis une release officielle actuelle épinglée, version/attribution et droits tiers revus ;
+- [ ] BnF/NDL importés avec identifiants, dates et provenance, sans confondre catalogage et disponibilité ;
+- [ ] IMDb optionnel isolé, purgeable et bloqué sans politique non commerciale autorisée ;
+- [ ] National Library of Korea bloquée avant preuve de licence du dataset ;
+- [ ] TVmaze isolé/attribué sous CC BY-SA et utilisé comme annonce seulement ;
+- [ ] MangaUpdates crédité, espacé, caché et interrogé par œuvres favorites sans miroir global ;
+- [ ] AniList, MAL, MangaDex, AnimeSchedule et Kitsu non activés avant leur gate propre ;
+- [ ] Google Custom Search JSON absent des dépendances ;
+- [ ] Brave Search optionnel sans chemin de favori ni donnée personnelle dans les requêtes ;
 - [ ] regroupement des requêtes et respect des limites ;
 - [ ] `429`, timeout et indisponibilité en mode dégradé ;
+- [ ] connecteur déclaratif limité à CSS/XPath/regex, domaine administrateur, version/aperçu/rollback et aucun code distant ;
 - [ ] fingerprints keyed locaux retraitables après changement de classifieur ;
 - [ ] purge des données lisibles de favoris ignorés.
 
@@ -88,7 +127,7 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] métriques de couverture, fraîcheur, erreurs et backlog ;
 - [ ] fraîcheur et version du mapper enregistrées ;
 - [ ] priorité de rafraîchissement adaptée au statut ;
-- [ ] dernier état valide conservé si fournisseur indisponible ;
+- [ ] dernier état valide conservé si fournisseur indisponible, sans dépasser la rétention permise ;
 - [ ] aucun miroir massif sans source explicitement autorisée ;
 - [ ] nouvelle saison signalable mais jamais ajoutée sans favori ;
 - [ ] second fournisseur ajoutable derrière le même contrat.
@@ -115,7 +154,7 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] une carte par œuvre malgré plusieurs favoris ;
 - [ ] sources multiples avec préférence personnelle ;
 - [ ] affiche absente ou cassée ;
-- [ ] métadonnées AniList obsolètes ou indisponibles ;
+- [ ] métadonnées fournisseur obsolètes, interdites ou indisponibles ;
 - [ ] favoris associés visibles uniquement par leur propriétaire ;
 - [ ] position favorite, dernière disponibilité et delta clairement séparés ;
 - [ ] historique de détection et diagnostic ;
@@ -161,7 +200,7 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 
 - [ ] cache extension limité aux fingerprints et événements minimaux ;
 - [ ] `chrome.storage.local` jamais présenté comme chiffré ;
-- [ ] cache AniList avec TTL, provenance et version de normalisation ;
+- [ ] cache fournisseur avec TTL, provenance, politique et version de normalisation ;
 - [ ] cache d'inspection et snapshot indexés par contexte complet ;
 - [ ] cache négatif court ;
 - [ ] `Retry-After` respecté ;
@@ -216,6 +255,14 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] origine suivante : `Sources (N)` seulement ;
 - [ ] alerte d'origine préférée tardive optionnelle ;
 - [ ] source privée liée à l'installation et jamais exposée ;
+- [ ] alarmes privées recréées au démarrage et échéances reprises au réveil ;
+- [ ] alarme coarse unique interrogeant les échéances serveur, jamais une alarme durable par œuvre ;
+- [ ] intervalle Chrome minimal de 30 secondes connu sans en déduire une ponctualité garantie ;
+- [ ] onglet absent ou session inutilisable : `WAITING_FOR_VISIT`/`AUTH_REQUIRED`, jamais « aucune nouveauté » ;
+- [ ] lease unique entre installations du même utilisateur ;
+- [ ] résultats privés hors ligne idempotents, bornés et acquittés ;
+- [ ] appareil hors ligne, permission absente et authentification expirée distingués ;
+- [ ] état privé périmé jamais interprété comme absence de nouveauté ;
 - [ ] domaine proposé soumis à validation administrateur et sous-wave ;
 - [ ] budgets utilisateur/instance/domaine et cooldown ;
 - [ ] CAPTCHA/paywall/anti-bot produit un diagnostic, jamais un contournement.
@@ -236,6 +283,10 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 
 - [ ] isolation Alice/Bob testée sur chaque endpoint personnel ;
 - [ ] mots de passe hachés avec algorithme adapté ;
+- [ ] Argon2id au minimum 19 Mio/2 itérations/parallélisme 1, paramètres encodés et rehash possible ;
+- [ ] minimum 15 caractères sans MFA, longueur maximale au moins 128 et liste locale de mots de passe compromis ;
+- [ ] cookie `__Host-`, Secure/HttpOnly/SameSite Strict, rotation et expirations testées ;
+- [ ] connexion générique et limitée par compte/IP ;
 - [ ] sessions et jetons hachés/révocables ;
 - [ ] CSRF, XSS et injections testés ;
 - [ ] SSRF : DNS, IP, redirections et rebinding contrôlés ;
@@ -255,6 +306,8 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] favoris non médias purgés ;
 - [ ] administrateur sans écran d'espionnage des favoris et modèle de confiance système affiché ;
 - [ ] export et suppression personnelle ;
+- [ ] chaque table possède scope, finalité, exportabilité, rétention, purge et règle de restauration ;
+- [ ] ancienne sauvegarde incapable de ressusciter un compte supprimé après application des tombstones ;
 - [ ] sauvegardes protégées ;
 - [ ] métriques agrégées sans URL brute ;
 - [ ] aucun appel à Google Identity nécessaire ;
@@ -281,7 +334,7 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 - [ ] index DB sur clés utilisateur, cible et déduplication ;
 - [ ] pagination bibliothèque, inbox et diagnostics ;
 - [ ] images dimensionnées et chargées paresseusement ;
-- [ ] cache AniList et requêtes mutualisées ;
+- [ ] cache fournisseur et requêtes mutualisés seulement lorsque permis ;
 - [ ] aucune liste massive rendue sans virtualisation si nécessaire ;
 - [ ] bundle Web et extension mesuré ;
 - [ ] objectifs de temps pour import, tri, fiche œuvre et inbox ;
@@ -302,6 +355,10 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 
 - [ ] sauvegarde PostgreSQL documentée ;
 - [ ] restauration sur base neuve testée ;
+- [ ] RPO/RTO cibles marqués non vérifiés avant mesure ;
+- [ ] planification nocturne, rétention 7/4/6 et copie chiffrée sur stockage distinct ;
+- [ ] checksum, déchiffrement, restauration et contrôle fonctionnel avant statut sain ;
+- [ ] procédure après perte de CA Caddy et escrow de la clé de sauvegarde testés ;
 - [ ] export personnel versionné ;
 - [ ] migrations ascendantes testées ;
 - [ ] stratégie de rollback ou sauvegarde avant migration irréversible ;
@@ -313,6 +370,8 @@ Cette checklist complète les waves. Elle évite de valider un parcours principa
 
 - [ ] unités : normaliseurs, scores, progression et diff ;
 - [ ] contrats : extension/API et connecteurs ;
+- [ ] `Idempotency-Key` rejoué/conflit et contraintes DB correspondantes ;
+- [ ] ressource Bob indistinguable d'une ressource inexistante lorsque nécessaire ;
 - [ ] intégration : PostgreSQL et worker ;
 - [ ] end-to-end : deux utilisateurs et deux profils ;
 - [ ] fixtures de pages cassées ;

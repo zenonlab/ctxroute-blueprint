@@ -1,0 +1,2 @@
+import { existsSync, statSync } from 'node:fs'; import process from 'node:process'; import { loadConfig } from '@favlib/config';
+try { const c=loadConfig(); console.log(JSON.stringify({node:process.version,config:'ok',baseUrl:c.FAVLIB_BASE_URL,backupDestination:c.BACKUP_DESTINATION,backupDestinationExists:existsSync(c.BACKUP_DESTINATION),backupFreeCheck:existsSync(c.BACKUP_DESTINATION)?statSync(c.BACKUP_DESTINATION).isDirectory():false},null,2)); } catch(e) { console.error('doctor: configuration invalide'); process.exitCode=1; }

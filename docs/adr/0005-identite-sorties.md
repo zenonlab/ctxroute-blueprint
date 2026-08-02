@@ -22,13 +22,19 @@ Une `release_origin` contient la source et sa représentation :
 
 - `source_target_id` et `source_release_key` ;
 - URL ;
-- langue ;
-- édition/version ;
+- langue du contenu ou de la traduction ;
+- langues audio et sous-titres éventuelles ;
+- région et mode d'accès ;
+- édition/version, qualité et censure déclarées ;
 - groupe ou diffuseur ;
+- variante de représentation servant à la mutualisation ;
+- statut officiel/licencié avec provenance, ou `UNKNOWN` ;
 - date de publication ;
 - libellé source brut.
 
 Deux origines fusionnent vers la même sortie logique uniquement si œuvre, type, séquence et numéro/partie concordent avec forte confiance. Sinon elles restent distinctes et peuvent être fusionnées manuellement plus tard.
+
+Le contrat du connecteur transporte tous ces champs, même lorsqu'ils sont absents ou inconnus. Il ne remplace jamais une saison, partie ou variante spéciale par un simple nombre normalisé.
 
 ## Ordre et progression
 

@@ -26,6 +26,8 @@ Objectif : figer les règles avant le code.
 - matrice de confidentialité et permissions ;
 - validation de la checklist transversale ;
 - doctrine `CLAUDE.md` et ADR acceptés ;
+- matrice datée des APIs, licences, langages et versions cibles ;
+- matrice des bases téléchargeables, fraîcheur, licences et stratégie d'import ;
 - dépôt Git local initialisé.
 
 Sortie : documentation approuvée et scénarios Given/When/Then exécutables plus tard.
@@ -35,15 +37,19 @@ Sortie : documentation approuvée et scénarios Given/When/Then exécutables plu
 Objectif : disposer d'une application locale réellement multi-utilisateur.
 
 - monorepo et conventions ;
+- Prettier et markdownlint intégrés à `pnpm lint` ;
 - Docker Compose, Caddy et origine `https://favlib.home.arpa` ;
 - PostgreSQL et migrations ;
+- Node.js 24 LTS et PostgreSQL 18 comme cibles initiales, revérifiées au scaffold ;
 - comptes, invitations et rôles ;
-- sessions Web et tests d'isolation ;
+- bootstrap sans compte par défaut, mots de passe Argon2id, sessions Web, CSRF et tests d'isolation selon ADR 0014 ;
+- schéma de rétention, journal de sécurité et tombstones de suppression selon ADR 0015 ;
 - endpoints de santé ;
 - export de la CA publique et procédure de trust client ;
-- sauvegarde minimale chiffrée hors dépôt.
+- sauvegarde nocturne chiffrée, copie distincte, rétention, checksum et restauration automatisée sur base neuve ;
+- objectifs RPO/RTO affichés comme non vérifiés jusqu'à mesure.
 
-Sortie : deux utilisateurs peuvent se connecter sans voir les données de l'autre.
+Sortie : deux utilisateurs peuvent se connecter sans voir les données de l'autre et une sauvegarde synthétique est restaurée avec succès sur une base neuve.
 
 ## Wave 2 — design system et UI contractuelle
 
@@ -65,18 +71,22 @@ Sortie : interface navigable avec données de démonstration, sans scraping.
 Objectif : prouver le transport robuste depuis plusieurs profils Chrome.
 
 - extension WXT Manifest V3 ;
+- ID d'extension stable et procédure de chargement non empaqueté pour les tests ;
+- décision préparée entre Web Store non répertorié et gestion d'entreprise pour la distribution durable ;
 - onboarding de la permission `bookmarks` ;
 - code d'appairage à usage unique ;
 - examen local de tous les favoris et import des candidats par lots ;
 - réconciliation en deux phases par fingerprints ;
 - événements temps réel ;
 - file hors ligne et réconciliation ;
+- budget local sous le quota Chrome, overflow explicite et réconciliation forcée ;
+- migration versionnée de `chrome.storage.local` et compatibilité de protocole extension/API ;
 - déduplication par installation/utilisateur ;
 - révocation d'un appareil.
 
 Sortie : deux profils Chrome importent leurs favoris dans deux comptes séparés, sans doublon après réimport.
 
-## Wave 4 — tri, catalogue local et AniList
+## Wave 4 — tri, catalogue local et fournisseurs autorisés
 
 Objectif : transformer l'inventaire de favoris en bibliothèque média.
 
@@ -84,9 +94,15 @@ Objectif : transformer l'inventaire de favoris en bibliothèque média.
 - tables `media`, alias multilingues, identifiants externes et relations ;
 - recherche PostgreSQL exacte + trigramme, avec ambiguïtés explicables ;
 - pipeline de classification versionné ;
-- service AniList avec cache et backoff ;
+- registre de politiques fournisseurs bloqué par défaut ;
+- importeur générique par release/checksum, staging, assertions, rejets, checkpoint, activation atomique et rollback ;
+- imports durables MADB depuis les releases officielles actuelles, Wikidata filtré et bibliographies BnF/NDL compatibles, avec provenance et attribution ;
+- IMDb non commercial optionnel, isolé et purgeable derrière une politique dédiée ;
+- National Library of Korea qualifiée ensuite pour le coréen, sans import avant preuve de licence ;
+- enrichissement MangaUpdates par œuvre favorite uniquement après politique dédiée, avec crédit, cache et sans miroir global ;
+- adaptateur AniList activable uniquement après autorisation documentée, avec cache et backoff ;
 - jobs de synchronisation, checkpoints et renormalisation ;
-- hydratation à la demande et préchauffage autorisé des œuvres actives ;
+- enrichissement à la demande conforme à la politique ; aucun préchauffage AniList sans autorisation ;
 - scoring explicable ;
 - catégories reconnu/ambigu/ignoré ;
 - purge des favoris ignorés ;
@@ -104,8 +120,8 @@ Objectif : valider le contrat sans dépendre immédiatement d'un site réel.
 - canonicalisation ;
 - extraction de positions ;
 - releases normales, décimales et spéciales ;
-- tests de parseur vide ou cassé.
-- `discover()` synthétique avec bonnes candidates, ambiguïtés et faux positifs ;
+- tests de parseur vide ou cassé ;
+- `discover()` synthétique avec bonnes candidates, ambiguïtés et faux positifs.
 
 Sortie : pipeline complet déterministe sur fixtures versionnées.
 
@@ -120,7 +136,8 @@ Objectif : détecter une nouvelle sortie de bout en bout.
 - caches PostgreSQL, TTL, invalidation et anti-stampede ;
 - mutualisation d'une cible entre utilisateurs ;
 - regroupement des origines par sortie logique ;
-- import des annonces anime et scheduling proche de la diffusion ;
+- import des annonces anime TVmaze après isolation CC BY-SA/attribution et scheduling proche de la diffusion ;
+- signal MangaUpdates utilisé pour anticiper une vérification, jamais comme preuve qu'un chapitre existe sur le site favori ;
 - séparation vérifiée entre annonce et disponibilité réelle ;
 - moteur de découverte borné, états de candidates et budgets ;
 - surveillance d'une alternative seulement après épinglage/fallback accepté ;
@@ -151,6 +168,7 @@ Objectif : ajouter les sites un par un.
 - implémentation et validation de `discover()` lorsqu'une méthode autorisée existe ;
 - recherche de catalogue seulement si API/méthode autorisée ;
 - API/RSS prioritaire ;
+- connecteur déclaratif privé CSS/XPath pour un site simple, créé/versionné par l'administrateur avec aperçu et rollback, sans code distant ;
 - fixtures et tests de non-régression ;
 - feature flag ;
 - tableau de santé ;
@@ -168,6 +186,7 @@ Objectif : rendre l'installation locale fiable.
 - audits SSRF/XSS/permissions ;
 - rotation des jetons ;
 - sauvegarde et restauration complète ;
+- export personnel versionné, suppression de compte idempotente, purges et test de non-résurrection après restauration ;
 - journaux structurés et métriques ;
 - documentation opérateur local.
 
@@ -176,6 +195,6 @@ Sortie : restauration testée, sécurité validée et fonctionnement continu doc
 ## Après la V1
 
 - Firefox si non inclus dans les premières waves ;
-- import AniList/MAL complémentaire ;
+- import AniList/MAL complémentaire seulement après autorisation ou licence compatible ;
 - statistiques et listes partageables ;
 - mode cloud seulement après conception d'un import explicite et d'un modèle de consentement adapté aux favoris.

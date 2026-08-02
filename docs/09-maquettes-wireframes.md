@@ -128,7 +128,26 @@ Confirmer ici résout une ambiguïté de tri ; ce n'est pas un ajout manuel d'œ
 ├ Santé ───────────────────────────────────────────────────────────┤
 │ Worker sain · 0 job bloqué · DB 120 MB                          │
 │ fixture-anime v1 · 100 % succès                                  │
+├ Sauvegardes ─────────────────────────────────────────────────────┤
+│ 02 août · HEALTHY · restore 41 s · RPO/RTO mesurés  [Rapport]   │
+│ 01 août · FAILED · checksum invalide · dernière saine conservée  │
+├ Sécurité ────────────────────────────────────────────────────────┤
+│ 2 sessions révoquées · 0 invitation ouverte · journal 90 jours  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-L'administration n'affiche jamais les URLs personnelles des favoris. Le contrôle de la machine hôte reste néanmoins une autorité de confiance documentée.
+`HEALTHY` exige checksum, déchiffrement et restauration sur base neuve. Les objectifs restent `NOT_VERIFIED` avant le premier essai réel. L'administration n'affiche jamais les URLs personnelles des favoris. Le contrôle de la machine hôte reste néanmoins une autorité de confiance documentée.
+
+## Compte et données
+
+```text
+┌ Mon compte ──────────────────────────────────────────────────────┐
+│ Sessions : cet appareil · autre session [Révoquer]              │
+│ Extension : Chrome bureau · dernière sync 10:42 [Révoquer]      │
+├ Mes données ─────────────────────────────────────────────────────┤
+│ [Créer un export]  JSON versionné · lien valable 24 h           │
+│ [Supprimer mon compte]  Réauthentification et confirmation       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+La suppression affiche les données concernées, l'effet différé des anciennes sauvegardes chiffrées et la protection contre la résurrection par tombstone. Le dernier administrateur doit d'abord désigner un successeur.

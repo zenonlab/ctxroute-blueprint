@@ -1,0 +1,20 @@
+{
+  "name": "favlib",
+  "private": true,
+  "packageManager": "pnpm@9.15.5",
+  "scripts": {
+    "build": "pnpm --filter @favlib/api build && pnpm --filter @favlib/web build",
+    "lint": "corepack pnpm -r lint && corepack pnpm --filter @favlib/extension lint",
+    "typecheck": "corepack pnpm -r typecheck && corepack pnpm --filter @favlib/extension typecheck",
+    "test": "corepack pnpm -r test && corepack pnpm --filter @favlib/extension test",
+    "test:e2e": "corepack pnpm --filter @favlib/api test:e2e && corepack pnpm --filter @favlib/web test:e2e",
+    "doctor": "corepack pnpm --filter @favlib/api run doctor",
+    "dev": "corepack pnpm --parallel --filter @favlib/api --filter @favlib/web dev",
+    "start:local": "docker compose -f infra/compose.yaml up -d",
+    "db:migrate": "corepack pnpm --filter @favlib/api db:migrate",
+    "bootstrap": "corepack pnpm --filter @favlib/api bootstrap",
+    "backup:create": "corepack pnpm --filter @favlib/api backup:create",
+    "backup:verify": "corepack pnpm --filter @favlib/api backup:verify",
+    "backup:restore-test": "corepack pnpm --filter @favlib/api backup:restore-test"
+  }
+}

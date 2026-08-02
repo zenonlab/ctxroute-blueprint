@@ -1,6 +1,8 @@
 # Third-party notices
 
-FavLib est actuellement au stade documentaire : aucun package n'est encore distribué avec le dépôt. Cette liste enregistre les fondations retenues et devra être complétée avec les versions exactes au scaffold.
+FavLib est actuellement au stade documentaire : aucun package ni dataset tiers brut n'est encore distribué avec le dépôt et les fixtures sont synthétiques. Cette liste enregistre les fondations retenues et devra être complétée avec les versions exactes au scaffold. Une mention de recherche dans la documentation ne signifie pas qu'un fournisseur ou dataset est intégré.
+
+Pour chaque intégration réelle, enregistrer nom, version/release, URL officielle, licence, attribution requise, modifications éventuelles et emplacement d'utilisation.
 
 | Projet | Usage prévu | Licence |
 |---|---|---|

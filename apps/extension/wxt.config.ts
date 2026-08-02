@@ -1,0 +1,1 @@
+export default { manifestVersion:3, manifest: { name:'FavLib — favoris privés', description:'Import privé et réconciliable des favoris média vers FavLib', permissions:['storage','bookmarks','alarms'], host_permissions:['https://favlib.home.arpa/*'], action:{default_popup:'popup.html'}, options_ui:{page:'options.html',open_in_tab:true} } };

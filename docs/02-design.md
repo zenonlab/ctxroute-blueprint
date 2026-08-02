@@ -58,7 +58,7 @@ Sur mobile, une barre inférieure remplace la sidebar. L'action principale est �
 
 La route `/library/:mediaId` est le centre de décision pour une œuvre précise. Elle présente :
 
-- métadonnées et titres alternatifs AniList ;
+- métadonnées et titres alternatifs locaux ou d'un fournisseur autorisé ;
 - favoris Chrome associés, sans exposer ceux d'un autre utilisateur ;
 - sites et pages canoniques détectés ;
 - position observée, origine du signal et statut de confirmation ;
@@ -86,6 +86,7 @@ La popup affiche l'œuvre reconnue, le type de page (`work`, `chapter`, `episode
 | [Kavita](https://github.com/Kareadita/Kavita) | organisation des collections et continuité de lecture | inspiration ; vérifier les fichiers copiés et leur licence |
 | [shadcn/ui](https://github.com/shadcn-ui/ui) | composants accessibles et possédés par le projet | base UI recommandée ; licence MIT |
 | [WXT](https://github.com/wxt-dev/wxt) | infrastructure d'extension multi-navigateur | base de l'extension ; licence MIT |
+| [Mantium](https://github.com/diogovalentte/mantium) | regroupement multi-source, connecteurs CSS/XPath et diagnostics d'erreur | inspiration métier uniquement ; stack et sécurité non adoptées |
 
 ## Système visuel initial
 
@@ -112,6 +113,8 @@ Chaque écran doit prévoir : chargement, vide, succès, données nombreuses, er
 5. Popup sur fiche œuvre, chapitre et épisode précis.
 6. Gestion des utilisateurs et appareils appairés.
 7. Diagnostic d'un connecteur cassé.
+8. Compte : sessions, export personnel et suppression avec réauthentification.
+9. Administration : sécurité, manifests de backup et essais de restauration sans favoris personnels.
 
 ## Règle de propriété intellectuelle
 

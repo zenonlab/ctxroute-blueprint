@@ -15,3 +15,7 @@ Les ADR enregistrent les décisions structurantes de FavLib.
 | [0009](0009-resolution-multi-source.md) | sélection, alternatives et migration de source | accepté |
 | [0010](0010-catalogue-local-et-signaux-sortie.md) | catalogue local, alias et preuve de disponibilité | accepté |
 | [0011](0011-decouverte-et-surveillance-sources.md) | découverte contrôlée, surveillance et notifications | accepté |
+| [0012](0012-conformite-fournisseurs-metadonnees.md) | gate légale et rétention des fournisseurs de métadonnées | accepté |
+| [0013](0013-surveillance-extension-privee.md) | planification best effort des sources privées par extension | accepté |
+| [0014](0014-authentification-et-sessions.md) | comptes, sessions Web et appairage | accepté |
+| [0015](0015-cycle-de-vie-des-donnees.md) | rétention, export, suppression et non-résurrection | accepté |

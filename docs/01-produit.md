@@ -17,7 +17,7 @@ L'application répond à trois questions :
 - Projet privé, sans inscription publique.
 - Chaque compte FavLib possède sa bibliothèque, sa progression et ses notifications.
 - Tous les favoris URL de chaque profil appairé sont examinés localement, sans imposer de dossier `FavLib` ; seuls les candidats médias quittent l'extension.
-- AniList est utilisé comme moteur principal d'enrichissement et de matching lorsque l'œuvre y existe.
+- Le catalogue local assure le matching ; AniList est un enrichisseur optionnel, désactivé jusqu'à autorisation documentée et jamais bloquant.
 - Un catalogue canonique local conserve les titres natifs, translittérés, traduits, synonymes, identifiants externes et relations entre saisons.
 - Une sortie annoncée et une sortie disponible sur un site sont deux états différents.
 - L'extension fonctionne à la fois depuis les favoris et sur la page précise ouverte dans le navigateur.
@@ -60,7 +60,7 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 4. L'extension examine tous les favoris URL et élimine localement les éléments manifestement non médias.
 5. Elle envoie les candidats médias par lots idempotents ; l'API les classe en reconnu, ambigu ou ignoré.
 6. Les œuvres reconnues apparaissent automatiquement dans la bibliothèque.
-7. Les favoris ambigus apparaissent dans « À vérifier » avec la meilleure proposition AniList.
+7. Les favoris ambigus apparaissent dans « À vérifier » avec les meilleures propositions locales ou d'un fournisseur autorisé.
 8. Le worker surveille chaque URL canonique publique sans dupliquer le travail entre utilisateurs.
 9. Les nouvelles sorties apparaissent dans l'inbox personnelle.
 10. Quand le favori change ou qu'une page suivante de la même œuvre favorite est observée avec consentement, la progression personnelle observée avance.
@@ -74,7 +74,7 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - examen et réconciliation locale de tous les favoris, avec import des seuls candidats médias ;
 - déduplication entre appareils/profils synchronisés ;
 - tri automatique et file d'ambiguïtés ;
-- AniList facultatif par résultat mais intégré au pipeline ;
+- adaptateurs de métadonnées optionnels, bloqués par défaut jusqu'à validation de leur politique ;
 - catalogue local actualisable et recherche multi-alias ;
 - bibliothèque manga/anime par utilisateur ;
 - fiche détaillée de chaque œuvre ;
@@ -86,7 +86,7 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - inbox, calendrier et diagnostics ;
 - connecteurs API, RSS, JSON-LD, HTML et extension ;
 - notifications internes, Web et ntfy ;
-- export/restauration par utilisateur et sauvegarde administrateur ;
+- export et suppression personnels ; sauvegarde/restauration complète par l'administrateur de l'hôte ;
 - déploiement local Docker Compose derrière HTTPS.
 
 ### Hors périmètre
@@ -98,7 +98,8 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 - contournement d'authentification, paywall, CAPTCHA, DRM ou protection anti-bot ;
 - envoi des cookies de sites tiers au serveur ;
 - suivi silencieux de tout l'historique de navigation ;
-- marketplace publique de scrapers.
+- marketplace publique de scrapers ;
+- réimport autonome d'un export personnel en V1 ;
 
 ## Règles de progression
 

@@ -22,8 +22,8 @@ Utilisateur A / profil Chrome A          Utilisateur B / profil Chrome B
                                                │
                  ┌─────────────────────────────┼────────────────────┐
                  ▼                             ▼                    ▼
-            PostgreSQL                   Workers planifiés     AniList / sites
-     utilisateurs + catalogue      catalogue + vérifications  fournisseurs/connecteurs
+            PostgreSQL                   Workers planifiés     fournisseurs / sites
+     utilisateurs + catalogue      catalogue + vérifications  autorisés/connecteurs
 ```
 
 ## Principe de mutualisation
@@ -38,6 +38,8 @@ source_target public + URL canonique
 ```
 
 Une page publique identique suivie par plusieurs comptes est récupérée une seule fois. Les favoris, positions, statuts et notifications restent personnels. Une source nécessitant une session utilisateur n'est pas récupérée par le worker commun ; seul un connecteur local d'extension peut fournir des métadonnées minimales, sans transmettre les cookies.
+
+Cette vérification privée est best effort : l'extension utilise des alarmes recréées au démarrage, un lease serveur et une file hors ligne idempotente. Le serveur distingue appareil hors ligne, permission manquante, authentification expirée et cible réellement cassée ; voir [ADR 0013](adr/0013-surveillance-extension-privee.md).
 
 La clé exacte de mutualisation est `(connector_id, connector_version, canonical_check_url, locale, region, access_mode, representation_variant)`. Elle est définie par [ADR 0004](adr/0004-mutualisation-sources.md).
 
@@ -62,15 +64,17 @@ La clé exacte de mutualisation est `(connector_id, connector_version, canonical
 - API Chrome Bookmarks et service worker.
 - content scripts uniquement sur les domaines autorisés.
 - file hors ligne persistante dans `chrome.storage.local`, explicitement considérée comme non chiffrée ; elle ne contient que des événements minimaux et des jetons opaques à portée limitée.
+- budget total FavLib de 5 Mio sous le quota Chrome de 10 Mo, sans `unlimitedStorage`; toute écriture rejetée déclenche un diagnostic et une réconciliation, jamais un succès fictif.
 - import complet, événements temps réel et réconciliation périodique.
 - popup contextuelle sur la page précise.
+- storage versionné/migré atomiquement sur mise à jour et protocole extension/API négocié pendant une fenêtre de compatibilité.
 
 Au moment de l'appairage, l'utilisateur fournit l'origine du serveur local, idéalement au moyen d'un lien ou QR contenant origine + code court. L'extension demande à l'exécution une permission d'hôte limitée exactement à cette origine, puis toutes les communications API partent de son service worker.
 
 ### Worker
 
 - jobs persistants dans PostgreSQL avec Graphile Worker ;
-- synchronisation et renormalisation du catalogue par fournisseur ;
+- synchronisation et renormalisation du catalogue par fournisseur `AUTHORIZED` ;
 - import des annonces de diffusion anime ;
 - verrou par cible canonique et domaine ;
 - limites par domaine, jitter et backoff ;
@@ -98,6 +102,8 @@ utilisateur connecté au Web
 ```
 
 Chaque installation possède ses propres identifiants et peut être révoquée sans déconnecter les autres appareils. Aucun compte Google n'est utilisé pour authentifier FavLib.
+
+Le service worker MV3 est jetable : chaque événement persiste son intention avant l'appel réseau et aucune variable globale ne porte une vérité métier. Une alarme coarse demande les échéances privées au serveur. Pour une page authentifiée, l'observation d'un onglet ouvert est distincte d'un fetch d'arrière-plan validé site par site ; sans l'un ou l'autre, l'état est `WAITING_FOR_VISIT`, jamais « aucune nouveauté ».
 
 ## Synchronisation robuste des favoris
 
@@ -159,11 +165,16 @@ FavLib/
 
 | Entité | Rôle |
 |---|---|
-| `user` | compte local et rôle |
+| `app_user` | compte local et rôle ; évite le mot spécial PostgreSQL `user` |
 | `invitation` | création fermée d'un compte |
+| `password_reset_token` | récupération locale, hachée, expirante et à usage unique |
+| `user_session` | session Web opaque hachée, expirante et révocable |
 | `device_installation` | extension appairée et révocable |
 | `pairing_code` | secret court, haché et expirant |
 | `device_token` | session d'extension à portée limitée |
+| `security_event` | audit borné sans secret ni URL personnelle |
+| `deletion_tombstone` | empêche la résurrection après restauration |
+| `account_export` | manifest et état d'un export personnel temporaire |
 
 ### Favoris et classification
 
@@ -187,6 +198,13 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 | `media_relation` | saison, suite, préquelle, adaptation ou side story |
 | `source_media_alias` | titre/slug propre à un connecteur, après validation |
 | `catalog_sync_state` | checkpoint, fraîcheur et état par fournisseur |
+| `metadata_provider_policy` | autorisation, finalités, rétention et purge par fournisseur |
+| `dataset_release` | version, licence revue et statut d'une livraison téléchargeable |
+| `dataset_artifact` | URL, format, taille, checksum et validators d'un fichier |
+| `dataset_import_run` | checkpoint, mapper, compteurs et activation atomique d'un batch |
+| `provider_record` | record fournisseur brut utile, hash et batch actif |
+| `metadata_assertion` | valeur normalisée et provenance champ par champ |
+| `dataset_reject` | record invalide mis en quarantaine avec raison bornée |
 | `library_item` | statut personnel de l'œuvre |
 | `source_site` | domaine et capacités d'un connecteur |
 | `source_target` | connecteur/version/URL/locale/région/mode/variante à vérifier |
@@ -211,7 +229,7 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 
 | Entité | Rôle |
 |---|---|
-| `metadata_cache` | réponses AniList normalisées, TTL et provenance |
+| `metadata_cache` | réponses d'un fournisseur autorisé, TTL, politique et provenance |
 | `source_inspection_cache` | canonicalisation et type de page contextualisés |
 | `source_snapshot` | dernier état valide et validators HTTP |
 | `negative_cache` | échec temporaire court avec raison |
@@ -219,6 +237,8 @@ La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. E
 Les caches PostgreSQL n'ajoutent pas de copie média. Les clés, TTL et invalidations sont définis par [ADR 0008](adr/0008-cache.md).
 
 Le catalogue canonique, ses alias et la séparation annonce/disponibilité sont définis par [ADR 0010](adr/0010-catalogue-local-et-signaux-sortie.md).
+La gate d'autorisation et de rétention des fournisseurs est définie par [ADR 0012](adr/0012-conformite-fournisseurs-metadonnees.md).
+Les dumps retenus, leur fraîcheur et leur pipeline d'import sont définis dans [Jeux de données, dumps et imports locaux](13-jeux-de-donnees-et-imports.md).
 
 ## Flux catalogue et matching
 
@@ -227,12 +247,12 @@ favori candidat
   → extraction titres + indices connecteur
   → recherche dans media_title/source_media_alias
   → candidats classés par alias + type + année + relations + source
-  → miss/ambigu : recherche AniList puis hydratation locale
+  → miss/ambigu : fournisseur autorisé optionnel
   → match fort, À vérifier ou unmatched
   → planification du prochain catalog_refresh
 ```
 
-Le rendu Web et les imports suivants interrogent d'abord PostgreSQL. AniList complète le catalogue en arrière-plan ou sur un miss contrôlé, jamais une fois par carte affichée.
+Le rendu Web et les imports interrogent PostgreSQL. Un dump passe par staging, assertions avec provenance et activation atomique ; il n'écrit jamais directement dans `media`. Un fournisseur autorisé peut compléter le matching sur un miss contrôlé dans les limites de sa politique ; AniList reste inactif tant que son usage n'est pas autorisé.
 
 ## Flux de découverte
 
@@ -270,7 +290,7 @@ scheduler
   → inbox/notification par utilisateur
 ```
 
-Un second flux importe les `release_announcement` AniList pour les anime suivis. À l'heure prévue, il accélère les vérifications des sources ; il ne crée une disponibilité que lorsqu'un connecteur valide une `release_origin`.
+Un second flux importe les `release_announcement` d'un fournisseur autorisé : calendrier TVmaze pour les anime suivis, signal MangaUpdates pour les manga/manhwa/manhua suivis. Il accélère les vérifications des sources ; il ne crée une disponibilité que lorsqu'un connecteur valide une `release_origin`.
 
 Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin d'éviter un lien obsolète. La stratégie complète est définie par [ADR 0009](adr/0009-resolution-multi-source.md).
 
@@ -286,6 +306,8 @@ Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin
 - tailles, délais et fréquence réseau limités ;
 - HTML non fiable, scripts non exécutés côté serveur ;
 - jetons d'appareil hachés, courts, rotatifs et révocables ;
+- sessions Web, bootstrap et appairage conformes à [ADR 0014](adr/0014-authentification-et-sessions.md) ;
+- rétention, export, suppression et tombstones conformes à [ADR 0015](adr/0015-cycle-de-vie-des-donnees.md) ;
 - journaux sans URL complète lorsque celle-ci peut contenir une donnée sensible ;
 - sauvegardes chiffrées par une clé administrateur hors dépôt, avec restauration testée par wave.
 
@@ -304,3 +326,4 @@ Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin
 La liste des dépendances directes reste courte et contrôlée. Chaque nouveau package doit justifier son besoin, sa licence, sa maintenance, son poids client et son comportement côté serveur ou extension. Les packages UI sont détaillés dans [02-design.md](02-design.md).
 
 Les décisions structurantes et leur justification sont enregistrées dans [adr/README.md](adr/README.md).
+La matrice datée des APIs, versions, licences et modes de distribution est tenue dans [12-api-fournisseurs-et-stack.md](12-api-fournisseurs-et-stack.md). La matrice des bases téléchargeables est tenue dans [13-jeux-de-donnees-et-imports.md](13-jeux-de-donnees-et-imports.md).

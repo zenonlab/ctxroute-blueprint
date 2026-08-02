@@ -23,7 +23,7 @@ connector_id
 
 `access_mode` vaut `public_shared` ou `extension_private`. Seules les cibles `public_shared` dont tout le contexte est identique sont vérifiées et mises en cache ensemble.
 
-Une cible `extension_private`, authentifiée, personnalisée ou dépendante de cookies reste reliée à un seul utilisateur/appareil et n'est jamais traitée par le worker public commun.
+Une cible `extension_private`, authentifiée, personnalisée ou dépendante de cookies reste reliée à son propriétaire et à ses installations autorisées ; elle n'est jamais traitée par le worker public commun. Un lease choisit une seule installation par cycle et autorise la reprise par une autre installation du même utilisateur selon l'[ADR 0013](0013-surveillance-extension-privee.md).
 
 Le passage à une nouvelle version de connecteur crée un nouveau contexte de snapshot ; l'ancien état reste disponible pour comparaison et rollback.
 

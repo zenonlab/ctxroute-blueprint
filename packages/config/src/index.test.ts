@@ -1,0 +1,2 @@
+import { describe, expect, it } from 'vitest'; import { loadConfig } from './index.js';
+describe('configuration fail closed',()=>it('rejects non HTTPS and missing secret paths',()=>expect(()=>loadConfig({FAVLIB_BASE_URL:'http://evil',DATABASE_URL_FILE:'/no',SESSION_SECRET_FILE:'/no',BACKUP_KEY_FILE:'/no',BACKUP_DESTINATION:'/tmp/favlib-backups',FAVLIB_DATA_DIR:'/tmp/favlib-data',TZ:'Europe/Paris',LOG_LEVEL:'info'})).toThrow()));
