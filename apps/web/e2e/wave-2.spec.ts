@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('Alice navigates inbox, library and a work detail', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Bonjour Alice' })).toBeVisible();
-  await expect(page.getByText('Planifié')).toBeVisible();
+  await expect(page.getByText('Planifié', { exact: true }).first()).toBeVisible();
   await page.goto('/library');
   await expect(page.getByRole('heading', { name: 'Bibliothèque' })).toBeVisible();
   await page.waitForTimeout(500);
@@ -15,8 +15,8 @@ test('Alice navigates inbox, library and a work detail', async ({ page }) => {
 test('planned releases never expose an open action and broken sources are stale', async ({ page }) => {
   await page.goto('/calendar');
   const planned = page.locator('.release-row').filter({ hasText: 'Paper Moon Hero' });
-  await expect(planned.getByText('Planifié')).toBeVisible();
-  await expect(planned.getByText('Aucune ouverture')).toBeVisible();
+  await expect(planned.getByText('Planifié', { exact: true }).first()).toBeVisible();
+  await expect(planned.getByText('Aucune ouverture', { exact: true }).first()).toBeVisible();
   await page.goto('/sources');
   await expect(page.getByText('fixture-anime-old v1')).toBeVisible();
   await expect(page.getByText('Erreur')).toBeVisible();

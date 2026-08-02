@@ -1,5 +1,6 @@
 import { State, bytes } from './core.js';
-export const emptyState=():State=>({version:1,installationId:`inst_${crypto.randomUUID()}`,queue:[],cursor:null,lastSyncAt:null});
-export async function loadState():Promise<State>{const {favlibState}=await chrome.storage.local.get('favlibState');return favlibState?.version===1?favlibState:emptyState()}
+export const emptyState=():State=>({version:2,installationId:`inst_${crypto.randomUUID()}`,queue:[],cursor:null,lastSyncAt:null,sites:[],checks:[],autoUpdateFavorites:false,updates:[]});
+function migrate(value:unknown):State|null { const old=value as Partial<State>|undefined; if(!old||!old.installationId||!Array.isArray(old.queue))return null; if(old.version===2)return {...emptyState(),...old,sites:old.sites??[],checks:old.checks??[],updates:old.updates??[],autoUpdateFavorites:old.autoUpdateFavorites??false}; if(old.version===1)return {...emptyState(),installationId:old.installationId,deviceToken:old.deviceToken,pairing:old.pairing,queue:old.queue,cursor:old.cursor??null,lastSyncAt:old.lastSyncAt??null}; return null }
+export async function loadState():Promise<State>{const {favlibState}=await chrome.storage.local.get('favlibState');return migrate(favlibState)??emptyState()}
 export async function saveState(state:State){if(bytes(state)>4.5*1024*1024)throw new Error('STORAGE_QUOTA_NEAR');await chrome.storage.local.set({favlibState:state})}
 export async function updateState(fn:(state:State)=>State){const state=await loadState(),next=fn(state);await saveState(next);return next}

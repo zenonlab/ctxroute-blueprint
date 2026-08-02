@@ -1,10 +1,10 @@
 # Validation Wave 2 — interface contractuelle
 
-État au 2026-08-02 : interface Web synthétique livrée et vérifiée localement.
+État au 2026-08-02 : interface Web synthétique livrée et vérifiée localement; la navigation Wave 3 ajoute Sites et Regarder.
 
 ## Périmètre livré
 
-- Shell responsive : sidebar desktop, barre inférieure mobile, thème sombre par défaut, tokens CSS sémantiques et navigation Accueil, Bibliothèque, Calendrier, À vérifier, Sources, Réglages.
+- Shell responsive : sidebar desktop, barre inférieure mobile, thème sombre par défaut, tokens CSS sémantiques et navigation Accueil, Bibliothèque, Sites, Regarder, Calendrier, À vérifier, Sources, Réglages.
 - Vues locales : inbox, bibliothèque filtrable, fiche œuvre, calendrier, candidats ambigus, diagnostics de sources, sessions/appareils et administration.
 - Les données sont les fixtures de démonstration Alice/Bob et ne contiennent ni URL personnelle réelle ni média tiers.
 - Les états `Planifié`, `Disponible`, `Obsolète`, `Erreur`, `Sain` et `À vérifier` sont affichés séparément. Une sortie planifiée ne propose aucune ouverture.
@@ -16,7 +16,7 @@
 corepack pnpm typecheck       ✅
 corepack pnpm lint            ✅
 corepack pnpm test            ✅
-corepack pnpm test:e2e        ✅ attendu avec Chromium installé
+corepack pnpm test:e2e        ✅ avec Chromium installé
 corepack pnpm --filter @favlib/web build ✅
 ```
 
