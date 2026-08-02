@@ -1,10 +1,10 @@
 # Validation Wave 2 — interface contractuelle
 
-État au 2026-08-02 : interface Web synthétique livrée et vérifiée localement; la navigation Wave 3 ajoute Sites et Regarder.
+État au 2026-08-02 : interface Web synthétique livrée et vérifiée localement.
 
 ## Périmètre livré
 
-- Shell responsive : sidebar desktop, barre inférieure mobile, thème sombre par défaut, tokens CSS sémantiques et navigation Accueil, Bibliothèque, Sites, Regarder, Calendrier, À vérifier, Sources, Réglages.
+- Shell responsive : sidebar desktop, barre inférieure mobile, thème sombre par défaut, tokens CSS sémantiques et navigation Accueil, Ma liste/Bibliothèque, Calendrier, À vérifier, Sources, Réglages. La gestion des sites approuvés appartient aux Réglages.
 - Vues locales : inbox, bibliothèque filtrable, fiche œuvre, calendrier, candidats ambigus, diagnostics de sources, sessions/appareils et administration.
 - Les données sont les fixtures de démonstration Alice/Bob et ne contiennent ni URL personnelle réelle ni média tiers.
 - Les états `Planifié`, `Disponible`, `Obsolète`, `Erreur`, `Sain` et `À vérifier` sont affichés séparément. Une sortie planifiée ne propose aucune ouverture.
@@ -26,7 +26,7 @@ Le test Playwright `apps/web/e2e/wave-2.spec.ts` couvre les parcours inbox → b
 
 - Le shell utilise des pictogrammes texte et des CSS possédés par FavLib ; le remplacement par les composants shadcn/Radix et Lucide est volontairement différé tant que les contrats d'API Web ne sont pas branchés.
 - Le changement Alice/admin est un commutateur de démonstration stocké dans `localStorage`. Il ne remplace pas l'autorisation serveur de Wave 1.
-- Les boutons de synchronisation, confirmation, export et ouverture donnent un retour synthétique et ne déclenchent aucune mutation métier ni navigation fournisseur.
+- Les boutons de synchronisation, confirmation et export donnent un retour synthétique et ne déclenchent aucune mutation métier ni navigation fournisseur. La fiche œuvre n’expose pas d’action « Regarder » ou « Ouvrir ».
 - La couverture des états offline/loading/permissionDenied est représentée par les panneaux et badges contractuels ; la télémétrie et les appels TanStack Query seront ajoutés avec les adaptateurs API.
 
 ## Retour arrière

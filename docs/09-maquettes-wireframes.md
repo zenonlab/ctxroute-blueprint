@@ -41,7 +41,7 @@ Ces wireframes fixent la structure et les états à tester avant le look final s
 
 ```text
 ┌ Orbital Knights ─────────────────────────────────────────────────┐
-│ [Affiche]  Anime · Saison 1 · En cours             [Ouvrir ▾]   │
+│ [Affiche]  Anime · Saison 1 · En cours                         │
 │            Position observée : épisode 11                        │
 │            Disponible : épisode 12 · 1 nouveauté                  │
 ├ Favoris associés ────────────────────────────────────────────────┤
@@ -49,7 +49,7 @@ Ces wireframes fixent la structure et les états à tester avant le look final s
 ├ Sources ─────────────────────────────────────────────────────────┤
 │ fixture-anime · FR · sain · vérifié il y a 2 h                  │
 ├ Sorties ─────────────────────────────────────────────────────────┤
-│ 12  Nouveau     fixture-anime · Sources (2)         [Ouvrir ▾]  │
+│ 12  Nouveau     fixture-anime · Sources (2)                     │
 │ 11  Observé     fixture-anime                       [Ouvrir]      │
 │ SP-3 Spécial    hors séquence principale            [Ouvrir]      │
 └──────────────────────────────────────────────────────────────────┘
