@@ -1,1 +1,35 @@
-<!doctype html><html><head><meta charset="utf-8"><style>:root{color-scheme:dark}*{box-sizing:border-box}body{width:340px;margin:0;background:#0b0b0e;color:#f2f2f4;font:13px system-ui,sans-serif}header{padding:15px 16px;border-bottom:1px solid #3b3b46;background:#15151a;display:flex;align-items:center;justify-content:space-between}header strong{display:block;font-size:21px;letter-spacing:-.04em}header small{display:block;margin-top:2px;color:#a6a6af;font-size:10px;text-transform:uppercase;letter-spacing:.14em}#sync-state{padding:5px 8px;border:1px solid #3b3b46;border-radius:99px;color:#ffcf68;font-size:11px}main{padding:16px}h1{margin:0;font-size:20px}p{color:#a6a6af;line-height:1.4}.state{padding:10px;border:1px solid #2d2d36;border-radius:6px;background:#15151a}.code{font-size:25px;letter-spacing:.16em;color:#ffcf68}.grid{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0}button,a{display:block;width:100%;padding:10px 8px;border-radius:6px;font:inherit;text-align:center}button{cursor:pointer;border:1px solid #ffb52e;background:#ffb52e;color:#211500;font-weight:700}button.secondary,a{border:1px solid #35353e;background:#1d1d24;color:#f2f2f4;text-decoration:none}#status.error{color:#f38b8b;border-color:#71383b}</style></head><body><header><div><strong>Fav<span style="color:#ffb52e">Lib</span></strong><small>Extension navigateur</small></div><span id="sync-state">—</span></header><main><div id="status" class="state">Chargement…</div><div id="pairing"></div><div class="grid"><a href="https://favlib.home.arpa/library">Ma liste</a><a href="https://favlib.home.arpa/settings">Réglages</a></div><button id="pair">Appairer ce profil</button><button class="secondary" id="import">Importer maintenant</button><p id="diagnostic"></p></main><script type="module" src="../src/popup.ts"></script></body></html>
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+      :root{color-scheme:dark;--bg:#0b0b0e;--surface:#15151a;--surface2:#1d1d24;--line:#303039;--text:#f2f2f4;--muted:#96969f;--accent:#ffb52e;--accent2:#ffcf68;--good:#70d6a1;--danger:#f38b8b}
+      *{box-sizing:border-box}body{width:360px;margin:0;background:var(--bg);color:var(--text);font:13px Inter,ui-sans-serif,system-ui,sans-serif}
+      header{display:flex;align-items:center;justify-content:space-between;padding:17px 18px 15px;background:#121216;border-bottom:1px solid #292930}
+      .brand{font-size:22px;font-weight:850;letter-spacing:-.06em}.brand span{color:var(--accent)}.eyebrow{display:block;margin-top:3px;color:var(--accent);font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+      #sync-state{display:flex;align-items:center;gap:6px;color:var(--good);font-size:10px;font-weight:700}.dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+      main{padding:17px}.section-label{margin:0 0 8px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+      #status{padding:13px 14px;border:1px solid var(--line);border-radius:7px;background:var(--surface);line-height:1.45;color:var(--text)}#status.error{color:var(--danger);border-color:#71383b}
+      #pairing{margin-top:12px;padding:14px;border:1px solid #59431c;border-radius:7px;background:linear-gradient(135deg,#211a0d,#15151a 70%)}#pairing p{margin:0 0 7px;color:var(--muted);font-size:11px}.code{font-size:29px;font-weight:800;letter-spacing:.17em;color:var(--accent2)}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:15px 0}.nav-link{display:flex;align-items:center;gap:8px;padding:11px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;font-weight:700;text-decoration:none}.nav-link:hover{border-color:var(--accent)}.nav-icon{color:var(--accent);font-size:14px}
+      .actions{display:grid;gap:8px;margin-top:14px}button{width:100%;padding:11px 12px;border-radius:6px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}button.primary{border:1px solid var(--accent);background:var(--accent);color:#211500}button.secondary{border:1px solid var(--line);background:var(--surface2);color:var(--text)}
+      #diagnostic{min-height:16px;margin:14px 1px 0;color:var(--muted);font-size:10px;line-height:1.45}
+    </style>
+  </head>
+  <body>
+    <header><div><div class="brand">Fav<span>Lib</span></div><span class="eyebrow">Extension navigateur</span></div><span id="sync-state"><i class="dot"></i> —</span></header>
+    <main>
+      <p class="section-label">État du profil</p>
+      <div id="status">Chargement…</div>
+      <div id="pairing"></div>
+      <p class="section-label" style="margin-top:18px">Accès rapide</p>
+      <nav class="grid" aria-label="Accès FavLib">
+        <a class="nav-link" href="https://favlib.home.arpa/library"><span class="nav-icon">▦</span>Ma liste</a>
+        <a class="nav-link" href="https://favlib.home.arpa/settings"><span class="nav-icon">⚙</span>Réglages</a>
+      </nav>
+      <div class="actions"><button id="pair" class="primary">Appairer ce profil</button><button id="import" class="secondary">Importer maintenant</button></div>
+      <p id="diagnostic"></p>
+    </main>
+  </body>
+</html>
