@@ -29,6 +29,7 @@ Le build WXT produit une cible Chrome MV3 et une cible Firefox. Pour un test loc
 - Les lots sont limités à 250 éléments et le budget interne est inférieur à 5 MiB. Une approche du quota produit un diagnostic `STORAGE_QUOTA_NEAR` plutôt qu’une purge silencieuse.
 - La migration atomique de `favlibState` est versionnée. En cas de corruption, une reconstruction peut relire `bookmarks.getTree()` et recréer la file.
 - Le serveur ne reçoit que les métadonnées nécessaires à l’identification et à la réconciliation ; ni contenu de page, ni mot de passe, ni session Web.
+- L’option « Mettre à jour automatiquement mes favoris » est proposée uniquement dans Options de l’extension. Elle est désactivée par défaut et ne s’applique qu’à la navigation locale sur des domaines approuvés ; elle n’est pas un réglage du compte Web.
 
 ## Rollback et migration
 

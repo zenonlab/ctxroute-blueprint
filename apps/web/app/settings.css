@@ -1,0 +1,4 @@
+/* L’auto-mise à jour concerne l’extension et sa navigation locale, pas le compte Web. */
+.extension-install > div > label {
+  display: none;
+}
