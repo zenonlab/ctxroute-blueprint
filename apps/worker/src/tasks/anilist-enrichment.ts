@@ -167,8 +167,9 @@ async function persist(
     "SELECT media_id FROM media_external_id WHERE provider='anilist' AND external_id=$1",
     [String(m.id)],
   );
-  if (existing.rows[0]?.media_id && existing.rows[0].media_id !== mediaId)
-    throw new Error("ANILIST_EXTERNAL_ID_CONFLICT");
+  // Provider identities are shared catalogue entities: if another favorite
+  // already resolved to this AniList id, enrich that same media and move the
+  // current bookmark link to it instead of creating a duplicate.
   const target = existing.rows[0]?.media_id ?? `anilist:${m.id}`;
   await h.query(
     "INSERT INTO media(id,type,season_year,country_of_origin,format) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET type=excluded.type,season_year=COALESCE(excluded.season_year,media.season_year),country_of_origin=COALESCE(excluded.country_of_origin,media.country_of_origin),format=COALESCE(excluded.format,media.format),updated_at=now()",
@@ -449,17 +450,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     const eligible: AniListMedia[] = [];
     if (known) {
       remember([known]);
-      const owner = await h.query(
-        "SELECT media_id FROM media_external_id WHERE provider='anilist' AND external_id=$1 LIMIT 1",
-        [String(known.id)],
-      );
       if (known.type !== "ANIME") {
         h.logger.warn(
           `[provider-reject] provider=anilist externalId=${known.id} type=${known.type} expected=ANIME source=known-id`,
-        );
-      } else if (owner.rows[0]?.media_id && owner.rows[0].media_id !== mediaId) {
-        h.logger.warn(
-          `[provider-collision] provider=anilist externalId=${known.id} existingMedia=${owner.rows[0].media_id} candidateMedia=${mediaId} source=known-id`,
         );
       } else selected = known;
     }
@@ -495,16 +488,6 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         if (candidate.type !== "ANIME") {
           h.logger.warn(
             `[provider-reject] provider=anilist externalId=${candidate.id} type=${candidate.type} expected=ANIME alias=${JSON.stringify(alias)}`,
-          );
-          continue;
-        }
-        const owner = await h.query(
-          "SELECT media_id FROM media_external_id WHERE provider='anilist' AND external_id=$1 LIMIT 1",
-          [String(candidate.id)],
-        );
-        if (owner.rows[0]?.media_id && owner.rows[0].media_id !== mediaId) {
-          h.logger.warn(
-            `[provider-collision] provider=anilist externalId=${candidate.id} existingMedia=${owner.rows[0].media_id} candidateMedia=${mediaId} alias=${JSON.stringify(alias)}`,
           );
           continue;
         }
