@@ -456,6 +456,11 @@ describe("AniList catalogue", () => {
     expect(series[0]?.titles).toEqual(
       expect.arrayContaining(["신에게 사랑받은 아이", "神に愛された子"]),
     );
+    expect(series[0]?.titles).not.toContain("ja");
+    expect(matchMangaUpdates(
+      { aliases: ["Titre français"], type: "MANHWA" },
+      [{ id: "78", title: "Titre anglais", titles: ["Titre français"], type: "Manhwa", image: "https://img.example/mu.jpg" }],
+    )?.series.id).toBe("78");
   });
   it("keeps compact and normalized variants for multi-signal searches", () =>
     expect(titleVariants(["Café — Blue Sky"])).toEqual(

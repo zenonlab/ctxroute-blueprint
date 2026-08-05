@@ -1051,6 +1051,19 @@ function stringValues(value: unknown): string[] {
     );
   return [];
 }
+function titleValues(value: unknown): string[] {
+  if (typeof value === "string") return value.trim() ? [value] : [];
+  if (!value || typeof value !== "object") return [];
+  const object = value as Record<string, unknown>;
+  const titleKeys = new Set(["title", "name", "text", "value", "english", "romaji", "native", "translation", "localized", "display"]);
+  const direct = Object.entries(object)
+    .filter(([key]) => titleKeys.has(key.toLowerCase()))
+    .flatMap(([, item]) => titleValues(item));
+  if (direct.length) return direct;
+  return Object.entries(object)
+    .filter(([key]) => !/^(?:id|language|lang|script|type|format|url|source)$/iu.test(key))
+    .flatMap(([, item]) => typeof item === "string" && item.trim() ? [item] : []);
+}
 function imageValue(value: unknown): string | undefined {
   if (typeof value === "string" && value.trim()) {
     try {
@@ -1077,17 +1090,17 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     ...stringValues(record.title),
     ...stringValues(record.name),
     ...(Array.isArray(record.titles)
-      ? record.titles.flatMap(stringValues)
+      ? record.titles.flatMap(titleValues)
       : []),
     ...(Array.isArray(record.alternative_titles)
-      ? record.alternative_titles.flatMap(stringValues)
+      ? record.alternative_titles.flatMap(titleValues)
       : []),
     ...associated.flatMap((x: any) => [
-      ...stringValues(x?.title),
-      ...stringValues(x?.name),
-      ...stringValues(x?.text),
-      ...stringValues(x?.value),
-      ...stringValues(x?.titles),
+      ...titleValues(x?.title),
+      ...titleValues(x?.name),
+      ...titleValues(x?.text),
+      ...titleValues(x?.value),
+      ...titleValues(x?.titles),
     ]),
   ]
     .flat()
