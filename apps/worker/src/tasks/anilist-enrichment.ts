@@ -171,6 +171,12 @@ async function persist(
   // already resolved to this AniList id, enrich that same media and move the
   // current bookmark link to it instead of creating a duplicate.
   const target = existing.rows[0]?.media_id ?? `anilist:${m.id}`;
+  if (target !== mediaId) {
+    await h.query(
+      "INSERT INTO media_title(media_id,text,normalized_text,language,kind,connector,provenance,script,title_type,personal_status,confidence) SELECT $1,text,normalized_text,language,kind,connector,provenance,script,title_type,personal_status,confidence FROM media_title WHERE media_id=$2 AND kind='personal' ON CONFLICT DO NOTHING",
+      [target, mediaId],
+    );
+  }
   await h.query(
     "INSERT INTO media(id,type,season_year,country_of_origin,format) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET type=excluded.type,season_year=COALESCE(excluded.season_year,media.season_year),country_of_origin=COALESCE(excluded.country_of_origin,media.country_of_origin),format=COALESCE(excluded.format,media.format),updated_at=now()",
     [
