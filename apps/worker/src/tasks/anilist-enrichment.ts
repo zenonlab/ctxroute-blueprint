@@ -18,6 +18,7 @@ import {
   normalizedError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
+import { notifyCoverUnavailable } from "../cover-notify.js";
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -570,6 +571,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     };
   } catch (error) {
     const code = normalizedError(error);
+    await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",
@@ -668,7 +670,7 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
       purpose: "cover",
       version: "anilist-cover-v4",
       owner: claim.owner,
-      status: "FAILED",
+      status: "TERMINAL",
       errorCode: code,
       resolutionCode: code,
     });

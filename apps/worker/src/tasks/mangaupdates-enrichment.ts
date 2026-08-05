@@ -19,6 +19,7 @@ import {
   waitProviderGate,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
+import { notifyCoverUnavailable } from "../cover-notify.js";
 
 type Helpers = Parameters<Task>[1];
 const VERSION = "mangaupdates-v4",
@@ -175,6 +176,7 @@ async function enrichCover(mediaId: string, h: any) {
     return { status: "SUCCESS", mediaId, provider: "anilist" };
   } catch (error) {
     const code = normalizedError(error);
+    await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",
