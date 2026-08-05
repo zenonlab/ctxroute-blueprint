@@ -20,6 +20,7 @@ import {
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
+import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
 
 type Helpers = Parameters<Task>[1];
 const VERSION = "mangaupdates-v4",
@@ -227,18 +228,38 @@ const task: Task = async (raw, helpers: Helpers) => {
   try {
     let candidates: any[] = [];
     let selected: any | undefined;
+    let fastPath = false;
     const providerOptions = { timeoutMs };
     for (const q of queries) {
       const results = await providerCall(h, () =>
         searchMangaUpdatesSeries(q, providerOptions),
       );
       candidates.push(...results);
+      const exact = results.find((candidate: any) =>
+        [candidate.hitTitle, candidate.title].some((name: unknown) =>
+          typeof name === 'string' && aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(name)),
+        ),
+      );
+      if (exact) {
+        const detailedExact = await providerCall(h, () =>
+          fetchMangaUpdatesSeries(exact.id, providerOptions),
+        );
+        const resolvedExact = resolveMangaUpdatesSeries(aliases, [
+          { ...detailedExact, hitTitle: exact.hitTitle ?? exact.title },
+        ]);
+        if (resolvedExact) {
+          selected = resolvedExact;
+          candidates.push(detailedExact);
+          fastPath = true;
+          break;
+        }
+      }
     }
     candidates = [...new Map(candidates.map((x) => [x.id, x])).values()];
     // Search responses are intentionally incomplete. Resolve every distinct hit
     // before scoring it, while retaining hit_title as an additional signal.
     const detailed: any[] = [];
-    for (const candidate of candidates) {
+    for (const candidate of fastPath ? [] : candidates) {
       try {
         const record = await providerCall(h, () =>
           fetchMangaUpdatesSeries(candidate.id, providerOptions),
@@ -250,23 +271,10 @@ const task: Task = async (raw, helpers: Helpers) => {
       }
     }
     candidates = [...new Map(detailed.map((x) => [x.id, x])).values()];
-    const available: any[] = [];
-    for (const candidate of candidates) {
-      const owner = await h.query(
-        "SELECT media_id FROM media_external_id WHERE provider='mangaupdates' AND external_id=$1 LIMIT 1",
-        [candidate.id],
-      );
-      if (owner.rows[0]?.media_id && owner.rows[0].media_id !== mediaId) {
-        trace(h, "provider_collision", {
-          provider: "mangaupdates",
-          externalId: candidate.id,
-          existingMedia: owner.rows[0].media_id,
-          candidateMedia: mediaId,
-        });
-        continue;
-      }
-      available.push(candidate);
-    }
+    // A provider identity is the canonical work. An existing owner remains a
+    // valid candidate: the new favorite must converge onto it, not create a
+    // second work merely because its provisional source media differs.
+    const available = candidates;
     selected = resolveMangaUpdatesSeries(aliases, available);
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
@@ -283,32 +291,49 @@ const task: Task = async (raw, helpers: Helpers) => {
         errorCode: "NO_RESULT",
         resolutionCode: "NO_RESULT",
       });
+      await markFavoriteUnresolved(h.query, mediaId, "NO_RESULT");
       return;
     }
     const s = selected;
-    const canonicalTitle = s.title ?? aliases[0] ?? "Unknown title";
-    await h.query(
-      "INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangaupdates',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",
-      [mediaId, s.id, { source: "MangaUpdates" }],
-    );
     const owner = await h.query(
       "SELECT media_id FROM media_external_id WHERE provider='mangaupdates' AND external_id=$1",
       [s.id],
     );
-    if (owner.rows[0]?.media_id !== mediaId)
-      throw new Error("MANGAUPDATES_EXTERNAL_ID_CONFLICT");
+    const targetMediaId = owner.rows[0]?.media_id ?? mediaId;
+    if (targetMediaId !== mediaId) {
+      trace(h, "provider_converge", {
+        provider: "mangaupdates",
+        externalId: s.id,
+        existingMedia: targetMediaId,
+        provisionalMedia: mediaId,
+      });
+      await h.query(
+        "INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance) SELECT $1,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance FROM media_title WHERE media_id=$2 ON CONFLICT DO NOTHING",
+        [targetMediaId, mediaId],
+      );
+      await h.query(
+        "UPDATE bookmark_media_link SET media_id=$1,status='review' WHERE media_id=$2 AND status IN ('matched','accepted','review')",
+        [targetMediaId, mediaId],
+      );
+    } else {
+      await h.query(
+        "INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangaupdates',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",
+        [mediaId, s.id, { source: "MangaUpdates" }],
+      );
+    }
+    const canonicalTitle = s.title ?? aliases[0] ?? "Unknown title";
     for (const title of [
       ...new Set([s.title, ...(s.titles ?? [])].filter(Boolean)),
     ])
       await h.query(
         "INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,NULL,'supplier','associated','mangaupdates',$4,$5) ON CONFLICT DO NOTHING",
-        [mediaId, title, normalizeTitle(title), 1, { provider: "mangaupdates", externalId: s.id }],
+        [targetMediaId, title, normalizeTitle(title), 1, { provider: "mangaupdates", externalId: s.id }],
       );
     if (s.title && !aliases.some((alias: string) => alias === s.title))
       await h.query(
         "INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,'en','official','canonical','mangaupdates',$4,$5) ON CONFLICT DO NOTHING",
         [
-          mediaId,
+          targetMediaId,
           s.title,
           normalizeTitle(s.title),
           1,
@@ -321,8 +346,9 @@ const task: Task = async (raw, helpers: Helpers) => {
       );
     await h.query(
       "INSERT INTO media_metadata(media_id,provider,external_id,source_url,status,resolved_at,updated_at) VALUES($1,'mangaupdates',$2,$3,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='mangaupdates',external_id=excluded.external_id,source_url=excluded.source_url,status='ACTIVE',updated_at=now()",
-      [mediaId, s.id, s.url ?? null],
+      [targetMediaId, s.id, s.url ?? null],
     );
+    await markFavoriteMatched(h.query, targetMediaId);
     await finishEnrichment(h, {
       mediaId,
       provider: "mangaupdates",
@@ -333,7 +359,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       externalId: s.id,
       resolutionCode: "SCORED_MATCH",
     });
-    await enrichCover(mediaId, h);
+    await enrichCover(targetMediaId, h);
     return;
   } catch (e) {
     const code = normalizedError(e);
@@ -347,6 +373,8 @@ const task: Task = async (raw, helpers: Helpers) => {
       errorCode: code,
       resolutionCode: code,
     });
+    if (claim.attempt_count >= maxAttempts || code === "NO_RESULT" || code === "NO_MATCH")
+      await markFavoriteUnresolved(h.query, mediaId, code);
     h.logger.warn(`MangaUpdates enrichment failed for ${mediaId}: ${code}`);
     return;
   }

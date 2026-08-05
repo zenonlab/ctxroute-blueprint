@@ -3,6 +3,7 @@ import type { Task } from 'graphile-worker';
 import { compactTitleKey, fetchPageMetadata, normalizeTitle, prepareTitleCandidates, sourceIdentityFromUrl, suspiciousPageMetadata, titleCandidateFromBookmark, type PageMetadata } from '@favlib/metadata';
 import { circuitAllows, closeCircuit, normalizedError, openCircuit } from '../enrichment-state.js';
 import { operationalValue } from '../settings.js';
+import { markFavoriteUnresolved } from '../favorite-resolution.js';
 
 type Payload={userId:string;mediaId:string;title:string;url:string;pageMetadata?:PageMetadata};
 type Helpers=Parameters<Task>[1];
@@ -11,7 +12,7 @@ const similarTitle=(a:string,b:string)=>{const x=normalizeTitle(a),y=normalizeTi
 const task:Task=async(raw,helpers)=>{
   const input=raw as Payload;
   const source=sourceIdentityFromUrl(input.url);
-  if(!source){await helpers.query("UPDATE bookmark_media_link SET status='review',evidence=$1 WHERE user_id=$2 AND media_id=$3",[{reason:'URL_IDENTITY_UNRESOLVED',url:input.url},input.userId,input.mediaId]);await helpers.query("INSERT INTO metadata_attempt(user_id,media_id,input_url,provider,status,error) VALUES($1,$2,$3,'source','IGNORED','URL_IDENTITY_UNRESOLVED')",[input.userId,input.mediaId,input.url]);return}
+  if(!source){await markFavoriteUnresolved(helpers.query,input.mediaId,'URL_IDENTITY_UNRESOLVED');await helpers.query("INSERT INTO metadata_attempt(user_id,media_id,input_url,provider,status,error) VALUES($1,$2,$3,'source','IGNORED','URL_IDENTITY_UNRESOLVED')",[input.userId,input.mediaId,input.url]);return}
   let page=input.pageMetadata;
   if(page&&suspiciousPageMetadata(page))page=undefined;
   if(!page){const domain=new URL(input.url).hostname.toLowerCase();if(await circuitAllows(helpers,domain))try{page=await fetchPageMetadata(input.url);await closeCircuit(helpers,domain)}catch(error){const code=normalizedError(error);await openCircuit(helpers,domain,code,300,86400);await helpers.query("INSERT INTO metadata_attempt(user_id,media_id,input_url,provider,status,error,next_retry_at) VALUES($1,$2,$3,'source-page','FAILED',$4,now()+interval '5 minutes')",[input.userId,input.mediaId,input.url,code])}}
@@ -32,7 +33,7 @@ const task:Task=async(raw,helpers)=>{
   // so the existing newest-personal display policy resolves Re:Monster rather
   // than the noisy browser label.
   if(preparation.personal)await helpers.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,personal_status,connector,confidence,provenance) VALUES($1,$2,$3,NULL,'personal','favorite','PERSONAL_ONLY',$4,1,$5) ON CONFLICT DO NOTHING",[mediaId,preparation.personal,normalizeTitle(preparation.personal),`chrome-bookmark:${input.userId}`,{userId:input.userId,official:false,original:false,role:'cleaned-personal-title',urlSlug:source.slug}]);
-  await helpers.query("UPDATE bookmark_media_link SET media_id=$1,status='matched',evidence=$2 WHERE user_id=$3 AND media_id=$4",[mediaId,{source:'source-url',canonicalUrl:source.canonicalUrl},input.userId,input.mediaId]);
+  await helpers.query("UPDATE bookmark_media_link SET media_id=$1,status='review',evidence=$2 WHERE user_id=$3 AND media_id=$4",[mediaId,{source:'source-url',canonicalUrl:source.canonicalUrl},input.userId,input.mediaId]);
   if(pageTitle&&page&&similarTitle(pageTitle,source.title))await helpers.query("INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence) VALUES($1,'title',$2,'source-page',$3,.85) ON CONFLICT DO NOTHING",[mediaId,JSON.stringify(pageTitle),page.canonicalUrl]);
   if(page?.image)await helpers.query("INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence) VALUES($1,'sourceImageHint',$2,'source-page',$3,.2) ON CONFLICT DO NOTHING",[mediaId,JSON.stringify(page.image),page.canonicalUrl]);
   await helpers.query("INSERT INTO media_metadata(media_id,provider,source_url,status,updated_at) VALUES($1,'source-page',$2,'FALLBACK',now()) ON CONFLICT(media_id) DO NOTHING",[mediaId,page?.canonicalUrl??source.canonicalUrl]);

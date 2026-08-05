@@ -19,6 +19,7 @@ import {
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
+import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -312,7 +313,7 @@ async function persist(
   // Relations remain in the favorite work's provider assertion below. They
   // are descriptive cache data, not independent catalog membership.
   await h.query(
-    "UPDATE bookmark_media_link SET media_id=$1,status='matched',evidence=$2 WHERE media_id=$3 AND status IN ('matched','review','accepted')",
+    "UPDATE bookmark_media_link SET media_id=$1,status='review',evidence=$2 WHERE media_id=$3 AND status IN ('matched','review','accepted')",
     [target, { provider: "anilist", externalId: m.id }, mediaId],
   );
   const themes = [
@@ -400,6 +401,7 @@ async function persist(
     "INSERT INTO media_metadata(media_id,provider,external_id,source_url,status,resolved_at,updated_at) VALUES($1,'anilist',$2,$3,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='anilist',external_id=excluded.external_id,source_url=excluded.source_url,status='ACTIVE',resolved_at=now(),updated_at=now()",
     [target, String(m.id), source],
   );
+  await markFavoriteMatched(h.query, target);
   return { target, cover: m.coverImage };
 }
 
@@ -499,6 +501,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
           continue;
         }
         eligible.push(candidate);
+        if (candidateTitles(candidate).some((title) =>
+          aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(title)),
+        )) selected = candidate;
       }
     }
     if (!selected)
@@ -520,6 +525,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         errorCode: "NO_RESULT",
         resolutionCode: "NO_RESULT",
       });
+      await markFavoriteUnresolved(h.query, mediaId, "NO_RESULT");
       return { status: "REVIEW", reason: "NO_RESULT" };
     }
     const complete =
@@ -582,6 +588,8 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       errorCode: code,
       resolutionCode: code,
     });
+    if (claim.attempt_count >= maxAttempts || code === "NO_RESULT" || code === "NO_MATCH")
+      await markFavoriteUnresolved(h.query, mediaId, code);
     h.logger.warn(`AniList enrichment failed for ${mediaId}: ${code}`);
     return { status: "FAILED", reason: code };
   }
