@@ -1356,11 +1356,27 @@ function mangaUpdatesOelComicEvidence(series: MangaUpdatesSeries) {
   return /\bchapters?\b|\bwebtoon\b|\bwebcomic\b|\bcomic\b/u.test(evidence);
 }
 
+const TITLE_STOP_WORDS = new Set([
+  "a", "an", "and", "as", "at", "be", "by", "for", "from", "in", "is", "it", "its",
+  "no", "of", "on", "or", "the", "to", "wa", "ga", "ni",
+]);
+const ORDINAL_WORDS = new Map(Object.entries({
+  first: "1", second: "2", third: "3", fourth: "4", fifth: "5",
+  sixth: "6", seventh: "7", eighth: "8", ninth: "9", tenth: "10",
+  eleventh: "11", twelfth: "12", thirteenth: "13", fourteenth: "14",
+  fifteenth: "15", sixteenth: "16", seventeenth: "17", eighteenth: "18",
+  nineteenth: "19", twentieth: "20",
+}));
+
+/** Identity-bearing title tokens. This deliberately normalizes grammar and
+ * ordinal spelling, but never invents provider-specific aliases. */
 function meaningfulTokens(value: string) {
   return normalizeTitle(value)
     .split(" ")
+    .map((token) => token.replace(/^(\d+)(?:st|nd|rd|th)$/u, "$1"))
+    .map((token) => ORDINAL_WORDS.get(token) ?? token)
     .map((token) => /^(?:return|returns|returned|returning)$/u.test(token) ? "return" : token)
-    .filter((token) => token.length >= 2 && !/^(?:the|a|an|of|and|no|ni|wa|ga)$/u.test(token));
+    .filter((token) => token.length >= 2 && !TITLE_STOP_WORDS.has(token));
 }
 
 function candidateTitles(series: MangaUpdatesSeries) {
@@ -1431,9 +1447,20 @@ function scoreMangaUpdatesSeries(aliases: string[], series: MangaUpdatesSeries) 
         best = Math.max(best, exactNames.includes(name) ? 118 : 103);
       else if (normalizedName.includes(alias) || alias.includes(normalizedName)) best = Math.max(best, 76);
       const wanted = new Set(meaningfulTokens(alias));
-      const found = meaningfulTokens(name).filter((token) => wanted.has(token));
-      if (wanted.size && found.length / wanted.size >= 0.8)
-        best = Math.max(best, 55 + Math.round((found.length / wanted.size) * 20));
+      const offered = new Set(meaningfulTokens(name));
+      const intersection = [...wanted].filter((token) => offered.has(token)).length;
+      const smaller = Math.min(wanted.size, offered.size);
+      const larger = Math.max(wanted.size, offered.size);
+      const containment = smaller ? intersection / smaller : 0;
+      const coverage = larger ? intersection / larger : 0;
+      const dice = wanted.size + offered.size
+        ? (2 * intersection) / (wanted.size + offered.size)
+        : 0;
+      // Require several shared identity tokens and strong symmetric coverage.
+      // Function words cannot inflate the result, while harmless grammatical
+      // rewrites and ordinal spelling remain equivalent.
+      if (intersection >= 3 && containment >= 0.8 && coverage >= 0.6 && dice >= 0.7)
+        best = Math.max(best, 55 + Math.round(dice * 35));
     }
   }
   return best + (series.hitTitle ? 3 : 0) + (series.image ? 2 : 0) + (series.description ? 1 : 0);
@@ -1449,7 +1476,13 @@ export function resolveMangaUpdatesSeries(
     .map((item) => ({ ...item, score: scoreMangaUpdatesSeries(aliases, item) }))
     .filter((item) => item.score >= 55)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
-  return ranked[0] ?? null;
+  const first = ranked[0];
+  if (!first) return null;
+  const second = ranked[1];
+  // Exact identities are decisive. A fuzzy identity must have a clear lead so
+  // provider ordering can never silently choose between plausible works.
+  if (first.score < 100 && second && first.score - second.score < 8) return null;
+  return first;
 }
 
 export type MangaUpdatesMatch = {

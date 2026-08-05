@@ -27,7 +27,7 @@ import { openReviewsForMedia } from "../favorite-review.js";
 import { isManualOnlyReviewTitle } from "../favorite-review.js";
 
 type Helpers = Parameters<Task>[1];
-export const MANGAUPDATES_ENRICHMENT_VERSION = "mangaupdates-v6";
+export const MANGAUPDATES_ENRICHMENT_VERSION = "mangaupdates-v7";
 const VERSION = MANGAUPDATES_ENRICHMENT_VERSION,
   COVER_VERSION = "mangaupdates-cover-v6";
 function snapshotCandidates(items: any[]) {

@@ -475,6 +475,30 @@ describe("AniList catalogue", () => {
     expect(resolveMangaUpdatesSeries(["The Crazy Genius Returns"], [{ ...candidate, id: "unrelated", title: "The Hero Returns", titles: [] }])).toBeNull();
   });
 
+  it("matches grammatical rewrites and ordinal spellings without title-specific aliases", () => {
+    const intended = { id: "chaebol", title: "Turns Out to Be a Third-Generation Chaebol", type: "Manhwa", year: 2026, status: "12 Chapters (Ongoing)" };
+    const unrelated = { id: "secret", title: "Secret Affairs of the 3rd Generation Chaebol", type: "Manhwa", year: 2026, status: "Ongoing" };
+    expect(resolveMangaUpdatesSeries(
+      ["Turns Out, It’s the 3rd Generation of the Chaebol"],
+      [unrelated, intended],
+    )?.id).toBe("chaebol");
+  });
+
+  it("rejects a semantic guess and equally plausible fuzzy candidates", () => {
+    const base = { type: "Manhwa", year: 2025, status: "Ongoing" };
+    expect(resolveMangaUpdatesSeries(
+      ["Hua Tuo Reincarnated as a Modern Surgical Genius"],
+      [{ ...base, id: "surgeon", title: "Hua Tuo Becomes a Surgeon" }],
+    )).toBeNull();
+    expect(resolveMangaUpdatesSeries(
+      ["Return of the Frozen Player"],
+      [
+        { ...base, id: "one", title: "The Frozen Player Returns" },
+        { ...base, id: "two", title: "Return of a Frozen Player" },
+      ],
+    )).toBeNull();
+  });
+
   it("uses all aliases, including a later alias, and does not reject chapter zero with identity", () => {
     const zeroChapter = { id: "1", title: "Preferred title", type: "Manga", image: "https://img/cover.jpg", latestChapter: "0" };
     expect(isDeadMangaUpdatesSeries(zeroChapter)).toBe(false);
