@@ -920,6 +920,12 @@ export function matchAniList(
         if (normalizedName === normalizedAlias) best = Math.max(best, 100);
         else if (compactTitleKey(name) === compactAlias) best = Math.max(best, 98);
         else if (normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) best = Math.max(best, 76);
+        else {
+          const wanted = new Set(normalizedAlias.split(" ").filter((token) => token.length >= 2));
+          const found = normalizedName.split(" ").filter((token) => wanted.has(token));
+          if (wanted.size >= 2 && found.length / wanted.size >= 0.6)
+            best = Math.max(best, 55 + Math.round((found.length / wanted.size) * 35));
+        }
       }
     }
     return best;
