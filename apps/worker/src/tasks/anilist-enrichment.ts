@@ -113,6 +113,23 @@ export function anilistProviderVariants(values: string[]) {
   return [...variants];
 }
 
+/**
+ * A bounded provider-native fallback: search only the most informative title
+ * token(s), then rank the returned candidates against the complete aliases.
+ * This is deliberately not a cartesian product of token combinations.
+ */
+export function anilistAnchorVariants(values: string[]) {
+  const anchors = new Set<string>();
+  for (const value of values) {
+    const tokens = normalizeTitle(value)
+      .split(" ")
+      .filter((token) => token.length >= 4 && !/^(?:the|this|that|with|from|into|your|once|life|man|girl|boy)$/u.test(token))
+      .sort((a, b) => b.length - a.length);
+    if (tokens[0]) anchors.add(tokens[0]);
+  }
+  return [...anchors].slice(0, 4);
+}
+
 async function assertion(
   h: Helpers,
   mediaId: string,
@@ -444,10 +461,13 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         );
       } else selected = known;
     }
-    const pendingVariants = anilistProviderVariants([
+    const pendingVariants = [
+      ...anilistProviderVariants([
       ...aliases,
       ...(known && known.type !== "ANIME" ? candidateTitles(known) : []),
-    ]);
+      ]),
+      ...anilistAnchorVariants(aliases),
+    ];
     const queuedVariants = new Set(pendingVariants);
     for (
       let variantIndex = 0;
