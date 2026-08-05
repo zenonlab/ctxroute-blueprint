@@ -919,7 +919,7 @@ export function matchAniList(
         const normalizedName = normalizeTitle(name);
         if (normalizedName === normalizedAlias) best = Math.max(best, 100);
         else if (compactTitleKey(name) === compactAlias) best = Math.max(best, 98);
-        else if (normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) best = Math.max(best, 76);
+        else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) && !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1)) best = Math.max(best, 76);
         else {
           const wanted = new Set(normalizedAlias.split(" ").filter((token) => token.length >= 2));
           const found = normalizedName.split(" ").filter((token) => wanted.has(token));
