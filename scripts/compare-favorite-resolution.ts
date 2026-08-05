@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { prepareTitleCandidates, sourceIdentityFromUrl, titleVariants } from "@favlib/metadata";
+import { matchAniList, prepareTitleCandidates, sourceIdentityFromUrl, titleVariants } from "@favlib/metadata";
 
 type Favorite = { id: string; title: string; url: string; providerTitles?: string[] };
 
@@ -47,9 +47,50 @@ const report = favorites.map((favorite) => {
   };
 });
 
+const checks: Array<{ stage: string; passed: boolean; detail: string }> = [];
+const check = (stage: string, passed: boolean, detail: string) => checks.push({ stage, passed, detail });
+
+// Stage 1: URL parser and bookmark preparation must produce a usable source
+// identity and preserve the personal title separately.
+check("01-parser", report.filter((item) => item.slug && item.parsedSourceTitle).length === report.length,
+  `${report.filter((item) => item.slug && item.parsedSourceTitle).length}/${report.length} favoris ont un slug et un titre source`);
+check("01-parser-personal", report.filter((item) => item.parsedPersonalTitle).length === report.length,
+  `${report.filter((item) => item.parsedPersonalTitle).length}/${report.length} favoris conservent un titre personnel`);
+
+// Stage 2: provider observations may be compared, but must not enter the new
+// local alias set.
+const providerLeak = report.filter((item) => {
+  const favorite = favorites.find((candidate) => candidate.id === item.id);
+  return (favorite?.providerTitles ?? []).some((title) => item.after.aliases.includes(title));
+});
+check("02-provenance", providerLeak.length === 0, providerLeak.length ? `${providerLeak.length} fuite(s) d’alias fournisseur` : "aucune observation fournisseur dans les alias locaux");
+
+// Stage 3: the before/after query plan is observable and bounded.
+const changed = report.filter((item) => item.changed);
+check("03-query-plan", report.every((item) => item.after.queries.length <= 64), `${Math.max(...report.map((item) => item.after.queries.length))} requêtes logiques maximum dans le corpus`);
+check("03-regression-signal", changed.some((item) => item.id === "regression-dragon"), "le cas de découverte secondaire est détecté");
+
+// Stage 4: detached provider responses exercise the current matching contract.
+const isekai = { id: 1, type: "ANIME" as const, title: { userPreferred: "Isekai Oji-san" }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] };
+const manga = { ...isekai, id: 2, type: "MANGA" as const };
+check("04-exact-compact", matchAniList({ aliases: ["Isekai Ojisan"], type: "ANIME" }, [isekai]).media.id === 1, "Isekai Ojisan ↔ Isekai Oji-san");
+check("04-type", matchAniList({ aliases: ["Isekai Ojisan"], type: "ANIME" }, [manga]) === null, "un candidat manga n’est pas accepté pour un anime");
+check("04-low-confidence", matchAniList({ aliases: ["Good Bye Dragon Life"], type: "ANIME" }, [{ ...isekai, id: 3, title: { userPreferred: "Sayonara Ryuusei Konnichiwa Jinsei" } }]) === null, "un titre seulement ressemblant reste non résolu");
+
+// Stage 5: the old fallback can discover a provider title, but this remains a
+// query hint only; it is never promoted to source/personal provenance.
+const dragon = report.find((item) => item.id === "regression-dragon");
+check("05-observation-fallback", Boolean(dragon?.before.providerObservationUsedAsQuery) && !dragon?.after.providerObservationUsedAsQuery,
+  "le fallback historique est visible et sa suppression actuelle est mesurée");
+
+const passed = checks.filter((item) => item.passed).length;
+for (const item of checks) console.log(`[${item.passed ? "PASS" : "FAIL"}] ${item.stage}: ${item.detail}`);
+if (passed !== checks.length) process.exitCode = 1;
+
 console.log(JSON.stringify({
   purpose: "Detached before/after comparison; providerTitles are observations only",
   count: report.length,
   changedCount: report.filter((item) => item.changed).length,
+  stages: { passed, total: checks.length },
   cases: report,
 }, null, 2));
