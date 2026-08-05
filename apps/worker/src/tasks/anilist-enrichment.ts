@@ -121,6 +121,8 @@ export function anilistProviderVariants(values: string[]) {
 export function anilistAnchorVariants(values: string[]) {
   const anchors = new Set<string>();
   for (const value of values) {
+    const compact = value.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+    if (compact.length >= 6) anchors.add(compact);
     const tokens = normalizeTitle(value)
       .split(" ")
       .filter((token) => token.length >= 4 && !/^(?:the|this|that|with|from|into|your|once|life|man|girl|boy)$/u.test(token))
