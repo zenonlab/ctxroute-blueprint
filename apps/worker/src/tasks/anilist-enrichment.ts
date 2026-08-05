@@ -3,7 +3,7 @@ import type { Task } from "graphile-worker";
 import {
   fetchAniList,
   cleanDisplayTitle,
-  compactTitleKey,
+  exactAniListMediaMatches,
   matchAniList,
   normalizeTitle,
   searchAniList,
@@ -22,8 +22,9 @@ import {
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
-import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
-import { isParenthesizedAmbiguity, openReviewsForMedia } from "../favorite-review.js";
+import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
+import { openReviewsForMedia } from "../favorite-review.js";
+import { isManualOnlyReviewTitle } from "../favorite-review.js";
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -36,6 +37,24 @@ function trace(h: Helpers, event: string, data: Record<string, unknown>) {
   else if (logger.info) logger.info(message);
   else h.logger.warn(message);
 }
+async function providerRequest<T>(
+  h: Helpers,
+  operation: string,
+  input: Record<string, unknown>,
+  request: () => Promise<T>,
+): Promise<T> {
+  trace(h, "provider_exchange_input", { provider: "anilist", operation, input });
+  try {
+    const output = await request();
+    trace(h, "provider_exchange_output", { provider: "anilist", operation, input, output });
+    return output;
+  } catch (error) {
+    trace(h, "provider_exchange_error", {
+      provider: "anilist", operation, input, error: normalizedError(error),
+    });
+    throw error;
+  }
+}
 function titleOf(m: AniListMedia) {
   return (
     m.title.userPreferred ??
@@ -47,20 +66,7 @@ function titleOf(m: AniListMedia) {
   );
 }
 export function serializeCandidateSnapshot(items: AniListMedia[]) {
-  return JSON.stringify(
-    items.slice(0, 10).map((x) => ({
-      id: x.id,
-      type: x.type,
-      title: titleOf(x),
-      titles: candidateTitles(x),
-      synonyms: x.synonyms,
-      siteUrl: x.siteUrl,
-      year: x.startYear,
-      format: x.format,
-      status: x.status,
-      coverImage: x.coverImage,
-    })),
-  );
+  return JSON.stringify(items);
 }
 
 function candidateTitles(media: AniListMedia) {
@@ -461,7 +467,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     const knownId = Number(context.anilist_id);
     const known =
       Number.isInteger(knownId) && knownId > 0
-        ? await fetchAniList(knownId, { timeoutMs, hooks: aniListHooks(h) })
+        ? await providerRequest(h, "fetch-media", { id: knownId, source: "known-id" }, () => fetchAniList(knownId, { timeoutMs, hooks: aniListHooks(h) }))
         : null;
     const items: AniListMedia[] = [];
     const seenItems = new Set<number>();
@@ -493,19 +499,23 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       ...anilistAnchorVariants(aliases),
     ].slice(0, 32);
     const observedVariants = new Set<string>();
+    const manualOnlyReview = aliases.some((alias: string) => isManualOnlyReviewTitle(alias));
+    if (manualOnlyReview) {
+      selected = undefined;
+      selectedResolutionCode = "NONE";
+    }
     for (
       let variantIndex = 0;
       !selected && variantIndex < pendingVariants.length;
       variantIndex++
     ) {
       const alias = pendingVariants[variantIndex];
-      const pages = await Promise.all([1, 2].map((page) => searchAniList(alias, {
-        timeoutMs,
-        hooks: aniListHooks(h),
-        type: "ANIME",
-        page,
-        perPage: 10,
-      })));
+      const pages = await Promise.all([1, 2].map((page) => providerRequest(
+        h, "search", { query: alias, page, perPage: 10, type: "ANIME" },
+        () => searchAniList(alias, {
+          timeoutMs, hooks: aniListHooks(h), type: "ANIME", page, perPage: 10,
+        }),
+      )));
       const candidates = pages.flat();
       remember(candidates);
       for (const candidate of candidates) {
@@ -533,21 +543,15 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       }
     }
     if (!selected) {
-      const exact = [...new Map(eligible.filter((candidate) => {
-        const names = candidateTitles(candidate);
-        return aliases.some((alias: string) => names.some((name) =>
-          normalizeTitle(alias) === normalizeTitle(name) ||
-          compactTitleKey(alias) === compactTitleKey(name),
-        ));
-      }).map((candidate) => [candidate.id, candidate] as const)).values()];
+      const exact = exactAniListMediaMatches(aliases, eligible);
       // A single compact/normalized exact identity is safe; ties stay a user
       // decision even when AniList returned them in a stable order.
-      if (exact.length === 1)
+      if (!manualOnlyReview && exact.length === 1)
         {
           selected = exact[0];
           selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
         }
-      else if (exact.length === 0)
+      else if (!manualOnlyReview && exact.length === 0)
         {
           selected = matchAniList({ aliases, type: "ANIME" }, eligible)?.media ?? undefined;
           if (selected) selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
@@ -557,19 +561,19 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2::text AND provider='anilist' AND purpose='metadata' AND connector_version=$3::text",
       [serializeCandidateSnapshot(items), mediaId, ENRICHMENT_VERSION],
     );
-    const ambiguity = aliases.some((alias: string) => isParenthesizedAmbiguity(alias, items.map(item => ({...item, title: titleOf(item), id: String(item.id)}))));
-    if (ambiguity || (!selected && items.length > 0)) {
+    const ambiguity = exactAniListMediaMatches(aliases, eligible).length > 1;
+    if (manualOnlyReview || ambiguity || (!selected && items.length > 0)) {
       // Detail every displayed candidate before exposing it to the user.
-      const exactItems = items.filter(item => candidateTitles(item).some(name => aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(name) || compactTitleKey(alias) === compactTitleKey(name))));
-      const reviewItems = (exactItems.length > 1 ? exactItems : items).filter(item => item.type === 'ANIME').slice(0, 5);
-      const detailed = await Promise.all(reviewItems.map(async item => {
-        try { return await fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) }); } catch { return item; }
+      const exactItems = exactAniListMediaMatches(aliases, eligible);
+      const reviewItems = (exactItems.length > 1 ? exactItems : items).filter(item => item.type === 'ANIME');
+      const detailed = manualOnlyReview ? [] : await Promise.all(reviewItems.map(async item => {
+        try { return await providerRequest(h, "fetch-review-candidate", { id: item.id }, () => fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) })); } catch { return item; }
       }));
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
-      const reason = items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
+      const reason = manualOnlyReview ? 'MANUAL_REVIEW' : items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
       await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? aliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'anilist', candidates: detailed.map(item => ({...item, id: String(item.id), title: titleOf(item)})), mediaId, reason });
-      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, reason]);
+      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2::text) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, reason]);
       await finishEnrichment(h, { mediaId, provider: 'anilist', purpose: 'metadata', version: ENRICHMENT_VERSION, owner: claim.owner, status: 'NO_MATCH', errorCode: reason, resolutionCode: reason, });
       return { status: 'REVIEW', reason };
     }
@@ -592,10 +596,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     const complete =
       selected === known
         ? known
-        : await fetchAniList(selected.id, {
-            timeoutMs,
-            hooks: aniListHooks(h),
-          });
+        : await providerRequest(h, "fetch-selected", { id: selected.id }, () => fetchAniList(selected.id, {
+            timeoutMs, hooks: aniListHooks(h),
+          }));
     if (complete.type !== "ANIME") throw new Error("ANILIST_WRONG_MEDIA_TYPE");
     trace(h, "anilist_match", {
       mediaId,
@@ -606,6 +609,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     const persisted = await persist(h, mediaId, complete, {
       displayTitle: titleOf(complete),
     });
+    await reconcileResolvedFavoriteReviews(h.query, persisted.target);
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",

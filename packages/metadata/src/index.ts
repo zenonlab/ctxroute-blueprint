@@ -185,6 +185,43 @@ export function normalizeTitle(v: string) {
     .replace(/\s+/g, " ");
 }
 
+/** Match an alias against a provider title, including only a final
+ * parenthesized suffix (for example `Existence (Wangho)`). */
+export function exactTitleMatchKind(alias: string, title: string):
+  | "NORMALIZED_EXACT"
+  | "COMPACT_EXACT"
+  | "PARENTHESIZED_EXACT"
+  | undefined {
+  const normalizedAlias = normalizeTitle(alias);
+  const normalizedTitle = normalizeTitle(title);
+  if (!normalizedAlias || !normalizedTitle) return undefined;
+  if (normalizedTitle === normalizedAlias) return "NORMALIZED_EXACT";
+  if (compactTitleKey(title) === compactTitleKey(alias)) return "COMPACT_EXACT";
+  if (seasonTitleKey(normalizedAlias) === seasonTitleKey(normalizedTitle) &&
+      seasonTitleKey(normalizedAlias) !== normalizedAlias)
+    return "COMPACT_EXACT";
+  const base = title.replace(/\s*\([^()]*\)\s*$/u, "").trim();
+  if (base !== title && normalizeTitle(base) === normalizedAlias)
+    return "PARENTHESIZED_EXACT";
+  if (base !== title && compactTitleKey(base) === compactTitleKey(alias))
+    return "PARENTHESIZED_EXACT";
+  return undefined;
+}
+
+const ROMAN_SEASONS = new Map([
+  ["i", "1"], ["ii", "2"], ["iii", "3"], ["iv", "4"], ["v", "5"],
+  ["vi", "6"], ["vii", "7"], ["viii", "8"], ["ix", "9"], ["x", "10"],
+]);
+
+/** Normalize only an explicit final season marker. Numbers elsewhere remain
+ * identity-bearing title text and are never rewritten. */
+function seasonTitleKey(value: string) {
+  const match = value.match(/^(.*?)(?:\s+(?:season|saison))?\s+(\d{1,2}|i{1,3}|iv|v|vi{0,3}|ix|x)(?:\s+(?:season|saison))?$/u);
+  if (!match?.[1] || !match[2]) return value;
+  const season = ROMAN_SEASONS.get(match[2]) ?? match[2];
+  return `${match[1].trim()} season ${season}`;
+}
+
 export function titleCandidateFromBookmark(v: string) {
   let s = v.replace(/\s+/g, " ").trim();
   s = s.replace(/^(?:read|watch|lire|regarder)\s+/i, "");
@@ -960,8 +997,10 @@ export function matchAniList(
           if (score > best.score || (score === best.score && `${name}` < `${best.matchedTitle ?? "~"}`))
             best = { media, score, matchedAlias: alias, matchedTitle: name, reason };
         };
-        if (normalizedName === normalizedAlias) candidate(100, "NORMALIZED_EXACT");
-        else if (compactTitleKey(name) === compactAlias) candidate(98, "COMPACT_EXACT");
+        const exactKind = exactTitleMatchKind(alias, name);
+        if (exactKind === "NORMALIZED_EXACT") candidate(100, "NORMALIZED_EXACT");
+        else if (exactKind === "COMPACT_EXACT") candidate(98, "COMPACT_EXACT");
+        else if (exactKind === "PARENTHESIZED_EXACT") candidate(96, "COMPACT_EXACT");
         else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) && !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1)) candidate(76, "PARTIAL");
         else {
           const wanted = new Set(normalizedAlias.split(" ").filter((token) => token.length >= 2));
@@ -1307,9 +1346,20 @@ export function mangaUpdatesMediaType(value: unknown): "MANGA" | "MANHWA" | "MAN
   return undefined;
 }
 
+function mangaUpdatesOelComicEvidence(series: MangaUpdatesSeries) {
+  if (String(series.type ?? "").trim().toLowerCase() !== "oel") return false;
+  const evidence = [
+    series.status,
+    ...(series.categories ?? []),
+    ...(series.publications ?? []),
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /\bchapters?\b|\bwebtoon\b|\bwebcomic\b|\bcomic\b/u.test(evidence);
+}
+
 function meaningfulTokens(value: string) {
   return normalizeTitle(value)
     .split(" ")
+    .map((token) => /^(?:return|returns|returned|returning)$/u.test(token) ? "return" : token)
     .filter((token) => token.length >= 2 && !/^(?:the|a|an|of|and|no|ni|wa|ga)$/u.test(token));
 }
 
@@ -1324,13 +1374,23 @@ export function exactMangaUpdatesSeriesMatches(
   aliases: string[],
   items: MangaUpdatesSeries[],
 ) {
-  const keys = aliases.flatMap((alias) => [normalizeTitle(alias), compactTitleKey(alias)]);
   return [...new Map(items
     .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
-    .filter((item) => candidateTitles(item).some((title) => {
-      const normalized = normalizeTitle(title);
-      return keys.includes(normalized) || keys.includes(compactTitleKey(title));
-    }))
+    .filter((item) => candidateTitles(item).some((title) =>
+      aliases.some((alias) => exactTitleMatchKind(alias, title))))
+    .map((item) => [item.id, item] as const)).values()];
+}
+
+export function exactAniListMediaMatches(aliases: string[], items: AniListMedia[]) {
+  return [...new Map(items
+    .filter((item) => [
+      item.title.english,
+      item.title.romaji,
+      item.title.userPreferred,
+      item.title.native,
+      ...item.synonyms,
+    ].filter((title): title is string => Boolean(title?.trim())).some((title) =>
+      aliases.some((alias) => exactTitleMatchKind(alias, title))))
     .map((item) => [item.id, item] as const)).values()];
 }
 
@@ -1350,7 +1410,8 @@ export function isDeadMangaUpdatesSeries(series: MangaUpdatesSeries) {
 export function mangaUpdatesTypeAllowed(series: MangaUpdatesSeries) {
   const values = [series.type, series.format].filter(Boolean).join(" ").toLowerCase();
   if (MU_NOVEL_TYPES.test(values)) return false;
-  return !values || Boolean(mangaUpdatesMediaType(series.type) ?? mangaUpdatesMediaType(series.format));
+  return !values || Boolean(mangaUpdatesMediaType(series.type) ?? mangaUpdatesMediaType(series.format)) ||
+    mangaUpdatesOelComicEvidence(series);
 }
 
 export type ScoredMangaUpdatesCandidate = MangaUpdatesSeries & { score: number };
@@ -1363,8 +1424,11 @@ function scoreMangaUpdatesSeries(aliases: string[], series: MangaUpdatesSeries) 
   for (const alias of normalizedAliases) {
     for (const name of names) {
       const normalizedName = normalizeTitle(name);
-      if (normalizedName === alias)
+      const exactKind = exactTitleMatchKind(alias, name);
+      if (exactKind === "NORMALIZED_EXACT")
         best = Math.max(best, exactNames.includes(name) ? 120 : 105);
+      else if (exactKind === "COMPACT_EXACT" || exactKind === "PARENTHESIZED_EXACT")
+        best = Math.max(best, exactNames.includes(name) ? 118 : 103);
       else if (normalizedName.includes(alias) || alias.includes(normalizedName)) best = Math.max(best, 76);
       const wanted = new Set(meaningfulTokens(alias));
       const found = meaningfulTokens(name).filter((token) => wanted.has(token));

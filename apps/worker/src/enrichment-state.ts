@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 // Bump when resolution semantics change so terminal decisions from the old
 // scorer/ambiguity resolver are retried under the first-result rule.
-export const ENRICHMENT_VERSION = "anilist-v7";
+export const ENRICHMENT_VERSION = "anilist-v8";
 export type EnrichmentStatus =
   "PENDING" | "SUCCESS" | "NO_MATCH" | "FAILED" | "TERMINAL";
 type Query = {
@@ -47,6 +47,9 @@ export function normalizedError(error: unknown) {
       .slice(0, 100) || "UNKNOWN_ERROR"
   );
 }
+export function retryableProviderError(code: string) {
+  return /^(?:TIMEOUT|RATE_LIMITED|HTTP_429|HTTP_5\d\d|MANGAUPDATES_HTTP_5\d\d|ANILIST_HTTP_5\d\d)$/u.test(code) || /(?:TIMEOUT|HTTP_429|HTTP_5\d\d|503)/u.test(code);
+}
 
 export async function canonicalEnrichmentInput(db: Query, mediaId: string) {
   const result = await db.query(
@@ -84,6 +87,11 @@ export async function acquireProviderSlot(
   provider: string,
   waitMs = 50,
 ) {
+  await db.query(
+    `INSERT INTO provider_request_gate(provider,next_allowed_at)
+     VALUES($1,now()) ON CONFLICT(provider) DO NOTHING`,
+    [provider],
+  );
   for (;;) {
     const result = await db.query(
       `UPDATE provider_request_gate SET in_flight=in_flight+1,updated_at=now() WHERE provider=$1 AND (blocked_until IS NULL OR blocked_until<=now()) AND in_flight<max_in_flight RETURNING provider`,

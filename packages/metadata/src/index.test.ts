@@ -7,8 +7,11 @@ import {
   matchMangaUpdates,
   resolveMangaUpdatesSeries,
   exactMangaUpdatesSeriesMatches,
+  exactAniListMediaMatches,
+  exactTitleMatchKind,
   isDeadMangaUpdatesSeries,
   mangaUpdatesMediaType,
+  mangaUpdatesTypeAllowed,
   searchAniList,
   sourceDispositionFromUrl,
   sourceIdentityFromUrl,
@@ -34,6 +37,16 @@ describe("deterministic display-title cleaning", () => {
 });
 
 describe("AniList catalogue", () => {
+  it("matches exact titles in all fields and treats a final parenthesized suffix as a variant", () => {
+    expect(exactTitleMatchKind("Existence", "Existence")).toBe("NORMALIZED_EXACT");
+    expect(exactTitleMatchKind("Existence", "Existence (Wangho)")).toBe("PARENTHESIZED_EXACT");
+    expect(exactTitleMatchKind("Existence", "Existence (Wangho) Extra")).toBeUndefined();
+    const items = [
+      { id: 1, type: "ANIME", title: { userPreferred: "Other" }, synonyms: ["Existence"] },
+      { id: 2, type: "ANIME", title: { userPreferred: "Existence (Wangho)" }, synonyms: [] },
+    ] as any;
+    expect(exactAniListMediaMatches(["Existence"], items).map(item => item.id)).toEqual([1, 2]);
+  });
   it("prepares bookmark and URL titles using URL release evidence", () => {
     const anime = sourceIdentityFromUrl("https://v5.voiranime.com/anime/remonster/re-monster-02-vostfr/");
     expect(anime).toMatchObject({ title: "Re Monster", type: "ANIME", slug: "remonster" });
@@ -439,6 +452,29 @@ describe("AniList catalogue", () => {
     )?.series.id).toBe("god-of-war-mu");
   });
 
+  it("accepts only OEL records with comic evidence and still rejects every novel", () => {
+    const comic = { id: "oel-comic", title: "The Beginning After the End", type: "OEL", status: "227 Chapters (Ongoing)", image: "https://img.example/oel.jpg" };
+    expect(mangaUpdatesTypeAllowed(comic)).toBe(true);
+    expect(resolveMangaUpdatesSeries(["The Beginning After the End"], [comic])?.id).toBe("oel-comic");
+    expect(mangaUpdatesTypeAllowed({ ...comic, id: "oel-unproven", status: undefined, categories: [] })).toBe(false);
+    expect(mangaUpdatesTypeAllowed({ ...comic, id: "novel", type: "OEL Web Novel" })).toBe(false);
+    expect(mangaUpdatesTypeAllowed({ ...comic, id: "novel-2", type: "Novel", status: "227 Chapters" })).toBe(false);
+  });
+
+  it("matches only explicit final season markers across roman and arabic forms", () => {
+    const seasonFive = { id: 170732, type: "ANIME", title: { userPreferred: "Dungeon title" }, synonyms: ["DanMachi V", "DanMachi Season 5"] } as any;
+    const seasonSix = { id: 207385, type: "ANIME", title: { userPreferred: "DanMachi VI" }, synonyms: [] } as any;
+    expect(exactAniListMediaMatches(["Danmachi 5"], [seasonFive, seasonSix]).map(item => item.id)).toEqual([170732]);
+    expect(matchAniList({ aliases: ["Danmachi 5"], type: "ANIME" }, [seasonSix, seasonFive])?.media.id).toBe(170732);
+    expect(exactTitleMatchKind("Studio 54", "Studio LIV")).toBeUndefined();
+  });
+
+  it("normalizes only the return inflection for a strong multi-token MangaUpdates match", () => {
+    const candidate = { id: "composer", title: "Genius Lout Composer Returns", titles: ["The Return of a Crazy Genius Composer"], type: "Manhwa", image: "https://img.example/composer.jpg", description: "A webtoon" };
+    expect(resolveMangaUpdatesSeries(["The Crazy Genius Composer Returns"], [candidate])?.id).toBe("composer");
+    expect(resolveMangaUpdatesSeries(["The Crazy Genius Returns"], [{ ...candidate, id: "unrelated", title: "The Hero Returns", titles: [] }])).toBeNull();
+  });
+
   it("uses all aliases, including a later alias, and does not reject chapter zero with identity", () => {
     const zeroChapter = { id: "1", title: "Preferred title", type: "Manga", image: "https://img/cover.jpg", latestChapter: "0" };
     expect(isDeadMangaUpdatesSeries(zeroChapter)).toBe(false);
@@ -450,6 +486,15 @@ describe("AniList catalogue", () => {
       { id: "2", title: "Other", titles: ["The Crazy Genius Composer Returns"], type: "Manhwa", image: "https://img/2.jpg" },
     ];
     expect(exactMangaUpdatesSeriesMatches(["The Crazy Genius Composer Returns"], items).map(item => item.id)).toEqual(["2"]);
+  });
+
+  it("returns only the exact and parenthesized group", () => {
+    const items = [
+      { id: "1", title: "Generic Existence", type: "Manhwa", image: "https://img/1.jpg" },
+      { id: "2", title: "Existence", type: "Manhwa", image: "https://img/2.jpg" },
+      { id: "3", title: "Existence (Wangho)", type: "Manhwa", image: "https://img/3.jpg" },
+    ];
+    expect(exactMangaUpdatesSeriesMatches(["Existence"], items).map(item => item.id)).toEqual(["2", "3"]);
   });
 
   it("rejects genuinely dead MangaUpdates records", () => {

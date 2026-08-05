@@ -2,6 +2,7 @@ import type { Task } from "graphile-worker";
 import {
   cleanDisplayTitle,
   exactMangaUpdatesSeriesMatches,
+  exactTitleMatchKind,
   fetchMangaUpdatesSeries,
   mangaUpdatesMediaType,
   normalizeTitle,
@@ -21,39 +22,16 @@ import {
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
-import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
-import { isParenthesizedAmbiguity, openReviewsForMedia } from "../favorite-review.js";
+import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
+import { openReviewsForMedia } from "../favorite-review.js";
+import { isManualOnlyReviewTitle } from "../favorite-review.js";
 
 type Helpers = Parameters<Task>[1];
-const VERSION = "mangaupdates-v5",
+export const MANGAUPDATES_ENRICHMENT_VERSION = "mangaupdates-v6";
+const VERSION = MANGAUPDATES_ENRICHMENT_VERSION,
   COVER_VERSION = "mangaupdates-cover-v6";
 function snapshotCandidates(items: any[]) {
-  return items.slice(0, 20).map((item) => ({
-    id: item.id,
-    title: item.title,
-    hitTitle: item.hitTitle,
-    titles: item.titles,
-    type: item.type,
-    year: item.year,
-    startDate: item.startDate,
-    status: item.status,
-    completed: item.completed,
-    licensed: item.licensed,
-    genres: item.genres,
-    categories: item.categories,
-    bayesianRating: item.bayesianRating,
-    ratingVotes: item.ratingVotes,
-    lastUpdated: item.lastUpdated,
-    latestChapter: item.latestChapter,
-    latestVolume: item.latestVolume,
-    url: item.url,
-    image: item.image,
-    imageThumbnail: item.imageThumbnail,
-    associated: item.associated,
-    authors: item.authors,
-    publishers: item.publishers,
-    publications: item.publications,
-  }));
+  return items;
 }
 function trace(h: any, event: string, data: Record<string, unknown>) {
   const message = `[provider-trace] ${JSON.stringify({ event, ...data })}`;
@@ -73,6 +51,8 @@ async function providerCall<T>(
     const result = await call();
     trace(h, "provider_response", {
       provider: "mangaupdates",
+      input: context,
+      output: result,
       status: "OK",
       resultSummary: Array.isArray(result)
         ? { count: result.length }
@@ -85,6 +65,8 @@ async function providerCall<T>(
   } catch (error) {
     trace(h, "provider_response", {
       provider: "mangaupdates",
+      input: context,
+      output: null,
       status: "ERROR",
       error: normalizedError(error),
       ...context,
@@ -148,6 +130,7 @@ async function enrichCover(mediaId: string, h: any) {
   try {
     const series = await providerCall(h, () =>
       fetchMangaUpdatesSeries(String(resolvedMu.rows[0].external_id), providerOptions),
+      { operation: "fetch-cover-source", id: String(resolvedMu.rows[0].external_id) },
     );
     if (series.image) {
       await saveCover(h, mediaId, series.image, "mangaupdates", "MangaUpdates", {
@@ -209,7 +192,11 @@ const task: Task = async (raw, helpers: Helpers) => {
     "SELECT 1 FROM media_metadata WHERE media_id=$1 AND provider='mangaupdates' AND status='ACTIVE' AND external_id IS NOT NULL LIMIT 1",
     [mediaId],
   );
-  if (alreadyResolved.rows[0] && !forceRefresh) return;
+  if (alreadyResolved.rows[0] && !forceRefresh) {
+    await markFavoriteMatched(h.query, mediaId);
+    await reconcileResolvedFavoriteReviews(h.query, mediaId);
+    return;
+  }
   const aliases = (Array.isArray(c.titles) ? c.titles : [])
     .filter(Boolean)
     .filter((value: unknown) =>
@@ -245,6 +232,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     if (knownMuId) {
       const record = await providerCall(h, () =>
         fetchMangaUpdatesSeries(knownMuId, providerOptions),
+        { operation: "fetch-known", id: knownMuId },
       );
       candidates = [record];
       selected = resolveMangaUpdatesSeries(searchAliases, candidates);
@@ -253,6 +241,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     for (const q of knownMuId ? [] : queries) {
       const results = await providerCall(h, () =>
         searchMangaUpdatesSeries(q, providerOptions),
+        { operation: "search", query: q },
       );
       candidates.push(...results);
     }
@@ -264,6 +253,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       try {
         const record = await providerCall(h, () =>
           fetchMangaUpdatesSeries(candidate.id, providerOptions),
+          { operation: "fetch-candidate", id: candidate.id },
         );
         detailed.push({ ...record, hitTitle: candidate.hitTitle ?? candidate.title });
       } catch {
@@ -273,32 +263,39 @@ const task: Task = async (raw, helpers: Helpers) => {
     }
     candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
     const exactMatches = exactMangaUpdatesSeriesMatches(searchAliases, candidates);
+    const manualOnlyReview = searchAliases.some((alias: string) => isManualOnlyReviewTitle(alias));
+    await h.query(
+      "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
+      [JSON.stringify(snapshotCandidates(candidates)), mediaId, VERSION],
+    );
     if (exactMatches.length === 1) {
       selected = exactMatches[0];
       fastPath = true;
     }
-    const ambiguity = exactMatches.length > 1 || searchAliases.some(alias => isParenthesizedAmbiguity(alias, candidates));
+    const ambiguity = !manualOnlyReview && exactMatches.length > 1;
     if (ambiguity) {
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
-      const reviewCandidates = exactMatches.length > 1 ? exactMatches : candidates.slice(0, 5);
+      const reviewCandidates = exactMatches.length > 1 ? exactMatches : candidates;
       await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? searchAliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: reviewCandidates, mediaId, reason: exactMatches.length > 1 ? 'AMBIGUOUS' : 'LOW_CONFIDENCE' });
-      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','ambiguous-review') WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId]);
+      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','ambiguous-review'::text) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId]);
+      await finishEnrichment(h, {
+        mediaId, provider: 'mangaupdates', purpose: 'metadata', version: VERSION,
+        owner: claim.owner, status: 'NO_MATCH', errorCode: 'AMBIGUOUS', resolutionCode: 'AMBIGUOUS',
+      });
       return;
     }
     // A provider identity is the canonical work. An existing owner remains a
     // valid candidate: the new favorite must converge onto it, not create a
     // second work merely because its provisional source media differs.
-    const available = candidates;
-    selected = exactMatches.length === 1 ? exactMatches[0] : undefined;
-    await h.query(
-      "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
-      [JSON.stringify(snapshotCandidates(candidates)), mediaId, VERSION],
-    );
+    selected = manualOnlyReview ? undefined : exactMatches.length === 1
+      ? exactMatches[0]
+      : resolveMangaUpdatesSeries(searchAliases, candidates) ?? undefined;
     if (!selected) {
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
-      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? searchAliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: candidates.slice(0, 5), mediaId, reason: candidates.length ? 'LOW_CONFIDENCE' : 'NO_RESULT' });
+      const unresolvedReason = manualOnlyReview ? 'MANUAL_REVIEW' : candidates.length ? 'LOW_CONFIDENCE' : 'NO_RESULT';
+      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? searchAliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates, mediaId, reason: unresolvedReason });
       await finishEnrichment(h, {
         mediaId,
         provider: "mangaupdates",
@@ -306,13 +303,19 @@ const task: Task = async (raw, helpers: Helpers) => {
         version: VERSION,
         owner: claim.owner,
         status: claim.attempt_count >= maxAttempts ? "TERMINAL" : "NO_MATCH",
-        errorCode: candidates.length ? "LOW_CONFIDENCE" : "NO_RESULT",
-        resolutionCode: candidates.length ? "LOW_CONFIDENCE" : "NO_RESULT",
+        errorCode: unresolvedReason,
+        resolutionCode: unresolvedReason,
       });
-      await markFavoriteUnresolved(h.query, mediaId, "NO_RESULT");
+      await markFavoriteUnresolved(h.query, mediaId, unresolvedReason);
       return;
     }
     const s = selected;
+    const exactResolution = exactMatches.length === 1 && searchAliases.some((alias) =>
+      [s.title, s.hitTitle, ...(s.titles ?? []), ...(s.associated ?? [])]
+        .filter((title): title is string => Boolean(title))
+        .some((title) => exactTitleMatchKind(alias, title) === 'NORMALIZED_EXACT'))
+      ? 'NORMALIZED_EXACT'
+      : exactMatches.length === 1 ? 'COMPACT_EXACT' : 'SCORED_MATCH';
     const owner = await h.query(
       "SELECT media_id FROM media_external_id WHERE provider='mangaupdates' AND external_id=$1",
       [s.id],
@@ -394,6 +397,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       );
     }
     await markFavoriteMatched(h.query, targetMediaId);
+    await reconcileResolvedFavoriteReviews(h.query, targetMediaId);
     await finishEnrichment(h, {
       mediaId,
       provider: "mangaupdates",
@@ -402,7 +406,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       owner: claim.owner,
       status: "SUCCESS",
       externalId: s.id,
-      resolutionCode: "SCORED_MATCH",
+      resolutionCode: exactResolution,
     });
     await enrichCover(targetMediaId, h);
     return;
