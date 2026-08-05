@@ -903,7 +903,31 @@ export function matchAniList(
           (x) => x.type === ("ANIME" === query.type ? "ANIME" : "MANGA"),
         )
       : items;
-  const media = allowed[0];
+  const score = (media: AniListMedia) => {
+    const names = [
+      media.title.userPreferred,
+      media.title.english,
+      media.title.romaji,
+      media.title.native,
+      ...media.synonyms,
+    ].filter((value): value is string => Boolean(value));
+    let best = 0;
+    for (const alias of query.aliases) {
+      const normalizedAlias = normalizeTitle(alias);
+      const compactAlias = compactTitleKey(alias);
+      for (const name of names) {
+        const normalizedName = normalizeTitle(name);
+        if (normalizedName === normalizedAlias) best = Math.max(best, 100);
+        else if (compactTitleKey(name) === compactAlias) best = Math.max(best, 98);
+        else if (normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) best = Math.max(best, 76);
+      }
+    }
+    return best;
+  };
+  const ranked = allowed.map((media) => ({ media, score: score(media) }))
+    .filter((candidate) => candidate.score >= 76)
+    .sort((a, b) => b.score - a.score || a.media.id - b.media.id);
+  const media = ranked[0]?.media;
   if (!media) return null;
   const titles = [
     media.title.userPreferred,

@@ -170,6 +170,10 @@ describe("AniList catalogue", () => {
     expect(body).not.toContain("bannerImage color siteUrl");
     expect(fetcher).toHaveBeenCalledOnce();
   });
+  it("does not accept an unrelated first AniList result", () => {
+    const item = (id: number, title: string) => ({ id, type: "ANIME", title: { userPreferred: title }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] });
+    expect(matchAniList({ aliases: ["Re:Monster"], type: "ANIME" }, [item(1, "Digimon Universe: Appli Monsters") as any, item(2, "Remonster") as any])?.media.id).toBe(2);
+  });
   it("coalesces simultaneous title searches into one HTTP request", async () => {
     const media = (id: number, title: string) => ({
       id,
