@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import type { Task } from "graphile-worker";
 import {
   fetchAniList,
+  cleanDisplayTitle,
+  compactTitleKey,
   matchAniList,
   normalizeTitle,
   searchAniList,
@@ -16,19 +18,23 @@ import {
   enrichmentFingerprint,
   finishEnrichment,
   normalizedError,
+  retryableProviderError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
+import { isParenthesizedAmbiguity, openReviewsForMedia } from "../favorite-review.js";
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
   logger: { warn: (message: string) => void };
 };
 function trace(h: Helpers, event: string, data: Record<string, unknown>) {
-  h.logger.warn(
-    `[provider-trace] ${JSON.stringify({ event, provider: "anilist", ...data })}`,
-  );
+  const message = `[provider-trace] ${JSON.stringify({ event, provider: "anilist", ...data })}`;
+  const logger = h.logger as typeof h.logger & { info?: (value: string) => void };
+  if (event.includes("error") || data.status === "ERROR") h.logger.warn(message);
+  else if (logger.info) logger.info(message);
+  else h.logger.warn(message);
 }
 function titleOf(m: AniListMedia) {
   return (
@@ -46,8 +52,13 @@ export function serializeCandidateSnapshot(items: AniListMedia[]) {
       id: x.id,
       type: x.type,
       title: titleOf(x),
+      titles: candidateTitles(x),
+      synonyms: x.synonyms,
+      siteUrl: x.siteUrl,
       year: x.startYear,
       format: x.format,
+      status: x.status,
+      coverImage: x.coverImage,
     })),
   );
 }
@@ -173,12 +184,6 @@ async function persist(
   // already resolved to this AniList id, enrich that same media and move the
   // current bookmark link to it instead of creating a duplicate.
   const target = existing.rows[0]?.media_id ?? `anilist:${m.id}`;
-  if (target !== mediaId) {
-    await h.query(
-      "INSERT INTO media_title(media_id,text,normalized_text,language,kind,connector,provenance,script,title_type,personal_status,confidence) SELECT $1,text,normalized_text,language,kind,connector,provenance,script,title_type,personal_status,confidence FROM media_title WHERE media_id=$2 AND kind='personal' ON CONFLICT DO NOTHING",
-      [target, mediaId],
-    );
-  }
   await h.query(
     "INSERT INTO media(id,type,season_year,country_of_origin,format) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET type=excluded.type,season_year=COALESCE(excluded.season_year,media.season_year),country_of_origin=COALESCE(excluded.country_of_origin,media.country_of_origin),format=COALESCE(excluded.format,media.format),updated_at=now()",
     [
@@ -189,6 +194,9 @@ async function persist(
       m.format ?? null,
     ],
   );
+  if (target !== mediaId) {
+    await h.query("SELECT merge_media_identity($1,$2,'anilist',$3,$4::jsonb)", [mediaId, target, String(m.id), JSON.stringify({source:'anilist-provider-id',externalId:m.id})]);
+  }
   const collectedAt = new Date();
   const hash = payloadHash(m);
   await h.query(
@@ -262,20 +270,21 @@ async function persist(
       ],
     );
   }
-  if (match?.displayTitle)
+  // The provider identity, never the search result's displayTitle, owns the
+  // title shown to users. Search/matching labels remain provenance only.
+  const canonical = cleanDisplayTitle(titleOf(m)) ?? titleOf(m).trim();
+  await h.query(
+    "UPDATE media_title SET text=$2,normalized_text=$3,language='en',script='Latn',confidence=1,provenance=provenance || $4::jsonb WHERE media_id=$1 AND kind='official' AND title_type='canonical' AND connector='anilist' AND provenance->>'externalId'=$5",
+    [target, canonical, normalizeTitle(canonical), JSON.stringify({ provider: "anilist", externalId: m.id, canonical: true }), String(m.id)],
+  );
+  const canonicalExists = await h.query(
+    "SELECT 1 FROM media_title WHERE media_id=$1 AND kind='official' AND title_type='canonical' AND connector='anilist' AND provenance->>'externalId'=$2 LIMIT 1",
+    [target, String(m.id)],
+  );
+  if (!canonicalExists.rows[0])
     await h.query(
-      "INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance) VALUES($1,$2,$3,'en','Latn','official','canonical',NULL,'anilist',$4,$5) ON CONFLICT DO NOTHING",
-      [
-        target,
-        match.displayTitle,
-        normalizeTitle(match.displayTitle),
-        1,
-        {
-          provider: "anilist",
-          externalId: m.id,
-          canonical: true,
-        },
-      ],
+      "INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance) VALUES($1,$2,$3,'en','Latn','official','canonical',NULL,'anilist',1,$4) ON CONFLICT DO NOTHING",
+      [target, canonical, normalizeTitle(canonical), { provider: "anilist", externalId: m.id, canonical: true }],
     );
   await h.query(
     "UPDATE media_title personal SET personal_status=CASE WHEN EXISTS(SELECT 1 FROM media_title supplier WHERE supplier.media_id=personal.media_id AND supplier.connector IN ('anilist','mangaupdates') AND supplier.normalized_text=personal.normalized_text) THEN 'CORROBORATED' ELSE 'PERSONAL_ONLY' END WHERE personal.media_id=$1 AND personal.kind='personal'",
@@ -328,6 +337,7 @@ async function persist(
     ["tags", m.tags],
     ["status", m.status],
     ["startDate", m.startDate],
+    ["authors", m.authors],
     ["endDate", m.endDate],
     ["year", m.startYear],
     ["season", m.season],
@@ -381,13 +391,13 @@ async function persist(
       inserted.rows[0]?.id ??
       (
         await h.query(
-          "SELECT id FROM media_airing WHERE media_id=$1 AND provider='anilist' AND episode=$2 AND airing_at_utc=$3",
+      "SELECT id FROM media_airing WHERE media_id=$1 AND provider='anilist' AND episode=$2::int AND airing_at_utc=$3::timestamptz",
           [target, airing.episode, at],
         )
       ).rows[0]?.id;
     if (airingId)
       await h.query(
-        "INSERT INTO media_airing_observation(airing_id,payload_id,observed_at,payload_hash,airing_at_utc,provenance) VALUES($1,(SELECT id FROM provider_payload WHERE media_id=$2 AND provider='anilist' AND payload_hash=$3 LIMIT 1),now(),$3,$4,$5) ON CONFLICT(airing_id,payload_hash) DO NOTHING",
+          "INSERT INTO media_airing_observation(airing_id,payload_id,observed_at,payload_hash,airing_at_utc,provenance) VALUES($1,(SELECT id FROM provider_payload WHERE media_id=$2 AND provider='anilist' AND payload_hash=$3::text LIMIT 1),now(),$3::text,$4::timestamptz,$5::jsonb) ON CONFLICT(airing_id,payload_hash) DO NOTHING",
         [
           airingId,
           target,
@@ -407,10 +417,11 @@ async function persist(
 
 export async function enrichAniList(payload: unknown, h: Helpers) {
   const mediaId = String((payload as any)?.mediaId ?? "");
+  const forceRefresh = (payload as any)?.forceRefresh === true;
   const timeoutMs = await operationalValue(h, "timeouts.providerMs");
   const maxAttempts = await operationalValue(h, "metadata.maxAttempts");
   const row = await h.query(
-    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'official' THEN 1 WHEN 'supplier' THEN 2 WHEN 'synonym' THEN 3 ELSE 4 END,t.id) FROM media_title t WHERE t.media_id=m.id),'[]') AS titles,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id FROM media m WHERE m.id=$1",
+    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'personal' THEN 1 ELSE 2 END,t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind IN ('source','personal')),'[]') AS titles,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id FROM media m WHERE m.id=$1",
     [mediaId],
   );
   if (!row.rows[0]) return { status: "SKIPPED", reason: "MEDIA_NOT_FOUND" };
@@ -431,6 +442,12 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     aliases,
     type: context.type,
   });
+  if (forceRefresh) {
+    await h.query(
+      "UPDATE media_enrichment_state SET invalidated_at=now(),next_attempt_at=NULL,updated_at=now() WHERE media_id=$1 AND provider='anilist' AND purpose='metadata'",
+      [mediaId],
+    );
+  }
   const claim = await claimEnrichment(h, {
     mediaId,
     provider: "anilist",
@@ -456,6 +473,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       }
     };
     let selected: AniListMedia | undefined;
+    let selectedResolutionCode = "NONE";
     const eligible: AniListMedia[] = [];
     if (known) {
       remember([known]);
@@ -463,35 +481,46 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         h.logger.warn(
           `[provider-reject] provider=anilist externalId=${known.id} type=${known.type} expected=ANIME source=known-id`,
         );
-      } else selected = known;
+      } else {
+        selected = known;
+        selectedResolutionCode = "KNOWN_EXTERNAL_ID";
+      }
     }
+    // Provider titles are observations, not source aliases. They may be shown
+    // as candidates, but never become new search input.
     const pendingVariants = [
-      ...anilistProviderVariants([
-      ...aliases,
-      ...(known && known.type !== "ANIME" ? candidateTitles(known) : []),
-      ]),
+      ...anilistProviderVariants(aliases),
       ...anilistAnchorVariants(aliases),
-    ];
-    const queuedVariants = new Set(pendingVariants);
+    ].slice(0, 32);
+    const observedVariants = new Set<string>();
     for (
       let variantIndex = 0;
       !selected && variantIndex < pendingVariants.length;
       variantIndex++
     ) {
       const alias = pendingVariants[variantIndex];
-      const candidates = await searchAniList(alias, {
+      const pages = await Promise.all([1, 2].map((page) => searchAniList(alias, {
         timeoutMs,
         hooks: aniListHooks(h),
         type: "ANIME",
-      });
+        page,
+        perPage: 10,
+      })));
+      const candidates = pages.flat();
       remember(candidates);
       for (const candidate of candidates) {
-        for (const title of candidateTitles(candidate)) {
-          for (const variant of anilistProviderVariants([title])) {
-            if (queuedVariants.has(variant) || pendingVariants.length >= 64)
-              continue;
-            queuedVariants.add(variant);
-            pendingVariants.push(variant);
+        // A provider title is a bounded discovery hint only. It is never added
+        // to `aliases`, never persisted as source/personal, and can therefore
+        // help recall without becoming identity evidence by itself.
+        if (pendingVariants.length < 48) {
+          for (const title of candidateTitles(candidate)) {
+            for (const variant of anilistProviderVariants([title])) {
+              if (observedVariants.has(variant) || pendingVariants.includes(variant)) continue;
+              observedVariants.add(variant);
+              pendingVariants.push(variant);
+              if (pendingVariants.length >= 48) break;
+            }
+            if (pendingVariants.length >= 48) break;
           }
         }
         if (candidate.type !== "ANIME") {
@@ -501,17 +530,47 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
           continue;
         }
         eligible.push(candidate);
-        if (candidateTitles(candidate).some((title) =>
-          aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(title)),
-        )) selected = candidate;
       }
     }
-    if (!selected)
-      selected = matchAniList({ aliases, type: "ANIME" }, eligible)?.media ?? undefined;
+    if (!selected) {
+      const exact = [...new Map(eligible.filter((candidate) => {
+        const names = candidateTitles(candidate);
+        return aliases.some((alias: string) => names.some((name) =>
+          normalizeTitle(alias) === normalizeTitle(name) ||
+          compactTitleKey(alias) === compactTitleKey(name),
+        ));
+      }).map((candidate) => [candidate.id, candidate] as const)).values()];
+      // A single compact/normalized exact identity is safe; ties stay a user
+      // decision even when AniList returned them in a stable order.
+      if (exact.length === 1)
+        {
+          selected = exact[0];
+          selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
+        }
+      else if (exact.length === 0)
+        {
+          selected = matchAniList({ aliases, type: "ANIME" }, eligible)?.media ?? undefined;
+          if (selected) selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
+        }
+    }
     await h.query(
-      "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='anilist' AND purpose='metadata' AND connector_version=$3",
+      "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2::text AND provider='anilist' AND purpose='metadata' AND connector_version=$3::text",
       [serializeCandidateSnapshot(items), mediaId, ENRICHMENT_VERSION],
     );
+    const ambiguity = aliases.some((alias: string) => isParenthesizedAmbiguity(alias, items.map(item => ({...item, title: titleOf(item), id: String(item.id)}))));
+    if (ambiguity || (!selected && items.length > 0)) {
+      // Detail every displayed candidate before exposing it to the user.
+      const detailed = await Promise.all(items.filter(item => item.type === 'ANIME').slice(0, 20).map(async item => {
+        try { return await fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) }); } catch { return item; }
+      }));
+      const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
+      const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
+      const reason = items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
+      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? aliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'anilist', candidates: detailed.map(item => ({...item, id: String(item.id), title: titleOf(item)})), mediaId, reason });
+      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, reason]);
+      await finishEnrichment(h, { mediaId, provider: 'anilist', purpose: 'metadata', version: ENRICHMENT_VERSION, owner: claim.owner, status: 'NO_MATCH', errorCode: reason, resolutionCode: reason, });
+      return { status: 'REVIEW', reason };
+    }
     if (!selected) {
       const status =
         claim.attempt_count >= maxAttempts ? "TERMINAL" : "NO_MATCH";
@@ -536,6 +595,12 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
             hooks: aniListHooks(h),
           });
     if (complete.type !== "ANIME") throw new Error("ANILIST_WRONG_MEDIA_TYPE");
+    trace(h, "anilist_match", {
+      mediaId,
+      externalId: complete.id,
+      resolutionCode: selectedResolutionCode,
+      sourceAliasCount: aliases.length,
+    });
     const persisted = await persist(h, mediaId, complete, {
       displayTitle: titleOf(complete),
     });
@@ -547,7 +612,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       owner: claim.owner,
       status: "SUCCESS",
       externalId: String(complete.id),
-      resolutionCode: "FIRST_RESULT",
+      resolutionCode: selectedResolutionCode,
     });
     if (persisted.cover) {
       const existing = await h.query(
@@ -577,7 +642,6 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     };
   } catch (error) {
     const code = normalizedError(error);
-    await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",
@@ -672,16 +736,19 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
     return { status: "SUCCESS", mediaId, provider: "anilist" };
   } catch (error) {
     const code = normalizedError(error);
+    const terminal = claim.attempt_count >= maxAttempts || !retryableProviderError(code);
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",
       purpose: "cover",
       version: "anilist-cover-v4",
       owner: claim.owner,
-      status: "TERMINAL",
+      status: terminal ? "TERMINAL" : "FAILED",
       errorCode: code,
+      retrySeconds: terminal ? null : Math.min(86400, 300 * 2 ** Math.max(0, claim.attempt_count - 1)),
       resolutionCode: code,
     });
+    if (terminal) await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     h.logger.warn(`AniList cover failed for ${mediaId}: ${code}`);
     return { status: "FAILED", reason: code };
   }

@@ -26,6 +26,7 @@ const report = favorites.map((favorite) => {
   const beforeAliases = unique([...localAliases, ...(favorite.providerTitles ?? [])]);
   const beforeQueries = queryVariants(beforeAliases);
   const afterQueries = queryVariants(localAliases);
+  const afterDiscoveryQueries = unique([...afterQueries, ...queryVariants(favorite.providerTitles ?? [])]);
   return {
     id: favorite.id,
     favoriteTitle: favorite.title,
@@ -41,7 +42,8 @@ const report = favorites.map((favorite) => {
     after: {
       aliases: localAliases,
       queries: afterQueries,
-      providerObservationUsedAsQuery: (favorite.providerTitles ?? []).some((title) => afterQueries.includes(title)),
+      discoveryQueries: afterDiscoveryQueries,
+      providerObservationUsedAsQuery: (favorite.providerTitles ?? []).some((title) => afterDiscoveryQueries.includes(title)),
     },
     changed: JSON.stringify(beforeQueries) !== JSON.stringify(afterQueries),
   };
@@ -67,8 +69,8 @@ check("02-provenance", providerLeak.length === 0, providerLeak.length ? `${provi
 
 // Stage 3: the before/after query plan is observable and bounded.
 const changed = report.filter((item) => item.changed);
-check("03-query-plan", report.every((item) => item.after.queries.length <= 64), `${Math.max(...report.map((item) => item.after.queries.length))} requêtes logiques maximum dans le corpus`);
-check("03-regression-signal", changed.some((item) => item.id === "regression-dragon"), "le cas de découverte secondaire est détecté");
+check("03-query-plan", report.every((item) => item.after.discoveryQueries.length <= 48), `${Math.max(...report.map((item) => item.after.discoveryQueries.length))} requêtes logiques maximum dans le corpus`);
+check("03-regression-signal", changed.some((item) => item.id === "regression-dragon" && item.after.providerObservationUsedAsQuery), "le cas de découverte secondaire reste couvert après séparation de provenance");
 
 // Stage 4: detached provider responses exercise the current matching contract.
 const isekai = { id: 1, type: "ANIME" as const, title: { userPreferred: "Isekai Oji-san" }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] };
@@ -80,8 +82,8 @@ check("04-low-confidence", matchAniList({ aliases: ["Good Bye Dragon Life"], typ
 // Stage 5: the old fallback can discover a provider title, but this remains a
 // query hint only; it is never promoted to source/personal provenance.
 const dragon = report.find((item) => item.id === "regression-dragon");
-check("05-observation-fallback", Boolean(dragon?.before.providerObservationUsedAsQuery) && !dragon?.after.providerObservationUsedAsQuery,
-  "le fallback historique est visible et sa suppression actuelle est mesurée");
+check("05-observation-fallback", Boolean(dragon?.before.providerObservationUsedAsQuery) && Boolean(dragon?.after.providerObservationUsedAsQuery) && !dragon?.after.aliases.includes("Sayonara Ryuusei, Konnichiwa Jinsei"),
+  "le fallback est conservé comme hint sans devenir alias local");
 
 const passed = checks.filter((item) => item.passed).length;
 for (const item of checks) console.log(`[${item.passed ? "PASS" : "FAIL"}] ${item.stage}: ${item.detail}`);

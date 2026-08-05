@@ -85,6 +85,12 @@ describe("AniList enrichment resolution", () => {
     ).toContain("Sousou no Frieren");
   });
 
+  it("keeps source aliases separate from provider observations", () => {
+    const variants = anilistProviderVariants(["Isekai Ojisan"]);
+    expect(variants).toContain("Isekai Ojisan");
+    expect(variants).not.toContain("Isekai Oji-san");
+  });
+
   it("skips a manga first result and resolves the anime through a returned romaji title", async () => {
     searchAniList.mockImplementation(async (query: string) =>
       /sayonara/i.test(query) ? [anime] : [manga],
@@ -100,7 +106,7 @@ describe("AniList enrichment resolution", () => {
             rows: [
               {
                 type: "ANIME",
-                titles: ["Goodbye Dragon Life Hello Human Life"],
+                titles: ["Goodbye Dragon Life Hello Human Life", "Sayonara Ryuusei, Konnichiwa Jinsei"],
                 year: null,
                 anilist_id: null,
               },
@@ -138,5 +144,27 @@ describe("AniList enrichment resolution", () => {
     );
     expect(relationsAssertion?.values?.[2]).toEqual(JSON.stringify(anime.relations));
     expect(calls.some(({ sql }) => sql.includes("source-url"))).toBe(false);
+  });
+
+  it("uses a provider title as a bounded discovery hint without making it a source alias", async () => {
+    searchAniList.mockImplementation(async (query: string) =>
+      /sayonara/i.test(query) ? [anime] : [manga],
+    );
+    fetchAniList.mockResolvedValue(anime);
+    const calls: { sql: string; values?: unknown[] }[] = [];
+    const helpers = {
+      logger: { warn: vi.fn() },
+      query: vi.fn(async (sql: string, values?: unknown[]) => {
+        calls.push({ sql, values });
+        if (sql.includes("SELECT m.type,COALESCE"))
+          return { rows: [{ type: "ANIME", titles: ["Goodbye Dragon Life Hello Human Life"], year: null, anilist_id: null }] };
+        return { rows: [] };
+      }),
+    };
+    const result = await enrichAniList({ mediaId: "source:dragon-discovery" }, helpers);
+    expect(result).toMatchObject({ status: "SUCCESS", externalId: 176053 });
+    expect(searchAniList.mock.calls.map(([query]) => query)).toContain("Sayonara Ryuusei, Konnichiwa Jinsei");
+    const sourceQuery = calls.find(({ sql }) => sql.includes("SELECT m.type,COALESCE"));
+    expect(sourceQuery?.values?.[0]).toBe("source:dragon-discovery");
   });
 });
