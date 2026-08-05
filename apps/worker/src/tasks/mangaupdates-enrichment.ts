@@ -1,14 +1,14 @@
 import type { Task } from "graphile-worker";
 import {
-  fetchAniList,
+  cleanDisplayTitle,
+  exactMangaUpdatesSeriesMatches,
   fetchMangaUpdatesSeries,
+  mangaUpdatesMediaType,
   normalizeTitle,
-  searchAniList,
   searchMangaUpdatesSeries,
   titleVariants,
   resolveMangaUpdatesSeries,
 } from "@favlib/metadata";
-import { aniListHooks } from "../anilist-gate.js";
 import { saveCover } from "../cover-store.js";
 import {
   acquireProviderSlot,
@@ -16,17 +16,50 @@ import {
   enrichmentFingerprint,
   finishEnrichment,
   normalizedError,
+  retryableProviderError,
   waitProviderGate,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved } from "../favorite-resolution.js";
+import { isParenthesizedAmbiguity, openReviewsForMedia } from "../favorite-review.js";
 
 type Helpers = Parameters<Task>[1];
-const VERSION = "mangaupdates-v4",
-  COVER_VERSION = "anilist-cover-v5";
+const VERSION = "mangaupdates-v5",
+  COVER_VERSION = "mangaupdates-cover-v6";
+function snapshotCandidates(items: any[]) {
+  return items.slice(0, 20).map((item) => ({
+    id: item.id,
+    title: item.title,
+    hitTitle: item.hitTitle,
+    titles: item.titles,
+    type: item.type,
+    year: item.year,
+    startDate: item.startDate,
+    status: item.status,
+    completed: item.completed,
+    licensed: item.licensed,
+    genres: item.genres,
+    categories: item.categories,
+    bayesianRating: item.bayesianRating,
+    ratingVotes: item.ratingVotes,
+    lastUpdated: item.lastUpdated,
+    latestChapter: item.latestChapter,
+    latestVolume: item.latestVolume,
+    url: item.url,
+    image: item.image,
+    imageThumbnail: item.imageThumbnail,
+    associated: item.associated,
+    authors: item.authors,
+    publishers: item.publishers,
+    publications: item.publications,
+  }));
+}
 function trace(h: any, event: string, data: Record<string, unknown>) {
-  h.logger.warn(`[provider-trace] ${JSON.stringify({ event, ...data })}`);
+  const message = `[provider-trace] ${JSON.stringify({ event, ...data })}`;
+  if (event.includes("error") || data.status === "ERROR") h.logger.warn(message);
+  else if (typeof h.logger.info === "function") h.logger.info(message);
+  else h.logger.warn(message);
 }
 async function providerCall<T>(
   h: any,
@@ -105,7 +138,7 @@ async function enrichCover(mediaId: string, h: any) {
     return { status: "SKIPPED", reason: "MANGAUPDATES_IDENTITY_REQUIRED" };
   const claim = await claimEnrichment(h, {
     mediaId,
-    provider: "anilist",
+    provider: "mangaupdates",
     purpose: "cover",
     version: COVER_VERSION,
     fingerprint,
@@ -123,7 +156,7 @@ async function enrichCover(mediaId: string, h: any) {
       });
       await finishEnrichment(h, {
         mediaId,
-        provider: "anilist",
+        provider: "mangaupdates",
         purpose: "cover",
         version: COVER_VERSION,
         owner: claim.owner,
@@ -133,68 +166,32 @@ async function enrichCover(mediaId: string, h: any) {
       });
       return { status: "SUCCESS", mediaId, provider: "mangaupdates" };
     }
-    const old = await h.query(
-      "SELECT external_id FROM media_external_id WHERE media_id=$1 AND provider='anilist' AND provenance->>'historical'='true' LIMIT 1",
-      [mediaId],
-    );
-    let anilistId = Number(old.rows[0]?.external_id);
-    let al;
-    if (Number.isInteger(anilistId) && anilistId > 0) {
-      al = await fetchAniList(anilistId, {
-        timeoutMs,
-        hooks: aniListHooks(h),
-      });
-    } else {
-      for (const alias of aliases) {
-        const results = await searchAniList(alias, {
-          type: "MANGA",
-          timeoutMs,
-          hooks: aniListHooks(h),
-        });
-        if (results.length) {
-          al = results[0];
-          anilistId = al.id;
-          break;
-        }
-      }
-    }
-    if (!al) throw new Error("NO_RESULT");
-    if (!al.coverImage) throw new Error("NO_COVER");
-    await saveCover(h, mediaId, al.coverImage, "anilist", "AniList", {
-      timeoutMs,
-      externalId: String(anilistId),
-    });
-    await finishEnrichment(h, {
-      mediaId,
-      provider: "anilist",
-      purpose: "cover",
-      version: COVER_VERSION,
-      owner: claim.owner,
-      status: "SUCCESS",
-      externalId: String(anilistId),
-      resolutionCode: "ANILIST_COVER",
-    });
-    return { status: "SUCCESS", mediaId, provider: "anilist" };
+    // Manga/manhwa/manhua covers are owned by MangaUpdates. Never substitute
+    // an unrelated AniList search result when MangaUpdates has no image.
+    throw new Error("MANGAUPDATES_COVER_UNAVAILABLE");
   } catch (error) {
     const code = normalizedError(error);
-    await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
+    const terminal = claim.attempt_count >= maxAttempts || !retryableProviderError(code);
     await finishEnrichment(h, {
       mediaId,
-      provider: "anilist",
+      provider: "mangaupdates",
       purpose: "cover",
       version: COVER_VERSION,
       owner: claim.owner,
-      status: claim.attempt_count >= maxAttempts ? "TERMINAL" : "FAILED",
+      status: terminal ? "TERMINAL" : "FAILED",
       errorCode: code,
+      retrySeconds: terminal ? null : Math.min(86400, 300 * 2 ** Math.max(0, claim.attempt_count - 1)),
       resolutionCode: "COVER_UNAVAILABLE",
     });
+    if (terminal) await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     return { status: "FAILED", reason: code };
   }
 }
 
 const task: Task = async (raw, helpers: Helpers) => {
   const h = helpers as any,
-    mediaId = String((raw as any)?.mediaId ?? "");
+    mediaId = String((raw as any)?.mediaId ?? ""),
+    forceRefresh = (raw as any)?.forceRefresh === true;
   if ((raw as any)?.cover === true) {
     await enrichCover(mediaId, h);
     return;
@@ -202,20 +199,32 @@ const task: Task = async (raw, helpers: Helpers) => {
   const timeoutMs = await operationalValue(h, "timeouts.providerMs"),
     maxAttempts = await operationalValue(h, "metadata.maxAttempts");
   const row = await h.query(
-    "SELECT m.type,m.season_year AS year,m.country_of_origin AS country,m.format,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'official' THEN 1 WHEN 'supplier' THEN 2 WHEN 'synonym' THEN 3 ELSE 4 END,t.id) FROM media_title t WHERE t.media_id=m.id),'[]') AS titles FROM media m WHERE m.id=$1",
+    "SELECT m.type,m.season_year AS year,m.country_of_origin AS country,m.format,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'official' THEN 1 WHEN 'supplier' THEN 2 WHEN 'synonym' THEN 3 ELSE 4 END,t.id) FROM media_title t WHERE t.media_id=m.id),'[]') AS titles,(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1) AS mangaupdates_id FROM media m WHERE m.id=$1",
     [mediaId],
   );
   if (!row.rows[0]) return;
   const c = row.rows[0];
   if (!["MANGA", "MANHWA", "MANHUA"].includes(c.type)) return;
+  const alreadyResolved = await h.query(
+    "SELECT 1 FROM media_metadata WHERE media_id=$1 AND provider='mangaupdates' AND status='ACTIVE' AND external_id IS NOT NULL LIMIT 1",
+    [mediaId],
+  );
+  if (alreadyResolved.rows[0] && !forceRefresh) return;
   const aliases = (Array.isArray(c.titles) ? c.titles : [])
     .filter(Boolean)
     .filter((value: unknown) =>
       typeof value === "string" &&
       !/^manga\s+[a-z]{1,3}\d{4,}$/iu.test(value.trim()),
     );
-  const queries = titleVariants(aliases).filter((value) => value.length > 2);
-  const fp = enrichmentFingerprint({ mediaId, type: c.type, aliases });
+  const searchAliases = [...new Set((aliases as string[]).map((value: string) => cleanDisplayTitle(value) ?? value))];
+  const queries = titleVariants(searchAliases).filter((value) => value.length > 2);
+  const fp = enrichmentFingerprint({ mediaId, type: c.type, aliases: searchAliases });
+  if (forceRefresh) {
+    await h.query(
+      "UPDATE media_enrichment_state SET invalidated_at=now(),next_attempt_at=NULL,updated_at=now() WHERE media_id=$1 AND provider='mangaupdates' AND purpose='metadata'",
+      [mediaId],
+    );
+  }
   const claim = await claimEnrichment(h, {
     mediaId,
     provider: "mangaupdates",
@@ -230,30 +239,22 @@ const task: Task = async (raw, helpers: Helpers) => {
     let selected: any | undefined;
     let fastPath = false;
     const providerOptions = { timeoutMs };
-    for (const q of queries) {
+    const knownMuId = forceRefresh && c.mangaupdates_id
+      ? String(c.mangaupdates_id)
+      : "";
+    if (knownMuId) {
+      const record = await providerCall(h, () =>
+        fetchMangaUpdatesSeries(knownMuId, providerOptions),
+      );
+      candidates = [record];
+      selected = resolveMangaUpdatesSeries(searchAliases, candidates);
+      if (selected) fastPath = true;
+    }
+    for (const q of knownMuId ? [] : queries) {
       const results = await providerCall(h, () =>
         searchMangaUpdatesSeries(q, providerOptions),
       );
       candidates.push(...results);
-      const exact = results.find((candidate: any) =>
-        [candidate.hitTitle, candidate.title].some((name: unknown) =>
-          typeof name === 'string' && aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(name)),
-        ),
-      );
-      if (exact) {
-        const detailedExact = await providerCall(h, () =>
-          fetchMangaUpdatesSeries(exact.id, providerOptions),
-        );
-        const resolvedExact = resolveMangaUpdatesSeries(aliases, [
-          { ...detailedExact, hitTitle: exact.hitTitle ?? exact.title },
-        ]);
-        if (resolvedExact) {
-          selected = resolvedExact;
-          candidates.push(detailedExact);
-          fastPath = true;
-          break;
-        }
-      }
     }
     candidates = [...new Map(candidates.map((x) => [x.id, x])).values()];
     // Search responses are intentionally incomplete. Resolve every distinct hit
@@ -270,17 +271,34 @@ const task: Task = async (raw, helpers: Helpers) => {
         detailed.push(candidate);
       }
     }
-    candidates = [...new Map(detailed.map((x) => [x.id, x])).values()];
+    candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
+    const exactMatches = exactMangaUpdatesSeriesMatches(searchAliases, candidates);
+    if (exactMatches.length === 1) {
+      selected = exactMatches[0];
+      fastPath = true;
+    }
+    const ambiguity = exactMatches.length > 1 || searchAliases.some(alias => isParenthesizedAmbiguity(alias, candidates));
+    if (ambiguity) {
+      const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
+      const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
+      const reviewCandidates = exactMatches.length > 1 ? exactMatches : candidates.slice(0, 5);
+      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? searchAliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: reviewCandidates, mediaId, reason: exactMatches.length > 1 ? 'AMBIGUOUS' : 'LOW_CONFIDENCE' });
+      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','ambiguous-review') WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId]);
+      return;
+    }
     // A provider identity is the canonical work. An existing owner remains a
     // valid candidate: the new favorite must converge onto it, not create a
     // second work merely because its provisional source media differs.
     const available = candidates;
-    selected = resolveMangaUpdatesSeries(aliases, available);
+    selected = exactMatches.length === 1 ? exactMatches[0] : undefined;
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
-      [JSON.stringify(candidates.slice(0, 20)), mediaId, VERSION],
+      [JSON.stringify(snapshotCandidates(candidates)), mediaId, VERSION],
     );
     if (!selected) {
+      const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
+      const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
+      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? searchAliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: candidates.slice(0, 5), mediaId, reason: candidates.length ? 'LOW_CONFIDENCE' : 'NO_RESULT' });
       await finishEnrichment(h, {
         mediaId,
         provider: "mangaupdates",
@@ -288,8 +306,8 @@ const task: Task = async (raw, helpers: Helpers) => {
         version: VERSION,
         owner: claim.owner,
         status: claim.attempt_count >= maxAttempts ? "TERMINAL" : "NO_MATCH",
-        errorCode: "NO_RESULT",
-        resolutionCode: "NO_RESULT",
+        errorCode: candidates.length ? "LOW_CONFIDENCE" : "NO_RESULT",
+        resolutionCode: candidates.length ? "LOW_CONFIDENCE" : "NO_RESULT",
       });
       await markFavoriteUnresolved(h.query, mediaId, "NO_RESULT");
       return;
@@ -307,21 +325,20 @@ const task: Task = async (raw, helpers: Helpers) => {
         existingMedia: targetMediaId,
         provisionalMedia: mediaId,
       });
-      await h.query(
-        "INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance) SELECT $1,text,normalized_text,language,script,kind,title_type,personal_status,connector,confidence,provenance FROM media_title WHERE media_id=$2 ON CONFLICT DO NOTHING",
-        [targetMediaId, mediaId],
-      );
-      await h.query(
-        "UPDATE bookmark_media_link SET media_id=$1,status='review' WHERE media_id=$2 AND status IN ('matched','accepted','review')",
-        [targetMediaId, mediaId],
-      );
+      await h.query("SELECT merge_media_identity($1::text,$2::text,'mangaupdates',$3::text,$4::jsonb)", [mediaId, targetMediaId, String(s.id), JSON.stringify({source:'mangaupdates-provider-id',externalId:s.id})]);
     } else {
       await h.query(
         "INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangaupdates',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",
         [mediaId, s.id, { source: "MangaUpdates" }],
       );
     }
-    const canonicalTitle = s.title ?? aliases[0] ?? "Unknown title";
+    const providerType = mangaUpdatesMediaType(s.type);
+    if (providerType)
+      await h.query(
+        "UPDATE media SET type=$2,updated_at=now() WHERE id=$1 AND type IN ('MANGA','MANHWA','MANHUA')",
+        [targetMediaId, providerType],
+      );
+    const canonicalTitle = cleanDisplayTitle(s.title ?? "") ?? s.title ?? aliases[0] ?? "Unknown title";
     for (const title of [
       ...new Set([s.title, ...(s.titles ?? [])].filter(Boolean)),
     ])
@@ -329,13 +346,23 @@ const task: Task = async (raw, helpers: Helpers) => {
         "INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,NULL,'supplier','associated','mangaupdates',$4,$5) ON CONFLICT DO NOTHING",
         [targetMediaId, title, normalizeTitle(title), 1, { provider: "mangaupdates", externalId: s.id }],
       );
-    if (s.title && !aliases.some((alias: string) => alias === s.title))
+    if (s.title) {
+      await h.query(
+        "UPDATE media_title SET text=$2,normalized_text=$3,confidence=1,provenance=provenance || $4::jsonb WHERE media_id=$1 AND kind='official' AND title_type='canonical' AND connector='mangaupdates' AND provenance->>'externalId'=$5",
+        [targetMediaId, canonicalTitle, normalizeTitle(canonicalTitle), JSON.stringify({ provider: "mangaupdates", externalId: s.id, canonical: true }), String(s.id)],
+      );
+    }
+    const canonicalExists = await h.query(
+      "SELECT 1 FROM media_title WHERE media_id=$1 AND kind='official' AND title_type='canonical' AND connector='mangaupdates' AND provenance->>'externalId'=$2 LIMIT 1",
+      [targetMediaId, String(s.id)],
+    );
+    if (s.title && !canonicalExists.rows[0])
       await h.query(
         "INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,'en','official','canonical','mangaupdates',$4,$5) ON CONFLICT DO NOTHING",
         [
           targetMediaId,
-          s.title,
-          normalizeTitle(s.title),
+          canonicalTitle,
+          normalizeTitle(canonicalTitle),
           1,
           {
             provider: "mangaupdates",
@@ -348,6 +375,24 @@ const task: Task = async (raw, helpers: Helpers) => {
       "INSERT INTO media_metadata(media_id,provider,external_id,source_url,status,resolved_at,updated_at) VALUES($1,'mangaupdates',$2,$3,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='mangaupdates',external_id=excluded.external_id,source_url=excluded.source_url,status='ACTIVE',updated_at=now()",
       [targetMediaId, s.id, s.url ?? null],
     );
+    const muValues: Array<[string, unknown]> = [
+      ["themes", [...new Set([...(s.genres ?? []), ...(s.categories ?? [])])]],
+      ["genres", s.genres ?? []],
+      ["categories", s.categories ?? []],
+      ["authors", s.authors ?? []],
+      ["startDate", s.startDate ?? (s.year === undefined ? undefined : { year: s.year })],
+      ["status", s.status],
+      ["year", s.year],
+      ["latestChapter", s.latestChapter],
+      ["latestVolume", s.latestVolume],
+    ];
+    for (const [field, value] of muValues) {
+      if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) continue;
+      await h.query(
+        "INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence,attribution) VALUES($1,$2,$3,'mangaupdates',$4,1,'MangaUpdates') ON CONFLICT(media_id,field,provider,source_url) DO UPDATE SET value=excluded.value,confidence=excluded.confidence,attribution=excluded.attribution,asserted_at=now()",
+        [targetMediaId, field, JSON.stringify(value), s.url ?? `https://www.mangaupdates.com/series/${s.id}`],
+      );
+    }
     await markFavoriteMatched(h.query, targetMediaId);
     await finishEnrichment(h, {
       mediaId,

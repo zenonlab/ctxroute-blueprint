@@ -115,11 +115,19 @@ export type AniListMedia = {
     site?: string;
   }[];
   studios: AniListStudio[];
+  authors: string[];
 };
 export type AniListMatch = {
   media: AniListMedia;
   displayTitle: string;
   titles: string[];
+};
+export type AniListCandidateScore = {
+  media: AniListMedia;
+  score: number;
+  matchedAlias?: string;
+  matchedTitle?: string;
+  reason: "NORMALIZED_EXACT" | "COMPACT_EXACT" | "PARTIAL" | "TOKEN_OVERLAP" | "NO_MATCH";
 };
 export type AniListHooks = {
   beforeRequest?: () => Promise<undefined | (() => Promise<void>)>;
@@ -176,6 +184,7 @@ export function normalizeTitle(v: string) {
     .trim()
     .replace(/\s+/g, " ");
 }
+
 export function titleCandidateFromBookmark(v: string) {
   let s = v.replace(/\s+/g, " ").trim();
   s = s.replace(/^(?:read|watch|lire|regarder)\s+/i, "");
@@ -190,6 +199,28 @@ export function titleCandidateFromBookmark(v: string) {
   );
   s = s.replace(/[\s|·:—–-]+$/u, "").trim();
   return s.length >= 2 ? s : undefined;
+}
+
+/** Title used for cards and headings. Input titles remain untouched in the
+ * provenance tables; this function is deliberately display-only. */
+export function cleanDisplayTitle(v: string) {
+  let s = v.replace(/\s+/gu, " ").trim();
+  if (!s) return undefined;
+  const release = /(?:^|\s*(?:[-–—|·:]\s*|\s+))(?:(?:episode|ep\.?|chapter|chapitre|chap\.?|ch\.?|volume|vol\.?|season|saison)\s*#?\d+[\w.-]*).*/iu;
+  const separatedRelease = /(?:^|\s*(?:[-–—|·:]\s*))(?:\d+\s*(?:vostfr|vf|vo|sub|dub|scan|scans)?|(?:vostfr|vf|vo|sub|dub|scan|scans)(?:\s*[- ]?\d+|\s*$)).*/iu;
+  const site = /(?:^|\s*(?:[-–—|·:]\s*|\s+))(?:voiranime|mangakakalot|anime[- ]?sama|japscan|lelscan|manganato|mangadex)(?:\b.*)?$/iu;
+  for (let pass = 0; pass < 5; pass++) {
+    const before = s;
+    s = s.replace(release, "").replace(separatedRelease, "").replace(site, "").replace(/[|·:—–-]+$/gu, "").trim();
+    if (s === before) break;
+  }
+  const key = (text: string) => normalizeTitle(text).replace(/[^\p{L}\p{N}]+/gu, "");
+  const kept: string[] = [];
+  for (const part of s.split(/\s*(?:\||·|—|–)\s*|\s+-\s+/u).map((x) => x.trim()).filter(Boolean)) {
+    if (!kept.some((item) => key(item) === key(part))) kept.push(part);
+  }
+  s = kept.join(" - ").trim();
+  return s.length >= 2 && !/^(?:episode|chapter|volume|vostfr|vf|scan)\b/iu.test(s) ? s : undefined;
 }
 
 const RELEASE_WORDS = /^(?:vf|vostfr|vo|sub|dub|scan|scans|english|français|french)$/iu;
@@ -639,7 +670,7 @@ async function anilistRequest(
     }
   }
 }
-const fields = `id idMal type format status startDate{year month day} endDate{year month day} countryOfOrigin genres tags{id name description rank isMediaSpoiler isGeneralSpoiler isAdult category} description coverImage{extraLarge large medium color} bannerImage siteUrl title{romaji english native userPreferred} synonyms season seasonYear seasonInt episodes chapters volumes duration averageScore meanScore popularity trending favourites isAdult isLicensed isLocked source hashtag updatedAt nextAiringEpisode{episode airingAt timeUntilAiring} airingSchedule{nodes{airingAt episode timeUntilAiring}} externalLinks{site url} relations{edges{relationType node{id type format title{romaji english native userPreferred}}}} streamingEpisodes{title thumbnail url site} studios{edges{isMain node{id name isAnimationStudio siteUrl}}}`;
+const fields = `id idMal type format status startDate{year month day} endDate{year month day} countryOfOrigin genres tags{id name description rank isMediaSpoiler isGeneralSpoiler isAdult category} description coverImage{extraLarge large medium color} bannerImage siteUrl title{romaji english native userPreferred} synonyms season seasonYear seasonInt episodes chapters volumes duration averageScore meanScore popularity trending favourites isAdult isLicensed isLocked source hashtag updatedAt nextAiringEpisode{episode airingAt timeUntilAiring} airingSchedule{nodes{airingAt episode timeUntilAiring}} externalLinks{site url} relations{edges{relationType node{id type format title{romaji english native userPreferred}}}} streamingEpisodes{title thumbnail url site} studios{edges{isMain node{id name isAnimationStudio siteUrl}}} staff{edges{role node{name{full}}}}`;
 const searchFields = `id type format startDate{year} title{romaji english native userPreferred} synonyms coverImage{extraLarge large medium color}`;
 function mapMedia(x: any): AniListMedia {
   return {
@@ -727,6 +758,12 @@ function mapMedia(x: any): AniListMedia {
             siteUrl: v.node.siteUrl,
           }))
       : [],
+    authors: Array.isArray(x.staff?.edges)
+      ? x.staff.edges
+          .filter((edge: any) => typeof edge?.node?.name?.full === "string")
+          .filter((edge: any) => /author|artist|original creator|story|draw|director|screenplay|writer|creator|character design/iu.test(String(edge.role ?? "")))
+          .map((edge: any) => edge.node.name.full)
+      : [],
   };
 }
 type AniListSearchOptions = {
@@ -737,6 +774,8 @@ type AniListSearchOptions = {
   now?: number;
   type?: "ANIME" | "MANGA";
   cache?: boolean;
+  page?: number;
+  perPage?: number;
 };
 type PendingSearch = {
   query: string;
@@ -763,7 +802,7 @@ async function flushSearchBatch() {
   const selections = unique
     .map(
       (item, index) =>
-        `p${index}:Page(perPage:5){media(search:$s${index},type:${item.options.type}){${searchFields}}}`,
+        `p${index}:Page(page:${Math.max(1, item.options.page ?? 1)},perPage:${Math.min(50, Math.max(1, item.options.perPage ?? 10))}){media(search:$s${index},type:${item.options.type}){${searchFields}}}`,
     )
     .join("");
   try {
@@ -789,7 +828,7 @@ export function searchAniList(
   options: AniListSearchOptions = {},
 ): Promise<AniListMedia[]> {
   const type = options.type ?? "ANIME",
-    key = `${type}:${normalizeTitle(query)}`,
+    key = `${type}:${Math.max(1, options.page ?? 1)}:${Math.min(50, Math.max(1, options.perPage ?? 10))}:${normalizeTitle(query)}`,
     hit = options.cache === false ? undefined : cache.get(key);
   if (hit) return Promise.resolve(hit.items);
   return new Promise((resolve, reject) => {
@@ -903,7 +942,7 @@ export function matchAniList(
           (x) => x.type === ("ANIME" === query.type ? "ANIME" : "MANGA"),
         )
       : items;
-  const score = (media: AniListMedia) => {
+  const score = (media: AniListMedia): AniListCandidateScore => {
     const names = [
       media.title.userPreferred,
       media.title.english,
@@ -911,28 +950,32 @@ export function matchAniList(
       media.title.native,
       ...media.synonyms,
     ].filter((value): value is string => Boolean(value));
-    let best = 0;
+    let best: AniListCandidateScore = { media, score: 0, reason: "NO_MATCH" };
     for (const alias of query.aliases) {
       const normalizedAlias = normalizeTitle(alias);
       const compactAlias = compactTitleKey(alias);
       for (const name of names) {
         const normalizedName = normalizeTitle(name);
-        if (normalizedName === normalizedAlias) best = Math.max(best, 100);
-        else if (compactTitleKey(name) === compactAlias) best = Math.max(best, 98);
-        else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) && !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1)) best = Math.max(best, 76);
+        const candidate = (score: number, reason: AniListCandidateScore["reason"]) => {
+          if (score > best.score || (score === best.score && `${name}` < `${best.matchedTitle ?? "~"}`))
+            best = { media, score, matchedAlias: alias, matchedTitle: name, reason };
+        };
+        if (normalizedName === normalizedAlias) candidate(100, "NORMALIZED_EXACT");
+        else if (compactTitleKey(name) === compactAlias) candidate(98, "COMPACT_EXACT");
+        else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) && !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1)) candidate(76, "PARTIAL");
         else {
           const wanted = new Set(normalizedAlias.split(" ").filter((token) => token.length >= 2));
           const found = normalizedName.split(" ").filter((token) => wanted.has(token));
           if (wanted.size >= 2 && found.length / wanted.size >= 0.6)
-            best = Math.max(best, 55 + Math.round((found.length / wanted.size) * 35));
+            candidate(55 + Math.round((found.length / wanted.size) * 35), "TOKEN_OVERLAP");
         }
       }
     }
     return best;
   };
   const ranked = allowed.map((media) => ({ media, score: score(media) }))
-    .filter((candidate) => candidate.score >= 76)
-    .sort((a, b) => b.score - a.score || a.media.id - b.media.id);
+    .filter((candidate) => candidate.score.score >= 98)
+    .sort((a, b) => b.score.score - a.score.score || a.media.id - b.media.id);
   const media = ranked[0]?.media;
   if (!media) return null;
   const titles = [
@@ -991,18 +1034,29 @@ export type MangaUpdatesSeries = {
   /** Title returned by the provider as the search hit, when it differs from the record title. */
   hitTitle?: string;
   type?: string;
-  year?: number;
-  country?: string;
   format?: string;
+  year?: number;
   status?: string;
+  completed?: boolean;
+  licensed?: boolean;
+  genres?: string[];
+  categories?: string[];
+  bayesianRating?: number;
+  ratingVotes?: number;
+  lastUpdated?: string;
+  startDate?: string;
+  authors?: string[];
+  publishers?: string[];
+  publications?: string[];
   description?: string;
   latestChapter?: string;
   latestVolume?: string;
   url?: string;
   image?: string;
+  imageThumbnail?: string;
   relations?: unknown[];
-  associated?: unknown[];
-  raw?: unknown;
+  associated?: string[];
+  relatedSeries?: unknown[];
 };
 export type MangaUpdatesRelease = {
   seriesId?: string;
@@ -1082,11 +1136,13 @@ function imageValue(value: unknown): string | undefined {
 function mapMuSeries(value: any): MangaUpdatesSeries | null {
   const record = value?.record ?? value;
   const id =
-    record?.id ?? record?.series_id ?? record?.seriesId ?? record?.record_id;
+    record?.series_id ?? record?.seriesId ?? record?.id ?? record?.record_id;
   if (id === undefined || id === null) return null;
-  const associated = Array.isArray(record?.associated) ? record.associated : [];
+  const associated = Array.isArray(record?.associated)
+    ? record.associated.flatMap(titleValues)
+    : [];
+  const hitTitle = stringValues(value?.hit_title ?? value?.hitTitle ?? record?.hit_title ?? record?.hitTitle)[0];
   const titles = [
-    ...stringValues(record.hit_title ?? record.hitTitle ?? value?.hit_title),
     ...stringValues(record.title),
     ...stringValues(record.name),
     ...(Array.isArray(record.titles)
@@ -1095,40 +1151,45 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     ...(Array.isArray(record.alternative_titles)
       ? record.alternative_titles.flatMap(titleValues)
       : []),
-    ...associated.flatMap((x: any) => [
-      ...titleValues(x?.title),
-      ...titleValues(x?.name),
-      ...titleValues(x?.text),
-      ...titleValues(x?.value),
-      ...titleValues(x?.titles),
-    ]),
+    ...associated,
   ]
     .flat()
     .filter((x): x is string => typeof x === "string" && x.trim().length > 0);
   return {
     id: String(id),
-    title: titles[0],
+    title: stringValues(record.title ?? record.name)[0],
     titles: [...new Set(titles)],
-    hitTitle:
-      stringValues(record.hit_title ?? record.hitTitle ?? value?.hit_title)[0],
+    hitTitle,
     type: record.type ?? record.series_type,
     year:
       Number(record.year ?? record.start_year ?? record.release_year) ||
       undefined,
-    country: record.country ?? record.country_of_origin,
-    format: record.format,
     status: record.status ?? record.serialization_status,
+    completed: typeof record.completed === "boolean" ? record.completed : undefined,
+    licensed: typeof record.licensed === "boolean" ? record.licensed : undefined,
+    genres: Array.isArray(record.genres) ? record.genres.flatMap(titleValues) : [],
+    categories: Array.isArray(record.categories) ? record.categories.flatMap(titleValues) : [],
+    bayesianRating: Number(record.bayesian_rating ?? record.bayesianRating) || undefined,
+    ratingVotes: Number(record.rating_votes ?? record.ratingVotes) || undefined,
+    lastUpdated: record.last_updated ?? record.lastUpdated,
+    startDate:
+      record.start_date ?? record.startDate ?? record.created_at ?? record.createdAt ??
+      (record.year ? String(record.year) : undefined),
+    authors: Array.isArray(record.authors) ? record.authors.flatMap(titleValues) : [],
+    publishers: Array.isArray(record.publishers) ? record.publishers.flatMap(titleValues) : [],
+    publications: Array.isArray(record.publications) ? record.publications.flatMap(titleValues) : [],
     description: record.description,
     image:
       imageValue(record.image) ??
       imageValue(record.cover_image) ??
       imageValue(record.cover),
+    imageThumbnail: imageValue(record.image?.url?.thumbnail ?? record.image?.thumbnail),
     relations: Array.isArray(record.relations) ? record.relations : [],
     associated,
+    relatedSeries: Array.isArray(record.related_series) ? record.related_series : [],
     latestChapter: record.latest_chapter ?? record.latestChapter,
     latestVolume: record.latest_volume ?? record.latestVolume,
     url: record.url,
-    raw: value,
   };
 }
 function mapMuRelease(value: any): MangaUpdatesRelease | null {
@@ -1201,9 +1262,12 @@ export async function searchMangaUpdatesSeries(
     { method: "POST", body: JSON.stringify({ search: q }) },
     options.searchEndpoint,
   );
-  return muArray(json, ["series", "results", "data"])
-    .map(mapMuSeries)
-    .filter((x): x is MangaUpdatesSeries => Boolean(x));
+  const resultList = ["series", "results", "data"].find((key) => Array.isArray(json?.[key]));
+  if (!resultList && !Array.isArray(json)) throw new Error("MANGAUPDATES_EMPTY_RESPONSE");
+  const rawItems = muArray(json, ["series", "results", "data"]);
+  const mapped = rawItems.map(mapMuSeries).filter((x): x is MangaUpdatesSeries => Boolean(x));
+  if (rawItems.length > 0 && mapped.length === 0) throw new Error("MANGAUPDATES_PARSE_ERROR");
+  return mapped;
 }
 export async function fetchMangaUpdatesSeries(
   id: string,
@@ -1233,8 +1297,15 @@ export function titleVariants(values: string[]) {
   return [...result];
 }
 
-const MU_MANGA_TYPES = new Set(["manga", "manhwa", "manhua"]);
 const MU_NOVEL_TYPES = /(?:light\s*)?novel|web\s*novel|visual\s*novel|webnovel/u;
+
+export function mangaUpdatesMediaType(value: unknown): "MANGA" | "MANHWA" | "MANHUA" | undefined {
+  const type = String(value ?? "").trim().toLowerCase();
+  if (type === "manga") return "MANGA";
+  if (type === "manhwa") return "MANHWA";
+  if (type === "manhua") return "MANHUA";
+  return undefined;
+}
 
 function meaningfulTokens(value: string) {
   return normalizeTitle(value)
@@ -1243,9 +1314,24 @@ function meaningfulTokens(value: string) {
 }
 
 function candidateTitles(series: MangaUpdatesSeries) {
-  return [series.hitTitle, series.title, ...(series.titles ?? [])]
+  return [series.hitTitle, series.title, ...(series.titles ?? []), ...(series.associated ?? [])]
     .filter((value): value is string => Boolean(value?.trim()))
     .map((value) => value.trim());
+}
+
+/** Returns provider records whose complete returned title set exactly identifies an alias. */
+export function exactMangaUpdatesSeriesMatches(
+  aliases: string[],
+  items: MangaUpdatesSeries[],
+) {
+  const keys = aliases.flatMap((alias) => [normalizeTitle(alias), compactTitleKey(alias)]);
+  return [...new Map(items
+    .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => candidateTitles(item).some((title) => {
+      const normalized = normalizeTitle(title);
+      return keys.includes(normalized) || keys.includes(compactTitleKey(title));
+    }))
+    .map((item) => [item.id, item] as const)).values()];
 }
 
 function hasValidChapter(value: unknown) {
@@ -1264,19 +1350,21 @@ export function isDeadMangaUpdatesSeries(series: MangaUpdatesSeries) {
 export function mangaUpdatesTypeAllowed(series: MangaUpdatesSeries) {
   const values = [series.type, series.format].filter(Boolean).join(" ").toLowerCase();
   if (MU_NOVEL_TYPES.test(values)) return false;
-  return !values || [...MU_MANGA_TYPES].some((type) => values.includes(type));
+  return !values || Boolean(mangaUpdatesMediaType(series.type) ?? mangaUpdatesMediaType(series.format));
 }
 
 export type ScoredMangaUpdatesCandidate = MangaUpdatesSeries & { score: number };
 
 function scoreMangaUpdatesSeries(aliases: string[], series: MangaUpdatesSeries) {
+  const exactNames = [series.hitTitle, series.title].filter((value): value is string => Boolean(value?.trim()));
   const names = candidateTitles(series);
   const normalizedAliases = aliases.map(normalizeTitle).filter(Boolean);
   let best = 0;
   for (const alias of normalizedAliases) {
     for (const name of names) {
       const normalizedName = normalizeTitle(name);
-      if (normalizedName === alias) best = Math.max(best, 100);
+      if (normalizedName === alias)
+        best = Math.max(best, exactNames.includes(name) ? 120 : 105);
       else if (normalizedName.includes(alias) || alias.includes(normalizedName)) best = Math.max(best, 76);
       const wanted = new Set(meaningfulTokens(alias));
       const found = meaningfulTokens(name).filter((token) => wanted.has(token));

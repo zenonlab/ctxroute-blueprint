@@ -560,7 +560,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     const ambiguity = aliases.some((alias: string) => isParenthesizedAmbiguity(alias, items.map(item => ({...item, title: titleOf(item), id: String(item.id)}))));
     if (ambiguity || (!selected && items.length > 0)) {
       // Detail every displayed candidate before exposing it to the user.
-      const detailed = await Promise.all(items.filter(item => item.type === 'ANIME').slice(0, 20).map(async item => {
+      const exactItems = items.filter(item => candidateTitles(item).some(name => aliases.some((alias: string) => normalizeTitle(alias) === normalizeTitle(name) || compactTitleKey(alias) === compactTitleKey(name))));
+      const reviewItems = (exactItems.length > 1 ? exactItems : items).filter(item => item.type === 'ANIME').slice(0, 5);
+      const detailed = await Promise.all(reviewItems.map(async item => {
         try { return await fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) }); } catch { return item; }
       }));
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);

@@ -6,7 +6,9 @@ import {
   matchAniList,
   matchMangaUpdates,
   resolveMangaUpdatesSeries,
+  exactMangaUpdatesSeriesMatches,
   isDeadMangaUpdatesSeries,
+  mangaUpdatesMediaType,
   searchAniList,
   sourceDispositionFromUrl,
   sourceIdentityFromUrl,
@@ -14,7 +16,22 @@ import {
   prepareTitleCandidates,
   titleCandidateFromBookmark,
   titleVariants,
+  cleanDisplayTitle,
 } from "./index.js";
+
+describe("deterministic display-title cleaning", () => {
+  it.each([
+    ["I Was Reincarnated as the 7th Prince So I Can Take My Time Perfecting My Magical Ability - I Was Reincarnated as the 7th Prince So I Can Take My Time Perfecting My Magical Ability - 02 VOSTFR - 02 - Voiranime", "I Was Reincarnated as the 7th Prince So I Can Take My Time Perfecting My Magical Ability"],
+    ["Solo Leveling - Episode 12 - Chapter 12 - Mangakakalot", "Solo Leveling"],
+    ["One Piece - 42 VF - 42 - Anime-Sama", "One Piece"],
+    ["The Title - The Title", "The Title"],
+  ])("cleans %s", (input, expected) => {
+    expect(cleanDisplayTitle(input)).toBe(expected);
+  });
+  it("keeps title words that only resemble markers", () => {
+    expect(cleanDisplayTitle("Sub Zero")) .toBe("Sub Zero");
+  });
+});
 
 describe("AniList catalogue", () => {
   it("prepares bookmark and URL titles using URL release evidence", () => {
@@ -173,6 +190,10 @@ describe("AniList catalogue", () => {
   it("does not accept an unrelated first AniList result", () => {
     const item = (id: number, title: string) => ({ id, type: "ANIME", title: { userPreferred: title }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] });
     expect(matchAniList({ aliases: ["Re:Monster"], type: "ANIME" }, [item(1, "Digimon Universe: Appli Monsters") as any, item(2, "Monster") as any, item(3, "Remonster") as any])?.media.id).toBe(3);
+  });
+  it("matches punctuation variants through the compact source key", () => {
+    const item = { id: 99, type: "ANIME", title: { userPreferred: "Isekai Oji-san" }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] };
+    expect(matchAniList({ aliases: ["Isekai Ojisan"], type: "ANIME" }, [item as any])?.media.id).toBe(99);
   });
   it("coalesces simultaneous title searches into one HTTP request", async () => {
     const media = (id: number, title: string) => ({
@@ -404,10 +425,31 @@ describe("AniList catalogue", () => {
     expect(matchMangaUpdates({ aliases: ["The Beginning"] }, results)?.series.id).toBe("24277219018");
   });
 
+  it("uses MangaUpdates as the authoritative reading type", () => {
+    expect(mangaUpdatesMediaType("Manhwa")).toBe("MANHWA");
+    expect(mangaUpdatesMediaType("manga")).toBe("MANGA");
+    expect(mangaUpdatesMediaType("Light Novel")).toBeUndefined();
+    expect(matchMangaUpdates(
+      { aliases: ["New Employee"] },
+      [{ id: "new-employee-mu", title: "New Employee", type: "Manhwa", image: "https://img.example/new-employee.jpg" }],
+    )?.series.type).toBe("Manhwa");
+    expect(matchMangaUpdates(
+      { aliases: ["The God of War is Leveling Up"] },
+      [{ id: "god-of-war-mu", title: "The God of War is Leveling Up", type: "Manhua", image: "https://img.example/god.jpg" }],
+    )?.series.id).toBe("god-of-war-mu");
+  });
+
   it("uses all aliases, including a later alias, and does not reject chapter zero with identity", () => {
     const zeroChapter = { id: "1", title: "Preferred title", type: "Manga", image: "https://img/cover.jpg", latestChapter: "0" };
     expect(isDeadMangaUpdatesSeries(zeroChapter)).toBe(false);
     expect(resolveMangaUpdatesSeries(["Source label", "Preferred title"], [zeroChapter])?.id).toBe("1");
+  });
+  it("finds a unique exact title in every returned title field, regardless of rank", () => {
+    const items = [
+      { id: "1", title: "Genius Lout Composer Returns", type: "Manhwa", image: "https://img/1.jpg" },
+      { id: "2", title: "Other", titles: ["The Crazy Genius Composer Returns"], type: "Manhwa", image: "https://img/2.jpg" },
+    ];
+    expect(exactMangaUpdatesSeriesMatches(["The Crazy Genius Composer Returns"], items).map(item => item.id)).toEqual(["2"]);
   });
 
   it("rejects genuinely dead MangaUpdates records", () => {
@@ -462,6 +504,33 @@ describe("AniList catalogue", () => {
       [{ id: "78", title: "Titre anglais", titles: ["Titre français"], type: "Manhwa", image: "https://img.example/mu.jpg" }],
     )?.series.id).toBe("78");
   });
+  it("parses the live MangaUpdates search envelope and keeps hit_title separate", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      results: [{
+        record: {
+          series_id: 66249161611,
+          title: "Resurrection Boy",
+          type: "Manhwa",
+          year: 2024,
+          genres: ["Action"],
+          bayesian_rating: 8.1,
+          rating_votes: 42,
+          image: { url: { original: "https://img.example/resurrection.jpg", thumbnail: "https://img.example/resurrection-small.jpg" } },
+        },
+        hit_title: "Resurrection Boy",
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const [series] = await (await import("./index.js")).searchMangaUpdatesSeries("Resurrection Boy", {
+      endpoint: "https://mu.live-shape.test/v1", fetch: fetcher,
+    });
+    expect(series).toMatchObject({
+      id: "66249161611", title: "Resurrection Boy", hitTitle: "Resurrection Boy",
+      type: "Manhwa", image: "https://img.example/resurrection.jpg", bayesianRating: 8.1,
+    });
+    expect(series?.imageThumbnail).toBe("https://img.example/resurrection-small.jpg");
+    expect(series).not.toHaveProperty("raw");
+    expect(matchMangaUpdates({ aliases: ["Resurrection Boy"] }, [series!])?.series.type).toBe("Manhwa");
+  });
   it("keeps compact and normalized variants for multi-signal searches", () =>
     expect(titleVariants(["Café — Blue Sky"])).toEqual(
       expect.arrayContaining([
@@ -470,4 +539,9 @@ describe("AniList catalogue", () => {
         "cafebluesky",
       ]),
     ));
+  it("cleans release and site slop only for display", async () => {
+    const { cleanDisplayTitle } = await import("./index.js");
+    expect(cleanDisplayTitle("Frieren - Episode 12 VOSTFR - VoirAnime")).toBe("Frieren");
+    expect(cleanDisplayTitle("Solo Leveling Chapter 38 | Mangakakalot")).toBe("Solo Leveling");
+  });
 });
