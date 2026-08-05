@@ -31,7 +31,7 @@ SELECT review_id,
             THEN ARRAY(SELECT jsonb_array_elements_text(candidate->'categories')) ELSE NULL END,
        CASE WHEN jsonb_typeof(candidate->'genres')='array'
             THEN ARRAY(SELECT jsonb_array_elements_text(candidate->'genres')) ELSE NULL END,
-       COALESCE(candidate->>'image', candidate->'coverImage'),
+       COALESCE(candidate->>'image', candidate->>'coverImage'),
        COALESCE(candidate->>'url', candidate->>'siteUrl',
          CASE WHEN provider='anilist' THEN 'https://anilist.co' ELSE 'https://www.mangaupdates.com' END),
        candidate, media_id
