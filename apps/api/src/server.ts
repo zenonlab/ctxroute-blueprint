@@ -73,13 +73,20 @@ async function calendarRows(userId:string,filters:CalendarFilters,timeZone='UTC'
     FROM mangaupdates_release_observation o
     WHERE o.release_date IS NOT NULL
     ORDER BY o.media_id,o.provider_release_key,o.observed_at DESC,o.id DESC
+  ), furthest_mu AS (
+    SELECT DISTINCT ON (o.media_id,(o.release_date AT TIME ZONE 'UTC')::date) o.*
+    FROM latest_mu o
+    ORDER BY o.media_id,(o.release_date AT TIME ZONE 'UTC')::date,
+      COALESCE(NULLIF(substring(o.chapter from '([0-9]+(?:[.][0-9]+)?)\\s*$'),''),'0')::numeric DESC,
+      COALESCE(NULLIF(substring(o.volume from '([0-9]+(?:[.][0-9]+)?)\\s*$'),''),'0')::numeric DESC,
+      o.observed_at DESC,o.id DESC
   ), events AS (
     SELECT 'airing'::text AS category,'ANIME'::text AS event_type,a.media_id,a.episode::text AS release_key,a.airing_at_utc AS starts_at,a.provider,a.schedule_status AS status,NULL::text AS chapter,NULL::text AS volume,NULL::text[] AS groups,NULL::text[] AS languages
     FROM media_airing a
     WHERE a.airing_at_utc IS NOT NULL AND a.schedule_status='SCHEDULED'
     UNION ALL
     SELECT 'release'::text,m.type,o.media_id,o.provider_release_key,o.release_date,'mangaupdates','ANNOUNCED',o.chapter,o.volume,o.groups,o.languages
-    FROM latest_mu o JOIN media m ON m.id=o.media_id
+    FROM furthest_mu o JOIN media m ON m.id=o.media_id
     WHERE m.type IN ('MANGA','MANHWA','MANHUA')
   ) SELECT e.category,e.event_type AS "type",e.media_id AS "mediaId",e.release_key AS "releaseKey",e.provider,e.status,e.starts_at AS "startsAt",e.chapter,e.volume,e.groups,e.languages,
     COALESCE(favlib_display_title(e.media_id,$1::uuid)->>'title',e.media_id) AS title,
