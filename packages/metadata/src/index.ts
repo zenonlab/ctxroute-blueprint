@@ -121,6 +121,7 @@ export type AniListMatch = {
   media: AniListMedia;
   displayTitle: string;
   titles: string[];
+  score?: number;
 };
 export type AniListCandidateScore = {
   media: AniListMedia;
@@ -134,7 +135,7 @@ export type AniListHooks = {
   onRateLimit?: (retryAt: number) => Promise<void>;
 };
 const UA =
-  "FavLib/catalog-anilist-v1 (private local media tracker; favlib.home.arpa)";
+  "FavLib/1.0 (private local media tracker; favlib.home.arpa)";
 const HTML_MAX = 512 * 1024,
   JSON_MAX = 2 * 1024 * 1024;
 
@@ -1038,7 +1039,7 @@ export function matchAniList(
     media.title.native,
     ...media.synonyms,
   ].filter((value): value is string => Boolean(value));
-  return { media, displayTitle: latinTitle(media), titles };
+  return { media, displayTitle: latinTitle(media), titles, score: first.score.score };
 }
 export function assertSafeImageUrl(value: string) {
   const u = new URL(value);
@@ -1128,7 +1129,6 @@ export type MangaUpdatesRelease = {
 export type MangaUpdatesClientOptions = {
   endpoint?: string;
   searchEndpoint?: string;
-  apiKey?: string;
   fetch?: SearchClient;
   timeoutMs?: number;
   now?: number;
@@ -1141,13 +1141,51 @@ function muHeaders(options: MangaUpdatesClientOptions) {
   return {
     accept: "application/json",
     "content-type": "application/json",
-    "user-agent": "FavLib/mangaupdates-v1",
-    ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}),
+    "user-agent": UA,
   };
 }
 function muArray(json: any, keys: string[]) {
   for (const key of keys) if (Array.isArray(json?.[key])) return json[key];
   return Array.isArray(json) ? json : [];
+}
+function parsePublicMangaUpdatesReleases(html:string): MangaUpdatesRelease[] {
+  const dayPattern=/<div[^>]*release_day_title[^>]*>[\s\S]*?<span>([A-Z][a-z]+ \d{1,2}, \d{4})<\/span>[\s\S]*?<\/div>/gu;
+  const days=[...html.matchAll(dayPattern)];
+  const parsed:MangaUpdatesRelease[]=[];
+  for(let index=0;index<days.length;index++){
+    const day=days[index];
+    const next=days[index+1];
+    const releaseDate=new Date(`${day[1]} 12:00:00 UTC`).toISOString();
+    const section=html.slice((day.index??0)+day[0].length,next?.index??html.length);
+    const rows=section.split(/(?=<div id="release\d+")/u).filter(row=>row.startsWith('<div id="release'));
+    for(const row of rows){
+      const releaseId=row.match(/^<div id="(release\d+)"/u)?.[1];
+      const series=row.match(/href="https:\/\/www\.mangaupdates\.com\/series\/([^"/]+)[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/u);
+      const cells=[...row.matchAll(/<div[^>]*pbreak[^>]*>([\s\S]*?)<\/div>/gu)];
+      const chapter=cells[1]?.[1]?.replace(/<[^>]+>/gu,' ').replace(/\s+/gu,' ').trim();
+      const group=cells[2]?.[1]?.replace(/<[^>]+>/gu,' ').replace(/\s+/gu,' ').trim();
+      if(!releaseId||!series?.[1]||!series[2]||!chapter)continue;
+      const title=series[2].replace(/\s+/gu,' ').trim();
+      parsed.push({seriesId:series[1],title,seriesTitle:title,chapter,group,releaseDate,url:`https://www.mangaupdates.com/series/${series[1]}`});
+    }
+  }
+  // Keep the old row parser as a guarded compatibility path. Undated rows are
+  // observational only and are deliberately excluded from the calendar.
+  const legacy:MangaUpdatesRelease[]=parsed.length?[]:html.split(/(?=<div id="release\d+")/u).filter(row=>row.startsWith('<div id="release')).flatMap(row=>{
+    const series=row.match(/href="https:\/\/www\.mangaupdates\.com\/series\/([^"/]+)[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/u);
+    const chapter=row.match(/<\/a>[\s\S]*?<div[^>]*>([^<]+)<\/div>/u)?.[1]?.trim();
+    if(!series?.[1]||!series[2]||!chapter)return [];
+    const title=series[2].replace(/\s+/gu,' ').trim();
+    return [{seriesId:series[1],title,seriesTitle:title,chapter,url:`https://www.mangaupdates.com/series/${series[1]}`}];
+  });
+  const seen=new Set<string>();
+  return [...parsed,...legacy].filter(value=>{const key=`${value.seriesId}|${value.chapter??''}|${value.releaseDate??''}`;if(seen.has(key))return false;seen.add(key);return true});
+}
+async function fetchPublicMangaUpdatesReleases(options:MangaUpdatesClientOptions):Promise<MangaUpdatesRelease[]> {
+  const client=options.fetch??safeFetch(JSON_MAX,['text/html','application/xhtml+xml']);
+  const response=await client('https://www.mangaupdates.com/releases.html',{headers:{accept:'text/html', 'user-agent':UA},signal:AbortSignal.timeout(options.timeoutMs??8000)});
+  if(!response.ok)throw new Error(`MANGAUPDATES_PUBLIC_HTTP_${response.status}`);
+  return parsePublicMangaUpdatesReleases((await response.text()).slice(0,2*1024*1024));
 }
 function stringValues(value: unknown): string[] {
   if (typeof value === "string") return value.trim() ? [value] : [];
@@ -1295,13 +1333,15 @@ async function muJson(
 export async function fetchMangaUpdatesReleases(
   options: MangaUpdatesClientOptions = {},
 ): Promise<MangaUpdatesRelease[]> {
-  const json = await muJson("/releases", options, {
-    method: "POST",
-    body: "{}",
-  });
-  return muArray(json, ["releases", "data", "results"])
-    .map(mapMuRelease)
-    .filter((x): x is MangaUpdatesRelease => Boolean(x));
+  try {
+    const json = await muJson("/releases", options, { method: "POST", body: "{}" });
+    return muArray(json, ["releases", "data", "results"])
+      .map(mapMuRelease)
+      .filter((x): x is MangaUpdatesRelease => Boolean(x));
+  } catch (error) {
+    if (!(error instanceof Error) || !/MANGAUPDATES_HTTP_(401|403|405)/u.test(error.message)) throw error;
+    return fetchPublicMangaUpdatesReleases(options);
+  }
 }
 export async function searchMangaUpdatesSeries(
   query: string,
@@ -1411,8 +1451,21 @@ export function exactMangaUpdatesSeriesMatches(
     .map((item) => [item.id, item] as const)).values()];
 }
 
+/** Automatic identity is deliberately narrower than review relevance: spelling
+ * differences, token overlap and parenthesized variants require a human. */
+export function automaticMangaUpdatesSeriesMatches(aliases: string[], items: MangaUpdatesSeries[]) {
+  return [...new Map(items
+    .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => candidateTitles(item).some((title) => aliases.some((alias) => {
+      const kind=exactTitleMatchKind(alias,title);
+      return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';
+    })))
+    .map((item) => [item.id,item] as const)).values()];
+}
+
 export function exactAniListMediaMatches(aliases: string[], items: AniListMedia[]) {
   return [...new Map(items
+    .filter((item) => item.type === "ANIME")
     .filter((item) => [
       item.title.english,
       item.title.romaji,
@@ -1422,6 +1475,13 @@ export function exactAniListMediaMatches(aliases: string[], items: AniListMedia[
     ].filter((title): title is string => Boolean(title?.trim())).some((title) =>
       aliases.some((alias) => exactTitleMatchKind(alias, title))))
     .map((item) => [item.id, item] as const)).values()];
+}
+
+export function automaticAniListMediaMatches(aliases: string[], items: AniListMedia[]) {
+  return [...new Map(items.filter((item) => [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
+    .filter((title):title is string=>Boolean(title?.trim()))
+    .some((title)=>aliases.some((alias)=>{const kind=exactTitleMatchKind(alias,title);return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';})))
+    .map((item)=>[item.id,item] as const)).values()];
 }
 
 function hasValidChapter(value: unknown) {
@@ -1478,6 +1538,15 @@ function scoreMangaUpdatesSeries(aliases: string[], series: MangaUpdatesSeries) 
     }
   }
   return best + (series.hitTitle ? 3 : 0) + (series.image ? 2 : 0) + (series.description ? 1 : 0);
+}
+
+export function rankMangaUpdatesReviewCandidates(aliases: string[], items: MangaUpdatesSeries[], limit = 5) {
+  return [...new Map(items.map((item) => [item.id,item] as const)).values()]
+    .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .map((item) => ({item,score:scoreMangaUpdatesSeries(aliases,item)}))
+    .sort((a,b)=>b.score-a.score||a.item.id.localeCompare(b.item.id))
+    .slice(0,Math.max(0,limit))
+    .map(({item})=>item);
 }
 
 /** Selects the coherent MangaUpdates identity, independently of result order. */

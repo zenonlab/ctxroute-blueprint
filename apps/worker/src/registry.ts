@@ -1,0 +1,15 @@
+export const WORKER_TASK_NAMES = [
+  'availability', 'availability-sweep', 'announcement-sync', 'backup', 'cover-recompress',
+  'health', 'notification-delivery', 'retention-purge', 'resolve-favorite',
+  'anilist-enrichment', 'mangaupdates-enrichment', 'enrichment-sweep', 'mangaupdates-release-sweep', 'anilist-calendar-sweep',
+] as const;
+
+export const SCHEDULES = {
+  'availability-sweep': 5 * 60_000, 'enrichment-sweep': 10 * 60_000,
+  'mangaupdates-release-sweep': 5 * 60_000, 'anilist-calendar-sweep': 5 * 60_000,
+  'notification-delivery': 5 * 60_000, health: 2 * 60_000, 'retention-purge': 24 * 60 * 60_000,
+} as const;
+
+export function parseCrontab(text: string): string[] {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => line.split(/\s+/).slice(5).join(' '));
+}

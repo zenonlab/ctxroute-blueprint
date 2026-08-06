@@ -1,26 +1,96 @@
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+    user: "999:999"
     environment: { POSTGRES_DB: favlib, POSTGRES_USER: favlib, POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password }
     secrets: [postgres_password]
     volumes: [favlib-postgres:/var/lib/postgresql]
+    ports: ['127.0.0.1:5433:5432']
     healthcheck: { test: [CMD-SHELL, 'pg_isready -U favlib -d favlib'], interval: 5s, timeout: 5s, retries: 20 }
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [favlib]
+  migrate:
+    build: { context: .., dockerfile: apps/api/Dockerfile }
+    command: [node, apps/api/dist/src/migrate.js]
+    environment: { DATABASE_URL_FILE: /run/secrets/favlib_database_url, CATALOG_FINGERPRINT_KEY_FILE: /run/secrets/catalog_fingerprint_key, FAVLIB_BASE_URL: https://favlib.home.arpa, FAVLIB_BUILD_VERSION: "${FAVLIB_BUILD_VERSION:-local}", NODE_ENV: production }
+    secrets: [favlib_database_url, catalog_fingerprint_key, backup_key]
+    depends_on: { postgres: { condition: service_healthy } }
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     networks: [favlib]
   api:
     build: { context: .., dockerfile: apps/api/Dockerfile }
-    environment: { DATABASE_URL: postgres://favlib:change-me@postgres:5432/favlib, FAVLIB_BASE_URL: https://favlib.home.arpa, PORT: 3001 }
-    depends_on: { postgres: { condition: service_healthy } }
+    environment: { DATABASE_URL_FILE: /run/secrets/favlib_database_url, CATALOG_FINGERPRINT_KEY_FILE: /run/secrets/catalog_fingerprint_key, FAVLIB_BASE_URL: https://favlib.home.arpa, BACKUP_DESTINATION: /var/lib/favlib/backups, BACKUP_KEY_FILE: /run/secrets/backup_key, FAVLIB_BUILD_VERSION: "${FAVLIB_BUILD_VERSION:-local}", PORT: 3001, NODE_ENV: production }
+    secrets: [favlib_database_url, catalog_fingerprint_key, backup_key]
+    volumes:
+      - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    healthcheck: { test: [CMD, node, -e, "fetch('http://127.0.0.1:3001/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [favlib]
+  worker:
+    build: { context: .., dockerfile: apps/worker/Dockerfile }
+    environment: { DATABASE_URL_FILE: /run/secrets/favlib_database_url, CATALOG_FINGERPRINT_KEY_FILE: /run/secrets/catalog_fingerprint_key, FAVLIB_BASE_URL: https://favlib.home.arpa, BACKUP_DESTINATION: /var/lib/favlib/backups, BACKUP_KEY_FILE: /run/secrets/backup_key, FAVLIB_WORKER_CONCURRENCY: "${FAVLIB_WORKER_CONCURRENCY:-16}", FAVLIB_BUILD_VERSION: "${FAVLIB_BUILD_VERSION:-local}", NODE_ENV: production }
+    secrets: [favlib_database_url, catalog_fingerprint_key, backup_key]
+    volumes:
+      - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
+    depends_on: { migrate: { condition: service_completed_successfully }, api: { condition: service_healthy } }
+    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['resolve-favorite','anilist-enrichment']) FROM service_heartbeat WHERE service='worker' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [favlib]
+  reading-worker:
+    build: { context: .., dockerfile: apps/worker/Dockerfile }
+    environment: { DATABASE_URL_FILE: /run/secrets/favlib_database_url, CATALOG_FINGERPRINT_KEY_FILE: /run/secrets/catalog_fingerprint_key, FAVLIB_BASE_URL: https://favlib.home.arpa, BACKUP_DESTINATION: /var/lib/favlib/backups, BACKUP_KEY_FILE: /run/secrets/backup_key, FAVLIB_WORKER_ROLE: reading, FAVLIB_WORKER_CONCURRENCY: "${FAVLIB_READING_WORKER_CONCURRENCY:-4}", FAVLIB_BUILD_VERSION: "${FAVLIB_BUILD_VERSION:-local}", NODE_ENV: production }
+    secrets: [favlib_database_url, catalog_fingerprint_key, backup_key]
+    volumes:
+      - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
+    depends_on: { migrate: { condition: service_completed_successfully }, api: { condition: service_healthy } }
+    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['mangaupdates-release-sweep']) FROM service_heartbeat WHERE service='worker-reading' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     networks: [favlib]
   web:
     build: { context: .., dockerfile: apps/web/Dockerfile }
-    depends_on: [api]
+    depends_on: { api: { condition: service_healthy } }
+    healthcheck: { test: [CMD, node, -e, "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp, /app/apps/web/.next/cache]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     networks: [favlib]
   caddy:
-    image: caddy:2.9-alpine
+    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
     ports: ['443:443']
     volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy-data:/data, caddy-config:/config]
-    depends_on: [web, api]
+    depends_on: { web: { condition: service_healthy }, api: { condition: service_healthy } }
+    healthcheck: { test: [CMD, wget, -q, --spider, http://127.0.0.1:2019/config/], interval: 10s, timeout: 5s, retries: 12 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
     networks: [favlib]
 networks: { favlib: { driver: bridge } }
 volumes: { favlib-postgres: {}, caddy-data: {}, caddy-config: {} }
-secrets: { postgres_password: { file: ./secrets/postgres_password } }
+secrets:
+  postgres_password: { file: ./secrets/postgres_password }
+  favlib_database_url: { file: ./secrets/favlib_database_url }
+  catalog_fingerprint_key: { file: ./secrets/catalog_fingerprint_key }
+  backup_key: { file: ./secrets/backup_key }

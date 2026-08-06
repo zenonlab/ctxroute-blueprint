@@ -8,6 +8,7 @@ import {
   resolveMangaUpdatesSeries,
   exactMangaUpdatesSeriesMatches,
   exactAniListMediaMatches,
+  automaticAniListMediaMatches,
   exactTitleMatchKind,
   isDeadMangaUpdatesSeries,
   mangaUpdatesMediaType,
@@ -207,6 +208,11 @@ describe("AniList catalogue", () => {
   it("matches punctuation variants through the compact source key", () => {
     const item = { id: 99, type: "ANIME", title: { userPreferred: "Isekai Oji-san" }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] };
     expect(matchAniList({ aliases: ["Isekai Ojisan"], type: "ANIME" }, [item as any])?.media.id).toBe(99);
+  });
+  it("auto-selects the parser-clean Dororo identity but keeps duplicate exact titles ambiguous", () => {
+    const item = (id: number, title: string) => ({ id, type: "ANIME", title: { userPreferred: title }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] });
+    expect(automaticAniListMediaMatches(["Dororo"], [item(1,"Dororo") as any]).map(x=>x.id)).toEqual([1]);
+    expect(automaticAniListMediaMatches(["Dororo"], [item(1,"Dororo") as any,item(3,"Dororo") as any])).toHaveLength(2);
   });
   it("accepts one clear canonical prefix but rejects competing partial titles", () => {
     const item = (id: number, english: string) => ({ id, type: "ANIME", title: { english, userPreferred: english }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] });
@@ -432,6 +438,12 @@ describe("AniList catalogue", () => {
       method: "POST",
       body: "{}",
     });
+  });
+  it("keeps the provider day when the MangaUpdates API falls back to public HTML", async () => {
+    const html='<div class="new-release-day-module__x__release_day_title"><i><span>August 5, 2026</span></i></div><div id="release12" class="row"><div class="pbreak"><a href="https://www.mangaupdates.com/series/oug0awj/reality-quest"><span>Reality Quest</span></a></div><div class="pbreak">c.217</div><div class="pbreak"><span>LINE Webtoon</span></div></div><div class="new-release-day-module__x__release_day_title"><i><span>August 6, 2026</span></i></div><div id="release13" class="row"><div class="pbreak"><a href="https://www.mangaupdates.com/series/other/title"><span>Other</span></a></div><div class="pbreak">c.10</div><div class="pbreak"><span>Group</span></div></div>';
+    const fetcher=vi.fn().mockResolvedValueOnce(new Response('',{status:405})).mockResolvedValueOnce(new Response(html,{status:200,headers:{'content-type':'text/html'}}));
+    const releases=await fetchMangaUpdatesReleases({endpoint:'https://mu.test/v1',fetch:fetcher});
+    expect(releases).toMatchObject([{seriesId:'oug0awj',chapter:'c.217',group:'LINE Webtoon',releaseDate:'2026-08-05T12:00:00.000Z'},{seriesId:'other',chapter:'c.10',releaseDate:'2026-08-06T12:00:00.000Z'}]);
   });
   it("scores every result and rejects dead records and novels", () => {
     const results = [

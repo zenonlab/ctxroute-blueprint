@@ -1,0 +1,7 @@
+*/5 * * * * availability-sweep
+*/10 * * * * enrichment-sweep
+*/5 * * * * mangaupdates-release-sweep
+*/5 * * * * anilist-calendar-sweep
+*/5 * * * * notification-delivery
+*/2 * * * * health
+17 3 * * * retention-purge

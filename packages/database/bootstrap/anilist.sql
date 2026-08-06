@@ -422,6 +422,15 @@ CREATE TABLE IF NOT EXISTS provider_request_gate(provider text PRIMARY KEY,next_
 ALTER TABLE provider_request_gate ADD COLUMN IF NOT EXISTS max_in_flight integer NOT NULL DEFAULT 2;
 ALTER TABLE provider_request_gate ADD COLUMN IF NOT EXISTS in_flight integer NOT NULL DEFAULT 0;
 INSERT INTO provider_request_gate(provider,max_in_flight) VALUES ('anilist',2),('mangaupdates',2) ON CONFLICT(provider) DO NOTHING;
+CREATE TABLE IF NOT EXISTS provider_request_waitlist (
+  id uuid PRIMARY KEY, provider text NOT NULL CHECK(provider IN ('anilist','mangaupdates')),
+  request_kind text NOT NULL, priority integer NOT NULL DEFAULT 50,
+  scope_key text, user_id uuid REFERENCES app_user(id) ON DELETE SET NULL,
+  state text NOT NULL CHECK(state IN ('WAITING','RUNNING','COMPLETED','FAILED')),
+  not_before timestamptz NOT NULL DEFAULT now(),attempt_count integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),started_at timestamptz,completed_at timestamptz,last_error text
+);
+CREATE INDEX IF NOT EXISTS provider_request_waitlist_dispatch_idx ON provider_request_waitlist(provider,state,priority DESC,not_before,created_at);
 ALTER TABLE media_enrichment_state ADD COLUMN IF NOT EXISTS resolution_code text;
 ALTER TABLE media_enrichment_state ADD COLUMN IF NOT EXISTS match_confidence numeric(4,3);
 ALTER TABLE media_enrichment_state ADD COLUMN IF NOT EXISTS candidate_snapshot jsonb;
@@ -570,7 +579,7 @@ CREATE TABLE IF NOT EXISTS media_airing (
   provider text NOT NULL, episode integer NOT NULL, airing_at_utc timestamptz NOT NULL,
   source_local_time text, source_timezone text, precision text NOT NULL,
   schedule_status text NOT NULL, last_verified_at timestamptz NOT NULL, provenance jsonb NOT NULL DEFAULT '{}'::jsonb,
-  UNIQUE(media_id,provider,episode,airing_at_utc)
+  UNIQUE(media_id,provider,episode)
 );
 CREATE INDEX IF NOT EXISTS media_airing_utc_idx ON media_airing(airing_at_utc);
 CREATE INDEX IF NOT EXISTS media_airing_media_idx ON media_airing(media_id,airing_at_utc);
@@ -704,3 +713,44 @@ BEGIN
   RETURN jsonb_build_object('removedLinks',removed_links,'removedJobs',removed_jobs,'preservedUsers',(SELECT count(*) FROM app_user),'preservedMedia',(SELECT count(*) FROM media),'preservedCovers',(SELECT count(*) FROM media_cover),'preservedImageAssets',(SELECT count(*) FROM catalog_image_asset),'enqueued',0);
 END $$;
 COMMENT ON FUNCTION favlib_reset_catalog(text) IS 'Clean reset; preserves users, covers and local image assets only.';
+
+-- Kept at the end so an idempotent bootstrap never restores the old
+-- personal-first projection. Migration 0014 supplies the full deterministic
+-- cleaner and local repair for already populated catalogues.
+CREATE OR REPLACE FUNCTION favlib_display_title(target_media_id text, target_user_id uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE selected media_title%ROWTYPE; reference_title text;
+BEGIN
+  SELECT t.text INTO reference_title FROM media_title t WHERE t.media_id=target_media_id AND t.kind='source' ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+  SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind='official' AND t.connector IN ('anilist','mangaupdates') AND t.title_type='canonical' ORDER BY CASE t.connector WHEN 'anilist' THEN 0 ELSE 1 END,t.id DESC LIMIT 1;
+  IF selected.id IS NULL THEN SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind IN ('official','supplier') AND t.connector IN ('anilist','mangaupdates') ORDER BY (t.kind='official') DESC,(t.title_type='official') DESC,t.confidence DESC NULLS LAST,t.id DESC LIMIT 1; END IF;
+  IF selected.id IS NULL THEN SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind='source' ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1; END IF;
+  IF selected.id IS NULL AND target_user_id IS NOT NULL THEN SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind='personal' AND t.provenance->>'userId'=target_user_id::text ORDER BY t.id DESC LIMIT 1; END IF;
+  RETURN jsonb_build_object('title',selected.text,'referenceTitle',reference_title,'score',CASE WHEN selected.id IS NULL THEN 0 WHEN selected.connector IN ('anilist','mangaupdates') THEN 1 ELSE .5 END,'alias',CASE WHEN selected.id IS NULL THEN NULL ELSE jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector) END,'reason',CASE WHEN selected.connector IN ('anilist','mangaupdates') THEN 'PROVIDER_CANONICAL' WHEN selected.kind='source' THEN 'SOURCE_CLEAN' WHEN selected.id IS NULL THEN 'NO_TITLE' ELSE 'PERSONAL_CLEAN' END);
+END $$;
+
+-- Final canonical display policy used by bootstrap as well as migration 0013.
+CREATE OR REPLACE FUNCTION favlib_clean_display_title(value text)
+RETURNS text LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE s text := coalesce(value,'');
+BEGIN
+  s:=regexp_replace(s,'\s*([-–—|·:]\s*)?(chapter|chapitre|chap|ch\.?|episode|épisode|ep\.?|volume|vol\.?|season|saison)\s*#?[0-9][0-9.\-a-z]*.*$','','i');
+  s:=regexp_replace(s,'\s*([-–—|·:]\s*)?(vostfr|vf|vo|sub|dub|scan|scans)\b.*$','','i');
+  s:=regexp_replace(s,'\s*([-–—|·:]\s*)?(voiranime|mangakakalot|anime-sama|anime sama|japscan|lelscan|manganato|mangadex)\b.*$','','i');
+  RETURN nullif(trim(regexp_replace(s,'[|·:—–-]+$','','g')),'');
+END $$;
+CREATE OR REPLACE FUNCTION favlib_display_title(target_media_id text, target_user_id uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE selected media_title%ROWTYPE; reference_title text; shown text;
+BEGIN
+ SELECT favlib_clean_display_title(t.text) INTO reference_title FROM media_title t WHERE t.media_id=target_media_id AND t.kind='source' ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+ SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind<>'personal' AND t.connector IN ('anilist','mangaupdates') AND favlib_clean_display_title(t.text) IS NOT NULL ORDER BY (t.title_type='canonical') DESC,(t.kind='official') DESC,(t.title_type='romaji') DESC,(t.connector='anilist') DESC,t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+ IF selected.id IS NOT NULL THEN shown:=favlib_clean_display_title(selected.text); RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',1,'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),'reason','PROVIDER_CANONICAL'); END IF;
+ SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind='source' AND favlib_clean_display_title(t.text) IS NOT NULL ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+ IF selected.id IS NOT NULL THEN shown:=favlib_clean_display_title(selected.text); RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',.9,'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),'reason','SOURCE_CLEAN'); END IF;
+ IF target_user_id IS NOT NULL THEN
+   SELECT t.* INTO selected FROM media_title t WHERE t.media_id=target_media_id AND t.kind='personal' AND t.provenance->>'userId'=target_user_id::text AND favlib_clean_display_title(t.text) IS NOT NULL ORDER BY t.id DESC LIMIT 1;
+   IF selected.id IS NOT NULL THEN shown:=favlib_clean_display_title(selected.text); RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',.5,'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),'reason','PERSONAL_CLEAN'); END IF;
+ END IF;
+ RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_TITLE');
+END $$;
