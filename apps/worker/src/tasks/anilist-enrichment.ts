@@ -572,7 +572,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       else if (!manualOnlyReview && exact.length === 0)
         {
           selected = matchAniList({ aliases, type: "ANIME" }, eligible)?.media ?? undefined;
-          if (selected) selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
+          if (selected) selectedResolutionCode = "SCORED_MATCH";
         }
     }
     await h.query(
