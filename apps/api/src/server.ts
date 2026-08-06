@@ -121,19 +121,19 @@ app.get('/api/v1/library',async(req:any,reply:any)=>{
   const parsed=libraryQuerySchema.safeParse(req.query??{});if(!parsed.success)return err(reply,400,'VALIDATION_FAILED','Paramètres de filtre invalides.',parsed.error.issues);
   const {limit,offset,sort,direction}=parsed.data;
   const orderBy={inventory:'"id"',title:'lower("title")',type:'"type"',year:'"seasonYear"',release:'"latestReleaseDate"',favorites:'"favoriteCount"'}[sort];
-  const r=await pool.query(`WITH ${libraryProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql()}) SELECT *,count(*) OVER()::int AS "totalCount" FROM filtered ORDER BY ${orderBy} ${direction.toUpperCase()} NULLS LAST,"id" LIMIT $12 OFFSET $13`,[...libraryFilterValues(req.user.id,parsed.data),limit,offset]);
+  const r=await pool.query(`WITH ${libraryProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql()}) SELECT *,count(*) OVER()::int AS "totalCount" FROM filtered ORDER BY ${orderBy} ${direction.toUpperCase()} NULLS LAST,"id" LIMIT $10 OFFSET $11`,[...libraryFilterValues(req.user.id,parsed.data),limit,offset]);
   const total=r.rows[0]?.totalCount??0;const items=r.rows.map(({totalCount:_,...row}:any)=>({...row,coverUrl:row.coverProvenance?`/api/v1/catalog/media/${encodeURIComponent(row.id)}/cover?v=${encodeURIComponent(row.coverProvenance.fetchedAt)}`:null}));const nextOffset=offset+items.length;
   return {items,total,nextOffset,hasMore:nextOffset<total};
 });
 app.get('/api/v1/library/facets',async(req:any,reply:any)=>{
-  const parsed=libraryQuerySchema.pick({q:true,type:true,theme:true,status:true,year:true,format:true,language:true,contentRating:true,demographic:true,provider:true}).safeParse(req.query??{});if(!parsed.success)return err(reply,400,'VALIDATION_FAILED','Paramètres de facette invalides.',parsed.error.issues);
+  const parsed=libraryQuerySchema.pick({q:true,type:true,theme:true,status:true,year:true,contentRating:true,demographic:true,provider:true}).safeParse(req.query??{});if(!parsed.success)return err(reply,400,'VALIDATION_FAILED','Paramètres de facette invalides.',parsed.error.issues);
   const query={limit:30,offset:0,sort:'inventory' as const,direction:'asc' as const,...parsed.data};const values=libraryFilterValues(req.user.id,query);
   const specs:Record<LibraryFilterKey,{expression:string;condition:string;order:string}>={
-    type:{expression:'"type"',condition:`"type" IN ('ANIME','MANGA','MANHUA','MANHWA')`,order:'value'},theme:{expression:'theme',condition:`theme<>''`,order:'value'},status:{expression:'status',condition:`status IS NOT NULL AND status<>''`,order:'value'},year:{expression:'"seasonYear"',condition:`"seasonYear" IS NOT NULL`,order:'value DESC'},format:{expression:'format',condition:`format IS NOT NULL AND format<>''`,order:'value'},language:{expression:'language',condition:`language IS NOT NULL AND language<>''`,order:'value'},contentRating:{expression:'"contentRating"',condition:`"contentRating" IS NOT NULL AND "contentRating"<>''`,order:'value'},demographic:{expression:'demographic',condition:`demographic IS NOT NULL AND demographic<>''`,order:'value'}
+    type:{expression:'"type"',condition:`"type" IN ('ANIME','MANGA','MANHUA','MANHWA')`,order:'value'},theme:{expression:'theme',condition:`theme<>''`,order:'value'},status:{expression:'status',condition:`status IN ('Ongoing','Hiatus','Completed')`,order:'value'},year:{expression:'"seasonYear"',condition:`"seasonYear" IS NOT NULL`,order:'value DESC'},contentRating:{expression:'"contentRating"',condition:`"contentRating" IS NOT NULL AND "contentRating"<>''`,order:'value'},demographic:{expression:'demographic',condition:`demographic IS NOT NULL AND demographic<>''`,order:'value'}
   };
   const results=await Promise.all(libraryFilterKeys.map(async key=>{const spec=specs[key];const source=key==='theme'?`filtered CROSS JOIN LATERAL jsonb_array_elements_text(themes) theme`:'filtered';const result=await pool.query(`WITH ${libraryProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql(key)}) SELECT ${spec.expression} AS value,count(DISTINCT "id")::int AS count FROM ${source} WHERE ${spec.condition} GROUP BY ${spec.expression} ORDER BY ${spec.order}`,values);return [key,result.rows] as const;}));
   const byKey=Object.fromEntries(results) as Record<LibraryFilterKey,Array<{value:string|number;count:number}>>;
-  return {types:retainSelected(byKey.type,query.type),themes:retainSelected(byKey.theme,query.theme),statuses:retainSelected(byKey.status,query.status),years:retainSelected(byKey.year,query.year),formats:retainSelected(byKey.format,query.format),languages:retainSelected(byKey.language,query.language),contentRatings:retainSelected(byKey.contentRating,query.contentRating),demographics:retainSelected(byKey.demographic,query.demographic)};
+  return {types:retainSelected(byKey.type,query.type),themes:retainSelected(byKey.theme,query.theme),statuses:retainSelected(byKey.status,query.status),years:retainSelected(byKey.year,query.year),contentRatings:retainSelected(byKey.contentRating,query.contentRating),demographics:retainSelected(byKey.demographic,query.demographic)};
 });
 app.get('/api/v1/library/:mediaId',async(req:any,reply:any)=>{const item=await richCatalogRow(req.user.id,req.params.mediaId,req.headers['x-timezone']);if(!item)return err(reply,404,'MEDIA_NOT_IN_LIBRARY');return item});
 app.get('/api/v1/catalog/search',async(req:any)=>{const q=typeof req.query?.q==='string'?req.query.q.trim().slice(0,200):'';return {items:await catalogRows(q)}});
@@ -336,7 +336,7 @@ app.get('/api/v1/admin/metrics',async(req:any,reply:any)=>{if(req.user.role!=='a
 app.get('/api/v1/admin/diagnostics',async(req:any,reply:any)=>{
   if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');
   const workerSchema=await pool.query("SELECT to_regclass('graphile_worker.jobs') AS jobs");const jobQuery=workerSchema.rows[0].jobs?pool.query("SELECT count(*)::int AS total,count(*) FILTER(WHERE last_error IS NOT NULL)::int AS failed,count(*) FILTER(WHERE locked_at IS NOT NULL)::int AS running FROM graphile_worker.jobs"):Promise.resolve({rows:[{total:0,failed:0,running:0,schemaMissing:true}]});
-  const [database,heartbeat,policies,inventory,covers,jobs,duplicates,orphans,isolation,enrichment,circuits]=await Promise.all([
+  const [database,heartbeat,policies,inventory,covers,jobs,duplicates,orphans,isolation,enrichment,circuits,coverQueue]=await Promise.all([
     pool.query('SELECT current_database() AS database,now() AS now'),
     pool.query("SELECT observed_at AS \"observedAt\",observed_at>now()-interval '5 minutes' AS fresh,build_version AS \"buildVersion\",details FROM service_heartbeat WHERE service='worker'"),
     pool.query("SELECT p.provider,p.status,p.version,p.license,p.attribution,p.reviewed_at AS \"reviewedAt\",last.status AS \"lastAttemptStatus\",last.error AS \"lastAttemptError\",last.created_at AS \"lastAttemptAt\" FROM catalog_provider_policy p LEFT JOIN LATERAL (SELECT a.status,a.error,a.created_at FROM metadata_attempt a WHERE a.provider=p.provider ORDER BY a.created_at DESC LIMIT 1) last ON true WHERE p.provider IN ('anilist','mangaupdates') ORDER BY p.provider"),
@@ -348,6 +348,19 @@ app.get('/api/v1/admin/diagnostics',async(req:any,reply:any)=>{
     pool.query("SELECT count(*)::int AS count FROM bookmark_media_link l WHERE NOT EXISTS(SELECT 1 FROM bookmark_import_item i WHERE i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id)"),
     pool.query("SELECT status,count(*)::int AS count FROM media_enrichment_state GROUP BY status ORDER BY status"),
     pool.query("SELECT count(*)::int AS open FROM provider_domain_circuit WHERE status='OPEN' AND blocked_until>now()"),
+    pool.query(`SELECT
+      count(*) FILTER(WHERE c.status='ACTIVE')::int AS active,
+      count(*) FILTER(WHERE c.media_id IS NULL)::int AS missing,
+      count(*) FILTER(WHERE c.media_id IS NULL AND es.status='PENDING')::int AS pending,
+      count(*) FILTER(WHERE c.media_id IS NULL AND es.status IN ('FAILED','NO_MATCH') AND es.next_attempt_at>now())::int AS retry,
+      count(*) FILTER(WHERE c.media_id IS NULL AND es.status='TERMINAL')::int AS terminal,
+      count(*) FILTER(WHERE c.media_id IS NULL AND mm.media_id IS NULL)::int AS "blockedByMissingIdentity"
+      FROM media m
+      JOIN (SELECT DISTINCT media_id FROM bookmark_media_link WHERE status IN ('matched','accepted','review')) l ON l.media_id=m.id
+      LEFT JOIN media_cover c ON c.media_id=m.id AND c.status='ACTIVE'
+      LEFT JOIN media_metadata mm ON mm.media_id=m.id AND mm.status='ACTIVE' AND mm.external_id IS NOT NULL
+      LEFT JOIN LATERAL (SELECT status,next_attempt_at FROM media_enrichment_state s WHERE s.media_id=m.id AND s.purpose='cover' ORDER BY s.updated_at DESC LIMIT 1) es ON true
+      WHERE m.type IN ('ANIME','MANGA','MANHWA','MANHUA')`),
   ]);
   const inv=inventory.rows[0],cover=covers.rows[0],queue=jobs.rows[0];const worker=heartbeat.rows[0];
   const checks=[
@@ -356,7 +369,7 @@ app.get('/api/v1/admin/diagnostics',async(req:any,reply:any)=>{
     {id:'worker',label:'Worker',status:worker?.fresh?'ok':'error',details:worker??{message:'Aucun heartbeat récent'}},
     {id:'providers',label:'Connectivité et politique fournisseurs',status:policies.rows.length===3&&policies.rows.every(row=>row.status==='AUTHORIZED')?'ok':'warning',details:{mode:'policy-only-no-network-probe',providers:policies.rows}},
     {id:'inventory',label:'Inventaire, empreintes et classifications',status:inv.invalidFingerprints||inv.invalidClassifications?'error':inv.pendingClassification?'warning':'ok',details:inv},
-    {id:'covers',label:'Couvertures locales, intégrité et provenance',status:cover.integrityIssues?'error':cover.compressionIssues?'warning':'ok',details:cover},
+    {id:'covers',label:'Couvertures locales, intégrité et provenance',status:cover.integrityIssues?'error':cover.compressionIssues?'warning':'ok',details:{...cover,queue:coverQueue.rows[0]}},
     {id:'jobs',label:'Tâches échouées',status:queue.schemaMissing?'error':queue.failed?'error':'ok',details:queue},
     {id:'duplicates',label:'Doublons',status:duplicates.rows[0].count?'warning':'ok',details:duplicates.rows[0]},
     {id:'orphans',label:'Œuvres orphelines',status:orphans.rows[0].count?'warning':'ok',details:orphans.rows[0]},

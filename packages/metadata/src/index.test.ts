@@ -21,7 +21,28 @@ import {
   titleCandidateFromBookmark,
   titleVariants,
   cleanDisplayTitle,
+  canonicalLibraryStatus,
+  preSerializationCandidateAllowed,
+  aniListFormatAllowed,
 } from "./index.js";
+
+describe('editorial and library projections', () => {
+  it('requires explicit pre-serialization evidence without changing ordinary parentheses', () => {
+    expect(preSerializationCandidateAllowed(['Example'], ['Example (Pre-serialization)'])).toBe(false);
+    expect(preSerializationCandidateAllowed(['Example (Pre-serialisation)'], ['Example (Pre-serialized)'])).toBe(true);
+    expect(preSerializationCandidateAllowed(['Example'], ['Example (Author)'])).toBe(true);
+  });
+  it('enforces OVA symmetrically', () => {
+    expect(aniListFormatAllowed(['Example OVA'], 'OVA')).toBe(true);
+    expect(aniListFormatAllowed(['Example OVA'], 'TV')).toBe(false);
+    expect(aniListFormatAllowed(['Example'], 'OVA')).toBe(false);
+    expect(aniListFormatAllowed(['Example'], 'TV')).toBe(true);
+  });
+  it.each([
+    ['50 Chapters (Complete)', 'Completed'], ['12 Volumes\nOn Hiatus', 'Hiatus'],
+    ['Ongoing', 'Ongoing'], ['FINISHED', 'Completed'], ['RELEASING', 'Ongoing'], ['Unknown', 'Ongoing'],
+  ])('canonicalizes %s', (raw, expected) => expect(canonicalLibraryStatus(raw)).toBe(expected));
+});
 
 describe("deterministic display-title cleaning", () => {
   it.each([
@@ -106,6 +127,10 @@ describe("AniList catalogue", () => {
       type: "MANGA",
       canonicalUrl: "https://reader.example/series/solo-leveling",
     });
+    expect(sourceIdentityFromUrl('https://comick.dev/comic/00-new-employee-kim-chul-soo/chapter-85-en')).toMatchObject({
+      title: 'New Employee Kim Chul Soo', slug: 'new-employee-kim-chul-soo',
+    });
+    expect(titleCandidateFromBookmark('Chapter 85 (English) - New Employee Kim Chul-Soo | ComicK')).toBe('New Employee Kim Chul-Soo');
     expect(
       sourceIdentityFromUrl(
         "https://comix.to/title/2l25-moral-less-scandal/10088140-chapter-44",

@@ -186,6 +186,33 @@ export function normalizeTitle(v: string) {
     .replace(/\s+/g, " ");
 }
 
+const PRE_SERIALIZATION = /\bpre[\s-]*seriali[sz](?:ation|ed)\b/iu;
+export function hasPreSerializationMarker(value: string) {
+  return PRE_SERIALIZATION.test(normalizeTitle(value));
+}
+export function preSerializationCandidateAllowed(sourceEvidence: string[], candidateTitles: string[]) {
+  const sourceRequiresIt = sourceEvidence.some(hasPreSerializationMarker);
+  const candidateHasIt = candidateTitles.some(hasPreSerializationMarker);
+  return sourceRequiresIt ? candidateHasIt : !candidateHasIt;
+}
+
+export function hasExplicitOvaMarker(value: string) {
+  return /(?:^|[^\p{L}\p{N}])ova(?:$|[^\p{L}\p{N}])/iu.test(value.normalize('NFKC'));
+}
+export function aniListFormatAllowed(sourceEvidence: string[], format: string | undefined) {
+  const requiresOva = sourceEvidence.some(hasExplicitOvaMarker);
+  return requiresOva ? format?.toUpperCase() === 'OVA' : format?.toUpperCase() !== 'OVA';
+}
+
+export type LibraryStatus = 'Ongoing' | 'Hiatus' | 'Completed';
+export function canonicalLibraryStatus(value: unknown): LibraryStatus {
+  const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
+  if (/\b(?:on\s+)?hiatus\b/iu.test(text)) return 'Hiatus';
+  if (/\b(?:complete|completed|finished)\b/iu.test(text)) return 'Completed';
+  if (/\b(?:ongoing|releasing)\b/iu.test(text)) return 'Ongoing';
+  return 'Ongoing';
+}
+
 /** Match an alias against a provider title, including only a final
  * parenthesized suffix (for example `Existence (Wangho)`). */
 export function exactTitleMatchKind(alias: string, title: string):
@@ -225,6 +252,8 @@ function seasonTitleKey(value: string) {
 
 export function titleCandidateFromBookmark(v: string) {
   let s = v.replace(/\s+/g, " ").trim();
+  const leadingRelease = s.match(/^(?:chapter|chapitre|chap|ch\.?|episode|épisode|ep\.?)\s*#?\d[\d.\-a-z]*(?:\s*\([^)]*\))?\s*[-–—|:]\s*(.+?)(?:\s*\|\s*[^|]+)?$/iu);
+  if (leadingRelease?.[1]) s = leadingRelease[1].trim();
   s = s.replace(/^(?:read|watch|lire|regarder)\s+/i, "");
   s = s.replace(
     /\s+(?:[-–—·:|]\s*)?(?:chapter|chapitre|chap|ch\.?|episode|épisode|ep\.?|volume|vol\.?|season|saison)\s*#?\d[\d.\-a-z]*.*$/iu,
@@ -450,6 +479,17 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
   }
   if (!slug || blocked.has(slug.toLowerCase()) || /^\d+$/.test(slug))
     return null;
+  // ComicK reserves a leading numeric component on /comic/ slugs for routing.
+  // This rule is deliberately host/path scoped so title-bearing numbers on all
+  // other URL structures remain identity evidence.
+  if (/^comick\.(?:dev|io|to)$/iu.test(host) && parts[index]?.toLowerCase() === 'comic') {
+    const technical = slug.match(/^\d+-+(.+)$/u);
+    if (technical?.[1]) {
+      slug = technical[1];
+      if (titleSegment === parts[index + 1]) titleSegment = slug;
+      evidence.push('COMICK_TECHNICAL_PREFIX_REMOVED');
+    }
+  }
   slug = slug
     .replace(
       /^(?=[a-z0-9]{3,8}-)(?=[a-z0-9]*[a-z])(?=[a-z0-9]*\d)[a-z0-9]+-/i,
@@ -1446,6 +1486,7 @@ export function exactMangaUpdatesSeriesMatches(
 ) {
   return [...new Map(items
     .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .filter((item) => candidateTitles(item).some((title) =>
       aliases.some((alias) => exactTitleMatchKind(alias, title))))
     .map((item) => [item.id, item] as const)).values()];
@@ -1456,6 +1497,7 @@ export function exactMangaUpdatesSeriesMatches(
 export function automaticMangaUpdatesSeriesMatches(aliases: string[], items: MangaUpdatesSeries[]) {
   return [...new Map(items
     .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .filter((item) => candidateTitles(item).some((title) => aliases.some((alias) => {
       const kind=exactTitleMatchKind(alias,title);
       return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';
@@ -1543,6 +1585,7 @@ function scoreMangaUpdatesSeries(aliases: string[], series: MangaUpdatesSeries) 
 export function rankMangaUpdatesReviewCandidates(aliases: string[], items: MangaUpdatesSeries[], limit = 5) {
   return [...new Map(items.map((item) => [item.id,item] as const)).values()]
     .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .map((item) => ({item,score:scoreMangaUpdatesSeries(aliases,item)}))
     .sort((a,b)=>b.score-a.score||a.item.id.localeCompare(b.item.id))
     .slice(0,Math.max(0,limit))
@@ -1556,6 +1599,7 @@ export function resolveMangaUpdatesSeries(
 ): ScoredMangaUpdatesCandidate | null {
   const ranked = items
     .filter((item) => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item))
+    .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .map((item) => ({ ...item, score: scoreMangaUpdatesSeries(aliases, item) }))
     .filter((item) => item.score >= 55)
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));

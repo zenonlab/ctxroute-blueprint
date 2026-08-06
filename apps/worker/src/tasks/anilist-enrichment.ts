@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
+import { CONNECTOR_VERSIONS } from "@favlib/config";
 import type { Task } from "graphile-worker";
 import {
   fetchAniList,
   cleanDisplayTitle,
+  automaticAniListMediaMatches,
   exactAniListMediaMatches,
   matchAniList,
+  aniListFormatAllowed,
+  hasExplicitOvaMarker,
   normalizeTitle,
   searchAniList,
   titleVariants,
@@ -24,7 +28,7 @@ import { operationalValue } from "../settings.js";
 import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
-import { isManualOnlyReviewTitle } from "../favorite-review.js";
+import { saveProviderProfileCover } from "../cover-store.js";
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -391,7 +395,7 @@ async function persist(
     if (!airing.airingAt || !airing.episode) continue;
     const at = new Date(airing.airingAt * 1000);
     const inserted = await h.query(
-      "INSERT INTO media_airing(media_id,provider,episode,airing_at_utc,source_local_time,source_timezone,precision,schedule_status,last_verified_at,provenance) VALUES($1,'anilist',$2,$3,NULL,NULL,'INSTANT','SCHEDULED',now(),$4) ON CONFLICT(media_id,provider,episode,airing_at_utc) DO UPDATE SET last_verified_at=now(),schedule_status='SCHEDULED',provenance=excluded.provenance RETURNING id",
+      "INSERT INTO media_airing(media_id,provider,episode,airing_at_utc,source_local_time,source_timezone,precision,schedule_status,last_verified_at,provenance) VALUES($1,'anilist',$2,$3,NULL,NULL,'INSTANT','SCHEDULED',now(),$4) ON CONFLICT(media_id,provider,episode) DO UPDATE SET airing_at_utc=excluded.airing_at_utc,last_verified_at=now(),schedule_status='SCHEDULED',provenance=excluded.provenance RETURNING id",
       [
         target,
         airing.episode,
@@ -403,7 +407,7 @@ async function persist(
       inserted.rows[0]?.id ??
       (
         await h.query(
-      "SELECT id FROM media_airing WHERE media_id=$1 AND provider='anilist' AND episode=$2::int AND airing_at_utc=$3::timestamptz",
+      "SELECT id FROM media_airing WHERE media_id=$1 AND provider='anilist' AND episode=$2::int",
           [target, airing.episode, at],
         )
       ).rows[0]?.id;
@@ -433,7 +437,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
   const timeoutMs = await operationalValue(h, "timeouts.providerMs");
   const maxAttempts = await operationalValue(h, "metadata.maxAttempts");
   const row = await h.query(
-    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'personal' THEN 1 ELSE 2 END,t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind IN ('source','personal')),'[]') AS titles,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id FROM media m WHERE m.id=$1",
+    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'personal' THEN 1 ELSE 2 END,t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind IN ('source','personal')),'[]') AS titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind='source'),'[]') AS source_titles,COALESCE((SELECT json_agg(t.provenance->>'sourceUrl') FROM media_title t WHERE t.media_id=m.id AND t.kind='source' AND t.provenance->>'sourceUrl' IS NOT NULL),'[]') AS source_urls,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id,EXISTS(SELECT 1 FROM favorite_review r JOIN favorite_review_candidate c ON c.review_id=r.id WHERE r.status='RESOLVED' AND r.selected_candidate_id=c.id AND r.provider='anilist' AND c.provider_id=(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1)) AS anilist_identity_user_selected FROM media m WHERE m.id=$1",
     [mediaId],
   );
   if (!row.rows[0]) return { status: "SKIPPED", reason: "MEDIA_NOT_FOUND" };
@@ -449,6 +453,10 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         typeof value === "string" &&
         !/^manga\s+[a-z]{1,3}\d{4,}$/iu.test(value.trim()),
     );
+  const parsedSourceAliases = (Array.isArray(context.source_titles) ? context.source_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
+  const identityAliases = parsedSourceAliases.length ? parsedSourceAliases : aliases;
+  const formatEvidence = [...identityAliases, ...(Array.isArray(context.source_urls) ? context.source_urls : [])].filter((value): value is string => typeof value === 'string');
+  const requiresOva = formatEvidence.some(hasExplicitOvaMarker);
   const fingerprint = enrichmentFingerprint({
     mediaId,
     aliases,
@@ -493,7 +501,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         h.logger.warn(
           `[provider-reject] provider=anilist externalId=${known.id} type=${known.type} expected=ANIME source=known-id`,
         );
-      } else {
+      } else if (context.anilist_identity_user_selected || (aniListFormatAllowed(formatEvidence, known.format) && automaticAniListMediaMatches(identityAliases, [known]).length === 1)) {
         selected = known;
         selectedResolutionCode = "KNOWN_EXTERNAL_ID";
       }
@@ -507,11 +515,6 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       ...anilistProviderVariants(aliases),
     ])].slice(0, 32);
     const observedVariants = new Set<string>();
-    const manualOnlyReview = aliases.some((alias: string) => isManualOnlyReviewTitle(alias));
-    if (manualOnlyReview) {
-      selected = undefined;
-      selectedResolutionCode = "NONE";
-    }
     for (
       let variantIndex = 0;
       !selected && variantIndex < pendingVariants.length;
@@ -557,45 +560,44 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
           );
           continue;
         }
-        eligible.push(candidate);
+        if (aniListFormatAllowed(formatEvidence, candidate.format)) eligible.push(candidate);
       }
     }
     if (!selected) {
-      const exact = exactAniListMediaMatches(aliases, eligible);
+      const exact = exactAniListMediaMatches(identityAliases, eligible);
+      const automatic = automaticAniListMediaMatches(identityAliases, eligible);
       // A single compact/normalized exact identity is safe; ties stay a user
       // decision even when AniList returned them in a stable order.
-      if (!manualOnlyReview && exact.length === 1)
+      if (exact.length === 1 && automatic.length === 1 && exact[0].id === automatic[0].id)
         {
           selected = exact[0];
-          selectedResolutionCode = aliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
+          selectedResolutionCode = identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
         }
-      else if (!manualOnlyReview && exact.length === 0)
-        {
-          selected = matchAniList({ aliases, type: "ANIME" }, eligible)?.media ?? undefined;
-          if (selected) selectedResolutionCode = "SCORED_MATCH";
-        }
+      // Similarity only ranks review candidates. It never establishes identity.
     }
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2::text AND provider='anilist' AND purpose='metadata' AND connector_version=$3::text",
       [serializeCandidateSnapshot(items), mediaId, ENRICHMENT_VERSION],
     );
-    const ambiguity = exactAniListMediaMatches(aliases, eligible).length > 1;
-    if (manualOnlyReview || ambiguity || (!selected && items.length > 0)) {
+    const ambiguity = exactAniListMediaMatches(identityAliases, eligible).length > 1;
+    if (ambiguity || (!selected && items.length > 0)) {
       // Detail every displayed candidate before exposing it to the user.
-      const exactItems = exactAniListMediaMatches(aliases, eligible);
-      const reviewItems = (exactItems.length > 1 ? exactItems : items).filter(item => item.type === 'ANIME');
-      const detailed = manualOnlyReview ? [] : await Promise.all(reviewItems.map(async item => {
+      const exactItems = exactAniListMediaMatches(identityAliases, eligible);
+      const tokens = (value: string) => new Set(normalizeTitle(value).split(' ').filter(token => token.length > 1 && !/^(?:the|this|that|with|from|into|your|once|episode|chapter|vostfr|saison)$/u.test(token)));
+      const reviewItems = (exactItems.length ? exactItems : items).filter(item => item.type === 'ANIME' && aniListFormatAllowed(formatEvidence, item.format)).map(item=>({item,match:matchAniList({aliases: identityAliases,type:'ANIME'},[item])})).filter(({match})=>Boolean(match)).sort((a,b)=>(b.match?.score??0)-(a.match?.score??0)||a.item.id-b.item.id).map(({item})=>item).slice(0,5);
+      const detailed = await Promise.all(reviewItems.map(async item => {
         try { return await providerRequest(h, "fetch-review-candidate", { id: item.id }, () => fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) })); } catch { return item; }
       }));
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
-      const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY t.id LIMIT 1", [mediaId]);
-      const reason = manualOnlyReview ? 'MANUAL_REVIEW' : items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
-      await openReviewsForMedia(h.query, { title: titleRow.rows[0]?.text ?? sourceRow.rows[0]?.text ?? aliases[0], url: titleRow.rows[0]?.url ?? sourceRow.rows[0]?.url ?? '', provider: 'anilist', candidates: detailed.map(item => ({...item, id: String(item.id), title: titleOf(item)})), mediaId, reason });
+      const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
+      const reason = items.some(item => item.type === 'ANIME') && !items.some(item => item.type === 'ANIME' && aniListFormatAllowed(formatEvidence, item.format)) ? 'FORMAT_MISMATCH' : items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
+      await openReviewsForMedia(h.query, { title: sourceRow.rows[0]?.text ?? titleRow.rows[0]?.text ?? aliases[0], url: sourceRow.rows[0]?.url ?? titleRow.rows[0]?.url ?? '', provider: 'anilist', candidates: detailed.map(item => ({...item, id: String(item.id), title: titleOf(item)})), mediaId, reason, persistCover: (profileId, imageUrl, provider) => imageUrl ? saveProviderProfileCover(h, profileId, imageUrl, provider, { timeoutMs }) : Promise.resolve() });
       await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2::text) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, reason]);
       await finishEnrichment(h, { mediaId, provider: 'anilist', purpose: 'metadata', version: ENRICHMENT_VERSION, owner: claim.owner, status: 'NO_MATCH', errorCode: reason, resolutionCode: reason, });
       return { status: 'REVIEW', reason };
     }
     if (!selected) {
+      const noResultReason = requiresOva ? 'OVA_REQUIRED_NOT_FOUND' : 'NO_RESULT';
       const status =
         claim.attempt_count >= maxAttempts ? "TERMINAL" : "NO_MATCH";
       await finishEnrichment(h, {
@@ -605,11 +607,11 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         version: ENRICHMENT_VERSION,
         owner: claim.owner,
         status,
-        errorCode: "NO_RESULT",
-        resolutionCode: "NO_RESULT",
+        errorCode: noResultReason,
+        resolutionCode: noResultReason,
       });
-      await markFavoriteUnresolved(h.query, mediaId, "NO_RESULT");
-      return { status: "REVIEW", reason: "NO_RESULT" };
+      await markFavoriteUnresolved(h.query, mediaId, noResultReason);
+      return { status: "REVIEW", reason: noResultReason };
     }
     const complete =
       selected === known
@@ -712,7 +714,7 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
     mediaId,
     provider: "anilist",
     purpose: "cover",
-    version: "anilist-cover-v4",
+    version: CONNECTOR_VERSIONS.anilistCover,
     fingerprint,
     maxAttempts,
   });
@@ -751,7 +753,7 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
       mediaId,
       provider: "anilist",
       purpose: "cover",
-      version: "anilist-cover-v4",
+      version: CONNECTOR_VERSIONS.anilistCover,
       owner: claim.owner,
       status: "SUCCESS",
       externalId: String(row.rows[0].anilist_id),
@@ -765,7 +767,7 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
       mediaId,
       provider: "anilist",
       purpose: "cover",
-      version: "anilist-cover-v4",
+      version: CONNECTOR_VERSIONS.anilistCover,
       owner: claim.owner,
       status: terminal ? "TERMINAL" : "FAILED",
       errorCode: code,
