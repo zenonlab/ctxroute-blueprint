@@ -140,15 +140,21 @@ export function anilistProviderVariants(values: string[]) {
 export function anilistAnchorVariants(values: string[]) {
   const anchors = new Set<string>();
   for (const value of values) {
-    const compact = value.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
-    if (compact.length >= 6) anchors.add(compact);
-    const tokens = normalizeTitle(value)
-      .split(" ")
-      .filter((token) => token.length >= 4 && !/^(?:the|this|that|with|from|into|your|once|life|man|girl|boy)$/u.test(token))
-      .sort((a, b) => b.length - a.length);
-    if (tokens[0]) anchors.add(tokens[0]);
+    const tokens = normalizeTitle(value).split(" ")
+      .filter((token) => token.length >= 2 && !/^(?:the|this|that|with|from|into|your|once|episode|chapter|vostfr|saison)$/u.test(token));
+    // Adjacent phrases retain much more identity than isolated keywords while
+    // still recovering provider titles that omit a translated subtitle.
+    for (const size of [4, 3, 2]) {
+      for (let start = 0; start + size <= tokens.length; start++) {
+        const phrase = tokens.slice(start, start + size).join(" ");
+        if (phrase.length >= 6) anchors.add(phrase);
+      }
+    }
+    const informative = [...tokens].filter((token) => token.length >= 4)
+      .sort((a, b) => b.length - a.length || a.localeCompare(b))[0];
+    if (informative) anchors.add(informative);
   }
-  return [...anchors].slice(0, 4);
+  return [...anchors].slice(0, 12);
 }
 
 async function assertion(
@@ -494,10 +500,12 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     }
     // Provider titles are observations, not source aliases. They may be shown
     // as candidates, but never become new search input.
-    const pendingVariants = [
-      ...anilistProviderVariants(aliases),
+    // Search identity-rich phrases first. Previously the long provider variant
+    // list was sliced before anchors, silently dropping the discovery fallback.
+    const pendingVariants = [...new Set([
       ...anilistAnchorVariants(aliases),
-    ].slice(0, 32);
+      ...anilistProviderVariants(aliases),
+    ])].slice(0, 32);
     const observedVariants = new Set<string>();
     const manualOnlyReview = aliases.some((alias: string) => isManualOnlyReviewTitle(alias));
     if (manualOnlyReview) {
@@ -523,7 +531,17 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         // to `aliases`, never persisted as source/personal, and can therefore
         // help recall without becoming identity evidence by itself.
         if (pendingVariants.length < 48) {
-          for (const title of candidateTitles(candidate)) {
+          const observedTitles = candidateTitles(candidate);
+          // Preserve one slot for every canonical field before expanding any
+          // spelling variants; otherwise English variants can starve romaji,
+          // native and synonym discovery.
+          for (const title of observedTitles) {
+            if (observedVariants.has(title) || pendingVariants.includes(title)) continue;
+            observedVariants.add(title);
+            pendingVariants.push(title);
+            if (pendingVariants.length >= 48) break;
+          }
+          for (const title of observedTitles) {
             for (const variant of anilistProviderVariants([title])) {
               if (observedVariants.has(variant) || pendingVariants.includes(variant)) continue;
               observedVariants.add(variant);

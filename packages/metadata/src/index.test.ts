@@ -208,6 +208,12 @@ describe("AniList catalogue", () => {
     const item = { id: 99, type: "ANIME", title: { userPreferred: "Isekai Oji-san" }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] };
     expect(matchAniList({ aliases: ["Isekai Ojisan"], type: "ANIME" }, [item as any])?.media.id).toBe(99);
   });
+  it("accepts one clear canonical prefix but rejects competing partial titles", () => {
+    const item = (id: number, english: string) => ({ id, type: "ANIME", title: { english, userPreferred: english }, synonyms: [], genres: [], tags: [], relations: [], airingSchedule: [], streamingEpisodes: [], studios: [] });
+    const expected = item(176053, "Good Bye, Dragon Life");
+    expect(matchAniList({ aliases: ["Goodbye Dragon Life, Hello Human Life"], type: "ANIME" }, [expected as any])?.media.id).toBe(176053);
+    expect(matchAniList({ aliases: ["Goodbye Dragon Life, Hello Human Life"], type: "ANIME" }, [expected as any, item(2, "Hello Human Life") as any])).toBeNull();
+  });
   it("coalesces simultaneous title searches into one HTTP request", async () => {
     const media = (id: number, title: string) => ({
       id,

@@ -40,11 +40,11 @@ const anime = {
   id: 176053,
   type: "ANIME" as const,
   title: {
-    english: "Good Bye, Dragon Life, Hello Human Life",
+    english: "Good Bye, Dragon Life",
     romaji: "Sayonara Ryuusei, Konnichiwa Jinsei",
-    userPreferred: "Good Bye, Dragon Life, Hello Human Life",
+    userPreferred: "Sayonara Ryuusei, Konnichiwa Jinsei",
   },
-  synonyms: ["Goodbye Dragon Life, Hello Human Life"],
+  synonyms: ["Goodbye Dragon Life"],
   genres: [],
   tags: [],
   coverImage: "https://img.example/176053.jpg",
@@ -73,6 +73,8 @@ describe("AniList enrichment resolution", () => {
   it("uses one bounded anchor when the provider needs candidate discovery", () => {
     expect(anilistAnchorVariants(["Sasaki to P-chan 7"])).toContain("sasaki");
     expect(anilistAnchorVariants(["Sasaki to P-chan 7"])).not.toContain("p");
+    expect(anilistAnchorVariants(["Goodbye Dragon Life Hello Human Life"]))
+      .toContain("goodbye dragon life");
   });
   it("adds generic singular token variants without title-specific rules", () => {
     expect(

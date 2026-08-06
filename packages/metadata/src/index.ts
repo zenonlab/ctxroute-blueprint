@@ -973,12 +973,15 @@ export function matchAniList(
   query: { aliases: string[]; type?: string; year?: number; format?: string },
   items: AniListMedia[],
 ): AniListMatch | null {
-  const allowed =
+  const typed =
     query.type && query.type !== "UNKNOWN"
       ? items.filter(
           (x) => x.type === ("ANIME" === query.type ? "ANIME" : "MANGA"),
         )
       : items;
+  // The same identity is commonly returned by several queries/pages. It must
+  // not compete against itself in the ambiguity margin.
+  const allowed = [...new Map(typed.map((item) => [item.id, item] as const)).values()];
   const score = (media: AniListMedia): AniListCandidateScore => {
     const names = [
       media.title.userPreferred,
@@ -1001,7 +1004,10 @@ export function matchAniList(
         if (exactKind === "NORMALIZED_EXACT") candidate(100, "NORMALIZED_EXACT");
         else if (exactKind === "COMPACT_EXACT") candidate(98, "COMPACT_EXACT");
         else if (exactKind === "PARENTHESIZED_EXACT") candidate(96, "COMPACT_EXACT");
-        else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName)) && !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1)) candidate(76, "PARTIAL");
+        else if ((normalizedName.includes(normalizedAlias) || normalizedAlias.includes(normalizedName) ||
+          compactAlias.includes(compactTitleKey(name)) || compactTitleKey(name).includes(compactAlias)) &&
+          !(normalizedAlias.split(" ").length >= 2 && normalizedName.split(" ").length === 1))
+          candidate(76, "PARTIAL");
         else {
           const wanted = new Set(normalizedAlias.split(" ").filter((token) => token.length >= 2));
           const found = normalizedName.split(" ").filter((token) => wanted.has(token));
@@ -1013,10 +1019,18 @@ export function matchAniList(
     return best;
   };
   const ranked = allowed.map((media) => ({ media, score: score(media) }))
-    .filter((candidate) => candidate.score.score >= 98)
+    .filter((candidate) => candidate.score.score >= 76)
     .sort((a, b) => b.score.score - a.score.score || a.media.id - b.media.id);
-  const media = ranked[0]?.media;
-  if (!media) return null;
+  const first = ranked[0];
+  if (!first) return null;
+  const second = ranked[1];
+  // Exact identities remain decisive. A prefix/suffix title is accepted only
+  // when it is the unique partial identity with a clear lead; generic token
+  // overlap alone is never enough to auto-select an AniList record.
+  if (first.score.score < 96 &&
+      (first.score.reason !== "PARTIAL" || (second && first.score.score - second.score.score < 12)))
+    return null;
+  const media = first.media;
   const titles = [
     media.title.userPreferred,
     media.title.english,

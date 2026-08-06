@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 // Bump when resolution semantics change so terminal decisions from the old
 // scorer/ambiguity resolver are retried under the first-result rule.
-export const ENRICHMENT_VERSION = "anilist-v8";
+export const ENRICHMENT_VERSION = "anilist-v9";
 export type EnrichmentStatus =
   "PENDING" | "SUCCESS" | "NO_MATCH" | "FAILED" | "TERMINAL";
 type Query = {
