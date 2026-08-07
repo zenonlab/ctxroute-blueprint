@@ -19,6 +19,8 @@ export const libraryQuerySchema = z.object({
   q: z.string().trim().max(200).default(''),
   type: repeated(), theme: repeated(), status: repeated(), year: years,
   contentRating: repeated(), demographic: repeated(),
+  excludeType: repeated(), excludeTheme: repeated(), excludeStatus: repeated(), excludeYear: years,
+  excludeContentRating: repeated(), excludeDemographic: repeated(),
   // Kept as a private compatibility parameter. It is deliberately absent from facets and the UI.
   provider: repeated(),
   sort: z.enum(['inventory', 'title', 'type', 'year', 'release', 'favorites']).default('inventory'),
@@ -43,15 +45,18 @@ export const libraryProjectionSql = `personal AS (
     m.format,
     (SELECT jsonb_build_object('provider',mm.provider,'status',mm.status,'latestChapter',mm.latest_chapter,'sourceUrl',mm.source_url,'metadata',COALESCE((SELECT jsonb_object_agg(a.field,a.value) FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.provider=mm.provider),'{}'::jsonb)) FROM media_metadata mm WHERE mm.media_id=p.media_id AND mm.status='ACTIVE' LIMIT 1) AS metadata,
     p.favorite_count AS "favoriteCount",
-    (SELECT jsonb_build_object('kind',fp.position_kind,'raw',fp.position_raw,'updatedAt',fp.updated_at) FROM favorite_progress fp WHERE fp.user_id=$1 AND fp.media_id=p.media_id ORDER BY fp.updated_at DESC LIMIT 1) AS progress,
+    (SELECT jsonb_build_object('kind',fp.position_kind,'number',fp.position_number::numeric,'raw',fp.position_raw,'updatedAt',fp.updated_at) FROM favorite_progress fp WHERE fp.user_id=$1 AND fp.media_id=p.media_id ORDER BY fp.updated_at DESC LIMIT 1) AS progress,
+    (SELECT jsonb_build_object('kind',pp.available_position_kind,'number',pp.available_position_number,'raw',pp.available_position_raw,'provider',pp.provider,'provenance',pp.available_position_provenance,'verifiedAt',pp.last_checked_at) FROM provider_progress pp WHERE pp.media_id=p.media_id AND pp.status='ACTIVE' AND pp.available_position_kind IS NOT NULL ORDER BY pp.updated_at DESC LIMIT 1) AS availability,
     CASE WHEN p.source_url IS NULL THEN NULL ELSE jsonb_build_object('url',p.source_url,'domain',split_part(regexp_replace(p.source_url,'^https?://',''),'/',1)) END AS "sourceIdentity",
     (SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at) FROM media_cover c WHERE c.media_id=p.media_id AND c.status='ACTIVE') AS "coverProvenance",
-    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT theme_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) theme_value WHERE a.media_id=p.media_id AND a.field='themes' AND jsonb_typeof(a.value)='array') v),'[]'::jsonb) AS themes,
+    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT theme_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) theme_value WHERE a.media_id=p.media_id AND a.field='themes' AND jsonb_typeof(a.value)='array' AND (COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) OR NOT EXISTS(SELECT 1 FROM metadata_assertion aa CROSS JOIN LATERAL jsonb_array_elements_text(aa.value) av WHERE aa.media_id=p.media_id AND aa.field='adultCategories' AND av=theme_value))) v),'[]'::jsonb) AS themes,
+    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT genre_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) genre_value WHERE a.media_id=p.media_id AND a.field='genres' AND jsonb_typeof(a.value)='array') v),'[]'::jsonb) AS genres,
+    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT category_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) category_value WHERE a.media_id=p.media_id AND a.field='categories' AND jsonb_typeof(a.value)='array' AND (COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) OR NOT EXISTS(SELECT 1 FROM metadata_assertion aa CROSS JOIN LATERAL jsonb_array_elements_text(aa.value) av WHERE aa.media_id=p.media_id AND aa.field='adultCategories' AND av=category_value))) v),'[]'::jsonb) AS categories,
     CASE
       WHEN raw_status ~* '\\m(on[[:space:]]+)?hiatus\\M' THEN 'Hiatus'
       WHEN raw_status ~* '\\m(complete|completed|finished)\\M' THEN 'Completed'
       WHEN raw_status ~* '\\m(ongoing|releasing)\\M' THEN 'Ongoing'
-      ELSE 'Ongoing'
+      ELSE NULL
     END AS status,
     (SELECT a.value #>> '{}' FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='language' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) AS language,
     (SELECT a.value #>> '{}' FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='contentRating' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) AS "contentRating",
@@ -59,7 +64,7 @@ export const libraryProjectionSql = `personal AS (
     (SELECT max(a.value #>> '{}') FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='latestReleaseDate') AS "latestReleaseDate",
     COALESCE((SELECT jsonb_agg(DISTINCT a.provider) FROM metadata_assertion a WHERE a.media_id=p.media_id),'[]'::jsonb) AS providers,
     COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('text',tt.text,'language',tt.language,'script',tt.script,'kind',tt.kind,'titleType',tt.title_type,'connector',tt.connector,'personalStatus',tt.personal_status,'provenance',tt.provenance,'externalId',tt.provenance->>'externalId')) FROM media_title tt WHERE tt.media_id=p.media_id),'[]'::jsonb) AS titles,
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('provider',pp.provider,'latestChapter',pp.latest_chapter,'latestVolume',pp.latest_volume,'latestReleaseAt',pp.latest_release_at,'status',pp.status,'lastCheckedAt',pp.last_checked_at,'lastError',pp.last_error) ORDER BY pp.provider) FROM provider_progress pp WHERE pp.media_id=p.media_id),'[]'::jsonb) AS "providerProgress",
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('provider',pp.provider,'latestChapter',pp.latest_chapter,'latestVolume',pp.latest_volume,'availablePositionKind',pp.available_position_kind,'availablePositionNumber',pp.available_position_number,'availablePositionRaw',pp.available_position_raw,'availablePositionProvenance',pp.available_position_provenance,'latestReleaseAt',pp.latest_release_at,'status',pp.status,'lastCheckedAt',pp.last_checked_at,'lastError',pp.last_error) ORDER BY pp.provider) FROM provider_progress pp WHERE pp.media_id=p.media_id),'[]'::jsonb) AS "providerProgress",
     COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('provider',a.provider,'text',a.attribution,'sourceUrl',a.source_url)) FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.attribution IS NOT NULL),'[]'::jsonb) AS attributions
   FROM personal p JOIN media m ON m.id=p.media_id
   LEFT JOIN LATERAL (SELECT a.value #>> '{}' AS raw_status FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='status' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) status_assertion ON true
@@ -75,14 +80,16 @@ const clauses: Record<LibraryFilterKey, string> = {
 };
 
 const ignoredCasts:Record<LibraryFilterKey,string>={type:'$3::text[] IS NOT NULL',theme:'$4::text[] IS NOT NULL',status:'$5::text[] IS NOT NULL',year:'$6::int[] IS NOT NULL',contentRating:'$7::text[] IS NOT NULL',demographic:'$8::text[] IS NOT NULL'};
+const ignoredExclusionCasts:Record<LibraryFilterKey,string>={type:'$10::text[] IS NOT NULL',theme:'$11::text[] IS NOT NULL',status:'$12::text[] IS NOT NULL',year:'$13::int[] IS NOT NULL',contentRating:'$14::text[] IS NOT NULL',demographic:'$15::text[] IS NOT NULL'};
 
 export function libraryFilterSql(ignore?: LibraryFilterKey) {
-  return [`($2='' OR EXISTS(SELECT 1 FROM media_title search_title WHERE search_title.media_id=projected."id" AND (search_title.normalized_text LIKE '%'||lower($2)||'%' OR NOT EXISTS(SELECT 1 FROM regexp_split_to_table(lower($2),'\\s+') token WHERE token<>'' AND search_title.normalized_text NOT LIKE '%'||token||'%'))))`, ...libraryFilterKeys.map(key => `(${key===ignore?ignoredCasts[key]:clauses[key]})`), `(cardinality($9::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(providers) value WHERE lower(value)=ANY($9::text[])))`].join(' AND ');
+  const exclusions:Record<LibraryFilterKey,string>={type:`cardinality($10::text[])=0 OR NOT ("type"=ANY($10::text[]))`,theme:`cardinality($11::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes) value WHERE lower(value)=ANY($11::text[]))`,status:`cardinality($12::text[])=0 OR NOT (lower(COALESCE(status,''))=ANY($12::text[]))`,year:`cardinality($13::int[])=0 OR NOT ("seasonYear"=ANY($13::int[]))`,contentRating:`cardinality($14::text[])=0 OR NOT (lower(COALESCE("contentRating",''))=ANY($14::text[]))`,demographic:`cardinality($15::text[])=0 OR NOT (lower(COALESCE(demographic,''))=ANY($15::text[]))`};
+  return [`($2='' OR EXISTS(SELECT 1 FROM media_title search_title WHERE search_title.media_id=projected."id" AND (search_title.normalized_text LIKE '%'||lower($2)||'%' OR NOT EXISTS(SELECT 1 FROM regexp_split_to_table(lower($2),'\\s+') token WHERE token<>'' AND search_title.normalized_text NOT LIKE '%'||token||'%'))))`, ...libraryFilterKeys.map(key => `(${key===ignore?ignoredCasts[key]:clauses[key]})`), `(cardinality($9::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(providers) value WHERE lower(value)=ANY($9::text[])))`,...libraryFilterKeys.map(key=>`(${key===ignore?ignoredExclusionCasts[key]:exclusions[key]})`)].join(' AND ');
 }
 
 export function libraryFilterValues(userId: string, query: LibraryQuery) {
   const lower = (values: string[]) => [...new Set(values.map(value => value.toLocaleLowerCase()))];
-  return [userId, query.q, [...new Set(query.type.map(value => value.toUpperCase()))], lower(query.theme), lower(query.status), [...new Set(query.year)], lower(query.contentRating), lower(query.demographic), lower(query.provider)];
+  return [userId, query.q, [...new Set(query.type.map(value => value.toUpperCase()))], lower(query.theme), lower(query.status), [...new Set(query.year)], lower(query.contentRating), lower(query.demographic), lower(query.provider),[...new Set(query.excludeType.map(value=>value.toUpperCase()))],lower(query.excludeTheme),lower(query.excludeStatus),[...new Set(query.excludeYear)],lower(query.excludeContentRating),lower(query.excludeDemographic)];
 }
 
 export function retainSelected(rows: Array<{value:string|number;count:number}>, selected: Array<string|number>) {

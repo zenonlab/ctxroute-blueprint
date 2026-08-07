@@ -1,5 +1,5 @@
 import {describe,expect,it,vi} from 'vitest';
-import {withProviderRequest} from './provider-queue.js';
+import {recoverProviderRequestOwner,withProviderRequest} from './provider-queue.js';
 
 describe('global provider waitlists',()=>{
   it('persists, prioritizes and completes one AniList request through the shared lane',async()=>{
@@ -12,4 +12,10 @@ describe('global provider waitlists',()=>{
     expect(sql.join('\n')).not.toContain('SKIP LOCKED');
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining('state=$2'),expect.arrayContaining(['COMPLETED']));
   });
+});
+it('fails orphaned requests and releases only their durable running slots',async()=>{
+  const query=vi.fn().mockResolvedValueOnce({rows:[{provider:'anilist',count:'2'}]}).mockResolvedValue({rows:[]});
+  await recoverProviderRequestOwner({query},'api','API_RESTART');
+  expect(query).toHaveBeenCalledWith(expect.stringContaining("state IN ('WAITING','RUNNING')"),['api','API_RESTART']);
+  expect(query).toHaveBeenCalledWith(expect.stringContaining('in_flight=GREATEST'),['anilist',2]);
 });

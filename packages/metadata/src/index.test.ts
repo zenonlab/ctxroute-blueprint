@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from 'node:fs';
 import {
   extractPageMetadata,
   fetchAniList,
+  fetchAniListCalendar,
   fetchMangaUpdatesReleases,
   matchAniList,
   matchMangaUpdates,
@@ -16,15 +18,49 @@ import {
   searchAniList,
   sourceDispositionFromUrl,
   sourceIdentityFromUrl,
+  collectiveTitleKey,
+  providerIdFromUrl,
+  assertProviderMediaType,
+  requiredProviderForMediaType,
   compactTitleKey,
   prepareTitleCandidates,
   titleCandidateFromBookmark,
+  explicitTitleAliases,
   titleVariants,
   cleanDisplayTitle,
   canonicalLibraryStatus,
   preSerializationCandidateAllowed,
   aniListFormatAllowed,
+  preferredMangaUpdatesSeriesMatch,
+  preferredAniListMediaMatch,
+  aniListExplicitSeasonMatch,
 } from "./index.js";
+
+describe("collective review identity", () => {
+  it("accepts opaque MangaUpdates series URLs with or without a slug", () => {
+    expect(providerIdFromUrl("mangaupdates", "https://www.mangaupdates.com/series/oqvzgof/synthetic-title")).toBe("oqvzgof");
+    expect(providerIdFromUrl("mangaupdates", "https://mangaupdates.com/series/oqvzgof")).toBe("oqvzgof");
+  });
+  it("rejects wrong domains and paths and keeps AniList numeric", () => {
+    expect(providerIdFromUrl("mangaupdates", "https://example.test/series/oqvzgof")).toBeNull();
+    expect(providerIdFromUrl("mangaupdates", "https://mangaupdates.com/releases/oqvzgof")).toBeNull();
+    expect(providerIdFromUrl("anilist", "https://anilist.co/anime/opaque/title")).toBeNull();
+    expect(providerIdFromUrl("anilist", "https://anilist.co/anime/123/title")).toBe("123");
+  });
+  it("only keys anime seasons when evidence is explicit", () => {
+    expect(collectiveTitleKey({provider:"anilist",mediaType:"ANIME",parsedTitle:"Synthetic 2"})).toBe("v1:anilist:ANIME:synthetic 2");
+    expect(collectiveTitleKey({provider:"anilist",mediaType:"ANIME",parsedTitle:"Synthetic",explicitSeason:2})).toBe("v1:anilist:ANIME:synthetic:season-2");
+    expect(collectiveTitleKey({provider:"mangaupdates",mediaType:"MANGA",parsedTitle:"Synthetic",explicitSeason:2})).toBe("v1:mangaupdates:MANGA:synthetic");
+  });
+  it("requires the canonical provider explicitly for every media type",()=>{
+    expect(requiredProviderForMediaType("ANIME")).toBe("anilist");
+    expect(requiredProviderForMediaType("MANGA")).toBe("mangaupdates");
+    expect(requiredProviderForMediaType("MANHWA")).toBe("mangaupdates");
+    expect(requiredProviderForMediaType("MANHUA")).toBe("mangaupdates");
+    expect(()=>assertProviderMediaType({provider:"mangaupdates",mediaType:"ANIME"})).toThrow("PROVIDER_MEDIA_TYPE_MISMATCH");
+    expect(()=>assertProviderMediaType({provider:"anilist",mediaType:"MANGA"})).toThrow("PROVIDER_MEDIA_TYPE_MISMATCH");
+  });
+});
 
 describe('editorial and library projections', () => {
   it('requires explicit pre-serialization evidence without changing ordinary parentheses', () => {
@@ -59,15 +95,93 @@ describe("deterministic display-title cleaning", () => {
 });
 
 describe("AniList catalogue", () => {
+  it('collects the global airing calendar with provider media identifiers',async()=>{
+    const fetch=vi.fn(async()=>new Response(JSON.stringify({data:{Page:{pageInfo:{hasNextPage:false},airingSchedules:[{airingAt:1_800_000_000,episode:4,mediaId:700,media:{id:700,type:'ANIME',status:'RELEASING',title:{romaji:'Synthetic Airing'},synonyms:[]}}]}}}),{status:200,headers:{'content-type':'application/json'}}));
+    await expect(fetchAniListCalendar(1_799_000_000,1_801_000_000,{fetch,maxPages:1})).resolves.toMatchObject([{id:700,airingSchedule:[{airingAt:1_800_000_000,episode:4}]}]);
+    const request=(fetch.mock.calls as unknown as Array<[unknown,{body?:unknown}]>)[0]?.[1];
+    expect(JSON.parse(String(request?.body)).query).toContain('airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME)');
+  });
+  it('requests the future airing page explicitly for the rolling calendar',()=>{
+    const source=readFileSync(new URL('./index.ts',import.meta.url),'utf8');
+    expect(source).toContain('airingSchedule(notYetAired:true,perPage:50)');
+  });
+  it("applies reordered-word fallback symmetrically to AniList without popularity", () => {
+    const make = (id:number,title:string,popularity:number) => ({id,type:'ANIME',title:{english:title},synonyms:[],popularity}) as any;
+    expect(preferredAniListMediaMatch(['Crimson Small Hero'],[make(1,'Small Crimson Hero',1),make(2,'Small Hero',999999)])?.id).toBe(1);
+    expect(preferredAniListMediaMatch(['Synthetic Show'],[make(1,'Synthetic Show',1000),make(2,'Synthetic Show',1)])).toBeUndefined();
+  });
+  it("selects only a uniquely newest exact AniList identity", () => {
+    const make=(id:number,startDate:any,popularity:number,startYear?:number)=>({id,type:'ANIME',title:{english:'Synthetic Exact'},synonyms:[],startDate,startYear,popularity}) as any;
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2020,month:2,day:3},999999),make(2,{year:2024,month:1,day:2},1)])?.id).toBe(2);
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024},1),make(2,{year:2024},999999)])).toBeUndefined();
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024,month:13,day:1},1),make(2,{year:2023,month:1,day:1},2)])).toBeUndefined();
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024},1,2023),make(2,{year:2023},2)])).toBeUndefined();
+  });
+  it("uses the same exact-date tiebreak for MangaUpdates", () => {
+    const make=(id:string,startDate?:string,year?:number,ratingVotes=0)=>({id,title:'Synthetic Exact',titles:['Synthetic Exact'],type:'Manhwa',status:'Ongoing',image:`https://example.test/${id}.jpg`,startDate,year,ratingVotes}) as any;
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','2020-02-03',2020,999999),make('2','2024-01-02',2024,1)])?.id).toBe('2');
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1',undefined,2024,1),make('2',undefined,2024,999999)])).toBeUndefined();
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','invalid',2024),make('2','2023-01-01',2023)])).toBeUndefined();
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','2024-01-01',2023),make('2','2023-01-01',2023)])).toBeUndefined();
+  });
+  it("keeps exact ahead of reordered words and a simple exact ahead of a parenthesized variant", () => {
+    const anime=(id:number,title:string,year:number)=>({id,type:'ANIME',title:{english:title},synonyms:[],startDate:{year}}) as any;
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[anime(1,'Synthetic Exact',2020),anime(2,'Exact Synthetic',2026)])?.id).toBe(1);
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[anime(1,'Synthetic Exact',2020),anime(2,'Synthetic Exact (Edition)',2026)])?.id).toBe(1);
+  });
+  it("recognizes a unique MangaUpdates title with the same significant words reordered", () => {
+    const base={type:'Manhwa',year:2024,status:'Ongoing',image:'https://example.test/a.jpg'};
+    const selected=preferredMangaUpdatesSeriesMatch(['My Crimson Small Hero'],[
+      {id:'1',title:'My Small Crimson Hero',titles:['My Small Crimson Hero'],...base},
+      {id:'2',title:'My Small Hero',titles:['My Small Hero'],...base},
+    ] as any);
+    expect(selected?.id).toBe('1');
+  });
   it("matches exact titles in all fields and treats a final parenthesized suffix as a variant", () => {
     expect(exactTitleMatchKind("Existence", "Existence")).toBe("NORMALIZED_EXACT");
     expect(exactTitleMatchKind("Existence", "Existence (Wangho)")).toBe("PARENTHESIZED_EXACT");
     expect(exactTitleMatchKind("Existence", "Existence (Wangho) Extra")).toBeUndefined();
+    expect(exactTitleMatchKind("Synthetic Cleric", "Synthetic Cleric: Office Worker Survival Path")).toBe("SUBTITLE_EXACT");
+    expect(exactTitleMatchKind("Office Worker Survival Path", "Synthetic Cleric: Office Worker Survival Path")).toBe("SUBTITLE_EXACT");
+    expect(exactTitleMatchKind("Synthetic Champion (The Champion)", "Synthetic Champion")).toBe("ALIAS_PARENTHESIZED_EXACT");
     const items = [
       { id: 1, type: "ANIME", title: { userPreferred: "Other" }, synonyms: ["Existence"] },
       { id: 2, type: "ANIME", title: { userPreferred: "Existence (Wangho)" }, synonyms: [] },
     ] as any;
     expect(exactAniListMediaMatches(["Existence"], items).map(item => item.id)).toEqual([1, 2]);
+  });
+  it("selects a unique provider base when the source adds a parenthesized alternate title", () => {
+    const anime={id:1,type:'ANIME',title:{romaji:'Synthetic Champion'},synonyms:[],startDate:{year:2020}} as any;
+    expect(preferredAniListMediaMatch(['Synthetic Champion (The Champion)'],[anime])?.id).toBe(1);
+    const reading={id:'1',title:'Synthetic Champion',titles:[],type:'Manhwa',year:2020,status:'Ongoing',image:'https://example.test/champion.jpg'} as any;
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Champion (The Champion)'],[reading])?.id).toBe('1');
+  });
+  it("uses a final parenthesized alternate title as a bounded identity alias", () => {
+    expect(explicitTitleAliases(['Synthetic Primary (Synthetic Alternate)'])).toEqual([
+      'Synthetic Primary (Synthetic Alternate)',
+      'Synthetic Primary',
+      'Synthetic Alternate',
+    ]);
+    expect(explicitTitleAliases(['Synthetic (Nested (Unsafe))'])).toEqual(['Synthetic (Nested (Unsafe))']);
+    const reading={id:'synthetic',title:'Synthetic Alternate',titles:[],type:'Manhwa',year:2024,status:'Ongoing',image:'https://example.test/synthetic.jpg'} as any;
+    expect(preferredMangaUpdatesSeriesMatch(explicitTitleAliases(['Synthetic Primary (Synthetic Alternate)']),[reading])?.id).toBe('synthetic');
+    const anime={id:99,type:'ANIME',title:{english:'Synthetic Alternate'},synonyms:[],startDate:{year:2024}} as any;
+    expect(preferredAniListMediaMatch(explicitTitleAliases(['Synthetic Primary (Synthetic Alternate)']),[anime])?.id).toBe(99);
+  });
+  it("combines an exact provider base with independent explicit season evidence", () => {
+    const sequel={id:2,type:'ANIME',title:{romaji:'Synthetic Evolution: Continued Path',english:'Synthetic Evolution Season 2'},synonyms:[],startDate:{year:2024}} as any;
+    expect(aniListExplicitSeasonMatch('Synthetic Evolution 2',sequel)).toBe(true);
+    expect(preferredAniListMediaMatch(['Synthetic Evolution 2'],[sequel])?.id).toBe(2);
+    expect(aniListExplicitSeasonMatch('Synthetic Evolution 3',sequel)).toBe(false);
+    expect(aniListExplicitSeasonMatch('Synthetic Evolution 2',{...sequel,title:{romaji:'Synthetic Evolution: Continued Path'}})).toBe(false);
+  });
+  it("selects a unique provider title whose explicit subtitle extends the source identity symmetrically", () => {
+    const anime={id:1,type:'ANIME',title:{romaji:'Synthetic Cleric: Office Worker Survival Path'},synonyms:[],startDate:{year:2023}} as any;
+    expect(preferredAniListMediaMatch(['Synthetic Cleric'],[anime])?.id).toBe(1);
+    const reading={id:'1',title:'Synthetic Cleric: Office Worker Survival Path',titles:[],type:'Manhwa',year:2023,status:'Ongoing',image:'https://example.test/cover.jpg'} as any;
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Cleric'],[reading])?.id).toBe('1');
+    const translated={...anime,id:2,title:{english:'Synthetic 100: Final Errand List'}};
+    expect(preferredAniListMediaMatch(['Final Errand List'],[translated])?.id).toBe(2);
   });
   it("prepares bookmark and URL titles using URL release evidence", () => {
     const anime = sourceIdentityFromUrl("https://v5.voiranime.com/anime/remonster/re-monster-02-vostfr/");
@@ -101,6 +215,31 @@ describe("AniList catalogue", () => {
       bookmarkTitle: "Sasaki to P-chan 7",
       url: "https://reader.example/series/sasaki-to-p-chan-7",
     }).personal).toBe("Sasaki to P-chan 7");
+  });
+
+  it("removes universal catalogue marketing tails and extracts only an explicit trailing year", () => {
+    expect(titleCandidateFromBookmark("Synthetic Chronicle Manga English [New Chapters]"))
+      .toBe("Synthetic Chronicle");
+    expect(titleCandidateFromBookmark("Synthetic Chronicle Manga English [New Chapters] Online Free"))
+      .toBe("Synthetic Chronicle");
+    expect(cleanDisplayTitle("Synthetic Chronicle Manga English [New Chapters] Online Free"))
+      .toBe("Synthetic Chronicle");
+    expect(prepareTitleCandidates({
+      bookmarkTitle: "Read Synthetic Chronicle Manga English [New Chapters] Online Free - Synthetic Reader",
+      url: "https://synthetic-reader.example/manga/synthetic-chronicle/chapter-54",
+    }).personal).toBe("Synthetic Chronicle");
+    expect(prepareTitleCandidates({
+      bookmarkTitle: "Synthetic Chronicle Manga English [New Chapters] (2023)",
+      url: "https://reader.example/series/synthetic-chronicle",
+    })).toMatchObject({ personal: "Synthetic Chronicle", year: 2023 });
+    expect(prepareTitleCandidates({
+      bookmarkTitle: "Synthetic Chronicle Manga English [New Chapters] 2023",
+      url: "https://reader.example/series/synthetic-chronicle",
+    })).toMatchObject({ personal: "Synthetic Chronicle", year: 2023 });
+    expect(prepareTitleCandidates({
+      bookmarkTitle: "Synthetic Chronicle Manga English [New Chapters]",
+      url: "https://reader.example/series/synthetic-chronicle",
+    }).year).toBeUndefined();
   });
 
   it("uses path evidence for release suffixes without deleting title words", () => {
@@ -444,6 +583,8 @@ describe("AniList catalogue", () => {
     const releases = await fetchMangaUpdatesReleases({
       endpoint: "https://mu.test/v1",
       fetch: fetcher,
+      startDate: "2026-08-03",
+      endDate: "2026-08-17",
     });
     expect(releases[0]).toMatchObject({ seriesId: "42", chapter: "201" });
     expect(
@@ -461,14 +602,24 @@ describe("AniList catalogue", () => {
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher.mock.calls[0][1]).toMatchObject({
       method: "POST",
-      body: "{}",
     });
+    expect(String(fetcher.mock.calls[0][0])).toContain('/releases/search');
+    expect(fetcher.mock.calls[0][1]?.headers).not.toHaveProperty('authorization');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toMatchObject({start_date:'2026-08-03',end_date:'2026-08-17',include_metadata:true,page:1});
   });
-  it("keeps the provider day when the MangaUpdates API falls back to public HTML", async () => {
-    const html='<div class="new-release-day-module__x__release_day_title"><i><span>August 5, 2026</span></i></div><div id="release12" class="row"><div class="pbreak"><a href="https://www.mangaupdates.com/series/oug0awj/reality-quest"><span>Reality Quest</span></a></div><div class="pbreak">c.217</div><div class="pbreak"><span>LINE Webtoon</span></div></div><div class="new-release-day-module__x__release_day_title"><i><span>August 6, 2026</span></i></div><div id="release13" class="row"><div class="pbreak"><a href="https://www.mangaupdates.com/series/other/title"><span>Other</span></a></div><div class="pbreak">c.10</div><div class="pbreak"><span>Group</span></div></div>';
-    const fetcher=vi.fn().mockResolvedValueOnce(new Response('',{status:405})).mockResolvedValueOnce(new Response(html,{status:200,headers:{'content-type':'text/html'}}));
-    const releases=await fetchMangaUpdatesReleases({endpoint:'https://mu.test/v1',fetch:fetcher});
-    expect(releases).toMatchObject([{seriesId:'oug0awj',chapter:'c.217',group:'LINE Webtoon',releaseDate:'2026-08-05T12:00:00.000Z'},{seriesId:'other',chapter:'c.10',releaseDate:'2026-08-06T12:00:00.000Z'}]);
+  it("paginates authenticated release search through total_hits without scraping", async () => {
+    const response=(page:number)=>new Response(JSON.stringify({total_hits:2,releases:[{series_id:String(page),series_title:`Synthetic ${page}`,chapter:String(page),release_date:`2026-08-0${page}` }]}),{status:200,headers:{'content-type':'application/json'}});
+    const fetcher=vi.fn().mockResolvedValueOnce(response(1)).mockResolvedValueOnce(response(2));
+    const releases=await fetchMangaUpdatesReleases({endpoint:'https://mu.test/v1',fetch:fetcher,startDate:'2026-08-01',endDate:'2026-08-15',pageSize:1});
+    expect(releases.map(value=>value.seriesId)).toEqual(['1','2']);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls.every(call=>String(call[0]).includes('/releases/search'))).toBe(true);
+  });
+  it('maps the documented nested release record and metadata series envelope',async()=>{
+    const fetcher=vi.fn().mockResolvedValue(new Response(JSON.stringify({total_hits:1,results:[{record:{id:700,title:'Synthetic Reading Release',volume:'4',chapter:'58.5',groups:[{name:'Synthetic Group'}],release_date:'2026-08-06'},metadata:{series:{series_id:900,title:'Synthetic Reading Series',url:'https://www.mangaupdates.com/series/synthetic'}}}]}),{status:200,headers:{'content-type':'application/json'}}));
+    const [release]=await fetchMangaUpdatesReleases({endpoint:'https://mu.test/v1',fetch:fetcher,startDate:'2026-08-01',endDate:'2026-08-15'});
+    expect(release).toMatchObject({seriesId:'900',seriesTitle:'Synthetic Reading Release',title:'Synthetic Reading Release',volume:'4',chapter:'58.5',group:'Synthetic Group',releaseDate:'2026-08-06',url:'https://www.mangaupdates.com/series/synthetic'});
+    expect(release?.raw).toMatchObject({record:{id:700}});
   });
   it("scores every result and rejects dead records and novels", () => {
     const results = [
@@ -479,6 +630,14 @@ describe("AniList catalogue", () => {
     expect(resolveMangaUpdatesSeries(["The Beginning"], results)?.id).toBe("24277219018");
     expect(resolveMangaUpdatesSeries(["The Beginning"], [...results].reverse())?.id).toBe("24277219018");
     expect(matchMangaUpdates({ aliases: ["The Beginning"] }, results)?.series.id).toBe("24277219018");
+  });
+
+  it("rejects an ambiguous exact match when provider date evidence has an unexpected shape", () => {
+    const candidates = [
+      { id: "synthetic-a", title: "Synthetic Exact", type: "Manga" as const, image: "https://img.test/a.jpg", startDate: { year: 2025 } as unknown as string },
+      { id: "synthetic-b", title: "Synthetic Exact", type: "Manga" as const, image: "https://img.test/b.jpg", startDate: "2024-01-01" },
+    ];
+    expect(preferredMangaUpdatesSeriesMatch(["Synthetic Exact"], candidates)).toBeUndefined();
   });
 
   it("uses MangaUpdates as the authoritative reading type", () => {

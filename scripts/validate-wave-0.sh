@@ -91,7 +91,7 @@ end
 abort "Liens locaux invalides:\n#{bad_links.join("\n")}" unless bad_links.empty?
 RUBY
 
-for documentation_file in docs/[0-9][0-9]-*.md docs/VALIDATION-WAVE-0.md; do
+for documentation_file in docs/[0-9][0-9]-*.md docs/VALIDATION-*.md; do
   documentation_name="${documentation_file#docs/}"
   rg -Fq "docs/$documentation_name" README.md || {
     printf 'Document absent de README.md: %s\n' "$documentation_file" >&2
@@ -112,5 +112,5 @@ if rg -n '[[:blank:]]+$' README.md CLAUDE.md THIRD_PARTY_NOTICES.md docs fixture
   exit 1
 fi
 
-printf 'Wave 0 valide: %s scénarios, dataset %s octets, sha256 %s\n' \
+printf 'Documentation valide: %s scénarios historiques, dataset %s octets, sha256 %s\n' \
   "$scenario_count" "$actual_bytes" "$actual_sha"

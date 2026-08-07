@@ -8,6 +8,8 @@ test-results/
 .turbo/
 .wxt/
 .output/
+.pnpm-store/
+.codex/
 *.tsbuildinfo
 
 # Runtime configuration and secrets
@@ -23,6 +25,8 @@ backups/
 dumps/
 *.dump
 *.sql
+!packages/database/migrations/*.sql
+!packages/database/bootstrap/anilist.sql
 *.sqlite*
 caddy-data/
 caddy-config/

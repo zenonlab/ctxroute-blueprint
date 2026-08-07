@@ -93,6 +93,33 @@ describe("AniList enrichment resolution", () => {
     expect(variants).not.toContain("Isekai Oji-san");
   });
 
+  it("trusts the exact provider id of a deterministic global catalogue media",async()=>{
+    const synthetic={...anime,id:700,title:{english:'Synthetic English Title',romaji:'Synthetic Romaji',native:'合成タイトル',userPreferred:'Synthetic Romaji'},synonyms:[]};
+    fetchAniList.mockResolvedValue(synthetic);searchAniList.mockClear();
+    const calls:Array<{sql:string;values?:unknown[]}>=[];
+    const helpers={logger:{warn:vi.fn()},query:vi.fn(async(sql:string,values?:unknown[])=>{calls.push({sql,values});if(sql.includes('SELECT m.type,COALESCE'))return {rows:[{type:'ANIME',titles:['合成タイトル'],source_titles:[],personal_titles:[],source_urls:[],year:2026,anilist_id:'700',anilist_identity_user_selected:false}]};return {rows:[],rowCount:1}})};
+    const result=await enrichAniList({mediaId:'anilist:700',forceRefresh:true},helpers);
+    expect(result).toMatchObject({status:'SUCCESS',externalId:700});
+    expect(searchAniList).not.toHaveBeenCalled();
+    expect(calls.some(call=>call.sql.includes('INSERT INTO media_title')&&call.values?.includes('Synthetic English Title'))).toBe(true);
+    expect(calls.some(call=>call.sql.startsWith('UPDATE media_title SET language=')&&call.values?.[1]==='Synthetic English Title'&&call.values?.[2]==='en')).toBe(true);
+    const titleUpdates=calls.filter(call=>call.sql.startsWith('UPDATE media_title SET language='));
+    expect(titleUpdates.every(call=>call.sql.includes("provenance->>'externalId'=$7")&&call.sql.includes("provenance->>'field'=$8"))).toBe(true);
+    expect(titleUpdates.find(call=>call.values?.[1]==='Synthetic Romaji'&&call.values?.[7]==='romaji')?.values?.[6]).toBe('700');
+  });
+
+  it("keeps synthetic AniList genres and tag categories as separate assertions",async()=>{
+    const synthetic={...anime,id:701,genres:['Adventure'],tags:[{id:1,name:'Found Family',category:'Cast-Main Cast',rank:80,isMediaSpoiler:false,isGeneralSpoiler:false,isAdult:false},{id:2,name:'Synthetic Adult Tag',category:'Content',rank:70,isMediaSpoiler:false,isGeneralSpoiler:false,isAdult:true}]};
+    fetchAniList.mockResolvedValue(synthetic);
+    const calls:Array<{sql:string;values?:unknown[]}>=[];
+    const helpers={logger:{warn:vi.fn()},query:vi.fn(async(sql:string,values?:unknown[])=>{calls.push({sql,values});if(sql.includes('SELECT m.type,COALESCE'))return {rows:[{type:'ANIME',titles:['Synthetic'],source_titles:[],personal_titles:[],source_urls:[],year:null,anilist_id:'701',anilist_identity_user_selected:false}]};return {rows:[],rowCount:1}})};
+    await enrichAniList({mediaId:'anilist:701',forceRefresh:true},helpers);
+    const assertions=calls.filter(call=>call.sql.includes('INSERT INTO metadata_assertion'));
+    expect(assertions.find(call=>call.values?.[1]==='genres')?.values?.[2]).toBe(JSON.stringify(['Adventure']));
+    expect(assertions.find(call=>call.values?.[1]==='categories')?.values?.[2]).toBe(JSON.stringify(['Found Family','Synthetic Adult Tag']));
+    expect(assertions.find(call=>call.values?.[1]==='adultCategories')?.values?.[2]).toBe(JSON.stringify(['Synthetic Adult Tag']));
+  });
+
   it("skips a manga first result and resolves the anime through a returned romaji title", async () => {
     searchAniList.mockImplementation(async (query: string) =>
       /sayonara/i.test(query) ? [anime] : [manga],
@@ -159,14 +186,24 @@ describe("AniList enrichment resolution", () => {
       query: vi.fn(async (sql: string, values?: unknown[]) => {
         calls.push({ sql, values });
         if (sql.includes("SELECT m.type,COALESCE"))
-          return { rows: [{ type: "ANIME", titles: ["Goodbye Dragon Life Hello Human Life"], year: null, anilist_id: null }] };
+          return { rows: [{ type: "ANIME", titles: ["Goodbye Dragon Life Hello Human Life"], source_titles: ["Goodbye Dragon Life Hello Human Life"], year: null, anilist_id: null }] };
         return { rows: [] };
       }),
     };
     const result = await enrichAniList({ mediaId: "source:dragon-discovery" }, helpers);
-    expect(result).toMatchObject({ status: "SUCCESS", externalId: 176053 });
+    expect(result).toMatchObject({ status: "REVIEW", reason: "LOW_CONFIDENCE" });
     expect(searchAniList.mock.calls.map(([query]) => query)).toContain("Sayonara Ryuusei, Konnichiwa Jinsei");
     const sourceQuery = calls.find(({ sql }) => sql.includes("SELECT m.type,COALESCE"));
     expect(sourceQuery?.values?.[0]).toBe("source:dragon-discovery");
+  });
+
+  it("uses the parser source identity instead of a copied personal title", async () => {
+    const clean = { ...anime, id: 1, title: { userPreferred: "Dororo", english: "Dororo" }, synonyms: [] };
+    const copied = { ...anime, id: 2, title: { userPreferred: "Dororo to Hyakkimaru", english: "Dororo to Hyakkimaru" }, synonyms: [] };
+    searchAniList.mockResolvedValue([copied, clean]);
+    fetchAniList.mockResolvedValue(clean);
+    const helpers = { logger:{warn:vi.fn()}, query:vi.fn(async(sql:string)=>sql.includes("SELECT m.type,COALESCE")?{rows:[{type:"ANIME",titles:["Dororo","Dororo to Hyakkimaru"],source_titles:["Dororo"],year:null,anilist_id:null}]}:{rows:[]}) };
+    const result=await enrichAniList({mediaId:"source:clean-parser-title"},helpers);
+    expect(result).toMatchObject({status:"SUCCESS",externalId:1});
   });
 });

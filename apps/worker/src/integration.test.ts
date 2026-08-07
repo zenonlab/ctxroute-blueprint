@@ -12,20 +12,24 @@ import notificationDelivery from './tasks/notification-delivery.js';
 import { waitProviderGate } from './enrichment-state.js';
 import { reconcileResolvedFavoriteReviews } from './favorite-resolution.js';
 import { openFavoriteReview } from './favorite-review.js';
+import { isolatedTestDatabaseUrl } from '@favlib/config';
 
-const enabled = Boolean(process.env.DATABASE_URL);
+const enabled = Boolean(process.env.TEST_DATABASE_URL);
+if (process.env.DATABASE_URL && !process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is required; refusing DATABASE_URL integration tests');
+const testDatabaseUrl = enabled ? isolatedTestDatabaseUrl() : undefined;
 const suite = describe.skipIf(!enabled);
-const pool = enabled ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
+const pool = enabled ? new Pool({ connectionString: testDatabaseUrl }) : null;
 const scope = `wave6-test-${Date.now()}`;
 
 beforeAll(async()=>{
-  if(process.env.DATABASE_URL)await runMigrations({connectionString:process.env.DATABASE_URL,noHandleSignals:true});
+  if(testDatabaseUrl)await runMigrations({connectionString:testDatabaseUrl,noHandleSignals:true});
 });
 
 suite('Wave 6 PostgreSQL worker integration', () => {
-  it('persists typed review payloads and reconciles only undecided non-manual reviews', async () => {
+  it('persists shared typed profiles and reconciles every undecided review without title exceptions', async () => {
     if (!pool) throw new Error('DATABASE_URL required');
     const mediaId = `wave-f4-review-${Date.now()}`;
+    const externalId = `integration-${randomUUID()}`;
     const user = await pool.query("INSERT INTO app_user(email,password_hash,role) VALUES($1,'synthetic','member') RETURNING id", [`wave-f4-${Date.now()}@example.test`]);
     await pool.query("INSERT INTO media(id,type) VALUES($1,'ANIME')", [mediaId]);
     for (const bookmarkId of ['automatic', 'manual'])
@@ -33,21 +37,21 @@ suite('Wave 6 PostgreSQL worker integration', () => {
     await openFavoriteReview(pool.query.bind(pool), {
       userId: user.rows[0].id, installationId: 'wave-f4', bookmarkId: 'automatic', mediaId,
       title: 'Danmachi 5', url: 'https://example.test/danmachi-5', provider: 'anilist', reason: 'LOW_CONFIDENCE',
-      candidates: [{ id: 170732, title: 'DanMachi V', type: 'ANIME', startDate: { year: 2024 }, authors: [], synonyms: ['DanMachi Season 5'] }],
+      candidates: [{ id: externalId, title: 'Synthetic Work', type: 'ANIME', startDate: { year: 2024 }, authors: [], synonyms: ['Synthetic Work Season 5'] }],
     });
     await openFavoriteReview(pool.query.bind(pool), {
       userId: user.rows[0].id, installationId: 'wave-f4', bookmarkId: 'manual', mediaId,
-      title: 'The Dreaming Man is a Realist - 7', url: 'https://example.test/dreaming-man', provider: 'anilist', reason: 'MANUAL_REVIEW', candidates: [],
+      title: 'Synthetic Parsed Work', url: 'https://example.test/synthetic-work', provider: 'anilist', reason: 'LOW_CONFIDENCE', candidates: [],
     });
-    await pool.query("INSERT INTO media_metadata(media_id,provider,external_id,status,resolved_at,updated_at) VALUES($1,'anilist','170732','ACTIVE',now(),now())", [mediaId]);
+    await pool.query("INSERT INTO media_metadata(media_id,provider,external_id,status,resolved_at,updated_at) VALUES($1,'anilist',$2,'ACTIVE',now(),now())", [mediaId,externalId]);
     await reconcileResolvedFavoriteReviews(pool.query.bind(pool), mediaId);
     const reviews = await pool.query("SELECT bookmark_id,status,reason,decision FROM favorite_review WHERE user_id=$1 AND installation_id='wave-f4' ORDER BY bookmark_id", [user.rows[0].id]);
     expect(reviews.rows).toEqual([
-      expect.objectContaining({ bookmark_id: 'automatic', status: 'RESOLVED', decision: expect.objectContaining({ kind: 'automatic-provider-resolution', externalId: '170732' }) }),
-      expect.objectContaining({ bookmark_id: 'manual', status: 'PENDING', reason: 'MANUAL_REVIEW', decision: null }),
+      expect.objectContaining({ bookmark_id: 'automatic', status: 'RESOLVED', decision: expect.objectContaining({ kind: 'automatic-provider-resolution', externalId }) }),
+      expect.objectContaining({ bookmark_id: 'manual', status: 'RESOLVED', decision: expect.objectContaining({ kind: 'automatic-provider-resolution', externalId }) }),
     ]);
-    const candidate = await pool.query("SELECT start_date,authors,payload FROM favorite_review_candidate c JOIN favorite_review r ON r.id=c.review_id WHERE r.user_id=$1 AND c.provider_id='170732'", [user.rows[0].id]);
-    expect(candidate.rows[0]).toMatchObject({ start_date: { year: 2024 }, authors: [], payload: expect.objectContaining({ id: 170732 }) });
+    const candidate = await pool.query("SELECT p.start_date,p.authors,p.payload FROM favorite_review_candidate c JOIN provider_profile p ON p.id=c.profile_id JOIN favorite_review r ON r.id=c.review_id WHERE r.user_id=$1 AND c.provider_id=$2", [user.rows[0].id,externalId]);
+    expect(candidate.rows[0]).toMatchObject({ start_date: { year: 2024 }, authors: [], payload: expect.objectContaining({ id: externalId }) });
     await pool.query('DELETE FROM app_user WHERE id=$1', [user.rows[0].id]);
     await pool.query('DELETE FROM media WHERE id=$1', [mediaId]);
   });
@@ -204,12 +208,12 @@ suite('Wave 6 PostgreSQL worker integration', () => {
         if (attempts === 1) throw new Error('synthetic transient failure');
       },
     };
-    await runOnce({ connectionString: process.env.DATABASE_URL, noHandleSignals: true, concurrency: 1 }, taskList);
+    await runOnce({ connectionString: testDatabaseUrl, noHandleSignals: true, concurrency: 1 }, taskList);
     const failed = await pool.query('SELECT attempts,max_attempts,last_error FROM graphile_worker._private_jobs WHERE key=$1', [key]);
     expect(attempts).toBe(1);
     expect(failed.rows[0]).toMatchObject({ attempts: 1, max_attempts: 2 });
     await pool.query('UPDATE graphile_worker._private_jobs SET run_at=now(),locked_at=NULL,locked_by=NULL WHERE key=$1', [key]);
-    await runOnce({ connectionString: process.env.DATABASE_URL, noHandleSignals: true, concurrency: 1 }, taskList);
+    await runOnce({ connectionString: testDatabaseUrl, noHandleSignals: true, concurrency: 1 }, taskList);
     const recovered = await pool.query('SELECT id FROM graphile_worker._private_jobs WHERE key=$1', [key]);
     expect(attempts).toBe(2);
     expect(recovered.rowCount).toBe(0);

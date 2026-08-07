@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import purge from './retention-purge.js';
+describe('retention purge', () => { it('runs bounded cleanup without ever deleting local images', async () => { const sql: string[] = []; const result = await purge({}, { query: async (statement) => { sql.push(statement); return { rowCount: 2 }; } }); expect(result).toEqual({ providerRequests:2,exports: 2, idempotency: 2, snapshots: 2, attempts:2, security:2, audit:2, deletions: 2, images:0 }); expect(sql).toHaveLength(10); expect(sql.join('\n')).toContain('provider_request_waitlist');expect(sql.join('\n')).toContain('purge_after');expect(sql.join('\n')).not.toMatch(/DELETE FROM (?:catalog_image_asset|media_cover|media_banner)/i); }); });

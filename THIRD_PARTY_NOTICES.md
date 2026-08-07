@@ -1,6 +1,6 @@
 # Third-party notices
 
-FavLib est actuellement au stade documentaire : aucun package ni dataset tiers brut n'est encore distribué avec le dépôt et les fixtures sont synthétiques. Cette liste enregistre les fondations retenues et devra être complétée avec les versions exactes au scaffold. Une mention de recherche dans la documentation ne signifie pas qu'un fournisseur ou dataset est intégré.
+FavLib ne redistribue aucun dataset tiers brut. Les métadonnées externes restent isolées avec leur provenance et leur attribution ; les images distantes sont téléchargées puis servies localement.
 
 Pour chaque intégration réelle, enregistrer nom, version/release, URL officielle, licence, attribution requise, modifications éventuelles et emplacement d'utilisation.
 
@@ -14,5 +14,6 @@ Pour chaque intégration réelle, enregistrer nom, version/release, URL officiel
 | [next-themes](https://github.com/pacocoursey/next-themes) | thèmes Next.js | MIT |
 | [WXT](https://github.com/wxt-dev/wxt) | extension Web | MIT |
 | [Graphile Worker](https://github.com/graphile/worker) | file de jobs PostgreSQL | MIT |
+| [axe-core Playwright](https://github.com/dequelabs/axe-core-npm) | gate de test automatisé WCAG A/AA du Web | MPL-2.0 |
 
 Seanime, Suwayomi, Komga et Kavita sont uniquement des références UX tant qu'aucun code ou asset n'en est copié. Toute reprise future doit vérifier la licence du fichier source et reporter les notices nécessaires ici.

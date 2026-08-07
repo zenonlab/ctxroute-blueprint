@@ -1,4 +1,4 @@
-import { runtimeEnvironment } from "@favlib/config";
+import { CONNECTOR_VERSIONS, runtimeEnvironment } from "@favlib/config";
 import { Pool } from "pg";
 
 /** Requeue only still-pending review media. Existing review decisions are
@@ -29,16 +29,19 @@ async function main() {
   const db = await pool.connect();
   try {
   const before = (await db.query(pendingSql)).rows as PendingRow[];
-  const eligible = before.filter((row) => row.mediaId && row.decision == null && row.reason !== 'MANUAL_REVIEW');
+  // MANUAL_REVIEW used to be a title-specific escape hatch. Requeue those too:
+  // the current parser/provider result replaces their stale candidate set.
+  const eligible = before.filter((row) => row.mediaId && row.decision == null);
   const jobs = [...new Map(eligible.map((row) => [`${row.provider}:${row.mediaId}`, row] as const)).values()];
   if (apply) {
     await db.query("BEGIN");
     try {
       for (const row of jobs) {
         const task = row.provider === "anilist" ? "anilist-enrichment" : "mangaupdates-enrichment";
-        const key = `favorite-review-resync:v2:${row.provider}:${row.mediaId}`;
+        const connectorVersion = row.provider === "anilist" ? CONNECTOR_VERSIONS.anilistMetadata : CONNECTOR_VERSIONS.mangaUpdatesMetadata;
+        const key = `favorite-review-resync:${connectorVersion}:${row.provider}:${row.mediaId}`;
         await db.query(
-          "SELECT graphile_worker.add_job($1,$2::json,job_key := $3,max_attempts := 3)",
+          "SELECT graphile_worker.add_job($1,$2::json,job_key := $3,max_attempts := 3,priority := -30,job_key_mode := 'replace')",
           [task, JSON.stringify({ mediaId: row.mediaId, forceRefresh: true, reviewResync: true }), key],
         );
       }
@@ -62,7 +65,7 @@ async function main() {
     jobsPlanned: jobs.length,
     jobsRecreated: apply ? jobs.length : 0,
     maxAttempts: 3,
-    manualReviewsSkipped: before.filter((row) => row.reason === 'MANUAL_REVIEW').length,
+    legacyManualReviewsRequeued: eligible.filter((row) => row.reason === 'MANUAL_REVIEW').length,
     decidedReviewsSkipped: before.filter((row) => row.decision != null).length,
     decisionsPreserved: preserved,
     reviews: after,

@@ -1,0 +1,3 @@
+export type Queryable={query:(sql:string,params:unknown[])=>Promise<{rowCount:number|null}>};
+export async function acquireLease(db:Queryable,scopeKey:string,owner:string,ttlMs=60_000){const result=await db.query("INSERT INTO source_check_lease(scope_key,owner,expires_at) VALUES($1,$2,now()+($3::bigint * interval '1 millisecond')) ON CONFLICT(scope_key) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at,acquired_at=now() WHERE source_check_lease.expires_at<now() RETURNING scope_key",[scopeKey,owner,ttlMs]);return result.rowCount===1;}
+export async function releaseLease(db:Queryable,scopeKey:string,owner:string){await db.query('DELETE FROM source_check_lease WHERE scope_key=$1 AND owner=$2',[scopeKey,owner]);}

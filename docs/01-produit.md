@@ -14,10 +14,10 @@ L'application répond à trois questions :
 
 - Application multi-utilisateur dès la première version.
 - Hébergement local pour le moment.
-- Projet privé, sans inscription publique.
+- Projet privé local, avec inscription normale par e-mail et mot de passe.
 - Chaque compte FavLib possède sa bibliothèque, sa progression et ses notifications.
-- Tous les favoris URL de chaque profil appairé sont examinés localement, sans imposer de dossier `FavLib` ; seuls les candidats médias quittent l'extension.
-- Le catalogue local assure le matching ; AniList est un enrichisseur optionnel, désactivé jusqu'à autorisation documentée et jamais bloquant.
+- Tous les favoris HTTP(S) de chaque profil appairé entrent dans l’inventaire de l’API locale, sans dossier ou filtre lexical obligatoire ; chacun reçoit un état traçable `recognized`, `review` ou `excluded`.
+- Le catalogue local assure le matching. AniList porte le catalogue anime et fournit les images. MangaUpdates porte le catalogue de lecture (manga, manhwa et manhua), ses titres associés multilingues, son statut et ses releases. La progression personnelle reste une observation de l’utilisateur ou de son extension, jamais une donnée MangaUpdates.
 - Un catalogue canonique local conserve les titres natifs, translittérés, traduits, synonymes, identifiants externes et relations entre saisons.
 - Une sortie annoncée et une sortie disponible sur un site sont deux états différents.
 - L'extension fonctionne à la fois depuis les favoris et sur la page précise ouverte dans le navigateur.
@@ -54,13 +54,13 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 
 ## Parcours utilisateur
 
-1. L'administrateur local crée ou invite un compte.
+1. L'utilisateur crée normalement son compte.
 2. L'utilisateur ouvre FavLib et génère un code d'appairage court.
 3. Il installe l'extension dans son profil Chrome et saisit ou scanne ce code.
-4. L'extension examine tous les favoris URL et élimine localement les éléments manifestement non médias.
-5. Elle envoie les candidats médias par lots idempotents ; l'API les classe en reconnu, ambigu ou ignoré.
+4. L'extension inventorie tous les favoris HTTP(S) par lots idempotents.
+5. L’API les classe en reconnu, à vérifier ou exclu sans gate lexicale ou de domaine.
 6. Les œuvres reconnues apparaissent automatiquement dans la bibliothèque.
-7. Les favoris ambigus apparaissent dans « À vérifier » avec les meilleures propositions locales ou d'un fournisseur autorisé.
+7. Une œuvre reconnue mais non résolue extérieurement reste visible sous son identité locale et apparaît aussi dans « À vérifier » avec la cause et les propositions autorisées.
 8. Le worker surveille chaque URL canonique publique sans dupliquer le travail entre utilisateurs.
 9. Les nouvelles sorties apparaissent dans l'inbox personnelle.
 10. Quand le favori change ou qu'une page suivante de la même œuvre favorite est observée avec consentement, la progression personnelle observée avance.
@@ -71,10 +71,10 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 
 - comptes locaux, invitations et rôles administrateur/membre ;
 - appairage de plusieurs installations d'extension par utilisateur ;
-- examen et réconciliation locale de tous les favoris, avec import des seuls candidats médias ;
+- inventaire et réconciliation de tous les favoris HTTP(S), avec classification traçable ;
 - déduplication entre appareils/profils synchronisés ;
 - tri automatique et file d'ambiguïtés ;
-- adaptateurs de métadonnées optionnels, bloqués par défaut jusqu'à validation de leur politique ;
+- enrichissement par le fournisseur canonique du type d’œuvre, borné, durablement mis en cache et réessayable sans doublon ;
 - catalogue local actualisable et recherche multi-alias ;
 - bibliothèque manga/anime par utilisateur ;
 - fiche détaillée de chaque œuvre ;
@@ -91,7 +91,7 @@ Si le site publie l'épisode 12 alors que le favori pointe toujours vers l'épis
 
 ### Hors périmètre
 
-- inscription publique et hébergement SaaS ;
+- hébergement SaaS ;
 - ajout manuel d'une œuvre comme parcours principal ;
 - téléchargement, hébergement ou republication de médias ;
 - extraction de flux vidéo ;

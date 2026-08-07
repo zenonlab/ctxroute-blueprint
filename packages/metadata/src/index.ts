@@ -186,6 +186,50 @@ export function normalizeTitle(v: string) {
     .replace(/\s+/g, " ");
 }
 
+export const COLLECTIVE_TITLE_KEY_VERSION = 1;
+
+export function requiredProviderForMediaType(mediaType: MediaType): "anilist" | "mangaupdates" {
+  return mediaType === "ANIME" ? "anilist" : "mangaupdates";
+}
+
+export function assertProviderMediaType(input: {provider:"anilist"|"mangaupdates";mediaType:MediaType}) {
+  const required = requiredProviderForMediaType(input.mediaType);
+  if (input.provider !== required) throw new Error("PROVIDER_MEDIA_TYPE_MISMATCH");
+  return input;
+}
+
+/** Stable, provider-symmetric key for sharing review evidence. Raw input and
+ * season provenance remain stored by callers; a trailing number alone is not
+ * promoted to season evidence here. */
+export function collectiveTitleKey(input: {
+  provider: "anilist" | "mangaupdates";
+  mediaType: MediaType;
+  parsedTitle: string;
+  explicitSeason?: number | null;
+}) {
+  assertProviderMediaType(input);
+  const title = normalizeTitle(input.parsedTitle);
+  if (!title) throw new Error("COLLECTIVE_TITLE_EMPTY");
+  const season = input.provider === "anilist" && Number.isInteger(input.explicitSeason) && Number(input.explicitSeason) > 0
+    ? `:season-${Number(input.explicitSeason)}` : "";
+  return `v${COLLECTIVE_TITLE_KEY_VERSION}:${input.provider}:${input.mediaType}:${title}${season}`;
+}
+
+/** Parse only public provider identity URLs. AniList identifiers are numeric;
+ * MangaUpdates identifiers are opaque ASCII tokens. */
+export function providerIdFromUrl(provider: "anilist" | "mangaupdates", value: string) {
+  let url: URL;
+  try { url = new URL(value); } catch { return null; }
+  if (!/^https?:$/u.test(url.protocol)) return null;
+  const host = url.hostname.toLowerCase().replace(/^www\./u, "");
+  if (provider === "anilist") {
+    if (host !== "anilist.co") return null;
+    return url.pathname.match(/^\/(?:anime|manga)\/(\d+)(?:\/|$)/u)?.[1] ?? null;
+  }
+  if (host !== "mangaupdates.com") return null;
+  return url.pathname.match(/^\/series\/([A-Za-z0-9]+)(?:\/[^/]*)?\/?$/u)?.[1] ?? null;
+}
+
 const PRE_SERIALIZATION = /\bpre[\s-]*seriali[sz](?:ation|ed)\b/iu;
 export function hasPreSerializationMarker(value: string) {
   return PRE_SERIALIZATION.test(normalizeTitle(value));
@@ -218,6 +262,8 @@ export function canonicalLibraryStatus(value: unknown): LibraryStatus {
 export function exactTitleMatchKind(alias: string, title: string):
   | "NORMALIZED_EXACT"
   | "COMPACT_EXACT"
+  | "SUBTITLE_EXACT"
+  | "ALIAS_PARENTHESIZED_EXACT"
   | "PARENTHESIZED_EXACT"
   | undefined {
   const normalizedAlias = normalizeTitle(alias);
@@ -228,6 +274,14 @@ export function exactTitleMatchKind(alias: string, title: string):
   if (seasonTitleKey(normalizedAlias) === seasonTitleKey(normalizedTitle) &&
       seasonTitleKey(normalizedAlias) !== normalizedAlias)
     return "COMPACT_EXACT";
+  const subtitle = title.match(/^([^:：]+)[:：]\s*(\S.*)$/u);
+  const exactSegment = [subtitle?.[1], subtitle?.[2]].filter((segment): segment is string => Boolean(segment?.trim())).some(segment =>
+    normalizeTitle(segment) === normalizedAlias || compactTitleKey(segment) === compactTitleKey(alias));
+  if (exactSegment)
+    return "SUBTITLE_EXACT";
+  const aliasBase = alias.replace(/\s*\([^()]*\)\s*$/u, "").trim();
+  if (aliasBase !== alias && (normalizeTitle(aliasBase) === normalizedTitle || compactTitleKey(aliasBase) === compactTitleKey(title)))
+    return "ALIAS_PARENTHESIZED_EXACT";
   const base = title.replace(/\s*\([^()]*\)\s*$/u, "").trim();
   if (base !== title && normalizeTitle(base) === normalizedAlias)
     return "PARENTHESIZED_EXACT";
@@ -252,6 +306,11 @@ function seasonTitleKey(value: string) {
 
 export function titleCandidateFromBookmark(v: string) {
   let s = v.replace(/\s+/g, " ").trim();
+  s = s.replace(/\s*(?:\(\s*)?(?:18|19|20|21)\d{2}(?:\s*\))?\s*$/u, "").trim();
+  s = stripCatalogMarketingSuffix(s);
+  // A separator is explicit release-position provenance. A bare number without
+  // that provenance remains identity-bearing and is deliberately preserved.
+  s = s.replace(/\s+[-–—|:]\s*#?\d+(?:\.\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?\s*$/iu, "").trim();
   const leadingRelease = s.match(/^(?:chapter|chapitre|chap|ch\.?|episode|épisode|ep\.?)\s*#?\d[\d.\-a-z]*(?:\s*\([^)]*\))?\s*[-–—|:]\s*(.+?)(?:\s*\|\s*[^|]+)?$/iu);
   if (leadingRelease?.[1]) s = leadingRelease[1].trim();
   s = s.replace(/^(?:read|watch|lire|regarder)\s+/i, "");
@@ -265,13 +324,14 @@ export function titleCandidateFromBookmark(v: string) {
     "",
   );
   s = s.replace(/[\s|·:—–-]+$/u, "").trim();
+  s = stripCatalogMarketingSuffix(s);
   return s.length >= 2 ? s : undefined;
 }
 
 /** Title used for cards and headings. Input titles remain untouched in the
  * provenance tables; this function is deliberately display-only. */
 export function cleanDisplayTitle(v: string) {
-  let s = v.replace(/\s+/gu, " ").trim();
+  let s = stripCatalogMarketingSuffix(v.replace(/\s+/gu, " ").trim());
   if (!s) return undefined;
   const release = /(?:^|\s*(?:[-–—|·:]\s*|\s+))(?:(?:episode|ep\.?|chapter|chapitre|chap\.?|ch\.?|volume|vol\.?|season|saison)\s*#?\d+[\w.-]*).*/iu;
   const separatedRelease = /(?:^|\s*(?:[-–—|·:]\s*))(?:\d+\s*(?:vostfr|vf|vo|sub|dub|scan|scans)?|(?:vostfr|vf|vo|sub|dub|scan|scans)(?:\s*[- ]?\d+|\s*$)).*/iu;
@@ -288,6 +348,13 @@ export function cleanDisplayTitle(v: string) {
   }
   s = kept.join(" - ").trim();
   return s.length >= 2 && !/^(?:episode|chapter|volume|vostfr|vf|scan)\b/iu.test(s) ? s : undefined;
+}
+
+function stripCatalogMarketingSuffix(value: string) {
+  const releaseBadge = String.raw`(?:\[|\()\s*(?:new|nouveaux?|nouvelles?)\s+(?:chapters?|chapitres?|episodes?|épisodes?|volumes?|releases?|sorties?)\s*(?:\]|\))`;
+  const catalogPrefix = String.raw`(?:(?:manga|manhwa|manhua|webtoon)\s+)?(?:english|français|french|vostfr|vf)\s+`;
+  const promotion = String.raw`(?:\s+(?:online\s+free|free\s+online|read\s+online(?:\s+free)?|lire\s+en\s+ligne(?:\s+gratuitement)?))?`;
+  return value.replace(new RegExp(String.raw`\s+(?:${catalogPrefix})?${releaseBadge}${promotion}\s*$`, "iu"), "").trim();
 }
 
 const RELEASE_WORDS = /^(?:vf|vostfr|vo|sub|dub|scan|scans|english|français|french)$/iu;
@@ -307,6 +374,7 @@ function cleanUrlTitle(value: string, parts: string[]) {
 export type TitlePreparation = {
   original: string;
   personal?: string;
+  year?: number;
   urlTitle?: string;
   sourceTitle?: string;
   candidates: string[];
@@ -323,6 +391,9 @@ export function prepareTitleCandidates(input: {
   const original = input.bookmarkTitle;
   let personal = input.bookmarkTitle.replace(/\s+/g, " ").trim();
   const transformations: string[] = [];
+  const yearMatch = personal.match(/(?:^|\s)(?:\(\s*)?((?:18|19|20|21)\d{2})(?:\s*\))?\s*$/u);
+  const year = yearMatch ? Number(yearMatch[1]) : undefined;
+  if (year !== undefined) transformations.push("extracted_bookmark_year");
   if (/^(?:watch(?:\s+full)?|read|lire|regarder)\s+/iu.test(personal)) {
     personal = personal.replace(/^(?:watch(?:\s+full)?|read|lire|regarder)\s+/iu, "");
     transformations.push("removed_action_prefix");
@@ -366,7 +437,7 @@ export function prepareTitleCandidates(input: {
   const values = (sameBase ? [personal, urlTitle, source?.title, original] : [urlTitle, source?.title, personal, original])
     .filter((v): v is string => Boolean(v?.trim()));
   const candidates = [...new Set(values.flatMap((value) => [value.trim(), normalizeTitle(value), compactTitleKey(value)]).filter((value) => value.length > 1))];
-  return { original, personal: personal || undefined, urlTitle, sourceTitle: source?.title, candidates, transformations };
+  return { original, personal: personal || undefined, year, urlTitle, sourceTitle: source?.title, candidates, transformations };
 }
 
 export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
@@ -748,7 +819,7 @@ async function anilistRequest(
     }
   }
 }
-const fields = `id idMal type format status startDate{year month day} endDate{year month day} countryOfOrigin genres tags{id name description rank isMediaSpoiler isGeneralSpoiler isAdult category} description coverImage{extraLarge large medium color} bannerImage siteUrl title{romaji english native userPreferred} synonyms season seasonYear seasonInt episodes chapters volumes duration averageScore meanScore popularity trending favourites isAdult isLicensed isLocked source hashtag updatedAt nextAiringEpisode{episode airingAt timeUntilAiring} airingSchedule{nodes{airingAt episode timeUntilAiring}} externalLinks{site url} relations{edges{relationType node{id type format title{romaji english native userPreferred}}}} streamingEpisodes{title thumbnail url site} studios{edges{isMain node{id name isAnimationStudio siteUrl}}} staff{edges{role node{name{full}}}}`;
+const fields = `id idMal type format status startDate{year month day} endDate{year month day} countryOfOrigin genres tags{id name description rank isMediaSpoiler isGeneralSpoiler isAdult category} description coverImage{extraLarge large medium color} bannerImage siteUrl title{romaji english native userPreferred} synonyms season seasonYear seasonInt episodes chapters volumes duration averageScore meanScore popularity trending favourites isAdult isLicensed isLocked source hashtag updatedAt nextAiringEpisode{episode airingAt timeUntilAiring} airingSchedule(notYetAired:true,perPage:50){nodes{airingAt episode timeUntilAiring}} externalLinks{site url} relations{edges{relationType node{id type format title{romaji english native userPreferred}}}} streamingEpisodes{title thumbnail url site} studios{edges{isMain node{id name isAnimationStudio siteUrl}}} staff{edges{role node{name{full}}}}`;
 const searchFields = `id type format startDate{year} title{romaji english native userPreferred} synonyms coverImage{extraLarge large medium color}`;
 function mapMedia(x: any): AniListMedia {
   return {
@@ -994,6 +1065,33 @@ export function fetchAniList(
       idBatchTimer = setTimeout(() => void flushIdBatch(), 25);
   });
 }
+
+export async function fetchAniListCalendar(
+  fromUnix: number,
+  toUnix: number,
+  options: AniListIdOptions & { maxPages?: number } = {},
+): Promise<AniListMedia[]> {
+  if (!Number.isInteger(fromUnix) || !Number.isInteger(toUnix) || fromUnix >= toUnix)
+    throw new Error("ANILIST_CALENDAR_RANGE_INVALID");
+  const byId = new Map<number, AniListMedia>();
+  const maxPages = Math.min(20, Math.max(1, options.maxPages ?? 10));
+  for (let page = 1; page <= maxPages; page++) {
+    const data = await anilistRequest({
+      query: `query($page:Int!,$from:Int!,$to:Int!){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode mediaId media{id type format status seasonYear episodes title{romaji english native userPreferred}synonyms coverImage{extraLarge large medium color}siteUrl}}}}`,
+      variables: { page, from: fromUnix, to: toUnix },
+    }, options);
+    const schedules = data?.Page?.airingSchedules ?? [];
+    for (const schedule of schedules) {
+      if (!schedule?.media?.id || !schedule.airingAt || !schedule.episode) continue;
+      const id = Number(schedule.media.id);
+      const existing = byId.get(id) ?? mapMedia(schedule.media);
+      existing.airingSchedule = [...existing.airingSchedule, { airingAt: schedule.airingAt, episode: schedule.episode }];
+      byId.set(id, existing);
+    }
+    if (!data?.Page?.pageInfo?.hasNextPage) break;
+  }
+  return [...byId.values()];
+}
 function latinTitle(media: AniListMedia) {
   const values = [
     media.title.english,
@@ -1172,6 +1270,9 @@ export type MangaUpdatesClientOptions = {
   fetch?: SearchClient;
   timeoutMs?: number;
   now?: number;
+  startDate?: string;
+  endDate?: string;
+  pageSize?: number;
 };
 const MU_BASE = "https://api.mangaupdates.com/v1";
 function muClient(options: MangaUpdatesClientOptions) {
@@ -1187,45 +1288,6 @@ function muHeaders(options: MangaUpdatesClientOptions) {
 function muArray(json: any, keys: string[]) {
   for (const key of keys) if (Array.isArray(json?.[key])) return json[key];
   return Array.isArray(json) ? json : [];
-}
-function parsePublicMangaUpdatesReleases(html:string): MangaUpdatesRelease[] {
-  const dayPattern=/<div[^>]*release_day_title[^>]*>[\s\S]*?<span>([A-Z][a-z]+ \d{1,2}, \d{4})<\/span>[\s\S]*?<\/div>/gu;
-  const days=[...html.matchAll(dayPattern)];
-  const parsed:MangaUpdatesRelease[]=[];
-  for(let index=0;index<days.length;index++){
-    const day=days[index];
-    const next=days[index+1];
-    const releaseDate=new Date(`${day[1]} 12:00:00 UTC`).toISOString();
-    const section=html.slice((day.index??0)+day[0].length,next?.index??html.length);
-    const rows=section.split(/(?=<div id="release\d+")/u).filter(row=>row.startsWith('<div id="release'));
-    for(const row of rows){
-      const releaseId=row.match(/^<div id="(release\d+)"/u)?.[1];
-      const series=row.match(/href="https:\/\/www\.mangaupdates\.com\/series\/([^"/]+)[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/u);
-      const cells=[...row.matchAll(/<div[^>]*pbreak[^>]*>([\s\S]*?)<\/div>/gu)];
-      const chapter=cells[1]?.[1]?.replace(/<[^>]+>/gu,' ').replace(/\s+/gu,' ').trim();
-      const group=cells[2]?.[1]?.replace(/<[^>]+>/gu,' ').replace(/\s+/gu,' ').trim();
-      if(!releaseId||!series?.[1]||!series[2]||!chapter)continue;
-      const title=series[2].replace(/\s+/gu,' ').trim();
-      parsed.push({seriesId:series[1],title,seriesTitle:title,chapter,group,releaseDate,url:`https://www.mangaupdates.com/series/${series[1]}`});
-    }
-  }
-  // Keep the old row parser as a guarded compatibility path. Undated rows are
-  // observational only and are deliberately excluded from the calendar.
-  const legacy:MangaUpdatesRelease[]=parsed.length?[]:html.split(/(?=<div id="release\d+")/u).filter(row=>row.startsWith('<div id="release')).flatMap(row=>{
-    const series=row.match(/href="https:\/\/www\.mangaupdates\.com\/series\/([^"/]+)[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/u);
-    const chapter=row.match(/<\/a>[\s\S]*?<div[^>]*>([^<]+)<\/div>/u)?.[1]?.trim();
-    if(!series?.[1]||!series[2]||!chapter)return [];
-    const title=series[2].replace(/\s+/gu,' ').trim();
-    return [{seriesId:series[1],title,seriesTitle:title,chapter,url:`https://www.mangaupdates.com/series/${series[1]}`}];
-  });
-  const seen=new Set<string>();
-  return [...parsed,...legacy].filter(value=>{const key=`${value.seriesId}|${value.chapter??''}|${value.releaseDate??''}`;if(seen.has(key))return false;seen.add(key);return true});
-}
-async function fetchPublicMangaUpdatesReleases(options:MangaUpdatesClientOptions):Promise<MangaUpdatesRelease[]> {
-  const client=options.fetch??safeFetch(JSON_MAX,['text/html','application/xhtml+xml']);
-  const response=await client('https://www.mangaupdates.com/releases.html',{headers:{accept:'text/html', 'user-agent':UA},signal:AbortSignal.timeout(options.timeoutMs??8000)});
-  if(!response.ok)throw new Error(`MANGAUPDATES_PUBLIC_HTTP_${response.status}`);
-  return parsePublicMangaUpdatesReleases((await response.text()).slice(0,2*1024*1024));
 }
 function stringValues(value: unknown): string[] {
   if (typeof value === "string") return value.trim() ? [value] : [];
@@ -1324,11 +1386,12 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
   };
 }
 function mapMuRelease(value: any): MangaUpdatesRelease | null {
-  const series = value?.series ?? value?.manga ?? {};
-  const id = value?.series_id ?? value?.seriesId ?? series?.id;
+  const record=value?.record??value;
+  const series = value?.metadata?.series ?? value?.series ?? value?.manga ?? record?.series ?? {};
+  const id = value?.series_id ?? value?.seriesId ?? series?.series_id ?? series?.id;
   const titles = [
     value?.series_title,
-    value?.title,
+    record?.title,
     series?.title,
     ...(Array.isArray(value?.titles) ? value.titles : []),
   ].filter((x): x is string => typeof x === "string" && x.trim().length > 0);
@@ -1336,17 +1399,17 @@ function mapMuRelease(value: any): MangaUpdatesRelease | null {
   return {
     seriesId: id === undefined ? undefined : String(id),
     seriesTitle: titles[0],
-    title: value?.release_title ?? value?.title,
+    title: record?.title,
     titles: [...new Set(titles)],
     chapter:
-      String(value?.chapter ?? value?.chapter_number ?? value?.number ?? "") ||
+      String(record?.chapter ?? record?.chapter_number ?? record?.number ?? "") ||
       undefined,
-    volume: String(value?.volume ?? value?.volume_number ?? "") || undefined,
-    releaseDate: value?.release_date ?? value?.released_at ?? value?.date,
+    volume: String(record?.volume ?? record?.volume_number ?? "") || undefined,
+    releaseDate: record?.release_date ?? record?.released_at ?? record?.date,
     status: value?.serialization_status ?? value?.status ?? series?.status,
-    group: value?.group_name ?? value?.group?.name ?? value?.group,
-    language: value?.language,
-    url: value?.url,
+    group: Array.isArray(record?.groups)?record.groups.map((group:any)=>group?.name).filter(Boolean).join(' · '):(record?.group_name ?? record?.group?.name ?? record?.group),
+    language: record?.language,
+    url: series?.url ?? record?.url,
     raw: value,
   };
 }
@@ -1373,15 +1436,25 @@ async function muJson(
 export async function fetchMangaUpdatesReleases(
   options: MangaUpdatesClientOptions = {},
 ): Promise<MangaUpdatesRelease[]> {
-  try {
-    const json = await muJson("/releases", options, { method: "POST", body: "{}" });
-    return muArray(json, ["releases", "data", "results"])
-      .map(mapMuRelease)
-      .filter((x): x is MangaUpdatesRelease => Boolean(x));
-  } catch (error) {
-    if (!(error instanceof Error) || !/MANGAUPDATES_HTTP_(401|403|405)/u.test(error.message)) throw error;
-    return fetchPublicMangaUpdatesReleases(options);
+  // MangaUpdates documents this release-search endpoint without an API key.
+  // Do not invent an Authorization header or introduce a secret-file contract.
+  const now = new Date(options.now ?? Date.now());
+  const startDate = options.startDate ?? now.toISOString().slice(0, 10);
+  const endDate = options.endDate ?? new Date(now.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const perPage = Math.min(100, Math.max(1, options.pageSize ?? 100));
+  const releases: MangaUpdatesRelease[] = [];
+  for (let page = 1; ; page++) {
+    const json = await muJson("/releases/search", options, {
+      method: "POST",
+      body: JSON.stringify({ start_date: startDate, end_date: endDate, include_metadata: true, page, perpage: perPage }),
+    });
+    const raw = muArray(json, ["releases", "results", "data"]);
+    releases.push(...raw.map(mapMuRelease).filter((x): x is MangaUpdatesRelease => Boolean(x)));
+    const total = Number(json?.total_hits ?? json?.totalHits ?? json?.pagination?.total_hits ?? releases.length);
+    if (!raw.length || releases.length >= total) break;
+    if (page >= 10_000) throw new Error("MANGAUPDATES_PAGINATION_LIMIT");
   }
+  return releases;
 }
 export async function searchMangaUpdatesSeries(
   query: string,
@@ -1414,9 +1487,27 @@ export async function fetchMangaUpdatesSeries(
     })()
   );
 }
+/** Preserve the raw title while exposing only an explicit final parenthesized
+ * segment as an alternate identity alias. Both provider pipelines use this
+ * same bounded rule; nested or empty parentheses are never guessed. */
+export function explicitTitleAliases(values: string[]) {
+  const aliases = new Set<string>();
+  for (const value of values) {
+    const raw = typeof value === "string" ? value.replace(/\s+/gu, " ").trim() : "";
+    if (!raw) continue;
+    aliases.add(raw);
+    const match = raw.match(/^(\S(?:.*\S)?)\s+\(([^()]+)\)$/u);
+    if (!match) continue;
+    const base = match[1].trim(), alternate = match[2].trim();
+    if (base.length >= 2) aliases.add(base);
+    if (alternate.length >= 2) aliases.add(alternate);
+  }
+  return [...aliases];
+}
+
 export function titleVariants(values: string[]) {
   const result = new Set<string>();
-  const rawValues = values.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean);
+  const rawValues = explicitTitleAliases(values);
   for (const raw of rawValues) result.add(raw);
   for (const raw of rawValues) {
     const normalized = normalizeTitle(raw);
@@ -1500,9 +1591,111 @@ export function automaticMangaUpdatesSeriesMatches(aliases: string[], items: Man
     .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .filter((item) => candidateTitles(item).some((title) => aliases.some((alias) => {
       const kind=exactTitleMatchKind(alias,title);
-      return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';
+      return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT'||kind==='SUBTITLE_EXACT'||kind==='ALIAS_PARENTHESIZED_EXACT';
     })))
     .map((item) => [item.id,item] as const)).values()];
+}
+
+function titleEditDistance(left: string, right: string) {
+  const a = compactTitleKey(left), b = compactTitleKey(right);
+  const row = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i++) {
+    let previous = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const saved = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+      previous = saved;
+    }
+  }
+  return row[b.length];
+}
+
+type ExactDateEvidence = { full?: number; year?: number; valid: boolean };
+function numericYear(value: unknown) { return typeof value === "number" && Number.isInteger(value) && value >= 1000 && value <= 9999 ? value : undefined; }
+function aniListExactDate(item: AniListMedia): ExactDateEvidence {
+  const date=item.startDate,dateYear=numericYear(date?.year);
+  const years=[...new Set([dateYear,numericYear(item.startYear),numericYear(item.seasonYear)].filter((year):year is number=>year!==undefined))];
+  if(years.length>1)return{valid:false};
+  if(date?.month!==undefined||date?.day!==undefined){
+    if(!dateYear||!Number.isInteger(date.month)||!Number.isInteger(date.day))return{valid:false};
+    const full=Date.UTC(dateYear,date.month!-1,date.day!),parsed=new Date(full);
+    if(parsed.getUTCFullYear()!==dateYear||parsed.getUTCMonth()!==date.month!-1||parsed.getUTCDate()!==date.day)return{valid:false};
+    return{full,year:dateYear,valid:true};
+  }
+  return{year:years[0],valid:true};
+}
+function mangaUpdatesExactDate(item:MangaUpdatesSeries):ExactDateEvidence{
+  const explicitYear=numericYear(item.year);let full:number|undefined,dateYear:number|undefined;
+  const raw=typeof item.startDate==="string"?item.startDate.trim():"";
+  if(raw){
+    const yearOnly=raw.match(/^(\d{4})$/u);
+    if(yearOnly)dateYear=numericYear(Number(yearOnly[1]));
+    else{const complete=raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/u);if(!complete)return{valid:false};dateYear=numericYear(Number(complete[1]));if(!dateYear)return{valid:false};full=Date.UTC(dateYear,Number(complete[2])-1,Number(complete[3]));const parsed=new Date(full);if(parsed.getUTCFullYear()!==dateYear||parsed.getUTCMonth()!==Number(complete[2])-1||parsed.getUTCDate()!==Number(complete[3]))return{valid:false};}
+  }
+  if(explicitYear!==undefined&&dateYear!==undefined&&explicitYear!==dateYear)return{valid:false};
+  return{full,year:dateYear??explicitYear,valid:true};
+}
+function recentUniqueExact<T>(items:T[],evidence:(item:T)=>ExactDateEvidence):T|undefined{
+  if(items.length<2)return items[0];const dated=items.map(item=>({item,date:evidence(item)}));if(dated.some(entry=>!entry.date.valid))return undefined;
+  const key:"full"|"year"=dated.every(entry=>entry.date.full!==undefined)?"full":"year";if(dated.some(entry=>entry.date[key]===undefined))return undefined;
+  const newest=Math.max(...dated.map(entry=>entry.date[key]!)),winners=dated.filter(entry=>entry.date[key]===newest);return winners.length===1?winners[0].item:undefined;
+}
+
+/** Prefer the user-visible favorite title. A small typo is accepted only when
+ * the winner is unique and clearly ahead of every other provider record. */
+export function preferredMangaUpdatesSeriesMatch(aliases: string[], items: MangaUpdatesSeries[]) {
+  const eligible = items.filter(item => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item));
+  const exact = automaticMangaUpdatesSeriesMatches(aliases, eligible);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return recentUniqueExact(exact, mangaUpdatesExactDate);
+  const tokenKey = (value: string) => meaningfulTokens(value).sort().join("|");
+  const wantedTokenKeys = new Set(aliases.map(tokenKey).filter(Boolean));
+  const tokenExact = eligible.filter(item => candidateTitles(item).some(title => wantedTokenKeys.has(tokenKey(title))));
+  if (tokenExact.length === 1) return tokenExact[0];
+  if (tokenExact.length > 1) return undefined;
+  const ranked = eligible.map(item => ({ item, distance: Math.min(...aliases.flatMap(alias => candidateTitles(item).map(title => titleEditDistance(alias, title)))) }))
+    .sort((a, b) => a.distance - b.distance || a.item.id.localeCompare(b.item.id));
+  const best = ranked[0], second = ranked[1];
+  if (!best || best.distance > 4 || (second && second.distance - best.distance < 3)) return undefined;
+  return best.item;
+}
+
+export function preferredAniListMediaMatch(aliases: string[], items: AniListMedia[]) {
+  const exact = automaticAniListMediaMatches(aliases, items);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return recentUniqueExact(exact, aniListExactDate);
+  const titles = (item: AniListMedia) => [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
+    .filter((value): value is string => Boolean(value?.trim()));
+  const tokenKey = (value: string) => meaningfulTokens(value).sort().join("|");
+  const wantedTokenKeys = new Set(aliases.map(tokenKey).filter(Boolean));
+  const tokenExact = items.filter(item => titles(item).some(title => wantedTokenKeys.has(tokenKey(title))));
+  if (tokenExact.length === 1) return tokenExact[0];
+  if (tokenExact.length > 1) return undefined;
+  const ranked = items.map(item => ({item,distance:Math.min(...aliases.flatMap(alias => titles(item).map(title => titleEditDistance(alias,title))))}))
+    .sort((a,b)=>a.distance-b.distance||a.item.id-b.item.id);
+  const best=ranked[0],second=ranked[1];
+  if(!best||best.distance>4||(second&&second.distance-best.distance<3))return undefined;
+  return best.item;
+}
+
+/** AniList may carry the localized base title and the explicit season number
+ * in different title fields. The trailing source number is used only when a
+ * provider title independently says `Season N`; it is never rewritten alone. */
+export function aniListExplicitSeasonMatch(alias: string, item: AniListMedia) {
+  const parsed = normalizeTitle(alias).match(/^(.*\S)\s+(\d{1,2})$/u);
+  if (!parsed) return false;
+  const [, aliasBase, season] = parsed;
+  const titles = [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
+    .filter((title):title is string=>Boolean(title?.trim()));
+  const hasBase = titles.some(title => {
+    const providerBase = title.split(/[:：]/u,1)[0]?.trim() ?? title;
+    return normalizeTitle(providerBase) === aliasBase || compactTitleKey(providerBase) === compactTitleKey(aliasBase);
+  });
+  const hasSeason = titles.some(title => {
+    const normalized = normalizeTitle(title);
+    return new RegExp(`(?:^|\\s)(?:season|saison)\\s+${season}(?:\\s|$)|(?:^|\\s)${season}(?:st|nd|rd|th)\\s+season(?:\\s|$)`, 'u').test(normalized);
+  });
+  return hasBase && hasSeason;
 }
 
 export function exactAniListMediaMatches(aliases: string[], items: AniListMedia[]) {
@@ -1522,7 +1715,7 @@ export function exactAniListMediaMatches(aliases: string[], items: AniListMedia[
 export function automaticAniListMediaMatches(aliases: string[], items: AniListMedia[]) {
   return [...new Map(items.filter((item) => [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
     .filter((title):title is string=>Boolean(title?.trim()))
-    .some((title)=>aliases.some((alias)=>{const kind=exactTitleMatchKind(alias,title);return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';})))
+    .some((title)=>aliases.some((alias)=>{const kind=exactTitleMatchKind(alias,title);return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT'||kind==='SUBTITLE_EXACT'||kind==='ALIAS_PARENTHESIZED_EXACT';})) || aliases.some(alias=>aniListExplicitSeasonMatch(alias,item)))
     .map((item)=>[item.id,item] as const)).values()];
 }
 

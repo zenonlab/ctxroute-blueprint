@@ -6,7 +6,7 @@ Protéger une application locale multi-utilisateur sans supposer que le LAN, le 
 
 ## Création et récupération des comptes
 
-- aucune inscription publique ni mot de passe par défaut ;
+- inscription normale par e-mail et mot de passe ; aucun mot de passe par défaut ;
 - le premier administrateur est créé par une commande locale interactive uniquement lorsque la base ne contient aucun compte ;
 - les comptes suivants utilisent une invitation administrateur opaque, à usage unique, expirant après 24 heures ;
 - la V1 n'envoie aucun email de récupération : un administrateur émet un jeton de réinitialisation à usage unique, valable 30 minutes ;

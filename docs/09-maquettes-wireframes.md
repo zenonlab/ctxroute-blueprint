@@ -30,7 +30,7 @@ Ces wireframes fixent la structure et les états à tester avant le look final s
 │ ┌ Affiche ┐  ┌ Affiche ┐  ┌ Affiche ┐                           │
 │ │         │  │   NEW   │  │         │                           │
 │ └─────────┘  └─────────┘  └─────────┘                           │
-│ Orbital      Paper Moon   Œuvre sans AniList                    │
+│ Orbital      Paper Moon   Œuvre à enrichir                      │
 │ 11 / 12      12 / 12.5    progression inconnue                  │
 └──────────────────────────────────────────────────────────────────┘
 ```

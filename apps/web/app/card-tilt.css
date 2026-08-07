@@ -1,0 +1,30 @@
+@media (hover:hover) and (pointer:fine){
+  .media-card,.planning-card,.release-tile{
+    --tilt-x:0deg;--tilt-y:0deg;--glare-x:50%;--glare-y:50%;--shadow-x:0px;
+    position:relative;isolation:isolate;transform-style:preserve-3d;will-change:transform,filter;
+    transform-origin:center center;overflow:visible!important;
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .12s ease!important;
+  }
+  .media-card.is-tilting,.planning-card.is-tilting,.release-tile.is-tilting{transition:filter .12s ease!important}
+  .media-card .poster,.planning-card-poster,.release-tile{overflow:hidden}
+  .media-card .poster::after,.planning-card-poster::after,.release-tile::after{
+    content:"";position:absolute;inset:-1px;z-index:4;pointer-events:none;border-radius:inherit;opacity:0;
+    background:radial-gradient(circle at var(--glare-x) var(--glare-y),rgba(255,255,255,.24),rgba(255,181,46,.08) 24%,rgba(2,3,8,.34) 72%);
+    mix-blend-mode:screen;transition:opacity .2s ease;
+  }
+  .media-card:hover,.media-card:focus-within,.planning-card:hover,.planning-card:focus-within,.release-tile:hover,.release-tile:focus-visible{
+    filter:brightness(.78) saturate(1.1)!important;
+    transform:perspective(900px) translateY(-6px) scale(1.055) rotateX(var(--tilt-x)) rotateY(var(--tilt-y))!important;
+  }
+  .media-card:hover .poster-visual,.media-card:focus-within .poster-visual,.planning-card:hover .planning-card-poster,.planning-card:focus-within .planning-card-poster,.release-tile:hover,.release-tile:focus-visible{
+    box-shadow:var(--shadow-x) 22px 38px #000d,0 0 0 1px rgba(255,181,46,.3)!important;
+  }
+  .media-card:hover .poster::after,.media-card:focus-within .poster::after,.planning-card:hover .planning-card-poster::after,.planning-card:focus-within .planning-card-poster::after,.release-tile:hover::after,.release-tile:focus-visible::after{opacity:.72}
+  .media-card .poster>img,.planning-card-poster>img,.release-tile-cover{transform:none!important}
+  .media-card .poster-copy,.media-card .card-topline,.calendar-card-date,.release-tile-foot{transform:translateZ(14px);transition:transform .14s ease,text-shadow .14s ease}
+  .media-card:hover .poster-copy,.media-card:focus-within .poster-copy{transform:translateZ(22px);text-shadow:0 5px 14px #000}
+}
+@media (prefers-reduced-motion:reduce){
+  .media-card,.planning-card,.release-tile{transition:none!important;transform:none!important}
+  .media-card .poster::after,.planning-card-poster::after,.release-tile::after{display:none}
+}

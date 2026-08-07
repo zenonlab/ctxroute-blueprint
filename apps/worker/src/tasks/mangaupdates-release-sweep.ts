@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Task } from "graphile-worker";
-import { withProviderRequest } from "../provider-queue.js";
+import { withProviderRequest } from "@favlib/database/provider-queue";
 import {
   fetchMangaUpdatesReleases,
   normalizeTitle,
@@ -11,6 +11,7 @@ import {
   normalizedError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
+import { normalizeSerializationStatus, position } from "@favlib/progression";
 
 type Helpers = {
   query: (
@@ -96,6 +97,22 @@ function findMedia(release: MangaUpdatesRelease, rows: MediaRow[]) {
   );
   return row ? { row, method: "TITLE_EXACT" } : null;
 }
+export async function storeMangaUpdatesCalendarIdentifier(release:MangaUpdatesRelease,h:Helpers){
+  if(!release.seriesId)return;
+  const title=release.seriesTitle??release.title;
+  if(!title)return;
+  const raw=release.raw??release;
+  const hash=createHash('sha256').update(JSON.stringify(raw)).digest('hex');
+  const titles=[...new Set([title,release.title,...(release.titles??[])].filter((value):value is string=>Boolean(value)))];
+  await h.query("INSERT INTO provider_profile(provider,provider_id,payload_hash,canonical_title,associated_titles,type,status,image,url,payload) VALUES('mangaupdates',$1,$2,$3,$4,'UNKNOWN','RELEASE_OBSERVED',NULL,$5,$6) ON CONFLICT(provider,provider_id,payload_hash) DO UPDATE SET last_seen_at=now()",[release.seriesId,hash,title,titles,release.url??null,raw]);
+  const mediaId=`mangaupdates:${release.seriesId}`;
+  await h.query("INSERT INTO media(id,type) VALUES($1,'MANGA') ON CONFLICT(id) DO NOTHING",[mediaId]);
+  await h.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangaupdates',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",[mediaId,release.seriesId,{provider:'mangaupdates',source:'release-search',rawIdentifier:release.seriesId}]);
+  for(const value of titles)await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,$4,'supplier','associated','mangaupdates',1,$5) ON CONFLICT DO NOTHING",[mediaId,value,normalizeTitle(value),release.language??'und',{provider:'mangaupdates',seriesId:release.seriesId,source:'release-search',rawTitle:value}]);
+  // Keep calendar imports on the same priority lane for both providers. The
+  // shared provider queue still enforces each API's own rate/concurrency gate.
+  await h.query("SELECT graphile_worker.add_job('mangaupdates-enrichment',$1,job_key := $2,max_attempts := 3,priority := -20,job_key_mode := 'replace')",[JSON.stringify({mediaId,cover:true}),`calendar-import:mangaupdates:${release.seriesId}`]);
+}
 
 export async function processMangaUpdatesReleases(
   releases: MangaUpdatesRelease[],
@@ -112,6 +129,7 @@ export async function processMangaUpdatesReleases(
     // search per unknown release or select the first search result. Identity is
     // resolved beforehand by the dedicated, durable enrichment queue.
     if (!found) {
+      await storeMangaUpdatesCalendarIdentifier(release,h);
       review++;
       continue;
     }
@@ -217,13 +235,18 @@ export async function processMangaUpdatesReleases(
       ],
     );
     announcements++;
+    const releasePosition=release.chapter?position(release.chapter,'chapter'):undefined;
     await h.query(
-      `INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,latest_release_at,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,COALESCE($5::timestamptz,now()),now(),'ACTIVE',NULL,$6,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=COALESCE(excluded.latest_chapter,provider_progress.latest_chapter),latest_volume=COALESCE(excluded.latest_volume,provider_progress.latest_volume),latest_release_at=GREATEST(provider_progress.latest_release_at,excluded.latest_release_at),last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance || excluded.provenance,updated_at=now()`,
+      `INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,available_position_kind,available_position_number,available_position_raw,available_position_provenance,latest_release_at,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,$5,$6,$7,$8,COALESCE($9::timestamptz,now()),now(),'ACTIVE',NULL,$10,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.latest_chapter ELSE provider_progress.latest_chapter END,latest_volume=COALESCE(excluded.latest_volume,provider_progress.latest_volume),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,latest_release_at=GREATEST(provider_progress.latest_release_at,excluded.latest_release_at),last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance || excluded.provenance,updated_at=now()`,
       [
         found.row.mediaId,
-        release.status ?? null,
+        normalizeSerializationStatus(release.status) ?? null,
         release.chapter ?? null,
         release.volume ?? null,
+        releasePosition?.number===undefined?null:'chapter',
+        releasePosition?.number??null,
+        release.chapter??null,
+        releasePosition?.number===undefined?null:{provider:'mangaupdates',evidence:'global-release',releaseKey:key},
         releaseDate,
         JSON.stringify(provenance),
       ],
@@ -244,7 +267,13 @@ const task: Task = async (_payload, helpers) => {
   if (!(await acquireLease(h))) return;
   try {
     await heartbeat(h);
-    const options = {};
+    const now=new Date();
+    const monday=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+    monday.setUTCDate(monday.getUTCDate()-((monday.getUTCDay()+6)%7));
+    const end=new Date(now.getTime()+14*86_400_000);
+    // MangaUpdates release search has no API-key contract. Keep this request
+    // deliberately unauthenticated and never log provider response payloads.
+    const options = {startDate:monday.toISOString().slice(0,10),endDate:end.toISOString().slice(0,10)};
     const releases = await providerCall(h, () =>
       fetchMangaUpdatesReleases(options),
     );
@@ -255,6 +284,7 @@ const task: Task = async (_payload, helpers) => {
     if (code.includes("429"))
       await blockProviderUntil(h, "mangaupdates", Date.now() + 60_000);
     h.logger?.warn(`MangaUpdates sweep failed: ${code}`);
+    throw error;
   } finally {
     await releaseLease(h);
   }

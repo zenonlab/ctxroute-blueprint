@@ -1,0 +1,2 @@
+import { describe,expect,it } from 'vitest';import { app,runtimeOpenApi,runtimeRouteOperations } from '../src/server.js';
+describe('runtime OpenAPI drift gate',()=>{it('contains every registered runtime method and path',async()=>{await app.ready();const document=runtimeOpenApi() as any;for(const [path,methods] of runtimeRouteOperations)for(const method of methods)expect(document.paths[path]?.[method],`${method.toUpperCase()} ${path}`).toBeDefined()})});

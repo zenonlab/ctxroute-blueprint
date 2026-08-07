@@ -16,6 +16,5 @@ COPY apps/worker/package.json apps/worker/package.json
 COPY packages packages
 RUN pnpm install --prod --frozen-lockfile && apk add --no-cache age postgresql-client
 COPY --from=build --chown=node:node /app/apps/worker/dist apps/worker/dist
-COPY --from=build --chown=node:node /app/apps/worker/crontab /app/crontab
 USER node
 CMD ["node","apps/worker/dist/index.js"]

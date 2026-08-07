@@ -17,6 +17,24 @@ const alice=randomUUID();
 const bob=randomUUID();
 
 suite('Wave 4 PostgreSQL ownership isolation',()=>{
+  it('prefers a synthetic Latin transliteration over a non-Latin provider title',async()=>{
+    if(!pool)throw new Error('DATABASE_URL required');
+    const mediaId=`display-transliteration-${randomUUID()}`;
+    await pool.query("INSERT INTO media(id,type) VALUES($1,'ANIME')",[mediaId]);
+    await pool.query("INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,connector,confidence,provenance) VALUES ($1,'Синтетическое название','синтетическое название','ru','Cyrl','native','native','anilist',1,'{}'),($1,'Sinteticheskoe Nazvanie','sinteticheskoe nazvanie','und','Latn','romaji','romaji','anilist',1,'{}')",[mediaId]);
+    const result=await pool.query('SELECT favlib_display_title($1,NULL) AS selection',[mediaId]);
+    expect(result.rows[0].selection).toMatchObject({title:'Sinteticheskoe Nazvanie',reason:'ROMAJI_FALLBACK'});
+    await pool.query('DELETE FROM media WHERE id=$1',[mediaId]);
+  });
+  it('prefers a synthetic English provider title over another Latin language',async()=>{
+    if(!pool)throw new Error('DATABASE_URL required');
+    const mediaId=`display-english-${randomUUID()}`;
+    await pool.query("INSERT INTO media(id,type) VALUES($1,'ANIME')",[mediaId]);
+    await pool.query("INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,connector,confidence,provenance) VALUES ($1,'Synthetischer Titel','synthetischer titel','de','Latn','official','canonical','anilist',1,'{}'),($1,'Synthetic English Title','synthetic english title','en','Latn','translation','english','anilist',1,'{}')",[mediaId]);
+    const result=await pool.query('SELECT favlib_display_title($1,NULL) AS selection',[mediaId]);
+    expect(result.rows[0].selection).toMatchObject({title:'Synthetic English Title',reason:'ENGLISH_FALLBACK'});
+    await pool.query('DELETE FROM media WHERE id=$1',[mediaId]);
+  });
   it('projects the provider canonical title before parser and personal aliases',async()=>{
     if(!pool)throw new Error('DATABASE_URL required');
     const mediaId=`display-title-${randomUUID()}`, mangaId=`display-title-manga-${randomUUID()}`, aliceAlias=randomUUID(), bobAlias=randomUUID();

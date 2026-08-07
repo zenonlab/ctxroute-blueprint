@@ -5,7 +5,7 @@
 
 ## Objectif
 
-Proposer, pour une même œuvre et une même sortie logique, plusieurs sites, langues, éditions ou groupes, avec un changement de source rapide comparable au parcours apprécié sur Comick, sans héberger les contenus.
+Proposer, pour une même œuvre et une même sortie logique, plusieurs sites, langues, éditions ou groupes, avec un changement de source rapide, sans héberger les contenus.
 
 ## Modèle
 
@@ -32,7 +32,7 @@ Une cible découverte chez un autre utilisateur n'expose jamais son favori ou so
 
 Le résolveur enrichit seulement une œuvre déjà ancrée dans les favoris personnels. Une candidate ne crée jamais seule une œuvre de bibliothèque, un `user_subscription` ou un favori Chrome.
 
-FavLib ne recherche pas arbitrairement des copies de contenus sur le Web et n'utilise pas une API Comick non documentée. Comick peut devenir un connecteur Wave 8 uniquement après vérification de son service actuel, de ses conditions et d'une API ou méthode autorisée.
+FavLib ne recherche pas arbitrairement des copies de contenus sur le Web et n'utilise aucune API non documentée. Une nouvelle origine devient un connecteur uniquement après vérification de son service, de ses conditions et d'une méthode autorisée.
 
 ## Préférences utilisateur
 

@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { CONNECTOR_VERSIONS } from "@favlib/config";
 
-// Bump when resolution semantics change so terminal decisions from the old
-// scorer/ambiguity resolver are retried under the first-result rule.
-export const ENRICHMENT_VERSION = "anilist-v9";
+// Bump when resolution semantics change so old terminal decisions are retried.
+export const ENRICHMENT_VERSION = CONNECTOR_VERSIONS.anilistMetadata;
 export type EnrichmentStatus =
   "PENDING" | "SUCCESS" | "NO_MATCH" | "FAILED" | "TERMINAL";
 type Query = {

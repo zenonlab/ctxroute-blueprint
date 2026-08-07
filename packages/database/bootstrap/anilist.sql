@@ -141,6 +141,30 @@ DO $$ BEGIN
   ALTER TABLE bookmark_import_item ADD CONSTRAINT bookmark_import_item_classification_status_check CHECK (classification_status IN ('recognized','review','excluded'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+-- Final readable-title policy. Keep this after every older bootstrap version.
+CREATE OR REPLACE FUNCTION favlib_display_title(target_media_id text, target_user_id uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE selected media_title%ROWTYPE; reference_title text; shown text;
+BEGIN
+  SELECT favlib_clean_display_title(t.text) INTO reference_title FROM media_title t
+  WHERE t.media_id=target_media_id AND t.kind='source'
+  ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+  SELECT t.* INTO selected FROM media_title t
+  WHERE t.media_id=target_media_id AND t.kind<>'personal'
+    AND t.connector IN ('anilist','mangaupdates')
+    AND favlib_clean_display_title(t.text) IS NOT NULL
+    AND ((t.kind='translation' AND t.language='en') OR t.title_type='romaji' OR t.script='Latn' OR t.text ~ '[A-Za-zÀ-ÖØ-öø-ÿ]')
+  ORDER BY (t.kind='translation' AND t.language='en') DESC,
+    (t.title_type='romaji') DESC,(t.script='Latn') DESC,
+    (t.title_type='canonical') DESC,t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+  IF selected.id IS NOT NULL THEN
+    shown:=favlib_clean_display_title(selected.text);
+    RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',1,
+      'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),
+      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' ELSE 'PROVIDER_LATIN_FALLBACK' END);
+  END IF;
+  RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_LATIN_TITLE');
+END $$;
 
 UPDATE bookmark_import_item item SET classification_status=CASE
   WHEN item.event='removed' THEN 'excluded'
@@ -592,7 +616,8 @@ CREATE TABLE IF NOT EXISTS media_airing_observation (
 CREATE INDEX IF NOT EXISTS media_airing_observation_time_idx ON media_airing_observation(observed_at);
 CREATE TABLE IF NOT EXISTS user_catalog_preference (
   user_id uuid PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
-  timezone text NOT NULL DEFAULT 'UTC', updated_at timestamptz NOT NULL DEFAULT now()
+  timezone text NOT NULL DEFAULT 'UTC', allow_adult boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS calendar_feed (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
@@ -753,4 +778,30 @@ BEGIN
    IF selected.id IS NOT NULL THEN shown:=favlib_clean_display_title(selected.text); RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',.5,'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),'reason','PERSONAL_CLEAN'); END IF;
  END IF;
  RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_TITLE');
+END $$;
+
+-- Final readable-title policy. This must remain the last display-title
+-- definition in the idempotent bootstrap.
+CREATE OR REPLACE FUNCTION favlib_display_title(target_media_id text, target_user_id uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE selected media_title%ROWTYPE; reference_title text; shown text;
+BEGIN
+  SELECT favlib_clean_display_title(t.text) INTO reference_title FROM media_title t
+  WHERE t.media_id=target_media_id AND t.kind='source'
+  ORDER BY t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+  SELECT t.* INTO selected FROM media_title t
+  WHERE t.media_id=target_media_id AND t.kind<>'personal'
+    AND t.connector IN ('anilist','mangaupdates')
+    AND favlib_clean_display_title(t.text) IS NOT NULL
+    AND ((t.kind='translation' AND t.language='en') OR t.title_type='romaji' OR t.script='Latn' OR t.text ~ '[A-Za-zÀ-ÖØ-öø-ÿ]')
+  ORDER BY (t.kind='translation' AND t.language='en') DESC,
+    (t.title_type='romaji') DESC,(t.script='Latn') DESC,
+    (t.title_type='canonical') DESC,t.confidence DESC NULLS LAST,t.id DESC LIMIT 1;
+  IF selected.id IS NOT NULL THEN
+    shown:=favlib_clean_display_title(selected.text);
+    RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',1,
+      'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),
+      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' ELSE 'PROVIDER_LATIN_FALLBACK' END);
+  END IF;
+  RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_LATIN_TITLE');
 END $$;

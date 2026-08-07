@@ -1,7 +1,9 @@
 # ADR 0002 — Confidentialité de l'import
 
-- Statut : accepté
+- Statut : remplacé par l'ADR 0018 pour la gate d'import
 - Date : 2026-08-02
+
+Le préfiltrage historique décrit ci-dessous n’est plus une gate d’inventaire : tous les favoris HTTP(S) sont inventoriés par l’API locale conformément à l’ADR 0018.
 
 ## Contexte
 

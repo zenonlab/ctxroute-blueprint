@@ -1,1 +1,1 @@
-{"name":"@favlib/config","version":"0.1.0","type":"module","exports":"./src/index.ts","scripts":{"lint":"tsc --noEmit","typecheck":"tsc --noEmit","test":"vitest run"},"devDependencies":{"typescript":"^5.7.3","vitest":"^2.1.8"},"dependencies":{"zod":"^3.24.1"}}
+{"name":"@favlib/config","version":"0.1.0","type":"module","exports":"./src/index.ts","scripts":{"lint":"tsc --noEmit","typecheck":"tsc --noEmit","test":"vitest run"},"devDependencies":{"typescript":"5.7.3","vitest":"2.1.8"},"dependencies":{"zod":"4.4.3"}}

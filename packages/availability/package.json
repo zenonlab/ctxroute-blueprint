@@ -1,0 +1,1 @@
+{"name":"@favlib/availability","version":"0.6.0","private":true,"type":"module","exports":"./src/index.ts","scripts":{"lint":"tsc --noEmit","typecheck":"tsc --noEmit","test":"vitest run"},"dependencies":{},"devDependencies":{"typescript":"5.7.3","vitest":"2.1.8","@types/node":"22.10.5"}}

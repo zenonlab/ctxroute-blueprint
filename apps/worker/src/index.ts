@@ -16,32 +16,52 @@ import enrichmentSweep from './tasks/enrichment-sweep.js';
 import mangaUpdatesReleaseSweep from './tasks/mangaupdates-release-sweep.js';
 import anilistCalendarSweep from './tasks/anilist-calendar-sweep.js';
 import providerProfileCover from './tasks/provider-profile-cover.js';
-import { SCHEDULES } from './registry.js';
-import { WORKER_TASK_NAMES } from './registry.js';
+import { ROLE_SCHEDULES, ROLE_TASK_NAMES } from './registry.js';
 import { buildVersion } from '@favlib/config';
+import { recoverProviderRequestOwner } from '@favlib/database/provider-queue';
 
 const runtime=runtimeEnvironment();
 const connectionString=runtime.databaseUrl;
 const workerRole=process.env.FAVLIB_WORKER_ROLE??'all';
+if(workerRole!=='all'&&workerRole!=='reading')throw new Error(`Unsupported worker role: ${workerRole}`);
+const role=workerRole as 'all'|'reading';
 const heartbeatService=workerRole==='reading'?'worker-reading':'worker';
-export async function recoverProviderSlots(db:{query:(sql:string)=>Promise<unknown>}){
+export async function recoverProviderSlots(db:{query:(sql:string,values?:unknown[])=>Promise<{rows?:Array<{provider:string;count:string}>}>},role:'all'|'reading'){
   // FavLib runs one worker service. A crashed/recreated process cannot release
   // its in-memory provider slots, so reset the durable counters before taking
   // new jobs. Without this recovery every concurrency thread can wait forever.
-  await db.query('UPDATE provider_request_gate SET in_flight=0,updated_at=now() WHERE in_flight<>0');
-  // A waitlist row is owned by the in-memory caller that created it. After a
-  // process restart nobody can resume that polling loop, so keeping it WAITING
-  // would leave an orphan at the head and block the entire provider lane.
-  await db.query("UPDATE provider_request_waitlist SET state='FAILED',completed_at=now(),last_error='WORKER_RESTART' WHERE state IN ('WAITING','RUNNING')");
+  await recoverProviderRequestOwner(db,role,'WORKER_RESTART');
+  // This process is the sole consumer for its role. Any pre-existing lock on
+  // one of its tasks belongs to the crashed/recreated predecessor.
+  await db.query(`UPDATE graphile_worker._private_jobs j SET locked_at=NULL,locked_by=NULL
+    FROM graphile_worker._private_tasks t
+    WHERE j.task_id=t.id AND j.locked_at IS NOT NULL
+      AND t.identifier=ANY($1::text[])`,[[...ROLE_TASK_NAMES[role]]]);
+  await db.query(`DELETE FROM graphile_worker._private_jobs j USING graphile_worker._private_tasks t
+    WHERE j.task_id=t.id AND t.identifier=ANY($1::text[])
+      AND j.id NOT IN (SELECT max(kept.id) FROM graphile_worker._private_jobs kept JOIN graphile_worker._private_tasks task ON task.id=kept.task_id WHERE task.identifier=ANY($1::text[]) GROUP BY kept.task_id)`,[[...Object.keys(ROLE_SCHEDULES[role])]]);
+}
+
+export async function scheduleRecurring(db:{query:(sql:string,values?:unknown[])=>Promise<unknown>},name:string){
+  const providerSweep=name==='anilist-calendar-sweep'||name==='mangaupdates-release-sweep';
+  await db.query(`SELECT graphile_worker.add_job($1,'{}'::json,job_key := $2,max_attempts := $4,priority := $3)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM graphile_worker._private_jobs j
+      JOIN graphile_worker._private_tasks t ON t.id=j.task_id
+      WHERE t.identifier=$1
+    )`,[name,`schedule:${name}`,providerSweep?-100:0,providerSweep?3:1]);
 }
 if(runtime.nodeEnv!=='test') {
   const schedulerPool=new Pool({connectionString});
-  await recoverProviderSlots(schedulerPool);
-  const heartbeat=async()=>{await schedulerPool.query("INSERT INTO service_heartbeat(service,observed_at,build_version,details) VALUES($1,now(),$2,$3) ON CONFLICT(service) DO UPDATE SET observed_at=excluded.observed_at,build_version=excluded.build_version,details=excluded.details",[heartbeatService,buildVersion(),JSON.stringify({tasks:WORKER_TASK_NAMES,role:workerRole,mode:'direct-heartbeat'})])};
+  await recoverProviderSlots(schedulerPool,role);
+  const heartbeat=async()=>{await schedulerPool.query("INSERT INTO service_heartbeat(service,observed_at,build_version,details) VALUES($1,now(),$2,$3) ON CONFLICT(service) DO UPDATE SET observed_at=excluded.observed_at,build_version=excluded.build_version,details=excluded.details",[heartbeatService,buildVersion(),JSON.stringify({tasks:ROLE_TASK_NAMES[role],role,mode:'direct-heartbeat'})])};
   await heartbeat();
-  const schedule=async(name:string,interval:number)=>{const bucket=Math.floor(Date.now()/interval);await schedulerPool.query("SELECT graphile_worker.add_job($1,'{}'::json,job_key := $2,max_attempts := 1)",[name,`schedule:${name}:${bucket}`])};
-  for(const [name,interval] of Object.entries(SCHEDULES)) await schedule(name,interval);
-  const timer=setInterval(()=>void Promise.all([heartbeat(),...Object.entries(SCHEDULES).map(([name,interval])=>schedule(name,interval))]).catch((error)=>console.error('scheduler error',error)),30_000); timer.unref();
+  const schedule=async(name:string,_interval:number)=>scheduleRecurring(schedulerPool,name);
+  const schedules=ROLE_SCHEDULES[role];
+  const nextRuns=new Map<string,number>();
+  for(const [name,interval] of Object.entries(schedules)){await schedule(name,interval);nextRuns.set(name,Date.now()+interval)}
+  const tick=async()=>{const now=Date.now();const due=Object.entries(schedules).filter(([name])=>now>=(nextRuns.get(name)??0));await Promise.all([heartbeat(),...due.map(async([name,interval])=>{await schedule(name,interval);nextRuns.set(name,now+interval)})])};
+  const timer=setInterval(()=>void tick().catch((error)=>console.error('scheduler error',error)),30_000); timer.unref();
   const runner=await run({
     connectionString,
     concurrency: runtime.workerConcurrency,
@@ -52,6 +72,10 @@ if(runtime.nodeEnv!=='test') {
       health: async (payload: unknown, helpers) => { await health(payload, helpers); },
       'notification-delivery': async (payload: unknown, helpers) => { await notificationDelivery(payload, helpers); },
       'mangaupdates-release-sweep': async (payload: unknown, helpers) => { await mangaUpdatesReleaseSweep(payload, helpers); },
+      'anilist-calendar-sweep': async (payload: unknown, helpers) => { await anilistCalendarSweep(payload, helpers); },
+      'anilist-enrichment': async (payload: unknown, helpers) => { await anilistEnrichment(payload, helpers); },
+      'mangaupdates-enrichment': async (payload: unknown, helpers) => { await mangaUpdatesEnrichment(payload, helpers); },
+      'enrichment-sweep': async (payload: unknown, helpers) => { await enrichmentSweep(payload, helpers); },
       'provider-profile-cover': async (payload: unknown, helpers) => { await providerProfileCover(payload, helpers); },
     } : {
       availability: async (payload: unknown, helpers) => { await availability(payload as Parameters<typeof availability>[0], helpers); },
@@ -63,11 +87,6 @@ if(runtime.nodeEnv!=='test') {
       'notification-delivery': async (payload: unknown, helpers) => { await notificationDelivery(payload, helpers); },
       'retention-purge': async (payload: unknown, helpers) => { await retentionPurge(payload, helpers); },
       'resolve-favorite': async (payload: unknown, helpers) => { await resolveFavorite(payload, helpers); },
-      'anilist-enrichment': async (payload: unknown, helpers) => { await anilistEnrichment(payload, helpers); },
-      'mangaupdates-enrichment': async (payload: unknown, helpers) => { await mangaUpdatesEnrichment(payload, helpers); },
-      'enrichment-sweep': async (payload: unknown, helpers) => { await enrichmentSweep(payload, helpers); },
-      'mangaupdates-release-sweep': async (payload: unknown, helpers) => { await mangaUpdatesReleaseSweep(payload, helpers); },
-      'anilist-calendar-sweep': async (payload: unknown, helpers) => { await anilistCalendarSweep(payload, helpers); },
     },
   });let stopping=false;const shutdown=async()=>{if(stopping)return;stopping=true;clearInterval(timer);await runner.stop();await schedulerPool.end()};process.once('SIGTERM',()=>void shutdown());process.once('SIGINT',()=>void shutdown());
 }

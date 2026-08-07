@@ -8,7 +8,7 @@ describe('favorite reviews', () => {
   it('is idempotent across worker retries and stores complete candidates', async () => {
     const calls: string[] = []; const query = vi.fn(async (sql: string) => { calls.push(sql); if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] }; if (sql.startsWith('INSERT INTO favorite_review')) return { rows: [{ id: 'review-1' }] }; if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] }; if (sql.startsWith("SELECT count(*)")) return { rows: [{ count: 1 }] }; return { rows: [] }; });
     await openFavoriteReview(query, { userId: 'u', title: 'Existence', url: 'https://example.test/existence', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Existence', hitTitle: 'Existence', authors: ['A'] }, { id: 2, title: 'Existence (Wang)', hitTitle: 'Existence' }] });
-    expect(calls.filter(sql => sql.startsWith('INSERT INTO favorite_review_candidate')).length).toBe(2);
+    expect(calls.filter(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES')).length).toBe(2);
     expect(calls.filter(sql => sql.startsWith('INSERT INTO personal_notification')).length).toBe(1);
   });
   it('persists AniList string coverImage values on review candidates', async () => {
@@ -66,5 +66,27 @@ describe('favorite reviews', () => {
     const reviewInsert=calls.find(call=>call.sql.startsWith('INSERT INTO favorite_review('));
     expect(reviewInsert?.values?.[3]).toBe('The Dreaming Man is a Realist');
     expect(calls.find(call=>call.sql.startsWith('DELETE FROM favorite_review_candidate'))?.values).toEqual(['review-1',['1']]);
+  });
+  it('uses the shared parser for a leading chapter label', async () => {
+    let reviewValues: unknown[] = [];
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId:'i', bookmarkId:'b', rawFavoriteTitle:'Chapter 46 (English) - Synthetic Warriors | ComicK', favoriteUrl:'https://example.test/chapter' }] };
+      if (sql.startsWith('INSERT INTO favorite_review(')) { reviewValues=values??[]; return {rows:[{id:'r'}]}; }
+      if (sql.startsWith('SELECT count(*)')) return {rows:[{count:1}]};
+      return {rows:[]};
+    });
+    await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://example.test',provider:'mangaupdates',candidates:[]});
+    expect(reviewValues[3]).toBe('Synthetic Warriors');
+  });
+  it('uses season URL evidence to remove a bare trailing episode number in every review', async () => {
+    let reviewValues: unknown[] = [];
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId:'i', bookmarkId:'b', rawFavoriteTitle:'Synthetic Cleric 9', favoriteUrl:'https://anime.example/catalogue/synthetic-cleric/saison1/vostfr/' }] };
+      if (sql.startsWith('INSERT INTO favorite_review(')) { reviewValues=values??[]; return {rows:[{id:'r'}]}; }
+      if (sql.startsWith('SELECT count(*)')) return {rows:[{count:1}]};
+      return {rows:[]};
+    });
+    await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://example.test',provider:'anilist',candidates:[]});
+    expect(reviewValues[3]).toBe('Synthetic Cleric');
   });
 });

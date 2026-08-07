@@ -46,10 +46,10 @@ Chaque passage valide identité, scope, taille, schéma et contexte. Une URL ou 
 |---|---|---|
 | Alice lit ou modifie Bob | `user_id` issu de l'auth, requêtes propriétaires, réponse non énumérable | matrice par endpoint dès Wave 1 puis chaque wave |
 | vol/fixation de session | secret opaque haché, cookie `__Host-`, rotation, expirations, CSRF/Origin | ADR 0014, Wave 1 |
-| brute force/invitation rejouée | limitation compte/IP, résultat générique, jetons courts à usage unique | Wave 1 |
+| brute force/inscription abusive | limitation compte/IP, résultat générique et politique de mot de passe | Wave 1 |
 | extension utilisée comme proxy | scopes appareil, origine FavLib exacte, domaines/permissions explicites, aucune URL libre | Wave 3 |
 | perte ou duplication d'événements MV3 | persistance avant réseau, idempotence, acquittement et réconciliation | Wave 3 |
-| XSS via titre/HTML tiers | données rendues comme texte, CSP stricte, aucune exécution HTML serveur | Waves 2/5/9 |
+| XSS via titre/HTML tiers | données rendues comme texte, CSP bornée au même hôte, aucune exécution HTML serveur | Waves 2/5/9 |
 | SSRF/DNS rebinding | schémas autorisés, résolution/revalidation DNS et redirections, IP privées refusées hors cible administrée | Waves 5/8/9 |
 | contenu faux = fausse sortie | annonce distincte d'origine, matching fort et connecteur versionné | Waves 4–8 |
 | archive/dataset hostile | taille/checksum, ZIP Slip/bomb, staging, schéma attendu et activation atomique | Wave 4 |

@@ -1,7 +1,8 @@
 import type { Task } from "graphile-worker";
-import { fetchAniList, type AniListMedia } from "@favlib/metadata";
+import { fetchAniList, fetchAniListCalendar, normalizeTitle, type AniListMedia } from "@favlib/metadata";
 import { aniListHooks } from "../anilist-gate.js";
 import { normalizedError } from "../enrichment-state.js";
+import { normalizeSerializationStatus } from "@favlib/progression";
 
 type Helpers = {
   query: (
@@ -37,9 +38,21 @@ export function aniListCalendarPollPlan(item: AniListMedia, now = Date.now()) {
     return { priority: 70, nextCheckAt: new Date(now + 12 * HOUR), reason: "RELEASING_WITHOUT_NEXT_AIRING" };
   return { priority: 20, nextCheckAt: new Date(now + 14 * DAY), reason: "STATUS_RECHECK" };
 }
+export function latestAniListAvailableEpisode(item:AniListMedia,now=Date.now()){
+  const status=normalizeSerializationStatus(item.status);
+  if(status==='Completed'&&item.episodes&&item.episodes>0)return {episode:item.episodes,evidence:'completed-total' as const};
+  const aired=[...(item.airingSchedule??[]),...(item.nextAiringEpisode?[item.nextAiringEpisode]:[])]
+    .filter(x=>x.episode!==undefined&&x.airingAt!==undefined&&x.airingAt*1000<=now)
+    .map(x=>x.episode!);
+  if(aired.length)return {episode:Math.max(...aired),evidence:'aired-calendar' as const};
+  const next=item.nextAiringEpisode;
+  if(next?.episode&&next.episode>1&&next.airingAt&&next.airingAt*1000>now)return {episode:next.episode-1,evidence:'next-airing-predecessor' as const};
+  return null;
+}
 export async function processAniListCalendar(
   items: AniListMedia[],
   h: Helpers,
+  now = Date.now(),
 ) {
   let saved = 0;
   for (const item of items) {
@@ -49,7 +62,7 @@ export async function processAniListCalendar(
     );
     if (!media.rowCount) continue;
     const mediaId = media.rows[0].mediaId;
-    const pollPlan = aniListCalendarPollPlan(item);
+    const pollPlan = aniListCalendarPollPlan(item,now);
     const schedule = [
       ...(item.nextAiringEpisode ? [item.nextAiringEpisode] : []),
       ...(item.airingSchedule ?? []),
@@ -98,17 +111,42 @@ export async function processAniListCalendar(
         item.siteUrl ?? `https://anilist.co/anime/${item.id}`,
       ],
     );
+    const available=latestAniListAvailableEpisode(item,now);
+    const availabilityProvenance=available?{provider:'anilist',anilistId:item.id,evidence:available.evidence,observedAt:new Date(now).toISOString()}:null;
     await h.query(
-      `INSERT INTO provider_progress(media_id,provider,serialization_status,last_checked_at,next_attempt_at,status,last_error,provenance,updated_at)
-       VALUES($1,'anilist',$2,now(),$3,'ACTIVE',NULL,$4,now())
-       ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=excluded.serialization_status,last_checked_at=now(),next_attempt_at=excluded.next_attempt_at,status='ACTIVE',last_error=NULL,provenance=excluded.provenance,updated_at=now()`,
-      [mediaId,item.status ?? null,pollPlan.nextCheckAt,{provider:'anilist',calendarPriority:pollPlan.priority,pollReason:pollPlan.reason,nextAiringAt:item.nextAiringEpisode?.airingAt ?? null}],
+      `INSERT INTO provider_progress(media_id,provider,serialization_status,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,next_attempt_at,status,last_error,provenance,updated_at)
+       VALUES($1,'anilist',$2,$3,$4,$5,$6,now(),$7,'ACTIVE',NULL,$8,now())
+       ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),next_attempt_at=excluded.next_attempt_at,status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,
+      [mediaId,normalizeSerializationStatus(item.status)??null,available?'episode':null,available?.episode??null,available?String(available.episode):null,availabilityProvenance,pollPlan.nextCheckAt,{provider:'anilist',calendarPriority:pollPlan.priority,pollReason:pollPlan.reason,nextAiringAt:item.nextAiringEpisode?.airingAt??null,terminalAvailabilityChecked:TERMINAL_STATUSES.has(item.status??'')}],
     );
   }
   return { status: "OK", saved };
 }
+export async function ensureAniListCalendarCatalog(items:AniListMedia[],h:Helpers){
+  for(const item of items){
+    const mediaId=`anilist:${item.id}`;
+    await h.query("INSERT INTO media(id,type,season_year,format) VALUES($1,'ANIME',$2,$3) ON CONFLICT(id) DO UPDATE SET season_year=COALESCE(excluded.season_year,media.season_year),format=COALESCE(excluded.format,media.format)",[mediaId,item.seasonYear??null,item.format??null]);
+    await h.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'anilist',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",[mediaId,String(item.id),{provider:'anilist',source:'global-airing-calendar',anilistId:item.id}]);
+    const titles=[
+      [item.title.romaji,'und','Latn','romaji','romaji'],
+      [item.title.english,'en','Latn','translation','english'],
+      [item.title.userPreferred,'und',null,'official','userPreferred'],
+      [item.title.native,'ja','Jpan','native','native'],
+      ...item.synonyms.map(title=>[title,'und',null,'synonym','synonym']),
+    ].filter((row):row is [string,string,string|null,string,string]=>Boolean(row[0]));
+    for(const [title,language,script,kind,titleType] of titles){
+      const provenance={provider:'anilist',source:'global-airing-calendar',anilistId:item.id,titleType};
+      await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,script,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,'anilist',1,$8) ON CONFLICT DO NOTHING",[mediaId,title,normalizeTitle(title),language,script,kind,titleType,provenance]);
+    }
+    await h.query("INSERT INTO media_metadata(media_id,provider,external_id,source_url,status,resolved_at,updated_at) VALUES($1,'anilist',$2,$3,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='anilist',external_id=excluded.external_id,source_url=excluded.source_url,status='ACTIVE',updated_at=now()",[mediaId,String(item.id),item.siteUrl??`https://anilist.co/anime/${item.id}`]);
+    await h.query("SELECT graphile_worker.add_job('anilist-enrichment',$1,job_key := $2,max_attempts := 3,priority := -20,job_key_mode := 'replace')",[JSON.stringify({mediaId,cover:true}),`calendar-cover:anilist:${item.id}`]);
+  }
+}
 const task: Task = async (_payload, helpers) => {
   const h = helpers as unknown as Helpers;
+  const now=Math.floor(Date.now()/1000);
+  const globalItems=await fetchAniListCalendar(now-7*24*60*60,now+21*24*60*60,{hooks:aniListHooks(h,{kind:'global-calendar',priority:95,scopeKey:'global-airing-calendar'}),maxPages:20});
+  await ensureAniListCalendarCatalog(globalItems,h);
   const due = await h.query(
     `SELECT DISTINCT e.external_id AS "externalId",
        COALESCE((p.provenance->>'calendarPriority')::int,50) AS priority
@@ -117,13 +155,12 @@ const task: Task = async (_payload, helpers) => {
        LEFT JOIN provider_progress p ON p.media_id=m.id AND p.provider='anilist'
       WHERE e.provider='anilist' AND m.type='ANIME'
         AND EXISTS(SELECT 1 FROM bookmark_media_link link WHERE link.media_id=m.id AND link.status IN ('matched','accepted'))
-        AND COALESCE(p.serialization_status,'') NOT IN ('FINISHED','CANCELLED')
-        AND NOT EXISTS(SELECT 1 FROM metadata_assertion assertion WHERE assertion.media_id=m.id AND assertion.provider='anilist' AND assertion.field='status' AND upper(assertion.value#>>'{}') IN ('FINISHED','CANCELLED'))
+        AND (NOT EXISTS(SELECT 1 FROM metadata_assertion assertion WHERE assertion.media_id=m.id AND assertion.provider='anilist' AND assertion.field='status' AND upper(assertion.value#>>'{}') IN ('FINISHED','CANCELLED')) OR COALESCE(p.provenance->>'terminalAvailabilityChecked','false')<>'true')
         AND (p.next_attempt_at IS NULL OR p.next_attempt_at<=now())
       ORDER BY priority DESC,e.external_id
       LIMIT 100`,
   );
-  if (!due.rowCount) return;
+  if (!due.rowCount){await processAniListCalendar(globalItems,h);return;}
   // fetchAniList coalesces simultaneous IDs into GraphQL batches of 50. With
   // 100 due entries this creates at most two concurrent, provider-gated calls.
   const settled = await Promise.allSettled(due.rows.map((row) =>
@@ -136,7 +173,7 @@ const task: Task = async (_payload, helpers) => {
       FROM media_external_id e WHERE e.provider='anilist' AND e.external_id=$1
       ON CONFLICT(media_id,provider) DO UPDATE SET next_attempt_at=excluded.next_attempt_at,status='FAILED',last_error=excluded.last_error,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[String(due.rows[index].externalId),error]);
   }
-  const items = settled.flatMap(result=>result.status==='fulfilled'?[result.value]:[]);
+  const items = [...new Map([...globalItems,...settled.flatMap(result=>result.status==='fulfilled'?[result.value]:[])].map(item=>[item.id,item])).values()];
   await processAniListCalendar(items, h);
 };
 export default task;

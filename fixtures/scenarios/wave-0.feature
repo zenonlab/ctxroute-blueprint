@@ -244,12 +244,6 @@ Feature: Invariants FavLib Wave 0
     Then chapter 42 state is "ANNOUNCED"
     And no available origin button or available-release notification is created
 
-  Scenario: A TVmaze title collision requires structured matching
-    Given TVmaze contains an animation and a live action show with the same title
-    When FavLib has no compatible type year or external identifier evidence
-    Then the TVmaze announcement is sent to review
-    And it is not attached automatically to Alice favorite work
-
   Scenario: A remote page change does not change its Chrome bookmark
     Given Alice favorites a stable work page URL
     When the remote site publishes a new chapter without Alice editing the bookmark

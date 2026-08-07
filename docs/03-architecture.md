@@ -74,7 +74,9 @@ Au moment de l'appairage, l'utilisateur fournit l'origine du serveur local, idé
 ### Worker
 
 - jobs persistants dans PostgreSQL avec Graphile Worker ;
-- synchronisation et renormalisation du catalogue par fournisseur `AUTHORIZED` ;
+- résolution AniList des anime et résolution MangaUpdates des œuvres de lecture ;
+- enrichissement éditorial strictement séparé de l’enrichissement image ;
+- AniList fournit les images après résolution d’identité ;
 - import des annonces de diffusion anime ;
 - verrou par cible canonique et domaine ;
 - limites par domaine, jitter et backoff ;
@@ -88,7 +90,7 @@ Au moment de l'appairage, l'utilisateur fournit l'origine du serveur local, idé
 - reverse proxy Caddy à l'origine configurable, par défaut `https://favlib.home.arpa` ;
 - routage même origine : `/api/*` vers Fastify et le reste vers Next.js ;
 - HTTPS obligatoire dès que le service est utilisé par plusieurs machines du réseau local ;
-- inscription fermée, comptes créés ou invités par l'administrateur.
+- inscription normale locale ; l'administrateur gère les rôles, l'activation et les sessions.
 
 ## Appairage d'une extension
 
@@ -121,11 +123,11 @@ Les lots sont acquittés par le serveur. Une reprise renvoie le même lot sans c
 
 Après le premier import, la réconciliation utilise deux phases :
 
-1. l'extension compare tous les identifiants et fingerprints dans le profil courant ;
-2. le préfiltre local élimine les non-médias ;
-3. l'API reçoit titre, URL et indice de type uniquement pour les candidats nouveaux ou modifiés.
+1. l'extension compare tous les identifiants et fingerprints HTTP(S) dans le profil courant ;
+2. elle transmet les créations, changements, déplacements et suppressions par lots idempotents ;
+3. l'API conserve l’état courant minimal et classe chaque favori `recognized`, `review` ou `excluded`.
 
-Un favori éliminé localement ne quitte jamais l'extension. Son fingerprint keyed local évite de le retraiter sans fin. Si la version du classifieur change, l'extension invalide ce cache local et réexamine le favori.
+Un fingerprint local évite de retransmettre inutilement un état inchangé, mais ne constitue jamais une gate d’inventaire. Si la version du classifieur change, l’API peut reclasser l’inventaire durable sans perdre les favoris exclus ou à vérifier.
 
 ## Arborescence cible
 
@@ -184,9 +186,27 @@ FavLib/
 | `bookmark_identity` | favori logique dédupliqué pour un utilisateur |
 | `classification_run` | décision, score, raisons et version du classifieur |
 | `bookmark_media_link` | relation personnelle entre favori et œuvre/source |
+| `favorite_review` | file de décision personnelle, une ligne par favori et fournisseur |
+| `favorite_review_candidate` | candidats détaillés et payloads fournisseur conservés pour audit |
 | `candidate_staging` | candidat serveur minimal, purgé sous 24 heures s'il est ignoré |
 
 La clé d'observation inclut `(user_id, installation_id, chrome_bookmark_id)`. Elle évite toute collision entre profils.
+
+### Résolution interactive
+
+```text
+favori HTTP(S)
+  → identité locale provisoire
+  → recherche AniList/MangaUpdates
+  → plusieurs candidats plausibles ou aucun résultat
+  → favorite_review PENDING + FAVORITE_REVIEW_REQUIRED
+  → /review/:reviewId
+       ├─ candidat choisi → favori concerné MATCHED
+       ├─ identifiant/URL fournisseur vérifié → même résolution
+       └─ aucun ne correspond → NO_MATCH sans média incorrect
+```
+
+Le titre du navigateur reste une donnée personnelle du favori. Le titre canonique affiché dans la carte candidat vient du fournisseur ; les variantes et `hit_title` sont affichés séparément. Les autres candidats restent conservés après résolution.
 
 ### Bibliothèque et disponibilité
 
@@ -247,12 +267,14 @@ favori candidat
   → extraction titres + indices connecteur
   → recherche dans media_title/source_media_alias
   → candidats classés par alias + type + année + relations + source
-  → miss/ambigu : fournisseur autorisé optionnel
+  → identité locale visible
+  → anime : résolution AniList
+  → manga/manhwa/manhua : résolution MangaUpdates
   → match fort, À vérifier ou unmatched
   → planification du prochain catalog_refresh
 ```
 
-Le rendu Web et les imports interrogent PostgreSQL. Un dump passe par staging, assertions avec provenance et activation atomique ; il n'écrit jamais directement dans `media`. Un fournisseur autorisé peut compléter le matching sur un miss contrôlé dans les limites de sa politique ; AniList reste inactif tant que son usage n'est pas autorisé.
+Le rendu Web et les imports interrogent PostgreSQL. Un dump passe par staging, assertions avec provenance et activation atomique ; il n'écrit jamais directement dans `media`. Une œuvre reconnue reste affichée sous son identité locale si le fournisseur canonique est indisponible ou si le match est ambigu. Chaque appel externe exige la politique autorisée correspondant à sa finalité. Une image ne participe jamais au matching.
 
 ## Flux de découverte
 
@@ -290,7 +312,7 @@ scheduler
   → inbox/notification par utilisateur
 ```
 
-Un second flux importe les `release_announcement` d'un fournisseur autorisé : calendrier TVmaze pour les anime suivis, signal MangaUpdates pour les manga/manhwa/manhua suivis. Il accélère les vérifications des sources ; il ne crée une disponibilité que lorsqu'un connecteur valide une `release_origin`.
+Les diffusions AniList pour les anime et les releases MangaUpdates pour les œuvres de lecture alimentent seulement les `release_announcement`. Les connecteurs des pages favorites doivent confirmer une `release_origin` avant toute disponibilité ou notification de disponibilité.
 
 Au clic sur « Ouvrir », l'API résout à nouveau les origines compatibles afin d'éviter un lien obsolète. La stratégie complète est définie par [ADR 0009](adr/0009-resolution-multi-source.md).
 

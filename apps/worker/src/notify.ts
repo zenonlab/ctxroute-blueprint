@@ -1,0 +1,3 @@
+import { fanOut, type Origin } from '@favlib/availability';
+export type NotificationDb={query:(sql:string,params:unknown[])=>Promise<unknown>};
+export async function enqueuePersonalNotifications(db:NotificationDb,release:Origin,users:{userId:string;mediaId:string;muted?:boolean}[]){const rows=fanOut(release,users);for(const row of rows)await db.query('INSERT INTO personal_notification(user_id,release_key,kind,payload) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,release_key,kind) DO NOTHING',[row.userId,row.releaseKey,'RELEASE_AVAILABLE',{release, dedupeKey:row.dedupeKey}]);return rows.length;}

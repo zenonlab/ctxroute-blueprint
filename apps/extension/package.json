@@ -1,15 +1,16 @@
 {
   "name": "@favlib/extension",
-  "version": "0.3.0",
+  "version": "0.5.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node node_modules/wxt/bin/wxt.mjs",
-    "build": "node node_modules/wxt/bin/wxt.mjs build --mv3 && node node_modules/wxt/bin/wxt.mjs build -b firefox --mv3",
+    "build": "node node_modules/wxt/bin/wxt.mjs build --mv3 && node node_modules/wxt/bin/wxt.mjs build -b firefox --mv3 && node scripts/package-downloads.mjs",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:downloads": "node scripts/verify-published-downloads.mjs"
   },
   "dependencies": { "@favlib/contracts": "workspace:*" },
-  "devDependencies": { "@types/chrome": "^0.0.280", "typescript": "^5.7.3", "vitest": "^2.1.8", "wxt": "^0.19.20" }
+  "devDependencies": { "@types/chrome": "0.0.280", "typescript": "5.7.3", "vitest": "2.1.8", "wxt": "0.19.29" }
 }

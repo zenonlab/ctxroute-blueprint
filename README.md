@@ -2,7 +2,7 @@
 
 FavLib est une application privée, locale et multi-utilisateur pour suivre mangas, manhwa, manhua et anime depuis les favoris Chrome synchronisés par Google.
 
-Chaque utilisateur installe l'extension dans son profil Chrome et l'appaire à son compte FavLib. Tous ses favoris sont examinés localement par le premier niveau de tri ; seuls les candidats médias sont envoyés à l'API. Les œuvres reconnues deviennent des abonnements surveillés.
+Chaque utilisateur installe l'extension dans son profil Chrome et l'appaire à son compte FavLib. Tous ses favoris HTTP(S) sont inventoriés par l’API locale puis classés explicitement `recognized`, `review` ou `excluded`. Les œuvres reconnues deviennent des abonnements surveillés.
 
 FavLib n'héberge et ne fournit aucun contenu. Il détecte les sorties, conserve la progression déduite des favoris et ouvre la page d'origine.
 
@@ -21,7 +21,7 @@ Validation reproductible de la documentation et des fixtures :
 - [Vision et règles produit](docs/01-produit.md)
 - [Design et écrans](docs/02-design.md)
 - [Architecture multi-utilisateur locale](docs/03-architecture.md)
-- [Favoris, AniList, connecteurs et scraping](docs/04-sources.md)
+- [Favoris, fournisseurs et connecteurs](docs/04-sources.md)
 - [Roadmap par waves](docs/05-roadmap.md)
 - [Décisions actées et points ouverts](docs/06-decisions.md)
 - [Plan de test de chaque wave](docs/07-waves-et-tests.md)
@@ -34,8 +34,10 @@ Validation reproductible de la documentation et des fixtures :
 - [Audit sauvegardes, limites API, logique et extension](docs/14-audit-sauvegardes-api-extension.md)
 - [Préparation du démarrage de l'implémentation](docs/15-preparation-demarrage.md)
 - [Modèle de menace](docs/16-modele-de-menace.md)
+- [Déploiement et reprise de la pipeline](docs/17-deploiement-pipeline.md)
+- [Audit live des fournisseurs](docs/18-audit-live-fournisseurs.md)
 - [Décisions d'architecture](docs/adr/README.md)
-- [Validation de la Wave 0](docs/VALIDATION-WAVE-0.md)
+- [Validation AniList historique, anime uniquement](docs/VALIDATION-ANILIST.md)
 
 ## Boucle métier
 
@@ -43,7 +45,7 @@ Validation reproductible de la documentation et des fixtures :
 favoris Chrome de chaque utilisateur
   → extension appairée
   → examen local idempotent de tous les favoris
-  → candidats médias → tri API/site + matching catalogue local/fournisseur autorisé
+  → inventaire HTTP(S) → tri API/site → identité locale → fournisseur canonique selon le type
   → œuvre + source suivie
   → découverte bornée + validation d'alternatives
   → worker public mutualisé ou extension privée best effort
@@ -53,4 +55,4 @@ favoris Chrome de chaque utilisateur
 
 Un favori vers une fiche d'œuvre signifie « je suis cette œuvre ». Un favori vers un chapitre ou épisode précis indique également une position. Après consentement, l'extension peut aussi observer une page suivante appartenant à cette même œuvre favorite et avancer une progression marquée « observée ». La nouveauté disponible est détectée par le connecteur du site, pas par une modification du favori.
 
-Le projet reste privé. L'hébergement cloud et l'inscription publique sont hors périmètre pour le moment.
+Le projet reste local et privé. Les utilisateurs peuvent créer normalement leur compte avec une adresse e-mail et un mot de passe ; l'administrateur gère ensuite les rôles et l'accès à l'instance.

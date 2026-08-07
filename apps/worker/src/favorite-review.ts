@@ -1,18 +1,7 @@
-import { exactTitleMatchKind } from '@favlib/metadata';
+import { collectiveTitleKey, exactTitleMatchKind, prepareTitleCandidates } from '@favlib/metadata';
 import { createHash } from 'node:crypto';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any>;
-
-function parsedFavoriteTitle(value: string): string {
-  const parts = value.replace(/\s+/gu, ' ').trim().split(/\s+-\s+/u).map(part => part.trim()).filter(Boolean);
-  const useful = parts.filter(part => !/^\d+(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?$/iu.test(part) && !/^voiranime$/iu.test(part) && !/^(?:vostfr|vf|vo|sub|dub|scan|scans)$/iu.test(part));
-  let title = useful[0] ?? value.trim();
-  title = title.replace(/^(?:read|watch|regarder gratuitement|regarder)\s+/iu, '');
-  title = title.replace(/\s+(?:chapter|chapitre|episode|ep)\s*\d+(?:\.\d+)?(?:[-–—].*|\s+.*)?$/iu, '');
-  title = title.replace(/\s+(?:in english online free|online free|en hd)\s*$/iu, '');
-  title = title.replace(/\s*(?:[-–—|·:]\s*)?(?:voiranime|mangakakalot|manganelo|mangakakalot\.com|manganelo\.com|manhwaz)\s*$/iu, '');
-  return title.replace(/\s+(?:vostfr|vf|vo|sub|dub|scan|scans|en hd)\s*$/iu, '').trim().replace(/[|·:—–-]+$/u, '').trim() || value.trim();
-}
 
 export type ReviewCandidate = Record<string, any> & { id: string | number; title?: string; hitTitle?: string; url?: string };
 
@@ -61,13 +50,21 @@ export async function openFavoriteReview(query: Query, input: {
   // Always normalize the raw Chrome title on the server. The extension hint is
   // useful for transport, but must never allow an older client/parser result
   // to leak into the review UI.
-  const favoriteTitle = parsedFavoriteTitle(rawFavoriteTitle);
   const favoriteUrl = link.rows[0]?.favoriteUrl || input.url || '';
+  const preparedTitle = prepareTitleCandidates({ bookmarkTitle: rawFavoriteTitle, url: favoriteUrl });
+  const favoriteTitle = preparedTitle.personal ?? preparedTitle.sourceTitle ?? rawFavoriteTitle.trim();
+  const mediaType = input.provider === 'anilist' ? 'ANIME' : 'MANGA';
+  const clusterKey = collectiveTitleKey({ provider: input.provider, mediaType, parsedTitle: favoriteTitle });
+  const cluster = await query(`INSERT INTO review_title_cluster(cluster_key,provider,media_type,parsed_title,raw_title_sample)
+    VALUES($1,$2,$3,$4,$5) ON CONFLICT(cluster_key) DO UPDATE SET updated_at=now() RETURNING id`,
+    [clusterKey,input.provider,mediaType,favoriteTitle,rawFavoriteTitle]);
+  const clusterId = cluster.rows[0]?.id ?? clusterKey;
   const review = await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason)
     VALUES($1,$2,$3,$4,$5,$6,'PENDING',$7) ON CONFLICT(user_id,installation_id,bookmark_id,provider)
     DO UPDATE SET favorite_title=excluded.favorite_title,favorite_url=excluded.favorite_url,reason=COALESCE(excluded.reason,favorite_review.reason)
     RETURNING id`, [input.userId, installationId, bookmarkId, favoriteTitle, favoriteUrl, input.provider, input.reason ?? null]);
   const reviewId = review.rows[0].id;
+  await query('UPDATE favorite_review SET cluster_id=$2 WHERE id=$1', [reviewId, clusterId]);
   for (const candidate of candidates) {
     const title = String(candidate.title ?? candidate.name ?? `${input.provider} ${candidate.id}`);
     const known = await query("SELECT media_id AS \"mediaId\" FROM media_external_id WHERE provider=$1 AND external_id=$2 LIMIT 1", [input.provider, String(candidate.id)]);
@@ -86,12 +83,19 @@ export async function openFavoriteReview(query: Query, input: {
         candidate.url ?? candidate.siteUrl ?? `https://${input.provider === 'anilist' ? 'anilist.co' : 'mangaupdates.com'}`,
         payload]);
     if (input.persistCover) await input.persistCover(String(profile.rows[0].id), candidateImage(candidate) ?? '', input.provider);
+    await query('INSERT INTO review_cluster_candidate(cluster_id,profile_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [clusterId, profile.rows[0].id]);
     await query(`INSERT INTO favorite_review_candidate(review_id,profile_id,provider_id,hit_title,media_id)
       VALUES($1,$2,$3,$4,$5)
       ON CONFLICT(review_id,provider_id) DO UPDATE SET profile_id=excluded.profile_id,hit_title=excluded.hit_title,media_id=COALESCE(excluded.media_id,favorite_review_candidate.media_id)`, [
         reviewId, profile.rows[0].id, String(candidate.id), candidate.hitTitle ?? null, known.rows[0]?.mediaId ?? null]);
   }
-  const currentProviderIds = [...new Set(candidates.map(candidate => String(candidate.id)))];
+  await query(`INSERT INTO favorite_review_candidate(review_id,profile_id,provider_id)
+    SELECT r.id,cc.profile_id,p.provider_id FROM favorite_review r
+    JOIN review_cluster_candidate cc ON cc.cluster_id=r.cluster_id JOIN provider_profile p ON p.id=cc.profile_id
+    WHERE r.cluster_id=$1 AND r.status='PENDING'
+    ON CONFLICT(review_id,provider_id) DO UPDATE SET profile_id=excluded.profile_id`, [clusterId]);
+  const local = await query(`SELECT p.provider_id FROM review_cluster_candidate cc JOIN provider_profile p ON p.id=cc.profile_id LEFT JOIN review_title_cluster cl ON cl.id=cc.cluster_id WHERE cc.cluster_id=$1 ORDER BY (cc.locked_at IS NOT NULL) DESC,(cl.consensus_profile_id=cc.profile_id) DESC,(SELECT count(DISTINCT e.user_id) FROM review_cluster_endorsement e WHERE e.cluster_id=cc.cluster_id AND e.profile_id=cc.profile_id) DESC,(SELECT count(*) FROM favorite_review_candidate rc JOIN favorite_review r ON r.id=rc.review_id WHERE r.cluster_id=cc.cluster_id AND rc.profile_id=cc.profile_id AND r.status='PENDING') DESC,(p.cover_status='ACTIVE') DESC,(p.type IS NOT NULL)::int+(p.year IS NOT NULL)::int DESC,favlib_provider_audience_signal(p.payload) DESC,cc.created_at,p.provider_id LIMIT 5`, [clusterId]);
+  const currentProviderIds = local.rows.length ? local.rows.map((row:any)=>row.provider_id) : [...new Set(candidates.map(candidate=>String(candidate.id)))];
   await query('DELETE FROM favorite_review_candidate WHERE review_id=$1 AND NOT (provider_id=ANY($2::text[]))', [reviewId, currentProviderIds]);
   await refreshReviewQueueNotification(query, input.userId);
   return reviewId;

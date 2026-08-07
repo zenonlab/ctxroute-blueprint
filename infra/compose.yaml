@@ -43,7 +43,7 @@ services:
     volumes:
       - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
     depends_on: { migrate: { condition: service_completed_successfully }, api: { condition: service_healthy } }
-    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['resolve-favorite','anilist-enrichment']) FROM service_heartbeat WHERE service='worker' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
+    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['resolve-favorite']) FROM service_heartbeat WHERE service='worker' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]
@@ -57,7 +57,7 @@ services:
     volumes:
       - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
     depends_on: { migrate: { condition: service_completed_successfully }, api: { condition: service_healthy } }
-    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['mangaupdates-release-sweep']) FROM service_heartbeat WHERE service='worker-reading' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
+    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['mangaupdates-release-sweep','anilist-enrichment','mangaupdates-enrichment']) FROM service_heartbeat WHERE service='worker-reading' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
     restart: unless-stopped
     read_only: true
     tmpfs: [/tmp]

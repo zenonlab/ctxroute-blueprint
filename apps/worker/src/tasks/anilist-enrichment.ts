@@ -1,17 +1,23 @@
 import { createHash } from "node:crypto";
 import { CONNECTOR_VERSIONS } from "@favlib/config";
+import { normalizeSerializationStatus } from "@favlib/progression";
 import type { Task } from "graphile-worker";
 import {
   fetchAniList,
   cleanDisplayTitle,
   automaticAniListMediaMatches,
+  preferredAniListMediaMatch,
   exactAniListMediaMatches,
+  exactTitleMatchKind,
+  explicitTitleAliases,
+  aniListExplicitSeasonMatch,
   matchAniList,
   aniListFormatAllowed,
   hasExplicitOvaMarker,
   normalizeTitle,
   searchAniList,
   titleVariants,
+  titleCandidateFromBookmark,
   type AniListMedia,
 } from "@favlib/metadata";
 import { aniListHooks } from "../anilist-gate.js";
@@ -285,6 +291,10 @@ async function persist(
         { provider: "anilist", externalId: m.id, field },
       ],
     );
+    await h.query(
+      "UPDATE media_title SET language=$3,script=$4,kind=$5,title_type=$5,confidence=1,provenance=provenance||$6 WHERE media_id=$1 AND text=$2 AND connector='anilist' AND provenance->>'externalId'=$7 AND provenance->>'field'=$8",
+      [target,title,language,script,titleType,{provider:'anilist',externalId:m.id,field},String(m.id),field],
+    );
   }
   // The provider identity, never the search result's displayTitle, owns the
   // title shown to users. Search/matching labels remain provenance only.
@@ -347,9 +357,27 @@ async function persist(
       ...m.tags.filter((tag) => !tag.isMediaSpoiler).map((tag) => tag.name),
     ]),
   ].sort((a, b) => a.localeCompare(b));
+  const categories = [
+    ...new Set(
+      m.tags
+        .filter((tag) => !tag.isMediaSpoiler)
+        .map((tag) => tag.name.trim())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  const adultCategories = [
+    ...new Set(
+      m.tags
+        .filter((tag) => !tag.isMediaSpoiler && tag.isAdult)
+        .map((tag) => tag.name.trim())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
   const values: [string, unknown][] = [
     ["themes", themes],
     ["genres", m.genres],
+    ["categories", categories],
+    ["adultCategories", adultCategories],
     ["tags", m.tags],
     ["status", m.status],
     ["startDate", m.startDate],
@@ -388,6 +416,10 @@ async function persist(
   ];
   for (const [field, value] of values)
     await assertion(h, target, field, value, source, 1);
+  const normalizedStatus = normalizeSerializationStatus(m.status);
+  const aired = (m.airingSchedule ?? []).filter(x => x.episode && x.airingAt && x.airingAt * 1000 <= Date.now()).map(x => x.episode!);
+  const available = normalizedStatus === 'Completed' && m.episodes ? m.episodes : aired.length ? Math.max(...aired) : undefined;
+  await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'anilist',$2,$3,$4,$5,$6,now(),'ACTIVE',NULL,$7,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[target,normalizedStatus??null,available===undefined?null:'episode',available??null,available===undefined?null:String(available),available===undefined?null:{provider:'anilist',anilistId:m.id,evidence:normalizedStatus==='Completed'?'completed-total':'aired-schedule'},{provider:'anilist',anilistId:m.id,payloadHash:hash}]);
   for (const airing of [
     ...(m.nextAiringEpisode ? [m.nextAiringEpisode] : []),
     ...(m.airingSchedule ?? []),
@@ -437,7 +469,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
   const timeoutMs = await operationalValue(h, "timeouts.providerMs");
   const maxAttempts = await operationalValue(h, "metadata.maxAttempts");
   const row = await h.query(
-    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'personal' THEN 1 ELSE 2 END,t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind IN ('source','personal')),'[]') AS titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind='source'),'[]') AS source_titles,COALESCE((SELECT json_agg(t.provenance->>'sourceUrl') FROM media_title t WHERE t.media_id=m.id AND t.kind='source' AND t.provenance->>'sourceUrl' IS NOT NULL),'[]') AS source_urls,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id,EXISTS(SELECT 1 FROM favorite_review r JOIN favorite_review_candidate c ON c.review_id=r.id WHERE r.status='RESOLVED' AND r.selected_candidate_id=c.id AND r.provider='anilist' AND c.provider_id=(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1)) AS anilist_identity_user_selected FROM media m WHERE m.id=$1",
+    "SELECT m.type,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'personal' THEN 1 ELSE 2 END,t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind IN ('source','personal')),'[]') AS titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind='source'),'[]') AS source_titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id DESC) FROM media_title t WHERE t.media_id=m.id AND t.kind='personal'),'[]') AS personal_titles,COALESCE((SELECT json_agg(t.provenance->>'sourceUrl') FROM media_title t WHERE t.media_id=m.id AND t.kind='source' AND t.provenance->>'sourceUrl' IS NOT NULL),'[]') AS source_urls,m.season_year AS year,(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1) AS anilist_id,EXISTS(SELECT 1 FROM favorite_review r JOIN favorite_review_candidate c ON c.review_id=r.id WHERE r.status='RESOLVED' AND r.selected_candidate_id=c.id AND r.provider='anilist' AND c.provider_id=(SELECT external_id FROM media_external_id WHERE media_id=m.id AND provider='anilist' LIMIT 1)) AS anilist_identity_user_selected FROM media m WHERE m.id=$1",
     [mediaId],
   );
   if (!row.rows[0]) return { status: "SKIPPED", reason: "MEDIA_NOT_FOUND" };
@@ -454,7 +486,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         !/^manga\s+[a-z]{1,3}\d{4,}$/iu.test(value.trim()),
     );
   const parsedSourceAliases = (Array.isArray(context.source_titles) ? context.source_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
-  const identityAliases = parsedSourceAliases.length ? parsedSourceAliases : aliases;
+  const identityAliases = explicitTitleAliases(parsedSourceAliases.length ? parsedSourceAliases : aliases);
+  const personalTitles = (Array.isArray(context.personal_titles) ? context.personal_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
+  const favoriteAliases = explicitTitleAliases(personalTitles.map((value: string) => titleCandidateFromBookmark(value) ?? cleanDisplayTitle(value) ?? value));
   const formatEvidence = [...identityAliases, ...(Array.isArray(context.source_urls) ? context.source_urls : [])].filter((value): value is string => typeof value === 'string');
   const requiresOva = formatEvidence.some(hasExplicitOvaMarker);
   const fingerprint = enrichmentFingerprint({
@@ -501,7 +535,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
         h.logger.warn(
           `[provider-reject] provider=anilist externalId=${known.id} type=${known.type} expected=ANIME source=known-id`,
         );
-      } else if (context.anilist_identity_user_selected || (aniListFormatAllowed(formatEvidence, known.format) && automaticAniListMediaMatches(identityAliases, [known]).length === 1)) {
+      } else {
+        // A stored AniList ID is already the resolved identity. Enrichment is
+        // a direct refresh and must not fall back to title search.
         selected = known;
         selectedResolutionCode = "KNOWN_EXTERNAL_ID";
       }
@@ -566,12 +602,13 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     if (!selected) {
       const exact = exactAniListMediaMatches(identityAliases, eligible);
       const automatic = automaticAniListMediaMatches(identityAliases, eligible);
+      const preferred = preferredAniListMediaMatch(favoriteAliases.length ? favoriteAliases : identityAliases, eligible);
       // A single compact/normalized exact identity is safe; ties stay a user
       // decision even when AniList returned them in a stable order.
-      if (exact.length === 1 && automatic.length === 1 && exact[0].id === automatic[0].id)
+      if (preferred || (exact.length === 1 && automatic.length === 1 && exact[0].id === automatic[0].id))
         {
-          selected = exact[0];
-          selectedResolutionCode = identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
+          selected = preferred ?? exact[0];
+          selectedResolutionCode = automatic.length > 1 ? "RECENT_EXACT_TIEBREAK" : identityAliases.some((alias:string)=>aniListExplicitSeasonMatch(alias,selected!)) ? "EXPLICIT_SEASON_MATCH" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => exactTitleMatchKind(alias,name) === "SUBTITLE_EXACT")) ? "SUBTITLE_EXACT" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => exactTitleMatchKind(alias,name) === "ALIAS_PARENTHESIZED_EXACT")) ? "ALIAS_PARENTHESIZED_EXACT" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
         }
       // Similarity only ranks review candidates. It never establishes identity.
     }
@@ -579,7 +616,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2::text AND provider='anilist' AND purpose='metadata' AND connector_version=$3::text",
       [serializeCandidateSnapshot(items), mediaId, ENRICHMENT_VERSION],
     );
-    const ambiguity = exactAniListMediaMatches(identityAliases, eligible).length > 1;
+    const ambiguity = exactAniListMediaMatches(identityAliases, eligible).length > 1 && !selected;
     if (ambiguity || (!selected && items.length > 0)) {
       // Detail every displayed candidate before exposing it to the user.
       const exactItems = exactAniListMediaMatches(identityAliases, eligible);
@@ -626,6 +663,8 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       resolutionCode: selectedResolutionCode,
       sourceAliasCount: aliases.length,
     });
+    if (selectedResolutionCode === "RECENT_EXACT_TIEBREAK")
+      await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: selectedResolutionCode, aliases: identityAliases, providerDate: complete.startDate ?? null, providerYear: complete.startYear ?? complete.seasonYear ?? null })]);
     const persisted = await persist(h, mediaId, complete, {
       displayTitle: titleOf(complete),
     });

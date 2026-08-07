@@ -13,10 +13,10 @@ export const SECURITY_LIMITS = Object.freeze({
 });
 
 export const CONNECTOR_VERSIONS = Object.freeze({
-  favoriteResolution: 'favorite-resolution-v2',
-  anilistMetadata: 'anilist-v11',
+  favoriteResolution: 'favorite-resolution-v3',
+  anilistMetadata: 'anilist-v18',
   anilistCover: 'anilist-cover-v4',
-  mangaUpdatesMetadata: 'mangaupdates-v9',
+  mangaUpdatesMetadata: 'mangaupdates-v17',
   mangaUpdatesCover: 'mangaupdates-cover-v6',
 });
 

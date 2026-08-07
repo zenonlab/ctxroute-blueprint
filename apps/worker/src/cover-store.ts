@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { downloadImage,type SearchClient } from '@favlib/metadata';
 import sharp,{type Metadata} from 'sharp';
-import { withProviderRequest } from './provider-queue.js';
+import { withProviderRequest } from '@favlib/database/provider-queue';
 
 type Helpers={query:(sql:string,values?:unknown[])=>Promise<any>;logger:{warn:(message:string)=>void}};
 function trace(h:Helpers,event:string,data:Record<string,unknown>){h.logger.warn(`[provider-trace] ${JSON.stringify({event,...data})}`)}

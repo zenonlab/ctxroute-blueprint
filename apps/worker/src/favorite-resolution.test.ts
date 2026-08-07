@@ -31,7 +31,7 @@ describe('favorite resolution lifecycle', () => {
     expect(calls[0].sql).toContain('mm.provider=r.provider');
     expect(calls.some(call => call.sql.startsWith('DELETE FROM personal_notification'))).toBe(true);
   });
-  it('does not close a manual-only review during reconciliation', async () => {
+  it('does not keep title-specific manual exceptions during reconciliation', async () => {
     const calls: string[] = [];
     const query = async (sql: string) => {
       calls.push(sql);
@@ -39,6 +39,6 @@ describe('favorite resolution lifecycle', () => {
       return { rows: [] };
     };
     await reconcileResolvedFavoriteReviews(query, 'media-1');
-    expect(calls.some(sql => sql.startsWith('UPDATE favorite_review'))).toBe(false);
+    expect(calls.some(sql => sql.startsWith('UPDATE favorite_review'))).toBe(true);
   });
 });

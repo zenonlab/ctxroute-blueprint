@@ -30,15 +30,15 @@ L'intégration PostgreSQL doit en plus exécuter les branches review avec JSON, 
 - [ ] sauvegarde vérifiée et restaurable disponible ;
 - [ ] prévisualisation `corepack pnpm resync:pending-reviews` archivée hors Git si elle contient des favoris réels ;
 - [ ] `decisionsPreserved=true` ;
-- [ ] `manualReviewsSkipped=3` ;
-- [ ] `jobsPlanned=7` sur l'état de référence (les deux reviews Goodbye partagent un média) ;
+- [ ] `legacyManualReviewsRequeued=3` ;
+- [ ] les jobs sont dédupliqués sur `(provider, media_id)` ;
 - [ ] versions déployées : `anilist-v8`, `mangaupdates-v6` ;
 - [ ] aucun job en double pour un même `(provider, media_id)`.
 
 ## Checklist après application
 
 - [ ] décisions existantes byte-for-byte inchangées ;
-- [ ] `Happy Mariage 8`, `Moi, le maître des interdits2` et `The Dreaming Man is a Realist - 7` restent `PENDING / MANUAL_REVIEW` ;
+- [ ] les anciens `MANUAL_REVIEW` sont reparsés et leur liste de candidats est remplacée par le résultat fournisseur courant ;
 - [ ] les exacts OEL graphiques sont résolus, les Novel restent rejetés ;
 - [ ] les reviews partageant un média sont toutes réconciliées si elles sont automatiques ;
 - [ ] aucune nouvelle erreur `22P02`/`42P08` ;

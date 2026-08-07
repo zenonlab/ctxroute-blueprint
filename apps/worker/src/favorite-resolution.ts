@@ -1,5 +1,5 @@
 type Query = (sql: string, values?: unknown[]) => Promise<unknown>;
-import { isManualOnlyReviewTitle, openReviewsForMedia, refreshReviewQueueNotification } from './favorite-review.js';
+import { openReviewsForMedia, refreshReviewQueueNotification } from './favorite-review.js';
 
 /** Resolve against the shared catalogue before a provider request. Only one
  * exact, non-personal alias may win; partial matches deliberately stay review. */
@@ -55,7 +55,6 @@ export async function reconcileResolvedFavoriteReviews(query: Query, mediaId: st
     WHERE l.media_id=$1 AND r.status='PENDING' AND r.decision IS NULL`, [mediaId]);
   const users = new Set<string>();
   for (const row of pending.rows ?? []) {
-    if (isManualOnlyReviewTitle(String(row.favoriteTitle ?? ''))) continue;
     const updated: any = await query(`UPDATE favorite_review
       SET status='RESOLVED',decision=jsonb_build_object('kind','automatic-provider-resolution','provider',$2::text,'externalId',$3::text,'mediaId',$4::text),resolved_at=now()
       WHERE id=$1 AND status='PENDING' AND decision IS NULL

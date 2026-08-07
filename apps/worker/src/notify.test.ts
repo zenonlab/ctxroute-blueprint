@@ -1,0 +1,3 @@
+import { describe,expect,it,vi } from 'vitest';
+import { enqueuePersonalNotifications } from './notify.js';
+describe('personal notification outbox',()=>{it('writes only active subscribers with an idempotent key',async()=>{const db={query:vi.fn().mockResolvedValue({})};const count=await enqueuePersonalNotifications(db,{mediaId:'m',sequence:{kind:'integer',raw:'1',number:1},connector:'fixture',checkedAt:'2026-08-02T00:00:00Z',status:'AVAILABLE'},[{userId:'alice',mediaId:'m'},{userId:'bob',mediaId:'m',muted:true}]);expect(count).toBe(1);expect(db.query).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'),expect.any(Array));});});

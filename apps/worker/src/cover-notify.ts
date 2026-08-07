@@ -13,7 +13,7 @@ export async function notifyCoverUnavailable(
           ORDER BY CASE WHEN t.connector='source-url' THEN 0 ELSE 1 END,t.id LIMIT 1),
          (SELECT t.text FROM media_title t WHERE t.media_id=m.id AND t.kind='official'
           ORDER BY t.id LIMIT 1),m.id),
-       'reason',$3,'message','Aucune couverture disponible pour ce favori'
+       'reason',$3::text,'message','Aucune couverture disponible pour ce favori'
      )
      FROM bookmark_media_link l
      JOIN media m ON m.id=l.media_id

@@ -9,6 +9,12 @@ describe('library multi-value query',()=>{
     expect(parsed.type).toEqual(['ANIME','MANGA']);expect(parsed.theme).toEqual(['Action','Drama']);expect(parsed.year).toEqual([2024,2025]);
   });
 
+  it('normalizes excluded facet values without turning them into inclusions',()=>{
+    const parsed=libraryQuerySchema.parse({excludeType:'ANIME',excludeTheme:['Drama']});
+    expect(parsed.excludeType).toEqual(['ANIME']);expect(parsed.excludeTheme).toEqual(['Drama']);
+    const sql=libraryFilterSql();expect(sql).toContain('NOT ("type"=ANY($10::text[]))');expect(sql).toContain('NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes)');
+  });
+
   it('uses array membership within categories and AND between categories',()=>{
     const sql=libraryFilterSql();
     expect(sql).toContain('"type"=ANY($3::text[])');expect(sql).toContain('lower(value)=ANY($4::text[])');expect(sql).toContain(' AND ');
@@ -31,6 +37,7 @@ describe('library multi-value query',()=>{
   it('temporarily removes only the facet being counted',()=>{
     const sql=libraryFilterSql('theme');
     expect(sql).not.toContain('jsonb_array_elements_text(themes)');expect(sql).toContain('$4::text[] IS NOT NULL');expect(sql).toContain('"type"=ANY($3::text[])');
+    expect(sql).toContain('$11::text[] IS NOT NULL');
   });
 
   it('keeps a selected zero-count option but does not invent an unselected unknown value',()=>{
@@ -43,5 +50,30 @@ describe('library multi-value query',()=>{
   it('does not expose language or format in the library query contract',()=>{
     expect(libraryQuerySchema.safeParse({language:'ja'}).success).toBe(false);
     expect(libraryQuerySchema.safeParse({format:'OVA'}).success).toBe(false);
+  });
+  it('keeps personal progress numeric and shared availability separate',()=>{
+    expect(libraryProjectionSql).toContain("'number',fp.position_number::numeric");
+    expect(libraryProjectionSql).toContain('available_position_kind');
+    expect(libraryProjectionSql).toContain("pp.status='ACTIVE'");
+    expect(libraryProjectionSql).toContain('ELSE NULL');
+  });
+
+  it('separates genres from provider categories without filtering favorite works',()=>{
+    expect(libraryProjectionSql).toContain("a.field='genres'");
+    expect(libraryProjectionSql).toContain("a.field='categories'");
+    expect(libraryProjectionSql).toContain('SELECT allow_adult FROM user_catalog_preference');
+    expect(libraryProjectionSql).toContain("aa.field='adultCategories'");
+    expect(libraryProjectionSql).not.toContain("adult.field='isAdult'");
+    expect(libraryProjectionSql).not.toContain("adult.field='contentRating'");
+  });
+
+  it('only advertises calendar covers backed by stored image data',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server).toContain('(c.data IS NOT NULL OR c.asset_sha256 IS NOT NULL)');
+    expect(server).toContain("FROM media_airing a");
+    expect(server).toContain("a.schedule_status='SCHEDULED'");
+    expect(server).toContain('a.precision AS time_precision');
+    expect(server).toContain("'DATE'::text");
+    expect(server).toContain('e.observed_at AS "observedAt"');
   });
 });
