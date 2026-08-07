@@ -1565,7 +1565,7 @@ const ORDINAL_WORDS = new Map(Object.entries({
   nineteenth: "19", twentieth: "20",
 }));
 
-export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v2";
+export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v3";
 export type ProviderTitleMatchMethod =
   | "ordered-exact"
   | "explicit-season"
@@ -1671,6 +1671,16 @@ export function decideProviderTitleMatch<T>(input: {
   const tokenKey = (value:string) => meaningfulTokens(value).sort().join("|");
   const reordered = chooseLevel("reordered-significant-words", pairs.filter(({alias,title}) => Boolean(tokenKey(alias)) && tokenKey(alias) === tokenKey(title)));
   if (reordered) return reordered;
+  const boundedTokenPairs = pairs.filter(({alias,title}) => {
+    const left=meaningfulTokens(alias),right=meaningfulTokens(title);
+    if (!left.length||!right.length) return false;
+    const remaining=[...right];
+    let exactCount=0;
+    for(const token of left){const index=remaining.indexOf(token);if(index<0)continue;exactCount++;remaining.splice(index,1);}
+    return exactCount>=3&&exactCount/left.length>=2/3;
+  });
+  const tokenBounded=chooseLevel("bounded-edit-distance",boundedTokenPairs);
+  if(tokenBounded)return tokenBounded;
   const ranked = pairs.map(pair => ({...pair,distance:titleEditDistance(pair.alias,pair.title)}))
     .sort((a,b)=>a.distance-b.distance||input.id(a.candidate).localeCompare(input.id(b.candidate))||a.title.localeCompare(b.title));
   const best = ranked[0];

@@ -35,6 +35,8 @@ import {
   preferredAniListMediaMatch,
   aniListExplicitSeasonMatch,
   decideProviderTitleMatch,
+  decideMangaUpdatesTitleMatch,
+  decideAniListTitleMatch,
   PROVIDER_TITLE_MATCHER_VERSION,
   progressionFromFavorite,
 } from "./index.js";
@@ -147,6 +149,23 @@ describe("AniList catalogue", () => {
     expect(decideProviderTitleMatch({aliases:['Synthetic'],candidates:[{id:'a',titles:['Synthetica']},{id:'b',titles:['Synthetico']}],id:item=>item.id,titles:item=>item.titles}).status).toBe('AMBIGUOUS');
     expect(decideProviderTitleMatch({aliases:['Synthetic Cleric'],candidates:[{id:'a',titles:['Synthetic Cleric: Office Worker Survival Path']}],id:item=>item.id,titles:item=>item.titles}).method).not.toBe('ordered-exact');
     expect(decideProviderTitleMatch({aliases:['Synthetic Champion (The Champion)'],candidates:[{id:'a',titles:['Synthetic Champion']}],id:item=>item.id,titles:item=>item.titles}).method).not.toBe('ordered-exact');
+  });
+  it("accepts one bounded translation-word variant in a long title symmetrically", () => {
+    const alias="My Standing as an Assassin Clearly Exceeds the Brave's";
+    const translated="My Standing as an Assassin Clearly Exceeds the Hero's";
+    const unrelated="The Quiet Gardener Builds a Village Beyond the Mountains";
+    const mangaDecision=decideMangaUpdatesTitleMatch([alias],[
+      {id:'winner',title:'Synthetic Provider Work',hitTitle:translated,titles:[translated],type:'Manga',year:2024},
+      {id:'other',title:unrelated,titles:[unrelated],type:'Manga',year:2024},
+    ] as any);
+    const animeDecision=decideAniListTitleMatch([alias],[
+      {id:1,type:'ANIME',title:{english:translated},synonyms:[]},
+      {id:2,type:'ANIME',title:{english:unrelated},synonyms:[]},
+    ] as any);
+    expect(mangaDecision).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'winner',matchedAlias:alias,providerTitle:translated});
+    expect(animeDecision).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'1',matchedAlias:alias,providerTitle:translated});
+    expect(decideProviderTitleMatch({aliases:['Synthetic Silent Ranger Crosses Northern Frontier'],candidates:[{id:'long',titles:['Synthetic Silent Guardian Crosses Northern Frontier: A Chronicle Beyond the Ancient Mountains']},{id:'noise',titles:['Unrelated Academy Romance']}],id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'long'});
+    expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'a',titles:[translated]},{id:'b',titles:["My Standing as an Assassin Clearly Exceeds the King's"]}],id:item=>item.id,titles:item=>item.titles}).status).toBe('AMBIGUOUS');
   });
   it("keeps exact ahead of reordered words and a simple exact ahead of a parenthesized variant", () => {
     const anime=(id:number,title:string,year:number)=>({id,type:'ANIME',title:{english:title},synonyms:[],startDate:{year}}) as any;
