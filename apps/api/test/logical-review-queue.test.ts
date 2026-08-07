@@ -15,7 +15,8 @@ describe('logical personal review queue',()=>{
     expect(source).toContain("pending.decision IS NULL RETURNING pending.id");
   });
   it('shows canonical titles before matched aliases',()=>{
-    expect(source).toContain('COALESCE(p.canonical_title,c.canonical_title,c.provider_id) AS "displayTitle"');
+    expect(source).toContain('COALESCE(p.canonical_title,c.provider_id) AS "displayTitle"');
     expect(source).toContain('c.hit_title AS "matchedAlias"');
+    expect(source).not.toContain('p.canonical_title,c.canonical_title');
   });
 });
