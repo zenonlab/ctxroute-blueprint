@@ -48,8 +48,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS progression_observation_materialization_key_un
   ON progression_observation(materialization_key) WHERE materialization_key IS NOT NULL;
 
 ALTER TABLE favorite_review DROP CONSTRAINT IF EXISTS favorite_review_reason_check;
-ALTER TABLE favorite_review ADD CONSTRAINT favorite_review_reason_check
-  CHECK (reason IS NULL OR reason='ANIME_CHAIN_AMBIGUOUS');
+-- Review reasons are extensible provenance codes shared by both provider
+-- resolvers. Do not reintroduce the legacy anime-only constraint here: an
+-- existing database can already contain valid reasons emitted by either
+-- resolver, and migration 0043 formalizes this contract.
 
 -- Reinstall the shared candidate materializer so season/local/global evidence
 -- follows the same trigger path as legacy candidates. Raw fields stay intact.
