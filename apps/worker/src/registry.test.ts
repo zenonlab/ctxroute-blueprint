@@ -21,7 +21,7 @@ describe('worker deployment contract', () => {
     expect(reading).toContain('anilist-calendar-sweep');
     expect(reading).toContain('mangaupdates-release-sweep');
     expect(ROLE_TASK_NAMES.all).not.toContain('anilist-calendar-sweep');
-    expect(ROLE_TASK_NAMES.reading).toEqual(expect.arrayContaining(['anilist-enrichment','mangaupdates-enrichment']));
+    expect(ROLE_TASK_NAMES.reading).toEqual(expect.arrayContaining(['anilist-enrichment','mangaupdates-enrichment','manual-review-provider']));
     expect(ROLE_TASK_NAMES.all).not.toContain('anilist-enrichment');
   });
   it('does not enqueue every schedule on each thirty-second heartbeat',()=>{

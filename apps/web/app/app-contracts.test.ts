@@ -42,4 +42,41 @@ describe('Wave 2 UI contracts', () => {
     expect(source).toContain('Fiche vérifiée et ajoutée à votre bibliothèque.');
     expect(source).toContain('window.setTimeout(onDone,1200)');
   });
+
+  it('repairs only incomplete visible cards in one bounded request and polls queued providers twice',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain("item.progress?[]:['personal']");
+    expect(source).toContain("item.availability?[]:['availability']");
+    expect(source).toContain("fetch('/api/v1/library/repair-missing-positions'");
+    expect(source).toContain('window.setTimeout(refresh,2000)');
+    expect(source).toContain('window.setTimeout(refresh,8000)');
+    expect(source).toContain("return `${personal} / ${available}`");
+    expect(source).toContain("item.progress?.number??item.progress?.raw??'—'");
+    expect(source).toContain("item.availability?.number??item.availability?.raw??'—'");
+  });
+
+  it('keeps cancelled status visible and bounds calendar exploration',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain("'Cancelled'");
+    expect(source).toContain('disabled={weekOffset<=-2}');
+    expect(source).toContain('disabled={weekOffset>=2}');
+    expect(source).toContain('days.map(day=>{const dayItems=eventsFor(day).slice(0,visibleRows)');
+    expect(source).toContain('const maxRows=Math.max(0,...days.map(day=>eventsFor(day).length))');
+    expect(source).toContain('useEffect(()=>setVisibleRows(5),[weekOffset,type,favoritesOnly])');
+    expect(source).toContain('Math.min(maxRows,value+5))}>Voir plus</button>');
+    expect(source).toContain('Titre, genre ou catégorie');
+    expect(source).toContain('item.genres');
+    expect(source).toContain('item.categories');
+    expect(source).toContain('<MultiFacet label="Genres"');
+    expect(source).toContain('<MultiFacet label="Catégories"');
+    expect(source).not.toContain('<MultiFacet label="Années"');
+    expect(source).not.toContain('<MultiFacet label="Thèmes"');
+    expect(source).not.toContain('Airings anime');
+  });
+
+  it('does not render the backend AniList graph in the work detail',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).not.toContain('data-testid="anime-sequence"');
+    expect(source).not.toContain('Chronologie AniList');
+  });
 });

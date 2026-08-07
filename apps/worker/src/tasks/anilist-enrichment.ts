@@ -5,8 +5,7 @@ import type { Task } from "graphile-worker";
 import {
   fetchAniList,
   cleanDisplayTitle,
-  automaticAniListMediaMatches,
-  preferredAniListMediaMatch,
+  decideAniListTitleMatch,
   exactAniListMediaMatches,
   exactTitleMatchKind,
   explicitTitleAliases,
@@ -35,6 +34,7 @@ import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
 import { saveProviderProfileCover } from "../cover-store.js";
+import { recordAndReconcileAnimeWork } from './anime-work.js';
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -195,6 +195,7 @@ async function persist(
   mediaId: string,
   m: AniListMedia,
   match?: { displayTitle?: string },
+  discoverAnimeWork = true,
 ) {
   const source =
     m.siteUrl ?? `https://anilist.co/${m.type.toLowerCase()}/${m.id}`;
@@ -217,6 +218,12 @@ async function persist(
     ],
   );
   if (target !== mediaId) {
+    const sourceIdentity = await h.query(
+      "SELECT external_id FROM media_external_id WHERE media_id=$1 AND provider='anilist' LIMIT 1",
+      [mediaId],
+    );
+    if (sourceIdentity.rowCount && String(sourceIdentity.rows[0].external_id) !== String(m.id))
+      throw new Error("ANILIST_IDENTITY_CONFLICT");
     await h.query("SELECT merge_media_identity($1,$2,'anilist',$3,$4::jsonb)", [mediaId, target, String(m.id), JSON.stringify({source:'anilist-provider-id',externalId:m.id})]);
   }
   const collectedAt = new Date();
@@ -420,6 +427,7 @@ async function persist(
   const aired = (m.airingSchedule ?? []).filter(x => x.episode && x.airingAt && x.airingAt * 1000 <= Date.now()).map(x => x.episode!);
   const available = normalizedStatus === 'Completed' && m.episodes ? m.episodes : aired.length ? Math.max(...aired) : undefined;
   await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'anilist',$2,$3,$4,$5,$6,now(),'ACTIVE',NULL,$7,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[target,normalizedStatus??null,available===undefined?null:'episode',available??null,available===undefined?null:String(available),available===undefined?null:{provider:'anilist',anilistId:m.id,evidence:normalizedStatus==='Completed'?'completed-total':'aired-schedule'},{provider:'anilist',anilistId:m.id,payloadHash:hash}]);
+  if(discoverAnimeWork)await recordAndReconcileAnimeWork(h,target,m,hash);
   for (const airing of [
     ...(m.nextAiringEpisode ? [m.nextAiringEpisode] : []),
     ...(m.airingSchedule ?? []),
@@ -601,16 +609,12 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     }
     if (!selected) {
       const exact = exactAniListMediaMatches(identityAliases, eligible);
-      const automatic = automaticAniListMediaMatches(identityAliases, eligible);
-      const preferred = preferredAniListMediaMatch(favoriteAliases.length ? favoriteAliases : identityAliases, eligible);
-      // A single compact/normalized exact identity is safe; ties stay a user
-      // decision even when AniList returned them in a stable order.
-      if (preferred || (exact.length === 1 && automatic.length === 1 && exact[0].id === automatic[0].id))
-        {
-          selected = preferred ?? exact[0];
-          selectedResolutionCode = automatic.length > 1 ? "RECENT_EXACT_TIEBREAK" : identityAliases.some((alias:string)=>aniListExplicitSeasonMatch(alias,selected!)) ? "EXPLICIT_SEASON_MATCH" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => exactTitleMatchKind(alias,name) === "SUBTITLE_EXACT")) ? "SUBTITLE_EXACT" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => exactTitleMatchKind(alias,name) === "ALIAS_PARENTHESIZED_EXACT")) ? "ALIAS_PARENTHESIZED_EXACT" : identityAliases.some((alias: string) => candidateTitles(selected!).some((name) => normalizeTitle(alias) === normalizeTitle(name))) ? "NORMALIZED_EXACT" : "COMPACT_EXACT";
-        }
-      // Similarity only ranks review candidates. It never establishes identity.
+      const matchDecision = decideAniListTitleMatch(favoriteAliases.length ? favoriteAliases : identityAliases, eligible);
+      if (matchDecision.status === "MATCH") {
+        selected = matchDecision.candidate;
+        selectedResolutionCode = matchDecision.method?.toUpperCase().replaceAll("-", "_") ?? "TITLE_MATCH";
+        await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: selectedResolutionCode, matcherVersion: matchDecision.matcherVersion, matchedAlias: matchDecision.matchedAlias, providerTitle: matchDecision.providerTitle, rawProvenance: matchDecision.rawProvenance })]);
+      }
     }
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2::text AND provider='anilist' AND purpose='metadata' AND connector_version=$3::text",
@@ -663,11 +667,9 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       resolutionCode: selectedResolutionCode,
       sourceAliasCount: aliases.length,
     });
-    if (selectedResolutionCode === "RECENT_EXACT_TIEBREAK")
-      await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: selectedResolutionCode, aliases: identityAliases, providerDate: complete.startDate ?? null, providerYear: complete.startYear ?? complete.seasonYear ?? null })]);
     const persisted = await persist(h, mediaId, complete, {
       displayTitle: titleOf(complete),
-    });
+    },true);
     await reconcileResolvedFavoriteReviews(h.query, persisted.target);
     await finishEnrichment(h, {
       mediaId,

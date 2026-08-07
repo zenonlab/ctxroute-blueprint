@@ -1,19 +1,10 @@
 import { z } from 'zod';
-export function parseBookmarkTitle(value:string){
-  const parts=value.replace(/\s+/g,' ').trim().split(/\s+-\s+/u).map(part=>part.trim()).filter(Boolean);
-  const useful=parts.filter(part=>!/^\d+(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?$/iu.test(part)&&!/^voiranime$/iu.test(part)&&!/^(?:vostfr|vf|vo|sub|dub|scan|scans)$/iu.test(part));
-  let title=useful[0]??value.trim();
-  title=title.replace(/^(?:read|watch|regarder gratuitement|regarder)\s+/iu,'');
-  title=title.replace(/\s+(?:chapter|chapitre|episode|ep)\s*\d+(?:\.\d+)?(?:[-–—].*|\s+.*)?$/iu,'');
-  title=title.replace(/\s+(?:in english online free|online free|en hd)\s*$/iu,'');
-  title=title.replace(/\s*(?:[-–—|·:]\s*)?(?:voiranime|mangakakalot|manganelo|mangakakalot\.com|manganelo\.com|manhwaz)\s*$/iu,'');
-  return title.replace(/\s+(?:vostfr|vf|vo|sub|dub|scan|scans|en hd)\s*$/iu,'').trim().replace(/[|·:—–-]+$/u,'').trim()||null;
-}
+export { parseBookmarkTitle } from '@favlib/metadata/bookmark-parser';
 export const errorEnvelope=z.object({error:z.object({code:z.string(),message:z.string(),requestId:z.string(),fields:z.array(z.record(z.string(),z.unknown())).max(20)})});
 export const healthContract=z.object({status:z.literal('ok'),currentProtocol:z.number().int(),minimumSupportedProtocol:z.number().int()});
 export const cursorPage=z.object({items:z.array(z.unknown()),nextCursor:z.string().nullable().optional()});
-export const calendarEventContract=z.object({mediaId:z.string(),releaseKey:z.string(),chapter:z.string().nullable().optional(),chapterDisplay:z.string().nullable().optional()}).passthrough();
-export const calendarPageContract=z.object({items:z.array(calendarEventContract),total:z.number().int().nonnegative(),nextCursor:z.string().nullable(),timeZone:z.string(),filters:z.record(z.string(),z.unknown())});
+export const calendarEventContract=z.object({mediaId:z.string(),releaseKey:z.string(),chapter:z.string().nullable().optional(),chapterDisplay:z.string().nullable().optional(),season:z.number().int().positive().nullable().optional(),localNumber:z.number().nonnegative().nullable().optional(),globalNumber:z.number().nonnegative().nullable().optional()}).passthrough();
+export const calendarPageContract=z.object({items:z.array(calendarEventContract),total:z.number().int().nonnegative(),nextCursor:z.string().nullable(),timeZone:z.string(),filters:z.record(z.string(),z.unknown()),facets:z.object({genres:z.array(z.object({value:z.string(),count:z.number().int().nonnegative()})),categories:z.array(z.object({value:z.string(),count:z.number().int().nonnegative()}))}).optional()});
 export const contentPreferenceContract=z.object({allowAdult:z.boolean(),updatedAt:z.string().datetime().nullable()});
 export const contentPreferencePatchContract=contentPreferenceContract.pick({allowAdult:true}).strict();
 export const registerRequestContract=z.object({email:z.string().email().max(320),password:z.string().min(1).max(128)});
@@ -26,8 +17,10 @@ export const reviewManualContract=z.object({provider:z.enum(['anilist','mangaupd
 export const reviewReportContract=z.object({reason:z.enum(['WRONG_IDENTITY','WRONG_SEASON','WRONG_MEDIA_TYPE','PROVIDER_RECORD_CHANGED']),details:z.string().trim().max(500).optional()}).strict();
 export const reviewRevalidationChoiceContract=z.object({profileId:z.string().uuid()}).strict();
 export const adminReviewClusterChoiceContract=z.object({profileId:z.string().uuid()}).strict();
-export const reviewCandidateContract=z.object({id:z.string().uuid(),providerId:z.string(),displayTitle:z.string(),image:z.string().nullable(),endorsements:z.number().int().nonnegative().nullable().optional(),reliableVotes:z.number().int().nonnegative().nullable().optional()}).passthrough();
-export const reviewDetailContract=z.object({id:z.string().uuid(),provider:z.enum(['anilist','mangaupdates']),status:z.enum(['PENDING','RESOLVED','NO_MATCH']),mode:z.enum(['required','optional']),collectiveState:reviewCollectiveStateContract.nullable(),allowedActions:z.array(z.enum(['choose','no-match','manual','report'])),candidates:z.array(reviewCandidateContract).max(5)}).passthrough();
+export const reviewCandidateContract=z.object({id:z.string().uuid(),providerId:z.string(),displayTitle:z.string(),matchedAlias:z.string().nullable().optional(),image:z.string().nullable(),endorsements:z.number().int().nonnegative().nullable().optional(),reliableVotes:z.number().int().nonnegative().nullable().optional()}).passthrough();
+export const reviewQueueItemContract=z.object({id:z.string().uuid(),clusterId:z.string().uuid().nullable().optional(),favoriteCount:z.number().int().positive().optional(),candidateCount:z.number().int().min(0).max(5).optional(),provider:z.enum(['anilist','mangaupdates','anilist-chain']),status:z.enum(['PENDING','RESOLVED','NO_MATCH'])}).passthrough();
+export const reviewQueueContract=z.object({items:z.array(reviewQueueItemContract),pendingCount:z.number().int().nonnegative()});
+export const reviewDetailContract=z.object({id:z.string().uuid(),clusterId:z.string().uuid().nullable().optional(),favoriteCount:z.number().int().positive().optional(),provider:z.enum(['anilist','mangaupdates','anilist-chain']),status:z.enum(['PENDING','RESOLVED','NO_MATCH']),mode:z.enum(['required','optional']),collectiveState:reviewCollectiveStateContract.nullable(),allowedActions:z.array(z.enum(['choose','no-match','manual','report'])),candidates:z.array(reviewCandidateContract).max(5)}).passthrough();
 export const reviewRevalidationContract=z.object({id:z.string().uuid(),clusterId:z.string().uuid(),epoch:z.number().int().positive(),status:z.enum(['PENDING','CHOSEN','SKIPPED']),selectedProfileId:z.string().uuid().nullable(),collectiveState:reviewCollectiveStateContract,title:z.string()}).passthrough();
 export const reviewRevalidationPageContract=z.object({items:z.array(reviewRevalidationContract)});
 export const collectiveReviewIdentityContract=z.object({provider:z.enum(['anilist','mangaupdates']),mediaType:z.enum(['ANIME','MANGA','MANHWA','MANHUA']),parsedTitle:z.string().trim().min(1).max(500)}).strict().superRefine((value,ctx)=>{const expected=value.mediaType==='ANIME'?'anilist':'mangaupdates';if(value.provider!==expected)ctx.addIssue({code:z.ZodIssueCode.custom,path:['provider'],message:'PROVIDER_MEDIA_TYPE_MISMATCH'})});
@@ -44,6 +37,12 @@ export const importItemContract = bookmarkContract.extend({fingerprint:z.string(
 export const importBatchContract = z.object({batchId:z.string().uuid(), installationId:z.string().min(16), protocol:z.number().int(), items:z.array(importItemContract).max(250), cursor:z.string().nullable()});
 export const catalogMediaContract = z.object({id:z.string().min(1),type:z.enum(['ANIME','MANGA','MANHWA','MANHUA','UNKNOWN']),seasonYear:z.number().int().nullable().optional(),countryOfOrigin:z.string().nullable().optional(),format:z.string().nullable().optional(),titles:z.array(z.object({text:z.string(),language:z.string().nullable().optional(),kind:z.string(),connector:z.string().nullable().optional()}))});
 export const catalogSearchContract = z.object({items:z.array(catalogMediaContract)});
+export const missingPositionSideContract=z.enum(['personal','availability']);
+export const repairMissingPositionsRequestContract=z.object({items:z.array(z.object({mediaId:z.string().min(1).max(300),missing:z.array(missingPositionSideContract).min(1).max(2)}).strict()).min(1).max(30)}).strict();
+export const repairMissingPositionStatusContract=z.enum(['repaired','queued','unchanged','no_evidence','cooldown','unauthorized']);
+export const repairMissingPositionsResponseContract=z.object({items:z.array(z.object({mediaId:z.string(),personal:repairMissingPositionStatusContract,availability:repairMissingPositionStatusContract}))});
+export type RepairMissingPositionsRequest=z.infer<typeof repairMissingPositionsRequestContract>;
+export type RepairMissingPositionsResponse=z.infer<typeof repairMissingPositionsResponseContract>;
 export const classificationContract = z.object({candidateId:z.string().uuid(),status:z.enum(['matched','review','ignored']),classifierVersion:z.string(),fingerprint:z.string().length(64),matches:z.array(z.object({mediaId:z.string(),score:z.number(),reasons:z.array(z.object({code:z.string(),weight:z.number(),detail:z.string().optional()}))}))});
 export const extensionPreferencesContract=z.object({autoUpdateFavorites:z.boolean(),observeNavigation:z.boolean(),syncMinutes:z.number().int().min(5).max(1440),updatedAt:z.string().datetime().nullable()});
 export const extensionPreferencesPatchContract=extensionPreferencesContract.pick({autoUpdateFavorites:true,observeNavigation:true,syncMinutes:true}).partial().strict().refine(value=>Object.keys(value).length>0);

@@ -35,3 +35,10 @@ Les sauvegardes et restaurations conservent reviews résolues, candidats et déc
 ## Tests attendus
 
 Fixture `Existence` / `Existence (Wang)`, retries idempotents, résolution du seul favori ciblé, conservation des candidats après résolution, URL fournisseur invalide, mauvais type, `NO_MATCH`, isolation Alice/Bob et parcours notification → `/review/:id`.
+# Addendum — matcher fournisseur v2 et reviews logiques
+
+La décision automatique est centralisée dans `@favlib/metadata` et identique pour AniList et MangaUpdates : exact ordonné, mots significatifs réordonnés, puis distance d’édition bornée avec avance minimale. Toute égalité reste une review. Popularité, audience, date et rang de réponse sont exclus de l’identité. AniList accepte en plus une saison seulement lorsque la fiche porte une preuve explicite concordante ; le nombre final brut reste dans la provenance.
+
+La file personnelle est projetée par `(user_id, cluster_id)` tout en conservant l’identifiant d’une ligne représentative pour les anciens clients. Un choix ou « Aucun ne correspond » clôt atomiquement toutes les lignes encore indécises de ce seul utilisateur et cluster. Les lignes historiques sont conservées. Les routes communautaires, leur quorum, leur suspension et leur historique restent disponibles sans nouvelle interface dans cette passe.
+
+Le backfill utilise `review_matcher_reassessment`, registre sans titre ni URL personnelle, puis réenfile les enrichissements via les waitlists avec des clés contenant fournisseur, versions du connecteur et du matcher, cluster et média. La table appartient au périmètre infrastructure : rétention alignée sur les clusters, suppression en cascade, sauvegarde/restauration avec PostgreSQL, aucun export de donnée personnelle.

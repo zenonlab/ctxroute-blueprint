@@ -1,6 +1,8 @@
 import { isIP } from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { safeRequest } from "@favlib/safe-http";
+import { FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
+export type { FavoriteProgression } from '@favlib/metadata/bookmark-parser';
 
 export type SearchClient = (
   input: RequestInfo | URL,
@@ -248,12 +250,15 @@ export function aniListFormatAllowed(sourceEvidence: string[], format: string | 
   return requiresOva ? format?.toUpperCase() === 'OVA' : format?.toUpperCase() !== 'OVA';
 }
 
-export type LibraryStatus = 'Ongoing' | 'Hiatus' | 'Completed';
+export type LibraryStatus = 'Ongoing' | 'Hiatus' | 'Completed' | 'Cancelled';
 export function canonicalLibraryStatus(value: unknown): LibraryStatus {
   const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
   if (/\b(?:on\s+)?hiatus\b/iu.test(text)) return 'Hiatus';
   if (/\b(?:complete|completed|finished)\b/iu.test(text)) return 'Completed';
+  if (/\b(?:cancelled|canceled)\b/iu.test(text)) return 'Cancelled';
+  if (/\b(?:discontinued|dropped)\b/iu.test(text)) return 'Cancelled';
   if (/\b(?:ongoing|releasing)\b/iu.test(text)) return 'Ongoing';
+  if (/\b(?:not[_ -]?yet[_ -]?released|upcoming|planned)\b/iu.test(text)) return 'Ongoing';
   return 'Ongoing';
 }
 
@@ -349,6 +354,13 @@ export function cleanDisplayTitle(v: string) {
   s = kept.join(" - ").trim();
   return s.length >= 2 && !/^(?:episode|chapter|volume|vostfr|vf|scan)\b/iu.test(s) ? s : undefined;
 }
+
+/** Shared bookmark-title parser for extension ingestion and resolver hints. */
+export function parseBookmarkTitle(value: string) {
+  return sharedParseBookmarkTitle(value);
+}
+export const progressionFromFavorite = sharedProgressionFromFavorite;
+export const FAVORITE_PROGRESS_PARSER_VERSION = sharedFavoriteProgressParserVersion;
 
 function stripCatalogMarketingSuffix(value: string) {
   const releaseBadge = String.raw`(?:\[|\()\s*(?:new|nouveaux?|nouvelles?)\s+(?:chapters?|chapitres?|episodes?|épisodes?|volumes?|releases?|sorties?)\s*(?:\]|\))`;
@@ -1553,6 +1565,23 @@ const ORDINAL_WORDS = new Map(Object.entries({
   nineteenth: "19", twentieth: "20",
 }));
 
+export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v2";
+export type ProviderTitleMatchMethod =
+  | "ordered-exact"
+  | "explicit-season"
+  | "reordered-significant-words"
+  | "bounded-edit-distance";
+export type ProviderTitleMatchDecision<T> = {
+  status: "MATCH" | "AMBIGUOUS" | "NO_MATCH";
+  method?: ProviderTitleMatchMethod;
+  candidate?: T;
+  matchedAlias?: string;
+  providerTitle?: string;
+  providerId?: string;
+  matcherVersion: typeof PROVIDER_TITLE_MATCHER_VERSION;
+  rawProvenance: { aliases: string[] };
+};
+
 /** Identity-bearing title tokens. This deliberately normalizes grammar and
  * ordinal spelling, but never invents provider-specific aliases. */
 function meaningfulTokens(value: string) {
@@ -1564,11 +1593,12 @@ function meaningfulTokens(value: string) {
     .filter((token) => token.length >= 2 && !TITLE_STOP_WORDS.has(token));
 }
 
-function candidateTitles(series: MangaUpdatesSeries) {
+export function mangaUpdatesCandidateTitles(series: MangaUpdatesSeries) {
   return [series.hitTitle, series.title, ...(series.titles ?? []), ...(series.associated ?? [])]
     .filter((value): value is string => Boolean(value?.trim()))
     .map((value) => value.trim());
 }
+const candidateTitles = mangaUpdatesCandidateTitles;
 
 /** Returns provider records whose complete returned title set exactly identifies an alias. */
 export function exactMangaUpdatesSeriesMatches(
@@ -1591,7 +1621,7 @@ export function automaticMangaUpdatesSeriesMatches(aliases: string[], items: Man
     .filter((item) => preSerializationCandidateAllowed(aliases, candidateTitles(item)))
     .filter((item) => candidateTitles(item).some((title) => aliases.some((alias) => {
       const kind=exactTitleMatchKind(alias,title);
-      return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT'||kind==='SUBTITLE_EXACT'||kind==='ALIAS_PARENTHESIZED_EXACT';
+      return kind==='NORMALIZED_EXACT'||kind==='COMPACT_EXACT';
     })))
     .map((item) => [item.id,item] as const)).values()];
 }
@@ -1610,72 +1640,68 @@ function titleEditDistance(left: string, right: string) {
   return row[b.length];
 }
 
-type ExactDateEvidence = { full?: number; year?: number; valid: boolean };
-function numericYear(value: unknown) { return typeof value === "number" && Number.isInteger(value) && value >= 1000 && value <= 9999 ? value : undefined; }
-function aniListExactDate(item: AniListMedia): ExactDateEvidence {
-  const date=item.startDate,dateYear=numericYear(date?.year);
-  const years=[...new Set([dateYear,numericYear(item.startYear),numericYear(item.seasonYear)].filter((year):year is number=>year!==undefined))];
-  if(years.length>1)return{valid:false};
-  if(date?.month!==undefined||date?.day!==undefined){
-    if(!dateYear||!Number.isInteger(date.month)||!Number.isInteger(date.day))return{valid:false};
-    const full=Date.UTC(dateYear,date.month!-1,date.day!),parsed=new Date(full);
-    if(parsed.getUTCFullYear()!==dateYear||parsed.getUTCMonth()!==date.month!-1||parsed.getUTCDate()!==date.day)return{valid:false};
-    return{full,year:dateYear,valid:true};
+/** Shared, provider-neutral identity policy. Input ordering and audience fields
+ * are deliberately ignored. A tie at any level is an ambiguity. */
+export function decideProviderTitleMatch<T>(input: {
+  aliases: string[];
+  candidates: T[];
+  id: (candidate: T) => string;
+  titles: (candidate: T) => string[];
+  explicitSeason?: (alias: string, candidate: T) => boolean;
+}): ProviderTitleMatchDecision<T> {
+  const rawProvenance = { aliases: [...input.aliases] };
+  const unique = [...new Map(input.candidates.map(candidate => [input.id(candidate), candidate] as const)).values()];
+  const chooseLevel = (method: ProviderTitleMatchMethod, matches: Array<{candidate:T;alias:string;title:string}>) => {
+    const byId = [...new Map(matches.map(match => [input.id(match.candidate), match] as const)).values()];
+    if (byId.length > 1) return { status: "AMBIGUOUS", method, matcherVersion: PROVIDER_TITLE_MATCHER_VERSION, rawProvenance } as ProviderTitleMatchDecision<T>;
+    const match = byId[0];
+    if (!match) return undefined;
+    return { status: "MATCH", method, candidate: match.candidate, matchedAlias: match.alias, providerTitle: match.title, providerId: input.id(match.candidate), matcherVersion: PROVIDER_TITLE_MATCHER_VERSION, rawProvenance } as ProviderTitleMatchDecision<T>;
+  };
+  const pairs = unique.flatMap(candidate => input.aliases.flatMap(alias => input.titles(candidate).map(title => ({candidate,alias,title}))));
+  const exact = chooseLevel("ordered-exact", pairs.filter(({alias,title}) => {
+    const kind = exactTitleMatchKind(alias,title);
+    return kind === "NORMALIZED_EXACT" || kind === "COMPACT_EXACT";
+  }));
+  if (exact) return exact;
+  if (input.explicitSeason) {
+    const season = chooseLevel("explicit-season", unique.flatMap(candidate => input.aliases.filter(alias => input.explicitSeason!(alias,candidate)).map(alias => ({candidate,alias,title:input.titles(candidate)[0] ?? ""}))));
+    if (season) return season;
   }
-  return{year:years[0],valid:true};
-}
-function mangaUpdatesExactDate(item:MangaUpdatesSeries):ExactDateEvidence{
-  const explicitYear=numericYear(item.year);let full:number|undefined,dateYear:number|undefined;
-  const raw=typeof item.startDate==="string"?item.startDate.trim():"";
-  if(raw){
-    const yearOnly=raw.match(/^(\d{4})$/u);
-    if(yearOnly)dateYear=numericYear(Number(yearOnly[1]));
-    else{const complete=raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/u);if(!complete)return{valid:false};dateYear=numericYear(Number(complete[1]));if(!dateYear)return{valid:false};full=Date.UTC(dateYear,Number(complete[2])-1,Number(complete[3]));const parsed=new Date(full);if(parsed.getUTCFullYear()!==dateYear||parsed.getUTCMonth()!==Number(complete[2])-1||parsed.getUTCDate()!==Number(complete[3]))return{valid:false};}
-  }
-  if(explicitYear!==undefined&&dateYear!==undefined&&explicitYear!==dateYear)return{valid:false};
-  return{full,year:dateYear??explicitYear,valid:true};
-}
-function recentUniqueExact<T>(items:T[],evidence:(item:T)=>ExactDateEvidence):T|undefined{
-  if(items.length<2)return items[0];const dated=items.map(item=>({item,date:evidence(item)}));if(dated.some(entry=>!entry.date.valid))return undefined;
-  const key:"full"|"year"=dated.every(entry=>entry.date.full!==undefined)?"full":"year";if(dated.some(entry=>entry.date[key]===undefined))return undefined;
-  const newest=Math.max(...dated.map(entry=>entry.date[key]!)),winners=dated.filter(entry=>entry.date[key]===newest);return winners.length===1?winners[0].item:undefined;
+  const tokenKey = (value:string) => meaningfulTokens(value).sort().join("|");
+  const reordered = chooseLevel("reordered-significant-words", pairs.filter(({alias,title}) => Boolean(tokenKey(alias)) && tokenKey(alias) === tokenKey(title)));
+  if (reordered) return reordered;
+  const ranked = pairs.map(pair => ({...pair,distance:titleEditDistance(pair.alias,pair.title)}))
+    .sort((a,b)=>a.distance-b.distance||input.id(a.candidate).localeCompare(input.id(b.candidate))||a.title.localeCompare(b.title));
+  const best = ranked[0];
+  if (!best || best.distance > 4) return {status:"NO_MATCH",matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};
+  const competing = ranked.find(entry => input.id(entry.candidate) !== input.id(best.candidate));
+  if (competing && competing.distance - best.distance < 3)
+    return {status:"AMBIGUOUS",method:"bounded-edit-distance",matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};
+  return {status:"MATCH",method:"bounded-edit-distance",candidate:best.candidate,matchedAlias:best.alias,providerTitle:best.title,providerId:input.id(best.candidate),matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};
 }
 
 /** Prefer the user-visible favorite title. A small typo is accepted only when
  * the winner is unique and clearly ahead of every other provider record. */
 export function preferredMangaUpdatesSeriesMatch(aliases: string[], items: MangaUpdatesSeries[]) {
-  const eligible = items.filter(item => mangaUpdatesTypeAllowed(item) && !isDeadMangaUpdatesSeries(item));
-  const exact = automaticMangaUpdatesSeriesMatches(aliases, eligible);
-  if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return recentUniqueExact(exact, mangaUpdatesExactDate);
-  const tokenKey = (value: string) => meaningfulTokens(value).sort().join("|");
-  const wantedTokenKeys = new Set(aliases.map(tokenKey).filter(Boolean));
-  const tokenExact = eligible.filter(item => candidateTitles(item).some(title => wantedTokenKeys.has(tokenKey(title))));
-  if (tokenExact.length === 1) return tokenExact[0];
-  if (tokenExact.length > 1) return undefined;
-  const ranked = eligible.map(item => ({ item, distance: Math.min(...aliases.flatMap(alias => candidateTitles(item).map(title => titleEditDistance(alias, title)))) }))
-    .sort((a, b) => a.distance - b.distance || a.item.id.localeCompare(b.item.id));
-  const best = ranked[0], second = ranked[1];
-  if (!best || best.distance > 4 || (second && second.distance - best.distance < 3)) return undefined;
-  return best.item;
+  return decideMangaUpdatesTitleMatch(aliases,items).candidate;
+}
+
+export function decideMangaUpdatesTitleMatch(aliases:string[],items:MangaUpdatesSeries[]) {
+  const eligible=items.filter(item=>mangaUpdatesTypeAllowed(item)&&!isDeadMangaUpdatesSeries(item))
+    .filter(item=>preSerializationCandidateAllowed(aliases,candidateTitles(item)));
+  return decideProviderTitleMatch({aliases,candidates:eligible,id:item=>item.id,titles:candidateTitles});
 }
 
 export function preferredAniListMediaMatch(aliases: string[], items: AniListMedia[]) {
-  const exact = automaticAniListMediaMatches(aliases, items);
-  if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return recentUniqueExact(exact, aniListExactDate);
+  return decideAniListTitleMatch(aliases,items).candidate;
+}
+
+export function decideAniListTitleMatch(aliases:string[],items:AniListMedia[]) {
   const titles = (item: AniListMedia) => [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
     .filter((value): value is string => Boolean(value?.trim()));
-  const tokenKey = (value: string) => meaningfulTokens(value).sort().join("|");
-  const wantedTokenKeys = new Set(aliases.map(tokenKey).filter(Boolean));
-  const tokenExact = items.filter(item => titles(item).some(title => wantedTokenKeys.has(tokenKey(title))));
-  if (tokenExact.length === 1) return tokenExact[0];
-  if (tokenExact.length > 1) return undefined;
-  const ranked = items.map(item => ({item,distance:Math.min(...aliases.flatMap(alias => titles(item).map(title => titleEditDistance(alias,title))))}))
-    .sort((a,b)=>a.distance-b.distance||a.item.id-b.item.id);
-  const best=ranked[0],second=ranked[1];
-  if(!best||best.distance>4||(second&&second.distance-best.distance<3))return undefined;
-  return best.item;
+  const eligible=items.filter(item=>item.type==='ANIME');
+  return decideProviderTitleMatch({aliases,candidates:eligible,id:item=>String(item.id),titles,explicitSeason:aniListExplicitSeasonMatch});
 }
 
 /** AniList may carry the localized base title and the explicit season number

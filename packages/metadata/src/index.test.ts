@@ -34,9 +34,23 @@ import {
   preferredMangaUpdatesSeriesMatch,
   preferredAniListMediaMatch,
   aniListExplicitSeasonMatch,
+  decideProviderTitleMatch,
+  PROVIDER_TITLE_MATCHER_VERSION,
+  progressionFromFavorite,
 } from "./index.js";
 
 describe("collective review identity", () => {
+  it("parses the greatest chapter from matching favorite title and URL path while retaining provenance", () => {
+    const result = progressionFromFavorite({ title: "Synthetic Chronicle chapter 4", url: "https://reader.example/manga/synthetic-chronicle/chapter-12" });
+    expect(result).toMatchObject({ kind: "chapter", number: 12, raw: "12", provenance: { source: "url-path", evidence: "labelled-url-path" } });
+  });
+  it("does not promote an unrelated bare title number to progression", () => {
+    expect(progressionFromFavorite({ title: "Synthetic Season 2", url: "https://reader.example/manga/synthetic-chronicle" })).toBeNull();
+  });
+  it("keeps a synthetic cancelled provider status visible", () => {
+    expect(canonicalLibraryStatus("CANCELED")).toBe("Cancelled");
+    expect(canonicalLibraryStatus("Cancelled")).toBe("Cancelled");
+  });
   it("accepts opaque MangaUpdates series URLs with or without a slug", () => {
     expect(providerIdFromUrl("mangaupdates", "https://www.mangaupdates.com/series/oqvzgof/synthetic-title")).toBe("oqvzgof");
     expect(providerIdFromUrl("mangaupdates", "https://mangaupdates.com/series/oqvzgof")).toBe("oqvzgof");
@@ -77,6 +91,7 @@ describe('editorial and library projections', () => {
   it.each([
     ['50 Chapters (Complete)', 'Completed'], ['12 Volumes\nOn Hiatus', 'Hiatus'],
     ['Ongoing', 'Ongoing'], ['FINISHED', 'Completed'], ['RELEASING', 'Ongoing'], ['Unknown', 'Ongoing'],
+    ['NOT_YET_RELEASED', 'Ongoing'], ['Discontinued', 'Cancelled'], ['Dropped', 'Cancelled'],
   ])('canonicalizes %s', (raw, expected) => expect(canonicalLibraryStatus(raw)).toBe(expected));
 });
 
@@ -110,19 +125,28 @@ describe("AniList catalogue", () => {
     expect(preferredAniListMediaMatch(['Crimson Small Hero'],[make(1,'Small Crimson Hero',1),make(2,'Small Hero',999999)])?.id).toBe(1);
     expect(preferredAniListMediaMatch(['Synthetic Show'],[make(1,'Synthetic Show',1000),make(2,'Synthetic Show',1)])).toBeUndefined();
   });
-  it("selects only a uniquely newest exact AniList identity", () => {
+  it("keeps duplicate exact AniList identities ambiguous regardless of date or popularity", () => {
     const make=(id:number,startDate:any,popularity:number,startYear?:number)=>({id,type:'ANIME',title:{english:'Synthetic Exact'},synonyms:[],startDate,startYear,popularity}) as any;
-    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2020,month:2,day:3},999999),make(2,{year:2024,month:1,day:2},1)])?.id).toBe(2);
+    expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2020,month:2,day:3},999999),make(2,{year:2024,month:1,day:2},1)])).toBeUndefined();
     expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024},1),make(2,{year:2024},999999)])).toBeUndefined();
     expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024,month:13,day:1},1),make(2,{year:2023,month:1,day:1},2)])).toBeUndefined();
     expect(preferredAniListMediaMatch(['Synthetic Exact'],[make(1,{year:2024},1,2023),make(2,{year:2023},2)])).toBeUndefined();
   });
-  it("uses the same exact-date tiebreak for MangaUpdates", () => {
+  it("keeps duplicate exact MangaUpdates identities ambiguous regardless of date or audience", () => {
     const make=(id:string,startDate?:string,year?:number,ratingVotes=0)=>({id,title:'Synthetic Exact',titles:['Synthetic Exact'],type:'Manhwa',status:'Ongoing',image:`https://example.test/${id}.jpg`,startDate,year,ratingVotes}) as any;
-    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','2020-02-03',2020,999999),make('2','2024-01-02',2024,1)])?.id).toBe('2');
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','2020-02-03',2020,999999),make('2','2024-01-02',2024,1)])).toBeUndefined();
     expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1',undefined,2024,1),make('2',undefined,2024,999999)])).toBeUndefined();
     expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','invalid',2024),make('2','2023-01-01',2023)])).toBeUndefined();
     expect(preferredMangaUpdatesSeriesMatch(['Synthetic Exact'],[make('1','2024-01-01',2023),make('2','2023-01-01',2023)])).toBeUndefined();
+  });
+  it("returns the same structured three-level decision with raw provenance", () => {
+    const candidates=[{id:'weak',titles:['Crimson Hero']},{id:'winner',titles:['Small Crimson Hero']}];
+    const decision=decideProviderTitleMatch({aliases:['Crimson Small Hero'],candidates,id:item=>item.id,titles:item=>item.titles});
+    expect(decision).toMatchObject({status:'MATCH',method:'reordered-significant-words',providerId:'winner',matchedAlias:'Crimson Small Hero',providerTitle:'Small Crimson Hero',matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance:{aliases:['Crimson Small Hero']}});
+    expect(decideProviderTitleMatch({aliases:['Synthetik Chronicle'],candidates:[{id:'a',titles:['Synthetic Chronicle']},{id:'b',titles:['Different Work']}],id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'a'});
+    expect(decideProviderTitleMatch({aliases:['Synthetic'],candidates:[{id:'a',titles:['Synthetica']},{id:'b',titles:['Synthetico']}],id:item=>item.id,titles:item=>item.titles}).status).toBe('AMBIGUOUS');
+    expect(decideProviderTitleMatch({aliases:['Synthetic Cleric'],candidates:[{id:'a',titles:['Synthetic Cleric: Office Worker Survival Path']}],id:item=>item.id,titles:item=>item.titles}).method).not.toBe('ordered-exact');
+    expect(decideProviderTitleMatch({aliases:['Synthetic Champion (The Champion)'],candidates:[{id:'a',titles:['Synthetic Champion']}],id:item=>item.id,titles:item=>item.titles}).method).not.toBe('ordered-exact');
   });
   it("keeps exact ahead of reordered words and a simple exact ahead of a parenthesized variant", () => {
     const anime=(id:number,title:string,year:number)=>({id,type:'ANIME',title:{english:title},synonyms:[],startDate:{year}}) as any;
@@ -150,11 +174,11 @@ describe("AniList catalogue", () => {
     ] as any;
     expect(exactAniListMediaMatches(["Existence"], items).map(item => item.id)).toEqual([1, 2]);
   });
-  it("selects a unique provider base when the source adds a parenthesized alternate title", () => {
+  it("keeps a parenthesized alternate title for review instead of treating it as ordered exact", () => {
     const anime={id:1,type:'ANIME',title:{romaji:'Synthetic Champion'},synonyms:[],startDate:{year:2020}} as any;
-    expect(preferredAniListMediaMatch(['Synthetic Champion (The Champion)'],[anime])?.id).toBe(1);
+    expect(preferredAniListMediaMatch(['Synthetic Champion (The Champion)'],[anime])).toBeUndefined();
     const reading={id:'1',title:'Synthetic Champion',titles:[],type:'Manhwa',year:2020,status:'Ongoing',image:'https://example.test/champion.jpg'} as any;
-    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Champion (The Champion)'],[reading])?.id).toBe('1');
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Champion (The Champion)'],[reading])).toBeUndefined();
   });
   it("uses a final parenthesized alternate title as a bounded identity alias", () => {
     expect(explicitTitleAliases(['Synthetic Primary (Synthetic Alternate)'])).toEqual([
@@ -175,13 +199,13 @@ describe("AniList catalogue", () => {
     expect(aniListExplicitSeasonMatch('Synthetic Evolution 3',sequel)).toBe(false);
     expect(aniListExplicitSeasonMatch('Synthetic Evolution 2',{...sequel,title:{romaji:'Synthetic Evolution: Continued Path'}})).toBe(false);
   });
-  it("selects a unique provider title whose explicit subtitle extends the source identity symmetrically", () => {
+  it("keeps an explicit subtitle extension for review symmetrically", () => {
     const anime={id:1,type:'ANIME',title:{romaji:'Synthetic Cleric: Office Worker Survival Path'},synonyms:[],startDate:{year:2023}} as any;
-    expect(preferredAniListMediaMatch(['Synthetic Cleric'],[anime])?.id).toBe(1);
+    expect(preferredAniListMediaMatch(['Synthetic Cleric'],[anime])).toBeUndefined();
     const reading={id:'1',title:'Synthetic Cleric: Office Worker Survival Path',titles:[],type:'Manhwa',year:2023,status:'Ongoing',image:'https://example.test/cover.jpg'} as any;
-    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Cleric'],[reading])?.id).toBe('1');
+    expect(preferredMangaUpdatesSeriesMatch(['Synthetic Cleric'],[reading])).toBeUndefined();
     const translated={...anime,id:2,title:{english:'Synthetic 100: Final Errand List'}};
-    expect(preferredAniListMediaMatch(['Final Errand List'],[translated])?.id).toBe(2);
+    expect(preferredAniListMediaMatch(['Final Errand List'],[translated])).toBeUndefined();
   });
   it("prepares bookmark and URL titles using URL release evidence", () => {
     const anime = sourceIdentityFromUrl("https://v5.voiranime.com/anime/remonster/re-monster-02-vostfr/");

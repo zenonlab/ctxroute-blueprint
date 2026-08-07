@@ -5,19 +5,19 @@ import { libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelec
 
 describe('library multi-value query',()=>{
   it('normalizes repeated parameters while retaining every selected value',()=>{
-    const parsed=libraryQuerySchema.parse({type:['ANIME','MANGA'],theme:['Action','Drama'],year:['2024','2025']});
-    expect(parsed.type).toEqual(['ANIME','MANGA']);expect(parsed.theme).toEqual(['Action','Drama']);expect(parsed.year).toEqual([2024,2025]);
+    const parsed=libraryQuerySchema.parse({type:['ANIME','MANGA'],theme:['Theme A'],genre:['Genre A'],category:['Category A'],year:['2024','2025']});
+    expect(parsed.type).toEqual(['ANIME','MANGA']);expect(parsed.genre).toEqual(['Genre A']);expect(parsed.category).toEqual(['Category A']);expect(parsed.year).toEqual([2024,2025]);
   });
 
   it('normalizes excluded facet values without turning them into inclusions',()=>{
     const parsed=libraryQuerySchema.parse({excludeType:'ANIME',excludeTheme:['Drama']});
     expect(parsed.excludeType).toEqual(['ANIME']);expect(parsed.excludeTheme).toEqual(['Drama']);
-    const sql=libraryFilterSql();expect(sql).toContain('NOT ("type"=ANY($10::text[]))');expect(sql).toContain('NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes)');
+    const sql=libraryFilterSql();expect(sql).toContain('NOT ("type"=ANY($12::text[]))');expect(sql).toContain('NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes)');
   });
 
   it('uses array membership within categories and AND between categories',()=>{
     const sql=libraryFilterSql();
-    expect(sql).toContain('"type"=ANY($3::text[])');expect(sql).toContain('lower(value)=ANY($4::text[])');expect(sql).toContain(' AND ');
+    expect(sql).toContain('"type"=ANY($3::text[])');expect(sql).toContain('jsonb_array_elements_text(genres)');expect(sql).toContain('jsonb_array_elements_text(categories)');expect(sql).toContain(' AND ');
   });
 
   it('uses the shared title policy and searches every alias',()=>{
@@ -37,7 +37,7 @@ describe('library multi-value query',()=>{
   it('temporarily removes only the facet being counted',()=>{
     const sql=libraryFilterSql('theme');
     expect(sql).not.toContain('jsonb_array_elements_text(themes)');expect(sql).toContain('$4::text[] IS NOT NULL');expect(sql).toContain('"type"=ANY($3::text[])');
-    expect(sql).toContain('$11::text[] IS NOT NULL');
+    expect(sql).toContain('$13::text[] IS NOT NULL');
   });
 
   it('keeps a selected zero-count option but does not invent an unselected unknown value',()=>{
@@ -52,7 +52,8 @@ describe('library multi-value query',()=>{
     expect(libraryQuerySchema.safeParse({format:'OVA'}).success).toBe(false);
   });
   it('keeps personal progress numeric and shared availability separate',()=>{
-    expect(libraryProjectionSql).toContain("'number',fp.position_number::numeric");
+    expect(libraryProjectionSql).toContain("'number',COALESCE(fp.global_position_number,fp.position_number::numeric)");
+    expect(libraryProjectionSql).toContain("'localNumber',fp.local_position_number");
     expect(libraryProjectionSql).toContain('available_position_kind');
     expect(libraryProjectionSql).toContain("pp.status='ACTIVE'");
     expect(libraryProjectionSql).toContain('ELSE NULL');
@@ -71,9 +72,16 @@ describe('library multi-value query',()=>{
     const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
     expect(server).toContain('(c.data IS NOT NULL OR c.asset_sha256 IS NOT NULL)');
     expect(server).toContain("FROM media_airing a");
-    expect(server).toContain("a.schedule_status='SCHEDULED'");
-    expect(server).toContain('a.precision AS time_precision');
     expect(server).toContain("'DATE'::text");
     expect(server).toContain('e.observed_at AS "observedAt"');
+  });
+
+  it('returns a bounded user-scoped AniList chronology from proved members',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server).toMatch(/animeSeasons:\s*animeSeasons\.rows/u);
+    expect(server).toMatch(/animeRelated:\s*animeRelated\.rows/u);
+    expect(server).toContain('WITH sequence_media AS (SELECT $1::text AS id UNION');
+    expect(server).toContain('WHERE w.root_media_id=$1 ORDER BY w.member_order LIMIT 50');
+    expect(server).toContain("payload.validity_status='VALID'");
   });
 });

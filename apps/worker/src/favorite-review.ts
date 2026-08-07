@@ -20,7 +20,7 @@ function stableJson(value: unknown): string {
 }
 
 export async function refreshReviewQueueNotification(query: Query, userId: string) {
-  const pending = await query("SELECT count(*)::int AS count FROM favorite_review WHERE user_id=$1 AND status='PENDING'", [userId]);
+  const pending = await query("SELECT count(DISTINCT COALESCE(cluster_id::text,id::text))::int AS count FROM favorite_review WHERE user_id=$1 AND status='PENDING'", [userId]);
   const count = Number(pending.rows[0]?.count ?? 0);
   if (!count) {
     await query("DELETE FROM personal_notification WHERE user_id=$1 AND kind='FAVORITE_REVIEW_REQUIRED' AND release_key='favorite-review-queue'", [userId]);
@@ -37,7 +37,7 @@ export async function openFavoriteReview(query: Query, input: {
   provider: 'anilist'|'mangaupdates'; candidates: ReviewCandidate[]; mediaId?: string; reason?: string;
   persistCover?: (profileId: string, imageUrl: string, provider: 'anilist'|'mangaupdates') => Promise<unknown>;
 }) {
-  const candidates = input.candidates.slice(0, 5);
+  const candidates = [...new Map(input.candidates.map(candidate => [String(candidate.id),candidate] as const)).values()].slice(0, 5);
   const link = await query(`SELECT l.installation_id AS "installationId",l.bookmark_id AS "bookmarkId",i.payload->>'title' AS "rawFavoriteTitle",i.payload->>'parsedTitle' AS "parsedFavoriteTitle",i.payload->>'url' AS "favoriteUrl"
     FROM bookmark_media_link l LEFT JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id
     WHERE l.user_id=$1 AND ($2::text IS NULL OR l.media_id=$2) AND ($3::text IS NULL OR l.installation_id=$3) AND ($4::text IS NULL OR l.bookmark_id=$4) ORDER BY l.created_at DESC LIMIT 1`, [input.userId, input.mediaId ?? null, input.installationId ?? null, input.bookmarkId ?? null]);
@@ -90,9 +90,10 @@ export async function openFavoriteReview(query: Query, input: {
         reviewId, profile.rows[0].id, String(candidate.id), candidate.hitTitle ?? null, known.rows[0]?.mediaId ?? null]);
   }
   await query(`INSERT INTO favorite_review_candidate(review_id,profile_id,provider_id)
-    SELECT r.id,cc.profile_id,p.provider_id FROM favorite_review r
+    SELECT DISTINCT ON(r.id,p.provider_id) r.id,cc.profile_id,p.provider_id FROM favorite_review r
     JOIN review_cluster_candidate cc ON cc.cluster_id=r.cluster_id JOIN provider_profile p ON p.id=cc.profile_id
     WHERE r.cluster_id=$1 AND r.status='PENDING'
+    ORDER BY r.id,p.provider_id,p.last_seen_at DESC,p.id DESC
     ON CONFLICT(review_id,provider_id) DO UPDATE SET profile_id=excluded.profile_id`, [clusterId]);
   const local = await query(`SELECT p.provider_id FROM review_cluster_candidate cc JOIN provider_profile p ON p.id=cc.profile_id LEFT JOIN review_title_cluster cl ON cl.id=cc.cluster_id WHERE cc.cluster_id=$1 ORDER BY (cc.locked_at IS NOT NULL) DESC,(cl.consensus_profile_id=cc.profile_id) DESC,(SELECT count(DISTINCT e.user_id) FROM review_cluster_endorsement e WHERE e.cluster_id=cc.cluster_id AND e.profile_id=cc.profile_id) DESC,(SELECT count(*) FROM favorite_review_candidate rc JOIN favorite_review r ON r.id=rc.review_id WHERE r.cluster_id=cc.cluster_id AND rc.profile_id=cc.profile_id AND r.status='PENDING') DESC,(p.cover_status='ACTIVE') DESC,(p.type IS NOT NULL)::int+(p.year IS NOT NULL)::int DESC,favlib_provider_audience_signal(p.payload) DESC,cc.created_at,p.provider_id LIMIT 5`, [clusterId]);
   const currentProviderIds = local.rows.length ? local.rows.map((row:any)=>row.provider_id) : [...new Set(candidates.map(candidate=>String(candidate.id)))];

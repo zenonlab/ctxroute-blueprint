@@ -3,27 +3,24 @@ import { mediaSites, mergeSites } from './sites.js';
 import { saveState, updateState } from './storage.js';
 import { API } from './api.js';
 import { apiFetch as fetch } from './api-fetch.js';
-import { parseBookmarkTitle } from '@favlib/contracts';
+import { parseBookmarkTitle, progressionFromFavorite } from '@favlib/metadata/bookmark-parser';
 
 export { API } from './api.js';
 
 export function progressionFrom(title: string, url: string) {
-  const value = `${title} ${url}`;
-  const match = value.match(/(?:episode|ep|chapter|chapitre|chap|ch|volume|vol)[\s._:/#-]*(\d+(?:\.\d+)?)/i);
-  if (!match) return null;
-  const lower = match[0].toLowerCase();
-  const kind = lower.includes('vol') ? 'volume' : lower.includes('ch') ? 'chapter' : 'episode';
-  return { position: match[1], kind: kind as 'episode' | 'chapter' | 'volume' };
+  const parsed = progressionFromFavorite({ title, url });
+  return parsed ? { position: parsed.raw, kind: parsed.kind } : null;
 }
 
 export async function reportBookmarkProgression(state: State, bookmark: Bookmark, event: Event['type']) {
   if (!state.deviceToken || !['created', 'changed'].includes(event)) return;
   const progression = progressionFrom(bookmark.title, bookmark.url);
   if (!progression) return;
+  const provenance = progressionFromFavorite({ title: bookmark.title, url: bookmark.url })?.provenance;
   const response = await fetch(`${API}/extension/progression`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${state.deviceToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bookmarkId: bookmark.id, url: bookmark.url, title: bookmark.title, ...progression, confidence: 'high', consented: true })
+    body: JSON.stringify({ bookmarkId: bookmark.id, url: bookmark.url, title: bookmark.title, ...progression, provenance, confidence: 'high', consented: true })
   });
   if (response.status === 401) throw new Error('DEVICE_REVOKED');
   if (response.status === 426) throw new Error('PROTOCOL_UNSUPPORTED');
@@ -61,7 +58,7 @@ export async function verifyInventory(state:State):Promise<State>{
   let verifiedAt:number|null=null;
   if(equal){const response=await fetch(`${API}/extension/reconcile`,{method:'POST',headers:{Authorization:`Bearer ${state.deviceToken}`,'Content-Type':'application/json','X-FavLib-Protocol':String(PROTOCOL)},body:JSON.stringify({inventoryTotal:state.inventory.totalWeb,inventoryDigest:state.inventory.digest})});if(response.status===401)throw new Error('DEVICE_REVOKED');if(response.status===426)throw new Error('PROTOCOL_UNSUPPORTED');if(response.status===409)equal=false;else if(!response.ok)throw new Error(`RECONCILE_${response.status}`);else{const body=await response.json() as {verifiedSyncAt:string};verifiedAt=Date.parse(body.verifiedSyncAt)}}
   const debugReport:DebugReport={at:attemptedAt,collection:{total:diagnostic.inventoryTotal,recognized:diagnostic.recognizedCount??0,review:diagnostic.reviewCount??0,excluded:diagnostic.excludedCount??0,unresolved:diagnostic.unresolvedItems?.length??0},unresolvedItems:diagnostic.unresolvedItems??[],resolution:diagnostic.debug?.resolution??[],covers:diagnostic.debug?.covers??[]};
-  return {...state,lastSyncAt:equal?attemptedAt:state.lastSyncAt,syncStatus:equal?'verified':'diverged',debugReport,serverReceipt:{inventoryTotal:diagnostic.inventoryTotal,recognizedCount:diagnostic.recognizedCount,reviewCount:diagnostic.reviewCount,excludedCount:diagnostic.excludedCount,inventoryDigest:diagnostic.inventoryDigest,serverSyncedAt:diagnostic.lastSyncAt?Date.parse(diagnostic.lastSyncAt):null,attemptedAt,verifiedAt:equal?(verifiedAt||attemptedAt):null}};
+  return {...state,progressCatchupPending:equal?false:state.progressCatchupPending,lastSyncAt:equal?attemptedAt:state.lastSyncAt,syncStatus:equal?'verified':'diverged',debugReport,serverReceipt:{inventoryTotal:diagnostic.inventoryTotal,recognizedCount:diagnostic.recognizedCount,reviewCount:diagnostic.reviewCount,excludedCount:diagnostic.excludedCount,inventoryDigest:diagnostic.inventoryDigest,serverSyncedAt:diagnostic.lastSyncAt?Date.parse(diagnostic.lastSyncAt):null,attemptedAt,verifiedAt:equal?(verifiedAt||attemptedAt):null}};
 }
 
 export function sameQueuedEvent(left:Event,right:Event){

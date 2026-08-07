@@ -2,6 +2,7 @@ export const WORKER_TASK_NAMES = [
   'availability', 'availability-sweep', 'announcement-sync', 'backup', 'cover-recompress',
   'health', 'notification-delivery', 'retention-purge', 'resolve-favorite',
   'anilist-enrichment', 'mangaupdates-enrichment', 'enrichment-sweep', 'mangaupdates-release-sweep', 'anilist-calendar-sweep',
+  'reassess-favorite-reviews',
 ] as const;
 
 export const SCHEDULES = {
@@ -25,7 +26,7 @@ export const ROLE_SCHEDULES = {
 
 export const ROLE_TASK_NAMES = {
   all: ['availability','announcement-sync','backup','cover-recompress','health','notification-delivery','retention-purge','resolve-favorite'],
-  reading: ['availability','availability-sweep','health','notification-delivery','anilist-enrichment','mangaupdates-enrichment','enrichment-sweep','mangaupdates-release-sweep','anilist-calendar-sweep','provider-profile-cover'],
+  reading: ['availability','availability-sweep','health','notification-delivery','anilist-enrichment','mangaupdates-enrichment','enrichment-sweep','mangaupdates-release-sweep','anilist-calendar-sweep','provider-profile-cover','manual-review-provider','reassess-favorite-reviews'],
 } as const;
 
 export function parseCrontab(text: string): string[] {

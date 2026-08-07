@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { digest, hashPassword } from '@favlib/auth';
@@ -15,6 +15,8 @@ const suite=describe.skipIf(!enabled);
 const pool=enabled?new Pool({connectionString:testDatabaseUrl}):null;
 const alice=randomUUID();
 const bob=randomUUID();
+
+beforeAll(async()=>{if(pool)await pool.query('DELETE FROM security_rate_limit')});
 
 suite('Wave 4 PostgreSQL ownership isolation',()=>{
   it('prefers a synthetic Latin transliteration over a non-Latin provider title',async()=>{
@@ -352,7 +354,7 @@ suite('Wave 4 PostgreSQL ownership isolation',()=>{
   });
   it('resets only provider-derived catalogue rows and preserves personal data and local image hashes',async()=>{
     if(!pool)throw new Error('DATABASE_URL required');
-    const userId=randomUUID(),mediaId=`catalog-reset-${randomUUID()}`,installationId=`catalog-reset-${randomUUID()}`,assetHash='f'.repeat(64);
+    const userId=randomUUID(),mediaId=`catalog-reset-${randomUUID()}`,installationId=`catalog-reset-${randomUUID()}`,assetHash=createHash('sha256').update(randomUUID()).digest('hex');
     await pool.query("INSERT INTO app_user(id,email,password_hash,role) VALUES($1,$2,'synthetic','member')",[userId,`catalog-reset-${userId}@example.test`]);
     await pool.query("INSERT INTO extension_device(user_id,installation_id,token_hash,name,browser,protocol) VALUES($1,$2,$3,'catalog reset','test',1)",[userId,installationId,digest(`catalog-reset-${userId}`)]);
     await pool.query("INSERT INTO media(id,type) VALUES($1,'MANGA')",[mediaId]);

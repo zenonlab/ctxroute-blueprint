@@ -37,7 +37,11 @@ export async function safeRequest(input:string|URL,options:SafeHttpOptions):Prom
       if(response.statusCode>=300&&response.statusCode<400){await response.body.dump();if(redirect===redirects)throw new Error('REDIRECT_LIMIT');const location=Array.isArray(headers.location)?headers.location[0]:headers.location;if(!location)throw new Error('REDIRECT_WITHOUT_LOCATION');current=new URL(location,current);continue}
       const declared=Number(Array.isArray(headers['content-length'])?headers['content-length'][0]:headers['content-length']);if(Number.isFinite(declared)&&declared>options.maxBytes){await response.body.dump();throw new Error('RESPONSE_TOO_LARGE')}if(response.statusCode>=200&&response.statusCode<300)responseMime(headers,options.mimeTypes);
       const chunks:Buffer[]=[];let size=0;for await(const chunk of response.body){const value=Buffer.from(chunk);size+=value.length;if(size>options.maxBytes){response.body.destroy();throw new Error('RESPONSE_TOO_LARGE')}chunks.push(value)}return {status:response.statusCode,headers,body:Buffer.concat(chunks),url:current.toString()};
-    }finally{await dispatcher.close()}
+    // This dispatcher belongs to exactly one bounded request. `close()` waits
+    // for an idle keep-alive socket to expire (commonly five seconds), which
+    // needlessly holds workers and makes timeout paths nondeterministic.
+    // Destroy it after the response body has been consumed or rejected.
+    }finally{await dispatcher.destroy()}
   }throw new Error('REDIRECT_LIMIT');
 }
 export async function safeJson<T=unknown>(input:string|URL,options:Omit<SafeHttpOptions,'mimeTypes'>):Promise<{data:T;response:SafeHttpResponse}>{const response=await safeRequest(input,{...options,mimeTypes:['application/json','application/problem+json']});try{return {data:JSON.parse(response.body.toString('utf8')) as T,response}}catch{throw new Error('INVALID_JSON')}}

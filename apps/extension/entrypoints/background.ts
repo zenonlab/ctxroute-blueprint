@@ -24,7 +24,7 @@ export default defineBackground(() => {
       state = await recoverServerInventory(state);
       state = await updateState(current => mergeReconciledState(current,state));
       state = await upload(state);
-      await updateState(current => ({ ...current,cursor:state.cursor,lastSyncAt:state.lastSyncAt,serverReceipt:state.serverReceipt,debugReport:state.debugReport,syncStatus:current.queue.length?'pending':state.syncStatus,diagnostic: { status: 'ok' } }));
+      await updateState(current => ({ ...current,progressCatchupPending:state.progressCatchupPending,cursor:state.cursor,lastSyncAt:state.lastSyncAt,serverReceipt:state.serverReceipt,debugReport:state.debugReport,syncStatus:current.queue.length?'pending':state.syncStatus,diagnostic: { status: 'ok' } }));
       retryAttempt = 0;
       await chrome.alarms.clear('favlib-sync-retry');
     } catch (error) {
@@ -120,11 +120,6 @@ export default defineBackground(() => {
     await sync();
   });
 
-  chrome.webNavigation.onCommitted.addListener(details => {
-    if (details.frameId !== 0) return;
-    void loadState().then(state => reportNavigation(state, details.url, details.url)).catch(error => updateState(current => ({ ...current, diagnostic: { status: 'error', lastError: String(error) } })));
-  });
-
   chrome.webNavigation.onCompleted.addListener(details => {
     if(details.frameId!==0||details.tabId<0)return;
     void loadState().then(async state=>{
@@ -141,6 +136,7 @@ export default defineBackground(() => {
       }});
       const metadata=results[0]?.result;if(!metadata)return;
       const response=await fetch(`${API}/extension/page-metadata`,{method:'POST',headers:{Authorization:`Bearer ${state.deviceToken}`,'Content-Type':'application/json'},body:JSON.stringify(metadata)});if(response.status===401)throw new Error('DEVICE_REVOKED');if(response.status===426)throw new Error('PROTOCOL_UNSUPPORTED');if(!response.ok)throw new Error(`PAGE_METADATA_${response.status}`);
+      await reportNavigation(state,metadata.pageUrl,metadata.title??metadata.pageUrl);
     }).catch(error=>updateState(current=>({...current,diagnostic:{status:'error',lastError:String(error)}})));
   });
 

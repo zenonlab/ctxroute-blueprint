@@ -22,4 +22,11 @@ describe('compact popup contracts',()=>{
     expect(script).toContain('autoUpdateFavorites:next');
     expect(html).toContain('Favori automatique');
   });
+  it('uses the same personal/available counter as the library card without source labels',()=>{
+    expect(script).toContain("return `${personal} / ${available}`");
+    expect(script).toContain("<small>${escapeHtml(availabilityCounter(item))}</small>");
+    expect(script).not.toContain("<small>${escapeHtml(item.type)}");
+    expect(script).not.toContain('position ${escapeHtml(item.progress');
+    expect(script).not.toContain('Dernière sortie ·');
+  });
 });

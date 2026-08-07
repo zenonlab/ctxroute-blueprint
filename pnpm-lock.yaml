@@ -78,6 +78,9 @@ importers:
       '@favlib/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@favlib/metadata':
+        specifier: workspace:*
+        version: link:../../packages/metadata
     devDependencies:
       '@types/chrome':
         specifier: 0.0.280
@@ -248,6 +251,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      '@favlib/metadata':
+        specifier: workspace:*
+        version: link:../metadata
       zod:
         specifier: 4.4.3
         version: 4.4.3

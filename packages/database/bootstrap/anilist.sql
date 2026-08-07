@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS progression_observation (
   position_kind text NOT NULL,
   position_number numeric,
   position_raw text NOT NULL,
+  provenance jsonb NOT NULL DEFAULT '{}'::jsonb,
   confidence text NOT NULL,
   consented boolean NOT NULL DEFAULT false,
   observed_at timestamptz NOT NULL,
@@ -70,6 +71,29 @@ CREATE TABLE IF NOT EXISTS favorite_progress (
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY(user_id, media_id, position_kind)
 );
+CREATE TABLE IF NOT EXISTS favorite_progress_candidate (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+  installation_id text NOT NULL, bookmark_id text NOT NULL,
+  position_kind text NOT NULL CHECK(position_kind IN ('chapter','episode','volume')),
+  position_number numeric NOT NULL CHECK(position_number>=0), position_raw text NOT NULL,
+  raw_title text NOT NULL, raw_url text NOT NULL, parsed_slug text, path_segments jsonb NOT NULL DEFAULT '[]'::jsonb,
+  evidence jsonb NOT NULL, first_observed_at timestamptz NOT NULL DEFAULT now(), last_observed_at timestamptz NOT NULL DEFAULT now(),
+  applied_at timestamptz, applied_media_id text REFERENCES media(id) ON DELETE SET NULL,
+  UNIQUE(user_id,installation_id,bookmark_id,position_kind)
+);
+CREATE INDEX IF NOT EXISTS favorite_progress_candidate_pending_idx ON favorite_progress_candidate(user_id,installation_id,bookmark_id) WHERE applied_at IS NULL;
+DO $$ BEGIN
+  IF to_regprocedure('favlib_materialize_progress_candidate()') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS bookmark_media_link_materialize_progress ON bookmark_media_link;
+    CREATE TRIGGER bookmark_media_link_materialize_progress AFTER INSERT OR UPDATE OF media_id,status ON bookmark_media_link FOR EACH ROW EXECUTE FUNCTION favlib_materialize_progress_candidate();
+  END IF;
+END $$;
+CREATE OR REPLACE FUNCTION favlib_progression_provenance() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.provenance := COALESCE(NEW.provenance, '{}'::jsonb) || jsonb_build_object('sourceUrl', NEW.source, 'positionRaw', NEW.position_raw, 'positionKind', NEW.position_kind); RETURN NEW; END $$;
+DROP TRIGGER IF EXISTS progression_observation_provenance ON progression_observation;
+CREATE TRIGGER progression_observation_provenance BEFORE INSERT OR UPDATE ON progression_observation FOR EACH ROW EXECUTE FUNCTION favlib_progression_provenance();
+
+-- Anime work tables and global-position columns are installed by ordered
+-- migrations 0036-0039 after all referenced legacy tables exist.
 
 CREATE TABLE IF NOT EXISTS source_connector (
   id text PRIMARY KEY,
@@ -161,9 +185,42 @@ BEGIN
     shown:=favlib_clean_display_title(selected.text);
     RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',1,
       'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),
-      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' ELSE 'PROVIDER_LATIN_FALLBACK' END);
+      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' WHEN selected.title_type='canonical' THEN 'PROVIDER_CANONICAL' ELSE 'PROVIDER_LATIN_FALLBACK' END);
   END IF;
   RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_LATIN_TITLE');
+END $$;
+
+-- Final provider-only reset policy. Personal state and local image assets are
+-- intentionally outside the reset boundary.
+CREATE OR REPLACE FUNCTION favlib_reset_catalog(confirmation text)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE removed_titles integer := 0; removed_assertions integer := 0;
+BEGIN
+  IF confirmation IS DISTINCT FROM 'RESET-FAVLIB-CATALOG' THEN RAISE EXCEPTION 'RESET_CONFIRMATION_REQUIRED'; END IF;
+  DELETE FROM media_title WHERE connector IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_titles = ROW_COUNT;
+  DELETE FROM metadata_assertion WHERE provider IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_assertions = ROW_COUNT;
+  DELETE FROM provider_payload WHERE provider IN ('anilist','mangaupdates'); DELETE FROM provider_sync_state WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_enrichment_state WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_metadata WHERE provider IN ('anilist','mangaupdates'); DELETE FROM provider_progress WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_external_id WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_airing WHERE provider IN ('anilist','mangaupdates'); DELETE FROM release_announcement WHERE provider IN ('anilist','mangaupdates');
+  RETURN jsonb_build_object('removedMedia',0,'removedProviderTitles',removed_titles,'removedProviderAssertions',removed_assertions,'preservedFavoriteMedia',(SELECT count(DISTINCT media_id) FROM bookmark_media_link WHERE media_id IS NOT NULL AND status IN ('matched','accepted')),'preservedCovers',(SELECT count(*) FROM media_cover WHERE status='ACTIVE'),'preservedImageAssets',(SELECT count(*) FROM catalog_image_asset),'enqueued',0);
+END $$;
+
+-- Final provider-only reset policy. Personal state and local image assets are
+-- intentionally outside the reset boundary.
+CREATE OR REPLACE FUNCTION favlib_reset_catalog(confirmation text)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE removed_titles integer := 0; removed_assertions integer := 0;
+BEGIN
+  IF confirmation IS DISTINCT FROM 'RESET-FAVLIB-CATALOG' THEN RAISE EXCEPTION 'RESET_CONFIRMATION_REQUIRED'; END IF;
+  DELETE FROM media_title WHERE connector IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_titles = ROW_COUNT;
+  DELETE FROM metadata_assertion WHERE provider IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_assertions = ROW_COUNT;
+  DELETE FROM provider_payload WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM provider_sync_state WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM media_enrichment_state WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM media_metadata WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM provider_progress WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM media_external_id WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM media_airing WHERE provider IN ('anilist','mangaupdates');
+  DELETE FROM release_announcement WHERE provider IN ('anilist','mangaupdates');
+  RETURN jsonb_build_object('removedMedia',0,'removedProviderTitles',removed_titles,'removedProviderAssertions',removed_assertions,'preservedFavoriteMedia',(SELECT count(DISTINCT media_id) FROM bookmark_media_link WHERE media_id IS NOT NULL AND status IN ('matched','accepted')),'preservedCovers',(SELECT count(*) FROM media_cover WHERE status='ACTIVE'),'preservedImageAssets',(SELECT count(*) FROM catalog_image_asset),'enqueued',0);
 END $$;
 
 UPDATE bookmark_import_item item SET classification_status=CASE
@@ -801,7 +858,19 @@ BEGIN
     shown:=favlib_clean_display_title(selected.text);
     RETURN jsonb_build_object('title',shown,'referenceTitle',reference_title,'score',1,
       'alias',jsonb_build_object('id',selected.id,'text',selected.text,'language',selected.language,'script',selected.script,'kind',selected.kind,'titleType',selected.title_type,'connector',selected.connector),
-      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' ELSE 'PROVIDER_LATIN_FALLBACK' END);
+      'reason',CASE WHEN selected.kind='translation' AND selected.language='en' THEN 'ENGLISH_FALLBACK' WHEN selected.title_type='romaji' THEN 'ROMAJI_FALLBACK' WHEN selected.title_type='canonical' THEN 'PROVIDER_CANONICAL' ELSE 'PROVIDER_LATIN_FALLBACK' END);
   END IF;
-  RETURN jsonb_build_object('title',NULL,'referenceTitle',reference_title,'score',0,'alias',NULL,'reason','NO_LATIN_TITLE');
+  RETURN jsonb_build_object('title',reference_title,'referenceTitle',reference_title,'score',CASE WHEN reference_title IS NULL THEN 0 ELSE 1 END,'alias',NULL,'reason',CASE WHEN reference_title IS NULL THEN 'NO_LATIN_TITLE' ELSE 'SOURCE_CLEAN' END);
+END $$;
+
+-- This is intentionally the last reset definition in the bootstrap.
+CREATE OR REPLACE FUNCTION favlib_reset_catalog(confirmation text)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE removed_titles integer := 0; removed_assertions integer := 0;
+BEGIN
+  IF confirmation IS DISTINCT FROM 'RESET-FAVLIB-CATALOG' THEN RAISE EXCEPTION 'RESET_CONFIRMATION_REQUIRED'; END IF;
+  DELETE FROM media_title WHERE connector IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_titles = ROW_COUNT;
+  DELETE FROM metadata_assertion WHERE provider IN ('anilist','mangaupdates'); GET DIAGNOSTICS removed_assertions = ROW_COUNT;
+  DELETE FROM provider_payload WHERE provider IN ('anilist','mangaupdates'); DELETE FROM provider_sync_state WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_enrichment_state WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_metadata WHERE provider IN ('anilist','mangaupdates'); DELETE FROM provider_progress WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_external_id WHERE provider IN ('anilist','mangaupdates'); DELETE FROM media_airing WHERE provider IN ('anilist','mangaupdates'); DELETE FROM release_announcement WHERE provider IN ('anilist','mangaupdates');
+  RETURN jsonb_build_object('removedMedia',0,'removedProviderTitles',removed_titles,'removedProviderAssertions',removed_assertions,'preservedFavoriteMedia',(SELECT count(DISTINCT media_id) FROM bookmark_media_link WHERE media_id IS NOT NULL AND status IN ('matched','accepted')),'preservedCovers',(SELECT count(*) FROM media_cover WHERE status='ACTIVE'),'preservedImageAssets',(SELECT count(*) FROM catalog_image_asset),'enqueued',0);
 END $$;

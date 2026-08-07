@@ -10,8 +10,8 @@ describe('admin review adjudication history',()=>{
     expect(migration).toContain('reverted_decision_id');
   });
   it('preserves qualified ambiguity during an admin choice and revert',()=>{
-    expect(api).toContain("qualified>=2?'HOMONYM_REQUIRED':'CONFIRMED'");
+    expect(api).toMatch(/qualified\s*>=\s*2\s*\?\s*["']HOMONYM_REQUIRED["']\s*:\s*["']CONFIRMED["']/u);
     expect(api).toContain("action,selected_profile_id,previous_state");
-    expect(api).toContain("/revert'");
+    expect(api).toMatch(/\/revert["']/u);
   });
 });

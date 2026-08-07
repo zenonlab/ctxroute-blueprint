@@ -14,9 +14,9 @@ export const SECURITY_LIMITS = Object.freeze({
 
 export const CONNECTOR_VERSIONS = Object.freeze({
   favoriteResolution: 'favorite-resolution-v3',
-  anilistMetadata: 'anilist-v18',
+  anilistMetadata: 'anilist-v19',
   anilistCover: 'anilist-cover-v4',
-  mangaUpdatesMetadata: 'mangaupdates-v17',
+  mangaUpdatesMetadata: 'mangaupdates-v18',
   mangaUpdatesCover: 'mangaupdates-cover-v6',
 });
 

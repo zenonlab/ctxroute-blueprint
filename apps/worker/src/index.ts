@@ -16,6 +16,8 @@ import enrichmentSweep from './tasks/enrichment-sweep.js';
 import mangaUpdatesReleaseSweep from './tasks/mangaupdates-release-sweep.js';
 import anilistCalendarSweep from './tasks/anilist-calendar-sweep.js';
 import providerProfileCover from './tasks/provider-profile-cover.js';
+import manualReviewProvider from './tasks/manual-review-provider.js';
+import reassessFavoriteReviews from './tasks/reassess-favorite-reviews.js';
 import { ROLE_SCHEDULES, ROLE_TASK_NAMES } from './registry.js';
 import { buildVersion } from '@favlib/config';
 import { recoverProviderRequestOwner } from '@favlib/database/provider-queue';
@@ -77,6 +79,8 @@ if(runtime.nodeEnv!=='test') {
       'mangaupdates-enrichment': async (payload: unknown, helpers) => { await mangaUpdatesEnrichment(payload, helpers); },
       'enrichment-sweep': async (payload: unknown, helpers) => { await enrichmentSweep(payload, helpers); },
       'provider-profile-cover': async (payload: unknown, helpers) => { await providerProfileCover(payload, helpers); },
+      'manual-review-provider': async (payload: unknown, helpers) => { await manualReviewProvider(payload, helpers); },
+      'reassess-favorite-reviews': async (payload: unknown, helpers) => { await reassessFavoriteReviews(payload, helpers); },
     } : {
       availability: async (payload: unknown, helpers) => { await availability(payload as Parameters<typeof availability>[0], helpers); },
       'availability-sweep': async (payload: unknown, helpers) => { await availabilitySweep(payload, helpers); },

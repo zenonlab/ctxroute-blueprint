@@ -6,7 +6,7 @@ describe('favorite reviews', () => {
     expect(isParenthesizedAmbiguity('Existence', [{ id: 1, title: 'Existence' }, { id: 2, title: 'Existence (Wang)' }])).toBe(true);
   });
   it('is idempotent across worker retries and stores complete candidates', async () => {
-    const calls: string[] = []; const query = vi.fn(async (sql: string) => { calls.push(sql); if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] }; if (sql.startsWith('INSERT INTO favorite_review')) return { rows: [{ id: 'review-1' }] }; if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] }; if (sql.startsWith("SELECT count(*)")) return { rows: [{ count: 1 }] }; return { rows: [] }; });
+    const calls: string[] = []; const query = vi.fn(async (sql: string) => { calls.push(sql); if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] }; if (sql.startsWith('INSERT INTO favorite_review')) return { rows: [{ id: 'review-1' }] }; if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] }; if (sql.startsWith("SELECT count(")) return { rows: [{ count: 1 }] }; return { rows: [] }; });
     await openFavoriteReview(query, { userId: 'u', title: 'Existence', url: 'https://example.test/existence', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Existence', hitTitle: 'Existence', authors: ['A'] }, { id: 2, title: 'Existence (Wang)', hitTitle: 'Existence' }] });
     expect(calls.filter(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES')).length).toBe(2);
     expect(calls.filter(sql => sql.startsWith('INSERT INTO personal_notification')).length).toBe(1);
@@ -17,7 +17,7 @@ describe('favorite reviews', () => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) return { rows: [{ id: 'review-1' }] };
       if (sql.startsWith('INSERT INTO provider_profile')) { values.push(parameters ?? []); return { rows: [{ id: 'profile-1' }] }; }
-      if (sql.startsWith('SELECT count(*)')) return { rows: [{ count: 1 }] };
+      if (sql.startsWith('SELECT count(')) return { rows: [{ count: 1 }] };
       return { rows: [] };
     });
     await openFavoriteReview(query, { userId: 'u', title: 'Anime', url: 'https://example.test/anime', provider: 'anilist', candidates: [{ id: 7, title: 'Anime', coverImage: 'https://img.example/7.jpg' }] });
@@ -29,7 +29,7 @@ describe('favorite reviews', () => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) return { rows: [{ id: 'review-1' }] };
       if (sql.startsWith('INSERT INTO provider_profile')) { values = parameters ?? []; return { rows: [{ id: 'profile-1' }] }; }
-      if (sql.startsWith('SELECT count(*)')) return { rows: [{ count: 1 }] };
+      if (sql.startsWith('SELECT count(')) return { rows: [{ count: 1 }] };
       return { rows: [] };
     });
     await openFavoriteReview(query, { userId: 'u', title: 'Existence', url: 'https://example.test/existence', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Existence', authors: [], startDate: { year: 2020 } }] });
@@ -43,7 +43,7 @@ describe('favorite reviews', () => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: String(parameters?.[4] ?? 'b') }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) return { rows: [{ id: `review-${parameters?.[2]}` }] };
       if (sql.startsWith('INSERT INTO provider_profile')) { profileValues.push(parameters ?? []); return { rows: [{ id: 'shared-profile' }] }; }
-      if (sql.startsWith("SELECT count(*)")) return { rows: [{ count: 2 }] };
+      if (sql.startsWith("SELECT count(")) return { rows: [{ count: 2 }] };
       return { rows: [] };
     });
     const candidate = { id: 7, title: 'Same', genres: ['Drama'], coverImage: 'https://img.example/7.jpg' };
@@ -59,7 +59,7 @@ describe('favorite reviews', () => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b', favoriteTitle: 'The Dreaming Man is a Realist - 7' }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) return { rows: [{ id: 'review-1' }] };
       if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] };
-      if (sql.startsWith("SELECT count(*)")) return { rows: [{ count: 1 }] };
+      if (sql.startsWith("SELECT count(")) return { rows: [{ count: 1 }] };
       return { rows: [] };
     });
     await openFavoriteReview(query, { userId:'u', title:'The Dreaming Boy Is a Realist', url:'https://source.test/dreaming-boy', provider:'anilist', candidates:[{id:1,title:'The Dreaming Boy Is a Realist'}] });
@@ -72,7 +72,7 @@ describe('favorite reviews', () => {
     const query = vi.fn(async (sql: string, values?: unknown[]) => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId:'i', bookmarkId:'b', rawFavoriteTitle:'Chapter 46 (English) - Synthetic Warriors | ComicK', favoriteUrl:'https://example.test/chapter' }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) { reviewValues=values??[]; return {rows:[{id:'r'}]}; }
-      if (sql.startsWith('SELECT count(*)')) return {rows:[{count:1}]};
+      if (sql.startsWith('SELECT count(')) return {rows:[{count:1}]};
       return {rows:[]};
     });
     await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://example.test',provider:'mangaupdates',candidates:[]});
@@ -83,7 +83,7 @@ describe('favorite reviews', () => {
     const query = vi.fn(async (sql: string, values?: unknown[]) => {
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId:'i', bookmarkId:'b', rawFavoriteTitle:'Synthetic Cleric 9', favoriteUrl:'https://anime.example/catalogue/synthetic-cleric/saison1/vostfr/' }] };
       if (sql.startsWith('INSERT INTO favorite_review(')) { reviewValues=values??[]; return {rows:[{id:'r'}]}; }
-      if (sql.startsWith('SELECT count(*)')) return {rows:[{count:1}]};
+      if (sql.startsWith('SELECT count(')) return {rows:[{count:1}]};
       return {rows:[]};
     });
     await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://example.test',provider:'anilist',candidates:[]});

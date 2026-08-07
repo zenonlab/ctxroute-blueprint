@@ -4,14 +4,11 @@ import { normalizeSerializationStatus, position } from "@favlib/progression";
 import { withProviderRequest } from "@favlib/database/provider-queue";
 import {
   cleanDisplayTitle,
-  automaticMangaUpdatesSeriesMatches,
-  exactMangaUpdatesSeriesMatches,
-  exactTitleMatchKind,
   explicitTitleAliases,
   fetchMangaUpdatesSeries,
   mangaUpdatesMediaType,
   normalizeTitle,
-  preferredMangaUpdatesSeriesMatch,
+  decideMangaUpdatesTitleMatch,
   rankMangaUpdatesReviewCandidates,
   searchMangaUpdatesSeries,
   titleVariants,
@@ -274,23 +271,22 @@ const task: Task = async (raw, helpers: Helpers) => {
       }
     }
     candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
-    const exactMatches = exactMangaUpdatesSeriesMatches(identityAliases, candidates);
-    const automaticMatches = automaticMangaUpdatesSeriesMatches(identityAliases, candidates);
-    const preferredFavoriteMatch = preferredMangaUpdatesSeriesMatch(favoriteAliases, candidates);
+    const matchDecision = decideMangaUpdatesTitleMatch(favoriteAliases.length ? favoriteAliases : identityAliases, candidates);
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
       [JSON.stringify(snapshotCandidates(candidates)), mediaId, VERSION],
     );
-    if (preferredFavoriteMatch || (exactMatches.length === 1 && automaticMatches.length === 1 && exactMatches[0].id === automaticMatches[0].id)) {
-      selected = preferredFavoriteMatch ?? automaticMatches[0];
+    if (matchDecision.status === 'MATCH') {
+      selected = matchDecision.candidate;
       fastPath = true;
+      await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH', matcherVersion: matchDecision.matcherVersion, matchedAlias: matchDecision.matchedAlias, providerTitle: matchDecision.providerTitle, rawProvenance: matchDecision.rawProvenance })]);
     }
-    const ambiguity = exactMatches.length > 1 && !preferredFavoriteMatch;
+    const ambiguity = matchDecision.status === 'AMBIGUOUS';
     if (ambiguity) {
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
-      const reviewCandidates = rankMangaUpdatesReviewCandidates(identityAliases, exactMatches.length > 1 ? exactMatches : candidates, 5);
-      await openReviewsForMedia(h.query, { title: sourceRow.rows[0]?.text ?? titleRow.rows[0]?.text ?? searchAliases[0], url: sourceRow.rows[0]?.url ?? titleRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: reviewCandidates, mediaId, reason: exactMatches.length > 1 ? 'AMBIGUOUS' : 'LOW_CONFIDENCE', persistCover: (profileId, imageUrl, provider) => imageUrl ? saveProviderProfileCover(h, profileId, imageUrl, provider, { timeoutMs }) : Promise.resolve() });
+      const reviewCandidates = rankMangaUpdatesReviewCandidates(identityAliases, candidates, 5);
+      await openReviewsForMedia(h.query, { title: sourceRow.rows[0]?.text ?? titleRow.rows[0]?.text ?? searchAliases[0], url: sourceRow.rows[0]?.url ?? titleRow.rows[0]?.url ?? '', provider: 'mangaupdates', candidates: reviewCandidates, mediaId, reason: 'AMBIGUOUS', persistCover: (profileId, imageUrl, provider) => imageUrl ? saveProviderProfileCover(h, profileId, imageUrl, provider, { timeoutMs }) : Promise.resolve() });
       await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','ambiguous-review'::text) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId]);
       await finishEnrichment(h, {
         mediaId, provider: 'mangaupdates', purpose: 'metadata', version: VERSION,
@@ -301,9 +297,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     // A provider identity is the canonical work. An existing owner remains a
     // valid candidate: the new favorite must converge onto it, not create a
     // second work merely because its provisional source media differs.
-    selected = preferredFavoriteMatch ?? (exactMatches.length === 1 && automaticMatches.length === 1 && exactMatches[0].id === automaticMatches[0].id
-      ? automaticMatches[0]
-      : undefined);
+    selected = matchDecision.status === 'MATCH' ? matchDecision.candidate : undefined;
     if (!selected) {
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
@@ -323,12 +317,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       return;
     }
     const s = selected;
-    const exactResolution = automaticMatches.length === 1 && identityAliases.some((alias:string)=>[s.title,s.hitTitle,...(s.titles??[]),...(s.associated??[])].filter((title):title is string=>Boolean(title)).some(title=>exactTitleMatchKind(alias,title)==='SUBTITLE_EXACT')) ? 'SUBTITLE_EXACT' : automaticMatches.length === 1 && identityAliases.some((alias:string)=>[s.title,s.hitTitle,...(s.titles??[]),...(s.associated??[])].filter((title):title is string=>Boolean(title)).some(title=>exactTitleMatchKind(alias,title)==='ALIAS_PARENTHESIZED_EXACT')) ? 'ALIAS_PARENTHESIZED_EXACT' : automaticMatches.length > 1 ? 'RECENT_EXACT_TIEBREAK' : exactMatches.length === 1 && identityAliases.some((alias: string) =>
-      [s.title, s.hitTitle, ...(s.titles ?? []), ...(s.associated ?? [])]
-        .filter((title): title is string => Boolean(title))
-        .some((title) => exactTitleMatchKind(alias, title) === 'NORMALIZED_EXACT'))
-      ? 'NORMALIZED_EXACT'
-      : exactMatches.length === 1 ? 'COMPACT_EXACT' : 'SCORED_MATCH';
+    const exactResolution = matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH';
     const owner = await h.query(
       "SELECT media_id FROM media_external_id WHERE provider='mangaupdates' AND external_id=$1",
       [s.id],
@@ -411,8 +400,6 @@ const task: Task = async (raw, helpers: Helpers) => {
     }
     const chapter=s.latestChapter?position(s.latestChapter,'chapter'):undefined;
     await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,$5,$6,$7,$8,now(),'ACTIVE',NULL,$9,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=COALESCE(excluded.latest_chapter,provider_progress.latest_chapter),latest_volume=COALESCE(excluded.latest_volume,provider_progress.latest_volume),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[targetMediaId,normalizeSerializationStatus(s.status)??null,s.latestChapter??null,s.latestVolume??null,chapter?.number===undefined?null:'chapter',chapter?.number??null,s.latestChapter??null,chapter?.number===undefined?null:{provider:'mangaupdates',seriesId:s.id,evidence:'series-record'},{provider:'mangaupdates',seriesId:s.id}]);
-    if (exactResolution === 'RECENT_EXACT_TIEBREAK')
-      await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [targetMediaId, JSON.stringify({resolution:exactResolution,aliases:identityAliases,providerDate:s.startDate??null,providerYear:s.year??null})]);
     await markFavoriteMatched(h.query, targetMediaId);
     await reconcileResolvedFavoriteReviews(h.query, targetMediaId);
     await finishEnrichment(h, {

@@ -11,6 +11,6 @@
     "test": "vitest run",
     "verify:downloads": "node scripts/verify-published-downloads.mjs"
   },
-  "dependencies": { "@favlib/contracts": "workspace:*" },
+  "dependencies": { "@favlib/contracts": "workspace:*", "@favlib/metadata": "workspace:*" },
   "devDependencies": { "@types/chrome": "0.0.280", "typescript": "5.7.3", "vitest": "2.1.8", "wxt": "0.19.29" }
 }
