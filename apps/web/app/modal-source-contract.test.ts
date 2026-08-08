@@ -24,6 +24,8 @@ describe('verso de modal œuvre',()=>{
     expect(source).toContain('navigator.clipboard');
     expect(source).toContain('providerPages');
     expect(source).toContain("provider==='anilist'?'AniList':'MangaUpdates'");
+    expect(source).toContain("item.type==='ANIME'?'anilist':'mangaupdates'");
+    expect(source).toContain("provider==='mangaupdates'?'MangaUpdates':'MangaDex'");
     expect(source).toContain("{(['anilist','mangaupdates'] as const).map(provider=>");
     expect(source).toContain('uniqueFavorites');
     expect(source).not.toContain('Aucune sortie planifiée connue.');
