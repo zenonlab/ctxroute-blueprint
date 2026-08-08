@@ -71,7 +71,7 @@ test('library appends five rows at a time without repeating cards', async ({ pag
   await expect(cards).toHaveCount(65);
   await expect(page.getByRole('button', { name: 'Voir plus' })).toHaveCount(0);
 
-  const hrefs = await cards.locator('> a').evaluateAll(links => links.map(link => link.getAttribute('href')));
+  const hrefs = await cards.locator('a[aria-label^="Aperçu de"]').evaluateAll(links => links.map(link => link.getAttribute('href')));
   expect(new Set(hrefs).size).toBe(65);
   expect(requestedOffsets).toEqual([0, 30, 60]);
 });
