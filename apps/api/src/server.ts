@@ -25,6 +25,7 @@ import {
 } from "@favlib/metadata";
 import { position, acceptObservation } from "@favlib/progression";
 import { previewDeclarative, validateDeclarative } from "@favlib/sources";
+import { safeRequest } from "@favlib/safe-http";
 import {
   EXTENSION_PROTOCOL,
   MINIMUM_EXTENSION_PROTOCOL,
@@ -341,6 +342,19 @@ app.get("/api/v1/health", async () => ({
   buildVersion: buildVersion(),
   schemaVersion: BOOTSTRAP_SCHEMA_VERSION,
 }));
+app.get("/api/v1/catalog/favicon", async (req: any, reply: any) => {
+  const parsed = z.object({domain:z.string().trim().toLowerCase().regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/)}).safeParse(req.query);
+  if (!parsed.success) return err(reply,400,"VALIDATION_FAILED");
+  const domain=parsed.data.domain;
+  const candidates=[`https://a.favicon.im/${encodeURIComponent(domain)}?larger=true&throw-error-on-404=true`,`https://${domain}/favicon.ico`];
+  for(const candidate of candidates){
+    try{
+      const response=await safeRequest(candidate,{requireHttps:true,maxRedirects:3,timeoutMs:5000,maxBytes:512*1024,mimeTypes:['image/png','image/jpeg','image/gif','image/webp','image/x-icon','image/vnd.microsoft.icon','image/svg+xml']});
+      if(response.status>=200&&response.status<300&&response.body.length){const contentType=Array.isArray(response.headers['content-type'])?response.headers['content-type'][0]:response.headers['content-type'];return reply.type(contentType?.split(';',1)[0]??'image/png').header('Cache-Control','public, max-age=86400').send(response.body)}
+    }catch{}
+  }
+  return err(reply,404,"FAVICON_NOT_FOUND");
+});
 app.get("/api/v1/openapi.json", async () => runtimeOpenApi());
 app.get(
   "/api/v1/public/extension-releases/:browser",

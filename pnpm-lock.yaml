@@ -38,6 +38,9 @@ importers:
       '@favlib/progression':
         specifier: workspace:*
         version: link:../../packages/progression
+      '@favlib/safe-http':
+        specifier: workspace:*
+        version: link:../../packages/safe-http
       '@favlib/sources':
         specifier: workspace:*
         version: link:../../packages/sources
