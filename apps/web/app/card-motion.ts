@@ -19,3 +19,12 @@ export function tiltAt(point:CardPoint){
 }
 
 export const motionDuration=(reduced:boolean)=>reduced?0:640;
+
+export type SpringState={position:number;velocity:number};
+export function stepSpring(state:SpringState,target:number,deltaSeconds:number):SpringState{
+  const dt=Math.min(.032,Math.max(0,deltaSeconds));
+  const acceleration=95*(target-state.position)-17*state.velocity;
+  const velocity=state.velocity+acceleration*dt;
+  return {position:state.position+velocity*dt,velocity};
+}
+export const springSettled=(state:SpringState,target:number)=>Math.abs(target-state.position)<.001&&Math.abs(state.velocity)<.01;

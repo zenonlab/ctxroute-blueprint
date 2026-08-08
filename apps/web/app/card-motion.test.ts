@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {flipAxis,motionDuration,pointInRect} from './card-motion';
+import {flipAxis,motionDuration,pointInRect,springSettled,stepSpring} from './card-motion';
 
 describe('physical card motion',()=>{
   it('chooses an oblique axis from an edge entry',()=>{
@@ -18,5 +18,9 @@ describe('physical card motion',()=>{
     expect(pointInRect(-5,150,{left:0,top:0,width:100,height:100})).toEqual({x:0,y:1});
     expect(motionDuration(true)).toBe(0);
     expect(motionDuration(false)).toBeGreaterThan(0);
+  });
+  it('uses a damped spring that converges in both directions',()=>{
+    let state={position:0,velocity:0};for(let frame=0;frame<180;frame++)state=stepSpring(state,1,1/60);expect(springSettled(state,1)).toBe(true);
+    for(let frame=0;frame<180;frame++)state=stepSpring(state,0,1/60);expect(springSettled(state,0)).toBe(true);
   });
 });
