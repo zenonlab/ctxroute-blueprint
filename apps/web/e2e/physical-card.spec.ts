@@ -39,6 +39,20 @@ test('reduced motion opens the final card state directly',async({page})=>{
   await page.goto('/library');await page.getByRole('link',{name:'Aperçu de Titre synthétique'}).click();await expect(page.getByRole('dialog')).toHaveCSS('transition-duration','0s');
 });
 
+test('library verso exposes its three accessible tabs and keeps parsed title provenance',async({page})=>{
+  await shell(page);
+  await page.route('**/api/v1/library/facets*',route=>json(route,{types:[],themes:[],genres:[],categories:[],statuses:[],years:[],contentRatings:[],demographics:[]}));
+  await page.route('**/api/v1/library*',route=>json(route,{items:[{...media,title:'Titre parsé',rawTitle:'Titre brut interdit',favoriteCount:2,format:'TV',seasonYear:2025,status:'Ongoing',metadata:{provider:'synthetic-provider',metadata:{description:'<p>Synopsis propre et long.</p>',language:'fr'}},progress:{kind:'episode',raw:'3',number:3,updatedAt:'2026-01-01T00:00:00.000Z'},availability:{kind:'episode',raw:'5',number:5,provider:'synthetic-provider'},latestReleaseDate:'2999-01-01T00:00:00.000Z',providers:['synthetic-provider'] }],total:1,nextOffset:1,hasMore:false}));
+  await page.goto('/library');
+  await page.getByRole('link',{name:'Aperçu de Titre parsé'}).click();
+  const dialog=page.getByRole('dialog',{name:'Aperçu de Titre parsé'});await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('tab')).toHaveCount(3);await expect(dialog).toContainText('Titre parsé');await expect(dialog).not.toContainText('Titre brut interdit');await expect(dialog).toContainText('Disponible');await expect(dialog).toContainText('Disponible : 5');
+  await dialog.getByRole('tab',{name:'Description & informations'}).click();await expect(dialog).toContainText('Synopsis propre et long.');
+  await dialog.getByRole('tab',{name:'Découvertes similaires'}).click();await expect(dialog).toContainText('Les recommandations seront affichées');
+  if(!test.info().project.name.includes('mobile')){await dialog.getByRole('tab',{name:'Liens & prochaine sortie'}).focus();await page.keyboard.press('Tab');await expect(dialog.getByRole('tab',{name:'Description & informations'})).toBeFocused();}
+  await page.getByRole('button',{name:'Fermer'}).click();if(!test.info().project.name.includes('mobile')){await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('link',{name:'Aperçu de Titre parsé'})).toBeFocused();}
+});
+
 test('touch tap opens and closes the media card',async({page,isMobile})=>{
   test.skip(!isMobile,'touch project only');await shell(page);
   await page.route('**/api/v1/library/facets*',route=>json(route,{types:[],themes:[],genres:[],categories:[],statuses:[],years:[],contentRatings:[],demographics:[]}));

@@ -39,6 +39,7 @@ import {
   extensionReleaseContract,
   contentPreferencePatchContract,
   repairMissingPositionsRequestContract,
+  sourceReportContract,
 } from "@favlib/contracts";
 import {
   CONNECTOR_VERSIONS,
@@ -1793,6 +1794,16 @@ app.get("/api/v1/library/:mediaId", async (req: any, reply: any) => {
   if (!item) return err(reply, 404, "MEDIA_NOT_IN_LIBRARY");
   return item;
 });
+app.post("/api/v1/library/:mediaId/source-reports", async (req: any, reply: any) => {
+  const parsed=sourceReportContract.safeParse({...req.body,mediaId:req.params.mediaId});
+  if(!parsed.success)return err(reply,400,"VALIDATION_FAILED","Signalement invalide.",parsed.error.issues);
+  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted') LIMIT 1",[req.user.id,req.params.mediaId]);
+  if(!owned.rowCount)return err(reply,404,"MEDIA_NOT_IN_LIBRARY");
+  const origin=await pool.query("SELECT 1 FROM release_origin WHERE media_id=$1 AND canonical_url=$2 AND (user_id IS NULL OR user_id=$3) LIMIT 1",[req.params.mediaId,parsed.data.canonicalUrl,req.user.id]);
+  if(!origin.rowCount)return err(reply,404,"SOURCE_NOT_FOUND");
+  await pool.query("INSERT INTO source_report(user_id,media_id,canonical_url,reason,details) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,media_id,canonical_url) DO UPDATE SET reason=excluded.reason,details=excluded.details,created_at=now()",[req.user.id,req.params.mediaId,parsed.data.canonicalUrl,parsed.data.reason,parsed.data.details??null]);
+  return reply.code(201).send({ok:true,mediaId:req.params.mediaId,canonicalUrl:parsed.data.canonicalUrl});
+});
 app.post(
   "/api/v1/library/repair-missing-positions",
   async (req: any, reply: any) => {
@@ -2070,6 +2081,10 @@ async function richCatalogRow(
       userId,
     ])
   ).rows[0]?.selection;
+  const [favorites, sources] = await Promise.all([
+    pool.query(`SELECT i.bookmark_id AS "bookmarkId",i.payload->>'url' AS url,i.payload->>'title' AS title,i.parse_artifact#>>'{identity,title}' AS "parsedTitle",i.parse_artifact->'progression' AS progression,COALESCE(d.name,'Profil') AS device,i.parser_id AS "parserId",i.parser_version AS "parserVersion",i.parse_artifact->'provenance' AS provenance FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l.user_id=$1 AND l.media_id=$2 AND l.status IN ('matched','accepted') AND i.event<>'removed' ORDER BY i.created_at DESC`,[userId,mediaId]),
+    pool.query(`SELECT o.media_id AS "mediaId",o.connector,o.canonical_url AS "canonicalUrl",CASE WHEN o.status='ERROR' THEN 'UNAVAILABLE' ELSE o.status END AS status,o.checked_at AS "checkedAt",o.provenance->>'title' AS title,o.provenance->>'chapter' AS chapter,split_part(regexp_replace(o.canonical_url,'^https?://',''),'/',1) AS domain,o.provenance FROM release_origin o WHERE o.media_id=$1 AND (o.user_id IS NULL OR o.user_id=$2) ORDER BY o.checked_at DESC`,[mediaId,userId]),
+  ]);
   return {
     ...base.rows[0],
     displayedTitle: titleSelection?.title ?? null,
@@ -2090,6 +2105,8 @@ async function richCatalogRow(
       status: row.status,
       error: row.error,
     })),
+    favorites: favorites.rows,
+    sources: sources.rows,
   };
 }
 app.get("/api/v1/catalog/media/:mediaId", async (req: any, reply: any) => {
