@@ -12,7 +12,7 @@ export FAVLIB_BACKUP_PATH="$backup_path"
 
 "${compose[@]}" up -d --build
 
-required_services=(postgres api worker web caddy)
+required_services=(postgres api worker reading-worker interactive-worker web caddy)
 deadline=$((SECONDS + 180))
 while (( SECONDS < deadline )); do
   all_healthy=1
@@ -29,7 +29,7 @@ while (( SECONDS < deadline )); do
     fi
   done
   if (( all_healthy )); then
-    echo "FavLib est lancé: PostgreSQL, API, worker, web et Caddy sont healthy."
+    echo "FavLib est lancé: PostgreSQL, API, workers, web et Caddy sont healthy."
     "${compose[@]}" ps
     exit 0
   fi

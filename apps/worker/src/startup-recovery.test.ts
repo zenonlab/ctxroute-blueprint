@@ -18,4 +18,11 @@ describe('worker startup recovery',()=>{
     expect(lockCall[1][0]).not.toContain('anilist-enrichment');
     expect(lockCall[1][0]).not.toContain('anilist-calendar-sweep');
   });
+  it('keeps interactive recovery scoped to user-triggered provider reviews',async()=>{
+    const query=vi.fn().mockResolvedValue({rows:[]});
+    await recoverProviderSlots({query},'interactive');
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("owner_service=$1"),['interactive']);
+    const lockCall=query.mock.calls.find(([statement])=>statement.includes('graphile_worker._private_jobs'))!;
+    expect(lockCall[1][0]).toEqual(['manual-review-provider']);
+  });
 });

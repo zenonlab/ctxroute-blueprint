@@ -78,6 +78,18 @@ describe('favorite reviews', () => {
     await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://example.test',provider:'mangaupdates',candidates:[]});
     expect(reviewValues[3]).toBe('Synthetic Warriors');
   });
+  it('consumes the persisted v3 artifact without restoring a chapter in the review title', async () => {
+    let reviewValues: unknown[] = [];
+    const query = vi.fn(async (sql: string, values?: unknown[]) => {
+      if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId:'i', bookmarkId:'b', rawFavoriteTitle:'Synthetic Harbor Chronicle Chapter 20', favoriteUrl:'https://reader.invalid/series/synthetic-harbor-chronicle/chapter-20', parseArtifact:{parser:'favorite-parser-v3',identity:{title:'Synthetic Harbor Chronicle'},displayTitle:'Synthetic Harbor Chronicle',progression:{kind:'chapter',number:20,raw:'20'}} }] };
+      if (sql.startsWith('INSERT INTO favorite_review(')) { reviewValues=values??[]; return {rows:[{id:'r'}]}; }
+      if (sql.startsWith('SELECT count(')) return {rows:[{count:1}]};
+      return {rows:[]};
+    });
+    await openFavoriteReview(query,{userId:'u',title:'fallback',url:'https://reader.invalid',provider:'mangaupdates',candidates:[]});
+    expect(reviewValues[3]).toBe('Synthetic Harbor Chronicle');
+    expect(String(reviewValues[3])).not.toMatch(/chapter|20/iu);
+  });
   it('uses season URL evidence to remove a bare trailing episode number in every review', async () => {
     let reviewValues: unknown[] = [];
     const query = vi.fn(async (sql: string, values?: unknown[]) => {

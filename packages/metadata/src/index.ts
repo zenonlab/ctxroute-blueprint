@@ -1,8 +1,9 @@
 import { isIP } from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { safeRequest } from "@favlib/safe-http";
-import { FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
-export type { FavoriteProgression } from '@favlib/metadata/bookmark-parser';
+import { FAVORITE_PARSER_ID, FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, parseFavorite, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
+export { FAVORITE_PARSER_ID, parseFavorite } from '@favlib/metadata/bookmark-parser';
+export type { FavoriteParseArtifact, FavoriteProgression } from '@favlib/metadata/bookmark-parser';
 
 export type SearchClient = (
   input: RequestInfo | URL,
@@ -13,7 +14,14 @@ export type SourceIdentity = {
   key: string;
   title: string;
   slug?: string;
+  rawSlug?: string;
   releaseSuffix?: string;
+  release?: {
+    raw: string;
+    number?: string;
+    kind?: "episode" | "chapter" | "volume" | "season" | "release";
+    provenance: "URL_PATH" | "URL_SLUG_SUFFIX";
+  };
   canonicalUrl: string;
   type: MediaType;
   strategy: "adapter" | "generic";
@@ -340,10 +348,9 @@ export function cleanDisplayTitle(v: string) {
   if (!s) return undefined;
   const release = /(?:^|\s*(?:[-–—|·:]\s*|\s+))(?:(?:episode|ep\.?|chapter|chapitre|chap\.?|ch\.?|volume|vol\.?|season|saison)\s*#?\d+[\w.-]*).*/iu;
   const separatedRelease = /(?:^|\s*(?:[-–—|·:]\s*))(?:\d+\s*(?:vostfr|vf|vo|sub|dub|scan|scans)?|(?:vostfr|vf|vo|sub|dub|scan|scans)(?:\s*[- ]?\d+|\s*$)).*/iu;
-  const site = /(?:^|\s*(?:[-–—|·:]\s*|\s+))(?:voiranime|mangakakalot|anime[- ]?sama|japscan|lelscan|manganato|mangadex)(?:\b.*)?$/iu;
   for (let pass = 0; pass < 5; pass++) {
     const before = s;
-    s = s.replace(release, "").replace(separatedRelease, "").replace(site, "").replace(/[|·:—–-]+$/gu, "").trim();
+    s = s.replace(release, "").replace(separatedRelease, "").replace(/[|·:—–-]+$/gu, "").trim();
     if (s === before) break;
   }
   const key = (text: string) => normalizeTitle(text).replace(/[^\p{L}\p{N}]+/gu, "");
@@ -389,6 +396,13 @@ export type TitlePreparation = {
   year?: number;
   urlTitle?: string;
   sourceTitle?: string;
+  rawSlug?: string;
+  stableSlug?: string;
+  sourceAliases: string[];
+  alignedSourceTitle?: string;
+  selectedSegment?: string;
+  sourceMatchMethod?: ProviderTitleMatchMethod;
+  segments: string[];
   candidates: string[];
   transformations: string[];
 };
@@ -400,7 +414,9 @@ export function prepareTitleCandidates(input: {
   source?: SourceIdentity | null;
 }): TitlePreparation {
   const source = input.source ?? sourceIdentityFromUrl(input.url);
+  const artifact = parseFavorite({ title: input.bookmarkTitle, url: input.url, source });
   const original = input.bookmarkTitle;
+  const segments = artifact.segments.map(segment => segment.raw);
   let personal = input.bookmarkTitle.replace(/\s+/g, " ").trim();
   const transformations: string[] = [];
   const yearMatch = personal.match(/(?:^|\s)(?:\(\s*)?((?:18|19|20|21)\d{2})(?:\s*\))?\s*$/u);
@@ -422,7 +438,20 @@ export function prepareTitleCandidates(input: {
     personal = cleaned;
     transformations.push("removed_bookmark_release_suffix");
   }
-  const urlTitle = source?.title;
+  const urlTitle = artifact.identity?.title ?? source?.title;
+  const identityTitle = artifact.identity?.stableSlug ? slugTitle(artifact.identity.stableSlug) : urlTitle;
+  const eligibleSegments = artifact.segments.flatMap(segment => segment.cleaned ? [segment.cleaned] : []);
+  const aligned = identityTitle ? decideProviderTitleMatch({
+    aliases: [identityTitle],
+    candidates: eligibleSegments,
+    id: segment => segment,
+    titles: segment => [segment],
+  }) : undefined;
+  const alignedSourceTitle = aligned?.status === "MATCH" ? aligned.candidate : undefined;
+  if (alignedSourceTitle) {
+    personal = alignedSourceTitle;
+    transformations.push("selected_slug_matching_favorite_segment");
+  }
   if (urlTitle && /(?:^|\/)(?:saison|season)\d*(?:\/|$)/iu.test(new URL(input.url).pathname)) {
     const withoutEpisode = personal.replace(/\s+\d+$/u, "").replace(/\d+$/u, "");
     if (withoutEpisode && compactTitleKey(urlTitle).includes(compactTitleKey(withoutEpisode))) {
@@ -446,10 +475,20 @@ export function prepareTitleCandidates(input: {
   const sameBase = Boolean(personal && urlTitle && compactTitleKey(personal) === compactTitleKey(urlTitle));
   // The URL parser owns identity. A matching favorite may only restore useful
   // punctuation/case; otherwise it is a fallback after the URL candidate.
-  const values = (sameBase ? [personal, urlTitle, source?.title, original] : [urlTitle, source?.title, personal, original])
+  const sourceAliases = artifact.identity?.aliases
+    .slice().sort((left,right)=>Number(right.provenance==='aligned-bookmark-segment')-Number(left.provenance==='aligned-bookmark-segment'))
+    .map(alias => alias.value) ?? [];
+  // Provider identity proof is source-owned. Raw/personal titles remain in the
+  // preparation artifact for display and provenance but are never queries or
+  // identity aliases when the shared URL identity exists.
+  const values = (sourceAliases.length ? sourceAliases : [personal])
     .filter((v): v is string => Boolean(v?.trim()));
+  transformations.push(...(artifact.identity?.transformations.map(item => `structured_${item.kind}`) ?? []));
   const candidates = [...new Set(values.flatMap((value) => [value.trim(), normalizeTitle(value), compactTitleKey(value)]).filter((value) => value.length > 1))];
-  return { original, personal: personal || undefined, year, urlTitle, sourceTitle: source?.title, candidates, transformations };
+  return { original, personal: personal || undefined, year, urlTitle, sourceTitle: artifact.identity?.title,
+    rawSlug: artifact.identity?.rawSlug, stableSlug: artifact.identity?.stableSlug, sourceAliases,
+    alignedSourceTitle, selectedSegment: alignedSourceTitle, sourceMatchMethod: aligned?.method,
+    segments, candidates, transformations };
 }
 
 export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
@@ -459,7 +498,7 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
   } catch {
     return null;
   }
-  if (!/^https?:$/.test(u.protocol) || /^\/catalogue\/?$/i.test(u.pathname))
+  if (!/^https?:$/.test(u.protocol) || /^\/catalogue(?:\/(?:index\.(?:php|html?)))?\/?$/i.test(u.pathname))
     return null;
   const host = u.hostname.toLowerCase().replace(/^www\./, "");
   const parts = u.pathname.split("/").filter(Boolean).map(decode);
@@ -562,17 +601,11 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
   }
   if (!slug || blocked.has(slug.toLowerCase()) || /^\d+$/.test(slug))
     return null;
-  // ComicK reserves a leading numeric component on /comic/ slugs for routing.
-  // This rule is deliberately host/path scoped so title-bearing numbers on all
-  // other URL structures remain identity evidence.
-  if (/^comick\.(?:dev|io|to)$/iu.test(host) && parts[index]?.toLowerCase() === 'comic') {
-    const technical = slug.match(/^\d+-+(.+)$/u);
-    if (technical?.[1]) {
-      slug = technical[1];
-      if (titleSegment === parts[index + 1]) titleSegment = slug;
-      evidence.push('COMICK_TECHNICAL_PREFIX_REMOVED');
-    }
-  }
+  const rawSlug = slug;
+  // `index` points at the category for /series/{slug}, but at the slug itself
+  // for generic /{slug}/ep42 paths. Freeze the actual identity boundary before
+  // any technical-prefix normalization changes the slug text.
+  const slugPathIndex = parts[index] === slug ? index : index + 1;
   slug = slug
     .replace(
       /^(?=[a-z0-9]{3,8}-)(?=[a-z0-9]*[a-z])(?=[a-z0-9]*\d)[a-z0-9]+-/i,
@@ -589,13 +622,22 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
   const rawTitle = titleSegment ?? slug;
   const embeddedRelease = rawTitle?.match(/(?:^|[-_ .])((?:episode|ep|chapter|chapitre|chap|ch|volume|vol|season|saison)[-_ .]*\d+|\d+[-_ .]*(?:vostfr|vf|vo|sub|dub|scan|scans|english|français))/iu)?.[1];
   const pathRelease = parts.slice(Math.max(0, index + 1)).filter((part) => pathReleaseSegment(part)).join("/");
+  const releaseRaw = embeddedRelease ?? pathRelease;
+  const releaseNumber = releaseRaw?.match(/\d+(?:[.,]\d+)?/u)?.[0]?.replace(",", ".");
+  const releaseKind = releaseRaw?.match(/(?:episode|ep)/iu) ? "episode"
+    : releaseRaw?.match(/(?:chapter|chapitre|chap|ch)/iu) ? "chapter"
+      : releaseRaw?.match(/(?:volume|vol)/iu) ? "volume"
+        : releaseRaw?.match(/(?:season|saison)/iu) ? "season" : releaseRaw ? "release" : undefined;
   const stable = host.replace(/^v\d+\./, "");
   return {
     key: `${stable}:${normalizeTitle(slug).replace(/ /g, "-")}`,
     title,
     slug,
-    releaseSuffix: (embeddedRelease ?? pathRelease) || undefined,
-    canonicalUrl: `https://${host}/${parts.slice(0, index + 2).join("/")}`,
+    rawSlug,
+    releaseSuffix: releaseRaw || undefined,
+    release: releaseRaw ? { raw: releaseRaw, number: releaseNumber, kind: releaseKind,
+      provenance: embeddedRelease ? "URL_SLUG_SUFFIX" : "URL_PATH" } : undefined,
+    canonicalUrl: `https://${host}/${parts.slice(0, slugPathIndex + 1).join("/")}`,
     type: pathType ?? typeFrom(pathText),
     strategy: evidence.length ? "adapter" : "generic",
     evidence,
@@ -1499,6 +1541,193 @@ export async function fetchMangaUpdatesSeries(
     })()
   );
 }
+
+export type MangaUpdatesLinkedSeriesResolution = {
+  series: MangaUpdatesSeries;
+  rawLink: string;
+  method: "numeric-series-id" | "public-url-slug";
+};
+
+function mangaUpdatesPublicSlug(value?: string) {
+  if (!value) return undefined;
+  try {
+    const segments = new URL(value).pathname.split("/").filter(Boolean);
+    const seriesIndex = segments.findIndex((segment) => segment.toLowerCase() === "series");
+    return seriesIndex >= 0 ? segments[seriesIndex + 1]?.toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * MangaDex links.mu preserves MangaUpdates' public URL key, which is not
+ * necessarily the numeric series_id accepted by GET /series/{series_id}.
+ * Resolve public slugs only through an exact provider URL returned by search;
+ * search order, rating and popularity must never establish this identity.
+ */
+export async function resolveMangaUpdatesPublicSlug(
+  rawLink: string,
+  sourceTitles: string[],
+  options: MangaUpdatesClientOptions = {},
+): Promise<MangaUpdatesLinkedSeriesResolution | null> {
+  const link = rawLink.trim();
+  if (!link) return null;
+  if (/^\d+$/u.test(link)) {
+    return { series: await fetchMangaUpdatesSeries(link, options), rawLink: link, method: "numeric-series-id" };
+  }
+  const hits: MangaUpdatesSeries[] = [];
+  for (const title of [...new Set(sourceTitles.map((value) => value.trim()).filter(Boolean))].slice(0, 8))
+    hits.push(...await searchMangaUpdatesSeries(title, options));
+  const exactSlugHits = [...new Map(
+    hits
+      .filter((hit) => mangaUpdatesPublicSlug(hit.url) === link.toLowerCase())
+      .map((hit) => [hit.id, hit]),
+  ).values()];
+  if (exactSlugHits.length !== 1) return null;
+  const series = await fetchMangaUpdatesSeries(exactSlugHits[0]!.id, options);
+  return { series, rawLink: link, method: "public-url-slug" };
+}
+
+export async function resolveMangaUpdatesLinkedSeries(
+  rawLink: string,
+  sourceTitles: string[],
+  options: MangaUpdatesClientOptions = {},
+): Promise<MangaUpdatesLinkedSeriesResolution | null> {
+  const resolved = await resolveMangaUpdatesPublicSlug(rawLink, sourceTitles, options);
+  if (!resolved) return null;
+  // The explicit URL proves which provider record the slug names, while the
+  // shared symmetric matcher verifies that record still names this work.
+  if (decideMangaUpdatesTitleMatch(sourceTitles, [resolved.series]).status !== "MATCH") return null;
+  return resolved;
+}
+
+export type MangaDexManga = {
+  id: string;
+  titles: string[];
+  localizedTitles: Array<{ text: string; language: string; kind: "title" | "alias"; raw: unknown }>;
+  descriptions: Record<string, string>;
+  tags: string[];
+  status?: string;
+  year?: number;
+  originalLanguage?: string;
+  publicationDemographic?: string;
+  contentRating?: string;
+  latestVolume?: string;
+  latestChapter?: string;
+  authors: Array<{ id: string; name?: string }>;
+  artists: Array<{ id: string; name?: string }>;
+  relations: Array<{ id: string; type: string }>;
+  coverFileName?: string;
+  coverUrl?: string;
+  raw: unknown;
+  mangaUpdatesId?: string;
+};
+export type MangaDexClientOptions = {
+  endpoint?: string;
+  fetch?: SearchClient;
+  timeoutMs?: number;
+};
+const MANGADEX_BASE = "https://api.mangadex.org";
+
+const localizedStrings = (value: unknown, kind: "title" | "alias") =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? Object.entries(value as Record<string, unknown>).flatMap(([language, text]) =>
+        typeof text === "string" && text.trim() ? [{ text: text.trim(), language, kind, raw: { [language]: text } }] : [])
+    : [];
+
+/** Parse the bounded official MangaDex manga representation. Raw input and
+ * every localized spelling remain attached; title matching still delegates
+ * to the provider-neutral matcher below and never uses result order. */
+export function parseMangaDexManga(value: unknown): MangaDexManga | null {
+  const record = value as any;
+  const id = typeof record?.id === "string" ? record.id.trim() : "";
+  const attributes = record?.attributes;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(id) || !attributes || typeof attributes !== "object") return null;
+  const localizedTitles = [
+    ...localizedStrings(attributes.title, "title"),
+    ...(Array.isArray(attributes.altTitles) ? attributes.altTitles.flatMap((entry: unknown) => localizedStrings(entry, "alias")) : []),
+  ];
+  const titles = [...new Set(localizedTitles.map(title => title.text))];
+  if (!titles.length) return null;
+  const descriptions = Object.fromEntries(localizedStrings(attributes.description, "alias").map(entry => [entry.language, entry.text]));
+  const relationships = Array.isArray(record.relationships) ? record.relationships : [];
+  const people = (type: string) => relationships.filter((entry: any) => entry?.type === type && typeof entry?.id === "string").map((entry: any) => ({ id: entry.id, ...(typeof entry?.attributes?.name === "string" ? { name: entry.attributes.name } : {}) }));
+  const coverFileName = relationships.find((entry: any) => entry?.type === "cover_art" && typeof entry?.attributes?.fileName === "string")?.attributes.fileName;
+  const coverUrl = coverFileName ? `https://uploads.mangadex.org/covers/${id}/${encodeURIComponent(coverFileName)}.512.jpg` : undefined;
+  const rawMu = attributes.links?.mu;
+  const mangaUpdatesId = typeof rawMu === "string" && /^[A-Za-z0-9_-]{1,128}$/u.test(rawMu.trim()) ? rawMu.trim() : undefined;
+  return {
+    id, titles, localizedTitles, descriptions,
+    tags: Array.isArray(attributes.tags) ? [...new Set<string>(attributes.tags.flatMap((tag: any): string[] => stringValues(tag?.attributes?.name)))] : [],
+    ...(typeof attributes.status === "string" ? { status: attributes.status } : {}),
+    ...(Number.isInteger(attributes.year) ? { year: attributes.year } : {}),
+    ...(typeof attributes.originalLanguage === "string" ? { originalLanguage: attributes.originalLanguage } : {}),
+    ...(typeof attributes.publicationDemographic === "string" ? { publicationDemographic: attributes.publicationDemographic } : {}),
+    ...(typeof attributes.contentRating === "string" ? { contentRating: attributes.contentRating } : {}),
+    ...(typeof attributes.lastVolume === "string" ? { latestVolume: attributes.lastVolume } : {}),
+    ...(typeof attributes.lastChapter === "string" ? { latestChapter: attributes.lastChapter } : {}),
+    authors: people("author"), artists: people("artist"),
+    relations: relationships.filter((entry: any) => entry?.type === "manga" && typeof entry?.id === "string").map((entry: any) => ({ id: entry.id, type: String(entry?.related ?? "related") })),
+    ...(coverFileName ? { coverFileName, coverUrl } : {}), raw: value,
+    ...(mangaUpdatesId ? { mangaUpdatesId } : {}),
+  };
+}
+
+export async function searchMangaDexManga(query: string, options: MangaDexClientOptions = {}): Promise<MangaDexManga[]> {
+  const title = query.trim().slice(0, 200);
+  if (!title) return [];
+  const endpoint = (options.endpoint ?? MANGADEX_BASE).replace(/\/+$/u, "");
+  const url = new URL(`${endpoint}/manga`);
+  url.searchParams.set("title", title);
+  url.searchParams.set("limit", "20");
+  url.searchParams.append("includes[]", "author");
+  url.searchParams.append("includes[]", "artist");
+  url.searchParams.append("includes[]", "cover_art");
+  const client = options.fetch ?? safeFetch(JSON_MAX, ["application/json"]);
+  const response = await client(url, { headers: { accept: "application/json", "user-agent": UA }, signal: AbortSignal.timeout(options.timeoutMs ?? 8000) });
+  if (response.status === 429) throw new Error(`MANGADEX_HTTP_429_RETRY_${response.headers.get("retry-after") ?? ""}`);
+  if (!response.ok) throw new Error(`MANGADEX_HTTP_${response.status}`);
+  const json = await boundedJson(response) as any;
+  if (!Array.isArray(json?.data)) throw new Error("MANGADEX_EMPTY_RESPONSE");
+  const parsed = json.data.map(parseMangaDexManga).filter((item: MangaDexManga | null): item is MangaDexManga => Boolean(item));
+  if (json.data.length && !parsed.length) throw new Error("MANGADEX_PARSE_ERROR");
+  return parsed;
+}
+
+export async function fetchMangaDexManga(id: string, options: MangaDexClientOptions = {}): Promise<MangaDexManga> {
+  if (!/^[0-9a-f-]{36}$/iu.test(id)) throw new Error("MANGADEX_ID_INVALID");
+  const endpoint = (options.endpoint ?? MANGADEX_BASE).replace(/\/+$/u, "");
+  const url = new URL(`${endpoint}/manga/${id}`);
+  url.searchParams.append("includes[]", "author"); url.searchParams.append("includes[]", "artist"); url.searchParams.append("includes[]", "cover_art");
+  const client = options.fetch ?? safeFetch(JSON_MAX, ["application/json"]);
+  const response = await client(url, { headers: { accept: "application/json", "user-agent": UA }, signal: AbortSignal.timeout(options.timeoutMs ?? 8000) });
+  if (response.status === 429) throw new Error(`MANGADEX_HTTP_429_RETRY_${response.headers.get("retry-after") ?? ""}`);
+  if (!response.ok) throw new Error(`MANGADEX_HTTP_${response.status}`);
+  const parsed = parseMangaDexManga((await boundedJson(response) as any)?.data);
+  if (!parsed) throw new Error("MANGADEX_PARSE_ERROR");
+  return parsed;
+}
+
+export function decideMangaDexTitleMatch(aliases: string[], items: MangaDexManga[]) {
+  return decideProviderTitleMatch({ aliases, candidates: items, id: item => item.id, titles: item => item.titles });
+}
+
+/** Shared deterministic display selection. It reuses identity-bearing tokens;
+ * provider rank, popularity and locale ordering are intentionally absent. */
+export function selectBestLocalizedTitle(referenceTitles: string[], candidates: Array<{ text: string; language?: string; [key: string]: unknown }>) {
+  const refs = referenceTitles.flatMap(meaningfulTokens);
+  const script = (value: string) => /\p{Script=Latin}/u.test(value) ? "latin"
+    : /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(value) ? "cjk"
+      : "other";
+  const referenceScripts = new Set<string>(referenceTitles.map(script).filter(value => value !== "other"));
+  const scored = candidates.map((candidate, index) => {
+    const tokens = meaningfulTokens(candidate.text), overlap = tokens.filter(token => refs.includes(token)).length;
+    const exact = referenceTitles.some(reference => exactTitleMatchKind(reference, candidate.text) === "NORMALIZED_EXACT") ? 1 : 0;
+    const scriptCompatible = referenceScripts.size === 0 || referenceScripts.has(script(candidate.text));
+    return { candidate, index, score: exact * 1_000 + overlap * 10 - Math.abs(tokens.length - refs.length) + (scriptCompatible ? 20 : 0) };
+  }).sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored[0]?.candidate;
+}
 /** Preserve the raw title while exposing only an explicit final parenthesized
  * segment as an alternate identity alias. Both provider pipelines use this
  * same bounded rule; nested or empty parentheses are never guessed. */
@@ -1555,7 +1784,9 @@ function mangaUpdatesOelComicEvidence(series: MangaUpdatesSeries) {
 
 const TITLE_STOP_WORDS = new Set([
   "a", "an", "and", "as", "at", "be", "by", "for", "from", "in", "is", "it", "its",
-  "no", "of", "on", "or", "the", "to", "wa", "ga", "ni",
+  "no", "of", "on", "or", "that", "the", "to", "wa", "ga", "ni", "which", "who", "whom", "whose",
+  "after", "before", "did", "do", "does", "had", "has", "have", "he", "her", "him", "his",
+  "my", "our", "she", "their", "them", "they", "when", "your",
 ]);
 const ORDINAL_WORDS = new Map(Object.entries({
   first: "1", second: "2", third: "3", fourth: "4", fifth: "5",
@@ -1565,7 +1796,7 @@ const ORDINAL_WORDS = new Map(Object.entries({
   nineteenth: "19", twentieth: "20",
 }));
 
-export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v3";
+export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v14";
 export type ProviderTitleMatchMethod =
   | "ordered-exact"
   | "explicit-season"
@@ -1589,8 +1820,21 @@ function meaningfulTokens(value: string) {
     .split(" ")
     .map((token) => token.replace(/^(\d+)(?:st|nd|rd|th)$/u, "$1"))
     .map((token) => ORDINAL_WORDS.get(token) ?? token)
+    .map((token) => token === "became" ? "become" : token)
     .map((token) => /^(?:return|returns|returned|returning)$/u.test(token) ? "return" : token)
+    .map((token) => token.length > 5 && token.endsWith("ing") ? token.slice(0,-3) : token)
+    .map((token) => token.length > 4 && token.endsWith("ed") ? token.slice(0,-2) : token)
     .filter((token) => token.length >= 2 && !TITLE_STOP_WORDS.has(token));
+}
+
+function candidateCorroboratesStructuredAlias(alias:string,title:string){
+  const outer=normalizeTitle(alias).split(' ').filter(Boolean),inner=normalizeTitle(title).split(' ').filter(Boolean);
+  if(inner.length<3||outer.length<=inner.length)return false;
+  const starts:number[]=[];
+  for(let index=0;index<=outer.length-inner.length;index++)if(inner.every((token,offset)=>outer[index+offset]===token))starts.push(index);
+  if(starts.length!==1)return false;
+  const before=outer.slice(0,starts[0]),after=outer.slice(starts[0]+inner.length);
+  return before.length===2&&/^\d+$/u.test(before[0])&&/^[a-z]{2}(?:-[a-z]{2,3})?$/u.test(before[1])&&after.length<=3;
 }
 
 export function mangaUpdatesCandidateTitles(series: MangaUpdatesSeries) {
@@ -1664,6 +1908,8 @@ export function decideProviderTitleMatch<T>(input: {
     return kind === "NORMALIZED_EXACT" || kind === "COMPACT_EXACT";
   }));
   if (exact) return exact;
+  const structuredExact=chooseLevel("ordered-exact",pairs.filter(({alias,title})=>candidateCorroboratesStructuredAlias(alias,title)));
+  if(structuredExact)return structuredExact;
   if (input.explicitSeason) {
     const season = chooseLevel("explicit-season", unique.flatMap(candidate => input.aliases.filter(alias => input.explicitSeason!(alias,candidate)).map(alias => ({candidate,alias,title:input.titles(candidate)[0] ?? ""}))));
     if (season) return season;
@@ -1671,7 +1917,22 @@ export function decideProviderTitleMatch<T>(input: {
   const tokenKey = (value:string) => meaningfulTokens(value).sort().join("|");
   const reordered = chooseLevel("reordered-significant-words", pairs.filter(({alias,title}) => Boolean(tokenKey(alias)) && tokenKey(alias) === tokenKey(title)));
   if (reordered) return reordered;
+  // A provider record may expose a short associated title and a longer
+  // canonical variant. Their union is evidence only within that one provider
+  // identity; tokens are never combined across separate search results.
+  const recordCoverage=chooseLevel("bounded-edit-distance",unique.flatMap(candidate=>input.aliases.flatMap(alias=>{
+    const aliasTokens=[...new Set(meaningfulTokens(alias))];
+    const providerTokens=new Set(input.titles(candidate).flatMap(title=>meaningfulTokens(title)));
+    const covered=aliasTokens.filter(token=>providerTokens.has(token)).length;
+    return aliasTokens.length>=4&&covered>=3&&covered/aliasTokens.length>=2/3
+      ? [{candidate,alias,title:input.titles(candidate)[0]??""}] : [];
+  })));
+  if(recordCoverage)return recordCoverage;
   const boundedTokenPairs = pairs.filter(({alias,title}) => {
+    // A provider's explicit `Base: Subtitle` segmentation is evidence that a
+    // segment alone is not the complete ordered identity. Keep such hits for
+    // review instead of promoting them through the looser token fallback.
+    if (exactTitleMatchKind(alias, title) === "SUBTITLE_EXACT") return false;
     const left=meaningfulTokens(alias),right=meaningfulTokens(title);
     if (!left.length||!right.length) return false;
     const remaining=[...right];
@@ -1684,7 +1945,8 @@ export function decideProviderTitleMatch<T>(input: {
   const ranked = pairs.map(pair => ({...pair,distance:titleEditDistance(pair.alias,pair.title)}))
     .sort((a,b)=>a.distance-b.distance||input.id(a.candidate).localeCompare(input.id(b.candidate))||a.title.localeCompare(b.title));
   const best = ranked[0];
-  if (!best || best.distance > 4) return {status:"NO_MATCH",matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};
+  const editLimit = best ? Math.min(4, Math.max(1, Math.floor(Math.max(compactTitleKey(best.alias).length, compactTitleKey(best.title).length) * .25))) : 0;
+  if (!best || best.distance > editLimit) return {status:"NO_MATCH",matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};
   const competing = ranked.find(entry => input.id(entry.candidate) !== input.id(best.candidate));
   if (competing && competing.distance - best.distance < 3)
     return {status:"AMBIGUOUS",method:"bounded-edit-distance",matcherVersion:PROVIDER_TITLE_MATCHER_VERSION,rawProvenance};

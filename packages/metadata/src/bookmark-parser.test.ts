@@ -1,9 +1,84 @@
 import { describe, expect, it } from "vitest";
-import { parseBookmarkTitle, progressionFromFavorite } from "./bookmark-parser.js";
+import { FAVORITE_PARSER_ID, parseBookmarkTitle, parseFavorite, progressionFromFavorite } from "./bookmark-parser.js";
 
 const source = (type: "ANIME" | "MANGA" = "MANGA") => ({ title: "Synthetic Chronicle", type, slug: "synthetic-chronicle" });
 
 describe("shared bookmark progression parser", () => {
+  it("keeps a synthetic chapter out of every identity alias and preserves raw provenance", () => {
+    const raw = { title: "Synthetic Glass Harbor - Chapter 20 - Reader", url: "https://reader.invalid/series/synthetic-glass-harbor/chapter-20" };
+    const parsed = parseFavorite({ ...raw, source: { key: "reader.invalid:synthetic-glass-harbor", title: "Synthetic Glass Harbor", slug: "synthetic-glass-harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor", type: "MANGA", releaseSuffix: "chapter-20" } });
+    expect(parsed).toMatchObject({ parser: FAVORITE_PARSER_ID, version: 8, raw, identity: { slug: "synthetic-glass-harbor", title: "Synthetic Glass Harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor" }, displayTitle: "Synthetic Glass Harbor", progression: { kind: "chapter", number: 20, provenance: { inputTitle: raw.title, inputUrl: raw.url, parserVersion: 8 } } });
+    expect(parsed.identity?.aliases.map(alias => alias.value).join(" ")).not.toMatch(/chapter|20/iu);
+    expect(parsed.segments).toContainEqual(expect.objectContaining({ raw: "Chapter 20", cleaned: null, excludedAs: "progression" }));
+  });
+
+  it("replaces an opaque URL identity with one uniquely cleaned human segment",()=>{
+    const raw={title:"Synthetic Dragon Archive Chapter 20 [END] - reader.invalid",url:"https://reader.invalid/chapter/kx926534/chapter_20"};
+    const parsed=parseFavorite({...raw,source:{title:"Kx926534",slug:"kx926534",rawSlug:"kx926534",type:"MANGA",releaseSuffix:"chapter_20"}});
+    expect(parsed).toMatchObject({raw,identity:{title:"Synthetic Dragon Archive",rawSlug:"kx926534",stableSlug:"synthetic-dragon-archive",transformations:[{kind:"opaque-url-slug-replaced",raw:"kx926534"}]},displayTitle:"Synthetic Dragon Archive",progression:{number:20}});
+  });
+
+  it("uses two corroborating human segments after removing a parenthesized release badge",()=>{
+    const raw={
+      title:"Synthetic Aurora Finale OVA - (OAV VOSTFR) Synthetic Aurora Finale OVA - Streamer",
+      url:"https://video.invalid/anime/aurora-finale/oav-vostfr-synthetic-aurora-finale-ova/",
+    };
+    const parsed=parseFavorite({...raw,source:{
+      key:"video.invalid:aurora-finale",title:"Oav Vostfr Synthetic Aurora Finale Ova",
+      slug:"aurora-finale",rawSlug:"aurora-finale",type:"ANIME",
+    }});
+    expect(parsed).toMatchObject({
+      parser:"favorite-parser-v8",version:8,raw,
+      identity:{title:"Synthetic Aurora Finale OVA",stableSlug:"aurora-finale",transformations:[{kind:"repeated-human-title",raw:"Oav Vostfr Synthetic Aurora Finale Ova"}]},
+      displayTitle:"Synthetic Aurora Finale OVA",
+    });
+    expect(parsed.identity?.aliases.map(alias=>alias.value)).toEqual(["Synthetic Aurora Finale OVA"]);
+    expect(parsed.segments[1]).toMatchObject({raw:"(OAV VOSTFR) Synthetic Aurora Finale OVA",cleaned:"Synthetic Aurora Finale OVA",transformations:["cleaned_generic_suffix"]});
+  });
+
+  it("aligns the human segment when a chapter is followed by a generic call to action",()=>{
+    const parsed=parseFavorite({
+      title:"Synthetic Glass Harbor [Orbit Reader] - Chapter 20 - Read Free Illustrated Work Online",
+      url:"https://reader.invalid/title/482-en-synthetic-glass-harbor-orbit-reader/900-ch_20",
+      source:{title:"482 En Synthetic Glass Harbor Orbit Reader",slug:"482-en-synthetic-glass-harbor-orbit-reader",rawSlug:"482-en-synthetic-glass-harbor-orbit-reader",type:"MANGA"},
+    });
+    expect(parsed).toMatchObject({identity:{title:"Synthetic Glass Harbor",stableSlug:"synthetic-glass-harbor"},displayTitle:"Synthetic Glass Harbor",progression:{number:20}});
+  });
+
+  it("cleans a corroborated routing/language/title/reader slug while retaining every raw field", () => {
+    const raw = {
+      title: "Synthetic Glass Harbor [Orbit Reader] - Chapter 20",
+      url: "https://reader.invalid/comic/482-fr-synthetic-glass-harbor-orbit-reader/chapter-20",
+    };
+    const parsed = parseFavorite({ ...raw, source: {
+      key: "reader.invalid:482-fr-synthetic-glass-harbor-orbit-reader",
+      title: "482 fr Synthetic Glass Harbor Orbit Reader",
+      slug: "482-fr-synthetic-glass-harbor-orbit-reader",
+      rawSlug: "482-fr-synthetic-glass-harbor-orbit-reader",
+      canonicalUrl: "https://reader.invalid/comic/482-fr-synthetic-glass-harbor-orbit-reader",
+      type: "MANGA",
+      releaseSuffix: "chapter-20",
+    } });
+    expect(parsed).toMatchObject({ raw, displayTitle: "Synthetic Glass Harbor", identity: {
+      rawSlug: "482-fr-synthetic-glass-harbor-orbit-reader",
+      stableSlug: "synthetic-glass-harbor",
+      title: "Synthetic Glass Harbor",
+      transformations: [
+        { kind: "numeric-routing-prefix", raw: "482" },
+        { kind: "language-marker", raw: "fr" },
+        { kind: "reader-brand-suffix", raw: "Orbit Reader" },
+      ],
+    }, progression: { kind: "chapter", number: 20 } });
+    expect(parsed.identity?.aliases.map(alias => alias.value)).toEqual(["Synthetic Glass Harbor"]);
+  });
+
+  it.each([
+    ["2048 Synthetic Harbor", "2048-synthetic-harbor"],
+    ["Io Synthetic Harbor", "io-synthetic-harbor"],
+  ])("does not truncate an uncorroborated title prefix: %s", (title, slug) => {
+    const parsed = parseFavorite({ title, url: `https://reader.invalid/comic/${slug}`, source: { title, slug, rawSlug: slug, type: "MANGA" } });
+    expect(parsed.identity).toMatchObject({ rawSlug: slug, stableSlug: slug, title, transformations: [] });
+  });
   it.each([
     ["Synthetic Chronicle - Chapitre 12", "https://reader.invalid/work", "chapter", 12],
     ["Synthetic Chronicle Épisode 7,5 VOSTFR", "https://video.invalid/work", "episode", 7.5],

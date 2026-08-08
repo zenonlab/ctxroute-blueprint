@@ -3,7 +3,7 @@ import { mediaSites, mergeSites } from './sites.js';
 import { saveState, updateState } from './storage.js';
 import { API } from './api.js';
 import { apiFetch as fetch } from './api-fetch.js';
-import { parseBookmarkTitle, progressionFromFavorite } from '@favlib/metadata/bookmark-parser';
+import { parseFavorite, progressionFromFavorite } from '@favlib/metadata/bookmark-parser';
 
 export { API } from './api.js';
 
@@ -87,7 +87,7 @@ export async function upload(state: State,persistAcknowledgement:PersistAcknowle
     const response = await fetch(`${API}/extension/import-batches`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${state.deviceToken}`, 'Content-Type': 'application/json', 'X-FavLib-Protocol': String(PROTOCOL), 'Idempotency-Key': group[0].id },
-      body: JSON.stringify({ batchId: group[0].id, installationId: state.installationId, protocol: PROTOCOL, cursor, items: group.map(event => ({ ...event.bookmark, parsedTitle: parseBookmarkTitle(event.bookmark.title), event: event.type })) })
+      body: JSON.stringify({ batchId: group[0].id, installationId: state.installationId, protocol: PROTOCOL, cursor, items: group.map(event => ({ ...event.bookmark, parsedTitle: parseFavorite({title:event.bookmark.title,url:event.bookmark.url}).displayTitle, event: event.type })) })
     });
     if (response.status === 426) throw new Error('PROTOCOL_UNSUPPORTED');
     if (response.status === 401) throw new Error('DEVICE_REVOKED');
@@ -178,7 +178,7 @@ export async function reimportAllInventory(state: State, onProgress?: (processed
   let next:State=current;
   while(next.queue.length){
     const group=next.queue.slice(0,250);
-    const response=await fetch(`${API}/extension/import-batches/admin-reimport`,{method:'POST',headers:{Authorization:`Bearer ${next.deviceToken}`,'Content-Type':'application/json','X-FavLib-Protocol':String(PROTOCOL),'Idempotency-Key':group[0].id},body:JSON.stringify({batchId:group[0].id,installationId:next.installationId,protocol:PROTOCOL,cursor:next.cursor,items:group.map(event=>({...event.bookmark,parsedTitle:parseBookmarkTitle(event.bookmark.title),event:event.type}))})});
+    const response=await fetch(`${API}/extension/import-batches/admin-reimport`,{method:'POST',headers:{Authorization:`Bearer ${next.deviceToken}`,'Content-Type':'application/json','X-FavLib-Protocol':String(PROTOCOL),'Idempotency-Key':group[0].id},body:JSON.stringify({batchId:group[0].id,installationId:next.installationId,protocol:PROTOCOL,cursor:next.cursor,items:group.map(event=>({...event.bookmark,parsedTitle:parseFavorite({title:event.bookmark.title,url:event.bookmark.url}).displayTitle,event:event.type}))})});
     if(response.status===401)throw new Error('DEVICE_REVOKED'); if(response.status===403)throw new Error('ADMIN_REQUIRED'); if(response.status===426)throw new Error('PROTOCOL_UNSUPPORTED'); if(!response.ok)throw new Error(`REIMPORT_${response.status}`);
     const body=await response.json() as {cursor:string}; const progress=next.reimport!; next={...next,queue:next.queue.slice(group.length),cursor:body.cursor,reimport:{...progress,processed:progress.processed+group.length}}; await saveState(next); await onProgress?.(next.reimport!.processed,next.reimport!.total);
   }

@@ -16,7 +16,6 @@ import {
   normalizeTitle,
   searchAniList,
   titleVariants,
-  titleCandidateFromBookmark,
   type AniListMedia,
 } from "@favlib/metadata";
 import { aniListHooks } from "../anilist-gate.js";
@@ -30,7 +29,6 @@ import {
   retryableProviderError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
-import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
 import { saveProviderProfileCover } from "../cover-store.js";
@@ -495,8 +493,6 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     );
   const parsedSourceAliases = (Array.isArray(context.source_titles) ? context.source_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
   const identityAliases = explicitTitleAliases(parsedSourceAliases.length ? parsedSourceAliases : aliases);
-  const personalTitles = (Array.isArray(context.personal_titles) ? context.personal_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
-  const favoriteAliases = explicitTitleAliases(personalTitles.map((value: string) => titleCandidateFromBookmark(value) ?? cleanDisplayTitle(value) ?? value));
   const formatEvidence = [...identityAliases, ...(Array.isArray(context.source_urls) ? context.source_urls : [])].filter((value): value is string => typeof value === 'string');
   const requiresOva = formatEvidence.some(hasExplicitOvaMarker);
   const fingerprint = enrichmentFingerprint({
@@ -609,7 +605,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     }
     if (!selected) {
       const exact = exactAniListMediaMatches(identityAliases, eligible);
-      const matchDecision = decideAniListTitleMatch(favoriteAliases.length ? favoriteAliases : identityAliases, eligible);
+      const matchDecision = decideAniListTitleMatch(identityAliases, eligible);
       if (matchDecision.status === "MATCH") {
         selected = matchDecision.candidate;
         selectedResolutionCode = matchDecision.method?.toUpperCase().replaceAll("-", "_") ?? "TITLE_MATCH";
@@ -815,7 +811,6 @@ export async function enrichAniListCover(payload: unknown, h: Helpers) {
       retrySeconds: terminal ? null : Math.min(86400, 300 * 2 ** Math.max(0, claim.attempt_count - 1)),
       resolutionCode: code,
     });
-    if (terminal) await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     h.logger.warn(`AniList cover failed for ${mediaId}: ${code}`);
     return { status: "FAILED", reason: code };
   }

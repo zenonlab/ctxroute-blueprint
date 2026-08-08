@@ -64,6 +64,20 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     networks: [favlib]
+  interactive-worker:
+    build: { context: .., dockerfile: apps/worker/Dockerfile }
+    environment: { DATABASE_URL_FILE: /run/secrets/favlib_database_url, CATALOG_FINGERPRINT_KEY_FILE: /run/secrets/catalog_fingerprint_key, FAVLIB_BASE_URL: https://favlib.home.arpa, BACKUP_DESTINATION: /var/lib/favlib/backups, BACKUP_KEY_FILE: /run/secrets/backup_key, FAVLIB_WORKER_ROLE: interactive, FAVLIB_WORKER_CONCURRENCY: "1", FAVLIB_BUILD_VERSION: "${FAVLIB_BUILD_VERSION:-local}", NODE_ENV: production }
+    secrets: [favlib_database_url, catalog_fingerprint_key, backup_key]
+    volumes:
+      - "${FAVLIB_BACKUP_PATH:?set FAVLIB_BACKUP_PATH to a distinct host or NAS path}:/var/lib/favlib/backups"
+    depends_on: { migrate: { condition: service_completed_successfully }, api: { condition: service_healthy } }
+    healthcheck: { test: [CMD-SHELL, "test \"$$(pg_isready -d \"$$(cat \"$$DATABASE_URL_FILE\")\" >/dev/null 2>&1; echo $$?)\" = 0 && test \"$$(psql \"$$(cat \"$$DATABASE_URL_FILE\")\" -tAc \"SELECT (details->'tasks' ?& ARRAY['manual-review-provider']) FROM service_heartbeat WHERE service='worker-interactive' AND observed_at>now()-interval '5 minutes'\")\" = 't'"], interval: 30s, timeout: 5s, retries: 3 }
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [favlib]
   web:
     build: { context: .., dockerfile: apps/web/Dockerfile }
     depends_on: { api: { condition: service_healthy } }

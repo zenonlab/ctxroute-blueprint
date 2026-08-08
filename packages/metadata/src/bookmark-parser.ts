@@ -1,7 +1,11 @@
 export type BookmarkSourceEvidence = {
+  key?: string;
   title: string;
   type: "ANIME" | "MANGA" | "MANHWA" | "MANHUA" | string;
   slug?: string;
+  /** Exact slug observed in the URL before title-corroborated cleanup. */
+  rawSlug?: string;
+  canonicalUrl?: string;
   releaseSuffix?: string;
   /** Aliases whose identity has already been established by FavLib. */
   aliases?: string[];
@@ -39,9 +43,34 @@ export type FavoriteProgression = {
 };
 
 /** Increment only when the generic evidence policy changes. */
-export const FAVORITE_PROGRESS_PARSER_VERSION = 2;
+export const FAVORITE_PARSER_ID = "favorite-parser-v8" as const;
+export const FAVORITE_PROGRESS_PARSER_VERSION = 8;
 
-const noise = /^(?:vostfr|vf|vo|sub|dub|scan|scans|english|français|voiranime)$/iu;
+export type FavoriteParseArtifact = {
+  parser: typeof FAVORITE_PARSER_ID;
+  version: 8;
+  fingerprint: string;
+  raw: { title: string; url: string };
+  identity: null | {
+    key: string;
+    title: string;
+    /** Exact URL slug and the title-corroborated stable identity slug. */
+    rawSlug: string;
+    stableSlug: string;
+    slug: string;
+    canonicalUrl: string;
+    type: BookmarkSourceEvidence["type"];
+    aliases: Array<{ value: string; provenance: "stable-url-slug" | "aligned-bookmark-segment" }>;
+    transformations: Array<{ kind: "numeric-routing-prefix" | "language-marker" | "reader-brand-suffix" | "opaque-url-slug-replaced" | "repeated-human-title"; raw: string }>;
+  };
+  segments: Array<{ raw: string; cleaned: string | null; transformations: string[]; excludedAs?: "progression" | "numeric" | "release" }>;
+  displayTitle: string | null;
+  progression: FavoriteProgression | null;
+  status: "parsed" | "identity-missing";
+  diagnostics: string[];
+};
+
+const noise = /^(?:vostfr|vf|vo|sub|dub|scan|scans|english|français)$/iu;
 const marker = /(chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)[-_.\s]*#?\s*(\d+(?:[.,]\d+)?)/giu;
 const seasonMarker = /(?:season|saison)\s*(\d+)/iu;
 const insignificant = new Set(["the", "a", "an", "of", "and", "et", "de", "la", "le", "les", "des", "episode", "chapter", "chapitre", "saison", "season", "vostfr", "vf", "vo", "sub", "dub"]);
@@ -93,13 +122,15 @@ function urlSegments(url: string) {
 export function parseBookmarkTitle(value: string) {
   let title = value.replace(/\s+/gu, " ").trim();
   title = title.replace(/^(?:read|watch|lire|regarder(?: gratuitement)?)\s+/iu, "");
+  // Parenthesized release badges are not identity. Requiring an explicit
+  // language/track marker avoids removing meaningful parenthetical work text.
+  title = title.replace(/^\(\s*(?=[^)]*(?:vostfr|vf|vo|sub|dub))(?:(?:oav|ova|vostfr|vf|vo|sub|dub|raw)[\s,/+&-]*)+\)\s*/iu, "");
   for (let pass = 0; pass < 5; pass++) {
     const before = title;
     title = title
-      .replace(/\s+(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)\s*#?\s*\d+(?:[.,]\d+)?(?:[-\w]+)?(?:\s+(?:online|free|vostfr|vf|vo|sub|dub|scan|scans).*)?$/iu, "")
+      .replace(/\s+(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)\s*#?\s*\d+(?:[.,]\d+)?(?:[-\w]+)?(?:\s*\[[^\]]+\])?(?:\s+(?:online|free|vostfr|vf|vo|sub|dub|scan|scans).*)?$/iu, "")
       .replace(/\s+-\s+\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?\s*$/iu, "")
       .replace(/\s+(?:in english online free|online free|en hd)\s*$/iu, "")
-      .replace(/\s*(?:[-–—|·:]\s*)?(?:voiranime|mangakakalot|manganelo|manhwaz)(?:\.com)?\s*$/iu, "")
       .replace(/\s+(?:vostfr|vf|vo|sub|dub|scan|scans|en hd)\s*$/iu, "")
       .replace(/[|·:—–-]+$/u, "").trim();
     if (title === before) break;
@@ -107,6 +138,113 @@ export function parseBookmarkTitle(value: string) {
   const parts=title.split(/\s+-\s+/u).map((part)=>part.trim()).filter((part)=>part&&!noise.test(part)&&!/^\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?$/iu.test(part));
   if(parts.length>1){const firstKey=compact(parts[0]);const duplicate=parts.slice(1).some((part)=>compact(part)===firstKey);if(duplicate)title=parts[0];}
   return title || null;
+}
+
+const splitSegments = (value: string) => value.split(/\s*(?:\||·|—|–)\s*|\s+-\s+/u).map(part => part.trim()).filter(Boolean);
+const releaseOnly = /^(?:(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol|season|saison)[-_.\s]*#?\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?)$/iu;
+const languageToken = /^(?:[a-z]{2}|[a-z]{2}-[a-z]{2,3}|english|french|français|japanese|korean|chinese)$/iu;
+
+function tokenList(value: string) {
+  return normalize(value).split(" ").filter(Boolean);
+}
+
+/** A structural URL fragment is removable only when the imported human title
+ * proves the complete remaining identity. This deliberately does not guess
+ * from a bare URL, so numeric and two-letter title prefixes remain intact. */
+function alignStructuredSlug(rawSlug: string, title: string) {
+  const transformations: Array<{ kind: "numeric-routing-prefix" | "language-marker" | "reader-brand-suffix"; raw: string }> = [];
+  const titleWithoutRelease = parseBookmarkTitle(title) ?? title.trim();
+  const bracket = titleWithoutRelease.match(/\s*\[([^\[\]]+)\]\s*$/u);
+  const humanTitle = (bracket ? titleWithoutRelease.slice(0, bracket.index).trim() : titleWithoutRelease).trim();
+  const slugTokens = tokenList(rawSlug), titleTokens = tokenList(humanTitle);
+  if (!titleTokens.length || slugTokens.length < titleTokens.length) return null;
+  const starts: number[] = [];
+  for (let index = 0; index <= slugTokens.length - titleTokens.length; index++)
+    if (titleTokens.every((token, offset) => slugTokens[index + offset] === token)) starts.push(index);
+  if (starts.length !== 1) return null;
+  const start = starts[0], before = slugTokens.slice(0, start), after = slugTokens.slice(start + titleTokens.length);
+  const prefixValid = before.length === 0 || (before.length === 2 && /^\d+$/u.test(before[0]) && languageToken.test(before[1]));
+  if (!prefixValid) return null;
+  const brandTokens = bracket ? tokenList(bracket[1]) : [];
+  const suffixValid = after.length === 0 || (brandTokens.length > 0 && after.length === brandTokens.length && after.every((token, index) => token === brandTokens[index]));
+  if (!suffixValid) return null;
+  if (before.length) {
+    transformations.push({ kind: "numeric-routing-prefix", raw: before[0] });
+    transformations.push({ kind: "language-marker", raw: before[1] });
+  }
+  if (after.length) transformations.push({ kind: "reader-brand-suffix", raw: bracket![1] });
+  if (!transformations.length) return null;
+  return { title: humanTitle, stableSlug: titleTokens.join("-"), transformations };
+}
+
+function fingerprint(value: string) {
+  // Stable, runtime-neutral FNV-1a fingerprint. It detects stale parse artifacts;
+  // it is not used as a security primitive.
+  let hash = 2166136261;
+  for (const char of value) { hash ^= char.codePointAt(0) ?? 0; hash = Math.imul(hash, 16777619); }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+/** Canonical parser. Raw input is never mutated and progression fragments are
+ * removed before any human title or identity alias can be emitted. */
+export function parseFavorite(input: { title: string; url: string; source?: BookmarkSourceEvidence | null }): FavoriteParseArtifact {
+  const raw = { title: input.title, url: input.url };
+  const source = input.source ?? null;
+  const progression = progressionFromFavorite({ ...input, source });
+  const rawSegments = splitSegments(input.title);
+  let observedHostLabel = "";
+  let observedHostname = "";
+  try { const hostname=new URL(input.url).hostname.replace(/^www\./iu, ""); observedHostLabel = normalize(hostname.split(".")[0] ?? ""); observedHostname=normalize(hostname).replace(/\s/gu,""); } catch { /* malformed input is diagnosed below */ }
+  const segments = rawSegments.map(rawSegment => {
+    const transformations: string[] = [];
+    if (releaseOnly.test(rawSegment)) {
+      marker.lastIndex = 0;
+      return { raw: rawSegment, cleaned: null, transformations: ["excluded_progression"], excludedAs: "progression" as const };
+    }
+    marker.lastIndex = 0;
+    if (/^\d+(?:[.,]\d+)?$/u.test(rawSegment)) return { raw: rawSegment, cleaned: null, transformations: ["excluded_numeric"], excludedAs: "numeric" as const };
+    if (noise.test(rawSegment)) return { raw: rawSegment, cleaned: null, transformations: ["excluded_release_marker"], excludedAs: "release" as const };
+    const compactSegment=normalize(rawSegment).replace(/\s/gu,"");
+    if (observedHostLabel && (compactSegment === observedHostLabel.replace(/\s/gu, "") || compactSegment===observedHostname)) return { raw: rawSegment, cleaned: null, transformations: ["excluded_observed_hostname"], excludedAs: "release" as const };
+    const cleaned = parseBookmarkTitle(rawSegment);
+    if (cleaned !== rawSegment) transformations.push("cleaned_generic_suffix");
+    return { raw: rawSegment, cleaned, transformations };
+  });
+  const rawSlug = source?.rawSlug ?? source?.slug ?? "";
+  const structuredMatches = source && rawSlug
+    ? [input.title,...segments.flatMap(segment=>segment.cleaned?[segment.cleaned]:[])]
+      .map(candidate=>alignStructuredSlug(rawSlug,candidate)).filter((item):item is NonNullable<typeof item>=>Boolean(item))
+    : [];
+  const structuredByIdentity = [...new Map(structuredMatches.map(item=>[`${normalize(item.title)}|${item.stableSlug}`,item] as const)).values()];
+  const structured = structuredByIdentity.length===1 ? structuredByIdentity[0] : null;
+  const opaqueSlug=source&&/^(?:[a-z]{1,3}\d{4,}|\d{4,}[a-z]{1,3})$/iu.test(rawSlug);
+  const humanSegments=[...new Set(segments.flatMap(segment=>segment.cleaned?[segment.cleaned]:[]).filter(value=>normalize(value)!==normalize(source?.title??"")))];
+  const opaqueReplacement=opaqueSlug&&humanSegments.length===1?humanSegments[0]:undefined;
+  const repeatedHumanTitle=segments.find((segment,index)=>segment.cleaned&&segments.some((peer,peerIndex)=>peerIndex!==index&&peer.cleaned&&compact(peer.cleaned)===compact(segment.cleaned!)))?.cleaned;
+  const stableSourceTitle = structured?.title ?? opaqueReplacement ?? repeatedHumanTitle ?? source?.title;
+  const stableSlug = structured?.stableSlug ?? (opaqueReplacement?tokenList(opaqueReplacement).join("-"):source?.slug) ?? compact(stableSourceTitle ?? "");
+  const sourceAliases = source ? [stableSourceTitle, ...(source.aliases ?? [])].filter((value): value is string => Boolean(value)) : [];
+  const aligned = sourceAliases.length
+    ? segments.filter(segment => segment.cleaned).map(segment => ({ segment, proof: matchValidatedTitle(segment.cleaned!, sourceAliases) })).find(item => item.proof)
+    : undefined;
+  const displayTitle = structured?.title ?? aligned?.segment.cleaned ?? segments.find(segment => segment.cleaned)?.cleaned ?? parseBookmarkTitle(input.title);
+  const aliases: Array<{ value: string; provenance: "stable-url-slug" | "aligned-bookmark-segment" }> = [];
+  if (source) {
+    aliases.push({ value: stableSourceTitle!, provenance: "stable-url-slug" });
+    if (aligned?.segment.cleaned && aligned.segment.cleaned !== stableSourceTitle) aliases.push({ value: aligned.segment.cleaned, provenance: "aligned-bookmark-segment" });
+  }
+  const identity = source ? {
+    key: structured ? `${source.key ?? "source"}:${stableSlug}` : source.key ?? stableSlug,
+    title: stableSourceTitle!, rawSlug, stableSlug, slug: stableSlug,
+    canonicalUrl: source.canonicalUrl ?? input.url, type: source.type, aliases,
+    transformations: structured?.transformations ?? (opaqueReplacement?[{kind:"opaque-url-slug-replaced" as const,raw:rawSlug}]:repeatedHumanTitle&&normalize(repeatedHumanTitle)!==normalize(source.title)?[{kind:"repeated-human-title" as const,raw:source.title}]:[]),
+  } : null;
+  return {
+    parser: FAVORITE_PARSER_ID, version: 8,
+    fingerprint: fingerprint(JSON.stringify({ parser: FAVORITE_PARSER_ID, raw })), raw, identity, segments,
+    displayTitle, progression, status: identity ? "parsed" : "identity-missing",
+    diagnostics: identity ? [] : ["URL_IDENTITY_MISSING"],
+  };
 }
 
 export function progressionFromFavorite(input: { title: string; url: string; source?: BookmarkSourceEvidence | null }): FavoriteProgression | null {

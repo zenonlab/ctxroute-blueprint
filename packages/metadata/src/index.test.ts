@@ -5,9 +5,13 @@ import {
   fetchAniList,
   fetchAniListCalendar,
   fetchMangaUpdatesReleases,
+  searchMangaDexManga,
+  parseMangaDexManga,
   matchAniList,
   matchMangaUpdates,
   resolveMangaUpdatesSeries,
+  resolveMangaUpdatesLinkedSeries,
+  resolveMangaUpdatesPublicSlug,
   exactMangaUpdatesSeriesMatches,
   exactAniListMediaMatches,
   automaticAniListMediaMatches,
@@ -36,9 +40,11 @@ import {
   aniListExplicitSeasonMatch,
   decideProviderTitleMatch,
   decideMangaUpdatesTitleMatch,
+  decideMangaDexTitleMatch,
   decideAniListTitleMatch,
   PROVIDER_TITLE_MATCHER_VERSION,
   progressionFromFavorite,
+  selectBestLocalizedTitle,
 } from "./index.js";
 
 describe("collective review identity", () => {
@@ -75,6 +81,37 @@ describe("collective review identity", () => {
     expect(requiredProviderForMediaType("MANHUA")).toBe("mangaupdates");
     expect(()=>assertProviderMediaType({provider:"mangaupdates",mediaType:"ANIME"})).toThrow("PROVIDER_MEDIA_TYPE_MISMATCH");
     expect(()=>assertProviderMediaType({provider:"anilist",mediaType:"MANGA"})).toThrow("PROVIDER_MEDIA_TYPE_MISMATCH");
+  });
+});
+
+describe("MangaDex identity bridge", () => {
+  const uuid = "123e4567-e89b-42d3-a456-426614174000";
+  it("preserves localized titles, descriptions and bounded relationship provenance", () => {
+    expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Synthetic Chronicle", ja: "Synthetic Native" }, altTitles: [{ fr: "Chronique synthétique" }, { en: "Synthetic Alias" }], links: { mu: "mu_bridge_1", al: "999" }, description: { en: "Synthetic description", fr: "Description synthétique" }, tags:[{attributes:{name:{en:"Synthetic genre"}}}], status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',lastVolume:'4',lastChapter:'31' }, relationships:[{id:'author-id',type:'author',attributes:{name:'Synthetic Author'}},{id:'cover-id',type:'cover_art',attributes:{fileName:'cover.png'}}] })).toMatchObject({
+      id: uuid,
+      titles: ["Synthetic Chronicle", "Synthetic Native", "Chronique synthétique", "Synthetic Alias"],
+      descriptions:{en:"Synthetic description",fr:"Description synthétique"}, tags:["Synthetic genre"],status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',latestVolume:'4',latestChapter:'31',
+      authors:[{id:'author-id',name:'Synthetic Author'}],coverFileName:'cover.png',
+      mangaUpdatesId: "mu_bridge_1",
+    });
+    expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Minimal Work" }, links: {} } })).toMatchObject({ id: uuid, titles: ["Minimal Work"],descriptions:{},authors:[],artists:[],relations:[] });
+    expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Bad Link" }, links: { mu: "https://invalid.example/id" } } })?.mangaUpdatesId).toBeUndefined();
+    expect(parseMangaDexManga({ id: "not-a-uuid", attributes: { title: { en: "Invalid" } } })).toBeNull();
+  });
+  it("uses the shared symmetric matcher and never result order or popularity", () => {
+    const first = { id: "223e4567-e89b-42d3-a456-426614174000", titles: ["Unrelated Work"], mangaUpdatesId: "noise", popularity: 999999 } as any;
+    const linked = { id: uuid, titles: ["Chronicle Synthetic"], mangaUpdatesId: "winner", popularity: 1 } as any;
+    expect(decideMangaDexTitleMatch(["Synthetic Chronicle"], [first, linked])).toMatchObject({ status: "MATCH", method: "reordered-significant-words", providerId: uuid });
+    expect(decideMangaDexTitleMatch(["Synthetic Chronicle"], [linked, { ...linked, id: "323e4567-e89b-42d3-a456-426614174000", mangaUpdatesId: "other" }]).status).toBe("AMBIGUOUS");
+  });
+  it("performs a bounded title-only search", async () => {
+    const fetch = vi.fn(async (url: URL) => {
+      expect(url.pathname).toBe("/manga");
+      expect(url.searchParams.get("title")).toBe("Synthetic Chronicle");
+      expect(url.searchParams.get("limit")).toBe("20");
+      return new Response(JSON.stringify({ data: [{ id: uuid, attributes: { title: { en: "Synthetic Chronicle" }, altTitles: [], links: { mu: "mu1" } } }] }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await expect(searchMangaDexManga("Synthetic Chronicle", { endpoint: "https://api.example.test", fetch: fetch as any })).resolves.toEqual([expect.objectContaining({ id: uuid, titles: ["Synthetic Chronicle"], mangaUpdatesId: "mu1" })]);
   });
 });
 
@@ -167,6 +204,53 @@ describe("AniList catalogue", () => {
     expect(decideProviderTitleMatch({aliases:['Synthetic Silent Ranger Crosses Northern Frontier'],candidates:[{id:'long',titles:['Synthetic Silent Guardian Crosses Northern Frontier: A Chronicle Beyond the Ancient Mountains']},{id:'noise',titles:['Unrelated Academy Romance']}],id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'long'});
     expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'a',titles:[translated]},{id:'b',titles:["My Standing as an Assassin Clearly Exceeds the King's"]}],id:item=>item.id,titles:item=>item.titles}).status).toBe('AMBIGUOUS');
   });
+  it("ignores English relative pronouns and requires two thirds shared identity tokens symmetrically", () => {
+    const alias = "The Scholar Who Conceals Ancient Power Beyond Silent City";
+    const translated = "Scholar That Hides Ancient Power Beyond Quiet City Walls";
+    const weak = "Scholar Which Hides Ancient Power Across Quiet Valley Walls";
+    const manga = (id:string,title:string,popularity:number) => ({id,title,titles:[title],type:'Manhwa',status:'Ongoing',popularity}) as any;
+    const anime = (id:number,title:string,popularity:number) => ({id,type:'ANIME',title:{english:title},synonyms:[],popularity}) as any;
+    expect(decideMangaUpdatesTitleMatch([alias],[manga('noise',weak,999999),manga('winner',translated,1)]))
+      .toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'winner',rawProvenance:{aliases:[alias]}});
+    expect(decideAniListTitleMatch([alias],[anime(2,weak,999999),anime(1,translated,1)]))
+      .toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'1',rawProvenance:{aliases:[alias]}});
+    expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'weak',titles:[weak]}],id:item=>item.id,titles:item=>item.titles}).status).toBe('NO_MATCH');
+  });
+  it("keeps equally qualifying relative-pronoun variants ambiguous", () => {
+    const alias = "The Pilot Whom Legends Call Guardian Of Seven Crystal Harbors";
+    const candidates = [
+      {id:'first',titles:['Pilot Who Legends Name Guardian Near Seven Crystal Ports'],rank:1},
+      {id:'second',titles:['Pilot Whose Legends Name Guardian Beyond Seven Crystal Ports'],rank:999999},
+    ];
+    expect(decideProviderTitleMatch({aliases:[alias],candidates,id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'AMBIGUOUS',method:'bounded-edit-distance'});
+  });
+  it("rejects short shared-prefix results before the provider fallback symmetrically", () => {
+    const reading = (id: string, title: string) => ({ id, title, titles: [title], type: 'Manhwa', status: 'Ongoing', image: 'https://example.test/cover.jpg' }) as any;
+    const anime = (id: number, title: string) => ({ id, type: 'ANIME', title: { english: title }, synonyms: [] }) as any;
+    const alias = 'Umbral Servant';
+    expect(decideMangaUpdatesTitleMatch([alias], [reading('1', 'Umbral Feline'), reading('2', 'Umbral Labor')]).status).toBe('NO_MATCH');
+    expect(decideAniListTitleMatch([alias], [anime(1, 'Umbral Feline'), anime(2, 'Umbral Labor')]).status).toBe('NO_MATCH');
+  });
+  it("selects the provider alias closest to the favorite instead of a distant canonical title", () => {
+    const selected = selectBestLocalizedTitle(
+      ['Quiet Alchemist Hides the Northern Crown'],
+      [
+        {text:'Remote Provider Canonical Name',language:'en'},
+        {text:'The Quiet Alchemist Who Hides Northern Crown',language:'en'},
+      ],
+    );
+    expect(selected?.text).toBe('The Quiet Alchemist Who Hides Northern Crown');
+  });
+  it("keeps a display title in the favorite script when otherwise tied", () => {
+    expect(selectBestLocalizedTitle(
+      ['Recruited for the Seventh Expedition'],
+      [{text:'セブンス'},{text:'Seventh'},{text:'The 7th'}],
+    )?.text).toBe('Seventh');
+    expect(selectBestLocalizedTitle(
+      ['架空の第七遠征'],
+      [{text:'Seventh'},{text:'架空の第七遠征'}],
+    )?.text).toBe('架空の第七遠征');
+  });
   it("keeps exact ahead of reordered words and a simple exact ahead of a parenthesized variant", () => {
     const anime=(id:number,title:string,year:number)=>({id,type:'ANIME',title:{english:title},synonyms:[],startDate:{year}}) as any;
     expect(preferredAniListMediaMatch(['Synthetic Exact'],[anime(1,'Synthetic Exact',2020),anime(2,'Exact Synthetic',2026)])?.id).toBe(1);
@@ -179,6 +263,40 @@ describe("AniList catalogue", () => {
       {id:'2',title:'My Small Hero',titles:['My Small Hero'],...base},
     ] as any);
     expect(selected?.id).toBe('1');
+  });
+  it("matches functional-word and inflection variants symmetrically without provider popularity",()=>{
+    const alias="My Junior Guardian Became Remarkably Skilled When He Trained As His Mentor Told Him";
+    const providerTitle="A Junior Guardian Who Had Become Remarkably Skilled After Training as His Mentor Told Him to Do";
+    const reading=[
+      {id:'noise',title:'Junior Office Guardian',titles:[],type:'Manhwa',status:'Ongoing',popularity:999999},
+      {id:'winner',title:providerTitle,titles:[providerTitle],type:'Manhwa',status:'Ongoing',popularity:1},
+    ] as any;
+    const anime=[
+      {id:1,type:'ANIME',title:{english:'Junior Office Guardian'},synonyms:[],popularity:999999},
+      {id:2,type:'ANIME',title:{english:providerTitle},synonyms:[],popularity:1},
+    ] as any;
+    expect(decideMangaUpdatesTitleMatch([alias],reading)).toMatchObject({status:'MATCH',method:'reordered-significant-words',providerId:'winner'});
+    expect(decideAniListTitleMatch([alias],anime)).toMatchObject({status:'MATCH',method:'reordered-significant-words',providerId:'2'});
+  });
+  it("combines titles only inside one provider identity for bounded token coverage",()=>{
+    const alias='Synthetic Dragon Chain - Heart Inside the Spirit';
+    const candidates=[
+      {id:'winner',titles:['Dragon Chain of Synthesis - Spirit Within the Heart','Synthetic Dragon Chain']},
+      {id:'noise-a',titles:['Heart Program']},
+      {id:'noise-b',titles:['Spirit Door']},
+    ];
+    expect(decideProviderTitleMatch({aliases:[alias],candidates,id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'winner'});
+    expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'split-a',titles:['Synthetic Dragon Chain']},{id:'split-b',titles:['Heart Inside the Spirit']}],id:item=>item.id,titles:item=>item.titles}).status).not.toBe('MATCH');
+  });
+  it("lets one provider title corroborate a structurally wrapped URL alias",()=>{
+    const aliases=['73142 En Synthetic Count S Hidden Attendant Edition'];
+    const candidates=[
+      {id:'noise',titles:['Synthetic Count of Northbridge']},
+      {id:'winner',titles:["Synthetic Count S Hidden Attendant"]},
+      {id:'other',titles:['Hidden Attendant Program']},
+    ];
+    expect(decideProviderTitleMatch({aliases,candidates,id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'ordered-exact',providerId:'winner'});
+    expect(decideProviderTitleMatch({aliases:['73142 Synthetic Count S Hidden Attendant Edition'],candidates,id:item=>item.id,titles:item=>item.titles}).method).not.toBe('ordered-exact');
   });
   it("matches exact titles in all fields and treats a final parenthesized suffix as a variant", () => {
     expect(exactTitleMatchKind("Existence", "Existence")).toBe("NORMALIZED_EXACT");
@@ -225,6 +343,8 @@ describe("AniList catalogue", () => {
     expect(preferredMangaUpdatesSeriesMatch(['Synthetic Cleric'],[reading])).toBeUndefined();
     const translated={...anime,id:2,title:{english:'Synthetic 100: Final Errand List'}};
     expect(preferredAniListMediaMatch(['Final Errand List'],[translated])).toBeUndefined();
+    const translatedReading={...reading,id:'2',title:'Synthetic 100: Final Errand List'};
+    expect(preferredMangaUpdatesSeriesMatch(['Final Errand List'],[translatedReading])).toBeUndefined();
   });
   it("prepares bookmark and URL titles using URL release evidence", () => {
     const anime = sourceIdentityFromUrl("https://v5.voiranime.com/anime/remonster/re-monster-02-vostfr/");
@@ -238,6 +358,32 @@ describe("AniList catalogue", () => {
     expect(prepared.candidates[0]).toBe("Re:Monster");
     expect(compactTitleKey("Re:Monster")).toBe(compactTitleKey("Re Monster"));
     expect(compactTitleKey("Re Monster")).toBe(compactTitleKey("Remonster"));
+  });
+  it("never turns a paginated catalogue index file into source identity",()=>{
+    const url='https://reader.invalid/catalogue/index.php?page=11';
+    expect(sourceIdentityFromUrl(url)).toBeNull();
+    expect(sourceDispositionFromUrl(url)).toEqual({status:'excluded',reason:'UTILITY_PAGE'});
+  });
+
+  it("keeps URL identity, a matching human segment, and release provenance separate", () => {
+    const url = "https://reader.example/synthetic-tower-expert/ep42/viewer";
+    const source = sourceIdentityFromUrl(url);
+    expect(source).toMatchObject({
+      slug: "synthetic-tower-expert",
+      title: "Synthetic Tower Expert",
+      canonicalUrl: "https://reader.example/synthetic-tower-expert",
+      release: { raw: "ep42", number: "42", kind: "episode", provenance: "URL_PATH" },
+    });
+    const prepared = prepareTitleCandidates({ bookmarkTitle: "Ep.42 - 42 | Synthetic Tower Expert", url, source });
+    expect(prepared).toMatchObject({
+      original: "Ep.42 - 42 | Synthetic Tower Expert",
+      alignedSourceTitle: "Synthetic Tower Expert",
+      selectedSegment: "Synthetic Tower Expert",
+      sourceMatchMethod: "ordered-exact",
+      personal: "Synthetic Tower Expert",
+    });
+    expect(prepared.candidates[0]).toBe("Synthetic Tower Expert");
+    expect(prepared.candidates).not.toContain("42");
   });
 
   it("uses path type over an anime-looking hostname and removes scan markers", () => {
@@ -310,7 +456,7 @@ describe("AniList catalogue", () => {
       canonicalUrl: "https://reader.example/series/solo-leveling",
     });
     expect(sourceIdentityFromUrl('https://comick.dev/comic/00-new-employee-kim-chul-soo/chapter-85-en')).toMatchObject({
-      title: 'New Employee Kim Chul Soo', slug: 'new-employee-kim-chul-soo',
+      title: '00 New Employee Kim Chul Soo', slug: '00-new-employee-kim-chul-soo', rawSlug: '00-new-employee-kim-chul-soo',
     });
     expect(titleCandidateFromBookmark('Chapter 85 (English) - New Employee Kim Chul-Soo | ComicK')).toBe('New Employee Kim Chul-Soo');
     expect(
@@ -732,8 +878,8 @@ describe("AniList catalogue", () => {
   it("rejects a semantic guess and equally plausible fuzzy candidates", () => {
     const base = { type: "Manhwa", year: 2025, status: "Ongoing" };
     expect(resolveMangaUpdatesSeries(
-      ["Hua Tuo Reincarnated as a Modern Surgical Genius"],
-      [{ ...base, id: "surgeon", title: "Hua Tuo Becomes a Surgeon" }],
+      ["Ancient Healer Reborn as a Metropolitan Surgical Prodigy"],
+      [{ ...base, id: "surgeon", title: "Ancient Healer Becomes a Surgeon" }],
     )).toBeNull();
     expect(resolveMangaUpdatesSeries(
       ["Return of the Frozen Player"],
@@ -844,6 +990,47 @@ describe("AniList catalogue", () => {
     expect(series?.imageThumbnail).toBe("https://img.example/resurrection-small.jpg");
     expect(series).not.toHaveProperty("raw");
     expect(matchMangaUpdates({ aliases: ["Resurrection Boy"] }, [series!])?.series.type).toBe("Manhwa");
+  });
+  it("resolves a MangaDex links.mu public slug through the exact provider URL, independent of rank", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [
+        { record: { series_id: 11, title: "Synthetic Chronicle", url: "https://www.mangaupdates.com/series/wrong11/synthetic-chronicle", bayesian_rating: 10 } },
+        { record: { series_id: 22, title: "Synthetic Chronicle", url: "https://www.mangaupdates.com/series/right22/synthetic-chronicle", bayesian_rating: 1 } },
+      ] }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        series_id: 22, title: "Synthetic Chronicle", type: "Manga", status: "Ongoing",
+        url: "https://www.mangaupdates.com/series/right22/synthetic-chronicle",
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    const result = await resolveMangaUpdatesLinkedSeries("right22", ["Synthetic Chronicle"], {
+      endpoint: "https://mu.slug.test/v1", fetch: fetcher,
+    });
+    expect(result).toMatchObject({
+      rawLink: "right22", method: "public-url-slug", series: { id: "22", title: "Synthetic Chronicle" },
+    });
+    expect(fetcher.mock.calls[1]?.[0].toString()).toContain("/series/22");
+  });
+  it("keeps an ambiguous public slug unresolved", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [
+      { record: { series_id: 31, title: "Synthetic Chronicle", url: "https://www.mangaupdates.com/series/shared31/one" } },
+      { record: { series_id: 32, title: "Synthetic Chronicle", url: "https://www.mangaupdates.com/series/shared31/two" } },
+    ] }), { status: 200, headers: { "content-type": "application/json" } }));
+    await expect(resolveMangaUpdatesLinkedSeries("shared31", ["Synthetic Chronicle"], {
+      endpoint: "https://mu.slug.test/v1", fetch: fetcher,
+    })).resolves.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it("lets an explicit manual slug select a uniquely proven provider URL despite a contrasting title", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [
+        { record: { series_id: 42, title: "Synthetic Monster", url: "https://www.mangaupdates.com/series/manual42/synthetic-monster", bayesian_rating: 1 } },
+      ] }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        series_id: 42, title: "Synthetic Monster", type: "Manga",
+        url: "https://www.mangaupdates.com/series/manual42/synthetic-monster",
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+    await expect(resolveMangaUpdatesPublicSlug("manual42", ["Contrasting Synthetic Favorite"], {
+      endpoint: "https://mu.manual.test/v1", fetch: fetcher,
+    })).resolves.toMatchObject({rawLink:"manual42",method:"public-url-slug",series:{id:"42",title:"Synthetic Monster"}});
   });
   it("keeps compact and normalized variants for multi-signal searches", () =>
     expect(titleVariants(["Café — Blue Sky"])).toEqual(

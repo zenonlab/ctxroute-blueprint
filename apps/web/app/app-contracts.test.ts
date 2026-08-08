@@ -37,10 +37,33 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('Script=Hiragana');
   });
 
-  it('confirms a successful manual review before advancing the queue',()=>{
+  it('persists a manual review request and advances without polling or delay',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
-    expect(source).toContain('Fiche vérifiée et ajoutée à votre bibliothèque.');
-    expect(source).toContain('window.setTimeout(onDone,1200)');
+    expect(source).toContain('Vérification enregistrée dans la file.');
+    expect(source).not.toContain("response.status===202&&path==='manual'");
+    expect(source).not.toContain('window.setTimeout(onDone');
+  });
+
+  it('uses the notification menu exclusively for the review queue',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain("useApi<ReviewQueueSummary>('/api/v1/reviews',reviewRefresh)");
+    expect(source).toContain('Aucune review à vérifier');
+    expect(source).not.toContain("useApi<{items:NotificationItem[]}>('/api/v1/notifications')");
+    expect(source).not.toContain('regularNotifications');
+  });
+
+  it('accepts alphanumeric provider keys and animates one disabled verification action',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain("id:/^https?:\\/\\//u.test(input)?undefined:input");
+    expect(source).toContain("`Vérifier${'.'.repeat(dots)}`");
+    expect(source).toContain('disabled={busy}');
+    expect(source).toContain('if(!manualPending)void decide');
+  });
+
+  it('explains that review cards show the closest provider title',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain('les cartes affichent le titre fournisseur le plus proche du favori');
+    expect(source).not.toContain('les cartes affichent le titre canonique du fournisseur');
   });
 
   it('repairs only incomplete visible cards in one bounded request and polls queued providers twice',()=>{

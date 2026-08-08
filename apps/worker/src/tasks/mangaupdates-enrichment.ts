@@ -1,4 +1,5 @@
 import type { Task } from "graphile-worker";
+import { createHash } from "node:crypto";
 import { CONNECTOR_VERSIONS } from "@favlib/config";
 import { normalizeSerializationStatus, position } from "@favlib/progression";
 import { withProviderRequest } from "@favlib/database/provider-queue";
@@ -6,24 +7,29 @@ import {
   cleanDisplayTitle,
   explicitTitleAliases,
   fetchMangaUpdatesSeries,
+  fetchMangaDexManga,
+  parseMangaDexManga,
+  decideMangaDexTitleMatch,
   mangaUpdatesMediaType,
+  mangaUpdatesTypeAllowed,
   normalizeTitle,
   decideMangaUpdatesTitleMatch,
   rankMangaUpdatesReviewCandidates,
+  resolveMangaUpdatesLinkedSeries,
   searchMangaUpdatesSeries,
+  searchMangaDexManga,
   titleVariants,
-  titleCandidateFromBookmark,
 } from "@favlib/metadata";
 import { saveCover, saveProviderProfileCover } from "../cover-store.js";
 import {
   claimEnrichment,
+  blockProviderUntil,
   enrichmentFingerprint,
   finishEnrichment,
   normalizedError,
   retryableProviderError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
-import { notifyCoverUnavailable } from "../cover-notify.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
 
@@ -73,6 +79,22 @@ async function providerCall<T>(
     });
     throw error;
    }
+  });
+}
+async function mangaDexCall<T>(h: any, call: () => Promise<T>, context: Record<string, unknown>): Promise<T> {
+  return withProviderRequest(h, { provider: 'mangadex', kind: String(context.operation ?? 'identity-bridge'), priority: 60, scopeKey: typeof context.mediaId === 'string' ? context.mediaId : undefined, spacingMs: 1000 }, async () => {
+    trace(h, 'provider_request', { provider: 'mangadex', ...context });
+    try {
+      const result = await call();
+      trace(h, 'provider_response', { provider: 'mangadex', status: 'OK', resultSummary: Array.isArray(result) ? { count: result.length } : typeof result, ...context });
+      return result;
+    } catch (error) {
+      const code = normalizedError(error);
+      const retry = code.match(/^MANGADEX_HTTP_429_RETRY_(\d+)$/u);
+      if (retry) await blockProviderUntil(h, 'mangadex', Date.now() + Math.min(86_400, Math.max(1, Number(retry[1]))) * 1000);
+      trace(h, 'provider_response', { provider: 'mangadex', status: 'ERROR', error: normalizedError(error), ...context });
+      throw error;
+    }
   });
 }
 async function enrichCover(mediaId: string, h: any) {
@@ -165,7 +187,6 @@ async function enrichCover(mediaId: string, h: any) {
       retrySeconds: terminal ? null : Math.min(86400, 300 * 2 ** Math.max(0, claim.attempt_count - 1)),
       resolutionCode: "COVER_UNAVAILABLE",
     });
-    if (terminal) await notifyCoverUnavailable(h.query.bind(h), mediaId, code);
     return { status: "FAILED", reason: code };
   }
 }
@@ -181,7 +202,7 @@ const task: Task = async (raw, helpers: Helpers) => {
   const timeoutMs = await operationalValue(h, "timeouts.providerMs"),
     maxAttempts = await operationalValue(h, "metadata.maxAttempts");
   const row = await h.query(
-    "SELECT m.type,m.season_year AS year,m.country_of_origin AS country,m.format,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'official' THEN 1 WHEN 'supplier' THEN 2 WHEN 'synonym' THEN 3 ELSE 4 END,t.id) FROM media_title t WHERE t.media_id=m.id),'[]') AS titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind='source'),'[]') AS source_titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id DESC) FROM media_title t WHERE t.media_id=m.id AND t.kind='personal'),'[]') AS personal_titles,(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1) AS mangaupdates_id,EXISTS(SELECT 1 FROM favorite_review r JOIN favorite_review_candidate rc ON rc.review_id=r.id WHERE r.status='RESOLVED' AND r.selected_candidate_id=rc.id AND r.provider='mangaupdates' AND rc.provider_id=(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1)) AS mangaupdates_identity_user_selected FROM media m WHERE m.id=$1",
+    "SELECT m.type,m.season_year AS year,m.country_of_origin AS country,m.format,COALESCE((SELECT json_agg(t.text ORDER BY CASE t.kind WHEN 'source' THEN 0 WHEN 'official' THEN 1 WHEN 'supplier' THEN 2 WHEN 'synonym' THEN 3 ELSE 4 END,t.id) FROM media_title t WHERE t.media_id=m.id),'[]') AS titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id) FROM media_title t WHERE t.media_id=m.id AND t.kind='source'),'[]') AS source_titles,COALESCE((SELECT json_agg(t.text ORDER BY t.id DESC) FROM media_title t WHERE t.media_id=m.id AND t.kind='personal'),'[]') AS personal_titles,(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1) AS mangaupdates_id,(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangadex' AND status='ACTIVE' LIMIT 1) AS mangadex_id,(SELECT payload FROM provider_payload WHERE media_id=m.id AND provider='mangadex' AND validity_status='VALID' AND is_current=true ORDER BY collected_at DESC LIMIT 1) AS mangadex_payload,EXISTS(SELECT 1 FROM favorite_review r JOIN favorite_review_candidate rc ON rc.review_id=r.id WHERE r.status='RESOLVED' AND r.selected_candidate_id=rc.id AND r.provider='mangaupdates' AND rc.provider_id=(SELECT external_id FROM media_metadata WHERE media_id=m.id AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1)) AS mangaupdates_identity_user_selected FROM media m WHERE m.id=$1",
     [mediaId],
   );
   if (!row.rows[0]) return;
@@ -208,9 +229,6 @@ const task: Task = async (raw, helpers: Helpers) => {
   const searchAliases = [...new Set((aliases as string[]).map((value: string) => cleanDisplayTitle(value) ?? value))];
   const parsedSourceAliases = (Array.isArray(c.source_titles) ? c.source_titles : []).filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
   const identityAliases = explicitTitleAliases(parsedSourceAliases.length ? parsedSourceAliases.map((value: string) => cleanDisplayTitle(value) ?? value) : searchAliases);
-  const personalTitles = (Array.isArray(c.personal_titles) ? c.personal_titles : [])
-    .filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()));
-  const favoriteAliases = explicitTitleAliases(personalTitles.map((value: string) => titleCandidateFromBookmark(value) ?? cleanDisplayTitle(value) ?? value));
   const queries = titleVariants(searchAliases).filter((value) => value.length > 2);
   const fp = enrichmentFingerprint({ mediaId, type: c.type, aliases: searchAliases });
   if (forceRefresh) {
@@ -232,6 +250,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     let candidates: any[] = [];
     let selected: any | undefined;
     let fastPath = false;
+    let bridgeProvenance: Record<string, unknown> | undefined;
     const providerOptions = { timeoutMs };
     const knownMuId = forceRefresh && c.mangaupdates_id
       ? String(c.mangaupdates_id)
@@ -246,6 +265,18 @@ const task: Task = async (raw, helpers: Helpers) => {
       // directly and never reopen title discovery during enrichment.
       selected = record;
       fastPath = true;
+    }
+    if (!fastPath && forceRefresh && c.mangadex_id && c.mangadex_payload) {
+      const storedMangaDex = parseMangaDexManga(c.mangadex_payload);
+      if (storedMangaDex?.mangaUpdatesId) {
+        const resolution = await providerCall(h, () => resolveMangaUpdatesLinkedSeries(storedMangaDex.mangaUpdatesId!, storedMangaDex.titles, providerOptions), { operation: 'resolve-stored-mangadex-link', mediaId, id: storedMangaDex.mangaUpdatesId });
+        if (resolution?.series && mangaUpdatesTypeAllowed(resolution.series)) {
+          selected = resolution.series;
+          candidates = [resolution.series];
+          fastPath = true;
+          bridgeProvenance = { source: 'stored-mangadex-link', mangaDexId: storedMangaDex.id, linkedValue: resolution.rawLink, linkedValueKind: resolution.method, resolvedSeriesId: resolution.series.id, mangaUpdatesVersion: VERSION };
+        }
+      }
     }
     for (const q of fastPath ? [] : queries) {
       const results = await providerCall(h, () =>
@@ -271,7 +302,67 @@ const task: Task = async (raw, helpers: Helpers) => {
       }
     }
     candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
-    const matchDecision = decideMangaUpdatesTitleMatch(favoriteAliases.length ? favoriteAliases : identityAliases, candidates);
+    const matchAliases = identityAliases;
+    const matchDecision = decideMangaUpdatesTitleMatch(matchAliases, candidates);
+    if (matchDecision.status === 'NO_MATCH' && !knownMuId) {
+      trace(h, 'bridge_attempt', { provider: 'mangadex', mediaId, queryCount: queries.length });
+      try {
+        const mangaDexCandidates: any[] = [];
+        for (const query of queries) mangaDexCandidates.push(...await mangaDexCall(h, () => searchMangaDexManga(query, providerOptions), { operation: 'identity-bridge-search', mediaId, query }));
+        const uniqueMangaDex = [...new Map(mangaDexCandidates.map(item => [item.id, item])).values()];
+        const bridgeDecision = decideMangaDexTitleMatch(matchAliases, uniqueMangaDex);
+        const mangaDexCandidate = bridgeDecision.candidate;
+        if (bridgeDecision.status === 'MATCH' && mangaDexCandidate) {
+          const mangaDex = await mangaDexCall(h, () => fetchMangaDexManga(mangaDexCandidate.id, providerOptions), { operation: 'identity-detail', mediaId, id: mangaDexCandidate.id });
+          let linked: any | undefined;
+          if (mangaDex.mangaUpdatesId) try {
+            const resolution = await providerCall(h, () => resolveMangaUpdatesLinkedSeries(mangaDex.mangaUpdatesId!, mangaDex.titles, providerOptions), { operation: 'resolve-bridged-link', mediaId, id: mangaDex.mangaUpdatesId });
+            const fetched = resolution?.series;
+            if (fetched && String(fetched.type ?? '').trim() && !mangaUpdatesTypeAllowed(fetched)) trace(h,'bridge_link_incompatible',{provider:'mangadex',mediaId,mangaDexId:mangaDex.id,mangaUpdatesLink:mangaDex.mangaUpdatesId,mangaUpdatesId:fetched.id});
+            else if (fetched) {
+              linked=fetched;
+              bridgeProvenance = { linkedValue: resolution.rawLink, linkedValueKind: resolution.method, resolvedSeriesId: fetched.id };
+            }
+          } catch(error) {
+            // A broken or temporarily unverifiable links.mu never invalidates
+            // the independently unique MangaDex identity. Weekly promotion
+            // will retry MangaUpdates without refreshing MangaDex metadata.
+            trace(h,'bridge_link_unavailable',{provider:'mangadex',mediaId,mangaDexId:mangaDex.id,mangaUpdatesId:mangaDex.mangaUpdatesId,error:normalizedError(error)});
+          }
+          if (linked) {
+          selected = linked;
+          bridgeProvenance = {
+            ...bridgeProvenance,
+            source: 'mangadex-mangaupdates-bridge', mangaDexId: mangaDexCandidate.id,
+            examinedTitles: uniqueMangaDex.map(item => ({ id: item.id, titles: item.titles, mangaUpdatesId: item.mangaUpdatesId })),
+            matchedTitle: bridgeDecision.providerTitle, matchedAlias: bridgeDecision.matchedAlias,
+            mangaUpdatesLink: mangaDex.mangaUpdatesId, mangaUpdatesId: linked.id, matcherMethod: bridgeDecision.method,
+            matcherVersion: bridgeDecision.matcherVersion, mangaDexBridgeVersion: CONNECTOR_VERSIONS.mangaDexBridge,
+            mangaUpdatesVersion: VERSION,
+          };
+          trace(h, 'bridge_match', { provider: 'mangadex', mediaId, mangaDexId: mangaDexCandidate.id, mangaUpdatesLink: mangaDex.mangaUpdatesId, mangaUpdatesId: linked.id });
+          } else {
+            const sourceUrl = `https://mangadex.org/title/${mangaDex.id}`;
+            const payload = JSON.stringify(mangaDex.raw), payloadDigest = createHash('sha256').update(payload).digest('hex');
+            await h.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangadex',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING", [mediaId, mangaDex.id, { provider: 'mangadex', sourceUrl, matcherVersion: bridgeDecision.matcherVersion, rawProvenance: bridgeDecision.rawProvenance }]);
+            await h.query("INSERT INTO provider_payload(media_id,provider,connector_version,payload_hash,payload,provenance,validity_status,is_current) VALUES($1,'mangadex',$2,$3,$4,$5,'VALID',true) ON CONFLICT(media_id,provider,connector_version,payload_hash) DO UPDATE SET is_current=true", [mediaId, CONNECTOR_VERSIONS.mangaDexBridge, payloadDigest, payload, { sourceUrl, externalId: mangaDex.id, collection: 'once' }]);
+            for (const title of mangaDex.localizedTitles) await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,$4,'supplier',$5,'mangadex',1,$6) ON CONFLICT DO NOTHING", [mediaId, title.text, normalizeTitle(title.text), title.language, title.kind === 'title' ? 'official' : 'associated', { provider: 'mangadex', externalId: mangaDex.id, raw: title.raw }]);
+            const values: Array<[string, unknown]> = [['descriptions',mangaDex.descriptions],['description',mangaDex.descriptions],['genres',mangaDex.tags],['themes',mangaDex.tags],['status',mangaDex.status],['year',mangaDex.year],['language',mangaDex.originalLanguage],['publicationDemographic',mangaDex.publicationDemographic],['contentRating',mangaDex.contentRating],['latestVolume',mangaDex.latestVolume],['latestChapter',mangaDex.latestChapter],['authors',mangaDex.authors],['artists',mangaDex.artists],['relations',mangaDex.relations]];
+            for (const [field,value] of values) if (value !== undefined && value !== null && (!Array.isArray(value) || value.length)) await h.query("INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence,attribution) VALUES($1,$2,$3,'mangadex',$4,1,'MangaDex') ON CONFLICT(media_id,field,provider,source_url) DO UPDATE SET value=excluded.value,asserted_at=now()", [mediaId,field,JSON.stringify(value),sourceUrl]);
+            await h.query("INSERT INTO media_metadata(media_id,provider,external_id,source_url,latest_chapter,status,resolved_at,updated_at) VALUES($1,'mangadex',$2,$3,$4,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='mangadex',external_id=excluded.external_id,source_url=excluded.source_url,latest_chapter=excluded.latest_chapter,status='ACTIVE',resolved_at=now(),updated_at=now()", [mediaId,mangaDex.id,sourceUrl,mangaDex.latestChapter??null]);
+            await h.query("INSERT INTO mangadex_promotion_state(media_id,mangadex_id,next_attempt_at,matcher_version,status) VALUES($1,$2,favlib_next_paris_monday(now()),$3,'PENDING') ON CONFLICT(media_id) DO NOTHING", [mediaId,mangaDex.id,bridgeDecision.matcherVersion]);
+            if (mangaDex.coverUrl) await saveCover(h,mediaId,mangaDex.coverUrl,'mangadex','MangaDex',{externalId:mangaDex.id});
+            await markFavoriteMatched(h.query,mediaId); await reconcileResolvedFavoriteReviews(h.query,mediaId,'mangadex-valid-resolution');
+            await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'SUCCESS',externalId:mangaDex.id,resolutionCode:'MANGADEX_VALID_RESOLUTION'});
+            return;
+          }
+        } else {
+          trace(h, bridgeDecision.status === 'AMBIGUOUS' ? 'bridge_ambiguous' : bridgeDecision.candidate && !bridgeDecision.candidate.mangaUpdatesId ? 'missing_mu_link' : 'bridge_no_match', { provider: 'mangadex', mediaId });
+        }
+      } catch (error) {
+        trace(h, 'bridge_error', { provider: 'mangadex', mediaId, status: 'ERROR', error: normalizedError(error) });
+      }
+    }
     await h.query(
       "UPDATE media_enrichment_state SET candidate_snapshot=$1::jsonb,updated_at=now() WHERE media_id=$2 AND provider='mangaupdates' AND purpose='metadata' AND connector_version=$3",
       [JSON.stringify(snapshotCandidates(candidates)), mediaId, VERSION],
@@ -297,7 +388,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     // A provider identity is the canonical work. An existing owner remains a
     // valid candidate: the new favorite must converge onto it, not create a
     // second work merely because its provisional source media differs.
-    selected = matchDecision.status === 'MATCH' ? matchDecision.candidate : undefined;
+    selected = selected ?? (matchDecision.status === 'MATCH' ? matchDecision.candidate : undefined);
     if (!selected) {
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
@@ -317,7 +408,8 @@ const task: Task = async (raw, helpers: Helpers) => {
       return;
     }
     const s = selected;
-    const exactResolution = matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH';
+    const exactResolution = bridgeProvenance ? 'MANGADEX_MANGAUPDATES_BRIDGE' : matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH';
+    if (bridgeProvenance) await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: 'mangadex-mangaupdates-bridge', rawProvenance: bridgeProvenance })]);
     const owner = await h.query(
       "SELECT media_id FROM media_external_id WHERE provider='mangaupdates' AND external_id=$1",
       [s.id],
@@ -334,7 +426,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     } else {
       await h.query(
         "INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'mangaupdates',$2,$3) ON CONFLICT(provider,external_id) DO NOTHING",
-        [mediaId, s.id, { source: "MangaUpdates" }],
+        [mediaId, s.id, bridgeProvenance ? { source: "MangaUpdates", bridge: bridgeProvenance } : { source: "MangaUpdates" }],
       );
     }
     const providerType = mangaUpdatesMediaType(s.type);
@@ -390,6 +482,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       ["year", s.year],
       ["latestChapter", s.latestChapter],
       ["latestVolume", s.latestVolume],
+      ["description", s.description],
     ];
     for (const [field, value] of muValues) {
       if (value === undefined || value === null || (Array.isArray(value) && value.length === 0)) continue;
@@ -401,7 +494,9 @@ const task: Task = async (raw, helpers: Helpers) => {
     const chapter=s.latestChapter?position(s.latestChapter,'chapter'):undefined;
     await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,$5,$6,$7,$8,now(),'ACTIVE',NULL,$9,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=COALESCE(excluded.latest_chapter,provider_progress.latest_chapter),latest_volume=COALESCE(excluded.latest_volume,provider_progress.latest_volume),available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[targetMediaId,normalizeSerializationStatus(s.status)??null,s.latestChapter??null,s.latestVolume??null,chapter?.number===undefined?null:'chapter',chapter?.number??null,s.latestChapter??null,chapter?.number===undefined?null:{provider:'mangaupdates',seriesId:s.id,evidence:'series-record'},{provider:'mangaupdates',seriesId:s.id}]);
     await markFavoriteMatched(h.query, targetMediaId);
-    await reconcileResolvedFavoriteReviews(h.query, targetMediaId);
+    await reconcileResolvedFavoriteReviews(h.query, targetMediaId, bridgeProvenance ? 'mangadex-mangaupdates-bridge' : 'automatic-provider-resolution');
+    if (bridgeProvenance)
+      await h.query("UPDATE mangadex_promotion_state SET status='PROMOTED',mangaupdates_id=$2,next_attempt_at=now(),last_attempt_at=now(),last_error=NULL,promoted_at=COALESCE(promoted_at,now()),updated_at=now() WHERE media_id IN ($1,$3)", [targetMediaId, String(s.id), mediaId]);
     await finishEnrichment(h, {
       mediaId,
       provider: "mangaupdates",

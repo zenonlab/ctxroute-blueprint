@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 type Query={query:(sql:string,values?:unknown[])=>Promise<{rows?:any[];rowCount?:number|null}>};
-export type ProviderQueueName='anilist'|'mangaupdates';
+export type ProviderQueueName='anilist'|'mangaupdates'|'mangadex';
 
 export async function recoverProviderRequestOwner(db:Query,ownerService:string,error='PROCESS_RESTART'){
   const running=await db.query("SELECT provider,count(*)::text AS count FROM provider_request_waitlist WHERE state='RUNNING' AND owner_service=$1 GROUP BY provider",[ownerService]);

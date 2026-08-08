@@ -35,7 +35,7 @@ describe('favorite resolution lifecycle', () => {
     const calls: string[] = [];
     const query = async (sql: string) => {
       calls.push(sql);
-      if (sql.startsWith('SELECT r.id')) return { rows: [{ id: 'review-1', userId: 'alice', favoriteTitle: 'The Dreaming Man is a Realist - 7', provider: 'anilist', externalId: '1' }] };
+      if (sql.startsWith('SELECT r.id')) return { rows: [{ id: 'review-1', userId: 'alice', favoriteTitle: 'Synthetic Dreamer - 7', provider: 'anilist', externalId: '1' }] };
       return { rows: [] };
     };
     await reconcileResolvedFavoriteReviews(query, 'media-1');

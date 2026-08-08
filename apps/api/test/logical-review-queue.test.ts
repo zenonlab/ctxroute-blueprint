@@ -14,9 +14,16 @@ describe('logical personal review queue',()=>{
     expect(source).toContain('pending.user_id=source.user_id');
     expect(source).toContain("pending.decision IS NULL RETURNING pending.id");
   });
-  it('shows canonical titles before matched aliases',()=>{
+  it('hides a whole personal cluster while any of its rows has a queued manual decision',()=>{
+    expect(source).toContain('queued.user_id=r.user_id');
+    expect(source).toContain("queued.status='PENDING'");
+    expect(source).toContain("queued.decision->>'kind'='manual-queued'");
+  });
+  it('keeps provider title fields compatible and selects the closest provider alias',()=>{
     expect(source).toContain('COALESCE(p.canonical_title,c.provider_id) AS "displayTitle"');
     expect(source).toContain('c.hit_title AS "matchedAlias"');
+    expect(source).toContain('[candidate.canonicalTitle,candidate.hitTitle,...(candidate.associatedTitles??[])]');
+    expect(source).toContain('selectBestLocalizedTitle([favoriteTitle]');
     expect(source).not.toContain('p.canonical_title,c.canonical_title');
   });
 });

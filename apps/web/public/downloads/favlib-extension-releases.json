@@ -6,21 +6,21 @@
       "browser": "chrome",
       "version": "0.5.2",
       "protocol": 1,
-      "checksumSha256": "8c6c40f1800c8c9ab6249455b7d9fc4dd0c2cab035eba3dbe3ce91fb987123fe",
+      "checksumSha256": "8d6bcc7ae01e2d120f5a0a21deadd63f39acba46ca328c7cece93c00488b0e9a",
       "artifactUrl": "https://favlib.home.arpa/downloads/favlib-extension-chrome.zip",
       "updateManifestUrl": null,
       "installationMode": "manual-zip",
-      "publishedAt": "2026-08-07T19:25:54.926Z"
+      "publishedAt": "2026-08-08T01:11:21.961Z"
     },
     {
       "browser": "firefox",
       "version": "0.5.2",
       "protocol": 1,
-      "checksumSha256": "fd07482e6ff2bdb6d8bde073d69c68c2ab6da275bf24e4e55905d53767c826ed",
+      "checksumSha256": "888ed84be07b01eb50ee6dba687bf77e1de6a246726820b0bcc02e7ff62703d4",
       "artifactUrl": "https://favlib.home.arpa/downloads/favlib-extension-firefox.zip",
       "updateManifestUrl": null,
       "installationMode": "manual-zip",
-      "publishedAt": "2026-08-07T19:25:54.927Z"
+      "publishedAt": "2026-08-08T01:11:21.962Z"
     }
   ]
 }

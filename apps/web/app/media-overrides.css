@@ -37,5 +37,6 @@
 .notification-panel.notification-panel-resolver .notification-manual .input{min-width:0;flex:1}
 .notification-panel.notification-panel-resolver .notification-resolver-footer{display:flex;align-items:center;gap:10px;margin-top:11px;min-height:8px}
 .notification-panel.notification-panel-resolver .notification-resolver-footer:empty{display:none}
+.verify-action{min-width:92px;white-space:nowrap}
 @media(max-width:700px){.notification-panel.notification-panel-resolver{width:calc(100vw - 24px);height:calc(100vh - 110px)}.notification-panel.notification-panel-resolver .notification-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.notification-panel.notification-panel-resolver{right:-8px}.notification-panel.notification-panel-resolver .notification-manual{align-items:stretch;flex-direction:column}.notification-panel.notification-panel-resolver .notification-manual form{width:100%}}

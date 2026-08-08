@@ -55,7 +55,7 @@ async function reconcileAnimeWork(h:Queryable,mediaId:string,item:AniListMedia,p
   }
   const chainVersion=result.members.map(member=>`${member.id}:${member.episodeTotal??'unknown'}:${member.offset??'blocked'}`).join('|');
   const implied=await h.query(`INSERT INTO progression_observation(user_id,media_id,source,position_kind,position_number,position_raw,season,local_position_number,global_position_number,materialization_key,provenance,confidence,consented,observed_at)
-    SELECT l.user_id,$1,'anilist-season-chain','episode',w.cumulative_offset+COALESCE(max(c.position_number),0),
+    SELECT l.user_id,$1::text,'anilist-season-chain','episode',w.cumulative_offset+COALESCE(max(c.position_number),0),
       (w.cumulative_offset+COALESCE(max(c.position_number),0))::text,w.member_order+1,max(c.position_number),w.cumulative_offset+COALESCE(max(c.position_number),0),
       encode(digest(concat_ws(':',l.user_id::text,$1,w.media_id,COALESCE(max(c.position_number),0)::text,w.cumulative_offset::text,$2::text),'sha256'),'hex'),
       jsonb_build_object('provider','anilist','evidence',CASE WHEN max(c.position_number) IS NULL THEN 'prior-seasons-implied-watched' ELSE 'season-local-plus-proved-offset' END,'seasonMediaId',w.media_id,'offset',w.cumulative_offset,'parserEvidence',jsonb_agg(c.evidence) FILTER(WHERE c.id IS NOT NULL)),

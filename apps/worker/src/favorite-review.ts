@@ -38,7 +38,7 @@ export async function openFavoriteReview(query: Query, input: {
   persistCover?: (profileId: string, imageUrl: string, provider: 'anilist'|'mangaupdates') => Promise<unknown>;
 }) {
   const candidates = [...new Map(input.candidates.map(candidate => [String(candidate.id),candidate] as const)).values()].slice(0, 5);
-  const link = await query(`SELECT l.installation_id AS "installationId",l.bookmark_id AS "bookmarkId",i.payload->>'title' AS "rawFavoriteTitle",i.payload->>'parsedTitle' AS "parsedFavoriteTitle",i.payload->>'url' AS "favoriteUrl"
+  const link = await query(`SELECT l.installation_id AS "installationId",l.bookmark_id AS "bookmarkId",i.payload->>'title' AS "rawFavoriteTitle",i.payload->>'url' AS "favoriteUrl",i.parse_artifact AS "parseArtifact"
     FROM bookmark_media_link l LEFT JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id
     WHERE l.user_id=$1 AND ($2::text IS NULL OR l.media_id=$2) AND ($3::text IS NULL OR l.installation_id=$3) AND ($4::text IS NULL OR l.bookmark_id=$4) ORDER BY l.created_at DESC LIMIT 1`, [input.userId, input.mediaId ?? null, input.installationId ?? null, input.bookmarkId ?? null]);
   const installationId = input.installationId ?? link.rows[0]?.installationId ?? 'worker';
@@ -47,12 +47,12 @@ export async function openFavoriteReview(query: Query, input: {
   // parsed/source title is only a resolver hint and may be an opaque URL slug
   // such as `Lw931574`.
   const rawFavoriteTitle = link.rows[0]?.rawFavoriteTitle ?? link.rows[0]?.favoriteTitle ?? input.title;
-  // Always normalize the raw Chrome title on the server. The extension hint is
-  // useful for transport, but must never allow an older client/parser result
-  // to leak into the review UI.
   const favoriteUrl = link.rows[0]?.favoriteUrl || input.url || '';
-  const preparedTitle = prepareTitleCandidates({ bookmarkTitle: rawFavoriteTitle, url: favoriteUrl });
-  const favoriteTitle = preparedTitle.personal ?? preparedTitle.sourceTitle ?? rawFavoriteTitle.trim();
+  const artifact = link.rows[0]?.parseArtifact as {identity?:{title?:string}|null;displayTitle?:string|null}|undefined;
+  // New imports consume the API-owned v3 artifact without reparsing. The
+  // fallback is limited to rows created before the additive migration.
+  const legacyPrepared = artifact ? undefined : prepareTitleCandidates({ bookmarkTitle: rawFavoriteTitle, url: favoriteUrl });
+  const favoriteTitle = artifact?.identity?.title ?? artifact?.displayTitle ?? legacyPrepared?.sourceTitle ?? legacyPrepared?.personal ?? rawFavoriteTitle.trim();
   const mediaType = input.provider === 'anilist' ? 'ANIME' : 'MANGA';
   const clusterKey = collectiveTitleKey({ provider: input.provider, mediaType, parsedTitle: favoriteTitle });
   const cluster = await query(`INSERT INTO review_title_cluster(cluster_key,provider,media_type,parsed_title,raw_title_sample)

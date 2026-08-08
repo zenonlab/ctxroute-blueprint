@@ -13,11 +13,12 @@ export const SECURITY_LIMITS = Object.freeze({
 });
 
 export const CONNECTOR_VERSIONS = Object.freeze({
-  favoriteResolution: 'favorite-resolution-v3',
-  anilistMetadata: 'anilist-v19',
+  favoriteResolution: 'favorite-resolution-v11',
+  anilistMetadata: 'anilist-v28',
   anilistCover: 'anilist-cover-v4',
-  mangaUpdatesMetadata: 'mangaupdates-v18',
+  mangaUpdatesMetadata: 'mangaupdates-v27',
   mangaUpdatesCover: 'mangaupdates-cover-v6',
+  mangaDexBridge: 'mangadex-resolution-v2',
 });
 
 export const operationalSettingSchemas = {

@@ -11,8 +11,8 @@ export async function resolveLocalFavorite(
   if (!aliases.length) return null;
   const result: any = await query(
     `SELECT m.id AS "mediaId",
-       EXISTS(SELECT 1 FROM media_metadata mm WHERE mm.media_id=m.id AND mm.status='ACTIVE' AND mm.provider IN ('anilist','mangaupdates')) AS "resolved",
-       EXISTS(SELECT 1 FROM media_external_id e WHERE e.media_id=m.id AND e.provider IN ('anilist','mangaupdates')) AS "hasProviderId"
+       EXISTS(SELECT 1 FROM media_metadata mm WHERE mm.media_id=m.id AND mm.status='ACTIVE' AND mm.provider IN ('anilist','mangaupdates','mangadex')) AS "resolved",
+       EXISTS(SELECT 1 FROM media_external_id e WHERE e.media_id=m.id AND e.provider IN ('anilist','mangaupdates','mangadex')) AS "hasProviderId"
      FROM media m JOIN media_title t ON t.media_id=m.id
      WHERE m.type=$1 AND t.kind<>'personal' AND t.normalized_text = ANY($2::text[])
      GROUP BY m.id
@@ -36,7 +36,7 @@ export async function markFavoriteUnresolved(query: Query, mediaId: string, reas
 }
 
 export async function markFavoriteMatched(query: Query, mediaId: string) {
-  await query("UPDATE bookmark_media_link SET status='matched',evidence=evidence||jsonb_build_object('resolution','active-provider') WHERE media_id=$1 AND status IN ('review','matched','accepted') AND EXISTS(SELECT 1 FROM media_metadata mm WHERE mm.media_id=$1 AND mm.status='ACTIVE' AND mm.provider IN ('anilist','mangaupdates'))", [mediaId]);
+  await query("UPDATE bookmark_media_link SET status='matched',evidence=evidence||jsonb_build_object('resolution','active-provider') WHERE media_id=$1 AND status IN ('review','matched','accepted') AND EXISTS(SELECT 1 FROM media_metadata mm WHERE mm.media_id=$1 AND mm.status='ACTIVE' AND mm.provider IN ('anilist','mangaupdates','mangadex'))", [mediaId]);
   await query(`DELETE FROM personal_notification
     WHERE kind='FAVORITE_UNRESOLVED'
       AND (payload->>'mediaId'=$1 OR payload->>'mediaId' IN (
@@ -46,19 +46,19 @@ export async function markFavoriteMatched(query: Query, mediaId: string) {
 
 /** Close stale provider-created reviews once the linked work has a durable
  * provider identity. User decisions are deliberately excluded. */
-export async function reconcileResolvedFavoriteReviews(query: Query, mediaId: string) {
+export async function reconcileResolvedFavoriteReviews(query: Query, mediaId: string, decisionKind = 'automatic-provider-resolution') {
   const pending: any = await query(`SELECT r.id,r.user_id AS "userId",r.favorite_title AS "favoriteTitle",
       mm.provider,mm.external_id AS "externalId"
     FROM favorite_review r
     JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id
-    JOIN media_metadata mm ON mm.media_id=l.media_id AND mm.provider=r.provider AND mm.status='ACTIVE' AND mm.external_id IS NOT NULL
-    WHERE l.media_id=$1 AND r.status='PENDING' AND r.decision IS NULL`, [mediaId]);
+    JOIN media_metadata mm ON mm.media_id=l.media_id AND (mm.provider=r.provider OR ($2='mangadex-valid-resolution' AND mm.provider='mangadex' AND r.provider='mangaupdates')) AND mm.status='ACTIVE' AND mm.external_id IS NOT NULL
+    WHERE l.media_id=$1 AND r.status='PENDING' AND r.decision IS NULL`, [mediaId, decisionKind]);
   const users = new Set<string>();
   for (const row of pending.rows ?? []) {
     const updated: any = await query(`UPDATE favorite_review
-      SET status='RESOLVED',decision=jsonb_build_object('kind','automatic-provider-resolution','provider',$2::text,'externalId',$3::text,'mediaId',$4::text),resolved_at=now()
+      SET status='RESOLVED',decision=jsonb_build_object('kind',$5::text,'provider',$2::text,'externalId',$3::text,'mediaId',$4::text),resolved_at=now()
       WHERE id=$1 AND status='PENDING' AND decision IS NULL
-      RETURNING user_id AS "userId"`, [row.id, row.provider, row.externalId, mediaId]);
+      RETURNING user_id AS "userId"`, [row.id, row.provider, row.externalId, mediaId, decisionKind]);
     for (const result of updated.rows ?? []) users.add(String(result.userId));
   }
   for (const userId of users) await refreshReviewQueueNotification(query, userId);

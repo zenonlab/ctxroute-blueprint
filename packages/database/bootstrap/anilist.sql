@@ -160,6 +160,11 @@ CREATE INDEX IF NOT EXISTS pairing_challenge_expiry_idx ON pairing_challenge(exp
 
 ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS classification_status text NOT NULL DEFAULT 'review';
 ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS classification_reason text;
+ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS parse_artifact jsonb;
+ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS parser_id text;
+ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS parser_version integer;
+ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS parser_fingerprint text;
+ALTER TABLE bookmark_import_item ADD COLUMN IF NOT EXISTS parse_status text;
 
 DO $$ BEGIN
   ALTER TABLE bookmark_import_item ADD CONSTRAINT bookmark_import_item_classification_status_check CHECK (classification_status IN ('recognized','review','excluded'));
@@ -502,9 +507,9 @@ CREATE INDEX IF NOT EXISTS metadata_assertion_media_field_idx ON metadata_assert
 CREATE TABLE IF NOT EXISTS provider_request_gate(provider text PRIMARY KEY,next_allowed_at timestamptz NOT NULL DEFAULT now(),blocked_until timestamptz,max_in_flight integer NOT NULL DEFAULT 2,in_flight integer NOT NULL DEFAULT 0,updated_at timestamptz NOT NULL DEFAULT now());
 ALTER TABLE provider_request_gate ADD COLUMN IF NOT EXISTS max_in_flight integer NOT NULL DEFAULT 2;
 ALTER TABLE provider_request_gate ADD COLUMN IF NOT EXISTS in_flight integer NOT NULL DEFAULT 0;
-INSERT INTO provider_request_gate(provider,max_in_flight) VALUES ('anilist',2),('mangaupdates',2) ON CONFLICT(provider) DO NOTHING;
+INSERT INTO provider_request_gate(provider,max_in_flight) VALUES ('anilist',2),('mangaupdates',2),('mangadex',1) ON CONFLICT(provider) DO NOTHING;
 CREATE TABLE IF NOT EXISTS provider_request_waitlist (
-  id uuid PRIMARY KEY, provider text NOT NULL CHECK(provider IN ('anilist','mangaupdates')),
+  id uuid PRIMARY KEY, provider text NOT NULL CHECK(provider IN ('anilist','mangaupdates','mangadex')),
   request_kind text NOT NULL, priority integer NOT NULL DEFAULT 50,
   scope_key text, user_id uuid REFERENCES app_user(id) ON DELETE SET NULL,
   state text NOT NULL CHECK(state IN ('WAITING','RUNNING','COMPLETED','FAILED')),
@@ -587,7 +592,7 @@ BEGIN
       queued := queued + 1;
     END IF;
   END LOOP;
-  DELETE FROM catalog_provider_policy WHERE provider NOT IN ('anilist','mangaupdates');
+  DELETE FROM catalog_provider_policy WHERE provider NOT IN ('anilist','mangaupdates','mangadex');
   INSERT INTO catalog_provider_policy(provider,status,version,license,attribution,purposes,fields,retention,purge_procedure,quota,terms_source,terms_checked_at,next_review_at)
   VALUES ('anilist','AUTHORIZED','graphql-v1','AniList terms','AniList metadata, themes and images',
     ARRAY['identity','metadata','themes','cover','banner'],
@@ -605,7 +610,7 @@ COMMENT ON FUNCTION favlib_reset_catalog(text) IS 'Provider catalogue reset; exa
 CREATE OR REPLACE FUNCTION enforce_catalog_provider_policy()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW.provider NOT IN ('anilist','mangaupdates') THEN
+  IF NEW.provider NOT IN ('anilist','mangaupdates','mangadex') THEN
     RAISE EXCEPTION 'CATALOG_PROVIDER_NOT_ALLOWED';
   END IF;
   RETURN NEW;
@@ -623,6 +628,10 @@ VALUES
  ('mangaupdates','AUTHORIZED','api-v1','MangaUpdates terms','MangaUpdates progression and release observations',ARRAY['progression','releases'],ARRAY['externalId','titles','status','chapter','volume','releaseDate'],'while the work is owned','delete provider progress, identifiers and announcements when unowned','global release feed every 5 minutes; bounded fallback search','https://www.mangaupdates.com/about.html','2026-08-03','2027-08-03')
 ON CONFLICT(provider) DO UPDATE SET status=excluded.status,version=excluded.version,license=excluded.license,attribution=excluded.attribution,purposes=excluded.purposes,fields=excluded.fields,retention=excluded.retention,purge_procedure=excluded.purge_procedure,quota=excluded.quota,terms_source=excluded.terms_source,terms_checked_at=excluded.terms_checked_at,next_review_at=excluded.next_review_at;
 
+INSERT INTO catalog_provider_policy(provider,status,version,license,attribution,purposes,fields,retention,purge_procedure,quota,terms_source,terms_checked_at,next_review_at)
+VALUES ('mangadex','AUTHORIZED','bridge-v1','MangaDex API policy','MangaDex identity bridge only',ARRAY['identity-bridge'],ARRAY['uuid','titles','links.mu'],'raw bridge provenance while the favorite is owned','removed with the owning enrichment evidence','one concurrent request; conservative spacing','https://api.mangadex.org/docs/','2026-08-07','2027-08-07')
+ON CONFLICT(provider) DO UPDATE SET status=excluded.status,version=excluded.version,attribution=excluded.attribution,purposes=excluded.purposes,fields=excluded.fields;
+
 COMMENT ON TABLE provider_progress IS 'Owner: canonical catalog; purpose: durable provider progression and release state; export: provider provenance; retention/purge: cascade with media; restore: stale until next successful sweep.';
 
 -- Rich read-only catalogue observations.  The normalized tables above remain the
@@ -638,7 +647,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS media_title_rich_identity_unique ON media_titl
 
 CREATE TABLE IF NOT EXISTS provider_payload (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE,
-  provider text NOT NULL CHECK(provider IN ('anilist','mangaupdates')),
+  provider text NOT NULL CHECK(provider IN ('anilist','mangaupdates','mangadex')),
   connector_version text NOT NULL, collected_at timestamptz NOT NULL DEFAULT now(), payload_hash text NOT NULL,
   payload jsonb NOT NULL, provenance jsonb NOT NULL DEFAULT '{}'::jsonb,
   validity_status text NOT NULL CHECK(validity_status IN ('VALID','INVALID','PARTIAL','ERROR')),
@@ -647,6 +656,17 @@ CREATE TABLE IF NOT EXISTS provider_payload (
 );
 CREATE INDEX IF NOT EXISTS provider_payload_provider_idx ON provider_payload(provider,collected_at DESC);
 CREATE INDEX IF NOT EXISTS provider_payload_media_idx ON provider_payload(media_id,provider,collected_at DESC);
+CREATE TABLE IF NOT EXISTS mangadex_promotion_state (
+  media_id text PRIMARY KEY REFERENCES media(id) ON DELETE CASCADE, mangadex_id text NOT NULL,
+  next_attempt_at timestamptz NOT NULL, last_attempt_at timestamptz, last_error text,
+  matcher_version text NOT NULL, mangaupdates_id text,
+  status text NOT NULL CHECK(status IN ('PENDING','PROMOTED')), promoted_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS mangadex_promotion_due_idx ON mangadex_promotion_state(status,next_attempt_at);
+CREATE OR REPLACE FUNCTION favlib_next_paris_monday(value timestamptz) RETURNS timestamptz LANGUAGE sql STABLE AS $$
+  SELECT (((value AT TIME ZONE 'Europe/Paris')::date + CASE WHEN extract(isodow FROM value AT TIME ZONE 'Europe/Paris')::int=1 AND (value AT TIME ZONE 'Europe/Paris')::time<time '03:00' THEN 0 ELSE 8-extract(isodow FROM value AT TIME ZONE 'Europe/Paris')::int END)+time '03:00') AT TIME ZONE 'Europe/Paris'
+$$;
 CREATE TABLE IF NOT EXISTS provider_sync_state (
   media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE, provider text NOT NULL,
   connector_version text NOT NULL, last_payload_hash text, last_collected_at timestamptz,

@@ -14,12 +14,14 @@ import {
 import { classify, normalizeText, type CatalogMedia } from "@favlib/catalog";
 import {
   FAVORITE_PROGRESS_PARSER_VERSION,
+  parseFavorite,
   progressionFromFavorite,
   providerIdFromUrl,
   sameSiteUrl,
   sourceDispositionFromUrl,
   sourceIdentityFromUrl,
   suspiciousPageMetadata,
+  selectBestLocalizedTitle,
 } from "@favlib/metadata";
 import { position, acceptObservation } from "@favlib/progression";
 import { previewDeclarative, validateDeclarative } from "@favlib/sources";
@@ -481,7 +483,7 @@ app.get("/api/v1/notifications", async (req: any) => {
 });
 app.get("/api/v1/reviews", async (req: any) => {
   const r = await pool.query(
-    `WITH owned AS (SELECT r.*,COALESCE(r.cluster_id::text,r.id::text) AS logical_key FROM favorite_review r WHERE r.user_id=$1),representative AS (SELECT DISTINCT ON(logical_key) * FROM owned ORDER BY logical_key,(status='PENDING') DESC,created_at DESC,id DESC),counts AS (SELECT logical_key,count(*) FILTER(WHERE status='PENDING')::int AS pending_rows,count(*)::int AS favorite_count FROM owned GROUP BY logical_key),candidates AS (SELECT o.logical_key,count(DISTINCT c.provider_id)::int AS candidate_count FROM owned o LEFT JOIN favorite_review_candidate c ON c.review_id=o.id GROUP BY o.logical_key) SELECT r.id,r.cluster_id AS "clusterId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",r.provider,r.status,r.reason,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",c.favorite_count AS "favoriteCount",LEAST(ca.candidate_count,5) AS "candidateCount" FROM representative r JOIN counts c USING(logical_key) JOIN candidates ca USING(logical_key) ORDER BY (c.pending_rows>0) DESC,CASE WHEN c.pending_rows>0 THEN LEAST(ca.candidate_count,5) ELSE 0 END DESC,r.created_at DESC`,
+    `WITH owned AS (SELECT r.*,COALESCE(r.cluster_id::text,r.id::text) AS logical_key FROM favorite_review r WHERE r.user_id=$1 AND NOT EXISTS(SELECT 1 FROM favorite_review queued WHERE queued.user_id=r.user_id AND COALESCE(queued.cluster_id::text,queued.id::text)=COALESCE(r.cluster_id::text,r.id::text) AND queued.status='PENDING' AND queued.decision->>'kind'='manual-queued')),representative AS (SELECT DISTINCT ON(logical_key) * FROM owned ORDER BY logical_key,(status='PENDING') DESC,created_at DESC,id DESC),counts AS (SELECT logical_key,count(*) FILTER(WHERE status='PENDING')::int AS pending_rows,count(*)::int AS favorite_count FROM owned GROUP BY logical_key),candidates AS (SELECT o.logical_key,count(DISTINCT c.provider_id)::int AS candidate_count FROM owned o LEFT JOIN favorite_review_candidate c ON c.review_id=o.id GROUP BY o.logical_key) SELECT r.id,r.cluster_id AS "clusterId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",r.provider,r.status,r.reason,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",c.favorite_count AS "favoriteCount",LEAST(ca.candidate_count,5) AS "candidateCount" FROM representative r JOIN counts c USING(logical_key) JOIN candidates ca USING(logical_key) ORDER BY (c.pending_rows>0) DESC,CASE WHEN c.pending_rows>0 THEN LEAST(ca.candidate_count,5) ELSE 0 END DESC,r.created_at DESC`,
     [req.user.id],
   );
   return {
@@ -491,7 +493,7 @@ app.get("/api/v1/reviews", async (req: any) => {
 });
 app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
   const review = await pool.query(
-    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
+    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",i.payload->>'title' AS "rawFavoriteTitle",COALESCE(i.parse_artifact#>>'{identity,title}',r.favorite_title) AS "sourceTitle",i.parse_artifact->'progression' AS progression,r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id LEFT JOIN bookmark_import_item i ON i.user_id=r.user_id AND i.installation_id=r.installation_id AND i.bookmark_id=r.bookmark_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
     [req.params.id, req.user.id],
   );
   if (!review.rowCount) return err(reply, 404, "REVIEW_NOT_FOUND");
@@ -500,7 +502,7 @@ app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
     `SELECT DISTINCT ON(c.provider_id) c.id,c.provider_id AS "providerId",COALESCE(p.canonical_title,c.provider_id) AS "displayTitle",p.canonical_title AS "canonicalTitle",c.hit_title AS "hitTitle",c.hit_title AS "matchedAlias",p.associated_titles AS "associatedTitles",p.type,COALESCE(NULLIF(p.payload->>'format',''),p.type) AS format,p.year,p.start_date AS "startDate",p.status,p.authors,p.categories,p.genres,CASE WHEN p.cover_status='ACTIVE' AND p.cover_asset_sha256 IS NOT NULL THEN '/api/v1/reviews/'||$1::text||'/candidates/'||c.id::text||'/cover' ELSE p.image END AS image,p.url,c.media_id AS "mediaId",p.payload_hash AS "profileHash",CASE WHEN $3::boolean AND p.id IS NOT NULL THEN (SELECT count(*)::int FROM review_cluster_endorsement e JOIN favorite_review rr ON rr.cluster_id=e.cluster_id WHERE rr.id=$2 AND e.profile_id=p.id) END AS endorsements,CASE WHEN $3::boolean AND p.id IS NOT NULL THEN (SELECT count(*)::int FROM review_cluster_vote v JOIN favorite_review rr ON rr.cluster_id=v.cluster_id WHERE rr.id=$2 AND v.profile_id=p.id) END AS "reliableVotes" FROM favorite_review target JOIN favorite_review sibling ON sibling.user_id=target.user_id AND COALESCE(sibling.cluster_id::text,sibling.id::text)=COALESCE(target.cluster_id::text,target.id::text) JOIN favorite_review_candidate c ON c.review_id=sibling.id JOIN provider_profile p ON p.id=c.profile_id WHERE target.id=$2::uuid AND target.user_id=$4::uuid ORDER BY c.provider_id,endorsements DESC NULLS LAST,(p.cover_status='ACTIVE') DESC LIMIT 5`,
     [req.params.id, req.params.id, chosen, req.user.id],
   );
-  const favoriteTitle = review.rows[0].favoriteTitle;
+  const favoriteTitle = review.rows[0].sourceTitle ?? review.rows[0].favoriteTitle;
   const chain = review.rows[0].provider === "anilist-chain";
   return {
     ...review.rows[0],
@@ -512,7 +514,7 @@ app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
         : chain
           ? []
           : ["report"],
-    candidates: candidates.rows,
+    candidates: candidates.rows.map((candidate:any) => ({...candidate,displayTitle:selectBestLocalizedTitle([favoriteTitle],[candidate.canonicalTitle,candidate.hitTitle,...(candidate.associatedTitles??[])].filter(Boolean).map((text:string)=>({text})))?.text??candidate.displayTitle})),
     google: chain
       ? undefined
       : {
@@ -824,7 +826,7 @@ app.post("/api/v1/reviews/:id/manual", async (req: any, reply: any) => {
     .safeParse(req.body);
   if (!p.success) return err(reply, 400, "VALIDATION_FAILED");
   const owned = await pool.query(
-    "SELECT provider FROM favorite_review WHERE id=$1 AND user_id=$2 AND status='PENDING'",
+    "SELECT provider FROM favorite_review WHERE id=$1 AND user_id=$2 AND status='PENDING' AND decision IS NULL",
     [req.params.id, req.user.id],
   );
   if (!owned.rowCount) return err(reply, 404, "REVIEW_NOT_FOUND");
@@ -844,33 +846,39 @@ app.post("/api/v1/reviews/:id/manual", async (req: any, reply: any) => {
       ? /^\d{1,12}$/u.test(id)
       : /^[A-Za-z0-9]{1,80}$/u.test(id);
   if (!validId) return err(reply, 422, "PROVIDER_ID_INVALID");
-  const existing = await pool.query(
-    "SELECT id FROM favorite_review_candidate WHERE review_id=$1 AND provider_id=$2",
-    [req.params.id, id],
-  );
-  const candidateId =
-    existing.rows[0]?.id ??
-    (await addManualReviewCandidate(req.params.id, p.data.provider, id));
-  if (candidateId)
-    return resolveReview(
-      req.params.id,
-      req.user.id,
-      candidateId,
-      { kind: "manual", provider: p.data.provider, id },
-      reply,
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const manualDecision = JSON.stringify({ kind: "manual-queued", provider: p.data.provider, id, submittedAt: new Date().toISOString() });
+    const persisted = await client.query(
+      `WITH source AS (
+        UPDATE favorite_review SET decision=$3::jsonb,reason='MANUAL_QUEUED'
+        WHERE id=$1 AND user_id=$2 AND status='PENDING' AND decision IS NULL
+        RETURNING id,user_id,cluster_id
+      ), siblings AS (
+        UPDATE favorite_review pending SET
+          decision=$3::jsonb||jsonb_build_object('sourceReviewId',$1::text),reason='MANUAL_QUEUED'
+        FROM source
+        WHERE pending.user_id=source.user_id
+          AND COALESCE(pending.cluster_id::text,pending.id::text)=COALESCE(source.cluster_id::text,source.id::text)
+          AND pending.status='PENDING' AND pending.decision IS NULL
+        RETURNING pending.id
+      ) SELECT id FROM source`,
+      [req.params.id, req.user.id, manualDecision],
     );
-  await pool.query(
-    "SELECT graphile_worker.add_job('manual-review-provider',$1,job_key := $2,max_attempts := 3,priority := -100,job_key_mode := 'preserve_run_at')",
-    [
-      JSON.stringify({
-        reviewId: req.params.id,
-        userId: req.user.id,
-        provider: p.data.provider,
-        providerId: id,
-      }),
-      `manual-review:${req.params.id}:${p.data.provider}:${id}`,
-    ],
-  );
+    if (!persisted.rowCount) { await client.query("ROLLBACK"); return err(reply, 409, "REVIEW_ALREADY_QUEUED"); }
+    await client.query(
+      "SELECT graphile_worker.add_job('manual-review-provider',$1,job_key := $2,max_attempts := 3,priority := -100,job_key_mode := 'preserve_run_at')",
+      [JSON.stringify({ reviewId: req.params.id, userId: req.user.id, provider: p.data.provider, providerId: id }), `manual-review:${req.params.id}:${p.data.provider}:${id}`],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  await refreshReviewQueue(req.user.id);
   return reply
     .code(202)
     .send({
@@ -2167,7 +2175,7 @@ app.get("/api/v1/catalog/health", async () => {
     "SELECT count(*)::int AS media, count(*) FILTER (WHERE status='AUTHORIZED')::int AS authorized_policies FROM media m CROSS JOIN catalog_provider_policy",
   );
   const providers = await pool.query(
-    "SELECT provider,status,version FROM catalog_provider_policy WHERE provider IN ('anilist','mangaupdates') ORDER BY provider",
+    "SELECT provider,status,version FROM catalog_provider_policy WHERE provider IN ('anilist','mangaupdates','mangadex') ORDER BY provider",
   );
   const sync = await pool.query(
     "SELECT service,observed_at AS \"observedAt\" FROM service_heartbeat WHERE service IN ('mangaupdates','anilist') ORDER BY service",
@@ -2893,14 +2901,9 @@ async function classifyImportItems(
         item.id,
       ],
     );
-    linked.push({
-      mediaId,
-      title:
-        typeof item.parsedTitle === "string" && item.parsedTitle.trim()
-          ? item.parsedTitle.trim()
-          : item.title,
-      url: item.url,
-    });
+    // `parsedTitle` remains accepted on the wire for old extensions, but raw
+    // server-observed input is the sole authority for parsing and identity.
+    linked.push({ mediaId, title: item.title, url: item.url });
   }
   return linked;
 }
@@ -2938,19 +2941,16 @@ app.post(
       );
       if (batch.rowCount) {
         for (const item of p.data.items) {
+          const source = item.event === "removed" ? null : sourceIdentityFromUrl(item.url);
+          const parseArtifact = parseFavorite({ title: item.title, url: item.url, source });
           const previous = await client.query(
-            "SELECT i.fingerprint,i.event,l.media_id AS \"mediaId\" FROM bookmark_import_item i LEFT JOIN bookmark_media_link l ON l.user_id=i.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id AND l.status IN ('matched','accepted','review') WHERE i.user_id=$1 AND i.installation_id=$2 AND i.bookmark_id=$3 FOR UPDATE OF i",
+            "SELECT i.fingerprint,i.event,i.parser_version AS \"parserVersion\",l.media_id AS \"mediaId\" FROM bookmark_import_item i LEFT JOIN bookmark_media_link l ON l.user_id=i.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id AND l.status IN ('matched','accepted','review') WHERE i.user_id=$1 AND i.installation_id=$2 AND i.bookmark_id=$3 FOR UPDATE OF i",
             [req.user.id, p.data.installationId, item.id],
           );
           // Always recompute evidence from raw input, including unchanged catch-up
           // imports. Client-provided parsed/provenance fields are only hints.
           if (item.event !== "removed") {
-            const source = sourceIdentityFromUrl(item.url);
-            const candidate = progressionFromFavorite({
-              title: item.title,
-              url: item.url,
-              source,
-            });
+            const candidate = parseArtifact.progression;
             if (candidate)
               await client.query(
                 `INSERT INTO favorite_progress_candidate(user_id,installation_id,bookmark_id,position_kind,position_number,position_raw,raw_title,raw_url,parsed_slug,path_segments,evidence,season,local_position_number,global_position_number)
@@ -2989,11 +2989,12 @@ app.post(
           if (
             previous.rows[0]?.fingerprint === item.fingerprint &&
             previous.rows[0]?.event === item.event &&
-            previous.rows[0]?.mediaId
+            previous.rows[0]?.mediaId &&
+            previous.rows[0]?.parserVersion === parseArtifact.version
           )
             continue;
           await client.query(
-            "INSERT INTO bookmark_import_item(batch_id,user_id,installation_id,bookmark_id,fingerprint,event,payload,classification_status,classification_reason) VALUES($1,$2,$3,$4,$5,$6,$7,'review','PENDING') ON CONFLICT(user_id,installation_id,bookmark_id) DO UPDATE SET batch_id=excluded.batch_id,fingerprint=excluded.fingerprint,event=excluded.event,payload=excluded.payload,classification_status='review',classification_reason='PENDING',created_at=now()",
+            "INSERT INTO bookmark_import_item(batch_id,user_id,installation_id,bookmark_id,fingerprint,event,payload,parse_artifact,parser_id,parser_version,parser_fingerprint,parse_status,classification_status,classification_reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,'review','PENDING') ON CONFLICT(user_id,installation_id,bookmark_id) DO UPDATE SET batch_id=excluded.batch_id,fingerprint=excluded.fingerprint,event=excluded.event,payload=excluded.payload,parse_artifact=excluded.parse_artifact,parser_id=excluded.parser_id,parser_version=excluded.parser_version,parser_fingerprint=excluded.parser_fingerprint,parse_status=excluded.parse_status,classification_status='review',classification_reason='PENDING',created_at=now()",
             [
               batch.rows[0].id,
               req.user.id,
@@ -3002,6 +3003,11 @@ app.post(
               item.fingerprint,
               item.event,
               item,
+              JSON.stringify(parseArtifact),
+              parseArtifact.parser,
+              parseArtifact.version,
+              parseArtifact.fingerprint,
+              parseArtifact.status,
             ],
           );
           await reconcileBookmarkEvent(
@@ -4345,7 +4351,7 @@ app.get("/api/v1/admin/diagnostics", async (req: any, reply: any) => {
       "SELECT observed_at AS \"observedAt\",observed_at>now()-interval '5 minutes' AS fresh,build_version AS \"buildVersion\",details FROM service_heartbeat WHERE service='worker'",
     ),
     pool.query(
-      'SELECT p.provider,p.status,p.version,p.license,p.attribution,p.reviewed_at AS "reviewedAt",last.status AS "lastAttemptStatus",last.error AS "lastAttemptError",last.created_at AS "lastAttemptAt" FROM catalog_provider_policy p LEFT JOIN LATERAL (SELECT a.status,a.error,a.created_at FROM metadata_attempt a WHERE a.provider=p.provider ORDER BY a.created_at DESC LIMIT 1) last ON true WHERE p.provider IN (\'anilist\',\'mangaupdates\') ORDER BY p.provider',
+      'SELECT p.provider,p.status,p.version,p.license,p.attribution,p.reviewed_at AS "reviewedAt",last.status AS "lastAttemptStatus",last.error AS "lastAttemptError",last.created_at AS "lastAttemptAt" FROM catalog_provider_policy p LEFT JOIN LATERAL (SELECT a.status,a.error,a.created_at FROM metadata_attempt a WHERE a.provider=p.provider ORDER BY a.created_at DESC LIMIT 1) last ON true WHERE p.provider IN (\'anilist\',\'mangaupdates\',\'mangadex\') ORDER BY p.provider',
     ),
     pool.query(
       "SELECT count(*)::int AS total,count(*) FILTER(WHERE fingerprint !~ '^[0-9a-f]{64}$')::int AS \"invalidFingerprints\",count(*) FILTER(WHERE classification_status NOT IN ('recognized','review','excluded'))::int AS \"invalidClassifications\",count(*) FILTER(WHERE classification_status='review')::int AS \"pendingClassification\" FROM bookmark_import_item WHERE event<>'removed'",

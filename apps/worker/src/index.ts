@@ -18,6 +18,7 @@ import anilistCalendarSweep from './tasks/anilist-calendar-sweep.js';
 import providerProfileCover from './tasks/provider-profile-cover.js';
 import manualReviewProvider from './tasks/manual-review-provider.js';
 import reassessFavoriteReviews from './tasks/reassess-favorite-reviews.js';
+import mangaDexPromotion from './tasks/mangadex-promotion.js';
 import { ROLE_SCHEDULES, ROLE_TASK_NAMES } from './registry.js';
 import { buildVersion } from '@favlib/config';
 import { recoverProviderRequestOwner } from '@favlib/database/provider-queue';
@@ -25,10 +26,11 @@ import { recoverProviderRequestOwner } from '@favlib/database/provider-queue';
 const runtime=runtimeEnvironment();
 const connectionString=runtime.databaseUrl;
 const workerRole=process.env.FAVLIB_WORKER_ROLE??'all';
-if(workerRole!=='all'&&workerRole!=='reading')throw new Error(`Unsupported worker role: ${workerRole}`);
-const role=workerRole as 'all'|'reading';
-const heartbeatService=workerRole==='reading'?'worker-reading':'worker';
-export async function recoverProviderSlots(db:{query:(sql:string,values?:unknown[])=>Promise<{rows?:Array<{provider:string;count:string}>}>},role:'all'|'reading'){
+if(workerRole!=='all'&&workerRole!=='reading'&&workerRole!=='interactive')throw new Error(`Unsupported worker role: ${workerRole}`);
+type WorkerRole=keyof typeof ROLE_TASK_NAMES;
+const role=workerRole as WorkerRole;
+const heartbeatService=workerRole==='all'?'worker':`worker-${workerRole}`;
+export async function recoverProviderSlots(db:{query:(sql:string,values?:unknown[])=>Promise<{rows?:Array<{provider:string;count:string}>}>},role:WorkerRole){
   // FavLib runs one worker service. A crashed/recreated process cannot release
   // its in-memory provider slots, so reset the durable counters before taking
   // new jobs. Without this recovery every concurrency thread can wait forever.
@@ -68,7 +70,9 @@ if(runtime.nodeEnv!=='test') {
     connectionString,
     concurrency: runtime.workerConcurrency,
     maxPoolSize: runtime.workerConcurrency + 4,
-    taskList: workerRole==='reading' ? {
+    taskList: workerRole==='interactive' ? {
+      'manual-review-provider': async (payload: unknown, helpers) => { await manualReviewProvider(payload, helpers); },
+    } : workerRole==='reading' ? {
       availability: async (payload: unknown, helpers) => { await availability(payload as Parameters<typeof availability>[0], helpers); },
       'availability-sweep': async (payload: unknown, helpers) => { await availabilitySweep(payload, helpers); },
       health: async (payload: unknown, helpers) => { await health(payload, helpers); },
@@ -79,8 +83,8 @@ if(runtime.nodeEnv!=='test') {
       'mangaupdates-enrichment': async (payload: unknown, helpers) => { await mangaUpdatesEnrichment(payload, helpers); },
       'enrichment-sweep': async (payload: unknown, helpers) => { await enrichmentSweep(payload, helpers); },
       'provider-profile-cover': async (payload: unknown, helpers) => { await providerProfileCover(payload, helpers); },
-      'manual-review-provider': async (payload: unknown, helpers) => { await manualReviewProvider(payload, helpers); },
       'reassess-favorite-reviews': async (payload: unknown, helpers) => { await reassessFavoriteReviews(payload, helpers); },
+      'mangadex-promotion': async (payload: unknown, helpers) => { await mangaDexPromotion(payload, helpers); },
     } : {
       availability: async (payload: unknown, helpers) => { await availability(payload as Parameters<typeof availability>[0], helpers); },
       'availability-sweep': async (payload: unknown, helpers) => { await availabilitySweep(payload, helpers); },
