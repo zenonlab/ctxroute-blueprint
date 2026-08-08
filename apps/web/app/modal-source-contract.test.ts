@@ -15,7 +15,10 @@ describe('verso de modal œuvre',()=>{
     expect(source).toContain("source.status==='MOVED'");
     expect(source).toContain('Lien déplacé');
     expect(source).toContain('source.canonicalUrl');
-    expect(source).toContain('https://${source.domain}/favicon.ico');
+    expect(source).toContain('icons.duckduckgo.com/ip3');
+    expect(source).toContain('faviconCandidates');
+    expect(styles).toContain('display:inline-flex;align-items:center;gap:5px');
+    expect(styles).toContain('align-items:baseline;gap:6px');
     expect(source).toContain('<Globe');
     expect(source).toContain("source.status==='UNAVAILABLE'");
     expect(source).toContain('href={source.canonicalUrl}');
