@@ -18,4 +18,4 @@ export function tiltAt(point:CardPoint){
   return {x:(.5-point.y)*14,y:(point.x-.5)*17,glareX:point.x*100,glareY:point.y*100,shadowX:(.5-point.x)*20};
 }
 
-export const motionDuration=(reduced:boolean)=>reduced?0:520;
+export const motionDuration=(reduced:boolean)=>reduced?0:640;
