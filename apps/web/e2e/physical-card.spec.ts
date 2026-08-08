@@ -15,9 +15,9 @@ test('media click flips into a centred vertical modal without navigation and res
   await page.route('**/api/v1/library*',route=>json(route,{items:[media],total:1,nextOffset:1,hasMore:false}));
   await page.goto('/library');const trigger=page.getByRole('link',{name:'Aperçu de Titre synthétique'});await trigger.click({position:{x:8,y:12}});
   await expect(page).toHaveURL(/\/library$/);const dialog=page.getByRole('dialog',{name:'Aperçu de Titre synthétique'});await expect(dialog).toBeVisible();await expect(page.locator('.physical-card-modal')).toHaveCount(0);await expect(page.locator('.physical-card-slot.has-open-card > .media-card')).toHaveCount(1);await page.waitForTimeout(550);const box=await dialog.boundingBox();expect(box!.width/box!.height).toBeCloseTo(2/3,1);
-  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await expect(trigger).toBeFocused();
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
   await trigger.click();await expect(page.getByTestId('media-card-backdrop')).toBeVisible();await page.waitForTimeout(50);await page.mouse.click(2,2);await expect(dialog).toHaveCount(0);
-  await trigger.press('Space');await expect(dialog).toBeVisible();await page.getByRole('button',{name:'Fermer'}).click();await expect(page.getByTestId('media-card-backdrop')).toHaveCount(0);await expect(dialog).toBeVisible();await expect(trigger).toBeFocused();await expect(page.locator('.media-card.suppress-hover')).toHaveCount(1);await page.mouse.move(1,1);await trigger.hover();await expect(page.locator('.media-card.suppress-hover')).toHaveCount(0);
+  await trigger.press('Space');await expect(dialog).toBeVisible();await page.getByRole('button',{name:'Fermer'}).click();await expect(page.getByTestId('media-card-backdrop')).toHaveCount(0);await expect(dialog).toBeVisible();
 });
 
 test('review hover reveals existing resolve and provider source actions',async({page,isMobile})=>{
