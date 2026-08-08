@@ -78,7 +78,11 @@ cette œuvre (`NOT_REQUESTED`, `GRANTED`, `DENIED`, `UNSUPPORTED` ou
 Google, si demandé, est décrit comme autorisation d'identification/consentement
 et ne doit jamais être présenté comme une synchronisation Google Calendar.
 
-Les favoris visibles sont ceux de l'utilisateur connecté uniquement. Chaque
+Les favoris visibles sont ceux de l'utilisateur connecté uniquement. Ils sont
+distincts des sources de lecture validées, qui peuvent être publiques ou
+rattachées à un autre périmètre de collecte. Chaque favori affiche son URL
+personnelle, son titre parsé et sa progression lorsqu'elle existe; les sources
+validées sont rendues dans un bloc séparé, groupées par fournisseur. Chaque
 ligne peut afficher le titre parsé, la progression, l'appareil et la provenance
 ; le titre brut n'est jamais utilisé comme titre visible de remplacement.
 Chaque réponse de diagnostic et chaque donnée d'import conservent cependant :
@@ -89,10 +93,13 @@ Chaque réponse de diagnostic et chaque donnée d'import conservent cependant :
 - empreinte et provenance de l'observation.
 
 Les sources sont limitées aux origines validées FavLib. Une ligne expose, si
-disponibles, l'état (`AVAILABLE`, `STALE`, `UNAVAILABLE`), langue, fraîcheur,
+disponibles, l'état (`AVAILABLE`, `STALE`, `UNAVAILABLE`, `MOVED`), langue, fraîcheur,
 attribution et URL canonique. L'action secondaire est libellée par exemple
 « Lien mort ? Signalez-le ! » ; elle ouvre un signalement, pas une nouvelle
 résolution automatique.
+
+`UNAVAILABLE` correspond à un site inaccessible; `MOVED` correspond à une
+réponse HTTP 404. L'absence de favicon reste indépendante de ces états.
 
 Le contrat de détail expose additivement `favorites` et `sources`. Les favoris
 contiennent le titre parsé par le parseur partagé, avec le titre/URL bruts,

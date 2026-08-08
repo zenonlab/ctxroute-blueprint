@@ -6,3 +6,4 @@
 .review-hover .physical-card-back-actions{transition:filter .15s,transform .15s}.review-hover.is-flipped:hover .physical-card-back-actions{filter:brightness(1.14);transform:translateY(-2px)}
 .review-hover .physical-card-back-actions{position:absolute;inset:-3px;width:auto;height:auto}
 .review-hover.is-tilting .physical-card-rotor{transition:transform .14s ease-out}
+.media-card-back-banner img{object-fit:contain}
