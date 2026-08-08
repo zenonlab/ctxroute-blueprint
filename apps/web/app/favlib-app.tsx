@@ -93,7 +93,7 @@ function availabilityCounter(item:LibraryItem){const personal=item.progress?.num
 function CardTopline({item}:{item:LibraryItem}){return <div className="card-topline"><span>{statusLabel(item.status)}</span><strong>{availabilityCounter(item)}</strong></div>}
 function cleanSynopsis(value:unknown){return typeof value==='string'?value.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim():null}
 function metadataValue(item:LibraryItem,key:string){const value=item.metadata?.metadata?.[key];if(typeof value==='string'||typeof value==='number')return String(value);return null}
-function faviconCandidates(domain:string){const clean=domain.trim().toLowerCase();return clean?[`https://${clean}/favicon.ico`,`https://icons.duckduckgo.com/ip3/${encodeURIComponent(clean)}.ico`]:[]}
+function faviconCandidates(domain:string){const clean=domain.trim().toLowerCase();return clean?[`https://a.favicon.im/${encodeURIComponent(clean)}?larger=true`,`https://${clean}/favicon.ico`,`https://icons.duckduckgo.com/ip3/${encodeURIComponent(clean)}.ico`]:[]}
 function DomainIcon({domain}:{domain:string}){const candidates=faviconCandidates(domain);const [index,setIndex]=useState(0);if(!candidates[index])return <span className="media-source-globe" title="Site inaccessible"><Globe size={16} aria-label="Site inaccessible"/></span>;return <img className="media-source-favicon" src={candidates[index]} alt="" aria-hidden="true" onError={()=>setIndex(value=>value+1)}/>}
 function SourceIcon({source}:{source:LibrarySource}){return <DomainIcon domain={source.domain}/>}
 function sourceProvider(source:LibrarySource){return source.connector==='anilist'?'AniList':source.connector==='mangaupdates'?'MangaUpdates':source.connector}
