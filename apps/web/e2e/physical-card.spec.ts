@@ -53,6 +53,16 @@ test('library verso exposes its three accessible tabs and keeps parsed title pro
   await page.getByRole('button',{name:'Fermer'}).click();if(!test.info().project.name.includes('mobile')){await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('link',{name:'Aperçu de Titre parsé'})).toBeFocused();}
 });
 
+test('related works header replaces tabs with a full-card relation menu',async({page})=>{
+  await shell(page);
+  await page.route('**/api/v1/library/facets*',route=>json(route,{types:[],themes:[],genres:[],categories:[],statuses:[],years:[],contentRatings:[],demographics:[]}));
+  await page.route('**/api/v1/library*',route=>json(route,{items:[{...media,relatedWorks:[{id:'synthetic-media',title:'Titre synthétique',type:'ANIME',format:'TV',seasonYear:2025,sequenceOrder:0,relationTypes:['CURRENT'],anilistId:'100',coverUrl:null},{id:'synthetic-sequel',title:'Suite synthétique',type:'ANIME',format:'ONA',seasonYear:2026,sequenceOrder:1,relationTypes:['SEQUENCE_MEMBER','SEQUEL'],anilistId:'101',coverUrl:null},{id:'synthetic-side',title:'Histoire synthétique',type:'ANIME',format:'SPECIAL',seasonYear:null,sequenceOrder:null,relationTypes:['SIDE_STORY'],anilistId:'102',coverUrl:null}]}],total:1,nextOffset:1,hasMore:false}));
+  await page.goto('/library');await page.getByRole('link',{name:'Aperçu de Titre synthétique'}).click();const dialog=page.getByRole('dialog',{name:'Aperçu de Titre synthétique'});
+  const toggle=dialog.getByRole('button',{name:/Titre synthétique/});await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(dialog.getByRole('tab')).toHaveCount(0);await expect(dialog.getByRole('region',{name:'Toutes les œuvres reliées'})).toContainText('Suite synthétique');await expect(dialog).toContainText('Partie chronologique 2');await expect(dialog).toContainText('Histoire parallèle');
+  await toggle.click();await expect(dialog.getByRole('tab')).toHaveCount(3);
+});
+
 test('touch tap opens and closes the media card',async({page,isMobile})=>{
   test.skip(!isMobile,'touch project only');await shell(page);
   await page.route('**/api/v1/library/facets*',route=>json(route,{types:[],themes:[],genres:[],categories:[],statuses:[],years:[],contentRatings:[],demographics:[]}));

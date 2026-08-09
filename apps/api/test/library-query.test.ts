@@ -84,4 +84,14 @@ describe('library multi-value query',()=>{
     expect(server).toContain('WHERE w.root_media_id=$1 ORDER BY w.member_order LIMIT 50');
     expect(server).toContain("payload.validity_status='VALID'");
   });
+  it('projects known related works without treating titles or popularity as relation evidence',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server).toContain('async function libraryRelatedWorks');
+    expect(server).toContain('JOIN media_relation relation ON relation.media_id=scope.media_id OR relation.target_media_id=scope.media_id');
+    expect(server).toContain('COALESCE((SELECT root_media_id FROM anime_work_member WHERE media_id=input_media_id),input_media_id)');
+    expect(server).toContain('favlib_display_title(ranked.media_id,$2::uuid)');
+    expect(server).toContain('ranked.related_rank<=50');
+    expect(server).toContain('relatedWorks:relatedByMedia.get(row.id)??[]');
+    expect(server.slice(server.indexOf('async function libraryRelatedWorks'),server.indexOf('app.get("/api/v1/library"'))).not.toContain('popularity');
+  });
 });

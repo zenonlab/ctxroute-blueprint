@@ -48,6 +48,23 @@ Une couverture absente affiche un emplacement neutre, sans URL de remplacement
 inventée. Les champs absents sont masqués ; ils ne sont pas remplacés par des
 valeurs supposées.
 
+Pour un anime possédant des relations AniList connues, l'en-tête entier est un
+contrôle dépliant. Fermé, il conserve la couverture et le titre de la carte et
+laisse visibles les trois onglets. Ouvert, il masque les onglets et leur panneau
+actif, puis occupe tout l'espace restant de la carte avec la liste bornée des
+œuvres reliées : membres de la chronologie prouvée, préquelles, suites,
+histoires parallèles, dérivées et autres relations conservées par le catalogue.
+Chaque ligne affiche uniquement les champs disponibles — couverture, titre issu
+de la politique partagée, format, année et nature de la relation — et peut ouvrir
+la page AniList validée dans un nouvel onglet.
+
+L'ordre `PREQUEL`/`SEQUEL` établit une position chronologique, pas un numéro de
+saison. L'interface emploie donc « Partie chronologique N » tant qu'une preuve
+explicite distincte ne permet pas « Saison N ». Ouvrir ou fermer ce panneau ne
+change ni l'identité de la carte, ni la progression, ni le favori sélectionné.
+La liste provient de la projection bibliothèque déjà reçue ; aucun chargement de
+détail ou matching n'est déclenché par son ouverture.
+
 ### Onglet « Liens & prochaine sortie »
 
 L'ordre de lecture est le suivant :
@@ -299,6 +316,11 @@ Les fixtures et titres de test sont synthétiques.
   bouton accessible ; restitution du focus ;
 - navigation clavier entre les trois onglets et annonce correcte au lecteur
   d'écran ;
+- ouverture du panneau des œuvres reliées depuis tout l'en-tête, mise à jour de
+  `aria-expanded`, masquage temporaire des onglets et restitution de ceux-ci à
+  la fermeture ;
+- chronologie complète et relations hors chronologie affichées sans transformer
+  `memberOrder + 1` en numéro de saison ;
 - date masquée lorsque `scheduledAt` est nul et état `UNKNOWN` ;
 - distinction visuelle et sémantique entre `PLANNED` et `AVAILABLE` ;
 - titre parsé affiché, titre brut conservé dans le payload de diagnostic ;

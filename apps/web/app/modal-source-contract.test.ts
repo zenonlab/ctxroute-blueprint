@@ -4,8 +4,12 @@ import { join } from 'node:path';
 
 const source=readFileSync(join(process.cwd(),'app/favlib-app.tsx'),'utf8');
 const styles=readFileSync(join(process.cwd(),'app/media-overrides.css'),'utf8');
+const physicalCardStyles=readFileSync(join(process.cwd(),'app/physical-card.css'),'utf8');
 
 describe('verso de modal œuvre',()=>{
+  it('déplie l’en-tête sur toute la carte et masque les onglets pendant les relations',()=>{
+    expect(source).toContain('aria-controls={`media-related-${item.id}`}');expect(source).toContain('Toutes les œuvres reliées');expect(source).toContain('relatedWorks.map(work=><RelatedWorkRow');expect(physicalCardStyles).toContain('.media-related-panel{min-height:0;flex:1;overflow-y:auto');expect(physicalCardStyles).toContain('.media-card-related-toggle[aria-expanded=true]');
+  });
   it('reste sobre et conserve les invariants de source',()=>{
     expect(styles).toContain('object-fit:contain');
     expect(source).toContain('item.sources?.length');
