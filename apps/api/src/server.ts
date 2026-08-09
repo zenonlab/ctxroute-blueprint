@@ -80,7 +80,10 @@ async function sendPublicCatalogCover(
   reply: any,
 ) {
   const cover = await pool.query(
-    `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.status,c.provider,c.attribution FROM media_cover c LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256 WHERE c.media_id=$1`,
+    `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.status,c.provider,c.attribution
+     FROM media_cover c LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256
+     WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1)
+     ORDER BY CASE WHEN c.media_id=$1 THEN 0 ELSE 1 END LIMIT 1`,
     [mediaId],
   );
   if (
@@ -1676,39 +1679,45 @@ async function catalogRows(query: string, mediaId?: string) {
   );
   return r.rows as CatalogMedia[];
 }
+const relatedWorkClosureSql = (mediaIdsPlaceholder: string) => `WITH RECURSIVE requested(card_id,root_id) AS (
+  SELECT input_media_id,COALESCE((SELECT root_media_id FROM anime_work_member WHERE media_id=input_media_id),input_media_id)
+  FROM unnest(${mediaIdsPlaceholder}::text[]) input_media_id
+),graph_edges(source_id,target_id,relation_type) AS (
+  SELECT relation.media_id,relation.target_media_id,relation.kind FROM media_relation relation
+  UNION ALL
+  SELECT relation.target_media_id,relation.media_id,CASE WHEN relation.kind='PREQUEL' THEN 'SEQUEL' WHEN relation.kind='SEQUEL' THEN 'PREQUEL' ELSE relation.kind END FROM media_relation relation
+  UNION ALL
+  SELECT member.root_media_id,member.media_id,'SEQUENCE_MEMBER' FROM anime_work_member member
+  UNION ALL
+  SELECT member.media_id,member.root_media_id,'SEQUENCE_ROOT' FROM anime_work_member member
+),sequence_scope AS (
+  SELECT card_id,root_id,root_id AS media_id FROM requested
+  UNION
+  SELECT requested.card_id,requested.root_id,member.media_id FROM requested JOIN anime_work_member member ON member.root_media_id=requested.root_id
+),relation_walk(card_id,root_id,media_id,relation_type,relation_depth,path) AS (
+  SELECT scope.card_id,scope.root_id,scope.media_id,CASE WHEN scope.media_id=scope.card_id THEN 'CURRENT' ELSE 'SEQUENCE_MEMBER' END,0,ARRAY[scope.media_id]::text[] FROM sequence_scope scope
+  UNION ALL
+  SELECT walk.card_id,walk.root_id,edge.target_id,edge.relation_type,walk.relation_depth+1,walk.path||edge.target_id
+  FROM relation_walk walk JOIN graph_edges edge ON edge.source_id=walk.media_id
+  WHERE walk.relation_depth<8 AND NOT edge.target_id=ANY(walk.path)
+)`;
 async function libraryRelatedWorks(mediaIds: string[], userId: string) {
   if (!mediaIds.length) return new Map<string, any[]>();
-  const result = await pool.query(
-    `WITH requested(card_id,root_id) AS (
-      SELECT input_media_id,COALESCE((SELECT root_media_id FROM anime_work_member WHERE media_id=input_media_id),input_media_id)
-      FROM unnest($1::text[]) input_media_id
-    ),sequence_scope AS (
-      SELECT card_id,root_id,root_id AS media_id FROM requested
-      UNION
-      SELECT requested.card_id,requested.root_id,member.media_id FROM requested JOIN anime_work_member member ON member.root_media_id=requested.root_id
-    ),candidate_edges AS (
-      SELECT scope.card_id,scope.root_id,scope.media_id,CASE WHEN scope.media_id=scope.card_id THEN 'CURRENT' ELSE 'SEQUENCE_MEMBER' END AS relation_type,member.member_order AS sequence_order
-      FROM sequence_scope scope LEFT JOIN anime_work_member member ON member.root_media_id=scope.root_id AND member.media_id=scope.media_id
-      UNION ALL
-      SELECT scope.card_id,scope.root_id,CASE WHEN relation.media_id=scope.media_id THEN relation.target_media_id ELSE relation.media_id END,
-        CASE WHEN relation.media_id=scope.media_id THEN relation.kind WHEN relation.kind='PREQUEL' THEN 'SEQUEL' WHEN relation.kind='SEQUEL' THEN 'PREQUEL' ELSE relation.kind END,
-        related_member.member_order
-      FROM sequence_scope scope JOIN media_relation relation ON relation.media_id=scope.media_id OR relation.target_media_id=scope.media_id
-      LEFT JOIN anime_work_member related_member ON related_member.root_media_id=scope.root_id AND related_member.media_id=CASE WHEN relation.media_id=scope.media_id THEN relation.target_media_id ELSE relation.media_id END
-    ),deduplicated AS (
-      SELECT card_id,root_id,media_id,min(sequence_order) AS sequence_order,array_agg(DISTINCT relation_type ORDER BY relation_type) AS relation_types
-      FROM candidate_edges GROUP BY card_id,root_id,media_id
-    ),ranked AS (
-      SELECT deduplicated.*,row_number() OVER(PARTITION BY card_id ORDER BY sequence_order NULLS LAST,media_id) AS related_rank FROM deduplicated
-    )
-    SELECT ranked.card_id AS "libraryMediaId",ranked.media_id AS id,ranked.sequence_order AS "sequenceOrder",ranked.relation_types AS "relationTypes",
-      favlib_display_title(ranked.media_id,$2::uuid)->>'title' AS title,media.type,media.format,media.season_year AS "seasonYear",
-      (SELECT external_id FROM media_external_id WHERE media_id=ranked.media_id AND provider='anilist' ORDER BY created_at DESC LIMIT 1) AS "anilistId",
-      EXISTS(SELECT 1 FROM media_cover cover WHERE cover.media_id=ranked.media_id AND cover.status='ACTIVE') AS "coverAvailable"
-    FROM ranked JOIN media ON media.id=ranked.media_id WHERE ranked.related_rank<=50
-    ORDER BY ranked.card_id,ranked.sequence_order NULLS LAST,ranked.media_id`,[mediaIds,userId]);
+  const result = await pool.query(`${relatedWorkClosureSql("$1")},deduplicated AS (
+    SELECT walk.card_id,walk.root_id,walk.media_id,min(member.member_order) AS sequence_order,min(walk.relation_depth) AS relation_depth,array_agg(DISTINCT walk.relation_type ORDER BY walk.relation_type) AS relation_types
+    FROM relation_walk walk LEFT JOIN anime_work_member member ON member.root_media_id=walk.root_id AND member.media_id=walk.media_id
+    GROUP BY walk.card_id,walk.root_id,walk.media_id
+  ),ranked AS (
+    SELECT deduplicated.*,row_number() OVER(PARTITION BY card_id ORDER BY sequence_order NULLS LAST,relation_depth,media_id) AS related_rank FROM deduplicated
+  )
+  SELECT ranked.card_id AS "libraryMediaId",ranked.media_id AS id,ranked.sequence_order AS "sequenceOrder",ranked.relation_depth AS "relationDepth",ranked.relation_types AS "relationTypes",
+    favlib_display_title(ranked.media_id,$2::uuid)->>'title' AS title,media.type,media.format,media.season_year AS "seasonYear",
+    (SELECT external_id FROM media_external_id WHERE media_id=ranked.media_id AND provider='anilist' ORDER BY created_at DESC LIMIT 1) AS "anilistId",
+    EXISTS(SELECT 1 FROM media_cover cover WHERE cover.status='ACTIVE' AND (cover.data IS NOT NULL OR cover.asset_sha256 IS NOT NULL) AND cover.media_id IN (SELECT ranked.media_id UNION SELECT merge.target_media_id FROM media_identity_merge merge WHERE merge.source_media_id=ranked.media_id)) AS "coverAvailable"
+  FROM ranked JOIN media ON media.id=ranked.media_id WHERE ranked.related_rank<=50
+  ORDER BY ranked.card_id,ranked.sequence_order NULLS LAST,ranked.relation_depth,ranked.media_id`,[mediaIds,userId]);
   const grouped=new Map<string,any[]>();
-  for(const row of result.rows){const values=grouped.get(row.libraryMediaId)??[];const {libraryMediaId:_,coverAvailable:__,...related}=row;values.push({...related,coverUrl:row.coverAvailable?`/api/v1/catalog/media/${encodeURIComponent(row.id)}/cover`:null});grouped.set(row.libraryMediaId,values)}
+  for(const row of result.rows){const values=grouped.get(row.libraryMediaId)??[];const {libraryMediaId:_,coverAvailable:__,...related}=row;values.push({...related,coverUrl:row.coverAvailable?`/api/v1/library/${encodeURIComponent(row.libraryMediaId)}/related/${encodeURIComponent(row.id)}/cover`:null});grouped.set(row.libraryMediaId,values)}
   return grouped;
 }
 app.get("/api/v1/library", async (req: any, reply: any) => {
@@ -2176,6 +2185,22 @@ app.get(
   "/api/v1/catalog/public-media/:mediaId/cover",
   async (req: any, reply: any) =>
     sendPublicCatalogCover(req.params.mediaId, req.headers, reply),
+);
+app.get(
+  "/api/v1/library/:mediaId/related/:relatedMediaId/cover",
+  async (req: any, reply: any) => {
+    const allowed = await pool.query(
+      `${relatedWorkClosureSql("$1")},authorized_source AS (
+        SELECT 1 FROM bookmark_media_link link
+        WHERE link.user_id=$3 AND link.media_id=$4 AND link.status IN ('matched','accepted','review') LIMIT 1
+      ) SELECT 1 FROM relation_walk walk CROSS JOIN authorized_source
+      WHERE walk.card_id=$4 AND walk.media_id=$2 LIMIT 1`,
+      [[req.params.mediaId], req.params.relatedMediaId, req.user.id, req.params.mediaId],
+    );
+    if (!allowed.rowCount)
+      return err(reply,404,"RELATED_MEDIA_NOT_IN_LIBRARY_GRAPH","Cette œuvre reliée n’est pas accessible depuis la bibliothèque.");
+    return sendPublicCatalogCover(req.params.relatedMediaId,req.headers,reply);
+  },
 );
 app.get(
   "/api/v1/catalog/media/:mediaId/cover",

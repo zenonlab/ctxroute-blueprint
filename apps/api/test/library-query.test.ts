@@ -84,14 +84,27 @@ describe('library multi-value query',()=>{
     expect(server).toContain('WHERE w.root_media_id=$1 ORDER BY w.member_order LIMIT 50');
     expect(server).toContain("payload.validity_status='VALID'");
   });
-  it('projects known related works without treating titles or popularity as relation evidence',()=>{
+  it('projects the bounded transitive relation closure without treating titles or popularity as relation evidence',()=>{
     const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
     expect(server).toContain('async function libraryRelatedWorks');
-    expect(server).toContain('JOIN media_relation relation ON relation.media_id=scope.media_id OR relation.target_media_id=scope.media_id');
+    expect(server).toContain('WITH RECURSIVE requested(card_id,root_id)');
+    expect(server).toContain('FROM relation_walk walk JOIN graph_edges edge ON edge.source_id=walk.media_id');
+    expect(server).toContain('walk.relation_depth<8 AND NOT edge.target_id=ANY(walk.path)');
+    expect(server).toContain("SELECT member.root_media_id,member.media_id,'SEQUENCE_MEMBER'");
     expect(server).toContain('COALESCE((SELECT root_media_id FROM anime_work_member WHERE media_id=input_media_id),input_media_id)');
     expect(server).toContain('favlib_display_title(ranked.media_id,$2::uuid)');
     expect(server).toContain('ranked.related_rank<=50');
+    expect(server).toContain('ranked.relation_depth AS "relationDepth"');
     expect(server).toContain('relatedWorks:relatedByMedia.get(row.id)??[]');
     expect(server.slice(server.indexOf('async function libraryRelatedWorks'),server.indexOf('app.get("/api/v1/library"'))).not.toContain('popularity');
+  });
+  it('authorizes each related cover through the owned source card and the same graph closure',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server).toContain('/api/v1/library/:mediaId/related/:relatedMediaId/cover');
+    expect(server).toContain('link.user_id=$3 AND link.media_id=$4');
+    expect(server).toContain("link.status IN ('matched','accepted','review')");
+    expect(server).toContain('walk.card_id=$4 AND walk.media_id=$2');
+    expect(server).toContain('/api/v1/library/${encodeURIComponent(row.libraryMediaId)}/related/${encodeURIComponent(row.id)}/cover');
+    expect(server).toContain('SELECT merge.target_media_id FROM media_identity_merge merge');
   });
 });

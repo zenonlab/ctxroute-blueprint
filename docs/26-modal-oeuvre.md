@@ -58,6 +58,17 @@ Chaque ligne affiche uniquement les champs disponibles — couverture, titre iss
 de la politique partagée, format, année et nature de la relation — et peut ouvrir
 la page AniList validée dans un nouvel onglet.
 
+Cette liste est la fermeture transitive des relations connues : les relations
+d'une œuvre reliée et les membres de sa propre chronologie sont parcourus à leur
+tour. Le parcours est déterministe, exclut les nœuds déjà présents dans le chemin,
+reste borné à huit sauts et à cinquante résultats, et ne déduit jamais une relation
+depuis un titre. La couverture d'une ligne est servie par une route privée qui
+vérifie à la fois le favori d'origine de l'utilisateur et l'appartenance de la
+cible à ce même graphe ; l'œuvre reliée n'a donc pas besoin d'être elle-même un
+favori. Les couvertures héritées d'une fusion d'identité restent traçables et sont
+acceptées, tandis qu'une couverture réellement absente conserve l'emplacement
+neutre.
+
 L'ordre `PREQUEL`/`SEQUEL` établit une position chronologique, pas un numéro de
 saison. L'interface emploie donc « Partie chronologique N » tant qu'une preuve
 explicite distincte ne permet pas « Saison N ». Ouvrir ou fermer ce panneau ne

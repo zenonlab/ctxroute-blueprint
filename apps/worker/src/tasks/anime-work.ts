@@ -14,7 +14,13 @@ async function reconcileAnimeWork(h:Queryable,mediaId:string,item:AniListMedia,p
     await h.query("INSERT INTO media(id,type,format) VALUES($1,'ANIME',$2) ON CONFLICT(id) DO UPDATE SET format=COALESCE(media.format,excluded.format)",[childId,relation.format??null]);
     await h.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,'anilist',$2,$3::jsonb) ON CONFLICT(provider,external_id) DO NOTHING",[childId,String(relation.id),JSON.stringify({provider:'anilist',relationFrom:item.id,relationType:relation.relationType,payloadHash})]);
     await h.query("INSERT INTO media_relation(media_id,target_media_id,kind,provenance) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(media_id,target_media_id,kind) DO UPDATE SET provenance=excluded.provenance",[mediaId,childId,relationType,JSON.stringify({provider:'anilist',anilistId:item.id,targetAniListId:relation.id,payloadHash})]);
-    await h.query("SELECT graphile_worker.add_job('anilist-enrichment',$1::json,job_key := $2,max_attempts := 3,priority := -15,job_key_mode := 'preserve_run_at')",[JSON.stringify({mediaId:childId,animeRelationDiscovery:true}),`anilist-relation:${CONNECTOR_VERSIONS.anilistMetadata}:${relation.id}`]);
+    const enrichment=await h.query(`SELECT
+      EXISTS(SELECT 1 FROM provider_payload payload WHERE payload.media_id=$1 AND payload.provider='anilist' AND payload.is_current) AS "payloadReady",
+      EXISTS(SELECT 1 FROM media_cover cover WHERE cover.media_id=$1 AND cover.status='ACTIVE' AND (cover.data IS NOT NULL OR cover.asset_sha256 IS NOT NULL)) AS "coverReady"`,[childId]);
+    if(!enrichment.rows[0]?.payloadReady)
+      await h.query("SELECT graphile_worker.add_job('anilist-enrichment',$1::json,job_key := $2,max_attempts := 3,priority := -15,job_key_mode := 'preserve_run_at')",[JSON.stringify({mediaId:childId,animeRelationDiscovery:true,forceRefresh:true}),`anilist-relation:${CONNECTOR_VERSIONS.anilistMetadata}:${relation.id}`]);
+    else if(!enrichment.rows[0]?.coverReady)
+      await h.query("SELECT graphile_worker.add_job('anilist-cover',$1::json,job_key := $2,max_attempts := 3,priority := -15,job_key_mode := 'preserve_run_at')",[JSON.stringify({mediaId:childId,source:'anilist-relation'}),`anilist-relation-cover:${CONNECTOR_VERSIONS.anilistCover}:${relation.id}`]);
   }
   const component=await h.query(`WITH RECURSIVE component(id) AS (
     SELECT $1::text UNION
