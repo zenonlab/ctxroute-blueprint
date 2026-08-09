@@ -177,7 +177,7 @@ suite('Wave 4 PostgreSQL ownership isolation',()=>{
     expect(title.rows).toContainEqual({text:'One Piece',connector:'source-url'});expect(ignored.rowCount).toBe(0);
     expect(decisions.rowCount).toBe(5);expect(decisions.rows).toEqual(expect.arrayContaining([
       expect.objectContaining({bookmark_id:'wave10-generic',classification_status:'recognized',classification_reason:'URL_IDENTITY_ADAPTER'}),
-      expect.objectContaining({bookmark_id:'wave10-youtube',classification_status:'review',classification_reason:'URL_IDENTITY_UNRESOLVED'}),
+      expect.objectContaining({bookmark_id:'wave10-youtube',classification_status:'review',classification_reason:'URL_IDENTITY_MISSING'}),
       expect.objectContaining({bookmark_id:'wave10-duplicate-a',classification_status:'review'}),
       expect.objectContaining({bookmark_id:'wave10-duplicate-b',classification_status:'review'}),
     ]));
@@ -257,6 +257,28 @@ suite('Wave 4 PostgreSQL ownership isolation',()=>{
     expect(accepted.statusCode).toBe(202);expect(row.rows[0].status).toBe('SCHEDULED');
     await pool.query('DELETE FROM app_user WHERE id=$1',[adminId]);await pool.query('DELETE FROM media WHERE id=$1',[mediaId]);
   });
+  it('hides removed-link reviews from the current queue while retaining scoped audit history',async()=>{
+    if(!pool)throw new Error('DATABASE_URL required');
+    const userId=randomUUID(),otherId=randomUUID(),mediaId=`review-visibility-${randomUUID()}`,password='Review-Visibility-Password!';
+    const email=`review-visible-${userId}@example.test`,otherEmail=`review-other-${otherId}@example.test`,passwordHash=await hashPassword(password);
+    await pool.query("INSERT INTO app_user(id,email,password_hash,role) VALUES($1,$2,$5,'member'),($3,$4,$5,'member')",[userId,email,otherId,otherEmail,passwordHash]);
+    await pool.query("INSERT INTO media(id,type) VALUES($1,'MANGA')",[mediaId]);
+    await pool.query("INSERT INTO bookmark_media_link(user_id,installation_id,bookmark_id,media_id,status,classifier_version,evidence) VALUES($1,'current-installation','current-bookmark',$3,'review','synthetic','{}'),($1,'obsolete-installation','obsolete-bookmark',$3,'removed','synthetic','{}'),($2,'other-installation','other-bookmark',$3,'review','synthetic','{}')",[userId,otherId,mediaId]);
+    const reviews=await pool.query("INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason) VALUES($1,'current-installation','current-bookmark','Synthetic Current Work','https://reader.invalid/current','mangaupdates','PENDING','LOW_CONFIDENCE'),($1,'obsolete-installation','obsolete-bookmark','Synthetic Archived Work','https://reader.invalid/archived','mangaupdates','PENDING','LOW_CONFIDENCE'),($2,'other-installation','other-bookmark','Synthetic Other Work','https://reader.invalid/other','mangaupdates','PENDING','LOW_CONFIDENCE') RETURNING id,bookmark_id",[userId,otherId]);
+    const archivedId=reviews.rows.find(row=>row.bookmark_id==='obsolete-bookmark').id;
+    const login=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email,password}}),cookie=String(login.headers['set-cookie']).split(';')[0];
+    const otherLogin=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email:otherEmail,password}}),otherCookie=String(otherLogin.headers['set-cookie']).split(';')[0];
+    const queue=await app.inject({method:'GET',url:'/api/v1/reviews',headers:{cookie}});
+    const history=await app.inject({method:'GET',url:`/api/v1/reviews/${archivedId}`,headers:{cookie}});
+    const isolated=await app.inject({method:'GET',url:`/api/v1/reviews/${archivedId}`,headers:{cookie:otherCookie}});
+    expect(queue.statusCode).toBe(200);expect(queue.json()).toMatchObject({pendingCount:1});
+    expect(queue.json().items.map((item:any)=>item.favoriteTitle)).toEqual(['Synthetic Current Work']);
+    expect(history.statusCode).toBe(200);expect(history.json().favoriteTitle).toBe('Synthetic Archived Work');
+    expect(isolated.statusCode).toBe(404);
+    const stored=await pool.query('SELECT count(*)::int AS count FROM favorite_review WHERE user_id=$1',[userId]);
+    expect(stored.rows[0].count).toBe(2);
+    await pool.query('DELETE FROM app_user WHERE id IN ($1,$2)',[userId,otherId]);await pool.query('DELETE FROM media WHERE id=$1',[mediaId]);
+  });
   it('keeps the notification inbox and read action isolated per account',async()=>{
     if(!pool)throw new Error('DATABASE_URL required');
     const userId=randomUUID(), otherId=randomUUID(), password='Wave6-Inbox-Password!';
@@ -330,11 +352,15 @@ suite('Wave 4 PostgreSQL ownership isolation',()=>{
     if(!pool)throw new Error('DATABASE_URL required');
     const userId=randomUUID(),prefix=`pagination-${randomUUID()}`,email=`${prefix}@example.test`,password='Pagination-Integration-Password!';
     await pool.query("INSERT INTO app_user(id,email,password_hash,role) VALUES($1,$2,$3,'member')",[userId,email,await hashPassword(password)]);
+    const installationId=`${prefix}-installation`;
+    const device=await pool.query("INSERT INTO extension_device(user_id,installation_id,token_hash,name,browser,protocol) VALUES($1,$2,$3,'Pagination fixture','test',1) RETURNING id",[userId,installationId,digest(`${prefix}-token`)]);
+    const batch=await pool.query('INSERT INTO bookmark_import_batch(device_id,batch_id,item_count) VALUES($1,$2,65) RETURNING id',[device.rows[0].id,randomUUID()]);
     for(let index=1;index<=65;index+=1){
-      const suffix=String(index).padStart(3,'0'),mediaId=`${prefix}-${suffix}`;
+      const suffix=String(index).padStart(3,'0'),mediaId=`${prefix}-${suffix}`,bookmarkId=`${prefix}-bookmark-${suffix}`;
       await pool.query("INSERT INTO media(id,type,season_year,format) VALUES($1,'MANGA',$2,'serialized')",[mediaId,2000+(index%20)]);
       await pool.query("INSERT INTO media_title(media_id,text,normalized_text,kind,connector,provenance) VALUES($1,$2,$3,'official','test','{}')",[mediaId,`Œuvre ${suffix}`,`œuvre ${suffix}`]);
-      await pool.query("INSERT INTO bookmark_media_link(user_id,installation_id,bookmark_id,media_id,status,classifier_version,evidence) VALUES($1,$2,$3,$4,'matched','test','{}')",[userId,`${prefix}-installation`,`${prefix}-bookmark-${suffix}`,mediaId]);
+      await pool.query("INSERT INTO bookmark_import_item(batch_id,user_id,installation_id,bookmark_id,fingerprint,event,payload,classification_status) VALUES($1,$2,$3,$4,$5,'created',$6,'recognized')",[batch.rows[0].id,userId,installationId,bookmarkId,digest(bookmarkId),{id:bookmarkId,title:`Œuvre ${suffix}`,url:`https://example.test/library/${suffix}`}]);
+      await pool.query("INSERT INTO bookmark_media_link(user_id,installation_id,bookmark_id,media_id,status,classifier_version,evidence) VALUES($1,$2,$3,$4,'matched','test','{}')",[userId,installationId,bookmarkId,mediaId]);
     }
     for(const [suffix,date] of [['001','2026-07-01'],['002','2026-08-01']]){const mediaId=`${prefix}-${suffix}`;for(const [field,value] of [['themes',['Action','Adventure']],['status','ongoing'],['language','ja'],['latestReleaseDate',date]])await pool.query('INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence,attribution) VALUES($1,$2,$3,\'anilist\',\'https://anilist.org\',1,\'Metadata source: AniList\')',[mediaId,field,JSON.stringify(value)]);}
     const login=await app.inject({method:'POST',url:'/api/v1/auth/login',payload:{email,password}}),cookie=String(login.headers['set-cookie']).split(';')[0];

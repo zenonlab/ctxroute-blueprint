@@ -38,4 +38,11 @@ describe('MangaDex fallback resolution boundary', () => {
     expect(source).toMatch(/if \(!fastPath && forceRefresh && c\.mangadex_id/u);
     expect(source).toContain("SET status='PROMOTED',mangaupdates_id=$2");
   });
+
+  it('never persists MangaDex chapter or volume availability',()=>{
+    expect(source).not.toContain("['latestChapter',mangaDex.latestChapter]");
+    expect(source).not.toContain("['latestVolume',mangaDex.latestVolume]");
+    expect(source).not.toContain('mangaDex.latestChapter??null');
+    expect(source).not.toMatch(/provider_progress[^;]+provider='mangadex'/u);
+  });
 });

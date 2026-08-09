@@ -1,5 +1,5 @@
 import { run } from 'graphile-worker';
-import { runtimeEnvironment } from '@favlib/config';
+import { CONNECTOR_VERSIONS, runtimeEnvironment } from '@favlib/config';
 import { Pool } from 'pg';
 import availability from './tasks/availability.js';
 import availabilitySweep from './tasks/availability-sweep.js';
@@ -95,6 +95,7 @@ if(runtime.nodeEnv!=='test') {
       'notification-delivery': async (payload: unknown, helpers) => { await notificationDelivery(payload, helpers); },
       'retention-purge': async (payload: unknown, helpers) => { await retentionPurge(payload, helpers); },
       'resolve-favorite': async (payload: unknown, helpers) => { await resolveFavorite(payload, helpers); },
+      [CONNECTOR_VERSIONS.sourceResolutionTask]: async (payload: unknown, helpers) => { await resolveFavorite(payload, helpers); },
     },
   });let stopping=false;const shutdown=async()=>{if(stopping)return;stopping=true;clearInterval(timer);await runner.stop();await schedulerPool.end()};process.once('SIGTERM',()=>void shutdown());process.once('SIGINT',()=>void shutdown());
 }

@@ -25,7 +25,10 @@ describe('missing position repair contract',()=>{
     expect(source).toContain('progressionFromFavorite');
     expect(source).toContain("i.event<>'removed'");
     expect(source).toContain("l.status IN ('matched','accepted')");
-    expect(source).toContain('position_number=GREATEST');
+    expect(source).toContain('position_number=excluded.position_number');
+    expect(source).toContain('position_raw=excluded.position_raw');
+    expect(source).not.toContain('position_number=GREATEST');
+    expect(source).toContain('DELETE FROM favorite_progress_candidate');
     expect(source).toContain('SET status=status');
     expect(source).toContain('FAVORITE_PROGRESS_PARSER_VERSION');
   });

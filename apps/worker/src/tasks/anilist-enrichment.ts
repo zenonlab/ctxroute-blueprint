@@ -26,6 +26,7 @@ import {
   enrichmentFingerprint,
   finishEnrichment,
   normalizedError,
+  isProtectedResolvedLinkError,
   retryableProviderError,
 } from "../enrichment-state.js";
 import { operationalValue } from "../settings.js";
@@ -353,7 +354,7 @@ async function persist(
   // Relations remain in the favorite work's provider assertion below. They
   // are descriptive cache data, not independent catalog membership.
   await h.query(
-    "UPDATE bookmark_media_link SET media_id=$1,status='review',evidence=$2 WHERE media_id=$3 AND status IN ('matched','review','accepted')",
+    "UPDATE bookmark_media_link l SET media_id=$1,status='review',evidence=$2 WHERE l.media_id=$3 AND l.status IN ('matched','review','accepted') AND NOT EXISTS(SELECT 1 FROM favorite_review r WHERE r.user_id=l.user_id AND r.installation_id=l.installation_id AND r.bookmark_id=l.bookmark_id AND r.status='RESOLVED' AND r.decision IS NOT NULL)",
     [target, { provider: "anilist", externalId: m.id }, mediaId],
   );
   const themes = [
@@ -629,7 +630,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
       const reason = items.some(item => item.type === 'ANIME') && !items.some(item => item.type === 'ANIME' && aniListFormatAllowed(formatEvidence, item.format)) ? 'FORMAT_MISMATCH' : items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
       await openReviewsForMedia(h.query, { title: sourceRow.rows[0]?.text ?? titleRow.rows[0]?.text ?? aliases[0], url: sourceRow.rows[0]?.url ?? titleRow.rows[0]?.url ?? '', provider: 'anilist', candidates: detailed.map(item => ({...item, id: String(item.id), title: titleOf(item)})), mediaId, reason, persistCover: (profileId, imageUrl, provider) => imageUrl ? saveProviderProfileCover(h, profileId, imageUrl, provider, { timeoutMs }) : Promise.resolve() });
-      await h.query("UPDATE bookmark_media_link SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2::text) WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, reason]);
+      await h.query("UPDATE bookmark_media_link l SET status='review',evidence=evidence||jsonb_build_object('resolution','candidate-review','reason',$2::text) WHERE l.media_id=$1 AND l.status IN ('matched','accepted','review') AND NOT EXISTS(SELECT 1 FROM favorite_review r WHERE r.user_id=l.user_id AND r.installation_id=l.installation_id AND r.bookmark_id=l.bookmark_id AND r.status='RESOLVED' AND r.decision IS NOT NULL)", [mediaId, reason]);
       await finishEnrichment(h, { mediaId, provider: 'anilist', purpose: 'metadata', version: ENRICHMENT_VERSION, owner: claim.owner, status: 'NO_MATCH', errorCode: reason, resolutionCode: reason, });
       return { status: 'REVIEW', reason };
     }
@@ -705,6 +706,10 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     };
   } catch (error) {
     const code = normalizedError(error);
+    if (isProtectedResolvedLinkError(code)) {
+      h.logger.warn(`[resolved-link-protected] provider=anilist mediaId=${mediaId}`);
+      return { status: "SKIPPED", reason: code };
+    }
     await finishEnrichment(h, {
       mediaId,
       provider: "anilist",

@@ -11,7 +11,8 @@ describe('global anime work persistence contract',()=>{
     expect(worker).toContain('ON CONFLICT(materialization_key)');
     expect(migration).not.toContain('CREATE TABLE anime_work_review');
     expect(worker).toContain("'ANIME_CHAIN_AMBIGUOUS'");
-    expect(migration).toContain('CHECK (reason IS NULL');
+    expect(migration).toContain('DROP CONSTRAINT IF EXISTS favorite_review_reason_check');
+    expect(migration).not.toContain('CHECK (reason IS NULL');
     expect(migration).not.toContain('ADD COLUMN review_reason');
   });
 

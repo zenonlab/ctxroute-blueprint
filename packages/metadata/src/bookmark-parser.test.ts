@@ -7,7 +7,7 @@ describe("shared bookmark progression parser", () => {
   it("keeps a synthetic chapter out of every identity alias and preserves raw provenance", () => {
     const raw = { title: "Synthetic Glass Harbor - Chapter 20 - Reader", url: "https://reader.invalid/series/synthetic-glass-harbor/chapter-20" };
     const parsed = parseFavorite({ ...raw, source: { key: "reader.invalid:synthetic-glass-harbor", title: "Synthetic Glass Harbor", slug: "synthetic-glass-harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor", type: "MANGA", releaseSuffix: "chapter-20" } });
-    expect(parsed).toMatchObject({ parser: FAVORITE_PARSER_ID, version: 8, raw, identity: { slug: "synthetic-glass-harbor", title: "Synthetic Glass Harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor" }, displayTitle: "Synthetic Glass Harbor", progression: { kind: "chapter", number: 20, provenance: { inputTitle: raw.title, inputUrl: raw.url, parserVersion: 8 } } });
+    expect(parsed).toMatchObject({ parser: FAVORITE_PARSER_ID, version: 11, raw, identity: { slug: "synthetic-glass-harbor", title: "Synthetic Glass Harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor" }, displayTitle: "Synthetic Glass Harbor", progression: { kind: "chapter", number: 20, provenance: { inputTitle: raw.title, inputUrl: raw.url, parserVersion: 9 } } });
     expect(parsed.identity?.aliases.map(alias => alias.value).join(" ")).not.toMatch(/chapter|20/iu);
     expect(parsed.segments).toContainEqual(expect.objectContaining({ raw: "Chapter 20", cleaned: null, excludedAs: "progression" }));
   });
@@ -28,12 +28,37 @@ describe("shared bookmark progression parser", () => {
       slug:"aurora-finale",rawSlug:"aurora-finale",type:"ANIME",
     }});
     expect(parsed).toMatchObject({
-      parser:"favorite-parser-v8",version:8,raw,
+      parser:"favorite-parser-v11",version:11,raw,
       identity:{title:"Synthetic Aurora Finale OVA",stableSlug:"aurora-finale",transformations:[{kind:"repeated-human-title",raw:"Oav Vostfr Synthetic Aurora Finale Ova"}]},
       displayTitle:"Synthetic Aurora Finale OVA",
     });
     expect(parsed.identity?.aliases.map(alias=>alias.value)).toEqual(["Synthetic Aurora Finale OVA"]);
     expect(parsed.segments[1]).toMatchObject({raw:"(OAV VOSTFR) Synthetic Aurora Finale OVA",cleaned:"Synthetic Aurora Finale OVA",transformations:["cleaned_generic_suffix"]});
+  });
+
+  it("requires unique human corroboration for a prefixed opaque routing slug",()=>{
+    const raw={title:"Synthetic Ember Ledger - Chapter 31",url:"https://reader.invalid/series/route-zx731904/chapter-31"};
+    const sourceEvidence={title:"Route Zx731904",slug:"route-zx731904",rawSlug:"route-zx731904",type:"MANGA" as const,strategy:"adapter",evidence:["CATEGORY_PATH"]};
+    const parsed=parseFavorite({...raw,source:sourceEvidence});
+    expect(parsed).toMatchObject({parser:"favorite-parser-v11",version:11,raw,identity:{title:"Synthetic Ember Ledger",rawSlug:"route-zx731904",stableSlug:"synthetic-ember-ledger",strategy:"adapter",evidence:["CATEGORY_PATH"],transformations:[{kind:"opaque-url-slug-replaced",raw:"route-zx731904",rawTitle:raw.title,corroboratedBy:"Synthetic Ember Ledger"}]},progression:{number:31,provenance:{parserVersion:9}}});
+  });
+
+  it("leaves an uncorroborated prefixed opaque routing slug unresolved",()=>{
+    const raw={title:"Chapter 31",url:"https://reader.invalid/series/route-zx731904/chapter-31"};
+    const parsed=parseFavorite({...raw,source:{title:"Route Zx731904",slug:"route-zx731904",rawSlug:"route-zx731904",type:"MANGA"}});
+    expect(parsed).toMatchObject({parser:"favorite-parser-v11",version:11,raw,identity:null,status:"identity-missing",diagnostics:["OPAQUE_IDENTITY_UNCORROBORATED"],progression:{number:31,provenance:{parserVersion:9}}});
+  });
+
+  it("lets one human bookmark identity override a numeric routing prefix while preserving provenance",()=>{
+    const raw={title:"Chapter 27 (English) - Azure Heart Protocol | Reader",url:"https://reader.invalid/comic/00-sapphire-heart-protocol/chapter-27-en"};
+    const parsed=parseFavorite({...raw,source:{key:"reader.invalid:00-sapphire-heart-protocol",title:"00 Sapphire Heart Protocol",slug:"00-sapphire-heart-protocol",rawSlug:"00-sapphire-heart-protocol",type:"MANGA"}});
+    expect(parsed).toMatchObject({
+      parser:"favorite-parser-v11",version:11,raw,displayTitle:"Azure Heart Protocol",
+      identity:{title:"Azure Heart Protocol",rawSlug:"00-sapphire-heart-protocol",stableSlug:"azure-heart-protocol",transformations:[{kind:"numeric-routing-prefix",raw:"00",rawTitle:raw.title,corroboratedBy:"Azure Heart Protocol"}]},
+      progression:{kind:"chapter",number:27,provenance:{parserVersion:9}},
+      provenance:{rawTitle:raw.title,rawUrl:raw.url},
+    });
+    expect(parsed.segments[0]).toMatchObject({raw:"Chapter 27 (English)",cleaned:null,excludedAs:"progression"});
   });
 
   it("aligns the human segment when a chapter is followed by a generic call to action",()=>{
@@ -88,8 +113,40 @@ describe("shared bookmark progression parser", () => {
     expect(progressionFromFavorite({ title, url, source: source(kind === "episode" ? "ANIME" : "MANGA") })).toMatchObject({ kind, number });
   });
 
-  it("keeps the greatest compatible number in a noisy sequence", () => {
+  it("uses the last same-quality marker instead of numeric magnitude", () => {
     expect(progressionFromFavorite({title:"Synthetic Chronicle - Chapter 8 - Chapter 11 VOSTFR",url:"https://reader.invalid/work",source:source()})).toMatchObject({kind:"chapter",number:11});
+    expect(progressionFromFavorite({title:"Synthetic Chronicle - Chapter 108 - Chapter 11 VOSTFR",url:"https://reader.invalid/work",source:source()})).toMatchObject({kind:"chapter",number:11});
+  });
+
+  it("selects a labelled chapter before a trailing technical identifier", () => {
+    const parsed = parseFavorite({
+      title: "Synthetic Chronicle",
+      url: "https://reader.invalid/synthetic-chronicle/chapter-71/132131/",
+      source: source(),
+    });
+    expect(parsed.progression).toMatchObject({
+      kind: "chapter",
+      number: 71,
+      provenance: {
+        pathSegments: ["synthetic-chronicle", "chapter-71", "132131"],
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ raw: "71", evidence: "labelled-url-path", segment: "chapter-71" }),
+          expect.objectContaining({ raw: "132131", evidence: "numeric-url-segment-after-source-identity" }),
+        ]),
+        rejectedCandidates: [expect.objectContaining({ raw: "132131", reason: "EXPLICIT_EVIDENCE_PRESENT" })],
+      },
+    });
+    expect(parsed.raw).toEqual({ title: "Synthetic Chronicle", url: "https://reader.invalid/synthetic-chronicle/chapter-71/132131/" });
+  });
+
+  it("does not turn a parenthesized year or slug routing number into progression", () => {
+    const input = {
+      title: "Synthetic Chronicle (2024)",
+      url: "https://reader.invalid/catalog/synthetic-chronicle-(2024)/route-987654",
+      source: { ...source(), title: "Synthetic Chronicle (2024)" },
+    };
+    expect(parseBookmarkTitle(input.title)).toBe("Synthetic Chronicle (2024)");
+    expect(progressionFromFavorite(input)).toBeNull();
   });
 
   it("accepts an unlabelled URL segment only with established source identity", () => {

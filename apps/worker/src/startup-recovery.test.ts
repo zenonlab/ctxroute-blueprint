@@ -15,6 +15,7 @@ describe('worker startup recovery',()=>{
     const lockCall=query.mock.calls.find(([statement])=>statement.includes('graphile_worker._private_jobs'))!;
     expect(lockCall[0]).toContain('locked_at IS NOT NULL');
     expect(lockCall[1][0]).toEqual(expect.arrayContaining(['resolve-favorite']));
+    expect(lockCall[1][0]).toEqual(expect.arrayContaining(['source-resolve:v2']));
     expect(lockCall[1][0]).not.toContain('anilist-enrichment');
     expect(lockCall[1][0]).not.toContain('anilist-calendar-sweep');
   });

@@ -1,6 +1,6 @@
 export const WORKER_TASK_NAMES = [
   'availability', 'availability-sweep', 'announcement-sync', 'backup', 'cover-recompress',
-  'health', 'notification-delivery', 'retention-purge', 'resolve-favorite',
+  'health', 'notification-delivery', 'retention-purge', 'resolve-favorite', 'source-resolve:v2',
   'anilist-enrichment', 'mangaupdates-enrichment', 'enrichment-sweep', 'mangaupdates-release-sweep', 'anilist-calendar-sweep',
   'provider-profile-cover', 'manual-review-provider', 'reassess-favorite-reviews',
   'mangadex-promotion',
@@ -29,7 +29,7 @@ export const ROLE_SCHEDULES = {
 } as const;
 
 export const ROLE_TASK_NAMES = {
-  all: ['availability','announcement-sync','backup','cover-recompress','health','notification-delivery','retention-purge','resolve-favorite'],
+  all: ['availability','announcement-sync','backup','cover-recompress','health','notification-delivery','retention-purge','resolve-favorite','source-resolve:v2'],
   reading: ['availability','availability-sweep','health','notification-delivery','anilist-enrichment','mangaupdates-enrichment','enrichment-sweep','mangaupdates-release-sweep','anilist-calendar-sweep','mangadex-promotion','provider-profile-cover','reassess-favorite-reviews'],
   interactive: ['manual-review-provider'],
 } as const;

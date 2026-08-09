@@ -11,6 +11,9 @@ export type BookmarkSourceEvidence = {
   aliases?: string[];
   /** Explicit season carried by a trusted URL adapter. */
   season?: number;
+  /** URL parser evidence copied into the immutable parse artifact. */
+  strategy?: string;
+  evidence?: string[];
 };
 
 export type TitleMatchMethod = "ordered-exact" | "reordered-significant-words" | "bounded-edit-distance";
@@ -29,7 +32,26 @@ export type ProgressionEvidence = {
   urlSeason?: number;
   titleSeason?: number;
   localNumber?: number;
+  /** Every progression-like fragment considered by the shared parser. */
+  candidates: ProgressionCandidateProvenance[];
+  /** Candidates not selected, with an auditable deterministic reason. */
+  rejectedCandidates: ProgressionRejectedCandidate[];
   parserVersion: number;
+};
+
+export type ProgressionCandidateProvenance = {
+  kind: "chapter" | "episode" | "volume";
+  raw: string;
+  number: number;
+  source: ProgressionEvidence["source"];
+  evidence: ProgressionEvidence["evidence"];
+  segment?: string;
+  segmentIndex?: number;
+  occurrence: number;
+};
+
+export type ProgressionRejectedCandidate = ProgressionCandidateProvenance & {
+  reason: "EXPLICIT_EVIDENCE_PRESENT" | "LOWER_QUALITY_EVIDENCE" | "EARLIER_SAME_QUALITY_EVIDENCE" | "INCOMPATIBLE_KIND";
 };
 
 export type FavoriteProgression = {
@@ -43,14 +65,20 @@ export type FavoriteProgression = {
 };
 
 /** Increment only when the generic evidence policy changes. */
-export const FAVORITE_PARSER_ID = "favorite-parser-v8" as const;
-export const FAVORITE_PROGRESS_PARSER_VERSION = 8;
+export const FAVORITE_PARSER_ID = "favorite-parser-v11" as const;
+export const FAVORITE_IDENTITY_PARSER_VERSION = 11;
+export const FAVORITE_PROGRESS_PARSER_VERSION = 9;
 
 export type FavoriteParseArtifact = {
   parser: typeof FAVORITE_PARSER_ID;
-  version: 8;
+  version: typeof FAVORITE_IDENTITY_PARSER_VERSION;
   fingerprint: string;
   raw: { title: string; url: string };
+  provenance: {
+    rawTitle: string;
+    rawUrl: string;
+    identityTransformations: Array<{ kind: string; raw: string; rawTitle?: string; corroboratedBy?: string }>;
+  };
   identity: null | {
     key: string;
     title: string;
@@ -60,8 +88,10 @@ export type FavoriteParseArtifact = {
     slug: string;
     canonicalUrl: string;
     type: BookmarkSourceEvidence["type"];
+    strategy?: string;
+    evidence: string[];
     aliases: Array<{ value: string; provenance: "stable-url-slug" | "aligned-bookmark-segment" }>;
-    transformations: Array<{ kind: "numeric-routing-prefix" | "language-marker" | "reader-brand-suffix" | "opaque-url-slug-replaced" | "repeated-human-title"; raw: string }>;
+    transformations: Array<{ kind: "numeric-routing-prefix" | "language-marker" | "reader-brand-suffix" | "opaque-url-slug-replaced" | "repeated-human-title"; raw: string; rawTitle?: string; corroboratedBy?: string }>;
   };
   segments: Array<{ raw: string; cleaned: string | null; transformations: string[]; excludedAs?: "progression" | "numeric" | "release" }>;
   displayTitle: string | null;
@@ -128,7 +158,7 @@ export function parseBookmarkTitle(value: string) {
   for (let pass = 0; pass < 5; pass++) {
     const before = title;
     title = title
-      .replace(/\s+(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)\s*#?\s*\d+(?:[.,]\d+)?(?:[-\w]+)?(?:\s*\[[^\]]+\])?(?:\s+(?:online|free|vostfr|vf|vo|sub|dub|scan|scans).*)?$/iu, "")
+      .replace(/\s+(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)\s*#?\s*\d+(?:[.,]\d+)?(?:[-\w]+)?(?:\s*\[[^\]]+\])?(?:(?:\s+|\s*[-|·:]\s*)(?:online|free|vostfr|vf|vo|sub|dub|scan|scans|[^\s]+).*)?$/iu, "")
       .replace(/\s+-\s+\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?\s*$/iu, "")
       .replace(/\s+(?:in english online free|online free|en hd)\s*$/iu, "")
       .replace(/\s+(?:vostfr|vf|vo|sub|dub|scan|scans|en hd)\s*$/iu, "")
@@ -141,7 +171,7 @@ export function parseBookmarkTitle(value: string) {
 }
 
 const splitSegments = (value: string) => value.split(/\s*(?:\||·|—|–)\s*|\s+-\s+/u).map(part => part.trim()).filter(Boolean);
-const releaseOnly = /^(?:(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol|season|saison)[-_.\s]*#?\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?)$/iu;
+const releaseOnly = /^(?:(?:chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol|season|saison)[-_.\s]*#?\s*\d+(?:[.,]\d+)?(?:\s*\([^)]*(?:english|french|français|vostfr|vf|vo|sub|dub|scan|scans)[^)]*\))?|\d+(?:[.,]\d+)?(?:\s+(?:vostfr|vf|vo|sub|dub|scan|scans))?)$/iu;
 const languageToken = /^(?:[a-z]{2}|[a-z]{2}-[a-z]{2,3}|english|french|français|japanese|korean|chinese)$/iu;
 
 function tokenList(value: string) {
@@ -217,12 +247,25 @@ export function parseFavorite(input: { title: string; url: string; source?: Book
     : [];
   const structuredByIdentity = [...new Map(structuredMatches.map(item=>[`${normalize(item.title)}|${item.stableSlug}`,item] as const)).values()];
   const structured = structuredByIdentity.length===1 ? structuredByIdentity[0] : null;
-  const opaqueSlug=source&&/^(?:[a-z]{1,3}\d{4,}|\d{4,}[a-z]{1,3})$/iu.test(rawSlug);
+  // An opaque routing identity can be the whole slug or the final component
+  // of a generic technical prefix. It is never promoted to a work identity
+  // unless exactly one cleaned human title from the favorite corroborates it.
+  const slugParts=rawSlug.split(/[-_.]+/u).filter(Boolean);
+  const opaqueToken=(value:string)=>value.length>=6&&/^[\p{L}\d]+$/u.test(value)&&/\p{L}/u.test(value)&&/\d/u.test(value)&&!/^(?=.*\p{L}{4,})(?=.*\d{1,2}$)[\p{L}\d]+$/u.test(value);
+  const opaqueSlug=Boolean(source&&(opaqueToken(rawSlug)||(slugParts.length>1&&slugParts.slice(0,-1).every(part=>/^\p{L}{2,16}$/u.test(part))&&opaqueToken(slugParts.at(-1)!))));
   const humanSegments=[...new Set(segments.flatMap(segment=>segment.cleaned?[segment.cleaned]:[]).filter(value=>normalize(value)!==normalize(source?.title??"")))];
   const opaqueReplacement=opaqueSlug&&humanSegments.length===1?humanSegments[0]:undefined;
+  // Some catalogues prepend a numeric routing bucket to a readable slug. If
+  // the imported bookmark independently supplies exactly one human identity,
+  // that human title is stronger evidence than the routing slug. A bare URL,
+  // or a bookmark that retains the numeric prefix, is deliberately unchanged.
+  const numericRoutingToken=slugParts.length>1&&/^\d+$/u.test(slugParts[0])?slugParts[0]:undefined;
+  const numericRoutingReplacement=!structured&&numericRoutingToken&&humanSegments.length===1
+    ? humanSegments[0]
+    : undefined;
   const repeatedHumanTitle=segments.find((segment,index)=>segment.cleaned&&segments.some((peer,peerIndex)=>peerIndex!==index&&peer.cleaned&&compact(peer.cleaned)===compact(segment.cleaned!)))?.cleaned;
-  const stableSourceTitle = structured?.title ?? opaqueReplacement ?? repeatedHumanTitle ?? source?.title;
-  const stableSlug = structured?.stableSlug ?? (opaqueReplacement?tokenList(opaqueReplacement).join("-"):source?.slug) ?? compact(stableSourceTitle ?? "");
+  const stableSourceTitle = structured?.title ?? opaqueReplacement ?? numericRoutingReplacement ?? repeatedHumanTitle ?? source?.title;
+  const stableSlug = structured?.stableSlug ?? ((opaqueReplacement??numericRoutingReplacement)?tokenList((opaqueReplacement??numericRoutingReplacement)!).join("-"):source?.slug) ?? compact(stableSourceTitle ?? "");
   const sourceAliases = source ? [stableSourceTitle, ...(source.aliases ?? [])].filter((value): value is string => Boolean(value)) : [];
   const aligned = sourceAliases.length
     ? segments.filter(segment => segment.cleaned).map(segment => ({ segment, proof: matchValidatedTitle(segment.cleaned!, sourceAliases) })).find(item => item.proof)
@@ -233,32 +276,37 @@ export function parseFavorite(input: { title: string; url: string; source?: Book
     aliases.push({ value: stableSourceTitle!, provenance: "stable-url-slug" });
     if (aligned?.segment.cleaned && aligned.segment.cleaned !== stableSourceTitle) aliases.push({ value: aligned.segment.cleaned, provenance: "aligned-bookmark-segment" });
   }
-  const identity = source ? {
-    key: structured ? `${source.key ?? "source"}:${stableSlug}` : source.key ?? stableSlug,
+  const identity = source && !(opaqueSlug&&!opaqueReplacement) ? {
+    key: structured||numericRoutingReplacement ? `${source.key ?? "source"}:${stableSlug}` : source.key ?? stableSlug,
     title: stableSourceTitle!, rawSlug, stableSlug, slug: stableSlug,
-    canonicalUrl: source.canonicalUrl ?? input.url, type: source.type, aliases,
-    transformations: structured?.transformations ?? (opaqueReplacement?[{kind:"opaque-url-slug-replaced" as const,raw:rawSlug}]:repeatedHumanTitle&&normalize(repeatedHumanTitle)!==normalize(source.title)?[{kind:"repeated-human-title" as const,raw:source.title}]:[]),
+    canonicalUrl: source.canonicalUrl ?? input.url, type: source.type, strategy: source.strategy, evidence: [...(source.evidence??[])], aliases,
+    transformations: structured?.transformations ?? (opaqueReplacement?[{kind:"opaque-url-slug-replaced" as const,raw:rawSlug,rawTitle:input.title,corroboratedBy:opaqueReplacement}]:numericRoutingReplacement?[{kind:"numeric-routing-prefix" as const,raw:numericRoutingToken!,rawTitle:input.title,corroboratedBy:numericRoutingReplacement}]:repeatedHumanTitle&&normalize(repeatedHumanTitle)!==normalize(source.title)?[{kind:"repeated-human-title" as const,raw:source.title,rawTitle:input.title,corroboratedBy:repeatedHumanTitle}]:[]),
   } : null;
   return {
-    parser: FAVORITE_PARSER_ID, version: 8,
-    fingerprint: fingerprint(JSON.stringify({ parser: FAVORITE_PARSER_ID, raw })), raw, identity, segments,
+    parser: FAVORITE_PARSER_ID, version: FAVORITE_IDENTITY_PARSER_VERSION,
+    fingerprint: fingerprint(JSON.stringify({ parser: FAVORITE_PARSER_ID, raw })), raw,
+    provenance: { rawTitle: raw.title, rawUrl: raw.url, identityTransformations: identity?.transformations ?? [] },
+    identity, segments,
     displayTitle, progression, status: identity ? "parsed" : "identity-missing",
-    diagnostics: identity ? [] : ["URL_IDENTITY_MISSING"],
+    diagnostics: identity ? [] : [opaqueSlug ? "OPAQUE_IDENTITY_UNCORROBORATED" : "URL_IDENTITY_MISSING"],
   };
 }
 
 export function progressionFromFavorite(input: { title: string; url: string; source?: BookmarkSourceEvidence | null }): FavoriteProgression | null {
   const pathSegments = urlSegments(input.url);
   const parsedTitle = parseBookmarkTitle(input.title);
-  const candidates: FavoriteProgression[] = [];
-  const add = (kind: FavoriteProgression["kind"], raw: string, evidence: ProgressionEvidence["evidence"], source: ProgressionEvidence["source"], extra: Partial<ProgressionEvidence> = {}) => {
+  const candidates: Array<FavoriteProgression & { candidate: ProgressionCandidateProvenance }> = [];
+  let occurrence = 0;
+  const add = (kind: FavoriteProgression["kind"], raw: string, evidence: ProgressionEvidence["evidence"], source: ProgressionEvidence["source"], extra: Partial<ProgressionEvidence> = {}, location: { segment?: string; segmentIndex?: number } = {}) => {
     const number = numberValue(raw);
     if (!Number.isFinite(number) || number < 0) return;
-    candidates.push({ kind, number, raw, season: input.source?.season, localNumber: kind === "episode" ? number : undefined, provenance: { source, evidence, inputTitle: input.title, inputUrl: input.url, parsedTitle, slug: input.source?.slug, pathSegments, releaseSuffix: input.source?.releaseSuffix, urlSeason: input.source?.season, localNumber: kind === "episode" ? number : undefined, parserVersion: FAVORITE_PROGRESS_PARSER_VERSION, ...extra } });
+    const candidate: ProgressionCandidateProvenance = { kind, raw, number, source, evidence, occurrence: occurrence++, ...location };
+    candidates.push({ kind, number, raw, season: input.source?.season, localNumber: kind === "episode" ? number : undefined, candidate, provenance: { source, evidence, inputTitle: input.title, inputUrl: input.url, parsedTitle, slug: input.source?.slug, pathSegments, releaseSuffix: input.source?.releaseSuffix, urlSeason: input.source?.season, localNumber: kind === "episode" ? number : undefined, candidates: [], rejectedCandidates: [], parserVersion: FAVORITE_PROGRESS_PARSER_VERSION, ...extra } });
   };
 
   for (const match of input.title.matchAll(marker)) add(kindFor(match[1]), match[2], "explicit-marker", "bookmark-title");
-  for (const match of [...pathSegments, input.source?.releaseSuffix ?? ""].join("/").matchAll(marker)) add(kindFor(match[1]), match[2], "labelled-url-path", "url-path");
+  for (const [segmentIndex, segment] of [...pathSegments, input.source?.releaseSuffix ?? ""].entries())
+    for (const match of segment.matchAll(marker)) add(kindFor(match[1]), match[2], "labelled-url-path", "url-path", {}, { segment, segmentIndex });
   for (const match of input.title.matchAll(/(?:^|\s[-–—|·:]\s)(\d+(?:[.,]\d+)?)(?:\s+(vostfr|vf|vo|sub|dub|scan|scans))(?=\s*(?:[-–—|·:]|$))/giu)) add(input.source?.type === "ANIME" ? "episode" : "chapter", match[1], "separated-release", "bookmark-title");
 
   const aliases = input.source ? [...new Set([input.source.title, ...(input.source.aliases ?? [])].filter(Boolean))] : [];
@@ -285,17 +333,35 @@ export function progressionFromFavorite(input: { title: string; url: string; sou
       break;
     }
     const identity = matchValidatedTitle(parsedTitle ?? input.title, aliases) ?? matchValidatedTitle(withoutSeason, aliases);
-    if (identity) for (const [segmentIndex, segment] of pathSegments.entries()) {
-      const isProvedSeasonSegment = input.source.season !== undefined && Number(segment) === input.source.season && /^(?:season|saison|s)$/iu.test(pathSegments[segmentIndex - 1] ?? "");
-      if (isProvedSeasonSegment) continue;
-      const matches = [...segment.matchAll(/(?:^|[-_.])(\d+(?:[.,]\d+)?)(?=$|[-_.])/gu)];
-      for (const match of matches) add(input.source.type === "ANIME" ? "episode" : "chapter", match[1], "numeric-url-segment-after-source-identity", "url-path", { matchedAlias: identity.alias, matchMethod: identity.method, titleSeason });
-      if (/^\d+(?:[.,]\d+)?$/u.test(segment)) add(input.source.type === "ANIME" ? "episode" : "chapter", segment, "numeric-url-segment-after-source-identity", "url-path", { matchedAlias: identity.alias, matchMethod: identity.method, titleSeason });
-    }
+    // A bare URL number is admissible only as the complete terminal path
+    // segment. Numbers embedded in title slugs, years and routing IDs are not
+    // progression evidence.
+    const terminalSegment = pathSegments.at(-1);
+    const terminalIsProvedSeason = input.source.season !== undefined && Number(terminalSegment) === input.source.season && /^(?:season|saison|s)$/iu.test(pathSegments.at(-2) ?? "");
+    if (identity && terminalSegment && !terminalIsProvedSeason && /^\d+(?:[.,]\d+)?$/u.test(terminalSegment))
+      add(input.source.type === "ANIME" ? "episode" : "chapter", terminalSegment, "numeric-url-segment-after-source-identity", "url-path", { matchedAlias: identity.alias, matchMethod: identity.method, titleSeason }, { segment: terminalSegment, segmentIndex: pathSegments.length - 1 });
   }
 
   if (!candidates.length) return null;
-  const priority = (candidate: FavoriteProgression) => candidate.provenance.evidence === "explicit-marker" ? 5 : candidate.provenance.evidence === "season-divergence" ? 4 : candidate.provenance.evidence === "bare-number-after-validated-identity" ? 3 : candidate.provenance.evidence === "labelled-url-path" ? 2 : 1;
-  const kind = [...candidates].sort((left, right) => priority(right) - priority(left))[0].kind;
-  return candidates.filter((candidate) => candidate.kind === kind).sort((a, b) => b.number - a.number || priority(b) - priority(a))[0];
+  const priority = (candidate: FavoriteProgression) => candidate.provenance.evidence === "explicit-marker" ? 5 : candidate.provenance.evidence === "labelled-url-path" ? 4 : candidate.provenance.evidence === "separated-release" ? 3 : candidate.provenance.evidence === "season-divergence" ? 2 : 1;
+  // Quality is authoritative; position only breaks ties within the same
+  // evidence class. Numeric magnitude never establishes progression.
+  const selected = [...candidates].sort((left, right) => priority(right) - priority(left) || right.candidate.occurrence - left.candidate.occurrence)[0]!;
+  const hasExplicitEvidence = candidates.some(candidate => candidate.provenance.evidence === "explicit-marker" || candidate.provenance.evidence === "labelled-url-path");
+  const rejectedCandidates: ProgressionRejectedCandidate[] = candidates
+    .filter(candidate => candidate !== selected)
+    .map(candidate => ({
+      ...candidate.candidate,
+      reason: candidate.kind !== selected.kind
+        ? "INCOMPATIBLE_KIND"
+        : hasExplicitEvidence && candidate.provenance.evidence !== "explicit-marker" && candidate.provenance.evidence !== "labelled-url-path"
+          ? "EXPLICIT_EVIDENCE_PRESENT"
+          : priority(candidate) < priority(selected)
+            ? "LOWER_QUALITY_EVIDENCE"
+            : "EARLIER_SAME_QUALITY_EVIDENCE",
+    }));
+  selected.provenance.candidates = candidates.map(candidate => candidate.candidate);
+  selected.provenance.rejectedCandidates = rejectedCandidates;
+  const { candidate: _candidate, ...result } = selected;
+  return result;
 }

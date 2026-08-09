@@ -1,8 +1,17 @@
 import { isIP } from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
+import { load as loadHtml } from "cheerio";
 import { safeRequest } from "@favlib/safe-http";
 import { FAVORITE_PARSER_ID, FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, parseFavorite, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
-export { FAVORITE_PARSER_ID, parseFavorite } from '@favlib/metadata/bookmark-parser';
+export type LanguageDetectionMethod = 'url-path' | 'manifest' | 'document' | 'undetected' | 'ambiguous';
+export type DetectedLanguage = { language: string | null; method: LanguageDetectionMethod; rawUrl: string; detectedAt: string };
+const languageIso6391 = new Set('aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu'.split(' '));
+export function normalizeLanguage(value: unknown): string | null { if (typeof value !== 'string') return null; const raw=value.trim().replace(/_/g,'-'); if (!/^[a-z]{2,3}(?:-[a-z]{2,4})?$/i.test(raw)) return null; const [primary,...rest]=raw.split('-'); return [primary.toLowerCase(),...rest.map(part=>part.length===2?part.toUpperCase():part)].join('-'); }
+export function languageMatches(preferred: string, detected: string | null): boolean { const a=normalizeLanguage(preferred)?.split('-')[0]; const b=normalizeLanguage(detected)?.split('-')[0]; return Boolean(a&&b&&a===b); }
+export function detectLanguageFromUrl(rawUrl:string,now=new Date().toISOString()):DetectedLanguage { let url:URL; try{url=new URL(rawUrl)}catch{return {language:null,method:'undetected',rawUrl,detectedAt:now}} const candidates=url.pathname.split('/').filter(Boolean).map(normalizeLanguage).filter((value):value is string=>Boolean(value)); const unique=[...new Set(candidates.filter(value=>languageIso6391.has(value.split('-')[0])))]; return {language:unique.length===1?unique[0]:null,method:unique.length===1?'url-path':unique.length>1?'ambiguous':'undetected',rawUrl,detectedAt:now}; }
+export function detectLanguage(rawUrl:string,manifestLanguage:unknown,now=new Date().toISOString()):DetectedLanguage { const fromUrl=detectLanguageFromUrl(rawUrl,now); if(fromUrl.language||fromUrl.method==='ambiguous')return fromUrl; const language=normalizeLanguage(manifestLanguage); return {language,method:language?'manifest':'undetected',rawUrl,detectedAt:now}; }
+export function detectLanguageFromDocument(rawUrl:string,documentLanguage:unknown,now=new Date().toISOString()):DetectedLanguage { const fromUrl=detectLanguageFromUrl(rawUrl,now); if(fromUrl.language||fromUrl.method==='ambiguous')return fromUrl; const language=normalizeLanguage(documentLanguage); return {language,method:language?'document':'undetected',rawUrl,detectedAt:now}; }
+export { FAVORITE_IDENTITY_PARSER_VERSION, FAVORITE_PARSER_ID, parseFavorite } from '@favlib/metadata/bookmark-parser';
 export type { FavoriteParseArtifact, FavoriteProgression } from '@favlib/metadata/bookmark-parser';
 
 export type SearchClient = (
@@ -41,6 +50,45 @@ export type PageMetadata = {
   provider: "source-page";
   confidence: number;
 };
+
+export type DeclaredLanguageEvidence = {
+  language: string | null;
+  method: "url-path" | "manifest" | "html-lang" | "content-language" | "og:locale" | "hreflang" | "undetected" | "ambiguous";
+  raw: string | null;
+};
+
+/** Declarative language evidence only. Statistical detection belongs after all
+ * of these signals and is intentionally not part of this resolver. */
+export function declaredLanguageEvidence(input: {
+  url: string;
+  manifestLanguage?: unknown;
+  html?: string;
+  headers?: Headers | Record<string, string | string[] | undefined>;
+}): DeclaredLanguageEvidence {
+  const fromUrl = detectLanguageFromUrl(input.url);
+  if (fromUrl.method === "ambiguous") return { language: null, method: "ambiguous", raw: null };
+  if (fromUrl.language) return { language: fromUrl.language, method: "url-path", raw: fromUrl.language };
+  const manifest = normalizeLanguage(input.manifestLanguage);
+  if (manifest) return { language: manifest, method: "manifest", raw: String(input.manifestLanguage) };
+  if (!input.html) return { language: null, method: "undetected", raw: null };
+  const $ = loadHtml(input.html);
+  const htmlLang = normalizeLanguage($("html").first().attr("lang"));
+  if (htmlLang) return { language: htmlLang, method: "html-lang", raw: $("html").first().attr("lang") ?? null };
+  const headerValue = input.headers instanceof Headers
+    ? input.headers.get("content-language")
+    : Object.entries(input.headers ?? {}).find(([key]) => key.toLowerCase() === "content-language")?.[1];
+  const header = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  const headerLanguage = normalizeLanguage(String(header ?? "").split(",")[0]?.split(";")[0]);
+  if (headerLanguage) return { language: headerLanguage, method: "content-language", raw: String(header) };
+  const locale = $("meta[property='og:locale'], meta[name='og:locale']").map((_, element) => $(element).attr("content")).get().find(Boolean);
+  const localeLanguage = normalizeLanguage(locale);
+  if (localeLanguage) return { language: localeLanguage, method: "og:locale", raw: locale ?? null };
+  const hreflangs = $("link[rel~='alternate'][hreflang]").map((_, element) => $(element).attr("hreflang")).get().map(normalizeLanguage).filter((value): value is string => Boolean(value));
+  const unique = [...new Set(hreflangs)];
+  if (unique.length === 1) return { language: unique[0], method: "hreflang", raw: unique[0] };
+  if (unique.length > 1) return { language: null, method: "ambiguous", raw: null };
+  return { language: null, method: "undetected", raw: null };
+}
 type AniListDate = { year?: number; month?: number; day?: number };
 export type AniListTitle = {
   romaji?: string;
@@ -680,9 +728,6 @@ export function sameSiteUrl(a: string, b: string) {
   }
 }
 
-function attr(tag: string, name: string) {
-  return tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
-}
 function absolute(v: string | undefined, b: string) {
   if (!v) return undefined;
   try {
@@ -694,39 +739,28 @@ function absolute(v: string | undefined, b: string) {
 export function extractPageMetadata(html: string, url: string): PageMetadata {
   if (new TextEncoder().encode(html).byteLength > HTML_MAX)
     throw new Error("METADATA_HTML_TOO_LARGE");
-  const metas = [...html.matchAll(/<meta\b[^>]*>/gi)].map((x) => x[0]);
-  const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((x) => x[0]);
+  const $ = loadHtml(html);
   const meta = (...names: string[]) => {
     for (const n of names) {
-      const t = metas.find((x) =>
-        [attr(x, "property"), attr(x, "name")].some(
-          (y) => y?.toLowerCase() === n,
-        ),
-      );
-      const c = t && attr(t, "content");
+      const c = $("meta").filter((_, element) => [$(element).attr("property"), $(element).attr("name")] .some((y) => y?.toLowerCase() === n)).first().attr("content");
       if (c) return c;
     }
   };
-  const canonicalTag = links.find((x) =>
-    /canonical/i.test(attr(x, "rel") ?? ""),
-  );
   const canonical =
-    absolute(canonicalTag && attr(canonicalTag, "href"), url) ??
+    absolute($("link[rel~='canonical']").first().attr("href"), url) ??
     new URL(url).toString();
   let json: any = {};
-  for (const m of html.matchAll(
-    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
-  )) {
+  $("script[type='application/ld+json']").each((_, element) => {
+    if (Object.keys(json).length) return;
     try {
-      const x = JSON.parse(m[1]);
+      const x = JSON.parse($(element).text());
       json = Array.isArray(x) ? x[0] : x;
-      break;
     } catch {}
-  }
+  });
   const title = [
     json?.name,
     meta("og:title", "twitter:title"),
-    html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1],
+    $("title").first().text(),
   ]
     .find(Boolean)
     ?.trim();
@@ -1303,6 +1337,8 @@ export type MangaUpdatesSeries = {
   relations?: unknown[];
   associated?: string[];
   relatedSeries?: unknown[];
+  /** Bounded provider response retained for field-level provenance. */
+  raw?: unknown;
 };
 export type MangaUpdatesRelease = {
   seriesId?: string;
@@ -1380,6 +1416,23 @@ function imageValue(value: unknown): string | undefined {
   if (candidate) return candidate;
   return undefined;
 }
+function providerScalar(value: unknown, keys: string[] = []): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string") return value.trim() || undefined;
+  if (!value || typeof value !== "object") return undefined;
+  for (const key of keys) {
+    const nested = providerScalar((value as Record<string, unknown>)[key]);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+}
+function providerPosition(value: unknown, keys: string[]): string | undefined {
+  const scalar = providerScalar(value, keys);
+  if (!scalar) return undefined;
+  const numeric = Number(scalar.replace(",", "."));
+  // Provider zero is an absence sentinel, never an available chapter/volume.
+  return Number.isFinite(numeric) && numeric === 0 ? undefined : scalar;
+}
 function mapMuSeries(value: any): MangaUpdatesSeries | null {
   const record = value?.record ?? value;
   const id =
@@ -1411,7 +1464,7 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     year:
       Number(record.year ?? record.start_year ?? record.release_year) ||
       undefined,
-    status: record.status ?? record.serialization_status,
+    status: providerScalar(record.status ?? record.serialization_status ?? record.series_status, ["status", "name", "value", "type"]),
     completed: typeof record.completed === "boolean" ? record.completed : undefined,
     licensed: typeof record.licensed === "boolean" ? record.licensed : undefined,
     genres: Array.isArray(record.genres) ? record.genres.flatMap(titleValues) : [],
@@ -1422,7 +1475,10 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     startDate:
       record.start_date ?? record.startDate ?? record.created_at ?? record.createdAt ??
       (record.year ? String(record.year) : undefined),
-    authors: Array.isArray(record.authors) ? record.authors.flatMap(titleValues) : [],
+    authors: [...new Set([
+      ...(Array.isArray(record.authors) ? record.authors.flatMap(titleValues) : titleValues(record.authors)),
+      ...titleValues(record.author),
+    ])],
     publishers: Array.isArray(record.publishers) ? record.publishers.flatMap(titleValues) : [],
     publications: Array.isArray(record.publications) ? record.publications.flatMap(titleValues) : [],
     description: record.description,
@@ -1434,9 +1490,10 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     relations: Array.isArray(record.relations) ? record.relations : [],
     associated,
     relatedSeries: Array.isArray(record.related_series) ? record.related_series : [],
-    latestChapter: record.latest_chapter ?? record.latestChapter,
-    latestVolume: record.latest_volume ?? record.latestVolume,
+    latestChapter: providerPosition(record.latest_chapter ?? record.latestChapter ?? record.latest_release, ["chapter", "chapter_number", "number", "value"]),
+    latestVolume: providerPosition(record.latest_volume ?? record.latestVolume ?? record.latest_release, ["volume", "volume_number", "number", "value"]),
     url: record.url,
+    raw: value,
   };
 }
 function mapMuRelease(value: any): MangaUpdatesRelease | null {
@@ -1612,8 +1669,6 @@ export type MangaDexManga = {
   originalLanguage?: string;
   publicationDemographic?: string;
   contentRating?: string;
-  latestVolume?: string;
-  latestChapter?: string;
   authors: Array<{ id: string; name?: string }>;
   artists: Array<{ id: string; name?: string }>;
   relations: Array<{ id: string; type: string }>;
@@ -1664,8 +1719,6 @@ export function parseMangaDexManga(value: unknown): MangaDexManga | null {
     ...(typeof attributes.originalLanguage === "string" ? { originalLanguage: attributes.originalLanguage } : {}),
     ...(typeof attributes.publicationDemographic === "string" ? { publicationDemographic: attributes.publicationDemographic } : {}),
     ...(typeof attributes.contentRating === "string" ? { contentRating: attributes.contentRating } : {}),
-    ...(typeof attributes.lastVolume === "string" ? { latestVolume: attributes.lastVolume } : {}),
-    ...(typeof attributes.lastChapter === "string" ? { latestChapter: attributes.lastChapter } : {}),
     authors: people("author"), artists: people("artist"),
     relations: relationships.filter((entry: any) => entry?.type === "manga" && typeof entry?.id === "string").map((entry: any) => ({ id: entry.id, type: String(entry?.related ?? "related") })),
     ...(coverFileName ? { coverFileName, coverUrl } : {}), raw: value,

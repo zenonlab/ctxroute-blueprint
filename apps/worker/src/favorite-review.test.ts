@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isParenthesizedAmbiguity, openFavoriteReview } from './favorite-review.js';
+import { isParenthesizedAmbiguity, openFavoriteReview, refreshReviewQueueNotification } from './favorite-review.js';
 
 describe('favorite reviews', () => {
+  it('counts only pending reviews backed by a current favorite link',async()=>{
+    let countSql='';
+    await refreshReviewQueueNotification(async sql=>{countSql ||= sql;return {rows:[{count:0}]};},'synthetic-user');
+    expect(countSql).toContain('JOIN bookmark_media_link l');
+    expect(countSql).toContain("l.status IN ('matched','accepted','review')");
+    expect(countSql).toContain('r.user_id=$1');
+  });
   it('keeps an exact title and its parenthesized variant', () => {
     expect(isParenthesizedAmbiguity('Existence', [{ id: 1, title: 'Existence' }, { id: 2, title: 'Existence (Wang)' }])).toBe(true);
   });
@@ -10,6 +17,28 @@ describe('favorite reviews', () => {
     await openFavoriteReview(query, { userId: 'u', title: 'Existence', url: 'https://example.test/existence', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Existence', hitTitle: 'Existence', authors: ['A'] }, { id: 2, title: 'Existence (Wang)', hitTitle: 'Existence' }] });
     expect(calls.filter(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES')).length).toBe(2);
     expect(calls.filter(sql => sql.startsWith('INSERT INTO personal_notification')).length).toBe(1);
+  });
+  it('does not reopen a favorite that already has a final user decision',async()=>{
+    const calls:string[]=[];
+    const query=vi.fn(async(sql:string)=>{calls.push(sql);if(sql.startsWith('SELECT l.installation'))return {rows:[{installationId:'i',bookmarkId:'b'}]};if(sql.startsWith('SELECT id,status'))return {rows:[{id:'final-review',status:'NO_MATCH'}]};return {rows:[]};});
+    await expect(openFavoriteReview(query,{userId:'u',title:'Synthetic Silent Atlas',url:'https://reader.invalid/work',provider:'mangaupdates',candidates:[],reason:'NO_RESULT'})).resolves.toBe('final-review');
+    expect(calls.some(sql=>sql.startsWith('INSERT INTO favorite_review'))).toBe(false);
+  });
+
+  it('reuses one verified canonical decision target even when its legacy link differs',async()=>{
+    const calls:Array<{sql:string;values?:unknown[]}>=[];
+    const query=vi.fn(async(sql:string,values?:unknown[])=>{calls.push({sql,values});if(sql.startsWith('SELECT l.installation'))return {rows:[{installationId:'i',bookmarkId:'b',rawFavoriteTitle:'Synthetic Copper Archive',favoriteUrl:'https://reader.invalid/work',parseArtifact:{identity:{title:'Synthetic Copper Archive'}}}]};if(sql.startsWith('INSERT INTO review_title_cluster'))return {rows:[{id:'cluster'}]};if(sql.startsWith("SELECT min(COALESCE(NULLIF(r.decision->>'mediaId'"))return {rows:[{mediaId:'canonical-media',providerId:'provider-17',sourceReviewId:'prior-review'}]};if(sql.startsWith('INSERT INTO favorite_review')&&sql.includes("'RESOLVED'"))return {rows:[{id:'reused-review'}]};return {rows:[]};});
+    await expect(openFavoriteReview(query,{userId:'u',title:'Synthetic Copper Archive',url:'https://reader.invalid/work',provider:'mangaupdates',candidates:[],reason:'LOW_CONFIDENCE'})).resolves.toBe('reused-review');
+    expect(calls.find(call=>call.sql.startsWith('UPDATE bookmark_media_link'))?.values?.[0]).toBe('canonical-media');
+    expect(calls.some(call=>call.sql.includes("NULLIF(r.decision->>'externalId','')"))).toBe(true);
+    expect(calls.some(call=>call.sql.includes("VALUES($1,$2,$3,$4,$5,$6,'PENDING'"))).toBe(false);
+  });
+
+  it('keeps conflicting prior resolutions pending',async()=>{
+    const calls:string[]=[];
+    const query=vi.fn(async(sql:string)=>{calls.push(sql);if(sql.startsWith('SELECT l.installation'))return {rows:[{installationId:'i',bookmarkId:'b',rawFavoriteTitle:'Synthetic Split Horizon',favoriteUrl:'https://reader.invalid/work',parseArtifact:{identity:{title:'Synthetic Split Horizon'}}}]};if(sql.startsWith('INSERT INTO review_title_cluster'))return {rows:[{id:'cluster'}]};if(sql.startsWith("SELECT min(COALESCE(NULLIF(r.decision->>'mediaId'"))return {rows:[]};if(sql.startsWith('SELECT min(r.id'))return {rows:[]};if(sql.startsWith('INSERT INTO favorite_review('))return {rows:[{id:'pending-review'}]};if(sql.startsWith('SELECT count('))return {rows:[{count:1}]};return {rows:[]};});
+    await openFavoriteReview(query,{userId:'u',title:'Synthetic Split Horizon',url:'https://reader.invalid/work',provider:'anilist',candidates:[],reason:'AMBIGUOUS'});
+    expect(calls.some(sql=>sql.includes("VALUES($1,$2,$3,$4,$5,$6,'PENDING'"))).toBe(true);
   });
   it('persists AniList string coverImage values on review candidates', async () => {
     const values: unknown[][] = [];

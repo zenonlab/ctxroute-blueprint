@@ -40,12 +40,16 @@ export function normalizedError(error: unknown) {
     return "IMAGE_REJECTED";
   if (/RESPONSE_TOO_LARGE/.test(raw)) return "RESPONSE_TOO_LARGE";
   if (/AMBIGUOUS/i.test(raw)) return "MATCH_AMBIGUOUS";
+  if (/RESOLVED_FAVORITE_LINK_IMMUTABLE|integrity_constraint_violation/i.test(raw)) return "RESOLVED_LINK_PROTECTED";
   return (
     raw
       .replace(/[^A-Za-z0-9_.-]+/g, "_")
       .replace(/^_+|_+$/g, "")
       .slice(0, 100) || "UNKNOWN_ERROR"
   );
+}
+export function isProtectedResolvedLinkError(code: string) {
+  return code === "RESOLVED_LINK_PROTECTED";
 }
 export function retryableProviderError(code: string) {
   return /^(?:TIMEOUT|RATE_LIMITED|HTTP_429|HTTP_5\d\d|MANGAUPDATES_HTTP_5\d\d|ANILIST_HTTP_5\d\d)$/u.test(code) || /(?:TIMEOUT|HTTP_429|HTTP_5\d\d|503)/u.test(code);

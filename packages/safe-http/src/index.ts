@@ -26,7 +26,7 @@ async function resolvePublic(host:string,options:SafeHttpOptions){
   let literal:{address:string;family:4|6}[];if(isIP(host))literal=[{address:host,family:isIP(host) as 4|6}];else if(options.resolver)literal=await options.resolver(host,{all:true,verbatim:true});else literal=(await dnsLookup(host,{all:true,verbatim:true})).map(item=>({address:item.address,family:item.family as 4|6}));
   if(!literal.length)throw new Error('DNS_UNAVAILABLE');if(!options.allowPrivateTest&&literal.some(item=>!isPublicAddress(item.address)))throw new Error('NON_PUBLIC_ADDRESS');return literal;
 }
-function responseMime(headers:Record<string,string|string[]>,allowed:readonly string[]){const raw=Array.isArray(headers['content-type'])?headers['content-type'][0]:headers['content-type'];if(!raw)throw new Error('MIME_REQUIRED');const mime=raw.split(';',1)[0].trim().toLowerCase();if(!allowed.map(item=>item.toLowerCase()).includes(mime))throw new Error('MIME_NOT_ALLOWED')}
+function responseMime(headers:Record<string,string|string[]>,allowed:readonly string[]){if(!allowed.length)return;const raw=Array.isArray(headers['content-type'])?headers['content-type'][0]:headers['content-type'];if(!raw)throw new Error('MIME_REQUIRED');const mime=raw.split(';',1)[0].trim().toLowerCase();if(!allowed.map(item=>item.toLowerCase()).includes(mime))throw new Error('MIME_NOT_ALLOWED')}
 export async function safeRequest(input:string|URL,options:SafeHttpOptions):Promise<SafeHttpResponse>{
   let current=new URL(input);const redirects=options.maxRedirects??2;
   for(let redirect=0;redirect<=redirects;redirect++){

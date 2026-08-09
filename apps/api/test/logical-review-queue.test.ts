@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 describe('logical personal review queue',()=>{
   const source=readFileSync(new URL('../src/server.ts',import.meta.url),'utf8');
   it('counts one pending item per personal cluster and exposes compatibility fields',()=>{
-    expect(source).toContain('count(DISTINCT COALESCE(cluster_id::text,id::text))');
+    expect(source).toContain('count(DISTINCT COALESCE(r.cluster_id::text,r.id::text))');
+    expect(source).toContain("l.status IN ('matched','accepted','review')");
     expect(source).toContain('r.cluster_id AS "clusterId"');
     expect(source).toContain('c.favorite_count AS "favoriteCount"');
     expect(source).toContain('count(DISTINCT c.provider_id)');

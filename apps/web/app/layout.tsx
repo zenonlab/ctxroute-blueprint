@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import 'flag-icons/css/flag-icons.min.css';
 import './globals.css';
 import './media-overrides.css';
 import './carousel.css';

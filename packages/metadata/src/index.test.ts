@@ -45,12 +45,26 @@ import {
   PROVIDER_TITLE_MATCHER_VERSION,
   progressionFromFavorite,
   selectBestLocalizedTitle,
+  declaredLanguageEvidence,
 } from "./index.js";
 
+describe("declarative source metadata", () => {
+  it("uses the requested language precedence and falls through invalid manifest data", () => {
+    const html = `<html lang="de"><head><meta property="og:locale" content="fr_FR"><link rel="alternate" hreflang="en" href="/en"><link rel="alternate" hreflang="fr" href="/fr"></head></html>`;
+    expect(declaredLanguageEvidence({ url: "https://source.invalid/work", manifestLanguage: "not-a-language", html, headers: { "content-language": "it" } })).toMatchObject({ language: "de", method: "html-lang" });
+    expect(declaredLanguageEvidence({ url: "https://source.invalid/fr/work", manifestLanguage: "de", html: `<html lang="ja"></html>` })).toMatchObject({ language: "fr", method: "url-path" });
+    expect(declaredLanguageEvidence({ url: "https://source.invalid/work", manifestLanguage: "de", html: "" })).toMatchObject({ language: "de", method: "manifest" });
+  });
+
+  it("reads metadata without relying on proprietary classes or element layout", () => {
+    expect(extractPageMetadata(`<html><head><title>  Synthetic Harbor  </title><meta property="og:image" content="/cover.png"><script type="application/ld+json">{"name":"Synthetic Harbor"}</script></head><body><div>text</div></body></html>`, "https://source.invalid/work")).toMatchObject({ title: "Synthetic Harbor", image: "https://source.invalid/cover.png" });
+  });
+});
+
 describe("collective review identity", () => {
-  it("parses the greatest chapter from matching favorite title and URL path while retaining provenance", () => {
+  it("prefers an explicit title chapter to a later URL marker while retaining the rejected proof", () => {
     const result = progressionFromFavorite({ title: "Synthetic Chronicle chapter 4", url: "https://reader.example/manga/synthetic-chronicle/chapter-12" });
-    expect(result).toMatchObject({ kind: "chapter", number: 12, raw: "12", provenance: { source: "url-path", evidence: "labelled-url-path" } });
+    expect(result).toMatchObject({ kind: "chapter", number: 4, raw: "4", provenance: { source: "bookmark-title", evidence: "explicit-marker", rejectedCandidates:[expect.objectContaining({raw:"12",reason:"LOWER_QUALITY_EVIDENCE"})] } });
   });
   it("does not promote an unrelated bare title number to progression", () => {
     expect(progressionFromFavorite({ title: "Synthetic Season 2", url: "https://reader.example/manga/synthetic-chronicle" })).toBeNull();
@@ -90,12 +104,13 @@ describe("MangaDex identity bridge", () => {
     expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Synthetic Chronicle", ja: "Synthetic Native" }, altTitles: [{ fr: "Chronique synthétique" }, { en: "Synthetic Alias" }], links: { mu: "mu_bridge_1", al: "999" }, description: { en: "Synthetic description", fr: "Description synthétique" }, tags:[{attributes:{name:{en:"Synthetic genre"}}}], status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',lastVolume:'4',lastChapter:'31' }, relationships:[{id:'author-id',type:'author',attributes:{name:'Synthetic Author'}},{id:'cover-id',type:'cover_art',attributes:{fileName:'cover.png'}}] })).toMatchObject({
       id: uuid,
       titles: ["Synthetic Chronicle", "Synthetic Native", "Chronique synthétique", "Synthetic Alias"],
-      descriptions:{en:"Synthetic description",fr:"Description synthétique"}, tags:["Synthetic genre"],status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',latestVolume:'4',latestChapter:'31',
+      descriptions:{en:"Synthetic description",fr:"Description synthétique"}, tags:["Synthetic genre"],status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',
       authors:[{id:'author-id',name:'Synthetic Author'}],coverFileName:'cover.png',
       mangaUpdatesId: "mu_bridge_1",
     });
     expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Minimal Work" }, links: {} } })).toMatchObject({ id: uuid, titles: ["Minimal Work"],descriptions:{},authors:[],artists:[],relations:[] });
     expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Bad Link" }, links: { mu: "https://invalid.example/id" } } })?.mangaUpdatesId).toBeUndefined();
+    expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "No Chapter Authority" }, lastChapter: "999", lastVolume: "99" } })).not.toMatchObject({latestChapter:expect.anything(),latestVolume:expect.anything()});
     expect(parseMangaDexManga({ id: "not-a-uuid", attributes: { title: { en: "Invalid" } } })).toBeNull();
   });
   it("uses the shared symmetric matcher and never result order or popularity", () => {
@@ -988,8 +1003,35 @@ describe("AniList catalogue", () => {
       type: "Manhwa", image: "https://img.example/resurrection.jpg", bayesianRating: 8.1,
     });
     expect(series?.imageThumbnail).toBe("https://img.example/resurrection-small.jpg");
-    expect(series).not.toHaveProperty("raw");
+    expect(series?.raw).toMatchObject({record:{series_id:66249161611}});
     expect(matchMangaUpdates({ aliases: ["Resurrection Boy"] }, [series!])?.series.type).toBe("Manhwa");
+  });
+  it.each([
+    {
+      label: "snake-case scalars",
+      payload: { series_id: 81, title: "Synthetic River", type: "Manga", serialization_status: "Ongoing", latest_chapter: 42, latest_volume: 5, authors: [{ name: "Synthetic Author" }] },
+    },
+    {
+      label: "nested latest release",
+      payload: { series_id: 82, title: "Synthetic Orchard", type: "Manhwa", status: { name: "Completed" }, latest_release: { chapter: "63.5", volume: "7" }, author: { name: "Synthetic Creator" } },
+    },
+  ])("preserves MangaUpdates status, positions, authors and raw provenance: $label", async ({payload}) => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } }));
+    const series = await (await import("./index.js")).fetchMangaUpdatesSeries(String(payload.series_id), { endpoint: "https://mu.detail.test/v1", fetch: fetcher });
+    expect(series).toMatchObject({
+      status: expect.any(String),
+      latestChapter: expect.stringMatching(/^(?:42|63\.5)$/u),
+      latestVolume: expect.stringMatching(/^(?:5|7)$/u),
+      authors: [expect.stringMatching(/^Synthetic/u)],
+      raw: payload,
+    });
+  });
+  it("maps a missing or zero MangaUpdates chapter to unknown, never chapter zero", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({series_id:91,title:"Synthetic Zero",type:"Manga",status:"Ongoing",latest_chapter:"0"}), {status:200,headers:{"content-type":"application/json"}}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({series_id:92,title:"Synthetic Unknown",type:"Manga",status:"Ongoing"}), {status:200,headers:{"content-type":"application/json"}}));
+    await expect((await import("./index.js")).fetchMangaUpdatesSeries("91", {endpoint:"https://mu.zero.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:undefined});
+    await expect((await import("./index.js")).fetchMangaUpdatesSeries("92", {endpoint:"https://mu.zero.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:undefined});
   });
   it("resolves a MangaDex links.mu public slug through the exact provider URL, independent of rank", async () => {
     const fetcher = vi.fn()

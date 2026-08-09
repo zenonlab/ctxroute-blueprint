@@ -83,16 +83,10 @@ async function main() {
         console.log(JSON.stringify({ mode: 'preview', repair: 'missing-favorites', count: report.length, report }, null, 2));
         return;
       }
-      await client.query('BEGIN');
-      const enqueued: string[] = [];
-      for (const item of report) {
-        if (item.status !== 'READY' || !item.url) continue;
-        await client.query("UPDATE media_enrichment_state SET invalidated_at=now(), next_attempt_at=NULL, updated_at=now() WHERE media_id=$1 AND status<>'SUCCESS'", [item.localId]);
-        await client.query("SELECT graphile_worker.add_job('resolve-favorite',$1,job_key := $2,max_attempts := 1)", [JSON.stringify({ userId: item.userId, mediaId: item.localId, title: item.favoriteTitleOriginal, url: item.url, syncCycle: 'favorite-repair' }), `favorite-repair:resolve:${item.localId}:${item.bookmarkId}`]);
-        enqueued.push(item.localId ?? '');
-      }
-      await client.query('COMMIT');
-      console.log(JSON.stringify({ mode: 'applied', repair: 'missing-favorites', count: report.length, enqueued, report }, null, 2));
+      // Historical source-resolution jobs could rewrite a user-selected
+      // identity. This legacy mode is retained as an audit-only compatibility
+      // surface and intentionally schedules no work.
+      console.log(JSON.stringify({ mode: 'applied-noop', repair: 'missing-favorites', count: report.length, enqueued: [], report }, null, 2));
       return;
     }
     const preview = await client.query(orphanQuery);

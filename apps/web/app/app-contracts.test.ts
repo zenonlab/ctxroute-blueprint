@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 describe('Wave 2 UI contracts', () => {
   it('keeps catalogue and connector states distinct', () => {
@@ -52,6 +53,32 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('regularNotifications');
   });
 
+  it('redirects legacy review pages while preserving the notification resolver byte-for-byte',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const resolver=source.slice(source.indexOf('function NotificationResolver'),source.indexOf('function Review('));
+    expect(createHash('sha256').update(resolver).digest('hex')).toBe('0aa65d4ba5a61eee34f9d4a28108c4b3939a0a99fa6bc10f9e7299da341ace10');
+    expect(source).not.toContain("path === '/review'");
+    expect(source).not.toContain("path.startsWith('/review/')");
+    const route=readFileSync(resolve(process.cwd(),'app/[...slug]/page.tsx'),'utf8');
+    expect(route).toContain("if(slug[0]==='review')redirect('/')");
+  });
+
+  it('creates removable author and studio filters from modal credits without permanent facets',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain("onContextFilter?.({kind:'author',value:author.name})");
+    expect(source).toContain("onContextFilter?.({kind:'studio',value:studio.name})");
+    expect(source).toContain('library-context-chip');
+    expect(source).toContain('removeContextFilter({kind,value})');
+    expect(source).not.toContain('<MultiFacet label="Auteurs"');
+    expect(source).not.toContain('<MultiFacet label="Studios"');
+  });
+
+  it('never exposes an unknown internal review code',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).not.toContain('`Cause : ${reason}`');
+    expect(source).toContain("??'Correspondance à vérifier.'");
+  });
+
   it('accepts alphanumeric provider keys and animates one disabled verification action',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
     expect(source).toContain("id:/^https?:\\/\\//u.test(input)?undefined:input");
@@ -101,5 +128,12 @@ describe('Wave 2 UI contracts', () => {
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
     expect(source).not.toContain('data-testid="anime-sequence"');
     expect(source).not.toContain('Chronologie AniList');
+  });
+
+  it('routes pointer interaction through controls instead of selectable labels or Lucide icons',()=>{
+    const styles=readFileSync(resolve(process.cwd(),'app/globals.css'),'utf8');
+    expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary){-webkit-user-select:none;user-select:none;touch-action:manipulation}');
+    expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary) svg{pointer-events:none}');
+    expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary) img{pointer-events:none');
   });
 });

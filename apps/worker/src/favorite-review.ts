@@ -20,7 +20,10 @@ function stableJson(value: unknown): string {
 }
 
 export async function refreshReviewQueueNotification(query: Query, userId: string) {
-  const pending = await query("SELECT count(DISTINCT COALESCE(cluster_id::text,id::text))::int AS count FROM favorite_review WHERE user_id=$1 AND status='PENDING'", [userId]);
+  const pending = await query(`SELECT count(DISTINCT COALESCE(r.cluster_id::text,r.id::text))::int AS count
+    FROM favorite_review r JOIN bookmark_media_link l ON l.user_id=r.user_id
+      AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id
+    WHERE r.user_id=$1 AND r.status='PENDING' AND l.status IN ('matched','accepted','review')`, [userId]);
   const count = Number(pending.rows[0]?.count ?? 0);
   if (!count) {
     await query("DELETE FROM personal_notification WHERE user_id=$1 AND kind='FAVORITE_REVIEW_REQUIRED' AND release_key='favorite-review-queue'", [userId]);
@@ -43,6 +46,11 @@ export async function openFavoriteReview(query: Query, input: {
     WHERE l.user_id=$1 AND ($2::text IS NULL OR l.media_id=$2) AND ($3::text IS NULL OR l.installation_id=$3) AND ($4::text IS NULL OR l.bookmark_id=$4) ORDER BY l.created_at DESC LIMIT 1`, [input.userId, input.mediaId ?? null, input.installationId ?? null, input.bookmarkId ?? null]);
   const installationId = input.installationId ?? link.rows[0]?.installationId ?? 'worker';
   const bookmarkId = input.bookmarkId ?? link.rows[0]?.bookmarkId ?? input.mediaId ?? input.url;
+  const decided = await query(`SELECT id,status FROM favorite_review
+    WHERE user_id=$1 AND installation_id=$2 AND bookmark_id=$3 AND provider=$4
+      AND status IN ('RESOLVED','NO_MATCH') AND decision IS NOT NULL
+    ORDER BY resolved_at DESC NULLS LAST,id DESC LIMIT 1`, [input.userId,installationId,bookmarkId,input.provider]);
+  if (decided.rows?.[0]) return decided.rows[0].id;
   // The review must show what the user actually imported from Chrome. The
   // parsed/source title is only a resolver hint and may be an opaque URL slug
   // such as `Lw931574`.
@@ -59,6 +67,32 @@ export async function openFavoriteReview(query: Query, input: {
     VALUES($1,$2,$3,$4,$5) ON CONFLICT(cluster_key) DO UPDATE SET updated_at=now() RETURNING id`,
     [clusterKey,input.provider,mediaType,favoriteTitle,rawFavoriteTitle]);
   const clusterId = cluster.rows[0]?.id ?? clusterKey;
+  const reusable = await query(`SELECT min(COALESCE(NULLIF(r.decision->>'mediaId',''),l.media_id)) AS "mediaId",min(e.external_id) AS "providerId",min(r.id::text) AS "sourceReviewId"
+    FROM favorite_review r
+    JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id
+    JOIN media_external_id e ON e.media_id=COALESCE(NULLIF(r.decision->>'mediaId',''),l.media_id) AND e.provider=$3
+      AND e.external_id=COALESCE(NULLIF(r.decision->>'providerId',''),NULLIF(r.decision->>'externalId',''),e.external_id)
+    WHERE r.user_id=$1 AND r.cluster_id=$2 AND r.provider=$3 AND r.status='RESOLVED' AND r.decision IS NOT NULL
+    HAVING count(DISTINCT COALESCE(NULLIF(r.decision->>'mediaId',''),l.media_id))=1 AND count(DISTINCT e.external_id)=1`,[input.userId,clusterId,input.provider]);
+  const noMatch = reusable.rows?.[0]?.mediaId ? undefined : await query(`SELECT min(r.id::text) AS "sourceReviewId" FROM favorite_review r
+    WHERE r.user_id=$1 AND r.cluster_id=$2 AND r.provider=$3 AND r.status='NO_MATCH' AND r.decision IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM favorite_review conflict WHERE conflict.user_id=r.user_id AND conflict.cluster_id=r.cluster_id AND conflict.provider=r.provider AND conflict.status='RESOLVED' AND conflict.decision IS NOT NULL)
+    HAVING count(*)>0`,[input.userId,clusterId,input.provider]);
+  if (reusable.rows?.[0]?.mediaId) {
+    const prior=reusable.rows[0];
+    await query(`UPDATE bookmark_media_link SET media_id=$1,status='matched',evidence=evidence||$2::jsonb
+      WHERE user_id=$3 AND installation_id=$4 AND bookmark_id=$5`,[prior.mediaId,JSON.stringify({resolution:'same-user-cluster-reuse',provider:input.provider,providerId:prior.providerId,sourceReviewId:prior.sourceReviewId}),input.userId,installationId,bookmarkId]);
+    const reused=await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason,cluster_id,decision,resolved_at)
+      VALUES($1,$2,$3,$4,$5,$6,'RESOLVED','REUSED_RESOLVED_DECISION',$7,$8::jsonb,now())
+      ON CONFLICT(user_id,installation_id,bookmark_id,provider) DO NOTHING RETURNING id`,[input.userId,installationId,bookmarkId,favoriteTitle,favoriteUrl,input.provider,clusterId,JSON.stringify({kind:'same-user-cluster-reuse',sourceReviewId:prior.sourceReviewId,provider:input.provider,providerId:prior.providerId,mediaId:prior.mediaId})]);
+    return reused.rows?.[0]?.id ?? prior.sourceReviewId;
+  }
+  if (noMatch?.rows?.[0]?.sourceReviewId) {
+    const reused=await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason,cluster_id,decision,resolved_at)
+      VALUES($1,$2,$3,$4,$5,$6,'NO_MATCH','REUSED_NO_MATCH_DECISION',$7,$8::jsonb,now())
+      ON CONFLICT(user_id,installation_id,bookmark_id,provider) DO NOTHING RETURNING id`,[input.userId,installationId,bookmarkId,favoriteTitle,favoriteUrl,input.provider,clusterId,JSON.stringify({kind:'same-user-cluster-no-match',sourceReviewId:noMatch.rows[0].sourceReviewId})]);
+    return reused.rows?.[0]?.id ?? noMatch.rows[0].sourceReviewId;
+  }
   const review = await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason)
     VALUES($1,$2,$3,$4,$5,$6,'PENDING',$7) ON CONFLICT(user_id,installation_id,bookmark_id,provider)
     DO UPDATE SET favorite_title=excluded.favorite_title,favorite_url=excluded.favorite_url,reason=COALESCE(excluded.reason,favorite_review.reason)

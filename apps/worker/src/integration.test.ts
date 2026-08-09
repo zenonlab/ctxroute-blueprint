@@ -50,10 +50,48 @@ suite('Wave 6 PostgreSQL worker integration', () => {
       expect.objectContaining({ bookmark_id: 'automatic', status: 'RESOLVED', decision: expect.objectContaining({ kind: 'automatic-provider-resolution', externalId }) }),
       expect.objectContaining({ bookmark_id: 'manual', status: 'RESOLVED', decision: expect.objectContaining({ kind: 'automatic-provider-resolution', externalId }) }),
     ]);
+    const links=await pool.query("SELECT bookmark_id,media_id,status FROM bookmark_media_link WHERE user_id=$1 AND installation_id='wave-f4' ORDER BY bookmark_id",[user.rows[0].id]);
+    expect(links.rows).toEqual([
+      {bookmark_id:'automatic',media_id:mediaId,status:'matched'},
+      {bookmark_id:'manual',media_id:mediaId,status:'matched'},
+    ]);
     const candidate = await pool.query("SELECT p.start_date,p.authors,p.payload FROM favorite_review_candidate c JOIN provider_profile p ON p.id=c.profile_id JOIN favorite_review r ON r.id=c.review_id WHERE r.user_id=$1 AND c.provider_id=$2", [user.rows[0].id,externalId]);
     expect(candidate.rows[0]).toMatchObject({ start_date: { year: 2024 }, authors: [], payload: expect.objectContaining({ id: externalId }) });
     await pool.query('DELETE FROM app_user WHERE id=$1', [user.rows[0].id]);
     await pool.query('DELETE FROM media WHERE id=$1', [mediaId]);
+  });
+
+  it.each(['anilist','mangaupdates'] as const)('atomically converges a synthetic %s provisional favorite and materializes its progress',async provider=>{
+    if(!pool)throw new Error('DATABASE_URL required');
+    const suffix=randomUUID(),sourceId=`source:integration-${suffix}`,targetId=`${provider}:integration-${suffix}`,externalId=`external-${suffix}`;
+    const user=await pool.query("INSERT INTO app_user(email,password_hash,role) VALUES($1,'synthetic','member') RETURNING id",[`convergence-${suffix}@example.test`]);
+    await pool.query("INSERT INTO media(id,type) VALUES($1,$3),($2,$3)",[sourceId,targetId,provider==='anilist'?'ANIME':'MANGA']);
+    await pool.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,$2,$3,'{}')",[targetId,provider,externalId]);
+    await pool.query("INSERT INTO media_metadata(media_id,provider,external_id,status,resolved_at,updated_at) VALUES($1,$2,$3,'ACTIVE',now(),now())",[targetId,provider,externalId]);
+    await pool.query("INSERT INTO media_identity_merge(source_media_id,target_media_id,provider,external_id,evidence) VALUES($1,$2,$3,$4,'{}')",[sourceId,targetId,provider,externalId]);
+    await pool.query("INSERT INTO bookmark_media_link(user_id,installation_id,bookmark_id,media_id,status,classifier_version,evidence) VALUES($1,'synthetic-installation','synthetic-bookmark',$2,'review','synthetic','{}')",[user.rows[0].id,sourceId]);
+    await pool.query("INSERT INTO favorite_progress_candidate(user_id,installation_id,bookmark_id,position_kind,position_number,position_raw,raw_title,raw_url,evidence) VALUES($1,'synthetic-installation','synthetic-bookmark','chapter',62,'62','Synthetic Chronicle Chapter 62','https://reader.invalid/chapter/62',$2)",[user.rows[0].id,{source:'shared-parser',raw:'62'}]);
+    await pool.query("INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason) VALUES($1,'synthetic-installation','synthetic-bookmark','Synthetic Chronicle','https://reader.invalid/chapter/62',$2,'PENDING','LOW_CONFIDENCE')",[user.rows[0].id,provider]);
+    await reconcileResolvedFavoriteReviews(pool.query.bind(pool),targetId);
+    const state=await pool.query("SELECT l.media_id,l.status,r.status AS review_status,r.decision,p.position_number,p.position_raw,o.provenance FROM bookmark_media_link l JOIN favorite_review r ON r.user_id=l.user_id AND r.installation_id=l.installation_id AND r.bookmark_id=l.bookmark_id LEFT JOIN favorite_progress p ON p.user_id=l.user_id AND p.media_id=l.media_id AND p.position_kind='chapter' LEFT JOIN progression_observation o ON o.id=p.observation_id WHERE l.user_id=$1",[user.rows[0].id]);
+    expect(state.rows[0]).toMatchObject({media_id:targetId,status:'matched',review_status:'RESOLVED',decision:expect.objectContaining({kind:'automatic-provider-resolution',provider,externalId}),position_number:'62',position_raw:'62',provenance:expect.objectContaining({raw:'62'})});
+    await pool.query('DELETE FROM app_user WHERE id=$1',[user.rows[0].id]);
+    await pool.query('DELETE FROM media WHERE id IN ($1,$2)',[sourceId,targetId]);
+  });
+
+  it('does not resurrect a removed favorite during automatic reconciliation',async()=>{
+    if(!pool)throw new Error('DATABASE_URL required');
+    const suffix=randomUUID(),mediaId=`anilist:removed-${suffix}`,externalId=`removed-${suffix}`;
+    const user=await pool.query("INSERT INTO app_user(email,password_hash,role) VALUES($1,'synthetic','member') RETURNING id",[`removed-${suffix}@example.test`]);
+    await pool.query("INSERT INTO media(id,type) VALUES($1,'ANIME')",[mediaId]);
+    await pool.query("INSERT INTO media_metadata(media_id,provider,external_id,status,resolved_at,updated_at) VALUES($1,'anilist',$2,'ACTIVE',now(),now())",[mediaId,externalId]);
+    await pool.query("INSERT INTO bookmark_media_link(user_id,installation_id,bookmark_id,media_id,status,classifier_version,evidence) VALUES($1,'removed-installation','removed-bookmark',$2,'removed','synthetic','{}')",[user.rows[0].id,mediaId]);
+    await pool.query("INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason) VALUES($1,'removed-installation','removed-bookmark','Synthetic Removed Work','https://reader.invalid/removed','anilist','PENDING','LOW_CONFIDENCE')",[user.rows[0].id]);
+    await reconcileResolvedFavoriteReviews(pool.query.bind(pool),mediaId);
+    const state=await pool.query("SELECT l.status,r.status AS review_status FROM bookmark_media_link l JOIN favorite_review r ON r.user_id=l.user_id AND r.installation_id=l.installation_id AND r.bookmark_id=l.bookmark_id WHERE l.user_id=$1",[user.rows[0].id]);
+    expect(state.rows[0]).toEqual({status:'removed',review_status:'PENDING'});
+    await pool.query('DELETE FROM app_user WHERE id=$1',[user.rows[0].id]);
+    await pool.query('DELETE FROM media WHERE id=$1',[mediaId]);
   });
 
   it('keeps the repaired MangaUpdates identity, aliases, favorites and active cover intact', async () => {

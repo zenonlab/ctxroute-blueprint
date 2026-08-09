@@ -1,6 +1,6 @@
 import type {Task} from 'graphile-worker';
 import {CONNECTOR_VERSIONS} from '@favlib/config';
-import {collectiveTitleKey,FAVORITE_PARSER_ID,FAVORITE_PROGRESS_PARSER_VERSION,PROVIDER_TITLE_MATCHER_VERSION,parseFavorite,sourceDispositionFromUrl,sourceIdentityFromUrl} from '@favlib/metadata';
+import {collectiveTitleKey,FAVORITE_IDENTITY_PARSER_VERSION,FAVORITE_PARSER_ID,PROVIDER_TITLE_MATCHER_VERSION,parseFavorite,sourceDispositionFromUrl,sourceIdentityFromUrl} from '@favlib/metadata';
 
 async function repairOldParserArtifacts(h:any,batch:number){
   const stale=await h.query(`SELECT i.user_id,i.installation_id,i.bookmark_id,i.payload->>'title' AS title,i.payload->>'url' AS url,
@@ -10,7 +10,7 @@ async function repairOldParserArtifacts(h:any,batch:number){
     WHERE i.event<>'removed'
       AND COALESCE(i.parser_version,0)<$1
       AND NOT EXISTS(SELECT 1 FROM favorite_parser_repair l WHERE l.user_id=i.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id AND l.parser_id=$2 AND l.matcher_version=$3)
-    ORDER BY i.created_at,i.user_id,i.installation_id,i.bookmark_id LIMIT $4`,[FAVORITE_PROGRESS_PARSER_VERSION,FAVORITE_PARSER_ID,PROVIDER_TITLE_MATCHER_VERSION,batch]);
+    ORDER BY i.created_at,i.user_id,i.installation_id,i.bookmark_id LIMIT $4`,[FAVORITE_IDENTITY_PARSER_VERSION,FAVORITE_PARSER_ID,PROVIDER_TITLE_MATCHER_VERSION,batch]);
   for(const row of stale.rows??[]){
     const source=sourceIdentityFromUrl(String(row.url??''));
     const artifact=parseFavorite({title:String(row.title??''),url:String(row.url??''),source});
@@ -38,7 +38,9 @@ async function repairOldParserArtifacts(h:any,batch:number){
       VALUES($1,$2,$3,$4,$5,'COMPLETED') ON CONFLICT DO NOTHING`,[row.user_id,row.installation_id,row.bookmark_id,FAVORITE_PARSER_ID,PROVIDER_TITLE_MATCHER_VERSION]);
     if(row.review_id){
       const media=await h.query(`SELECT media_id FROM bookmark_media_link WHERE user_id=$1 AND installation_id=$2 AND bookmark_id=$3 AND status IN ('matched','accepted','review')`,[row.user_id,row.installation_id,row.bookmark_id]);
-      for(const item of media.rows??[]) await h.query("SELECT graphile_worker.add_job('resolve-favorite',$1::json,job_key := $2,max_attempts := 3,job_key_mode := 'replace')",[JSON.stringify({userId:row.user_id,mediaId:item.media_id,title:row.title,url:row.url,forceRefresh:true}),`favorite-parser-repair:${FAVORITE_PARSER_ID}:${PROVIDER_TITLE_MATCHER_VERSION}:${item.media_id}`]);
+      // Parser repair updates the durable raw artifact only. It deliberately
+      // does not enqueue source resolution, which could move or merge a
+      // personal bookmark without a user decision.
     }
   }
   return stale.rowCount??stale.rows?.length??0;

@@ -1,12 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
+import { libraryFilterKeys, libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
 
 describe('library multi-value query',()=>{
   it('normalizes repeated parameters while retaining every selected value',()=>{
-    const parsed=libraryQuerySchema.parse({type:['ANIME','MANGA'],theme:['Theme A'],genre:['Genre A'],category:['Category A'],year:['2024','2025']});
+    const parsed=libraryQuerySchema.parse({type:['ANIME','MANGA'],theme:['Theme A'],genre:['Genre A'],category:['Category A'],year:['2024','2025'],author:['Synthetic Author'],studio:['Synthetic Studio']});
     expect(parsed.type).toEqual(['ANIME','MANGA']);expect(parsed.genre).toEqual(['Genre A']);expect(parsed.category).toEqual(['Category A']);expect(parsed.year).toEqual([2024,2025]);
+    expect(parsed.author).toEqual(['Synthetic Author']);expect(parsed.studio).toEqual(['Synthetic Studio']);
+  });
+
+  it('projects credited people with provenance and filters them only through private parameters',()=>{
+    expect(libraryProjectionSql).toContain("a.field='authors'");
+    expect(libraryProjectionSql).toContain("a.field='studios'");
+    expect(libraryProjectionSql).toContain("'sourceUrl',person.source_url");
+    expect(libraryProjectionSql).toContain('AS authors');
+    expect(libraryProjectionSql).toContain('AS studios');
+    const sql=libraryFilterSql();
+    expect(sql).toContain("lower(value->>'name')=ANY($20::text[])");
+    expect(sql).toContain("lower(value->>'name')=ANY($21::text[])");
+    expect(libraryFilterKeys).not.toEqual(expect.arrayContaining(['author','studio']));
+  });
+
+  it('separates AniList episode total from aired availability and MangaUpdates chapter provenance',()=>{
+    expect(libraryProjectionSql).toContain("a.provider='anilist' AND a.field IN ('episodes','episodeCount')");
+    expect(libraryProjectionSql).toContain('AS "episodeTotal"');
+    expect(libraryProjectionSql).toContain("pp.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END");
+    expect(libraryProjectionSql).toContain("CASE WHEN mm.provider='mangaupdates' THEN mm.latest_chapter ELSE NULL END");
+    expect(libraryProjectionSql).toContain("'provenance',pp.available_position_provenance");
   });
 
   it('normalizes excluded facet values without turning them into inclusions',()=>{
@@ -22,6 +43,39 @@ describe('library multi-value query',()=>{
 
   it('uses the shared title policy and searches every alias',()=>{
     expect(libraryProjectionSql).toContain('favlib_display_title');expect(libraryProjectionSql).not.toContain('max(t.text)');expect(libraryFilterSql()).toContain('search_title.media_id=projected."id"');
+  });
+  it('includes review-linked media in the read-only library without treating review as accepted identity',()=>{
+    expect(libraryProjectionSql).toContain("l.status IN ('matched','accepted','review')");
+    expect(libraryProjectionSql).toContain("review_link.status='review'");
+    expect(libraryProjectionSql).toContain("resolved_review.status='RESOLVED'");
+    expect(libraryProjectionSql).toContain('resolved_review.decision IS NOT NULL');
+    expect(libraryProjectionSql).toContain("AS \"classificationStatus\"");
+    expect(libraryProjectionSql).not.toContain("UPDATE bookmark_media_link");
+  });
+
+  it('requires a live raw bookmark before a link contributes a library card',()=>{
+    expect(libraryProjectionSql).toContain('JOIN bookmark_import_item active_import');
+    expect(libraryProjectionSql).toContain("active_import.event<>'removed'");
+  });
+
+  it('hides removed favorites from the review queue while preserving direct audit access',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const list=server.slice(server.indexOf('app.get("/api/v1/reviews"'),server.indexOf('app.get("/api/v1/reviews/:id"'));
+    const detail=server.slice(server.indexOf('app.get("/api/v1/reviews/:id"'),server.indexOf('app.get(\n  "/api/v1/reviews/:id/candidates'));
+    expect(list).toContain("active_link.status IN ('matched','accepted','review')");
+    expect(list).toContain('active_link.user_id=r.user_id');
+    expect(detail).toContain('r.id=$1::uuid AND r.user_id=$2::uuid');
+    expect(detail).not.toContain('active_link.status');
+  });
+
+  it('keeps covers attached to a merged target visible without changing the favorite media id',()=>{
+    expect(libraryProjectionSql).toContain('media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id');
+    expect(libraryProjectionSql).toContain("'media-identity-merge'");
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server).toContain('c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id');
+    expect(server).toContain('l.media_id=$1 AND l.user_id=$2');
+    expect(server).toContain('AS "coverProvenance"');
+    expect(server).toContain('coverUrl: base.rows[0].coverProvenance');
   });
 
   it('defines personal aliases as a direct display projection',()=>{
@@ -97,16 +151,38 @@ describe('library multi-value query',()=>{
     expect(server).toContain('favlib_display_title(ranked.media_id,$2::uuid)');
     expect(server).toContain('ranked.related_rank<=50');
     expect(server).toContain('ranked.relation_depth AS "relationDepth"');
-    expect(server).toContain('relatedWorks:relatedByMedia.get(row.id)??[]');
+    expect(server).toContain("progress.user_id=$2 AND progress.media_id=ranked.media_id");
+    expect(server).toContain("availability.media_id=ranked.media_id AND availability.status='ACTIVE'");
+    expect(server).toContain("END AS status");
+    expect(server).toContain('relatedWorks: relatedByMedia.get(row.id) ?? []');
+    expect(server.match(/WHERE relation\.kind<>'canonical_variant'/gu)).toHaveLength(2);
+    expect(server).toContain("AND relation.kind<>'canonical_variant'");
     expect(server.slice(server.indexOf('async function libraryRelatedWorks'),server.indexOf('app.get("/api/v1/library"'))).not.toContain('popularity');
+  });
+  it('isolates personal relation progress to the requesting user',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const projection=server.slice(server.indexOf('async function libraryRelatedWorks'),server.indexOf('async function relatedLibraryMediaAllowed'));
+    expect(projection).toContain('favlib_display_title(ranked.media_id,$2::uuid)');
+    expect(projection).toContain('progress.user_id=$2');
+    expect(projection).not.toMatch(/favorite_progress progress WHERE progress\.media_id=ranked\.media_id(?![^)]*progress\.user_id)/u);
+    expect(projection).not.toContain('favorite_progress progress WHERE progress.user_id<>');
   });
   it('authorizes each related cover through the owned source card and the same graph closure',()=>{
     const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
     expect(server).toContain('/api/v1/library/:mediaId/related/:relatedMediaId/cover');
     expect(server).toContain('link.user_id=$3 AND link.media_id=$4');
     expect(server).toContain("link.status IN ('matched','accepted','review')");
-    expect(server).toContain('walk.card_id=$4 AND walk.media_id=$2');
-    expect(server).toContain('/api/v1/library/${encodeURIComponent(row.libraryMediaId)}/related/${encodeURIComponent(row.id)}/cover');
+    expect(server).toContain('ranked.card_id=$4 AND ranked.media_id=$2 AND ranked.related_rank<=50');
+    expect(server).toContain('relatedLibraryMediaAllowed(req.params.mediaId,req.params.relatedMediaId,req.user.id)');
+    expect(server).toContain('/api/v1/library/${encodeURIComponent(coverScope)}/related/${encodeURIComponent(row.id)}/cover');
     expect(server).toContain('SELECT merge.target_media_id FROM media_identity_merge merge');
+  });
+  it('serves a bounded root-scoped related detail without using identity heuristics',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const route=server.slice(server.indexOf('app.get("/api/v1/library/:rootMediaId/related/:mediaId"'),server.indexOf('app.post("/api/v1/library/:mediaId/source-reports"'));
+    expect(route).toContain('richCatalogRow(req.user.id,mediaId,req.headers["x-timezone"],rootMediaId)');
+    expect(route).toContain('new Map([[mediaId,rootMediaId]])');
+    expect(route).toContain('rootMediaId,relatedWorks:');
+    expect(server.slice(server.indexOf('async function relatedLibraryMediaAllowed'),server.indexOf('app.get("/api/v1/library"'))).not.toContain('popularity');
   });
 });

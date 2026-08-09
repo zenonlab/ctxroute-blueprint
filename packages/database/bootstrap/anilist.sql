@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS dataset_record_staging (id uuid PRIMARY KEY DEFAULT g
 CREATE TABLE IF NOT EXISTS source_snapshot (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES app_user(id) ON DELETE CASCADE, scope_key text NOT NULL, connector text NOT NULL, connector_version text NOT NULL, canonical_target text NOT NULL, locale text NOT NULL DEFAULT '', region text NOT NULL DEFAULT '', status text NOT NULL CHECK(status IN ('VALID','QUARANTINED','NOT_MODIFIED','ERROR')), fetched_at timestamptz NOT NULL, payload jsonb NOT NULL, payload_hash text NOT NULL, error text, UNIQUE(scope_key,connector,connector_version,canonical_target,locale,region));
 CREATE TABLE IF NOT EXISTS release_announcement (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE, release_key text NOT NULL, provider text NOT NULL, status text NOT NULL CHECK(status IN ('SCHEDULED','ANNOUNCED')), announced_at timestamptz NOT NULL, provenance jsonb NOT NULL, UNIQUE(provider,release_key));
 CREATE TABLE IF NOT EXISTS release_origin (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES app_user(id) ON DELETE CASCADE, scope_key text NOT NULL, media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE, release_key text NOT NULL, connector text NOT NULL, canonical_url text NOT NULL, status text NOT NULL CHECK(status IN ('AVAILABLE','STALE','ERROR')), checked_at timestamptz NOT NULL, provenance jsonb NOT NULL, UNIQUE(scope_key,release_key,connector,canonical_url));
+CREATE TABLE IF NOT EXISTS domain_favicon_cache (domain text PRIMARY KEY, mime_type text, data bytea, fetched_at timestamptz NOT NULL DEFAULT now(), error text);
+ALTER TABLE user_catalog_preference ADD COLUMN IF NOT EXISTS preferred_languages text[] NOT NULL DEFAULT '{}';
+CREATE TABLE IF NOT EXISTS site_metadata_cache (domain text PRIMARY KEY, language text, detection_method text NOT NULL, manifest_url text, raw_url text NOT NULL, detected_at timestamptz NOT NULL DEFAULT now(), error text);
 CREATE TABLE IF NOT EXISTS source_check_lease (scope_key text PRIMARY KEY, owner text NOT NULL, expires_at timestamptz NOT NULL, acquired_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS personal_notification (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE, release_key text NOT NULL, kind text NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), read_at timestamptz, UNIQUE(user_id,release_key,kind));
 
@@ -361,7 +364,11 @@ BEGIN
   INSERT INTO media_identity_merge(source_media_id,target_media_id,provider,external_id,evidence)
   VALUES(source_id,target_id,merge_provider,merge_external_id,merge_evidence)
   ON CONFLICT(source_media_id) DO UPDATE SET target_media_id=excluded.target_media_id,provider=excluded.provider,external_id=excluded.external_id,evidence=excluded.evidence,merged_at=now();
-  INSERT INTO media_relation(media_id,target_media_id,kind,provenance) VALUES(source_id,target_id,'canonical_variant',merge_evidence) ON CONFLICT DO NOTHING;
+  DELETE FROM media_relation
+  WHERE media_id=source_id AND kind='canonical_variant' AND target_media_id<>target_id;
+  INSERT INTO media_relation(media_id,target_media_id,kind,provenance)
+  VALUES(source_id,target_id,'canonical_variant',merge_evidence)
+  ON CONFLICT(media_id,target_media_id,kind) DO UPDATE SET provenance=excluded.provenance;
   INSERT INTO media_title(media_id,text,normalized_text,language,kind,connector,provenance)
     SELECT target_id,text,normalized_text,language,kind,connector,provenance FROM media_title WHERE media_id=source_id ON CONFLICT DO NOTHING;
   INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence,asserted_at,attribution)
