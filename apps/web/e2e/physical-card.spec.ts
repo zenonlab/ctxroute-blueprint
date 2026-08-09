@@ -47,9 +47,9 @@ test('library verso exposes its three accessible tabs and keeps parsed title pro
   await page.getByRole('link',{name:'Aperçu de Titre parsé'}).click();
   const dialog=page.getByRole('dialog',{name:'Aperçu de Titre parsé'});await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('tab')).toHaveCount(3);await expect(dialog).toContainText('Titre parsé');await expect(dialog).not.toContainText('Titre brut interdit');await expect(dialog).toContainText('AniList');await expect(dialog).toContainText('Chapitre 5');await expect(dialog).toContainText('https://synthetic.invalid/work');await expect(dialog).not.toContainText('Disponibilité réelle');
-  await dialog.getByRole('tab',{name:'Description & informations'}).click();await expect(dialog).toContainText('Synopsis propre et long.');
-  await dialog.getByRole('tab',{name:'Découvertes similaires'}).click();await expect(dialog).toContainText('Les recommandations seront affichées');
-  if(!test.info().project.name.includes('mobile')){await dialog.getByRole('tab',{name:'Liens & prochaine sortie'}).focus();await page.keyboard.press('Tab');await expect(dialog.getByRole('tab',{name:'Description & informations'})).toBeFocused();}
+  await dialog.getByRole('tab',{name:'Informations'}).click();await expect(dialog).toContainText('Synopsis propre et long.');
+  await dialog.getByRole('tab',{name:'Découvertes'}).click();await expect(dialog).toContainText('Les recommandations seront affichées');
+  if(!test.info().project.name.includes('mobile')){await dialog.getByRole('tab',{name:'Liens'}).focus();await page.keyboard.press('Tab');await expect(dialog.getByRole('tab',{name:'Informations'})).toBeFocused();}
   await page.getByRole('button',{name:'Fermer'}).click();if(!test.info().project.name.includes('mobile')){await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('link',{name:'Aperçu de Titre parsé'})).toBeFocused();}
 });
 

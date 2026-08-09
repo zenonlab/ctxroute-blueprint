@@ -10,6 +10,11 @@ describe('verso de modal œuvre',()=>{
   it('déplie l’en-tête sur toute la carte et masque les onglets pendant les relations',()=>{
     expect(source).toContain('aria-controls={`media-related-${item.id}`}');expect(source).toContain('Toutes les œuvres reliées');expect(source).toContain('relatedWorks.map(work=><RelatedWorkRow');expect(source).toContain('<Cover item={{id:work.id,title:work.title,coverUrl:work.coverUrl}}/>');expect(physicalCardStyles).toContain('.media-related-panel{min-height:0;flex:1;overflow-y:auto');expect(physicalCardStyles).toContain('.media-card-related-toggle[aria-expanded=true]');
   });
+  it('affiche des onglets courts et aucun compteur de relations dans le type',()=>{
+    expect(source).toContain("const tabs=[['links','Liens'],['info','Informations'],['similar','Découvertes']]");
+    expect(source).toContain('<span className="eyebrow">{item.type}</span>');
+    expect(source).not.toContain('relatedWorks.length} œuvres');
+  });
   it('reste sobre et conserve les invariants de source',()=>{
     expect(styles).toContain('object-fit:contain');
     expect(source).toContain('item.sources?.length');
