@@ -60,7 +60,7 @@ la page AniList validée dans un nouvel onglet.
 
 Cette liste est la fermeture transitive des relations connues : les relations
 d'une œuvre reliée et les membres de sa propre chronologie sont parcourus à leur
-tour. Le parcours est déterministe, exclut les nœuds déjà présents dans le chemin,
+tour. Le parcours est déterministe, déduplique chaque état du graphe,
 reste borné à huit sauts et à cinquante résultats, et ne déduit jamais une relation
 depuis un titre. La couverture d'une ligne est servie par une route privée qui
 vérifie à la fois le favori d'origine de l'utilisateur et l'appartenance de la

@@ -89,7 +89,9 @@ describe('library multi-value query',()=>{
     expect(server).toContain('async function libraryRelatedWorks');
     expect(server).toContain('WITH RECURSIVE requested(card_id,root_id)');
     expect(server).toContain('FROM relation_walk walk JOIN graph_edges edge ON edge.source_id=walk.media_id');
-    expect(server).toContain('walk.relation_depth<8 AND NOT edge.target_id=ANY(walk.path)');
+    expect(server).toContain('relation_walk(card_id,root_id,media_id,relation_type,relation_depth)');
+    expect(server).toContain('WHERE walk.relation_depth<8');
+    expect(server).not.toContain('walk.path||edge.target_id');
     expect(server).toContain("SELECT member.root_media_id,member.media_id,'SEQUENCE_MEMBER'");
     expect(server).toContain('COALESCE((SELECT root_media_id FROM anime_work_member WHERE media_id=input_media_id),input_media_id)');
     expect(server).toContain('favlib_display_title(ranked.media_id,$2::uuid)');

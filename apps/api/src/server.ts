@@ -1694,12 +1694,12 @@ const relatedWorkClosureSql = (mediaIdsPlaceholder: string) => `WITH RECURSIVE r
   SELECT card_id,root_id,root_id AS media_id FROM requested
   UNION
   SELECT requested.card_id,requested.root_id,member.media_id FROM requested JOIN anime_work_member member ON member.root_media_id=requested.root_id
-),relation_walk(card_id,root_id,media_id,relation_type,relation_depth,path) AS (
-  SELECT scope.card_id,scope.root_id,scope.media_id,CASE WHEN scope.media_id=scope.card_id THEN 'CURRENT' ELSE 'SEQUENCE_MEMBER' END,0,ARRAY[scope.media_id]::text[] FROM sequence_scope scope
-  UNION ALL
-  SELECT walk.card_id,walk.root_id,edge.target_id,edge.relation_type,walk.relation_depth+1,walk.path||edge.target_id
+),relation_walk(card_id,root_id,media_id,relation_type,relation_depth) AS (
+  SELECT scope.card_id,scope.root_id,scope.media_id,CASE WHEN scope.media_id=scope.card_id THEN 'CURRENT' ELSE 'SEQUENCE_MEMBER' END,0 FROM sequence_scope scope
+  UNION
+  SELECT walk.card_id,walk.root_id,edge.target_id,edge.relation_type,walk.relation_depth+1
   FROM relation_walk walk JOIN graph_edges edge ON edge.source_id=walk.media_id
-  WHERE walk.relation_depth<8 AND NOT edge.target_id=ANY(walk.path)
+  WHERE walk.relation_depth<8
 )`;
 async function libraryRelatedWorks(mediaIds: string[], userId: string) {
   if (!mediaIds.length) return new Map<string, any[]>();
