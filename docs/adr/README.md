@@ -29,3 +29,4 @@ Les ADR enregistrent les décisions structurantes de FavLib.
 | [0023](0023-review-interactive-correspondances-ambiguës.md) | review interactive et par-favori des correspondances ambiguës | accepté |
 | [0024](0024-resolution-automatique-deterministe.md) | résolution automatique déterministe, OEL graphique et reprise terminale | accepté ; complète 0022 et 0023 |
 | [0025](0025-pont-mangadex-mangaupdates.md) | pont interne MangaDex vers une identité MangaUpdates explicite | accepté |
+| [0026](0026-exclusion-globale-taxonomie-contenu.md) | exclusion globale par genres et catégories explicites | accepté |

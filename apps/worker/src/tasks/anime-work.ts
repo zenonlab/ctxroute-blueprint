@@ -34,7 +34,7 @@ async function reconcileAnimeWork(h:Queryable,mediaId:string,item:AniListMedia,p
   const result=buildLinearAnimeChain(component.rows.map((row:any)=>({id:row.id,format:row.format,episodeTotal:row.episode_total===null?null:Number(row.episode_total),relations:row.relations})),mediaId);
   if(result.status==='ambiguous'){
     await h.query(`WITH affected AS (
-      SELECT DISTINCT l.user_id,l.installation_id,l.bookmark_id,i.title,i.url
+      SELECT DISTINCT l.user_id,l.installation_id,l.bookmark_id,i.payload->>'title' AS title,i.payload->>'url' AS url
       FROM bookmark_media_link l JOIN bookmark_import_item i USING(user_id,installation_id,bookmark_id)
       WHERE l.media_id=ANY($1::text[]) AND l.status IN ('matched','accepted') AND i.event<>'removed'
     ) INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason)

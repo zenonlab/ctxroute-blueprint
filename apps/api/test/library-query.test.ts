@@ -17,8 +17,8 @@ describe('library multi-value query',()=>{
     expect(libraryProjectionSql).toContain('AS authors');
     expect(libraryProjectionSql).toContain('AS studios');
     const sql=libraryFilterSql();
-    expect(sql).toContain("lower(value->>'name')=ANY($20::text[])");
-    expect(sql).toContain("lower(value->>'name')=ANY($21::text[])");
+    expect(sql).toContain("lower(value->>'name')=ANY($16::text[])");
+    expect(sql).toContain("lower(value->>'name')=ANY($17::text[])");
     expect(libraryFilterKeys).not.toEqual(expect.arrayContaining(['author','studio']));
   });
 
@@ -27,13 +27,14 @@ describe('library multi-value query',()=>{
     expect(libraryProjectionSql).toContain('AS "episodeTotal"');
     expect(libraryProjectionSql).toContain("pp.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END");
     expect(libraryProjectionSql).toContain("CASE WHEN mm.provider='mangaupdates' THEN mm.latest_chapter ELSE NULL END");
-    expect(libraryProjectionSql).toContain("'provenance',pp.available_position_provenance");
+    expect(libraryProjectionSql).toContain('pp.available_position_provenance AS provenance');
+    expect(libraryProjectionSql).toContain("'provenance',available.provenance");
   });
 
   it('normalizes excluded facet values without turning them into inclusions',()=>{
     const parsed=libraryQuerySchema.parse({excludeType:'ANIME',excludeTheme:['Drama']});
     expect(parsed.excludeType).toEqual(['ANIME']);expect(parsed.excludeTheme).toEqual(['Drama']);
-    const sql=libraryFilterSql();expect(sql).toContain('NOT ("type"=ANY($12::text[]))');expect(sql).toContain('NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes)');
+    const sql=libraryFilterSql();expect(sql).toContain('NOT ("type"=ANY($10::text[]))');expect(sql).toContain('NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes)');
   });
 
   it('uses array membership within categories and AND between categories',()=>{
@@ -56,6 +57,16 @@ describe('library multi-value query',()=>{
   it('requires a live raw bookmark before a link contributes a library card',()=>{
     expect(libraryProjectionSql).toContain('JOIN bookmark_import_item active_import');
     expect(libraryProjectionSql).toContain("active_import.event<>'removed'");
+  });
+
+  it('projects one recent, available, language-qualified work URL per domain within the user scope',()=>{
+    expect(libraryProjectionSql).toContain("o.provenance->>'workUrl'");
+    expect(libraryProjectionSql).toContain("o.status='AVAILABLE'");
+    expect(libraryProjectionSql).toContain("languageDetection' NOT IN ('undetected','ambiguous')");
+    expect(libraryProjectionSql).toContain('SELECT DISTINCT ON');
+    expect(libraryProjectionSql).toContain('(o.user_id IS NULL OR o.user_id=$1)');
+    expect(libraryProjectionSql).toContain('o.checked_at DESC');
+    expect(libraryProjectionSql).not.toContain('o.user_id<>$1');
   });
 
   it('hides removed favorites from the review queue while preserving direct audit access',()=>{
@@ -91,7 +102,7 @@ describe('library multi-value query',()=>{
   it('temporarily removes only the facet being counted',()=>{
     const sql=libraryFilterSql('theme');
     expect(sql).not.toContain('jsonb_array_elements_text(themes)');expect(sql).toContain('$4::text[] IS NOT NULL');expect(sql).toContain('"type"=ANY($3::text[])');
-    expect(sql).toContain('$13::text[] IS NOT NULL');
+    expect(sql).toContain('$11::text[] IS NOT NULL');
   });
 
   it('keeps a selected zero-count option but does not invent an unselected unknown value',()=>{
@@ -113,13 +124,23 @@ describe('library multi-value query',()=>{
     expect(libraryProjectionSql).toContain('ELSE NULL');
   });
 
-  it('separates genres from provider categories without filtering favorite works',()=>{
+  it('uses a preserved raw favorite page as user-scoped translation availability',()=>{
+    expect(libraryProjectionSql).toContain("'favorite-source'");
+    expect(libraryProjectionSql).toContain("'favorite-raw-observation'");
+    expect(libraryProjectionSql).toContain('observation.provenance');
+    expect(libraryProjectionSql).toContain('fp.user_id=$1');
+    expect(libraryProjectionSql).toContain('ORDER BY available.number DESC');
+  });
+
+  it('globally excludes exact blocked genres and categories without retaining classifications or demographics',()=>{
     expect(libraryProjectionSql).toContain("a.field='genres'");
     expect(libraryProjectionSql).toContain("a.field='categories'");
-    expect(libraryProjectionSql).toContain('SELECT allow_adult FROM user_catalog_preference');
-    expect(libraryProjectionSql).toContain("aa.field='adultCategories'");
-    expect(libraryProjectionSql).not.toContain("adult.field='isAdult'");
-    expect(libraryProjectionSql).not.toContain("adult.field='contentRating'");
+    expect(libraryProjectionSql).toContain("blocked.field='genres'");
+    expect(libraryProjectionSql).toContain("blocked.field='categories'");
+    expect(libraryProjectionSql).not.toContain('allow_adult');
+    expect(libraryProjectionSql).not.toContain('contentRating');
+    expect(libraryProjectionSql).not.toContain('publicationDemographic');
+    expect(libraryFilterKeys).toEqual(['type','theme','genre','category','status','year']);
   });
 
   it('only advertises calendar covers backed by stored image data',()=>{
@@ -135,7 +156,7 @@ describe('library multi-value query',()=>{
     expect(server).toMatch(/animeSeasons:\s*animeSeasons\.rows/u);
     expect(server).toMatch(/animeRelated:\s*animeRelated\.rows/u);
     expect(server).toContain('WITH sequence_media AS (SELECT $1::text AS id UNION');
-    expect(server).toContain('WHERE w.root_media_id=$1 ORDER BY w.member_order LIMIT 50');
+    expect(server).toContain("WHERE w.root_media_id=$1 AND ${contentAllowedSql('w.media_id')} ORDER BY w.member_order LIMIT 50");
     expect(server).toContain("payload.validity_status='VALID'");
   });
   it('projects the bounded transitive relation closure without treating titles or popularity as relation evidence',()=>{

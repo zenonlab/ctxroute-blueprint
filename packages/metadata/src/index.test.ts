@@ -51,7 +51,7 @@ import {
 describe("declarative source metadata", () => {
   it("uses the requested language precedence and falls through invalid manifest data", () => {
     const html = `<html lang="de"><head><meta property="og:locale" content="fr_FR"><link rel="alternate" hreflang="en" href="/en"><link rel="alternate" hreflang="fr" href="/fr"></head></html>`;
-    expect(declaredLanguageEvidence({ url: "https://source.invalid/work", manifestLanguage: "not-a-language", html, headers: { "content-language": "it" } })).toMatchObject({ language: "de", method: "html-lang" });
+    expect(declaredLanguageEvidence({ url: "https://source.invalid/work", manifestLanguage: "not-a-language", html, headers: { "content-language": "it" } })).toMatchObject({ language: "it", method: "content-language" });
     expect(declaredLanguageEvidence({ url: "https://source.invalid/fr/work", manifestLanguage: "de", html: `<html lang="ja"></html>` })).toMatchObject({ language: "fr", method: "url-path" });
     expect(declaredLanguageEvidence({ url: "https://source.invalid/work", manifestLanguage: "de", html: "" })).toMatchObject({ language: "de", method: "manifest" });
   });
@@ -104,7 +104,7 @@ describe("MangaDex identity bridge", () => {
     expect(parseMangaDexManga({ id: uuid, attributes: { title: { en: "Synthetic Chronicle", ja: "Synthetic Native" }, altTitles: [{ fr: "Chronique synthétique" }, { en: "Synthetic Alias" }], links: { mu: "mu_bridge_1", al: "999" }, description: { en: "Synthetic description", fr: "Description synthétique" }, tags:[{attributes:{name:{en:"Synthetic genre"}}}], status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',lastVolume:'4',lastChapter:'31' }, relationships:[{id:'author-id',type:'author',attributes:{name:'Synthetic Author'}},{id:'cover-id',type:'cover_art',attributes:{fileName:'cover.png'}}] })).toMatchObject({
       id: uuid,
       titles: ["Synthetic Chronicle", "Synthetic Native", "Chronique synthétique", "Synthetic Alias"],
-      descriptions:{en:"Synthetic description",fr:"Description synthétique"}, tags:["Synthetic genre"],status:'ongoing',year:2026,originalLanguage:'ja',publicationDemographic:'seinen',contentRating:'safe',
+      descriptions:{en:"Synthetic description",fr:"Description synthétique"}, tags:["Synthetic genre"],status:'ongoing',year:2026,originalLanguage:'ja',
       authors:[{id:'author-id',name:'Synthetic Author'}],coverFileName:'cover.png',
       mangaUpdatesId: "mu_bridge_1",
     });
@@ -1082,6 +1082,17 @@ describe("AniList catalogue", () => {
         "cafebluesky",
       ]),
     ));
+  it("excludes only explicit blocked genres and categories while preserving raw evidence", async () => {
+    const { contentTaxonomyExclusion } = await import("./index.js");
+    expect(contentTaxonomyExclusion({ genres: ["  HÉNTAI  "], categories: ["Graphic-sex"] })).toEqual({
+      reason: "BLOCKED_CONTENT_TAXONOMY",
+      matches: [
+        { field: "genre", raw: "  HÉNTAI  ", normalized: "hentai" },
+        { field: "category", raw: "Graphic-sex", normalized: "graphic sex" },
+      ],
+    });
+    expect(contentTaxonomyExclusion({ genres: ["Ecchi", "Mature"], categories: ["Adult cast", "Sexuality"] })).toBeNull();
+  });
   it("cleans release and site slop only for display", async () => {
     const { cleanDisplayTitle } = await import("./index.js");
     expect(cleanDisplayTitle("Frieren - Episode 12 VOSTFR - VoirAnime")).toBe("Frieren");

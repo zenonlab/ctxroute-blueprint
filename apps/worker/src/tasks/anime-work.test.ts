@@ -38,4 +38,24 @@ describe('anime work PostgreSQL contract', () => {
     const implied = calls.find(sql => sql.includes("'anilist-season-chain'"));
     expect(implied).toContain('SELECT l.user_id,$1::text');
   });
+
+  it('opens an ambiguous chain review from the preserved raw bookmark payload', async () => {
+    const calls: string[] = [];
+    const query = vi.fn(async (sql: string) => {
+      calls.push(sql);
+      if (sql.includes('WITH RECURSIVE component')) return { rows: [
+        {id:'anilist:301',format:'TV',anilist_id:'301',episode_total:12,payload_ready:true,relations:[{id:'anilist:302',kind:'SEQUEL'},{id:'anilist:303',kind:'SEQUEL'}]},
+        {id:'anilist:302',format:'TV',anilist_id:'302',episode_total:12,payload_ready:true,relations:[{id:'anilist:301',kind:'PREQUEL'}]},
+        {id:'anilist:303',format:'TV',anilist_id:'303',episode_total:12,payload_ready:true,relations:[{id:'anilist:301',kind:'PREQUEL'}]},
+      ] };
+      return { rows: [] };
+    });
+    await recordAndReconcileAnimeWork({query},'anilist:301',{
+      id:301,type:'ANIME',format:'TV',title:{},synonyms:[],genres:[],tags:[],relations:[],airingSchedule:[],streamingEpisodes:[],studios:[],authors:[],
+    },'synthetic-ambiguous-payload');
+    const reviewInsert=calls.find(sql=>sql.includes("'anilist-chain','PENDING'"));
+    expect(reviewInsert).toContain("i.payload->>'title' AS title");
+    expect(reviewInsert).toContain("i.payload->>'url' AS url");
+    expect(reviewInsert).not.toContain('i.title');
+  });
 });

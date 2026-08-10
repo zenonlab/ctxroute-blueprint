@@ -4,11 +4,10 @@ import { resolutionStatus, type Snapshot } from '@favlib/availability';
 import { isTestEnvironment } from '@favlib/config';
 import { progressionFromFavorite } from '@favlib/metadata';
 import { safeRequest } from '@favlib/safe-http';
-import { declaredLanguageEvidence } from '@favlib/metadata';
-import { detectLanguageStatistically } from '@favlib/metadata/language';
+import { resolvePageLanguage } from '@favlib/metadata';
 
 export type FetchPolicy = { timeoutMs?: number; maxBytes?: number; maxRedirects?: number; approvedDomains: string[]; allowPrivateTest?: boolean };
-export type CollectionInput = { target: string; mediaId: string; connector: string; connectorVersion: string; policy: FetchPolicy; now?: string };
+export type CollectionInput = { target: string; rawTarget?: string; workUrl?: string; mediaId: string; connector: string; connectorVersion: string; policy: FetchPolicy; now?: string };
 
 const FAVICON_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/svg+xml'];
 const MEDIA_KEYWORDS = /(?:anime|manga|manhwa|manhua|comic|comics|webtoon|light\s*novel|novel|chapter|chapitre|episode|épisode|scan|reading|read)/iu;
@@ -30,8 +29,8 @@ function manifestText(value: unknown) {
 
 async function validateSiteSignals(domain: string, policy: FetchPolicy) {
   if (policy.allowPrivateTest && isTestEnvironment()) return null;
-  const favicon = await safeRequest(`https://${domain}/favicon.ico`, { requireHttps: true, maxRedirects: 2, timeoutMs: 3000, maxBytes: 512 * 1024, mimeTypes: FAVICON_MIMES, allowedHosts: policy.approvedDomains });
-  if (favicon.status < 200 || favicon.status >= 300 || !favicon.body.length) throw new Error('FAVICON_NOT_FOUND');
+  // A favicon is presentation metadata, never availability evidence.
+  try { await safeRequest(`https://${domain}/favicon.ico`, { requireHttps: true, maxRedirects: 2, timeoutMs: 3000, maxBytes: 512 * 1024, mimeTypes: FAVICON_MIMES, allowedHosts: policy.approvedDomains }); } catch { /* DomainIcon owns its fallback. */ }
   let sawSuspectManifest = false;
   for (const path of ['/manifest.json', '/site.webmanifest']) {
     try {
@@ -49,7 +48,7 @@ async function validateSiteSignals(domain: string, policy: FetchPolicy) {
     }
   }
   if (sawSuspectManifest) throw new Error('MANIFEST_SUSPECT');
-  throw new Error('SITE_MANIFEST_NOT_FOUND');
+  return null;
 }
 
 export async function collectSnapshot(input: CollectionInput): Promise<Snapshot> {
@@ -65,13 +64,13 @@ export async function collectSnapshot(input: CollectionInput): Promise<Snapshot>
       if (!progression) return [];
       return [{ logicalKey: `${input.mediaId}:${progression.kind}:${progression.raw}`, sequence: { kind: progression.kind === 'episode' ? 'integer' as const : progression.raw.includes('.') ? 'decimal' as const : 'integer' as const, raw: progression.raw, number: progression.number, part: undefined }, url: response.url, title: parsedTitle ?? '', evidence: ['accessible-target', 'shared-progression-parser'] }];
     })();
-    const origins = releases.map(release => {
+    const languageUrl=input.workUrl??response.url;
+    const detected = resolvePageLanguage({ url:languageUrl, manifestLanguage:(manifest as Record<string, unknown> | null)?.lang, html:response.html, headers:response.headers, now:fetchedAt });
+    const origins:Snapshot['origins'] = releases.map(release => {
       const url = canonicalUrl(release.url, response.url) ?? release.url;
-      const declared = declaredLanguageEvidence({ url, manifestLanguage: (manifest as Record<string, unknown> | null)?.lang, html: response.html, headers: response.headers });
-      const statistical = declared.language ? null : detectLanguageStatistically(`${parsedTitle ?? ''} ${(manifest as Record<string, unknown> | null)?.name ?? ''} ${response.html.replace(/<[^>]+>/gu, ' ')}`, url, fetchedAt);
-      const detected = statistical?.language ? { language: statistical.language, method: 'statistical' as const } : { language: declared.language, method: declared.method === 'html-lang' ? 'document' as const : declared.method };
-      return { mediaId: input.mediaId, connector: input.connector, checkedAt: fetchedAt, status: 'AVAILABLE' as const, sequence: { kind: release.sequence.kind, raw: release.sequence.raw, number: release.sequence.number, part: release.sequence.part }, title: release.title, url, language: detected.language, languageDetection: detected.method };
+      return { mediaId: input.mediaId, connector: input.connector, checkedAt: fetchedAt, status: 'AVAILABLE' as const, observationKind:'RELEASE' as const, sequence: { kind: release.sequence.kind, raw: release.sequence.raw, number: release.sequence.number, part: release.sequence.part }, title: release.title, url, workUrl: input.workUrl ?? input.target, language: detected.language, languageDetection: detected.method, languageEvidence:detected.evidence };
     });
+    if(parsed.status==='VALID')origins.unshift({mediaId:input.mediaId,connector:input.connector,checkedAt:fetchedAt,status:'AVAILABLE' as const,observationKind:'WORK' as const,sequence:{kind:'special' as const,raw:'work-source'},title:parsedTitle,url:input.workUrl??input.target,workUrl:input.workUrl??input.target,language:detected.language,languageDetection:detected.method,languageEvidence:detected.evidence});
     return { fetchedAt, status: 'VALID', resolutionStatus: resolutionStatus({ accessible: true, identityResolved: parsed.status === 'VALID', chapterResolved: releases.length > 0 }), origins };
   } catch (error) {
     const errorCode = error instanceof Error ? error.message : 'COLLECTION_FAILED';

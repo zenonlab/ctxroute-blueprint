@@ -700,7 +700,7 @@ CREATE TABLE IF NOT EXISTS media_airing_observation (
 CREATE INDEX IF NOT EXISTS media_airing_observation_time_idx ON media_airing_observation(observed_at);
 CREATE TABLE IF NOT EXISTS user_catalog_preference (
   user_id uuid PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
-  timezone text NOT NULL DEFAULT 'UTC', allow_adult boolean NOT NULL DEFAULT false,
+  timezone text NOT NULL DEFAULT 'UTC',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS calendar_feed (

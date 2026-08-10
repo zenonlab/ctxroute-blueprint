@@ -33,11 +33,24 @@ import {
 import { operationalValue } from "../settings.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
+import { excludeFavoriteMediaByTaxonomy, providerContentExclusion } from "../content-exclusion.js";
 
 type Helpers = Parameters<Task>[1];
 export const MANGAUPDATES_ENRICHMENT_VERSION = CONNECTOR_VERSIONS.mangaUpdatesMetadata;
 const VERSION = MANGAUPDATES_ENRICHMENT_VERSION,
   COVER_VERSION = CONNECTOR_VERSIONS.mangaUpdatesCover;
+
+/** MangaUpdates uses zero as an unknown-position sentinel. Keep the raw
+ * provider value only when it proves a positive chapter. */
+export function mangaUpdatesAvailableChapter(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  const raw = String(value).trim();
+  if (!raw) return undefined;
+  const parsed = position(raw, "chapter");
+  return parsed.number !== undefined && parsed.number > 0
+    ? { raw, number: parsed.number }
+    : undefined;
+}
 function snapshotCandidates(items: any[]) {
   return items;
 }
@@ -304,6 +317,13 @@ const task: Task = async (raw, helpers: Helpers) => {
     }
     candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
     const matchAliases = identityAliases;
+    const unfilteredMatchDecision = decideMangaUpdatesTitleMatch(matchAliases, candidates);
+    if (unfilteredMatchDecision.status === 'MATCH' && unfilteredMatchDecision.candidate && providerContentExclusion(unfilteredMatchDecision.candidate)) {
+      await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "mangaupdates", unfilteredMatchDecision.candidate);
+      await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
+      return;
+    }
+    candidates = candidates.filter(candidate => !providerContentExclusion(candidate));
     const matchDecision = decideMangaUpdatesTitleMatch(matchAliases, candidates);
     if (matchDecision.status === 'NO_MATCH' && !knownMuId) {
       trace(h, 'bridge_attempt', { provider: 'mangadex', mediaId, queryCount: queries.length });
@@ -315,6 +335,10 @@ const task: Task = async (raw, helpers: Helpers) => {
         const mangaDexCandidate = bridgeDecision.candidate;
         if (bridgeDecision.status === 'MATCH' && mangaDexCandidate) {
           const mangaDex = await mangaDexCall(h, () => fetchMangaDexManga(mangaDexCandidate.id, providerOptions), { operation: 'identity-detail', mediaId, id: mangaDexCandidate.id });
+          if (await excludeFavoriteMediaByTaxonomy(h.query, mediaId, 'mangadex', { categories: mangaDex.tags })) {
+            await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
+            return;
+          }
           let linked: any | undefined;
           if (mangaDex.mangaUpdatesId) try {
             const resolution = await providerCall(h, () => resolveMangaUpdatesLinkedSeries(mangaDex.mangaUpdatesId!, mangaDex.titles, providerOptions), { operation: 'resolve-bridged-link', mediaId, id: mangaDex.mangaUpdatesId });
@@ -350,7 +374,7 @@ const task: Task = async (raw, helpers: Helpers) => {
             for (const title of mangaDex.localizedTitles) await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,$4,'supplier',$5,'mangadex',1,$6) ON CONFLICT DO NOTHING", [mediaId, title.text, normalizeTitle(title.text), title.language, title.kind === 'title' ? 'official' : 'associated', { provider: 'mangadex', externalId: mangaDex.id, raw: title.raw }]);
             // MangaDex may contribute identity and editorial metadata, but it
             // never contributes chapter/volume availability.
-            const values: Array<[string, unknown]> = [['descriptions',mangaDex.descriptions],['description',mangaDex.descriptions],['genres',mangaDex.tags],['themes',mangaDex.tags],['status',mangaDex.status],['year',mangaDex.year],['language',mangaDex.originalLanguage],['publicationDemographic',mangaDex.publicationDemographic],['contentRating',mangaDex.contentRating],['authors',mangaDex.authors],['artists',mangaDex.artists],['relations',mangaDex.relations]];
+            const values: Array<[string, unknown]> = [['descriptions',mangaDex.descriptions],['description',mangaDex.descriptions],['genres',mangaDex.tags],['themes',mangaDex.tags],['status',mangaDex.status],['year',mangaDex.year],['language',mangaDex.originalLanguage],['authors',mangaDex.authors],['artists',mangaDex.artists],['relations',mangaDex.relations]];
             for (const [field,value] of values) if (value !== undefined && value !== null && (!Array.isArray(value) || value.length)) await h.query("INSERT INTO metadata_assertion(media_id,field,value,provider,source_url,confidence,attribution) VALUES($1,$2,$3,'mangadex',$4,1,'MangaDex') ON CONFLICT(media_id,field,provider,source_url) DO UPDATE SET value=excluded.value,asserted_at=now()", [mediaId,field,JSON.stringify(value),sourceUrl]);
             await h.query("INSERT INTO media_metadata(media_id,provider,external_id,source_url,latest_chapter,status,resolved_at,updated_at) VALUES($1,'mangadex',$2,$3,NULL,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='mangadex',external_id=excluded.external_id,source_url=excluded.source_url,latest_chapter=NULL,status='ACTIVE',resolved_at=now(),updated_at=now()", [mediaId,mangaDex.id,sourceUrl]);
             await h.query("INSERT INTO mangadex_promotion_state(media_id,mangadex_id,next_attempt_at,matcher_version,status) VALUES($1,$2,favlib_next_paris_monday(now()),$3,'PENDING') ON CONFLICT(media_id) DO NOTHING", [mediaId,mangaDex.id,bridgeDecision.matcherVersion]);
@@ -411,6 +435,10 @@ const task: Task = async (raw, helpers: Helpers) => {
       return;
     }
     const s = selected;
+    if (await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "mangaupdates", s)) {
+      await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
+      return;
+    }
     const exactResolution = bridgeProvenance ? 'MANGADEX_MANGAUPDATES_BRIDGE' : matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH';
     if (bridgeProvenance) await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: 'mangadex-mangaupdates-bridge', rawProvenance: bridgeProvenance })]);
     const owner = await h.query(
@@ -475,11 +503,17 @@ const task: Task = async (raw, helpers: Helpers) => {
     const rawPayload = s.raw ?? s;
     const rawPayloadJson = JSON.stringify(rawPayload);
     const rawPayloadHash = createHash('sha256').update(rawPayloadJson).digest('hex');
+    const chapter=mangaUpdatesAvailableChapter(s.latestChapter);
+    // Clean legacy zero sentinels before the monotonic upserts below. They are
+    // absence, so they must not outrank a raw favorite observation.
+    await h.query("UPDATE media_metadata SET latest_chapter=NULL,updated_at=now() WHERE media_id=$1 AND provider='mangaupdates' AND latest_chapter ~ '^[[:space:]]*0(?:[.]0+)?[[:space:]]*$'",[targetMediaId]);
+    await h.query("DELETE FROM metadata_assertion WHERE media_id=$1 AND provider='mangaupdates' AND field='latestChapter' AND value#>>'{}' ~ '^[[:space:]]*0(?:[.]0+)?[[:space:]]*$'",[targetMediaId]);
+    await h.query("UPDATE provider_progress SET latest_chapter=NULL,available_position_kind=NULL,available_position_number=NULL,available_position_raw=NULL,available_position_provenance=NULL,updated_at=now() WHERE media_id=$1 AND provider='mangaupdates' AND available_position_number=0",[targetMediaId]);
     await h.query("INSERT INTO provider_payload(media_id,provider,connector_version,collected_at,payload_hash,payload,provenance,validity_status,is_current) VALUES($1,'mangaupdates',$2,now(),$3,$4,$5,'VALID',true) ON CONFLICT(media_id,provider,connector_version,payload_hash) DO UPDATE SET collected_at=now(),provenance=excluded.provenance,validity_status='VALID',is_current=true", [targetMediaId, VERSION, rawPayloadHash, rawPayloadJson, {provider:'mangaupdates',seriesId:s.id,sourceUrl,verifiedAt:new Date().toISOString(),bridge:bridgeProvenance??null}]);
     await h.query("UPDATE provider_payload SET is_current=false WHERE media_id=$1 AND provider='mangaupdates' AND connector_version=$2 AND payload_hash<>$3", [targetMediaId,VERSION,rawPayloadHash]);
     await h.query(
       "INSERT INTO media_metadata(media_id,provider,external_id,source_url,latest_chapter,status,resolved_at,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider='mangaupdates',external_id=excluded.external_id,source_url=excluded.source_url,latest_chapter=COALESCE(excluded.latest_chapter,media_metadata.latest_chapter),status='ACTIVE',updated_at=now()",
-      [targetMediaId, s.id, sourceUrl, s.latestChapter ?? null],
+      [targetMediaId, s.id, sourceUrl, chapter?.raw ?? null],
     );
     const muValues: Array<[string, unknown]> = [
       ["themes", [...new Set([...(s.genres ?? []), ...(s.categories ?? [])])]],
@@ -489,7 +523,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       ["startDate", s.startDate ?? (s.year === undefined ? undefined : { year: s.year })],
       ["status", s.status],
       ["year", s.year],
-      ["latestChapter", s.latestChapter],
+      ["latestChapter", chapter?.raw],
       ["latestVolume", s.latestVolume],
       ["description", s.description],
     ];
@@ -500,8 +534,7 @@ const task: Task = async (raw, helpers: Helpers) => {
         [targetMediaId, field, JSON.stringify(value), sourceUrl],
       );
     }
-    const chapter=s.latestChapter?position(s.latestChapter,'chapter'):undefined;
-    await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,$5,$6,$7,$8,now(),'ACTIVE',NULL,$9,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.latest_chapter ELSE provider_progress.latest_chapter END,latest_volume=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN COALESCE(excluded.latest_volume,provider_progress.latest_volume) ELSE provider_progress.latest_volume END,available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[targetMediaId,normalizeSerializationStatus(s.status)??null,s.latestChapter??null,s.latestVolume??null,chapter?.number===undefined?null:'chapter',chapter?.number??null,s.latestChapter??null,chapter?.number===undefined?null:{provider:'mangaupdates',seriesId:s.id,evidence:'series-record',raw:rawPayload,verifiedAt:new Date().toISOString()},{provider:'mangaupdates',seriesId:s.id,payloadHash:rawPayloadHash,raw:rawPayload,verifiedAt:new Date().toISOString()}]);
+    await h.query(`INSERT INTO provider_progress(media_id,provider,serialization_status,latest_chapter,latest_volume,available_position_kind,available_position_number,available_position_raw,available_position_provenance,last_checked_at,status,last_error,provenance,updated_at) VALUES($1,'mangaupdates',$2,$3,$4,$5,$6,$7,$8,now(),'ACTIVE',NULL,$9,now()) ON CONFLICT(media_id,provider) DO UPDATE SET serialization_status=COALESCE(excluded.serialization_status,provider_progress.serialization_status),latest_chapter=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.latest_chapter ELSE provider_progress.latest_chapter END,latest_volume=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN COALESCE(excluded.latest_volume,provider_progress.latest_volume) ELSE provider_progress.latest_volume END,available_position_kind=COALESCE(excluded.available_position_kind,provider_progress.available_position_kind),available_position_number=CASE WHEN excluded.available_position_number IS NULL OR provider_progress.available_position_number>excluded.available_position_number THEN provider_progress.available_position_number ELSE excluded.available_position_number END,available_position_raw=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_raw ELSE provider_progress.available_position_raw END,available_position_provenance=CASE WHEN excluded.available_position_number IS NOT NULL AND (provider_progress.available_position_number IS NULL OR excluded.available_position_number>=provider_progress.available_position_number) THEN excluded.available_position_provenance ELSE provider_progress.available_position_provenance END,last_checked_at=now(),status='ACTIVE',last_error=NULL,provenance=provider_progress.provenance||excluded.provenance,updated_at=now()`,[targetMediaId,normalizeSerializationStatus(s.status)??null,chapter?.raw??null,s.latestVolume??null,chapter?'chapter':null,chapter?.number??null,chapter?.raw??null,chapter?{provider:'mangaupdates',seriesId:s.id,evidence:'series-record',raw:rawPayload,verifiedAt:new Date().toISOString()}:null,{provider:'mangaupdates',seriesId:s.id,payloadHash:rawPayloadHash,raw:rawPayload,verifiedAt:new Date().toISOString()}]);
     await markFavoriteMatched(h.query, targetMediaId);
     await reconcileResolvedFavoriteReviews(h.query, targetMediaId, bridgeProvenance ? 'mangadex-mangaupdates-bridge' : 'automatic-provider-resolution');
     if (bridgeProvenance)

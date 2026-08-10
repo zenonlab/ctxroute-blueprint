@@ -61,10 +61,10 @@ describe('refonte de la modal œuvre',()=>{
     expect(source).toContain('className="poster-visual"');
     expect(styles).toContain('.related-work-card.card.media-card .poster');
   });
-  it('préserve les sources, les favoris parsés et leurs actions',()=>{
-    expect(source).toContain('item.sources?.length');
+  it('préserve les recommandations d’œuvre, les favoris parsés et leurs actions',()=>{
+    expect(source).toContain('recommendedSources.length');
     expect(source).toContain('favorite.parsedTitle');
-    expect(source).toContain('source.canonicalUrl');
+    expect(source).toContain('source.workUrl??source.canonicalUrl');
     expect(source).toContain('source-reports');
     expect(source).toContain('navigator.clipboard');
   });

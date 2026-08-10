@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { OPERATIONAL_DEFAULTS } from '@favlib/config';
 import { withProviderRequest } from '@favlib/database/provider-queue';
 import { fetchAniList, fetchMangaUpdatesSeries, resolveMangaUpdatesPublicSlug } from '@favlib/metadata';
+import { excludeFavoriteMediaByTaxonomy } from '../content-exclusion.js';
 
 type Payload={reviewId:string;userId:string;provider:'anilist'|'mangaupdates';providerId:string};
 type Helpers={query:(sql:string,values?:unknown[])=>Promise<{rowCount?:number|null;rows:any[]}>};
@@ -26,6 +27,11 @@ export default async function manualReviewProvider(payload:unknown,h:Helpers){
   });
   const stillOwned=await h.query("SELECT 1 FROM favorite_review WHERE id=$1 AND user_id=$2 AND provider=$3 AND status='PENDING' AND decision->>'kind'='manual-queued'",[reviewId,userId,provider]);
   if(!stillOwned.rowCount)return;
+  const provisional=await h.query("SELECT media_id AS \"mediaId\" FROM bookmark_media_link WHERE user_id=$1 AND installation_id=(SELECT installation_id FROM favorite_review WHERE id=$2) AND bookmark_id=(SELECT bookmark_id FROM favorite_review WHERE id=$2) LIMIT 1",[userId,reviewId]);
+  if(provisional.rows[0]?.mediaId && await excludeFavoriteMediaByTaxonomy(h.query, provisional.rows[0].mediaId, provider, record)) {
+    await h.query("UPDATE favorite_review SET status='NO_MATCH',reason='BLOCKED_CONTENT_TAXONOMY',decision=jsonb_build_object('kind','content-excluded'),resolved_at=now() WHERE id=$1 AND user_id=$2 AND status='PENDING'",[reviewId,userId]);
+    return;
+  }
   const resolvedProviderId=provider==='mangaupdates'?String(record.id??providerId):providerId;
   const canonicalTitle=provider==='anilist'?(record.title?.userPreferred??record.title?.romaji??record.title?.english??record.title?.native??`AniList ${providerId}`):(record.title??record.titles?.[0]??`MangaUpdates ${providerId}`);
   const associatedTitles=provider==='anilist'?[record.title?.romaji,record.title?.english,record.title?.native,...(record.synonyms??[])].filter(Boolean):[...(record.titles??[]),...(record.associated??[])].filter(Boolean);
@@ -67,4 +73,17 @@ export default async function manualReviewProvider(payload:unknown,h:Helpers){
     ) UPDATE favorite_review r SET status='RESOLVED',selected_candidate_id=c.id,
       decision=$5::jsonb,resolved_at=now(),reason=NULL FROM affected a JOIN favorite_review_candidate c ON c.review_id=a.id AND c.profile_id=$6
       WHERE r.id=a.id`,[reviewId,userId,mediaId,JSON.stringify({resolution:'manual-review-queue',provider,providerId:resolvedProviderId}),JSON.stringify({kind:'manual',provider,id:resolvedProviderId,rawId:providerId,profileHash:payloadHash}),profile.rows[0].id]);
+  // The manual lookup proves identity, but provider_profile is only review
+  // evidence. Hand the fixed provider ID to the canonical enrichment lane so
+  // status, positions, payload provenance and covers use the same persistence
+  // policy as automatic resolutions. forceRefresh makes MangaUpdates bypass
+  // its already-resolved fast return; neither provider reopens title matching.
+  await h.query(
+    "SELECT graphile_worker.add_job($1,$2,job_key := $3,max_attempts := 3,priority := -80,job_key_mode := 'replace')",
+    [
+      provider==='anilist'?'anilist-enrichment':'mangaupdates-enrichment',
+      {mediaId,forceRefresh:true,repairAvailability:true},
+      `manual-review-enrichment:${provider}:${resolvedProviderId}`,
+    ],
+  );
 }

@@ -12,6 +12,36 @@ describe('Wave 2 UI contracts', () => {
     expect(['Alice', 'Bob']).not.toContain('alice@example.com');
   });
 
+  it('keeps fixed provider logos separate from source-domain favicons and country flags',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const styles=readFileSync(resolve(process.cwd(),'app/media-overrides.css'),'utf8');
+    expect(source).toContain("anilist:'/provider-icons/anilist.svg'");
+    expect(source).toContain("mangaupdates:'/provider-icons/mangaupdates.svg'");
+    expect(source).toContain("mangadex:'/provider-icons/mangadex.svg'");
+    expect(source).toContain('<ProviderIcon provider={page.provider}/>');
+    expect(source).toContain('<DomainIcon domain={source.domain}/><LanguageBadge language={source.language}/>');
+    expect(source).toContain('<i className="source-icon-wrap"><DomainIcon');
+    expect(source).not.toContain("fallback={source.connector==='mangaupdates'?'MU':undefined}");
+    expect(source).toContain("favicon?domain=${encodeURIComponent(clean)}&v=2");
+    expect(styles).toContain('.media-card-source-list .media-source-link .source-language-flag');
+    expect(styles).toContain('.media-card-source-list .media-source-favicon,.media-card-source-list .media-source-globe{width:20px;height:20px}');
+    expect(styles).toContain('right:-2px;bottom:-1px');
+    expect(styles).toContain('width:11px!important;min-width:11px;height:8px!important');
+    expect(styles).toContain('border:0;border-radius:0;background-color:transparent;background-size:100% 100%;box-shadow:none');
+  });
+
+  it('renders flat work-level site recommendations without provider, release, or state labels',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const row=source.slice(source.indexOf('function SourceRow'),source.indexOf('function WorkHeaderIdentity'));
+    expect(source).toContain('<h3>Sites recommandés</h3>');
+    expect(source).not.toContain('<h3>Sources validées</h3>');
+    expect(row).toContain('<strong>{source.domain}</strong>');
+    expect(row).toContain('const workUrl=source.workUrl??source.canonicalUrl');
+    expect(row).not.toContain('source.chapter');
+    expect(row).not.toContain("'Disponible'");
+    expect(source).toContain("[workUrl]:'UNAVAILABLE'");
+  });
+
   it('places the continue shelf directly after the personal list with visible progress',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
     expect(source.indexOf('<PersonalShelf compact />')).toBeLessThan(source.indexOf('<h2>À continuer</h2>'));
@@ -101,8 +131,8 @@ describe('Wave 2 UI contracts', () => {
     expect(source).toContain('window.setTimeout(refresh,2000)');
     expect(source).toContain('window.setTimeout(refresh,8000)');
     expect(source).toContain("return `${personal} / ${available}`");
-    expect(source).toContain("item.progress?.number??item.progress?.raw??'—'");
-    expect(source).toContain("item.availability?.number??item.availability?.raw??'—'");
+    expect(source).toContain("item.progress?.raw??item.progress?.number??'—'");
+    expect(source).toContain("item.availability?.raw??item.availability?.number??'—'");
   });
 
   it('keeps cancelled status visible and bounds calendar exploration',()=>{
@@ -122,6 +152,9 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('<MultiFacet label="Années"');
     expect(source).not.toContain('<MultiFacet label="Thèmes"');
     expect(source).not.toContain('Airings anime');
+    expect(source).not.toContain('label="Classifications"');
+    expect(source).not.toContain('label="Démographies"');
+    expect(source).not.toContain('function ContentPreferences');
   });
 
   it('does not render the backend AniList graph in the work detail',()=>{

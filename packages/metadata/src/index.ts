@@ -3,14 +3,8 @@ import { lookup as dnsLookup } from "node:dns/promises";
 import { load as loadHtml } from "cheerio";
 import { safeRequest } from "@favlib/safe-http";
 import { FAVORITE_PARSER_ID, FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, parseFavorite, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
-export type LanguageDetectionMethod = 'url-path' | 'manifest' | 'document' | 'undetected' | 'ambiguous';
-export type DetectedLanguage = { language: string | null; method: LanguageDetectionMethod; rawUrl: string; detectedAt: string };
-const languageIso6391 = new Set('aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu'.split(' '));
-export function normalizeLanguage(value: unknown): string | null { if (typeof value !== 'string') return null; const raw=value.trim().replace(/_/g,'-'); if (!/^[a-z]{2,3}(?:-[a-z]{2,4})?$/i.test(raw)) return null; const [primary,...rest]=raw.split('-'); return [primary.toLowerCase(),...rest.map(part=>part.length===2?part.toUpperCase():part)].join('-'); }
-export function languageMatches(preferred: string, detected: string | null): boolean { const a=normalizeLanguage(preferred)?.split('-')[0]; const b=normalizeLanguage(detected)?.split('-')[0]; return Boolean(a&&b&&a===b); }
-export function detectLanguageFromUrl(rawUrl:string,now=new Date().toISOString()):DetectedLanguage { let url:URL; try{url=new URL(rawUrl)}catch{return {language:null,method:'undetected',rawUrl,detectedAt:now}} const candidates=url.pathname.split('/').filter(Boolean).map(normalizeLanguage).filter((value):value is string=>Boolean(value)); const unique=[...new Set(candidates.filter(value=>languageIso6391.has(value.split('-')[0])))]; return {language:unique.length===1?unique[0]:null,method:unique.length===1?'url-path':unique.length>1?'ambiguous':'undetected',rawUrl,detectedAt:now}; }
-export function detectLanguage(rawUrl:string,manifestLanguage:unknown,now=new Date().toISOString()):DetectedLanguage { const fromUrl=detectLanguageFromUrl(rawUrl,now); if(fromUrl.language||fromUrl.method==='ambiguous')return fromUrl; const language=normalizeLanguage(manifestLanguage); return {language,method:language?'manifest':'undetected',rawUrl,detectedAt:now}; }
-export function detectLanguageFromDocument(rawUrl:string,documentLanguage:unknown,now=new Date().toISOString()):DetectedLanguage { const fromUrl=detectLanguageFromUrl(rawUrl,now); if(fromUrl.language||fromUrl.method==='ambiguous')return fromUrl; const language=normalizeLanguage(documentLanguage); return {language,method:language?'document':'undetected',rawUrl,detectedAt:now}; }
+export { declaredLanguageEvidence, declaredLanguageSignals, detectLanguage, detectLanguageFromDocument, detectLanguageFromUrl, languageMatches, normalizeLanguage, resolvePageLanguage, visibleDocumentText } from '@favlib/metadata/language';
+export type { DeclaredLanguageEvidence, DetectedLanguage, LanguageDetectionMethod, LanguageEvidence, LanguageSignal, ResolvedLanguage } from '@favlib/metadata/language';
 export { FAVORITE_IDENTITY_PARSER_VERSION, FAVORITE_PARSER_ID, parseFavorite } from '@favlib/metadata/bookmark-parser';
 export type { FavoriteParseArtifact, FavoriteProgression } from '@favlib/metadata/bookmark-parser';
 
@@ -19,6 +13,61 @@ export type SearchClient = (
   init?: RequestInit,
 ) => Promise<Response>;
 export type MediaType = "ANIME" | "MANGA" | "MANHWA" | "MANHUA";
+
+/**
+ * Global content gate. These are provider taxonomy labels, never title or user
+ * data. Matching is exact after Unicode/case/punctuation normalization so a
+ * harmless category containing one of these words is not rejected.
+ */
+export const BLOCKED_CONTENT_GENRES = ["Adult", "Erotica", "Hentai", "Smut"] as const;
+export const BLOCKED_CONTENT_CATEGORIES = [
+  "18+",
+  "Adult",
+  "Erotica",
+  "Explicit Sex",
+  "Explicit Sexual Content",
+  "Graphic Sex",
+  "Hardcore",
+  "Hentai",
+  "Lolicon",
+  "Pornographic Content",
+  "Pornography",
+  "Sexual Content",
+  "Shotacon",
+  "Smut",
+] as const;
+
+const normalizeContentTaxonomy = (value: string) => value
+  .normalize("NFKD")
+  .replace(/\p{M}/gu, "")
+  .toLocaleLowerCase("en")
+  .replace(/[^\p{L}\p{N}]+/gu, " ")
+  .trim();
+const blockedGenreKeys = new Set(BLOCKED_CONTENT_GENRES.map(normalizeContentTaxonomy));
+const blockedCategoryKeys = new Set(BLOCKED_CONTENT_CATEGORIES.map(normalizeContentTaxonomy));
+
+export type ContentTaxonomyExclusion = {
+  reason: "BLOCKED_CONTENT_TAXONOMY";
+  matches: Array<{ field: "genre" | "category"; raw: string; normalized: string }>;
+};
+
+export function contentTaxonomyExclusion(input: {
+  genres?: readonly unknown[] | null;
+  categories?: readonly unknown[] | null;
+}): ContentTaxonomyExclusion | null {
+  const matches: ContentTaxonomyExclusion["matches"] = [];
+  for (const [field, values, blocked] of [
+    ["genre", input.genres, blockedGenreKeys],
+    ["category", input.categories, blockedCategoryKeys],
+  ] as const) {
+    for (const value of values ?? []) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const normalized = normalizeContentTaxonomy(value);
+      if (blocked.has(normalized)) matches.push({ field, raw: value, normalized });
+    }
+  }
+  return matches.length ? { reason: "BLOCKED_CONTENT_TAXONOMY", matches } : null;
+}
 export type SourceIdentity = {
   key: string;
   title: string;
@@ -51,44 +100,6 @@ export type PageMetadata = {
   confidence: number;
 };
 
-export type DeclaredLanguageEvidence = {
-  language: string | null;
-  method: "url-path" | "manifest" | "html-lang" | "content-language" | "og:locale" | "hreflang" | "undetected" | "ambiguous";
-  raw: string | null;
-};
-
-/** Declarative language evidence only. Statistical detection belongs after all
- * of these signals and is intentionally not part of this resolver. */
-export function declaredLanguageEvidence(input: {
-  url: string;
-  manifestLanguage?: unknown;
-  html?: string;
-  headers?: Headers | Record<string, string | string[] | undefined>;
-}): DeclaredLanguageEvidence {
-  const fromUrl = detectLanguageFromUrl(input.url);
-  if (fromUrl.method === "ambiguous") return { language: null, method: "ambiguous", raw: null };
-  if (fromUrl.language) return { language: fromUrl.language, method: "url-path", raw: fromUrl.language };
-  const manifest = normalizeLanguage(input.manifestLanguage);
-  if (manifest) return { language: manifest, method: "manifest", raw: String(input.manifestLanguage) };
-  if (!input.html) return { language: null, method: "undetected", raw: null };
-  const $ = loadHtml(input.html);
-  const htmlLang = normalizeLanguage($("html").first().attr("lang"));
-  if (htmlLang) return { language: htmlLang, method: "html-lang", raw: $("html").first().attr("lang") ?? null };
-  const headerValue = input.headers instanceof Headers
-    ? input.headers.get("content-language")
-    : Object.entries(input.headers ?? {}).find(([key]) => key.toLowerCase() === "content-language")?.[1];
-  const header = Array.isArray(headerValue) ? headerValue[0] : headerValue;
-  const headerLanguage = normalizeLanguage(String(header ?? "").split(",")[0]?.split(";")[0]);
-  if (headerLanguage) return { language: headerLanguage, method: "content-language", raw: String(header) };
-  const locale = $("meta[property='og:locale'], meta[name='og:locale']").map((_, element) => $(element).attr("content")).get().find(Boolean);
-  const localeLanguage = normalizeLanguage(locale);
-  if (localeLanguage) return { language: localeLanguage, method: "og:locale", raw: locale ?? null };
-  const hreflangs = $("link[rel~='alternate'][hreflang]").map((_, element) => $(element).attr("hreflang")).get().map(normalizeLanguage).filter((value): value is string => Boolean(value));
-  const unique = [...new Set(hreflangs)];
-  if (unique.length === 1) return { language: unique[0], method: "hreflang", raw: unique[0] };
-  if (unique.length > 1) return { language: null, method: "ambiguous", raw: null };
-  return { language: null, method: "undetected", raw: null };
-}
 type AniListDate = { year?: number; month?: number; day?: number };
 export type AniListTitle = {
   romaji?: string;
@@ -1667,8 +1678,6 @@ export type MangaDexManga = {
   status?: string;
   year?: number;
   originalLanguage?: string;
-  publicationDemographic?: string;
-  contentRating?: string;
   authors: Array<{ id: string; name?: string }>;
   artists: Array<{ id: string; name?: string }>;
   relations: Array<{ id: string; type: string }>;
@@ -1717,8 +1726,6 @@ export function parseMangaDexManga(value: unknown): MangaDexManga | null {
     ...(typeof attributes.status === "string" ? { status: attributes.status } : {}),
     ...(Number.isInteger(attributes.year) ? { year: attributes.year } : {}),
     ...(typeof attributes.originalLanguage === "string" ? { originalLanguage: attributes.originalLanguage } : {}),
-    ...(typeof attributes.publicationDemographic === "string" ? { publicationDemographic: attributes.publicationDemographic } : {}),
-    ...(typeof attributes.contentRating === "string" ? { contentRating: attributes.contentRating } : {}),
     authors: people("author"), artists: people("artist"),
     relations: relationships.filter((entry: any) => entry?.type === "manga" && typeof entry?.id === "string").map((entry: any) => ({ id: entry.id, type: String(entry?.related ?? "related") })),
     ...(coverFileName ? { coverFileName, coverUrl } : {}), raw: value,

@@ -117,7 +117,7 @@ describe("AniList enrichment resolution", () => {
     const assertions=calls.filter(call=>call.sql.includes('INSERT INTO metadata_assertion'));
     expect(assertions.find(call=>call.values?.[1]==='genres')?.values?.[2]).toBe(JSON.stringify(['Adventure']));
     expect(assertions.find(call=>call.values?.[1]==='categories')?.values?.[2]).toBe(JSON.stringify(['Found Family','Synthetic Adult Tag']));
-    expect(assertions.find(call=>call.values?.[1]==='adultCategories')?.values?.[2]).toBe(JSON.stringify(['Synthetic Adult Tag']));
+    expect(assertions.some(call=>call.values?.[1]==='adultCategories')).toBe(false);
   });
 
   it("skips a manga first result and resolves the anime through a returned romaji title", async () => {

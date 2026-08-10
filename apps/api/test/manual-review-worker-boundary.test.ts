@@ -34,4 +34,12 @@ describe('manual provider review boundary',()=>{
     expect(resolver.indexOf('x.provider === "anilist-chain"')).toBeLessThan(resolver.indexOf('mangaupdates-enrichment'));
     expect(resolver).toContain('decision IS NULL');
   });
+
+  it('hands selected provider profiles to canonical metadata enrichment, not a cover-only shortcut',()=>{
+    const source=readFileSync(new URL('../src/server.ts',import.meta.url),'utf8');
+    const resolver=source.slice(source.indexOf('async function resolveReview'),source.indexOf('async function recordCollectiveEndorsement'));
+    expect(resolver).toContain('forceRefresh: true');
+    expect(resolver).toContain('repairAvailability: true');
+    expect(resolver).not.toContain('JSON.stringify({ mediaId, cover: true })');
+  });
 });

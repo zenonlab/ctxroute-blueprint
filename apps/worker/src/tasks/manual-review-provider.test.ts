@@ -1,13 +1,14 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 
-const {fetchMangaUpdatesSeries,resolveMangaUpdatesPublicSlug}=vi.hoisted(()=>({
+const {fetchAniList,fetchMangaUpdatesSeries,resolveMangaUpdatesPublicSlug}=vi.hoisted(()=>({
+  fetchAniList:vi.fn(),
   fetchMangaUpdatesSeries:vi.fn(),
   resolveMangaUpdatesPublicSlug:vi.fn(),
 }));
 
 vi.mock('@favlib/metadata',async()=>{
   const actual=await vi.importActual<typeof import('@favlib/metadata')>('@favlib/metadata');
-  return {...actual,fetchMangaUpdatesSeries,resolveMangaUpdatesPublicSlug};
+  return {...actual,fetchAniList,fetchMangaUpdatesSeries,resolveMangaUpdatesPublicSlug};
 });
 vi.mock('@favlib/database/provider-queue',()=>({withProviderRequest:vi.fn(async(_h:unknown,_input:unknown,call:()=>Promise<unknown>)=>call())}));
 
@@ -44,5 +45,30 @@ describe('manual provider review',()=>{
     const coverJob=calls.find(call=>call.sql.includes("add_job('provider-profile-cover'"));
     expect(coverJob?.values?.[0]).toEqual({profileId:'profile-synthetic'});
     expect(coverJob?.values?.[1]).toBe('provider-profile-cover:mangaupdates:420042');
+    const enrichmentJob=calls.find(call=>call.sql.includes('graphile_worker.add_job($1'));
+    expect(enrichmentJob?.values).toEqual([
+      'mangaupdates-enrichment',
+      {mediaId:'mangaupdates:420042',forceRefresh:true,repairAvailability:true},
+      'manual-review-enrichment:mangaupdates:420042',
+    ]);
+  });
+
+  it('hands a synthetic AniList manual identity to the same canonical enrichment lane',async()=>{
+    fetchAniList.mockResolvedValue({id:700,title:{userPreferred:'Synthetic Animation',romaji:'Synthetic Animation'},type:'ANIME',synonyms:[]});
+    const calls:Array<{sql:string;values?:unknown[]}>=[];
+    const query=vi.fn(async(sql:string,values?:unknown[])=>{
+      calls.push({sql,values});
+      if(sql.includes('FROM favorite_review review'))return {rowCount:1,rows:[{favorite_title:'Synthetic Animation',source_titles:['Synthetic Animation']}]};
+      if(sql.startsWith('SELECT 1 FROM favorite_review'))return {rowCount:1,rows:[{}]};
+      if(sql.includes('INSERT INTO provider_profile'))return {rowCount:1,rows:[{id:'profile-animation'}]};
+      return {rowCount:1,rows:[]};
+    });
+    await manualReviewProvider({reviewId:'review-animation',userId:'user-animation',provider:'anilist',providerId:'700'},{query});
+    const enrichmentJob=calls.find(call=>call.sql.includes('graphile_worker.add_job($1'));
+    expect(enrichmentJob?.values).toEqual([
+      'anilist-enrichment',
+      {mediaId:'anilist:700',forceRefresh:true,repairAvailability:true},
+      'manual-review-enrichment:anilist:700',
+    ]);
   });
 });

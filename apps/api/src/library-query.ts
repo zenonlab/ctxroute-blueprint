@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { BLOCKED_CONTENT_CATEGORIES, BLOCKED_CONTENT_GENRES } from '@favlib/metadata';
 
-export const libraryFilterKeys = ['type', 'theme', 'genre', 'category', 'status', 'year', 'contentRating', 'demographic'] as const;
+export const libraryFilterKeys = ['type', 'theme', 'genre', 'category', 'status', 'year'] as const;
 export type LibraryFilterKey = typeof libraryFilterKeys[number];
 
 const repeated = (max = 100) => z.preprocess(
@@ -18,9 +19,7 @@ export const libraryQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
   q: z.string().trim().max(200).default(''),
   type: repeated(), theme: repeated(), genre: repeated(), category: repeated(), status: repeated(), year: years,
-  contentRating: repeated(), demographic: repeated(),
   excludeType: repeated(), excludeTheme: repeated(), excludeGenre: repeated(), excludeCategory: repeated(), excludeStatus: repeated(), excludeYear: years,
-  excludeContentRating: repeated(), excludeDemographic: repeated(),
   // Kept as a private compatibility parameter. It is deliberately absent from facets and the UI.
   provider: repeated(),
   // Contextual filters are created from modal metadata chips. They are not
@@ -38,13 +37,18 @@ export const activeProviderSql = "l.status IN ('matched','accepted')";
 // operations and use this one only for the read-only library projection.
 export const libraryVisibleLinkSql = "l.status IN ('matched','accepted','review')";
 
+const sqlTextArray = (values: readonly string[]) => `ARRAY[${values.map(value => `'${value.toLocaleLowerCase('en').replace(/[^a-z0-9]+/gu, ' ').trim().replaceAll("'", "''")}'`).join(',')}]::text[]`;
+export function contentAllowedSql(mediaId: string) {
+  return `NOT EXISTS(SELECT 1 FROM metadata_assertion blocked CROSS JOIN LATERAL jsonb_array_elements_text(blocked.value) taxonomy_value WHERE blocked.media_id=${mediaId} AND jsonb_typeof(blocked.value)='array' AND ((blocked.field='genres' AND lower(btrim(regexp_replace(taxonomy_value,'[^[:alnum:]]+',' ','g')))=ANY(${sqlTextArray(BLOCKED_CONTENT_GENRES)})) OR (blocked.field='categories' AND lower(btrim(regexp_replace(taxonomy_value,'[^[:alnum:]]+',' ','g')))=ANY(${sqlTextArray(BLOCKED_CONTENT_CATEGORIES)}))))`;
+}
+
 /** One canonical user-scoped projection is shared by result and facet queries. */
 export const libraryProjectionSql = `personal AS (
   SELECT l.media_id,count(DISTINCT (l.installation_id,l.bookmark_id))::int AS favorite_count,
     (SELECT i.payload->>'url' FROM bookmark_media_link source_link JOIN bookmark_import_item i ON i.user_id=source_link.user_id AND i.installation_id=source_link.installation_id AND i.bookmark_id=source_link.bookmark_id WHERE source_link.user_id=$1 AND source_link.media_id=l.media_id AND i.event<>'removed' ORDER BY i.created_at DESC LIMIT 1) AS source_url
   FROM bookmark_media_link l
   JOIN bookmark_import_item active_import ON active_import.user_id=l.user_id AND active_import.installation_id=l.installation_id AND active_import.bookmark_id=l.bookmark_id AND active_import.event<>'removed'
-  WHERE l.user_id=$1 AND l.status IN ('matched','accepted','review') AND l.media_id IS NOT NULL
+  WHERE l.user_id=$1 AND l.status IN ('matched','accepted','review') AND l.media_id IS NOT NULL AND ${contentAllowedSql('l.media_id')}
   GROUP BY l.media_id
 ), projected AS (
   SELECT p.media_id AS "id",
@@ -57,7 +61,14 @@ export const libraryProjectionSql = `personal AS (
     p.favorite_count AS "favoriteCount",
     CASE WHEN EXISTS(SELECT 1 FROM bookmark_media_link review_link WHERE review_link.user_id=$1 AND review_link.media_id=p.media_id AND review_link.status='review' AND NOT EXISTS(SELECT 1 FROM favorite_review resolved_review WHERE resolved_review.user_id=review_link.user_id AND resolved_review.installation_id=review_link.installation_id AND resolved_review.bookmark_id=review_link.bookmark_id AND resolved_review.status='RESOLVED' AND resolved_review.decision IS NOT NULL)) THEN 'review' ELSE 'classified' END AS "classificationStatus",
     (SELECT jsonb_build_object('kind',fp.position_kind,'number',COALESCE(fp.global_position_number,fp.position_number::numeric),'raw',fp.position_raw,'season',fp.season,'localNumber',fp.local_position_number,'globalNumber',fp.global_position_number,'updatedAt',fp.updated_at) FROM favorite_progress fp WHERE fp.user_id=$1 AND fp.media_id=p.media_id ORDER BY COALESCE(fp.global_position_number,fp.position_number::numeric) DESC NULLS LAST,fp.updated_at DESC LIMIT 1) AS progress,
-    (SELECT jsonb_build_object('kind',pp.available_position_kind,'number',COALESCE(pp.global_position_number,pp.available_position_number),'raw',pp.available_position_raw,'season',pp.season,'localNumber',pp.local_position_number,'globalNumber',pp.global_position_number,'provider',pp.provider,'provenance',pp.available_position_provenance,'verifiedAt',pp.last_checked_at) FROM provider_progress pp WHERE pp.media_id=p.media_id AND pp.status='ACTIVE' AND pp.available_position_kind IS NOT NULL AND pp.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END ORDER BY pp.updated_at DESC LIMIT 1) AS availability,
+    (SELECT jsonb_build_object('kind',available.kind,'number',available.number,'raw',available.raw,'season',available.season,'localNumber',available.local_number,'globalNumber',available.global_number,'provider',available.provider,'provenance',available.provenance,'verifiedAt',available.verified_at) FROM (
+      SELECT pp.available_position_kind AS kind,COALESCE(pp.global_position_number,pp.available_position_number) AS number,pp.available_position_raw AS raw,pp.season,pp.local_position_number AS local_number,pp.global_position_number AS global_number,pp.provider,pp.available_position_provenance AS provenance,pp.last_checked_at AS verified_at,0 AS source_priority
+      FROM provider_progress pp WHERE pp.media_id=p.media_id AND pp.status='ACTIVE' AND pp.available_position_kind IS NOT NULL AND pp.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END
+      UNION ALL
+      SELECT fp.position_kind,COALESCE(fp.global_position_number,fp.position_number::numeric),fp.position_raw,fp.season,fp.local_position_number,fp.global_position_number,'favorite-source',COALESCE(observation.provenance,'{}'::jsonb)||jsonb_build_object('source','favorite-raw-observation','positionRaw',fp.position_raw),fp.updated_at,1
+      FROM favorite_progress fp LEFT JOIN progression_observation observation ON observation.id=fp.observation_id
+      WHERE fp.user_id=$1 AND fp.media_id=p.media_id AND fp.position_kind=CASE WHEN m.type='ANIME' THEN 'episode' ELSE 'chapter' END
+    ) available WHERE available.number IS NOT NULL ORDER BY available.number DESC,available.source_priority,available.verified_at DESC NULLS LAST LIMIT 1) AS availability,
     CASE WHEN p.source_url IS NULL THEN NULL ELSE jsonb_build_object('url',p.source_url,'domain',split_part(regexp_replace(p.source_url,'^https?://',''),'/',1)) END AS "sourceIdentity",
     COALESCE(
       (SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at) FROM media_cover c WHERE c.media_id=p.media_id AND c.status='ACTIVE'),
@@ -65,9 +76,9 @@ export const libraryProjectionSql = `personal AS (
        FROM media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id AND c.status='ACTIVE'
        WHERE im.source_media_id=p.media_id LIMIT 1)
     ) AS "coverProvenance",
-    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT theme_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) theme_value WHERE a.media_id=p.media_id AND a.field='themes' AND jsonb_typeof(a.value)='array' AND (COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) OR NOT EXISTS(SELECT 1 FROM metadata_assertion aa CROSS JOIN LATERAL jsonb_array_elements_text(aa.value) av WHERE aa.media_id=p.media_id AND aa.field='adultCategories' AND av=theme_value))) v),'[]'::jsonb) AS themes,
+    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT theme_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) theme_value WHERE a.media_id=p.media_id AND a.field='themes' AND jsonb_typeof(a.value)='array') v),'[]'::jsonb) AS themes,
     COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT genre_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) genre_value WHERE a.media_id=p.media_id AND a.field='genres' AND jsonb_typeof(a.value)='array') v),'[]'::jsonb) AS genres,
-    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT category_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) category_value WHERE a.media_id=p.media_id AND a.field='categories' AND jsonb_typeof(a.value)='array' AND (COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) OR NOT EXISTS(SELECT 1 FROM metadata_assertion aa CROSS JOIN LATERAL jsonb_array_elements_text(aa.value) av WHERE aa.media_id=p.media_id AND aa.field='adultCategories' AND av=category_value))) v),'[]'::jsonb) AS categories,
+    COALESCE((SELECT jsonb_agg(v.value ORDER BY v.value) FROM (SELECT DISTINCT category_value AS value FROM metadata_assertion a CROSS JOIN LATERAL jsonb_array_elements_text(a.value) category_value WHERE a.media_id=p.media_id AND a.field='categories' AND jsonb_typeof(a.value)='array') v),'[]'::jsonb) AS categories,
     CASE
       WHEN raw_status ~* '\\m(on[[:space:]]+)?hiatus\\M' THEN 'Hiatus'
       WHEN raw_status ~* '\\m(complete|completed|finished)\\M' THEN 'Completed'
@@ -78,8 +89,6 @@ export const libraryProjectionSql = `personal AS (
       ELSE NULL
     END AS status,
     (SELECT a.value #>> '{}' FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='language' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) AS language,
-    (SELECT a.value #>> '{}' FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='contentRating' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) AS "contentRating",
-    (SELECT a.value #>> '{}' FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='publicationDemographic' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) AS demographic,
     (SELECT max(a.value #>> '{}') FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='latestReleaseDate') AS "latestReleaseDate",
     COALESCE((SELECT jsonb_agg(DISTINCT a.provider) FROM metadata_assertion a WHERE a.media_id=p.media_id),'[]'::jsonb) AS providers,
     COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('text',tt.text,'language',tt.language,'script',tt.script,'kind',tt.kind,'titleType',tt.title_type,'connector',tt.connector,'personalStatus',tt.personal_status,'provenance',tt.provenance,'externalId',tt.provenance->>'externalId')) FROM media_title tt WHERE tt.media_id=p.media_id),'[]'::jsonb) AS titles,
@@ -89,7 +98,7 @@ export const libraryProjectionSql = `personal AS (
     COALESCE((SELECT jsonb_agg(jsonb_build_object('provider',pp.provider,'latestChapter',pp.latest_chapter,'latestVolume',pp.latest_volume,'availablePositionKind',pp.available_position_kind,'availablePositionNumber',pp.available_position_number,'availablePositionRaw',pp.available_position_raw,'availablePositionProvenance',pp.available_position_provenance,'latestReleaseAt',pp.latest_release_at,'status',pp.status,'lastCheckedAt',pp.last_checked_at,'lastError',pp.last_error) ORDER BY pp.provider) FROM provider_progress pp WHERE pp.media_id=p.media_id),'[]'::jsonb) AS "providerProgress",
     COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('provider',a.provider,'text',a.attribution,'sourceUrl',a.source_url)) FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.attribution IS NOT NULL),'[]'::jsonb) AS attributions,
     COALESCE((SELECT jsonb_agg(jsonb_build_object('bookmarkId',i.bookmark_id,'url',i.payload->>'url','title',i.payload->>'title','parsedTitle',i.parse_artifact#>>'{identity,title}','progression',i.parse_artifact->'progression','device',COALESCE(d.name,'Profil'),'parserId',i.parser_id,'parserVersion',i.parser_version,'provenance',i.parse_artifact->'provenance') ORDER BY i.created_at DESC) FROM bookmark_media_link l2 JOIN bookmark_import_item i ON i.user_id=l2.user_id AND i.installation_id=l2.installation_id AND i.bookmark_id=l2.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l2.user_id=$1 AND l2.media_id=p.media_id AND l2.status IN ('matched','accepted','review') AND i.event<>'removed'),'[]'::jsonb) AS favorites,
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('mediaId',o.media_id,'connector',o.connector,'canonicalUrl',o.canonical_url,'status',CASE WHEN o.provenance->>'statusCode'='404' OR o.provenance->>'httpStatus'='404' THEN 'MOVED' WHEN o.status='ERROR' THEN 'UNAVAILABLE' ELSE o.status END,'checkedAt',o.checked_at,'title',o.provenance->>'title','chapter',o.provenance->>'chapter','domain',split_part(regexp_replace(o.canonical_url,'^https?://',''),'/',1),'language',o.provenance->>'language','provenance',o.provenance) ORDER BY o.checked_at DESC) FROM release_origin o WHERE o.media_id=p.media_id AND (o.user_id IS NULL OR o.user_id=$1)),'[]'::jsonb) AS sources
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('mediaId',recommended.media_id,'connector',recommended.connector,'canonicalUrl',recommended.work_url,'workUrl',recommended.work_url,'status','AVAILABLE','checkedAt',recommended.checked_at,'title',NULL,'chapter',NULL,'domain',recommended.domain,'language',recommended.language,'provenance',recommended.provenance) ORDER BY recommended.checked_at DESC) FROM (SELECT DISTINCT ON (lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i'))) o.media_id,o.connector,o.checked_at,o.provenance,o.provenance->>'workUrl' AS work_url,o.provenance->>'language' AS language,lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')) AS domain FROM release_origin o WHERE o.media_id=p.media_id AND (o.user_id IS NULL OR o.user_id=$1) AND o.status='AVAILABLE' AND NULLIF(o.provenance->>'language','') IS NOT NULL AND o.provenance->>'languageDetection' NOT IN ('undetected','ambiguous') AND o.provenance->>'workUrl' ~ '^https?://' ORDER BY lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')),o.checked_at DESC) recommended),'[]'::jsonb) AS sources
   FROM personal p JOIN media m ON m.id=p.media_id
   LEFT JOIN LATERAL (SELECT a.value #>> '{}' AS raw_status FROM metadata_assertion a WHERE a.media_id=p.media_id AND a.field='status' ORDER BY a.confidence DESC,a.asserted_at DESC LIMIT 1) status_assertion ON true
 )`;
@@ -101,21 +110,19 @@ const clauses: Record<LibraryFilterKey, string> = {
   category: `cardinality($6::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(categories) value WHERE lower(value)=ANY($6::text[]))`,
   status: `cardinality($7::text[])=0 OR lower(COALESCE(status,''))=ANY($7::text[])`,
   year: `cardinality($8::int[])=0 OR "seasonYear"=ANY($8::int[])`,
-  contentRating: `cardinality($9::text[])=0 OR lower(COALESCE("contentRating",''))=ANY($9::text[])`,
-  demographic: `cardinality($10::text[])=0 OR lower(COALESCE(demographic,''))=ANY($10::text[])`,
 };
 
-const ignoredCasts:Record<LibraryFilterKey,string>={type:'$3::text[] IS NOT NULL',theme:'$4::text[] IS NOT NULL',genre:'$5::text[] IS NOT NULL',category:'$6::text[] IS NOT NULL',status:'$7::text[] IS NOT NULL',year:'$8::int[] IS NOT NULL',contentRating:'$9::text[] IS NOT NULL',demographic:'$10::text[] IS NOT NULL'};
-const ignoredExclusionCasts:Record<LibraryFilterKey,string>={type:'$12::text[] IS NOT NULL',theme:'$13::text[] IS NOT NULL',genre:'$14::text[] IS NOT NULL',category:'$15::text[] IS NOT NULL',status:'$16::text[] IS NOT NULL',year:'$17::int[] IS NOT NULL',contentRating:'$18::text[] IS NOT NULL',demographic:'$19::text[] IS NOT NULL'};
+const ignoredCasts:Record<LibraryFilterKey,string>={type:'$3::text[] IS NOT NULL',theme:'$4::text[] IS NOT NULL',genre:'$5::text[] IS NOT NULL',category:'$6::text[] IS NOT NULL',status:'$7::text[] IS NOT NULL',year:'$8::int[] IS NOT NULL'};
+const ignoredExclusionCasts:Record<LibraryFilterKey,string>={type:'$10::text[] IS NOT NULL',theme:'$11::text[] IS NOT NULL',genre:'$12::text[] IS NOT NULL',category:'$13::text[] IS NOT NULL',status:'$14::text[] IS NOT NULL',year:'$15::int[] IS NOT NULL'};
 
 export function libraryFilterSql(ignore?: LibraryFilterKey) {
-  const exclusions:Record<LibraryFilterKey,string>={type:`cardinality($12::text[])=0 OR NOT ("type"=ANY($12::text[]))`,theme:`cardinality($13::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes) value WHERE lower(value)=ANY($13::text[]))`,genre:`cardinality($14::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(genres) value WHERE lower(value)=ANY($14::text[]))`,category:`cardinality($15::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(categories) value WHERE lower(value)=ANY($15::text[]))`,status:`cardinality($16::text[])=0 OR NOT (lower(COALESCE(status,''))=ANY($16::text[]))`,year:`cardinality($17::int[])=0 OR NOT ("seasonYear"=ANY($17::int[]))`,contentRating:`cardinality($18::text[])=0 OR NOT (lower(COALESCE("contentRating",''))=ANY($18::text[]))`,demographic:`cardinality($19::text[])=0 OR NOT (lower(COALESCE(demographic,''))=ANY($19::text[]))`};
-  return [`($2='' OR EXISTS(SELECT 1 FROM media_title search_title WHERE search_title.media_id=projected."id" AND (search_title.normalized_text LIKE '%'||lower($2)||'%' OR NOT EXISTS(SELECT 1 FROM regexp_split_to_table(lower($2),'\\s+') token WHERE token<>'' AND search_title.normalized_text NOT LIKE '%'||token||'%'))))`, ...libraryFilterKeys.map(key => `(${key===ignore?ignoredCasts[key]:clauses[key]})`), `(cardinality($11::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(providers) value WHERE lower(value)=ANY($11::text[])))`,...libraryFilterKeys.map(key=>`(${key===ignore?ignoredExclusionCasts[key]:exclusions[key]})`), `(cardinality($20::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(authors) value WHERE lower(value->>'name')=ANY($20::text[])))`, `(cardinality($21::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(studios) value WHERE lower(value->>'name')=ANY($21::text[])))`].join(' AND ');
+  const exclusions:Record<LibraryFilterKey,string>={type:`cardinality($10::text[])=0 OR NOT ("type"=ANY($10::text[]))`,theme:`cardinality($11::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(themes) value WHERE lower(value)=ANY($11::text[]))`,genre:`cardinality($12::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(genres) value WHERE lower(value)=ANY($12::text[]))`,category:`cardinality($13::text[])=0 OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements_text(categories) value WHERE lower(value)=ANY($13::text[]))`,status:`cardinality($14::text[])=0 OR NOT (lower(COALESCE(status,''))=ANY($14::text[]))`,year:`cardinality($15::int[])=0 OR NOT ("seasonYear"=ANY($15::int[]))`};
+  return [`($2='' OR EXISTS(SELECT 1 FROM media_title search_title WHERE search_title.media_id=projected."id" AND (search_title.normalized_text LIKE '%'||lower($2)||'%' OR NOT EXISTS(SELECT 1 FROM regexp_split_to_table(lower($2),'\\s+') token WHERE token<>'' AND search_title.normalized_text NOT LIKE '%'||token||'%'))))`, ...libraryFilterKeys.map(key => `(${key===ignore?ignoredCasts[key]:clauses[key]})`), `(cardinality($9::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(providers) value WHERE lower(value)=ANY($9::text[])))`,...libraryFilterKeys.map(key=>`(${key===ignore?ignoredExclusionCasts[key]:exclusions[key]})`), `(cardinality($16::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(authors) value WHERE lower(value->>'name')=ANY($16::text[])))`, `(cardinality($17::text[])=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(studios) value WHERE lower(value->>'name')=ANY($17::text[])))`].join(' AND ');
 }
 
 export function libraryFilterValues(userId: string, query: LibraryQuery) {
   const lower = (values: string[]) => [...new Set(values.map(value => value.toLocaleLowerCase()))];
-  return [userId, query.q, [...new Set(query.type.map(value => value.toUpperCase()))], lower(query.theme),lower(query.genre),lower(query.category),lower(query.status), [...new Set(query.year)], lower(query.contentRating), lower(query.demographic), lower(query.provider),[...new Set(query.excludeType.map(value=>value.toUpperCase()))],lower(query.excludeTheme),lower(query.excludeGenre),lower(query.excludeCategory),lower(query.excludeStatus),[...new Set(query.excludeYear)],lower(query.excludeContentRating),lower(query.excludeDemographic),lower(query.author),lower(query.studio)];
+  return [userId, query.q, [...new Set(query.type.map(value => value.toUpperCase()))], lower(query.theme),lower(query.genre),lower(query.category),lower(query.status), [...new Set(query.year)], lower(query.provider),[...new Set(query.excludeType.map(value=>value.toUpperCase()))],lower(query.excludeTheme),lower(query.excludeGenre),lower(query.excludeCategory),lower(query.excludeStatus),[...new Set(query.excludeYear)],lower(query.author),lower(query.studio)];
 }
 
 export function retainSelected(rows: Array<{value:string|number;count:number}>, selected: Array<string|number>) {
