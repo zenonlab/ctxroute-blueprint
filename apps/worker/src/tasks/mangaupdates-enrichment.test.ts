@@ -16,4 +16,11 @@ describe('MangaUpdates provider availability',()=>{
     expect(source).toContain("chapter?.raw??null");
     expect(source).not.toContain("s.latestChapter??null,s.latestVolume");
   });
+  it('reapplies a proved provider type before an active-identity fast return',()=>{
+    const source=readFileSync(new URL('./mangaupdates-enrichment.ts',import.meta.url),'utf8');
+    expect(source).toContain('mangaUpdatesMediaType(currentIdentity.rows[0]?.raw_type)');
+    expect(source).toContain('UPDATE media SET type=$2,updated_at=now()');
+    expect(source).toContain('c.mangaupdates_id ??= currentIdentity.rows[0]?.external_id');
+    expect(source).not.toContain("String(record.type??'MANGA').toUpperCase()");
+  });
 });

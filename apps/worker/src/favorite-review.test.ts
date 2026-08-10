@@ -18,18 +18,19 @@ describe('favorite reviews', () => {
     expect(calls.filter(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES')).length).toBe(2);
     expect(calls.filter(sql => sql.startsWith('INSERT INTO personal_notification')).length).toBe(1);
   });
-  it('never persists blocked provider taxonomies as review candidates', async () => {
+  it('retains blocked provider taxonomy as review evidence for the personal visibility gate', async () => {
     const calls: string[] = [];
     const query = vi.fn(async (sql: string) => {
       calls.push(sql);
       if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] };
       if (sql.startsWith('INSERT INTO favorite_review')) return { rows: [{ id: 'review-1' }] };
+      if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] };
       if (sql.startsWith("SELECT count(")) return { rows: [{ count: 1 }] };
       return { rows: [] };
     });
     await openFavoriteReview(query, { userId: 'u', title: 'Synthetic Neutral Title', url: 'https://example.test/work', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Synthetic Neutral Title', genres: ['Adult'] }] });
-    expect(calls.some(sql => sql.startsWith('INSERT INTO provider_profile'))).toBe(false);
-    expect(calls.some(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES'))).toBe(false);
+    expect(calls.some(sql => sql.startsWith('INSERT INTO provider_profile'))).toBe(true);
+    expect(calls.some(sql => sql.startsWith('INSERT INTO favorite_review_candidate') && sql.includes('VALUES'))).toBe(true);
   });
   it('does not reopen a favorite that already has a final user decision',async()=>{
     const calls:string[]=[];

@@ -7,6 +7,8 @@ export const calendarEventContract=z.object({mediaId:z.string(),releaseKey:z.str
 export const calendarPageContract=z.object({items:z.array(calendarEventContract),total:z.number().int().nonnegative(),nextCursor:z.string().nullable(),timeZone:z.string(),filters:z.record(z.string(),z.unknown()),facets:z.object({genres:z.array(z.object({value:z.string(),count:z.number().int().nonnegative()})),categories:z.array(z.object({value:z.string(),count:z.number().int().nonnegative()}))}).optional()});
 export const languagePreferenceContract=z.object({preferredLanguages:z.array(z.string().regex(/^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$/)).max(20),updatedAt:z.string().datetime().nullable()});
 export const languagePreferencePatchContract=languagePreferenceContract.pick({preferredLanguages:true}).strict();
+export const contentPreferenceContract=z.object({allowAdult:z.boolean(),updatedAt:z.string().datetime().nullable()});
+export const contentPreferencePatchContract=contentPreferenceContract.pick({allowAdult:true}).strict();
 export const registerRequestContract=z.object({email:z.string().email().max(320),password:z.string().min(1).max(128)});
 export const adminSettingsPatchContract=z.record(z.string(),z.number()).refine(value=>Object.keys(value).length>0);
 export const adminUserPatchContract=z.object({role:z.enum(['admin','member']).optional(),active:z.boolean().optional()}).strict().refine(value=>value.role!==undefined||value.active!==undefined);

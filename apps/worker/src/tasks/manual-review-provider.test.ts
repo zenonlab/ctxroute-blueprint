@@ -20,7 +20,7 @@ describe('manual provider review',()=>{
   it('resolves a synthetic MangaUpdates public slug through the shared exact-URL bridge',async()=>{
     resolveMangaUpdatesPublicSlug.mockResolvedValue({
       rawLink:'synthetic42',method:'public-url-slug',
-      series:{id:'420042',title:'Synthetic Tower Expert',titles:['Synthetic Tower Expert'],type:'Manga',image:'https://images.provider.invalid/synthetic-cover.jpg',url:'https://provider.invalid/series/synthetic42/synthetic-tower-expert'},
+      series:{id:'420042',title:'Synthetic Tower Expert',titles:['Synthetic Tower Expert'],type:'Manhwa',image:'https://images.provider.invalid/synthetic-cover.jpg',url:'https://provider.invalid/series/synthetic42/synthetic-tower-expert'},
     });
     const calls:Array<{sql:string;values?:unknown[]}>=[];
     let ownershipChecks=0;
@@ -41,6 +41,9 @@ describe('manual provider review',()=>{
     expect(calls.find(call=>call.sql.includes('INSERT INTO favorite_review_candidate'))?.values?.[2]).toBe('synthetic42');
     expect(calls.some(call=>call.sql.includes("SET status='RESOLVED'"))).toBe(true);
     expect(calls.some(call=>call.sql.includes("INSERT INTO media_external_id"))).toBe(true);
+    const mediaUpsert=calls.find(call=>call.sql.includes('INSERT INTO media(id,type,season_year)'))!;
+    expect(mediaUpsert.values?.[1]).toBe('MANHWA');
+    expect(mediaUpsert.sql).toContain('type=excluded.type');
     expect(calls.some(call=>call.sql.includes("UPDATE bookmark_media_link"))).toBe(true);
     const coverJob=calls.find(call=>call.sql.includes("add_job('provider-profile-cover'"));
     expect(coverJob?.values?.[0]).toEqual({profileId:'profile-synthetic'});

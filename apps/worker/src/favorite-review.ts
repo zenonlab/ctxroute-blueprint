@@ -1,4 +1,4 @@
-import { collectiveTitleKey, contentTaxonomyExclusion, exactTitleMatchKind, prepareTitleCandidates } from '@favlib/metadata';
+import { collectiveTitleKey, exactTitleMatchKind, prepareTitleCandidates } from '@favlib/metadata';
 import { createHash } from 'node:crypto';
 
 type Query = (sql: string, values?: unknown[]) => Promise<any>;
@@ -40,9 +40,7 @@ export async function openFavoriteReview(query: Query, input: {
   provider: 'anilist'|'mangaupdates'; candidates: ReviewCandidate[]; mediaId?: string; reason?: string;
   persistCover?: (profileId: string, imageUrl: string, provider: 'anilist'|'mangaupdates') => Promise<unknown>;
 }) {
-  const candidates = [...new Map(input.candidates.map(candidate => [String(candidate.id),candidate] as const)).values()]
-    .filter(candidate => !contentTaxonomyExclusion({genres:candidate.genres,categories:candidate.categories ?? (Array.isArray(candidate.tags)?candidate.tags.map((tag:any)=>typeof tag==='string'?tag:tag?.name):[])}))
-    .slice(0, 5);
+  const candidates = [...new Map(input.candidates.map(candidate => [String(candidate.id),candidate] as const)).values()].slice(0, 5);
   const link = await query(`SELECT l.installation_id AS "installationId",l.bookmark_id AS "bookmarkId",i.payload->>'title' AS "rawFavoriteTitle",i.payload->>'url' AS "favoriteUrl",i.parse_artifact AS "parseArtifact"
     FROM bookmark_media_link l LEFT JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id
     WHERE l.user_id=$1 AND ($2::text IS NULL OR l.media_id=$2) AND ($3::text IS NULL OR l.installation_id=$3) AND ($4::text IS NULL OR l.bookmark_id=$4) ORDER BY l.created_at DESC LIMIT 1`, [input.userId, input.mediaId ?? null, input.installationId ?? null, input.bookmarkId ?? null]);

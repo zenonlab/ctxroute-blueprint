@@ -29,7 +29,7 @@ test('Wave 7 extension popup renders linked episode progression', async ({ isMob
     await popup.evaluate((url) => { const bookmark={ id:'b1',parentId:null,title:'Episode 12',url,dateAdded:null,dateGroupModified:null,fingerprint:'a'.repeat(64) };return chrome.storage.local.set({ favlibState:{version:4,installationId:'e2e-extension',deviceToken:'e2e-device',queue:[],cursor:null,lastSyncAt:Date.now(),sites:[],checks:[],autoUpdateFavorites:false,observeNavigation:false,updates:[],knownBookmarks:[bookmark],inventory:{totalWeb:1,likelyMedia:1,ambiguous:0,digest:'b'.repeat(64),updatedAt:Date.now()},syncStatus:'verified',serverReceipt:{inventoryTotal:1,recognizedCount:1,reviewCount:0,excludedCount:0,inventoryDigest:'b'.repeat(64),serverSyncedAt:Date.now(),attemptedAt:Date.now(),verifiedAt:Date.now()}} }) }, episodeUrl);
     await popup.addInitScript(url => { chrome.tabs.query = async () => [{ url }]; }, episodeUrl);
     await popup.reload();
-    await expect(popup.locator('#connection')).toContainText('Automatique');
+    await expect(popup.locator('#connection')).toContainText('Synchronisé');
     await expect(popup.locator('.tab.active')).toContainText('Page');
     await tab.bringToFront();
     await expect(popup.locator('#page-content')).toContainText('Orbital Knights');

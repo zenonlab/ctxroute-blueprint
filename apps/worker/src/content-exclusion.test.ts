@@ -21,6 +21,7 @@ describe("global content taxonomy exclusion", () => {
     })).resolves.toBe(true);
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]?.[0]).toContain("classification_status='excluded'");
+    expect(query.mock.calls[0]?.[0]).toContain('allow_adult');
     expect(query.mock.calls[0]?.[0]).not.toContain("DELETE FROM bookmark_import_item");
     expect(query.mock.calls[1]?.[1]?.[1]).toContain('"provider":"anilist"');
     expect(query.mock.calls[1]?.[1]?.[1]).toContain('"raw":"Hentai"');

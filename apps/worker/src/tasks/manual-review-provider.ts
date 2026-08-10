@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { OPERATIONAL_DEFAULTS } from '@favlib/config';
 import { withProviderRequest } from '@favlib/database/provider-queue';
-import { fetchAniList, fetchMangaUpdatesSeries, resolveMangaUpdatesPublicSlug } from '@favlib/metadata';
-import { excludeFavoriteMediaByTaxonomy } from '../content-exclusion.js';
+import { fetchAniList, fetchMangaUpdatesSeries, mangaUpdatesMediaType, resolveMangaUpdatesPublicSlug } from '@favlib/metadata';
 
 type Payload={reviewId:string;userId:string;provider:'anilist'|'mangaupdates';providerId:string};
 type Helpers={query:(sql:string,values?:unknown[])=>Promise<{rowCount?:number|null;rows:any[]}>};
@@ -27,11 +26,6 @@ export default async function manualReviewProvider(payload:unknown,h:Helpers){
   });
   const stillOwned=await h.query("SELECT 1 FROM favorite_review WHERE id=$1 AND user_id=$2 AND provider=$3 AND status='PENDING' AND decision->>'kind'='manual-queued'",[reviewId,userId,provider]);
   if(!stillOwned.rowCount)return;
-  const provisional=await h.query("SELECT media_id AS \"mediaId\" FROM bookmark_media_link WHERE user_id=$1 AND installation_id=(SELECT installation_id FROM favorite_review WHERE id=$2) AND bookmark_id=(SELECT bookmark_id FROM favorite_review WHERE id=$2) LIMIT 1",[userId,reviewId]);
-  if(provisional.rows[0]?.mediaId && await excludeFavoriteMediaByTaxonomy(h.query, provisional.rows[0].mediaId, provider, record)) {
-    await h.query("UPDATE favorite_review SET status='NO_MATCH',reason='BLOCKED_CONTENT_TAXONOMY',decision=jsonb_build_object('kind','content-excluded'),resolved_at=now() WHERE id=$1 AND user_id=$2 AND status='PENDING'",[reviewId,userId]);
-    return;
-  }
   const resolvedProviderId=provider==='mangaupdates'?String(record.id??providerId):providerId;
   const canonicalTitle=provider==='anilist'?(record.title?.userPreferred??record.title?.romaji??record.title?.english??record.title?.native??`AniList ${providerId}`):(record.title??record.titles?.[0]??`MangaUpdates ${providerId}`);
   const associatedTitles=provider==='anilist'?[record.title?.romaji,record.title?.english,record.title?.native,...(record.synonyms??[])].filter(Boolean):[...(record.titles??[]),...(record.associated??[])].filter(Boolean);
@@ -53,8 +47,8 @@ export default async function manualReviewProvider(payload:unknown,h:Helpers){
 
   const known=await h.query("SELECT media_id AS \"mediaId\" FROM media_external_id WHERE provider=$1 AND external_id=$2 LIMIT 1",[provider,resolvedProviderId]);
   const mediaId=known.rows[0]?.mediaId??`${provider}:${resolvedProviderId}`;
-  const mediaType=provider==='anilist'?'ANIME':String(record.type??'MANGA').toUpperCase().replace('WEBTOON','MANHWA');
-  await h.query("INSERT INTO media(id,type,season_year) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET season_year=COALESCE(excluded.season_year,media.season_year)",[mediaId,['ANIME','MANGA','MANHWA','MANHUA'].includes(mediaType)?mediaType:'MANGA',record.startYear??record.year??null]);
+  const mediaType=provider==='anilist'?'ANIME':mangaUpdatesMediaType(record.type)??'MANGA';
+  await h.query("INSERT INTO media(id,type,season_year) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET type=excluded.type,season_year=COALESCE(excluded.season_year,media.season_year),updated_at=now()",[mediaId,mediaType,record.startYear??record.year??null]);
   await h.query("INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",[mediaId,provider,resolvedProviderId,{source:'manual-review-queue',reviewId,rawProviderId:providerId}]);
   await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,lower(regexp_replace($2,'[^[:alnum:]]+',' ','g')),NULL,'official','canonical',$3,1,$4) ON CONFLICT DO NOTHING",[mediaId,canonicalTitle,provider,{source:'manual-review-queue',reviewId,providerId:resolvedProviderId}]);
   await h.query("INSERT INTO media_metadata(media_id,provider,external_id,source_url,status,resolved_at,updated_at) VALUES($1,$2,$3,$4,'ACTIVE',now(),now()) ON CONFLICT(media_id) DO UPDATE SET provider=excluded.provider,external_id=excluded.external_id,source_url=excluded.source_url,status='ACTIVE',resolved_at=now(),updated_at=now()",[mediaId,provider,resolvedProviderId,record.siteUrl??record.url??null]);

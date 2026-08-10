@@ -154,7 +154,8 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('Airings anime');
     expect(source).not.toContain('label="Classifications"');
     expect(source).not.toContain('label="Démographies"');
-    expect(source).not.toContain('function ContentPreferences');
+    expect(source).toContain('function ContentPreferences');
+    expect(source).toContain('Afficher les œuvres adultes');
   });
 
   it('does not render the backend AniList graph in the work detail',()=>{

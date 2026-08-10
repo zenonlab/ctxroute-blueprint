@@ -33,7 +33,7 @@ import {
 import { operationalValue } from "../settings.js";
 import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteReviews } from "../favorite-resolution.js";
 import { openReviewsForMedia } from "../favorite-review.js";
-import { excludeFavoriteMediaByTaxonomy, providerContentExclusion } from "../content-exclusion.js";
+import { excludeFavoriteMediaByTaxonomy } from "../content-exclusion.js";
 
 type Helpers = Parameters<Task>[1];
 export const MANGAUPDATES_ENRICHMENT_VERSION = CONNECTOR_VERSIONS.mangaUpdatesMetadata;
@@ -208,7 +208,8 @@ async function enrichCover(mediaId: string, h: any) {
 const task: Task = async (raw, helpers: Helpers) => {
   const h = helpers as any,
     mediaId = String((raw as any)?.mediaId ?? ""),
-    forceRefresh = (raw as any)?.forceRefresh === true;
+    forceRefreshRequested = (raw as any)?.forceRefresh === true;
+  let forceRefresh = forceRefreshRequested;
   if ((raw as any)?.cover === true) {
     await enrichCover(mediaId, h);
     return;
@@ -221,18 +222,34 @@ const task: Task = async (raw, helpers: Helpers) => {
   );
   if (!row.rows[0]) return;
   const c = row.rows[0];
+  const currentIdentity = await h.query(
+    `SELECT identity.external_id,
+      COALESCE((SELECT NULLIF(p.type,'UNKNOWN') FROM provider_profile p WHERE p.provider='mangaupdates' AND p.provider_id=identity.external_id ORDER BY p.last_seen_at DESC LIMIT 1),
+        (SELECT payload.payload->>'type' FROM provider_payload payload WHERE payload.media_id=$1 AND payload.provider='mangaupdates' AND payload.is_current ORDER BY payload.collected_at DESC LIMIT 1)) AS raw_type
+     FROM (SELECT COALESCE(
+       (SELECT external_id FROM media_metadata WHERE media_id=$1 AND provider='mangaupdates' AND status='ACTIVE' LIMIT 1),
+       (SELECT external_id FROM media_external_id WHERE media_id=$1 AND provider='mangaupdates' LIMIT 1)
+     ) AS external_id) identity`,
+    [mediaId],
+  );
+  c.mangaupdates_id ??= currentIdentity.rows[0]?.external_id;
   if (!["MANGA", "MANHWA", "MANHUA"].includes(c.type)) return;
   const alreadyResolved = await h.query(
     "SELECT 1 FROM media_metadata WHERE media_id=$1 AND provider='mangaupdates' AND status='ACTIVE' AND external_id IS NOT NULL LIMIT 1",
     [mediaId],
   );
   if (alreadyResolved.rows[0] && !forceRefresh) {
-    await markFavoriteMatched(h.query, mediaId);
-    await reconcileResolvedFavoriteReviews(h.query, mediaId);
-    // Metadata may already be complete while the cover lane is missing or
-    // stale. Never let the metadata fast-return permanently skip cover work.
-    await enrichCover(mediaId, h);
-    return;
+    const currentType = mangaUpdatesMediaType(currentIdentity.rows[0]?.raw_type);
+    if (currentType) {
+      await h.query("UPDATE media SET type=$2,updated_at=now() WHERE id=$1 AND type IN ('MANGA','MANHWA','MANHUA')",[mediaId,currentType]);
+      await markFavoriteMatched(h.query, mediaId);
+      await reconcileResolvedFavoriteReviews(h.query, mediaId);
+      // Metadata may already be complete while the cover lane is missing or
+      // stale. Never let the metadata fast-return permanently skip cover work.
+      await enrichCover(mediaId, h);
+      return;
+    }
+    forceRefresh = true;
   }
   const aliases = (Array.isArray(c.titles) ? c.titles : [])
     .filter(Boolean)
@@ -266,7 +283,7 @@ const task: Task = async (raw, helpers: Helpers) => {
     let fastPath = false;
     let bridgeProvenance: Record<string, unknown> | undefined;
     const providerOptions = { timeoutMs };
-    const knownMuId = forceRefresh && c.mangaupdates_id
+    const knownMuId = c.mangaupdates_id
       ? String(c.mangaupdates_id)
       : "";
     if (knownMuId) {
@@ -317,13 +334,6 @@ const task: Task = async (raw, helpers: Helpers) => {
     }
     candidates = [...new Map((fastPath ? candidates : detailed).map((x) => [x.id, x])).values()];
     const matchAliases = identityAliases;
-    const unfilteredMatchDecision = decideMangaUpdatesTitleMatch(matchAliases, candidates);
-    if (unfilteredMatchDecision.status === 'MATCH' && unfilteredMatchDecision.candidate && providerContentExclusion(unfilteredMatchDecision.candidate)) {
-      await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "mangaupdates", unfilteredMatchDecision.candidate);
-      await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
-      return;
-    }
-    candidates = candidates.filter(candidate => !providerContentExclusion(candidate));
     const matchDecision = decideMangaUpdatesTitleMatch(matchAliases, candidates);
     if (matchDecision.status === 'NO_MATCH' && !knownMuId) {
       trace(h, 'bridge_attempt', { provider: 'mangadex', mediaId, queryCount: queries.length });
@@ -335,10 +345,7 @@ const task: Task = async (raw, helpers: Helpers) => {
         const mangaDexCandidate = bridgeDecision.candidate;
         if (bridgeDecision.status === 'MATCH' && mangaDexCandidate) {
           const mangaDex = await mangaDexCall(h, () => fetchMangaDexManga(mangaDexCandidate.id, providerOptions), { operation: 'identity-detail', mediaId, id: mangaDexCandidate.id });
-          if (await excludeFavoriteMediaByTaxonomy(h.query, mediaId, 'mangadex', { categories: mangaDex.tags })) {
-            await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
-            return;
-          }
+          await excludeFavoriteMediaByTaxonomy(h.query, mediaId, 'mangadex', { categories: mangaDex.tags });
           let linked: any | undefined;
           if (mangaDex.mangaUpdatesId) try {
             const resolution = await providerCall(h, () => resolveMangaUpdatesLinkedSeries(mangaDex.mangaUpdatesId!, mangaDex.titles, providerOptions), { operation: 'resolve-bridged-link', mediaId, id: mangaDex.mangaUpdatesId });
@@ -435,10 +442,7 @@ const task: Task = async (raw, helpers: Helpers) => {
       return;
     }
     const s = selected;
-    if (await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "mangaupdates", s)) {
-      await finishEnrichment(h,{mediaId,provider:'mangaupdates',purpose:'metadata',version:VERSION,owner:claim.owner,status:'TERMINAL',errorCode:'BLOCKED_CONTENT_TAXONOMY',resolutionCode:'BLOCKED_CONTENT_TAXONOMY'});
-      return;
-    }
+    await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "mangaupdates", s);
     const exactResolution = bridgeProvenance ? 'MANGADEX_MANGAUPDATES_BRIDGE' : matchDecision.method?.toUpperCase().replaceAll('-', '_') ?? 'TITLE_MATCH';
     if (bridgeProvenance) await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')", [mediaId, JSON.stringify({ resolution: 'mangadex-mangaupdates-bridge', rawProvenance: bridgeProvenance })]);
     const owner = await h.query(

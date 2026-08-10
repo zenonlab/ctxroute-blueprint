@@ -12,6 +12,9 @@ describe('MangaUpdates release sweep',()=>{
     const calls:Array<{sql:string;values?:unknown[]}>=[];const h={query:async(sql:string,values?:unknown[])=>{calls.push({sql,values});return {rows:[],rowCount:1}}};
     await storeMangaUpdatesCalendarIdentifier({seriesId:'synthetic-700',seriesTitle:'Synthetic Reading',chapter:'7'},h);
     expect(calls[0]?.sql).toContain('provider_profile');expect(calls[0]?.values?.[0]).toBe('synthetic-700');expect(calls.some(call=>call.sql.includes('bookmark_media_link'))).toBe(false);
+    const enrichment=calls.find(call=>call.sql.includes("add_job('mangaupdates-enrichment"));
+    expect(enrichment?.values?.[0]).toContain('"forceRefresh":true');
+    expect(enrichment?.values?.[0]).not.toContain('"cover":true');
   });
   it('keeps language and group outside the logical release identity',()=>{
     const a={chapter:'12',volume:'1',group:'A',language:'en'};const b={chapter:'12',volume:'1',group:'B',language:'fr'};

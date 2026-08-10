@@ -34,7 +34,7 @@ import { markFavoriteMatched, markFavoriteUnresolved, reconcileResolvedFavoriteR
 import { openReviewsForMedia } from "../favorite-review.js";
 import { saveProviderProfileCover } from "../cover-store.js";
 import { recordAndReconcileAnimeWork } from './anime-work.js';
-import { excludeFavoriteMediaByTaxonomy, providerContentExclusion } from '../content-exclusion.js';
+import { excludeFavoriteMediaByTaxonomy } from '../content-exclusion.js';
 
 type Helpers = {
   query: (sql: string, values?: unknown[]) => Promise<any>;
@@ -616,7 +616,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
       const reviewItems = (exactItems.length ? exactItems : items).filter(item => item.type === 'ANIME' && aniListFormatAllowed(formatEvidence, item.format)).map(item=>({item,match:matchAniList({aliases: identityAliases,type:'ANIME'},[item])})).filter(({match})=>Boolean(match)).sort((a,b)=>(b.match?.score??0)-(a.match?.score??0)||a.item.id-b.item.id).map(({item})=>item).slice(0,5);
       const detailed = (await Promise.all(reviewItems.map(async item => {
         try { return await providerRequest(h, "fetch-review-candidate", { id: item.id }, () => fetchAniList(item.id, { timeoutMs, hooks: aniListHooks(h) })); } catch { return item; }
-      }))).filter(item => !providerContentExclusion(item));
+      })));
       const titleRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='personal' ORDER BY t.id DESC LIMIT 1", [mediaId]);
       const sourceRow = await h.query("SELECT t.text,t.provenance->>'sourceUrl' AS url FROM media_title t WHERE t.media_id=$1 AND t.kind='source' ORDER BY CASE WHEN t.title_type='official' THEN 0 ELSE 1 END,t.id LIMIT 1", [mediaId]);
       const reason = items.some(item => item.type === 'ANIME') && !items.some(item => item.type === 'ANIME' && aniListFormatAllowed(formatEvidence, item.format)) ? 'FORMAT_MISMATCH' : items.every(item => item.type !== 'ANIME') ? 'TYPE_MISMATCH' : ambiguity ? 'AMBIGUOUS' : 'LOW_CONFIDENCE';
@@ -649,14 +649,7 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
             timeoutMs, hooks: aniListHooks(h),
           }));
     if (complete.type !== "ANIME") throw new Error("ANILIST_WRONG_MEDIA_TYPE");
-    if (await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "anilist", complete)) {
-      await finishEnrichment(h, {
-        mediaId, provider: "anilist", purpose: "metadata", version: ENRICHMENT_VERSION,
-        owner: claim.owner, status: "TERMINAL", errorCode: "BLOCKED_CONTENT_TAXONOMY",
-        resolutionCode: "BLOCKED_CONTENT_TAXONOMY",
-      });
-      return { status: "EXCLUDED", reason: "BLOCKED_CONTENT_TAXONOMY" };
-    }
+    await excludeFavoriteMediaByTaxonomy(h.query, mediaId, "anilist", complete);
     trace(h, "anilist_match", {
       mediaId,
       externalId: complete.id,

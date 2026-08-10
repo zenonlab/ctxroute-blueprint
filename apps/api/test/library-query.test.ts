@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { libraryFilterKeys, libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
+import { contentAllowedSql, libraryFilterKeys, libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
 
 describe('library multi-value query',()=>{
   it('normalizes repeated parameters while retaining every selected value',()=>{
@@ -132,15 +132,22 @@ describe('library multi-value query',()=>{
     expect(libraryProjectionSql).toContain('ORDER BY available.number DESC');
   });
 
-  it('globally excludes exact blocked genres and categories without retaining classifications or demographics',()=>{
+  it('delegates exact blocked taxonomy visibility to the user-scoped SQL function',()=>{
     expect(libraryProjectionSql).toContain("a.field='genres'");
     expect(libraryProjectionSql).toContain("a.field='categories'");
-    expect(libraryProjectionSql).toContain("blocked.field='genres'");
-    expect(libraryProjectionSql).toContain("blocked.field='categories'");
-    expect(libraryProjectionSql).not.toContain('allow_adult');
+    expect(libraryProjectionSql).toContain('favlib_content_allowed(l.media_id,$1::uuid)');
+    expect(contentAllowedSql('synthetic.media_id','$2')).toBe('favlib_content_allowed(synthetic.media_id,$2::uuid)');
     expect(libraryProjectionSql).not.toContain('contentRating');
     expect(libraryProjectionSql).not.toContain('publicationDemographic');
     expect(libraryFilterKeys).toEqual(['type','theme','genre','category','status','year']);
+  });
+
+  it('projects the shared parser display title before the legacy identity fallback',()=>{
+    expect(libraryProjectionSql).toContain("NULLIF(i.parse_artifact->>'displayTitle','')");
+    expect(libraryProjectionSql).toContain("i.parse_artifact#>>'{identity,title}'");
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    expect(server.match(/parse_artifact->>'displayTitle'/gu)?.length).toBeGreaterThanOrEqual(3);
+    expect(server).not.toContain('Titre parsé indisponible');
   });
 
   it('only advertises calendar covers backed by stored image data',()=>{
@@ -156,7 +163,7 @@ describe('library multi-value query',()=>{
     expect(server).toMatch(/animeSeasons:\s*animeSeasons\.rows/u);
     expect(server).toMatch(/animeRelated:\s*animeRelated\.rows/u);
     expect(server).toContain('WITH sequence_media AS (SELECT $1::text AS id UNION');
-    expect(server).toContain("WHERE w.root_media_id=$1 AND ${contentAllowedSql('w.media_id')} ORDER BY w.member_order LIMIT 50");
+    expect(server).toContain("WHERE w.root_media_id=$1 AND ${contentAllowedSql('w.media_id','$2')} ORDER BY w.member_order LIMIT 50");
     expect(server).toContain("payload.validity_status='VALID'");
   });
   it('projects the bounded transitive relation closure without treating titles or popularity as relation evidence',()=>{

@@ -22,6 +22,7 @@ import {
   suspiciousPageMetadata,
   selectBestLocalizedTitle,
   contentTaxonomyExclusion,
+  mangaUpdatesMediaType,
   type FavoriteParseArtifact,
 } from "@favlib/metadata";
 import { position, acceptObservation } from "@favlib/progression";
@@ -39,6 +40,7 @@ import {
   extensionPreferencesPatchContract,
   extensionProposalResultContract,
   extensionReleaseContract,
+  contentPreferencePatchContract,
   languagePreferencePatchContract,
   repairMissingPositionsRequestContract,
   sourceReportContract,
@@ -84,15 +86,16 @@ import { importIdentityFromArtifact } from './import-identity.js';
 import { faviconCacheIsFresh, pageIconRequests } from './favicon.js';
 async function sendPublicCatalogCover(
   mediaId: string,
+  userId: string,
   headers: Record<string, unknown>,
   reply: any,
 ) {
   const cover = await pool.query(
     `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.status,c.provider,c.attribution
      FROM media_cover c LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256
-     WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1) AND ${contentAllowedSql('c.media_id')}
+     WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1) AND ${contentAllowedSql('c.media_id','$2')}
      ORDER BY CASE WHEN c.media_id=$1 THEN 0 ELSE 1 END LIMIT 1`,
-    [mediaId],
+    [mediaId,userId],
   );
   if (
     !cover.rowCount ||
@@ -128,7 +131,7 @@ async function addManualReviewCandidate(
     `SELECT id,canonical_title,categories,genres FROM provider_profile WHERE provider=$1 AND provider_id=$2 ORDER BY last_seen_at DESC LIMIT 1`,
     [provider, providerId],
   );
-  if (cached.rowCount && !contentTaxonomyExclusion(cached.rows[0])) {
+  if (cached.rowCount) {
     const candidate = await pool.query(
       `INSERT INTO favorite_review_candidate(review_id,profile_id,provider_id,hit_title) VALUES($1,$2,$3,$4) ON CONFLICT(review_id,provider_id) DO UPDATE SET profile_id=excluded.profile_id,hit_title=excluded.hit_title RETURNING id`,
       [reviewId, cached.rows[0].id, providerId, cached.rows[0].canonical_title],
@@ -529,7 +532,12 @@ app.get("/api/v1/notifications", async (req: any) => {
   favlib_display_title(m.id,$1::uuid) AS "titleSelection"
   FROM personal_notification n
   LEFT JOIN media m ON m.id=COALESCE(n.payload#>>'{release,mediaId}',split_part(n.release_key,'|',1))
-  WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100`,
+  WHERE n.user_id=$1 AND (m.id IS NULL OR favlib_content_allowed(m.id,$1::uuid))
+    AND (n.kind<>'FAVORITE_REVIEW_REQUIRED' OR EXISTS(
+      SELECT 1 FROM favorite_review review JOIN bookmark_media_link link
+        ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id
+      WHERE review.user_id=$1 AND review.status='PENDING' AND link.media_id IS NOT NULL AND favlib_content_allowed(link.media_id,$1::uuid)))
+  ORDER BY n.created_at DESC LIMIT 100`,
     [req.user.id],
   );
   return { items: r.rows };
@@ -539,17 +547,27 @@ app.get("/api/v1/reviews", async (req: any) => {
     `WITH owned AS (SELECT r.*,COALESCE(r.cluster_id::text,r.id::text) AS logical_key FROM favorite_review r WHERE r.user_id=$1 AND EXISTS(SELECT 1 FROM bookmark_media_link active_link WHERE active_link.user_id=r.user_id AND active_link.installation_id=r.installation_id AND active_link.bookmark_id=r.bookmark_id AND active_link.status IN ('matched','accepted','review')) AND NOT EXISTS(SELECT 1 FROM favorite_review queued JOIN bookmark_media_link queued_link ON queued_link.user_id=queued.user_id AND queued_link.installation_id=queued.installation_id AND queued_link.bookmark_id=queued.bookmark_id AND queued_link.status IN ('matched','accepted','review') WHERE queued.user_id=r.user_id AND COALESCE(queued.cluster_id::text,queued.id::text)=COALESCE(r.cluster_id::text,r.id::text) AND queued.status='PENDING' AND queued.decision->>'kind'='manual-queued')),representative AS (SELECT DISTINCT ON(logical_key) * FROM owned ORDER BY logical_key,(status='PENDING') DESC,created_at DESC,id DESC),counts AS (SELECT logical_key,count(*) FILTER(WHERE status='PENDING')::int AS pending_rows,count(*)::int AS favorite_count FROM owned GROUP BY logical_key),candidates AS (SELECT o.logical_key,count(DISTINCT c.provider_id)::int AS candidate_count FROM owned o LEFT JOIN favorite_review_candidate c ON c.review_id=o.id GROUP BY o.logical_key) SELECT r.id,r.cluster_id AS "clusterId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",r.provider,r.status,r.reason,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",c.favorite_count AS "favoriteCount",LEAST(ca.candidate_count,5) AS "candidateCount" FROM representative r JOIN counts c USING(logical_key) JOIN candidates ca USING(logical_key) ORDER BY (c.pending_rows>0) DESC,CASE WHEN c.pending_rows>0 THEN LEAST(ca.candidate_count,5) ELSE 0 END DESC,r.created_at DESC`,
     [req.user.id],
   );
+  const visible=await pool.query(`SELECT DISTINCT review.id FROM favorite_review review JOIN bookmark_media_link link
+    ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id
+    WHERE review.user_id=$1 AND link.media_id IS NOT NULL AND favlib_content_allowed(link.media_id,$1::uuid)`,[req.user.id]);
+  const visibleIds=new Set(visible.rows.map((row:any)=>row.id));
+  const items=r.rows.filter((row:any)=>visibleIds.has(row.id));
   return {
-    items: r.rows,
-    pendingCount: r.rows.filter((row: any) => row.status === "PENDING").length,
+    items,
+    pendingCount: items.filter((row: any) => row.status === "PENDING").length,
   };
 });
 app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
   const review = await pool.query(
-    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",i.payload->>'title' AS "rawFavoriteTitle",COALESCE(i.parse_artifact#>>'{identity,title}',r.favorite_title) AS "sourceTitle",i.parse_artifact->'progression' AS progression,r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id LEFT JOIN bookmark_import_item i ON i.user_id=r.user_id AND i.installation_id=r.installation_id AND i.bookmark_id=r.bookmark_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
+    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",i.payload->>'title' AS "rawFavoriteTitle",COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}',r.favorite_title) AS "sourceTitle",i.parse_artifact->'progression' AS progression,r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id LEFT JOIN bookmark_import_item i ON i.user_id=r.user_id AND i.installation_id=r.installation_id AND i.bookmark_id=r.bookmark_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
     [req.params.id, req.user.id],
   );
   if (!review.rowCount) return err(reply, 404, "REVIEW_NOT_FOUND");
+  const reviewVisibility=await pool.query(`SELECT 1 FROM bookmark_media_link link WHERE link.user_id=$1 AND link.installation_id=$2 AND link.bookmark_id=$3
+    AND link.media_id IS NOT NULL AND favlib_content_allowed(link.media_id,$1::uuid) LIMIT 1`,[req.user.id,review.rows[0].installationId,review.rows[0].bookmarkId]);
+  if(!reviewVisibility.rowCount)return err(reply,404,"REVIEW_NOT_FOUND");
+  const contentPreference=await pool.query('SELECT COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) AS "allowAdult"',[req.user.id]);
+  const allowAdult=Boolean(contentPreference.rows[0]?.allowAdult);
   const chosen = review.rows[0].status !== "PENDING";
   const candidates = await pool.query(
     `SELECT DISTINCT ON(c.provider_id) c.id,c.provider_id AS "providerId",COALESCE(p.canonical_title,c.provider_id) AS "displayTitle",p.canonical_title AS "canonicalTitle",c.hit_title AS "hitTitle",c.hit_title AS "matchedAlias",p.associated_titles AS "associatedTitles",p.type,COALESCE(NULLIF(p.payload->>'format',''),p.type) AS format,p.year,p.start_date AS "startDate",p.status,p.authors,p.categories,p.genres,CASE WHEN p.cover_status='ACTIVE' AND p.cover_asset_sha256 IS NOT NULL THEN '/api/v1/reviews/'||$1::text||'/candidates/'||c.id::text||'/cover' ELSE p.image END AS image,p.url,c.media_id AS "mediaId",p.payload_hash AS "profileHash",CASE WHEN $3::boolean AND p.id IS NOT NULL THEN (SELECT count(*)::int FROM review_cluster_endorsement e JOIN favorite_review rr ON rr.cluster_id=e.cluster_id WHERE rr.id=$2 AND e.profile_id=p.id) END AS endorsements,CASE WHEN $3::boolean AND p.id IS NOT NULL THEN (SELECT count(*)::int FROM review_cluster_vote v JOIN favorite_review rr ON rr.cluster_id=v.cluster_id WHERE rr.id=$2 AND v.profile_id=p.id) END AS "reliableVotes" FROM favorite_review target JOIN favorite_review sibling ON sibling.user_id=target.user_id AND COALESCE(sibling.cluster_id::text,sibling.id::text)=COALESCE(target.cluster_id::text,target.id::text) JOIN favorite_review_candidate c ON c.review_id=sibling.id JOIN provider_profile p ON p.id=c.profile_id WHERE target.id=$2::uuid AND target.user_id=$4::uuid ORDER BY c.provider_id,endorsements DESC NULLS LAST,(p.cover_status='ACTIVE') DESC LIMIT 5`,
@@ -567,7 +585,7 @@ app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
         : chain
           ? []
           : ["report"],
-    candidates: candidates.rows.filter((candidate:any)=>!contentTaxonomyExclusion(candidate)).map((candidate:any) => ({...candidate,displayTitle:selectBestLocalizedTitle([favoriteTitle],[candidate.canonicalTitle,candidate.hitTitle,...(candidate.associatedTitles??[])].filter(Boolean).map((text:string)=>({text})))?.text??candidate.displayTitle})),
+    candidates: candidates.rows.filter((candidate:any)=>allowAdult||!contentTaxonomyExclusion(candidate)).map((candidate:any) => ({...candidate,displayTitle:selectBestLocalizedTitle([favoriteTitle],[candidate.canonicalTitle,candidate.hitTitle,...(candidate.associatedTitles??[])].filter(Boolean).map((text:string)=>({text})))?.text??candidate.displayTitle})),
     google: chain
       ? undefined
       : {
@@ -579,11 +597,12 @@ app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
 app.get(
   "/api/v1/reviews/:id/candidates/:candidateId/cover",
   async (req: any, reply: any) => {
+    const contentPreference=await pool.query('SELECT COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) AS "allowAdult"',[req.user.id]);
     const cover = await pool.query(
       `SELECT a.mime_type,a.data,p.categories,p.genres FROM favorite_review r JOIN favorite_review owner ON owner.user_id=r.user_id AND COALESCE(owner.cluster_id::text,owner.id::text)=COALESCE(r.cluster_id::text,r.id::text) JOIN favorite_review_candidate c ON c.review_id=owner.id AND c.id=$2 JOIN provider_profile p ON p.id=c.profile_id AND p.cover_status='ACTIVE' JOIN catalog_image_asset a ON a.sha256=p.cover_asset_sha256 WHERE r.id=$1 AND r.user_id=$3`,
       [req.params.id, req.params.candidateId, req.user.id],
     );
-    if (!cover.rowCount || !cover.rows[0].data || contentTaxonomyExclusion(cover.rows[0]))
+    if (!cover.rowCount || !cover.rows[0].data || (!contentPreference.rows[0]?.allowAdult && contentTaxonomyExclusion(cover.rows[0])))
       return err(
         reply,
         404,
@@ -599,7 +618,7 @@ app.get(
 );
 async function refreshReviewQueue(userId: string) {
   const pending = await pool.query(
-    "SELECT count(DISTINCT COALESCE(r.cluster_id::text,r.id::text))::int AS count FROM favorite_review r JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id WHERE r.user_id=$1 AND r.status='PENDING' AND l.status IN ('matched','accepted','review')",
+    "SELECT count(DISTINCT COALESCE(r.cluster_id::text,r.id::text))::int AS count FROM favorite_review r JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id WHERE r.user_id=$1 AND r.status='PENDING' AND l.status IN ('matched','accepted','review') AND l.media_id IS NOT NULL AND favlib_content_allowed(l.media_id,$1::uuid)",
     [userId],
   );
   const count = Number(pending.rows[0]?.count ?? 0);
@@ -638,7 +657,8 @@ async function resolveReview(
       return err(reply, 404, "REVIEW_CANDIDATE_NOT_FOUND");
     }
     const x = row.rows[0];
-    if (contentTaxonomyExclusion(x)) {
+    const contentPreference=await client.query('SELECT COALESCE((SELECT allow_adult FROM user_catalog_preference WHERE user_id=$1),false) AS "allowAdult"',[userId]);
+    if (!contentPreference.rows[0]?.allowAdult && contentTaxonomyExclusion(x)) {
       await client.query("ROLLBACK");
       return err(reply,409,"CONTENT_EXCLUDED","Cette œuvre appartient à une catégorie ou un genre bloqué.");
     }
@@ -673,20 +693,12 @@ async function resolveReview(
       await refreshReviewQueue(userId);
       return { ok: true, reviewId, mediaId: seed.rows[0].media_id, status: "RESOLVED", profileStored: false, coverQueued: false, resolvedSiblingCount: 0 };
     }
-    const mediaType =
-      x.provider === "anilist"
-        ? "ANIME"
-        : ((
-            { manga: "MANGA", manhwa: "MANHWA", manhua: "MANHUA" } as Record<
-              string,
-              string
-            >
-          )[String(x.type).toLowerCase()] ?? "MANGA");
+    const mediaType = x.provider === "anilist" ? "ANIME" : mangaUpdatesMediaType(x.type) ?? "MANGA";
     let mediaId = x.media_id;
     if (!mediaId) {
       mediaId = `${x.provider}:${x.provider_id}`;
       await client.query(
-        "INSERT INTO media(id,type,season_year) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET season_year=COALESCE(excluded.season_year,media.season_year)",
+        "INSERT INTO media(id,type,season_year) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET type=excluded.type,season_year=COALESCE(excluded.season_year,media.season_year),updated_at=now()",
         [mediaId, mediaType, x.year],
       );
       await client.query(
@@ -712,6 +724,7 @@ async function resolveReview(
         [mediaId, x.provider, x.provider_id, x.url],
       );
     }
+    if(x.provider==='mangaupdates')await client.query("UPDATE media SET type=$2,updated_at=now() WHERE id=$1 AND type IN ('MANGA','MANHWA','MANHUA')",[mediaId,mediaType]);
     await client.query(
       "INSERT INTO provider_payload(media_id,provider,connector_version,collected_at,payload_hash,payload,provenance,validity_status,is_current) VALUES($1,$2,'favorite-review-v1',now(),COALESCE($3,encode(digest($4::jsonb::text,'sha256'),'hex')),$4::jsonb,$5::jsonb,'VALID',true) ON CONFLICT(media_id,provider,connector_version,payload_hash) DO UPDATE SET is_current=true",
       [
@@ -1634,10 +1647,18 @@ app.patch(
   },
 );
 app.get("/api/v1/preferences/content", async (req: any) => {
-  return { allowAdult: false, updatedAt: null, immutable: true };
+  const result=await pool.query('SELECT allow_adult AS "allowAdult",updated_at AS "updatedAt" FROM user_catalog_preference WHERE user_id=$1',[req.user.id]);
+  return result.rows[0]??{allowAdult:false,updatedAt:null};
 });
 app.patch("/api/v1/preferences/content", async (req: any, reply: any) => {
-  return err(reply,409,"CONTENT_POLICY_IMMUTABLE","Les catégories et genres bloqués sont toujours exclus.");
+  const parsed=contentPreferencePatchContract.safeParse(req.body);
+  if(!parsed.success)return err(reply,400,"VALIDATION_FAILED","Préférence de contenu invalide.",parsed.error.issues);
+  const result=await pool.query(`INSERT INTO user_catalog_preference(user_id,allow_adult,updated_at) VALUES($1,$2,now())
+    ON CONFLICT(user_id) DO UPDATE SET allow_adult=excluded.allow_adult,updated_at=now()
+    RETURNING allow_adult AS "allowAdult",updated_at AS "updatedAt"`,[req.user.id,parsed.data.allowAdult]);
+  await pool.query('SELECT favlib_recalculate_user_content_visibility($1::uuid)',[req.user.id]);
+  await refreshReviewQueue(req.user.id);
+  return result.rows[0];
 });
 app.get("/api/v1/preferences/languages", async (req: any) => {
   const r=await pool.query('SELECT preferred_languages AS "preferredLanguages",updated_at AS "updatedAt" FROM user_catalog_preference WHERE user_id=$1',[req.user.id]);
@@ -1710,10 +1731,10 @@ app.post("/api/v1/admin/announcements", async (req: any, reply: any) => {
     client.release();
   }
 });
-async function catalogRows(query: string, mediaId?: string) {
+async function catalogRows(userId:string,query: string, mediaId?: string) {
   const r = await pool.query(
-    `SELECT m.id,m.type,m.season_year AS "seasonYear",m.country_of_origin AS "countryOfOrigin",m.format,(SELECT jsonb_object_agg(a.field,a.value) FROM metadata_assertion a WHERE a.media_id=m.id AND a.provider IN ('anilist','mangaupdates')) AS metadata,COALESCE((SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at) FROM media_cover c WHERE c.media_id=m.id AND c.status='ACTIVE'),(SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at,'provenance',jsonb_build_object('source','media-identity-merge','targetMediaId',im.target_media_id)) FROM media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id AND c.status='ACTIVE' WHERE im.source_media_id=m.id LIMIT 1)) AS "coverProvenance",COALESCE(json_agg(jsonb_build_object('text',t.text,'language',t.language,'kind',t.kind,'connector',t.connector)) FILTER (WHERE t.id IS NOT NULL),'[]'::json) AS titles FROM media m LEFT JOIN media_title t ON t.media_id=m.id WHERE ${contentAllowedSql('m.id')} AND ($1='' OR m.id=$1 OR t.normalized_text LIKE '%'||lower($1)||'%') GROUP BY m.id ORDER BY m.id LIMIT 50`,
-    [mediaId ?? query],
+    `SELECT m.id,m.type,m.season_year AS "seasonYear",m.country_of_origin AS "countryOfOrigin",m.format,(SELECT jsonb_object_agg(a.field,a.value) FROM metadata_assertion a WHERE a.media_id=m.id AND a.provider IN ('anilist','mangaupdates')) AS metadata,COALESCE((SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at) FROM media_cover c WHERE c.media_id=m.id AND c.status='ACTIVE'),(SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at,'provenance',jsonb_build_object('source','media-identity-merge','targetMediaId',im.target_media_id)) FROM media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id AND c.status='ACTIVE' WHERE im.source_media_id=m.id LIMIT 1)) AS "coverProvenance",COALESCE(json_agg(jsonb_build_object('text',t.text,'language',t.language,'kind',t.kind,'connector',t.connector)) FILTER (WHERE t.id IS NOT NULL),'[]'::json) AS titles FROM media m LEFT JOIN media_title t ON t.media_id=m.id WHERE ${contentAllowedSql('m.id','$2')} AND ($1='' OR m.id=$1 OR t.normalized_text LIKE '%'||lower($1)||'%') GROUP BY m.id ORDER BY m.id LIMIT 50`,
+    [mediaId ?? query,userId],
   );
   return r.rows as CatalogMedia[];
 }
@@ -1781,7 +1802,7 @@ async function libraryRelatedWorks(mediaIds: string[], userId: string, coverScop
         (SELECT ranked.media_id UNION SELECT merge.target_media_id FROM media_identity_merge merge WHERE merge.source_media_id=ranked.media_id)) AS "coverAvailable"
     FROM ranked JOIN media ON media.id=ranked.media_id
     LEFT JOIN LATERAL (SELECT assertion.value #>> '{}' AS raw_status FROM metadata_assertion assertion WHERE assertion.media_id=ranked.media_id AND assertion.field='status' ORDER BY assertion.confidence DESC,assertion.asserted_at DESC LIMIT 1) status_assertion ON true
-    WHERE ranked.related_rank<=50 AND ${contentAllowedSql('ranked.media_id')}
+    WHERE ranked.related_rank<=50 AND ${contentAllowedSql('ranked.media_id','$2')}
     ORDER BY ranked.card_id,ranked.sequence_order NULLS LAST,ranked.relation_depth,ranked.media_id`,
     [mediaIds, userId],
   );
@@ -1811,7 +1832,7 @@ async function relatedLibraryMediaAllowed(rootMediaId:string,mediaId:string,user
       WHERE link.user_id=$3 AND link.media_id=$4 AND link.status IN ('matched','accepted','review') LIMIT 1
     )
     SELECT 1 FROM ranked CROSS JOIN authorized_root
-    WHERE ranked.card_id=$4 AND ranked.media_id=$2 AND ranked.related_rank<=50 AND ${contentAllowedSql('ranked.media_id')} LIMIT 1`,
+    WHERE ranked.card_id=$4 AND ranked.media_id=$2 AND ranked.related_rank<=50 AND ${contentAllowedSql('ranked.media_id','$3')} LIMIT 1`,
     [[rootMediaId],mediaId,userId,rootMediaId],
   );
   return Boolean(allowed.rowCount);
@@ -1858,7 +1879,7 @@ app.get("/api/v1/library/inventory", async (req: any, reply: any) => {
   const {limit,offset}=parsed.data;
   const result=await pool.query(`SELECT i.installation_id AS "installationId",i.bookmark_id AS "bookmarkId",
       i.payload->>'title' AS "rawTitle",i.payload->>'url' AS "rawUrl",
-      i.parse_artifact#>>'{identity,title}' AS "parsedTitle",i.classification_status AS "classificationStatus",
+      COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}') AS "parsedTitle",i.classification_status AS "classificationStatus",
       l.status AS "linkStatus",l.media_id AS "mediaId",
       i.parse_artifact->'provenance' AS provenance
     FROM bookmark_import_item i
@@ -1973,7 +1994,7 @@ app.get("/api/v1/library/:rootMediaId/related/:mediaId", async (req:any,reply:an
 app.post("/api/v1/library/:mediaId/source-reports", async (req: any, reply: any) => {
   const parsed=sourceReportContract.safeParse({...req.body,mediaId:req.params.mediaId});
   if(!parsed.success)return err(reply,400,"VALIDATION_FAILED","Signalement invalide.",parsed.error.issues);
-  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted','review') LIMIT 1",[req.user.id,req.params.mediaId]);
+  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted','review') AND favlib_content_allowed(media_id,$1::uuid) LIMIT 1",[req.user.id,req.params.mediaId]);
   if(!owned.rowCount)return err(reply,404,"MEDIA_NOT_IN_LIBRARY");
   const origin=await pool.query("SELECT 1 FROM release_origin WHERE media_id=$1 AND (canonical_url=$2 OR provenance->>'workUrl'=$2) AND (user_id IS NULL OR user_id=$3) LIMIT 1",[req.params.mediaId,parsed.data.canonicalUrl,req.user.id]);
   if(!origin.rowCount)return err(reply,404,"SOURCE_NOT_FOUND");
@@ -1984,7 +2005,7 @@ app.post("/api/v1/library/:mediaId/source-check", async (req: any, reply: any) =
   const parsed=sourceCheckContract.safeParse(req.body);
   if(!parsed.success)return err(reply,400,"VALIDATION_FAILED","Contrôle de source invalide.",parsed.error.issues);
   const mediaId=String(req.params.mediaId);
-  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted','review') LIMIT 1",[req.user.id,mediaId]);
+  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted','review') AND favlib_content_allowed(media_id,$1::uuid) LIMIT 1",[req.user.id,mediaId]);
   if(!owned.rowCount)return err(reply,404,"MEDIA_NOT_IN_LIBRARY");
   const origin=await pool.query("SELECT 1 FROM release_origin WHERE media_id=$1 AND (canonical_url=$2 OR provenance->>'workUrl'=$2) AND (user_id IS NULL OR user_id=$3) LIMIT 1",[mediaId,parsed.data.canonicalUrl,req.user.id]);
   if(!origin.rowCount)return err(reply,404,"SOURCE_NOT_FOUND");
@@ -2023,7 +2044,7 @@ app.post(
       let personal: RepairStatus = "unchanged",
         availability: RepairStatus = "unchanged";
       const owned = await pool.query(
-        `SELECT m.type FROM media m WHERE m.id=$1 AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.user_id=$2 AND l.media_id=m.id AND l.status IN ('matched','accepted') AND i.event<>'removed')`,
+        `SELECT m.type FROM media m WHERE m.id=$1 AND favlib_content_allowed(m.id,$2::uuid) AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.user_id=$2 AND l.media_id=m.id AND l.status IN ('matched','accepted') AND i.event<>'removed')`,
         [requested.mediaId, req.user.id],
       );
       if (!owned.rowCount) {
@@ -2168,7 +2189,7 @@ app.post(
 app.get("/api/v1/catalog/search", async (req: any) => {
   const q =
     typeof req.query?.q === "string" ? req.query.q.trim().slice(0, 200) : "";
-  return { items: await catalogRows(q) };
+  return { items: await catalogRows(req.user.id,q) };
 });
 async function richCatalogRow(
   userId: string,
@@ -2185,7 +2206,7 @@ async function richCatalogRow(
     );
     if (!favorite.rowCount) return null;
   }
-  const allowedContent = await pool.query(`SELECT 1 WHERE ${contentAllowedSql('$1')}`,[mediaId]);
+  const allowedContent = await pool.query(`SELECT 1 WHERE ${contentAllowedSql('$1','$2')}`,[mediaId,userId]);
   if (!allowedContent.rowCount) return null;
   const timezoneRow = await pool.query(
     "SELECT timezone FROM user_catalog_preference WHERE user_id=$1",
@@ -2223,8 +2244,8 @@ async function richCatalogRow(
         COALESCE(
           (SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at) FROM media_cover c WHERE c.media_id=$1 AND c.status='ACTIVE'),
           (SELECT jsonb_build_object('provider',c.provider,'sourceUrl',c.source_url,'attribution',c.attribution,'fetchedAt',c.fetched_at,'provenance',jsonb_build_object('source','media-identity-merge','targetMediaId',im.target_media_id)) FROM media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id AND c.status='ACTIVE' WHERE im.source_media_id=$1 LIMIT 1)
-        ) AS "coverProvenance" FROM media WHERE id=$1 AND ${contentAllowedSql('id')}`,
-      [mediaId],
+        ) AS "coverProvenance" FROM media WHERE id=$1 AND ${contentAllowedSql('id','$2')}`,
+      [mediaId,userId],
     ),
     pool.query(
       `SELECT text,language,script,kind AS "kind",title_type AS "titleType",personal_status AS "personalStatus",connector,confidence,provenance FROM media_title WHERE media_id=$1 ORDER BY CASE WHEN kind='personal' AND provenance->>'userId'=$2 THEN 0 ELSE 1 END,kind,text`,
@@ -2259,7 +2280,7 @@ async function richCatalogRow(
       favlib_display_title(w.media_id,$2::uuid)->>'title' AS title,m.format,m.season_year AS "seasonYear",w.anilist_id AS "anilistId",
       EXISTS(SELECT 1 FROM provider_payload payload WHERE payload.media_id=w.media_id AND payload.provider='anilist' AND payload.is_current AND payload.validity_status='VALID') AS enriched
       FROM anime_work_member w JOIN media m ON m.id=w.media_id
-      WHERE w.root_media_id=$1 AND ${contentAllowedSql('w.media_id')} ORDER BY w.member_order LIMIT 50`,
+      WHERE w.root_media_id=$1 AND ${contentAllowedSql('w.media_id','$2')} ORDER BY w.member_order LIMIT 50`,
       [mediaId, userId],
     ),
     pool.query(
@@ -2271,7 +2292,7 @@ async function richCatalogRow(
       JOIN media related ON related.id=CASE WHEN relation.media_id=member.id THEN relation.target_media_id ELSE relation.media_id END
       LEFT JOIN media_external_id external ON external.media_id=related.id AND external.provider='anilist'
       WHERE NOT EXISTS(SELECT 1 FROM anime_work_member sequence WHERE sequence.root_media_id=$1 AND sequence.media_id=related.id)
-        AND relation.kind<>'canonical_variant' AND ${contentAllowedSql('related.id')}
+        AND relation.kind<>'canonical_variant' AND ${contentAllowedSql('related.id','$2')}
       ORDER BY related.id,relation.kind LIMIT 50`,
       [mediaId, userId],
     ),
@@ -2288,7 +2309,7 @@ async function richCatalogRow(
     ])
   ).rows[0]?.selection;
   const [favorites, sources, providerPages,modalProjection] = await Promise.all([
-    pool.query(`SELECT i.bookmark_id AS "bookmarkId",i.payload->>'url' AS url,i.payload->>'title' AS title,i.parse_artifact#>>'{identity,title}' AS "parsedTitle",i.parse_artifact->'progression' AS progression,COALESCE(d.name,'Profil') AS device,i.parser_id AS "parserId",i.parser_version AS "parserVersion",i.parse_artifact->'provenance' AS provenance FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l.user_id=$1 AND l.media_id=$2 AND l.status IN ('matched','accepted','review') AND i.event<>'removed' ORDER BY i.created_at DESC`,[userId,mediaId]),
+    pool.query(`SELECT i.bookmark_id AS "bookmarkId",i.payload->>'url' AS url,i.payload->>'title' AS title,COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}') AS "parsedTitle",i.parse_artifact->'progression' AS progression,COALESCE(d.name,'Profil') AS device,i.parser_id AS "parserId",i.parser_version AS "parserVersion",i.parse_artifact->'provenance' AS provenance FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l.user_id=$1 AND l.media_id=$2 AND l.status IN ('matched','accepted','review') AND i.event<>'removed' ORDER BY i.created_at DESC`,[userId,mediaId]),
     pool.query(`SELECT DISTINCT ON (lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i'))) o.media_id AS "mediaId",o.connector,o.provenance->>'workUrl' AS "canonicalUrl",o.provenance->>'workUrl' AS "workUrl",'AVAILABLE' AS status,o.checked_at AS "checkedAt",NULL::text AS title,NULL::text AS chapter,lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')) AS domain,o.provenance->>'language' AS language,o.provenance FROM release_origin o WHERE o.media_id=$1 AND (o.user_id IS NULL OR o.user_id=$2) AND o.status='AVAILABLE' AND NULLIF(o.provenance->>'language','') IS NOT NULL AND o.provenance->>'languageDetection' NOT IN ('undetected','ambiguous') AND o.provenance->>'workUrl' ~ '^https?://' ORDER BY lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')),o.checked_at DESC`,[mediaId,userId]),
     pool.query(`SELECT provider,source_url AS "sourceUrl",status FROM media_metadata WHERE media_id=$1 AND provider IN ('anilist','mangaupdates','mangadex') AND status='ACTIVE' ORDER BY provider`,[mediaId]),
     pool.query(`SELECT
@@ -2347,7 +2368,7 @@ app.get("/api/v1/catalog/media/:mediaId", async (req: any, reply: any) => {
 app.get(
   "/api/v1/catalog/public-media/:mediaId/cover",
   async (req: any, reply: any) =>
-    sendPublicCatalogCover(req.params.mediaId, req.headers, reply),
+    sendPublicCatalogCover(req.params.mediaId, req.user.id, req.headers, reply),
 );
 app.get(
   "/api/v1/library/:mediaId/related/:relatedMediaId/cover",
@@ -2361,6 +2382,7 @@ app.get(
       );
     return sendPublicCatalogCover(
       req.params.relatedMediaId,
+      req.user.id,
       req.headers,
       reply,
     );
@@ -2370,7 +2392,7 @@ app.get(
   "/api/v1/catalog/media/:mediaId/cover",
   async (req: any, reply: any) => {
     const cover = await pool.query(
-      `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.status,c.provider,c.attribution FROM media_cover c LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256 WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1) AND ${contentAllowedSql('c.media_id')} AND EXISTS (SELECT 1 FROM bookmark_media_link l WHERE l.media_id=$1 AND l.user_id=$2 AND l.status IN ('matched','accepted','review'))`,
+      `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.status,c.provider,c.attribution FROM media_cover c LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256 WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1) AND ${contentAllowedSql('c.media_id','$2')} AND EXISTS (SELECT 1 FROM bookmark_media_link l WHERE l.media_id=$1 AND l.user_id=$2 AND l.status IN ('matched','accepted','review'))`,
       [req.params.mediaId, req.user.id],
     );
     if (
@@ -2402,7 +2424,7 @@ app.get(
   "/api/v1/catalog/media/:mediaId/banner",
   async (req: any, reply: any) => {
     const banner = await pool.query(
-      `SELECT b.mime_type,COALESCE(a.data,b.data) AS data,b.status,b.provider,b.attribution FROM media_banner b JOIN bookmark_media_link l ON l.media_id=b.media_id AND l.user_id=$2 AND l.status IN ('matched','accepted','review') LEFT JOIN catalog_image_asset a ON a.sha256=b.asset_sha256 WHERE b.media_id=$1`,
+      `SELECT b.mime_type,COALESCE(a.data,b.data) AS data,b.status,b.provider,b.attribution FROM media_banner b JOIN bookmark_media_link l ON l.media_id=b.media_id AND l.user_id=$2 AND l.status IN ('matched','accepted','review') LEFT JOIN catalog_image_asset a ON a.sha256=b.asset_sha256 WHERE b.media_id=$1 AND favlib_content_allowed(b.media_id,$2::uuid)`,
       [req.params.mediaId, req.user.id],
     );
     if (
@@ -2495,7 +2517,7 @@ app.post("/api/v1/classification", async (req: any, reply: any) => {
     })
     .safeParse(req.body);
   if (!p.success) return err(reply, 400, "VALIDATION_FAILED");
-  const rows = await catalogRows("");
+  const rows = await catalogRows(req.user.id,"");
   const result = classify(p.data, rows, runtime.classificationKey);
   const saved = await pool.query(
     "INSERT INTO classification_run(user_id,classifier_version,input_fingerprint,status,matches) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,input_fingerprint,classifier_version) DO UPDATE SET status=excluded.status,matches=excluded.matches RETURNING id",
@@ -5346,7 +5368,7 @@ app.get("/api/v1/extension/page-resolution", async (req: any, reply: any) => {
   if (!match.mediaId || !["matched", "accepted"].includes(match.status))
     return { state: "associating" };
   const details = await pool.query(
-    `SELECT m.id,m.type,m.format,favlib_display_title(m.id,$2::uuid)->>'title' AS title,favlib_display_title(m.id,$2::uuid) AS "titleSelection" FROM media m WHERE m.id=$1 AND ${contentAllowedSql('m.id')}`,
+    `SELECT m.id,m.type,m.format,favlib_display_title(m.id,$2::uuid)->>'title' AS title,favlib_display_title(m.id,$2::uuid) AS "titleSelection" FROM media m WHERE m.id=$1 AND ${contentAllowedSql('m.id','$2')}`,
     [match.mediaId, req.user.id],
   );
   if (!details.rowCount) return { state: "excluded" };
@@ -5399,7 +5421,7 @@ app.get(
     const cover = await pool.query(
       `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.provider,c.attribution FROM media_cover c
     LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256
-    WHERE c.media_id=$1 AND c.status='ACTIVE' AND ${contentAllowedSql('c.media_id')} AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.media_id=c.media_id AND l.user_id=$2 AND l.status IN ('matched','accepted') AND i.event<>'removed')`,
+    WHERE c.media_id=$1 AND c.status='ACTIVE' AND ${contentAllowedSql('c.media_id','$2')} AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.media_id=c.media_id AND l.user_id=$2 AND l.status IN ('matched','accepted') AND i.event<>'removed')`,
       [req.params.mediaId, req.user.id],
     );
     if (!cover.rowCount || !cover.rows[0].data)

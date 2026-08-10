@@ -111,7 +111,7 @@ export async function storeMangaUpdatesCalendarIdentifier(release:MangaUpdatesRe
   for(const value of titles)await h.query("INSERT INTO media_title(media_id,text,normalized_text,language,kind,title_type,connector,confidence,provenance) VALUES($1,$2,$3,$4,'supplier','associated','mangaupdates',1,$5) ON CONFLICT DO NOTHING",[mediaId,value,normalizeTitle(value),release.language??'und',{provider:'mangaupdates',seriesId:release.seriesId,source:'release-search',rawTitle:value}]);
   // Keep calendar imports on the same priority lane for both providers. The
   // shared provider queue still enforces each API's own rate/concurrency gate.
-  await h.query("SELECT graphile_worker.add_job('mangaupdates-enrichment',$1,job_key := $2,max_attempts := 3,priority := -20,job_key_mode := 'replace')",[JSON.stringify({mediaId,cover:true}),`calendar-import:mangaupdates:${release.seriesId}`]);
+  await h.query("SELECT graphile_worker.add_job('mangaupdates-enrichment',$1,job_key := $2,max_attempts := 3,priority := -20,job_key_mode := 'replace')",[JSON.stringify({mediaId,forceRefresh:true,providerId:release.seriesId}),`calendar-import:mangaupdates:${release.seriesId}`]);
 }
 
 export async function processMangaUpdatesReleases(

@@ -8,7 +8,10 @@ const createBatchSql=`WITH preference AS (
   AND NOT EXISTS(SELECT 1 FROM notification_delivery_batch recent WHERE recent.user_id=p.user_id AND recent.delivered_at>now()-interval '5 minutes')
   AND NOT EXISTS(SELECT 1 FROM notification_delivery_batch active WHERE active.user_id=p.user_id AND active.status IN ('PENDING','SENDING'))
 ), candidates AS (
-  SELECT preference.user_id,preference.ntfy_topic,ARRAY(SELECT n.id FROM personal_notification n WHERE n.user_id=preference.user_id AND n.delivered_at IS NULL AND n.delivery_batch_id IS NULL ORDER BY n.created_at,n.id LIMIT 100) ids FROM preference
+  SELECT preference.user_id,preference.ntfy_topic,ARRAY(SELECT n.id FROM personal_notification n WHERE n.user_id=preference.user_id AND n.delivered_at IS NULL AND n.delivery_batch_id IS NULL
+    AND (n.kind<>'RELEASE_AVAILABLE' OR favlib_content_allowed(COALESCE(n.payload#>>'{release,mediaId}',split_part(n.release_key,'|',1)),n.user_id))
+    AND (n.kind<>'FAVORITE_REVIEW_REQUIRED' OR EXISTS(SELECT 1 FROM favorite_review review JOIN bookmark_media_link link ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id WHERE review.user_id=n.user_id AND review.status='PENDING' AND link.media_id IS NOT NULL AND favlib_content_allowed(link.media_id,n.user_id)))
+    ORDER BY n.created_at,n.id LIMIT 100) ids FROM preference
 ), inserted AS (
   INSERT INTO notification_delivery_batch(user_id,topic,event_ids,sequence_id)
   SELECT user_id,ntfy_topic,ids,md5(user_id::text||':'||array_to_string(ids,',')) FROM candidates WHERE cardinality(ids)>0 ON CONFLICT(sequence_id) DO NOTHING RETURNING id,event_ids
