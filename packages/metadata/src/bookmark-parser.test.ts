@@ -7,7 +7,7 @@ describe("shared bookmark progression parser", () => {
   it("keeps a synthetic chapter out of every identity alias and preserves raw provenance", () => {
     const raw = { title: "Synthetic Glass Harbor - Chapter 20 - Reader", url: "https://reader.invalid/series/synthetic-glass-harbor/chapter-20" };
     const parsed = parseFavorite({ ...raw, source: { key: "reader.invalid:synthetic-glass-harbor", title: "Synthetic Glass Harbor", slug: "synthetic-glass-harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor", type: "MANGA", releaseSuffix: "chapter-20" } });
-    expect(parsed).toMatchObject({ parser: FAVORITE_PARSER_ID, version: 11, raw, identity: { slug: "synthetic-glass-harbor", title: "Synthetic Glass Harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor" }, displayTitle: "Synthetic Glass Harbor", progression: { kind: "chapter", number: 20, provenance: { inputTitle: raw.title, inputUrl: raw.url, parserVersion: 9 } } });
+    expect(parsed).toMatchObject({ parser: FAVORITE_PARSER_ID, version: 12, raw, identity: { slug: "synthetic-glass-harbor", title: "Synthetic Glass Harbor", canonicalUrl: "https://reader.invalid/series/synthetic-glass-harbor" }, displayTitle: "Synthetic Glass Harbor", progression: { kind: "chapter", number: 20, provenance: { inputTitle: raw.title, inputUrl: raw.url, parserVersion: 9 } } });
     expect(parsed.identity?.aliases.map(alias => alias.value).join(" ")).not.toMatch(/chapter|20/iu);
     expect(parsed.segments).toContainEqual(expect.objectContaining({ raw: "Chapter 20", cleaned: null, excludedAs: "progression" }));
   });
@@ -28,7 +28,7 @@ describe("shared bookmark progression parser", () => {
       slug:"aurora-finale",rawSlug:"aurora-finale",type:"ANIME",
     }});
     expect(parsed).toMatchObject({
-      parser:"favorite-parser-v11",version:11,raw,
+      parser:"favorite-parser-v12",version:12,raw,
       identity:{title:"Synthetic Aurora Finale OVA",stableSlug:"aurora-finale",transformations:[{kind:"repeated-human-title",raw:"Oav Vostfr Synthetic Aurora Finale Ova"}]},
       displayTitle:"Synthetic Aurora Finale OVA",
     });
@@ -40,25 +40,37 @@ describe("shared bookmark progression parser", () => {
     const raw={title:"Synthetic Ember Ledger - Chapter 31",url:"https://reader.invalid/series/route-zx731904/chapter-31"};
     const sourceEvidence={title:"Route Zx731904",slug:"route-zx731904",rawSlug:"route-zx731904",type:"MANGA" as const,strategy:"adapter",evidence:["CATEGORY_PATH"]};
     const parsed=parseFavorite({...raw,source:sourceEvidence});
-    expect(parsed).toMatchObject({parser:"favorite-parser-v11",version:11,raw,identity:{title:"Synthetic Ember Ledger",rawSlug:"route-zx731904",stableSlug:"synthetic-ember-ledger",strategy:"adapter",evidence:["CATEGORY_PATH"],transformations:[{kind:"opaque-url-slug-replaced",raw:"route-zx731904",rawTitle:raw.title,corroboratedBy:"Synthetic Ember Ledger"}]},progression:{number:31,provenance:{parserVersion:9}}});
+    expect(parsed).toMatchObject({parser:"favorite-parser-v12",version:12,raw,identity:{title:"Synthetic Ember Ledger",rawSlug:"route-zx731904",stableSlug:"synthetic-ember-ledger",strategy:"adapter",evidence:["CATEGORY_PATH"],transformations:[{kind:"opaque-url-slug-replaced",raw:"route-zx731904",rawTitle:raw.title,corroboratedBy:"Synthetic Ember Ledger"}]},progression:{number:31,provenance:{parserVersion:9}}});
   });
 
   it("leaves an uncorroborated prefixed opaque routing slug unresolved",()=>{
     const raw={title:"Chapter 31",url:"https://reader.invalid/series/route-zx731904/chapter-31"};
     const parsed=parseFavorite({...raw,source:{title:"Route Zx731904",slug:"route-zx731904",rawSlug:"route-zx731904",type:"MANGA"}});
-    expect(parsed).toMatchObject({parser:"favorite-parser-v11",version:11,raw,identity:null,status:"identity-missing",diagnostics:["OPAQUE_IDENTITY_UNCORROBORATED"],progression:{number:31,provenance:{parserVersion:9}}});
+    expect(parsed).toMatchObject({parser:"favorite-parser-v12",version:12,raw,identity:null,status:"identity-missing",diagnostics:["OPAQUE_IDENTITY_UNCORROBORATED"],progression:{number:31,provenance:{parserVersion:9}}});
   });
 
   it("lets one human bookmark identity override a numeric routing prefix while preserving provenance",()=>{
     const raw={title:"Chapter 27 (English) - Azure Heart Protocol | Reader",url:"https://reader.invalid/comic/00-sapphire-heart-protocol/chapter-27-en"};
     const parsed=parseFavorite({...raw,source:{key:"reader.invalid:00-sapphire-heart-protocol",title:"00 Sapphire Heart Protocol",slug:"00-sapphire-heart-protocol",rawSlug:"00-sapphire-heart-protocol",type:"MANGA"}});
     expect(parsed).toMatchObject({
-      parser:"favorite-parser-v11",version:11,raw,displayTitle:"Azure Heart Protocol",
+      parser:"favorite-parser-v12",version:12,raw,displayTitle:"Azure Heart Protocol",
       identity:{title:"Azure Heart Protocol",rawSlug:"00-sapphire-heart-protocol",stableSlug:"azure-heart-protocol",transformations:[{kind:"numeric-routing-prefix",raw:"00",rawTitle:raw.title,corroboratedBy:"Azure Heart Protocol"}]},
       progression:{kind:"chapter",number:27,provenance:{parserVersion:9}},
       provenance:{rawTitle:raw.title,rawUrl:raw.url},
     });
     expect(parsed.segments[0]).toMatchObject({raw:"Chapter 27 (English)",cleaned:null,excludedAs:"progression"});
+  });
+
+  it("prefers the stable URL slug identity over a release-only favorite label",()=>{
+    const raw={title:"Ch 2 Special",url:"https://reader.invalid/series/synthetic-lantern-index/chapter-2-special"};
+    const parsed=parseFavorite({...raw,source:{title:"Synthetic Lantern Index",slug:"synthetic-lantern-index",rawSlug:"synthetic-lantern-index",canonicalUrl:"https://reader.invalid/series/synthetic-lantern-index",releaseSuffix:"chapter-2-special",type:"MANGA",strategy:"adapter",evidence:["CATEGORY_PATH"]}});
+    expect(parsed).toMatchObject({
+      parser:"favorite-parser-v12",version:12,raw,displayTitle:"Synthetic Lantern Index",
+      identity:{title:"Synthetic Lantern Index",rawSlug:"synthetic-lantern-index",stableSlug:"synthetic-lantern-index"},
+      progression:{kind:"chapter",number:2,raw:"2"},
+      provenance:{rawTitle:raw.title,rawUrl:raw.url},
+    });
+    expect(parsed.displayTitle).not.toMatch(/(?:^|\s)ch(?:apter)?\s*2/iu);
   });
 
   it("aligns the human segment when a chapter is followed by a generic call to action",()=>{

@@ -1341,6 +1341,10 @@ export type MangaUpdatesSeries = {
   publications?: string[];
   description?: string;
   latestChapter?: string;
+  latestChapterProvenance?: {
+    source: "translation-release" | "original-status";
+    raw: unknown;
+  };
   latestVolume?: string;
   url?: string;
   image?: string;
@@ -1444,6 +1448,19 @@ function providerPosition(value: unknown, keys: string[]): string | undefined {
   // Provider zero is an absence sentinel, never an available chapter/volume.
   return Number.isFinite(numeric) && numeric === 0 ? undefined : scalar;
 }
+function originalStatusChapter(value: unknown): string | undefined {
+  const status = providerScalar(value, ["status", "name", "value", "type"]);
+  if (!status) return undefined;
+  const matches = [
+    ...status.matchAll(/(?:^|[^\p{L}])(\d+(?:[.,]\d+)?)\s*(?:chapters?|chapitres?|chaps?\.?)(?=$|[^\p{L}])/giu),
+    ...status.matchAll(/(?:chapters?|chapitres?|chaps?\.?)\s*(\d+(?:[.,]\d+)?)(?=$|[^\d])/giu),
+  ];
+  for (const match of matches) {
+    const chapter = providerPosition(match[1], []);
+    if (chapter) return chapter;
+  }
+  return undefined;
+}
 function mapMuSeries(value: any): MangaUpdatesSeries | null {
   const record = value?.record ?? value;
   const id =
@@ -1453,6 +1470,9 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     ? record.associated.flatMap(titleValues)
     : [];
   const hitTitle = stringValues(value?.hit_title ?? value?.hitTitle ?? record?.hit_title ?? record?.hitTitle)[0];
+  const translationChapterRaw = record.latest_chapter ?? record.latestChapter ?? record.latest_release;
+  const translationChapter = providerPosition(translationChapterRaw, ["chapter", "chapter_number", "number", "value"]);
+  const originChapter = translationChapter ? undefined : originalStatusChapter(record.status ?? record.serialization_status ?? record.series_status);
   const titles = [
     ...stringValues(record.title),
     ...stringValues(record.name),
@@ -1501,7 +1521,12 @@ function mapMuSeries(value: any): MangaUpdatesSeries | null {
     relations: Array.isArray(record.relations) ? record.relations : [],
     associated,
     relatedSeries: Array.isArray(record.related_series) ? record.related_series : [],
-    latestChapter: providerPosition(record.latest_chapter ?? record.latestChapter ?? record.latest_release, ["chapter", "chapter_number", "number", "value"]),
+    latestChapter: translationChapter ?? originChapter,
+    latestChapterProvenance: translationChapter
+      ? { source: "translation-release", raw: translationChapterRaw }
+      : originChapter
+        ? { source: "original-status", raw: record.status ?? record.serialization_status ?? record.series_status }
+        : undefined,
     latestVolume: providerPosition(record.latest_volume ?? record.latestVolume ?? record.latest_release, ["volume", "volume_number", "number", "value"]),
     url: record.url,
     raw: value,
@@ -1810,6 +1835,15 @@ export function titleVariants(values: string[]) {
   const result = new Set<string>();
   const rawValues = explicitTitleAliases(values);
   for (const raw of rawValues) result.add(raw);
+  // Discovery mirrors the bounded matcher: a substantial first clause may be
+  // queried without becoming a new persisted identity alias. Both canonical
+  // providers consume this same variant generator.
+  for(const raw of rawValues){
+    const match=raw.match(/^([^,;]+)[,;]\s*(.+)$/u);
+    if(!match)continue;
+    const prefix=match[1].trim(),suffix=match[2].trim();
+    if(normalizeTitle(prefix).split(' ').filter(Boolean).length>=3&&normalizeTitle(suffix).split(' ').filter(Boolean).length>=2)result.add(prefix);
+  }
   for (const raw of rawValues) {
     const normalized = normalizeTitle(raw);
     if (normalized) result.add(normalized);
@@ -1856,7 +1890,7 @@ const ORDINAL_WORDS = new Map(Object.entries({
   nineteenth: "19", twentieth: "20",
 }));
 
-export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v14";
+export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v15";
 export type ProviderTitleMatchMethod =
   | "ordered-exact"
   | "explicit-season"
@@ -1895,6 +1929,18 @@ function candidateCorroboratesStructuredAlias(alias:string,title:string){
   if(starts.length!==1)return false;
   const before=outer.slice(0,starts[0]),after=outer.slice(starts[0]+inner.length);
   return before.length===2&&/^\d+$/u.test(before[0])&&/^[a-z]{2}(?:-[a-z]{2,3})?$/u.test(before[1])&&after.length<=3;
+}
+
+/** Some source pages expose `provider title, localized explanatory title` as
+ * one preserved label. The first clause may establish the provider identity,
+ * but only at the bounded fallback level and only with a substantial second
+ * clause; competing provider records remain ambiguous. */
+function boundedDelimitedAliasPrefix(alias:string,title:string){
+  const clauses=alias.split(/\s*[,;]\s*/u).filter(Boolean);
+  if(clauses.length<2)return false;
+  const prefix=clauses[0],suffix=clauses.slice(1).join(' ');
+  if(meaningfulTokens(prefix).length<3||meaningfulTokens(suffix).length<2)return false;
+  return compactTitleKey(prefix)===compactTitleKey(title);
 }
 
 export function mangaUpdatesCandidateTitles(series: MangaUpdatesSeries) {
@@ -1977,6 +2023,8 @@ export function decideProviderTitleMatch<T>(input: {
   const tokenKey = (value:string) => meaningfulTokens(value).sort().join("|");
   const reordered = chooseLevel("reordered-significant-words", pairs.filter(({alias,title}) => Boolean(tokenKey(alias)) && tokenKey(alias) === tokenKey(title)));
   if (reordered) return reordered;
+  const delimitedPrefix=chooseLevel("bounded-edit-distance",pairs.filter(({alias,title})=>boundedDelimitedAliasPrefix(alias,title)));
+  if(delimitedPrefix)return delimitedPrefix;
   // A provider record may expose a short associated title and a longer
   // canonical variant. Their union is evidence only within that one provider
   // identity; tokens are never combined across separate search results.

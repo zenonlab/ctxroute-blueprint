@@ -219,6 +219,21 @@ describe("AniList catalogue", () => {
     expect(decideProviderTitleMatch({aliases:['Synthetic Silent Ranger Crosses Northern Frontier'],candidates:[{id:'long',titles:['Synthetic Silent Guardian Crosses Northern Frontier: A Chronicle Beyond the Ancient Mountains']},{id:'noise',titles:['Unrelated Academy Romance']}],id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'long'});
     expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'a',titles:[translated]},{id:'b',titles:["My Standing as an Assassin Clearly Exceeds the King's"]}],id:item=>item.id,titles:item=>item.titles}).status).toBe('AMBIGUOUS');
   });
+  it("uses a unique delimited source-title prefix at the bounded level for both providers",()=>{
+    const alias='Farewell Star Journey, Welcome Mortal Morning';
+    const reading=[
+      {id:'noise',title:'Farewell Star Academy',titles:['Farewell Star Academy'],type:'Manga',year:2025},
+      {id:'winner',title:'Fare well, Star Journey',titles:['Fare well, Star Journey'],type:'Manga',year:2025},
+    ] as any;
+    const anime=[
+      {id:1,type:'ANIME',title:{english:'Farewell Star Academy'},synonyms:[],popularity:999999},
+      {id:2,type:'ANIME',title:{english:'Fare well, Star Journey'},synonyms:[],popularity:1},
+    ] as any;
+    expect(decideMangaUpdatesTitleMatch([alias],reading)).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'winner',matchedAlias:alias,rawProvenance:{aliases:[alias]}});
+    expect(decideAniListTitleMatch([alias],anime)).toMatchObject({status:'MATCH',method:'bounded-edit-distance',providerId:'2',matchedAlias:alias,rawProvenance:{aliases:[alias]}});
+    expect(decideProviderTitleMatch({aliases:[alias],candidates:[{id:'a',titles:['Fare well, Star Journey']},{id:'b',titles:['Farewell Star Journey']}],id:item=>item.id,titles:item=>item.titles})).toMatchObject({status:'AMBIGUOUS',method:'bounded-edit-distance'});
+    expect(titleVariants([alias])).toEqual(expect.arrayContaining([alias,'Farewell Star Journey']));
+  });
   it("ignores English relative pronouns and requires two thirds shared identity tokens symmetrically", () => {
     const alias = "The Scholar Who Conceals Ancient Power Beyond Silent City";
     const translated = "Scholar That Hides Ancient Power Beyond Quiet City Walls";
@@ -1032,6 +1047,16 @@ describe("AniList catalogue", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({series_id:92,title:"Synthetic Unknown",type:"Manga",status:"Ongoing"}), {status:200,headers:{"content-type":"application/json"}}));
     await expect((await import("./index.js")).fetchMangaUpdatesSeries("91", {endpoint:"https://mu.zero.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:undefined});
     await expect((await import("./index.js")).fetchMangaUpdatesSeries("92", {endpoint:"https://mu.zero.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:undefined});
+  });
+  it("uses an explicit original-status chapter only when translation releases omit one", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({series_id:93,title:"Synthetic Origin Ledger",type:"Manhwa",status:"9 Volumes 72 Chapters (Complete)"}), {status:200,headers:{"content-type":"application/json"}}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({series_id:94,title:"Synthetic Translation Ledger",type:"Manhwa",status:"9 Volumes 72 Chapters (Complete)",latest_chapter:"41"}), {status:200,headers:{"content-type":"application/json"}}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({series_id:95,title:"Synthetic Volume Ledger",type:"Manga",status:"9 Volumes (Complete)"}), {status:200,headers:{"content-type":"application/json"}}));
+    const metadata=await import("./index.js");
+    await expect(metadata.fetchMangaUpdatesSeries("93",{endpoint:"https://mu.origin.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:"72",latestChapterProvenance:{source:"original-status",raw:"9 Volumes 72 Chapters (Complete)"}});
+    await expect(metadata.fetchMangaUpdatesSeries("94",{endpoint:"https://mu.origin.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:"41",latestChapterProvenance:{source:"translation-release",raw:"41"}});
+    await expect(metadata.fetchMangaUpdatesSeries("95",{endpoint:"https://mu.origin.test/v1",fetch:fetcher})).resolves.toMatchObject({latestChapter:undefined,latestChapterProvenance:undefined});
   });
   it("resolves a MangaDex links.mu public slug through the exact provider URL, independent of rank", async () => {
     const fetcher = vi.fn()

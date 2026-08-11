@@ -65,8 +65,8 @@ export type FavoriteProgression = {
 };
 
 /** Increment only when the generic evidence policy changes. */
-export const FAVORITE_PARSER_ID = "favorite-parser-v11" as const;
-export const FAVORITE_IDENTITY_PARSER_VERSION = 11;
+export const FAVORITE_PARSER_ID = "favorite-parser-v12" as const;
+export const FAVORITE_IDENTITY_PARSER_VERSION = 12;
 export const FAVORITE_PROGRESS_PARSER_VERSION = 9;
 
 export type FavoriteParseArtifact = {
@@ -270,7 +270,6 @@ export function parseFavorite(input: { title: string; url: string; source?: Book
   const aligned = sourceAliases.length
     ? segments.filter(segment => segment.cleaned).map(segment => ({ segment, proof: matchValidatedTitle(segment.cleaned!, sourceAliases) })).find(item => item.proof)
     : undefined;
-  const displayTitle = structured?.title ?? aligned?.segment.cleaned ?? segments.find(segment => segment.cleaned)?.cleaned ?? parseBookmarkTitle(input.title);
   const aliases: Array<{ value: string; provenance: "stable-url-slug" | "aligned-bookmark-segment" }> = [];
   if (source) {
     aliases.push({ value: stableSourceTitle!, provenance: "stable-url-slug" });
@@ -282,6 +281,11 @@ export function parseFavorite(input: { title: string; url: string; source?: Book
     canonicalUrl: source.canonicalUrl ?? input.url, type: source.type, strategy: source.strategy, evidence: [...(source.evidence??[])], aliases,
     transformations: structured?.transformations ?? (opaqueReplacement?[{kind:"opaque-url-slug-replaced" as const,raw:rawSlug,rawTitle:input.title,corroboratedBy:opaqueReplacement}]:numericRoutingReplacement?[{kind:"numeric-routing-prefix" as const,raw:numericRoutingToken!,rawTitle:input.title,corroboratedBy:numericRoutingReplacement}]:repeatedHumanTitle&&normalize(repeatedHumanTitle)!==normalize(source.title)?[{kind:"repeated-human-title" as const,raw:source.title,rawTitle:input.title,corroboratedBy:repeatedHumanTitle}]:[]),
   } : null;
+  // Once the URL establishes an identity, its stable slug owns the displayed
+  // parsed title too. A bookmark label such as "Ch 2 special" is release
+  // context, not a safer work title than the URL identity. Human text still
+  // replaces opaque/structured routing slugs only through the proofs above.
+  const displayTitle = identity?.title ?? segments.find(segment => segment.cleaned)?.cleaned ?? parseBookmarkTitle(input.title);
   return {
     parser: FAVORITE_PARSER_ID, version: FAVORITE_IDENTITY_PARSER_VERSION,
     fingerprint: fingerprint(JSON.stringify({ parser: FAVORITE_PARSER_ID, raw })), raw,

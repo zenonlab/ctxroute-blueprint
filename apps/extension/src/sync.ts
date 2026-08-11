@@ -74,7 +74,8 @@ export function mergeReconciledState(current:State,reconciled:State):State{
   for(const event of current.queue)queued.set(event.bookmark.id,event);
   const known=new Map(reconciled.knownBookmarks.map(bookmark=>[bookmark.id,bookmark]));
   for(const event of current.queue){if(event.type==='removed')known.delete(event.bookmark.id);else known.set(event.bookmark.id,event.bookmark)}
-  return {...current,...reconciled,queue:[...queued.values()],knownBookmarks:[...known.values()],syncStatus:current.deviceToken?'pending':'unpaired'};
+  const queue=[...queued.values()];
+  return {...current,...reconciled,queue,knownBookmarks:[...known.values()],syncStatus:!current.deviceToken?'unpaired':queue.length?'pending':reconciled.syncStatus};
 }
 
 type PersistAcknowledgement=(acknowledged:Event[],cursor:string)=>Promise<State>;
@@ -92,20 +93,15 @@ export async function upload(state: State,persistAcknowledgement:PersistAcknowle
     if (response.status === 426) throw new Error('PROTOCOL_UNSUPPORTED');
     if (response.status === 401) throw new Error('DEVICE_REVOKED');
     if (!response.ok) throw new Error(`SYNC_${response.status}`);
-    const body = await response.json() as { cursor: string };
+    const body = await response.json() as { cursor: string;receipt?:{inventoryTotal:number;recognizedCount:number;reviewCount:number;excludedCount:number;inventoryDigest:string;serverSyncedAt:string} };
     cursor = body.cursor;
 
     // The import is acknowledged first. Optional progression enrichment must never
     // keep an already accepted batch in the offline queue.
     state = await persistAcknowledgement(group,cursor);
-    for (const event of group.filter(item => item.type === 'changed')) {
-      try { await reportBookmarkProgression(state, event.bookmark, event.type); }
-      catch (error) {
-        if (String(error).includes('REVOKED') || String(error).includes('PROTOCOL')) throw error;
-      }
-    }
+    if(body.receipt)state={...state,lastSyncAt:Date.now(),syncStatus:'verified',serverReceipt:{...body.receipt,serverSyncedAt:Date.parse(body.receipt.serverSyncedAt),attemptedAt:Date.now(),verifiedAt:Date.now()}};
   }
-  return verifyInventory(state);
+  return state;
 }
 
 export function createSyncDrain(run:()=>Promise<void>){
@@ -121,6 +117,14 @@ export function createSyncDrain(run:()=>Promise<void>){
 
 function sameBookmark(left:Bookmark,right:Bookmark){return left.url===right.url&&left.title===right.title&&left.parentId===right.parentId&&left.fingerprint===right.fingerprint}
 
+export function inventorySnapshotChanged(before:State,after:State){
+  if(before.queue.length!==after.queue.length||before.knownBookmarks.length!==after.knownBookmarks.length)return true;
+  const queued=new Map(before.queue.map(event=>[event.bookmark.id,event]));
+  if(after.queue.some(event=>{const previous=queued.get(event.bookmark.id);return !previous||!sameQueuedEvent(previous,event)}))return true;
+  const known=new Map(before.knownBookmarks.map(bookmark=>[bookmark.id,bookmark]));
+  return after.knownBookmarks.some(bookmark=>{const previous=known.get(bookmark.id);return !previous||!sameBookmark(previous,bookmark)});
+}
+
 export function reconcileBookmarks(state:State,current:Bookmark[],now=Date.now()):State {
   const previous=new Map(state.knownBookmarks.map(bookmark=>[bookmark.id,bookmark]));
   const currentById=new Map(current.map(bookmark=>[bookmark.id,bookmark]));
@@ -134,7 +138,7 @@ export function reconcileBookmarks(state:State,current:Bookmark[],now=Date.now()
   const queue=state.queue.filter(event=>!affected.has(event.bookmark.id));
   for(const event of generated){const pendingCreated=state.queue.find(item=>item.bookmark.id===event.bookmark.id&&item.type==='created');queue.push(pendingCreated&&event.type!=='removed'?{...pendingCreated,bookmark:event.bookmark}:event)}
   const likelyMedia=current.filter(bookmark=>isMedia(bookmark.title,bookmark.url)).length;
-  return {...state,queue,knownBookmarks:current,inventory:{totalWeb:current.length,likelyMedia,ambiguous:current.length-likelyMedia,digest:null,updatedAt:now},syncStatus:state.deviceToken?'pending':'unpaired'};
+  return {...state,queue,knownBookmarks:current,inventory:{totalWeb:current.length,likelyMedia,ambiguous:current.length-likelyMedia,digest:null,updatedAt:now},syncStatus:!state.deviceToken?'unpaired':queue.length?'pending':state.syncStatus};
 }
 
 export function rebuildImportQueue(state:State,now=Date.now()):State {
@@ -152,15 +156,11 @@ export async function recoverServerInventory(state:State):Promise<State>{
 
 export async function reconcileInventory(state: State) {
   const tree = await chrome.bookmarks.getTree();
-  const bookmarks: Bookmark[] = [];
-  const walk = async (nodes: chrome.bookmarks.BookmarkTreeNode[]) => {
-    for (const node of nodes) {
-      const bookmark = await webBookmark(node);
-      if (bookmark) bookmarks.push(bookmark);
-      if (node.children) await walk(node.children);
-    }
-  };
-  await walk(tree);
+  const nodes:chrome.bookmarks.BookmarkTreeNode[]=[];
+  const walk=(items:chrome.bookmarks.BookmarkTreeNode[])=>{for(const node of items){if(node.url)nodes.push(node);if(node.children)walk(node.children)}};
+  walk(tree);
+  const cached=new Map(state.knownBookmarks.map(bookmark=>[bookmark.id,bookmark]));
+  const bookmarks=(await Promise.all(nodes.map(node=>webBookmark(node,cached.get(node.id))))).filter((bookmark):bookmark is Bookmark=>Boolean(bookmark));
   const reconciled=mergeSites(reconcileBookmarks(state,bookmarks),mediaSites(bookmarks));
   return {...reconciled,inventory:{...reconciled.inventory,digest:await inventoryDigest(bookmarks)}};
 }

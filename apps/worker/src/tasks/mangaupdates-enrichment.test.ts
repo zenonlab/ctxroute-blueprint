@@ -14,6 +14,8 @@ describe('MangaUpdates provider availability',()=>{
     expect(source).toContain("DELETE FROM metadata_assertion");
     expect(source).toContain("available_position_number=0");
     expect(source).toContain("chapter?.raw??null");
+    expect(source).toContain("s.latestChapterProvenance?.source");
+    expect(source).toContain("providerEvidence:s.latestChapterProvenance");
     expect(source).not.toContain("s.latestChapter??null,s.latestVolume");
   });
   it('reapplies a proved provider type before an active-identity fast return',()=>{

@@ -5,6 +5,9 @@ import { join } from 'node:path';
 const source=readFileSync(join(process.cwd(),'app/favlib-app.tsx'),'utf8');
 const styles=readFileSync(join(process.cwd(),'app/physical-card.css'),'utf8');
 const physicalCard=readFileSync(join(process.cwd(),'app/physical-card.tsx'),'utf8');
+const reportStyles=readFileSync(join(process.cwd(),'app/report-card.css'),'utf8');
+const tiltStyles=readFileSync(join(process.cwd(),'app/card-tilt.css'),'utf8');
+const motionFixes=readFileSync(join(process.cwd(),'app/physical-card-motion-fixes.css'),'utf8');
 const cardBack=source.slice(source.indexOf('function MediaCardBack'),source.indexOf('function MediaCard('));
 
 describe('refonte de la modal œuvre',()=>{
@@ -31,10 +34,10 @@ describe('refonte de la modal œuvre',()=>{
     expect(cardBack).toContain('aria-live="polite"');
   });
   it('réinitialise la session à la fermeture et ne rend aucun contrôle Fermer',()=>{
-    expect(source).toContain('onClose={()=>setSession(value=>value+1)}');
+    expect(source).toContain('setSession(value=>value+1)');
     expect(physicalCard).toContain("event.key==='Escape'");
     expect(physicalCard).toContain("document.addEventListener('pointerdown',outside,true)");
-    expect(physicalCard).toContain('trigger.current?.focus()');
+    expect(physicalCard).toContain('trigger.current?.focus({preventScroll:true})');
     expect(physicalCard).not.toContain('>Fermer</button>');
   });
   it('restaure les onglets textuels et le sélecteur compact',()=>{
@@ -65,7 +68,32 @@ describe('refonte de la modal œuvre',()=>{
     expect(source).toContain('recommendedSources.length');
     expect(source).toContain('favorite.parsedTitle');
     expect(source).toContain('source.workUrl??source.canonicalUrl');
-    expect(source).toContain('source-reports');
+    expect(source).toContain("fetch('/api/v1/reports'");
     expect(source).toContain('navigator.clipboard');
+  });
+  it('ajoute une seconde face sans couverture avec états complets, échappement et réduction de mouvement',()=>{
+    expect(source).toContain('function ReportFace');
+    expect(source).toContain('Avertissement envoyé à l’admin');
+    expect(source).toContain('Session expirée');
+    expect(source).toContain('Réessayer');
+    expect(source).toContain('Aucun sujet vérifié ne peut être signalé');
+    expect(source).toContain('data-report-trigger');
+    expect(physicalCard).toContain('onEscape');
+    expect(reportStyles).toContain('is-secondary-flipped .physical-card-rotor{animation:modal-report-turn');
+    expect(reportStyles).toContain('@keyframes modal-report-turn');
+    expect(reportStyles).toContain('@media(prefers-reduced-motion:reduce)');
+    expect(source.slice(source.indexOf('function ReportFace'),source.indexOf('function MediaCardBack'))).not.toContain('<Cover');
+  });
+  it('garde la modal fixe et isole les cartes Découvertes',()=>{
+    expect(physicalCard).not.toContain('interactiveHoverSelector');
+    expect(physicalCard).not.toContain('modalFreezeBounds');
+    expect(physicalCard).not.toContain("window.addEventListener('pointermove',track,true)");
+    expect(physicalCard).not.toContain('onPointerOverCapture=');
+    expect(physicalCard).not.toContain('--modal-tilt-');
+    expect(styles).toContain('.physical-card.media-modal.is-modal-open .physical-card-rotor');
+    expect(styles).toContain('transition:none');
+    expect(styles).toContain('.physical-card.media-modal.is-modal-open.is-flipped .physical-card-rotor{transform:rotateY(180deg)}');
+    expect(tiltStyles).toContain('.media-card:not(.review-hover)>.physical-card-rotor>.physical-card-front>a>.poster');
+    expect(motionFixes).toContain('.related-work-card.card.media-card>.poster');
   });
 });

@@ -29,4 +29,24 @@ describe('compact popup contracts',()=>{
     expect(script).not.toContain('position ${escapeHtml(item.progress');
     expect(script).not.toContain('Dernière sortie ·');
   });
+  it('does not expose raw bookmark or synchronization internals while the library loads',()=>{
+    expect(script).not.toContain('Favori local · synchronisation');
+    expect(script).not.toContain('function localRenderList');
+    expect(script).toContain("loadingMarkup(syncing?'Importation de votre bibliothèque…':'Chargement de votre bibliothèque…')");
+  });
+  it('explains pairing and import latency instead of showing an unexplained skeleton',()=>{
+    expect(script).toContain('Création du code et ouverture de FavLib…');
+    expect(script).toContain('Appairage réussi. Votre bibliothèque est en cours d’importation');
+    expect(script).toContain('role="status"');
+    expect(script).toContain('Importation en cours : les autres œuvres apparaîtront progressivement.');
+  });
+  it('deduplicates works and avoids repeating an unavailable-cover sentence on every card',()=>{
+    expect(script).toContain('uniqueById((await response.json()');
+    expect(script).not.toContain('Couverture<br>indisponible');
+    expect(script).toContain('aria-label="Visuel en préparation"');
+  });
+  it('allows enough time and retries for authenticated cover downloads',()=>{
+    expect(script).toContain('const coverFetch={attempts:3,timeoutMs:10000}');
+    expect(script).toContain('},coverFetch)');
+  });
 });

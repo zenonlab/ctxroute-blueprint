@@ -4,7 +4,7 @@ import { saveState } from './storage.js';
 import { API } from './sync.js';
 import { apiFetch as fetch } from './api-fetch.js';
 
-type Config=ExtensionConfig&{sites?:{id:string;domain:string;source:'bookmark'|'manual'}[]};
+type Config=ExtensionConfig&{sites?:{id:string;domain:string;source:'bookmark'|'manual'}[];proposals?:Proposal[];receipt?:{inventoryTotal:number;recognizedCount:number;reviewCount:number;excludedCount:number;inventoryDigest:string}};
 type Proposal=ExtensionUpdateProposal;
 const headers=(state:State)=>({Authorization:`Bearer ${state.deviceToken}`,'Content-Type':'application/json'});
 async function checked(response:Response,label:string){if(response.status===401)throw new Error('DEVICE_REVOKED');if(response.status===426)throw new Error('PROTOCOL_UNSUPPORTED');if(!response.ok)throw new Error(`${label}_${response.status}`);return response}
@@ -29,10 +29,9 @@ export async function processProposal(state:State,proposal:Proposal):Promise<Sta
 
 export async function synchronizeExtensionControl(state:State):Promise<State>{
   if(!state.deviceToken)return state;let next=await flushResults(state);
-  const config=await checked(await fetch(`${API}/extension/config`,{headers:headers(next)}),'CONFIG').then(response=>response.json()) as Config;
+  const config=await checked(await fetch(`${API}/extension/control`,{headers:headers(next)}),'CONTROL').then(response=>response.json()) as Config;
   const serverSites=await Promise.all((config.sites??[]).map(async site=>({id:site.id,domain:site.domain,source:site.source,approvedAt:Date.now(),permissionGranted:await permissionFor(site.domain)})));
-  const domains=new Set(serverSites.map(site=>site.domain));next={...next,sites:[...next.sites.filter(site=>!domains.has(site.domain)),...serverSites],accountRole:config.role,autoUpdateFavorites:config.preferences.autoUpdateFavorites,observeNavigation:config.preferences.observeNavigation,syncMinutes:config.preferences.syncMinutes,availableVersion:config.availableVersion};await saveState(next);
-  const proposals=await checked(await fetch(`${API}/extension/update-proposals`,{headers:headers(next)}),'PROPOSALS').then(response=>response.json()) as {items:Proposal[]};
-  for(const proposal of proposals.items){next=await processProposal(next,proposal);await acknowledge(next,next.pendingProposalResults.find(item=>item.id===proposal.id)!);next={...next,pendingProposalResults:next.pendingProposalResults.filter(item=>item.id!==proposal.id)};await saveState(next)}
+  const domains=new Set(serverSites.map(site=>site.domain));next={...next,sites:[...next.sites.filter(site=>!domains.has(site.domain)),...serverSites],accountRole:config.role,autoUpdateFavorites:config.preferences.autoUpdateFavorites,observeNavigation:config.preferences.observeNavigation,syncMinutes:config.preferences.syncMinutes,availableVersion:config.availableVersion,...(config.receipt?{serverReceipt:{...config.receipt,serverSyncedAt:null,attemptedAt:Date.now(),verifiedAt:null}}:{})};await saveState(next);
+  for(const proposal of config.proposals??[]){next=await processProposal(next,proposal);await acknowledge(next,next.pendingProposalResults.find(item=>item.id===proposal.id)!);next={...next,pendingProposalResults:next.pendingProposalResults.filter(item=>item.id!==proposal.id)};await saveState(next)}
   return next;
 }

@@ -2,6 +2,14 @@
 
 Statut : accepté — 2026-08-07
 
+## Amendement du 10 août 2026 — autorité administrative
+
+Les signalements postérieurs à une résolution ne participent plus à un quorum de suspension. Ils ouvrent un case adjudicable, agrégé par sujet et révision de preuve. La fiche, l’identité et les recommandations restent inchangées tant qu’un administrateur n’a pas rendu une décision explicite. Les anciennes routes restent compatibles mais alimentent ce cycle ; `DEAD_LINK` est classé comme retour de santé automatisé.
+
+Une décision peut conserver l’identité, corriger le seul favori rapporté, corriger le cluster de même identité parsée, conserver une association source ou bloquer l’association œuvre↔site exacte. Elle est précédée d’une prévisualisation du nombre de favoris actifs, confirmée, inscrite dans un audit immuable et réversible. Les décisions source publiques sont partagées ; une preuve `extension_private` reste bornée à son utilisateur. Les décisions originales et les artefacts du parseur ne sont jamais réécrits : une surcharge administrative explicite porte l’ancienne et la nouvelle identité avec provenance.
+
+`report_submission` est personnel et cascade avec le compte ; `report_case` ne conserve que des agrégats et preuves publiques expurgées. `source_association_decision` est partagé pour une preuve publique et porte un `user_id` pour `extension_private`. `admin_identity_override` et `report_case_audit_event` relèvent de l’audit administrateur local. Ces tables suivent la rétention du catalogue référencé, sont incluses dans sauvegarde/restauration et exportent uniquement agrégats et décisions hors sauvegarde administrateur. La purge d’un compte retire ses soumissions et associations privées sans effacer les événements d’audit déjà anonymisés ; la purge catalogue supprime d’abord les cases sans sujet, et une restauration applique les tombstones avant réactivation des jobs.
+
 ## Décision
 
 FavLib partage uniquement les fiches publiques des fournisseurs, jamais les favoris, identités ou votes individuels. Une clé `v1` combine fournisseur, type de média, titre issu du parseur partagé et, pour AniList seulement, une saison accompagnée d’une preuve explicite. Le titre brut et la provenance de saison sont conservés. Un numéro terminal nu ne devient pas une saison.

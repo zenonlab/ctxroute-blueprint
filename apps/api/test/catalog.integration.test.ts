@@ -370,6 +370,12 @@ suite('Wave 4 PostgreSQL ownership isolation',()=>{
     expect(ids).toHaveLength(65);expect(new Set(ids).size).toBe(65);expect(ids[0]).toBe(`${prefix}-001`);expect(ids[64]).toBe(`${prefix}-065`);
     const facets=await app.inject({method:'GET',url:'/api/v1/library/facets',headers:{cookie}}),filtered=await app.inject({method:'GET',url:'/api/v1/library?theme=Action&type=MANGA&status=ongoing&provider=anilist&sort=release&direction=desc',headers:{cookie}});
     expect(facets.statusCode).toBe(200);expect(facets.json().themes).toContainEqual(expect.objectContaining({value:'Action',count:2}));expect(filtered.json().items.map((item:any)=>item.id)).toEqual([`${prefix}-002`,`${prefix}-001`]);
+    const cards=await app.inject({method:'GET',url:'/api/v1/library/cards?limit=30&offset=0',headers:{cookie}}),home=await app.inject({method:'GET',url:'/api/v1/home',headers:{cookie}}),header=await app.inject({method:'GET',url:'/api/v1/header-summary',headers:{cookie}});
+    expect(cards.statusCode).toBe(200);expect(cards.json()).toMatchObject({total:65,nextOffset:30,hasMore:true});expect(cards.headers['cache-control']).toBe('private, max-age=30');expect(cards.headers.vary).toContain('Cookie');
+    expect(Buffer.byteLength(cards.body)).toBeLessThanOrEqual(Math.floor(Buffer.byteLength(first.body)*0.2));
+    expect(Object.keys(cards.json().items[0]).sort()).toEqual(['availability','classificationStatus','coverUrl','favoriteCount','format','id','progress','status','title','type'].sort());
+    expect(home.statusCode).toBe(200);expect(home.json().myList).toHaveLength(6);expect(home.json().continue).toEqual([]);expect(home.json().latestReleases).toEqual([]);
+    expect(header.json()).toEqual({role:'member',pendingReviewCount:0});
     await pool.query('DELETE FROM app_user WHERE id=$1',[userId]);await pool.query('DELETE FROM media WHERE id LIKE $1',[`${prefix}-%`]);
   });
   it('validates, persists and authorizes operational settings and protects the last admin',async()=>{

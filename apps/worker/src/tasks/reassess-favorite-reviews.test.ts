@@ -12,7 +12,7 @@ describe('review reassessment',()=>{
     expect(calls.some(call=>call.sql.includes("status='ERROR'")&&call.sql.includes('last_error_code'))).toBe(true);
     expect(calls.some(call=>call.sql.includes('RETURNING a.cluster_id'))).toBe(false);
     expect(calls.some(call=>call.sql.includes('FROM LATERAL'))).toBe(false);
-    expect(calls.filter(call=>call.values?.includes('provider-title-v14')).length).toBeGreaterThan(0);
+    expect(calls.filter(call=>call.values?.includes('provider-title-v15')).length).toBeGreaterThan(0);
     expect(calls.some(call=>call.sql.includes('favorite_parser_repair')&&call.sql.includes("review.decision IS NULL"))).toBe(true);
     expect(calls.find(call=>call.sql.includes('graphile_worker.add_job'))?.values?.[2]).toContain('review-reassess:anilist:');
   });

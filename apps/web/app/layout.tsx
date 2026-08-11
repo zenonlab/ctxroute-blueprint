@@ -12,6 +12,8 @@ import './settings.css';
 import './login.css';
 import './card-tilt.css';
 import './physical-card.css';
+import './physical-card-motion-fixes.css';
+import './report-card.css';
 import './design-fixes.css';
 
 export const metadata:Metadata={title:{default:'FavLib',template:'%s · FavLib'},description:'Bibliothèque locale privée de favoris manga et anime'};

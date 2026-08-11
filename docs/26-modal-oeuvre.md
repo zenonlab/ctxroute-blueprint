@@ -65,6 +65,12 @@ fournisseur, favoris et sources n’ont ni fond ni bordure. Copier et signaler
 restent des boutons tactiles sans bordure, avec un focus visible. Les états
 vides, notices et métadonnées restent eux aussi sans cadres décoratifs.
 
+## Face de signalement
+
+« Signaler un problème » déclenche une seconde rotation physique de 180° depuis les détails. Cette face est strictement textuelle et n’affiche aucune couverture, bannière ou image source. Retour et Échap inversent seulement cette seconde rotation et restaurent le focus sur le bouton de signalement ; un second Échap depuis les détails ferme la modale. Avec réduction des animations, le changement de face est immédiat.
+
+Le parcours distingue l’identité de l’œuvre et l’association à un site vérifié, impose des raisons structurées et une confirmation avant envoi, puis affiche les états envoi, succès, erreur récupérable, session expirée, attente admin et liste vide. Une indisponibilité ou redirection reste un contrôle de santé automatique. Un signalement ne change jamais la carte ni les recommandations : seul un jugement administrateur audité et réversible possède cette autorité.
+
 Les titres affichés viennent de la sélection de titre partagée. Les favoris
 conservent titre/URL bruts, résultat du parseur, version et provenance dans le
 payload ; le brut ne remplace pas silencieusement le titre parsé. La progression

@@ -3,16 +3,17 @@ import { collectSnapshot, snapshotHash, type FetchPolicy } from '../collect.js';
 import { acquireLease, releaseLease } from '../lease.js';
 
 type QueryHelper = { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount: number|null }> };
-type Payload = { previous: Snapshot|null; current: Snapshot } | { scopeKey: string; target: string; rawTarget?: string; workUrl?: string; workUrlProvenance?: Record<string,unknown>; mediaId: string; connector: string; connectorVersion: string; policy: FetchPolicy; userId?: string; ttlMs?: number };
+type Payload = { previous: Snapshot|null; current: Snapshot } | { scopeKey: string; target: string; rawTarget?: string; workUrl?: string; workUrlProvenance?: Record<string,unknown>; mediaId: string; connector: string; connectorVersion: string; accessMode?:'public'|'authenticated'|'extension_private'; policy: FetchPolicy; userId?: string; ttlMs?: number };
 type CollectionPayload=Extract<Payload,{target:string}>;
 
 export function releaseOriginProvenance(payload:CollectionPayload,current:Snapshot,release:Snapshot['origins'][number]){
-  return {snapshotHash:snapshotHash(current),rawUrl:payload.rawTarget??release.url??payload.target,releaseUrl:release.url??null,workUrl:release.workUrl??payload.workUrl??payload.target,workUrlProvenance:payload.workUrlProvenance??{source:'availability-target'},language:release.language??null,languageDetection:release.languageDetection??'undetected',languageEvidence:release.languageEvidence??null,detectedAt:release.checkedAt};
+  return {snapshotHash:snapshotHash(current),rawUrl:payload.rawTarget??release.url??payload.target,releaseUrl:release.url??null,workUrl:release.workUrl??payload.workUrl??payload.target,workUrlProvenance:payload.workUrlProvenance??{source:'availability-target'},language:release.language??null,languageDetection:release.languageDetection??'undetected',languageEvidence:release.languageEvidence??null,accessMode:payload.accessMode??'public',connectorVersion:payload.connectorVersion,detectedAt:release.checkedAt};
 }
 
 export default async function availability(payload?: Payload, helpers?: QueryHelper){
   if (payload && 'current' in payload) return diffSnapshots(payload.previous, payload.current);
   if (!payload || !('target' in payload)) return { status: 'SKIPPED', reason: 'snapshot-target-not-configured' };
+  if(helpers){const associationUrl=payload.workUrl??payload.target;const blocked=await helpers.query(`SELECT 1 FROM source_association_decision WHERE active AND verdict='BLOCK' AND media_id=$1 AND canonical_url=$2 AND (user_id IS NULL OR user_id=$3) LIMIT 1`,[payload.mediaId,associationUrl,payload.userId??null]);if(blocked.rowCount)return {status:'BLOCKED',reason:'ADMIN_ASSOCIATION_DECISION',mediaId:payload.mediaId,canonicalUrl:associationUrl}}
   const owner = `worker-${process.pid}`;
   const leased = Boolean(helpers && await acquireLease(helpers, payload.scopeKey, owner, 5 * 60 * 1000));
   if (helpers && !leased) return { status: 'LEASED', scopeKey: payload.scopeKey };

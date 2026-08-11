@@ -1,5 +1,6 @@
 import { FavLibApp } from '../../favlib-app';
 
-export default function MediaPage() {
-  return <FavLibApp />;
+export default async function MediaPage({params}:{params:Promise<{mediaId:string}>}) {
+  const {mediaId}=await params;
+  return <FavLibApp initialPath={`/library/${encodeURIComponent(mediaId)}`} />;
 }

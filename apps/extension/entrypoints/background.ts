@@ -1,5 +1,5 @@
 import { loadState, updateState } from '../src/storage.js';
-import { createSyncDrain, mergeReconciledState, reconcileInventory, recoverServerInventory, reportNavigation, upload, reimportAllInventory, API } from '../src/sync.js';
+import { createSyncDrain, inventorySnapshotChanged, mergeReconciledState, reconcileInventory, rebuildImportQueue, reportNavigation, upload, reimportAllInventory, API } from '../src/sync.js';
 import { webBookmark } from '../src/core.js';
 import { siteFromUrl, mergeSites } from '../src/sites.js';
 import { synchronizeExtensionControl } from '../src/server-control.js';
@@ -9,6 +9,7 @@ declare function defineBackground(main: () => void): unknown;
 
 export default defineBackground(() => {
   let retryAttempt = 0;
+  let controlRequested = false;
   const scheduleRetry = async () => {
     const delayInMinutes = Math.min(15, 2 ** retryAttempt);
     retryAttempt = Math.min(retryAttempt + 1, 4);
@@ -18,11 +19,23 @@ export default defineBackground(() => {
     try {
       let state = await loadState();
       if (!state.deviceToken) return;
-      state = await synchronizeExtensionControl(state);
-      await chrome.alarms.create('favlib-sync', { periodInMinutes: state.syncMinutes });
-      state = await reconcileInventory(state);
-      state = await recoverServerInventory(state);
-      state = await updateState(current => mergeReconciledState(current,state));
+      const reconciled=await reconcileInventory(state);
+      const snapshotChanged=inventorySnapshotChanged(state,reconciled);
+      state=reconciled;
+      if(snapshotChanged)state=await updateState(current => mergeReconciledState(current,state));
+      const shouldControl=controlRequested;controlRequested=false;
+      if(shouldControl){
+        state=await synchronizeExtensionControl(state);
+        await chrome.alarms.create('favlib-sync',{periodInMinutes:state.syncMinutes});
+        const receipt=state.serverReceipt;
+        if(!state.queue.length&&receipt&&(receipt.inventoryTotal!==state.inventory.totalWeb||receipt.inventoryDigest!==state.inventory.digest)){
+          const rebuilt=rebuildImportQueue({...state,syncStatus:'diverged'});
+          state=await updateState(current=>mergeReconciledState(current,rebuilt));
+        }
+      }
+      // Periodic alarms only compare the local Chrome tree. An unchanged tree
+      // with no queued work must produce exactly zero network requests.
+      if(!state.queue.length)return;
       state = await upload(state);
       await updateState(current => ({ ...current,progressCatchupPending:state.progressCatchupPending,cursor:state.cursor,lastSyncAt:state.lastSyncAt,serverReceipt:state.serverReceipt,debugReport:state.debugReport,syncStatus:current.queue.length?'pending':state.syncStatus,diagnostic: { status: 'ok' } }));
       retryAttempt = 0;
@@ -34,6 +47,7 @@ export default defineBackground(() => {
       if (status === 'offline') await scheduleRetry();
     }
   });
+  const requestSync=(withControl=false)=>{if(withControl)controlRequested=true;return sync()};
   const adminReimport = async () => {
     const state=await loadState();
     if(state.accountRole!=='admin'){await updateState(current=>({...current,reimport:{status:'failed',processed:0,total:0,error:'ADMIN_REQUIRED'}}));return;}
@@ -55,7 +69,7 @@ export default defineBackground(() => {
       const result = await response.json() as { status: string; deviceToken?: string };
       if (result.status === 'activated' && result.deviceToken) {
         await updateState(current => ({ ...current, deviceToken: result.deviceToken, pairing: { ...current.pairing!, status: 'activated', error: undefined }, syncStatus:'pending', diagnostic: { status: 'ok' } }));
-        await sync();
+        await requestSync(true);
       } else if (result.status === 'expired') {
         await updateState(current => ({ ...current, pairing: current.pairing ? { ...current.pairing, status: 'expired' } : undefined }));
       } else if (result.status === 'pending') {
@@ -85,19 +99,16 @@ export default defineBackground(() => {
   };
 
   chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === 'sync') void sync().catch(() => undefined);
-    if (message?.type === 'manual-sync') void loadState().then(state=>state.accountRole==='admin'?sync():undefined).catch(() => undefined);
+    if (message?.type === 'sync') void requestSync().catch(() => undefined);
+    if (message?.type === 'manual-sync') void loadState().then(state=>state.accountRole==='admin'?requestSync(true):undefined).catch(() => undefined);
     if (message?.type === 'admin-reimport') void adminReimport().catch(() => undefined);
     if (message?.type === 'pairing-start') void startPairing();
     if (message?.type === 'pairing-poll') void pairingPoll();
   });
 
   chrome.runtime.onInstalled.addListener(async () => {
-    const state = await loadState();
     await updateState(current => current);
-    const next = await reconcileInventory(state);
-    await updateState(() => next);
-    await sync();
+    await requestSync(true);
   });
 
   for (const [event, type] of [[chrome.bookmarks.onCreated, 'created'], [chrome.bookmarks.onChanged, 'changed'], [chrome.bookmarks.onMoved, 'moved']] as const) {
@@ -108,7 +119,7 @@ export default defineBackground(() => {
       if (!bookmark) return;
       const site = siteFromUrl(bookmark.url, 'bookmark');
       await updateState(state => {const pending=state.queue.find(item=>item.bookmark.id===bookmark.id);const nextEvent={id:pending?.id??crypto.randomUUID(),type:pending?.type==='created'?'created':type,bookmark,createdAt:pending?.createdAt??Date.now(),attempts:pending?.attempts??0};return { ...mergeSites(state, site ? [site] : []), knownBookmarks: [...state.knownBookmarks.filter(item => item.id !== bookmark.id), bookmark], queue: [...state.queue.filter(item=>item.bookmark.id!==bookmark.id),nextEvent],syncStatus:state.deviceToken?'pending':'unpaired' }});
-      await sync();
+      await requestSync();
     });
   }
 
@@ -117,7 +128,7 @@ export default defineBackground(() => {
       const previous = state.knownBookmarks.find(bookmark => bookmark.id === id);
       const pending=state.queue.find(item=>item.bookmark.id===id);return previous ? { ...state, knownBookmarks: state.knownBookmarks.filter(bookmark => bookmark.id !== id), queue: [...state.queue.filter(item=>item.bookmark.id!==id), { id:pending?.id??crypto.randomUUID(), type: 'removed', bookmark: previous, createdAt: pending?.createdAt??Date.now(), attempts: pending?.attempts??0 }],syncStatus:state.deviceToken?'pending':'unpaired' } : state;
     });
-    await sync();
+    await requestSync();
   });
 
   chrome.webNavigation.onCompleted.addListener(details => {
@@ -145,6 +156,6 @@ export default defineBackground(() => {
     if (!(await chrome.alarms.get('favlib-pairing'))) await chrome.alarms.create('favlib-pairing', { periodInMinutes: 1 });
   };
   void ensureAlarms();
-  chrome.runtime.onStartup.addListener(() => { void ensureAlarms(); void sync(); void pairingPoll(); });
-  chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'favlib-pairing') void pairingPoll(); else if (alarm.name === 'favlib-sync' || alarm.name === 'favlib-sync-retry') void sync(); });
+  chrome.runtime.onStartup.addListener(() => { void ensureAlarms(); void requestSync(true); void pairingPoll(); });
+  chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === 'favlib-pairing') void pairingPoll(); else if (alarm.name === 'favlib-sync-retry') void requestSync(true); else if(alarm.name==='favlib-sync')void requestSync(); });
 });

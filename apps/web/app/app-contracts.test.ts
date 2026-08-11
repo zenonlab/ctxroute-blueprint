@@ -44,9 +44,10 @@ describe('Wave 2 UI contracts', () => {
 
   it('places the continue shelf directly after the personal list with visible progress',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
-    expect(source.indexOf('<PersonalShelf compact />')).toBeLessThan(source.indexOf('<h2>À continuer</h2>'));
+    expect(source.indexOf('data-testid="personal-shelf"')).toBeLessThan(source.indexOf('<h2>À continuer</h2>'));
     expect(source).toContain('data-testid="continue-shelf"');
     expect(source).toContain('item.progress?.raw');
+    expect(source).toContain("useApi<{myList:LibraryItem[];continue:LibraryItem[];latestReleases:CalendarItem[]}>('/api/v1/home')");
   });
 
   it('cycles facets through include, exclude, and neutral and keeps calendar cards free of announcement copy',()=>{
@@ -77,7 +78,8 @@ describe('Wave 2 UI contracts', () => {
 
   it('uses the notification menu exclusively for the review queue',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
-    expect(source).toContain("useApi<ReviewQueueSummary>('/api/v1/reviews',reviewRefresh)");
+    expect(source).toContain("useApi<ReviewQueueSummary>(notificationOpen?'/api/v1/reviews':'',reviewRefresh)");
+    expect(source).toContain("useApi<{role:'admin'|'member';pendingReviewCount:number}>('/api/v1/header-summary'");
     expect(source).toContain('Aucune review à vérifier');
     expect(source).not.toContain("useApi<{items:NotificationItem[]}>('/api/v1/notifications')");
     expect(source).not.toContain('regularNotifications');
@@ -123,16 +125,41 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('les cartes affichent le titre canonique du fournisseur');
   });
 
-  it('repairs only incomplete visible cards in one bounded request and polls queued providers twice',()=>{
+  it('never mutates progression while rendering a GET page',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
-    expect(source).toContain("item.progress?[]:['personal']");
-    expect(source).toContain("item.availability?[]:['availability']");
-    expect(source).toContain("fetch('/api/v1/library/repair-missing-positions'");
-    expect(source).toContain('window.setTimeout(refresh,2000)');
-    expect(source).toContain('window.setTimeout(refresh,8000)');
+    expect(source).not.toContain("fetch('/api/v1/library/repair-missing-positions'");
     expect(source).toContain("return `${personal} / ${available}`");
     expect(source).toContain("item.progress?.raw??item.progress?.number??'—'");
     expect(source).toContain("item.availability?.raw??item.availability?.number??'—'");
+  });
+
+  it('loads card details once on open and defers facets until a filter opens',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    expect(source).toContain('const mediaDetailCache=new Map<string,LibraryItem>()');
+    expect(source).toContain('onOpen={()=>void load()}');
+    expect(source).toContain('/api/v1/library/${encodeURIComponent(summary.id)}`');
+    expect(source).toContain("facetsRequested?`/api/v1/library/facets?");
+    expect(source).toContain('/api/v1/library/cards?${params}');
+  });
+
+  it('keeps the library content area empty during its initial request',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const loadingBranch=source.split('\n').find(line=>line.includes("if (status === 'loading')"));
+    expect(loadingBranch).toContain('title="Bibliothèque"');
+    expect(loadingBranch).not.toContain('DataState');
+    expect(loadingBranch).not.toContain('Chargement');
+    expect(source).not.toContain('issue de PostgreSQL');
+    expect(source).not.toContain('issus de PostgreSQL');
+  });
+
+  it('shows only a centred animated SVG while modal details load',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const styles=readFileSync(resolve(process.cwd(),'app/physical-card.css'),'utf8');
+    expect(source).toContain('if(!detail||state!==\'ready\')return <ModalLoadingIndicator/>');
+    expect(source).toContain('<svg viewBox="0 0 48 48" aria-hidden="true">');
+    expect(source).not.toContain('<strong>Chargement de la fiche…</strong>');
+    expect(styles).toContain('.media-card-loading{position:absolute;inset:0;display:grid;place-items:center');
+    expect(styles).toContain('@keyframes media-card-loading-spin');
   });
 
   it('keeps cancelled status visible and bounds calendar exploration',()=>{
@@ -169,5 +196,15 @@ describe('Wave 2 UI contracts', () => {
     expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary){-webkit-user-select:none;user-select:none;touch-action:manipulation}');
     expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary) svg{pointer-events:none}');
     expect(styles).toContain(':where(button,a,[role="button"],[role="tab"],summary) img{pointer-events:none');
+  });
+
+  it('hydrates each route with the same path rendered by the server',()=>{
+    const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
+    const catchAll=readFileSync(resolve(process.cwd(),'app/[...slug]/page.tsx'),'utf8');
+    const media=readFileSync(resolve(process.cwd(),'app/library/[mediaId]/page.tsx'),'utf8');
+    expect(source).not.toContain("typeof window === 'undefined' ? '/' : window.location.pathname");
+    expect(source).toContain("FavLibApp({initialPath='/'}");
+    expect(catchAll).toContain("initialPath={`/${slug.join('/')}`}");
+    expect(media).toContain('initialPath={`/library/${encodeURIComponent(mediaId)}`}');
   });
 });

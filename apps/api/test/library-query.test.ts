@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { contentAllowedSql, libraryFilterKeys, libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
+import { contentAllowedSql, libraryCardProjectionSql, libraryFilterKeys, libraryFilterSql, libraryProjectionSql, libraryQuerySchema, retainSelected } from '../src/library-query.js';
 
 describe('library multi-value query',()=>{
   it('normalizes repeated parameters while retaining every selected value',()=>{
@@ -58,6 +58,14 @@ describe('library multi-value query',()=>{
     expect(libraryProjectionSql).toContain('JOIN bookmark_import_item active_import');
     expect(libraryProjectionSql).toContain("active_import.event<>'removed'");
   });
+  it('keeps the card projection free of detailed personal and provider payloads',()=>{
+    expect(libraryCardProjectionSql).toContain('JOIN bookmark_import_item active_import');
+    expect(libraryCardProjectionSql).not.toContain('AS favorites');
+    expect(libraryCardProjectionSql).not.toContain('AS sources');
+    expect(libraryCardProjectionSql).not.toContain('relatedWorks');
+    expect(libraryCardProjectionSql).not.toContain('reporting');
+    expect(libraryCardProjectionSql).not.toContain('available_position_provenance');
+  });
 
   it('projects one recent, available, language-qualified work URL per domain within the user scope',()=>{
     expect(libraryProjectionSql).toContain("o.provenance->>'workUrl'");
@@ -87,6 +95,16 @@ describe('library multi-value query',()=>{
     expect(server).toContain('l.media_id=$1 AND l.user_id=$2');
     expect(server).toContain('AS "coverProvenance"');
     expect(server).toContain('coverUrl: base.rows[0].coverProvenance');
+  });
+
+  it('serves extension covers through the canonical merge only when stored bytes exist',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const routes=server.slice(server.indexOf('app.get("/api/v1/extension/page-resolution"'),server.indexOf('app.post(\n  "/api/v1/extension/devices/:id/rotate"'));
+    expect(routes).toContain('im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=m.id');
+    expect(routes).toContain('COALESCE(asset.data,c.data) IS NOT NULL');
+    expect(routes).toContain('c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id');
+    expect(routes).toContain('WHERE l.media_id=$1 AND l.user_id=$2');
+    expect(routes).toContain('ORDER BY (c.media_id=$1) DESC LIMIT 1');
   });
 
   it('defines personal aliases as a direct display projection',()=>{
@@ -143,7 +161,7 @@ describe('library multi-value query',()=>{
   });
 
   it('projects the shared parser display title before the legacy identity fallback',()=>{
-    expect(libraryProjectionSql).toContain("NULLIF(i.parse_artifact->>'displayTitle','')");
+    expect(libraryProjectionSql).toContain("COALESCE(i.parse_artifact#>>'{identity,title}',NULLIF(i.parse_artifact->>'displayTitle',''))");
     expect(libraryProjectionSql).toContain("i.parse_artifact#>>'{identity,title}'");
     const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
     expect(server.match(/parse_artifact->>'displayTitle'/gu)?.length).toBeGreaterThanOrEqual(3);

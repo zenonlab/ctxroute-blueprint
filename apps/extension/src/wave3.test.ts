@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { domainMatches, inventoryDigest, webBookmark } from './core.js';
+import { domainMatches, inventoryDigest, uniqueById, webBookmark } from './core.js';
 import type { State } from './core.js';
 import { emptyState, migrateState } from './storage.js';
 import { checkAndPersist, checkLink, mediaSites, requestSitePermission, siteFromUrl } from './sites.js';
 import { proposeFavoriteUpdate } from './updates.js';
-import { acknowledgeEvents, createSyncDrain, mergeReconciledState, progressionFrom, rebuildImportQueue, reconcileBookmarks, recoverServerInventory, reportBookmarkProgression, upload } from './sync.js';
+import { acknowledgeEvents, createSyncDrain, inventorySnapshotChanged, mergeReconciledState, progressionFrom, rebuildImportQueue, reconcileBookmarks, recoverServerInventory, reportBookmarkProgression, upload } from './sync.js';
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -27,6 +27,20 @@ describe('Wave 3 sites and opt-in updates', () => {
     expect(second.queue).toHaveLength(1);
     const removed=reconcileBookmarks({...second,queue:[]},[missing],125);
     expect(removed.queue.map(event=>[event.type,event.bookmark.id])).toEqual([['removed','old']]);
+  });
+
+  it('keeps an unchanged verified snapshot idle and reuses its cached fingerprints',async()=>{
+    const cached={...bookmark('cached'),fingerprint:'a'.repeat(64)};
+    const digest=vi.spyOn(crypto.subtle,'digest');
+    const hydrated=await webBookmark({id:cached.id,parentId:cached.parentId??undefined,title:cached.title,url:cached.url},cached);
+    expect(hydrated).toBe(cached);expect(digest).not.toHaveBeenCalled();
+    const before={...emptyState(),deviceToken:'device-token',syncStatus:'verified' as const,knownBookmarks:[cached],inventory:{totalWeb:1,likelyMedia:1,ambiguous:0,digest:'b'.repeat(64),updatedAt:1}};
+    const after=reconcileBookmarks(before,[cached],2);
+    expect(after.syncStatus).toBe('verified');expect(after.queue).toEqual([]);expect(inventorySnapshotChanged(before,after)).toBe(false);
+  });
+
+  it('renders only one card per canonical media id when a response repeats rows',()=>{
+    expect(uniqueById([{id:'synthetic-media',value:1},{id:'synthetic-media',value:2},{id:'synthetic-other',value:3}])).toEqual([{id:'synthetic-media',value:1},{id:'synthetic-other',value:3}]);
   });
 
   it('rebuilds the complete queue when the paired server inventory was reset', async()=>{
@@ -112,7 +126,7 @@ describe('Wave 3 sites and opt-in updates', () => {
     expect(passes).toBe(2);
   });
 
-  it('drains 1,446 queued favorites in six stable, persisted batches and verifies the receipt', async () => {
+  it('drains 1,446 queued favorites in six stable batches using import receipts only', async () => {
     const saved = vi.fn();
     vi.stubGlobal('chrome', { storage: { local: { set: saved } } });
     const importBodies: Array<{ batchId: string; items: unknown[] }> = [];
@@ -120,12 +134,10 @@ describe('Wave 3 sites and opt-in updates', () => {
     const digest=await inventoryDigest(bookmarks);
     vi.stubGlobal('fetch', vi.fn(async (input: string|URL, init: RequestInit) => {
       const url=String(input);
-      if(url.includes('/diagnostic'))return new Response(JSON.stringify({protocol:1,minimumProtocol:1,inventoryTotal:1446,recognizedCount:360,reviewCount:1086,excludedCount:0,inventoryDigest:digest,lastSyncAt:'2026-08-02T10:00:00.000Z'}),{status:200});
-      if(url.includes('/reconcile'))return new Response(JSON.stringify({verified:true,verifiedSyncAt:'2026-08-02T10:01:00.000Z'}),{status:200});
       if (!url.includes('/import-batches')) return new Response('{}', { status: 404 });
       const body = JSON.parse(String(init.body));
       importBodies.push(body);
-      return new Response(JSON.stringify({ cursor: `cursor-${importBodies.length}` }), { status: 200 });
+      return new Response(JSON.stringify({ cursor: `cursor-${importBodies.length}`,receipt:{inventoryTotal:1446,recognizedCount:360,reviewCount:1086,excludedCount:0,inventoryDigest:digest,serverSyncedAt:'2026-08-02T10:00:00.000Z'} }), { status: 200 });
     }));
     const queue = bookmarks.map(item => ({ id: crypto.randomUUID(), type: 'created' as const, bookmark:item, createdAt: Date.now(), attempts: 0 }));
     const state = { ...emptyState(), deviceToken: 'device-token', queue,knownBookmarks:bookmarks,inventory:{totalWeb:1446,likelyMedia:1446,ambiguous:0,digest,updatedAt:1} };

@@ -7,5 +7,5 @@ export default async function RoutePage({params}:{params:Promise<{slug:string[]}
   // remain exclusively in NotificationResolver; do not route this redirect
   // through or modify that resolver.
   if(slug[0]==='review')redirect('/');
-  return <FavLibApp />;
+  return <FavLibApp initialPath={`/${slug.join('/')}`} />;
 }

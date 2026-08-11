@@ -23,6 +23,7 @@
     "repair:favorite-parser-v9": "corepack pnpm --filter @favlib/api exec tsx src/repair-favorite-parser-v9.ts",
     "repair:favorite-parser-v10": "corepack pnpm --filter @favlib/api exec tsx src/repair-favorite-parser-v9.ts",
     "repair:favorite-parser-v11": "corepack pnpm --filter @favlib/api exec tsx src/repair-favorite-parser-v9.ts",
+    "repair:favorite-parser-v12": "corepack pnpm --filter @favlib/api exec tsx src/repair-favorite-parser-v9.ts",
     "repair:resolved-review-links": "corepack pnpm --filter @favlib/api exec tsx ../../scripts/repair-resolved-review-links.ts",
     "cleanup:obsolete-installation": "corepack pnpm --filter @favlib/api exec tsx ../../scripts/cleanup-obsolete-installation.ts",
     "resync:pending-reviews": "corepack pnpm --filter @favlib/api exec tsx ../../scripts/resync-pending-favorite-reviews.ts",

@@ -1,5 +1,6 @@
 favlib.home.arpa {
   tls internal
+  encode zstd gzip
 
   header {
     X-Content-Type-Options "nosniff"

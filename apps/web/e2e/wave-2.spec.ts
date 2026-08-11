@@ -5,28 +5,29 @@ const json = (route: Route, body: unknown, status = 200) => route.fulfill({ stat
 async function publicApi(page: Page) {
   await page.route('**/api/v1/releases', route => json(route, { items: [] }));
   await page.route('**/api/v1/calendar', route => json(route, { items: [] }));
+  await page.route('**/api/v1/header-summary',route=>json(route,{role:'member',pendingReviewCount:0}));
 }
 
 test('public home and calendar are accessible without a session', async ({ page }) => {
   await publicApi(page);
-  await page.route('**/api/v1/library*', route => json(route, {}, 401));
+  await page.route('**/api/v1/home', route => json(route, {}, 401));
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Votre bibliothèque' })).toBeVisible();
-  await expect(page.getByText('Connexion requise')).toHaveCount(2);
+  await expect(page.getByText('Session requise.')).toBeVisible();
   await page.goto('/calendar');
   await expect(page.getByRole('heading', { name: 'Calendrier' })).toBeVisible();
 });
 
 test('authenticated home renders the personal shelf instead of a login gate', async ({ page }) => {
   await publicApi(page);
-  await page.route('**/api/v1/library*', route => json(route, { items: [{ id: 'personal-work', title: 'Œuvre personnelle', type: 'MANGA', favoriteCount: 1, coverUrl: '' }], total: 1, nextOffset: 1, hasMore: false }));
+  await page.route('**/api/v1/home', route => json(route, { myList: [{ id: 'personal-work', title: 'Œuvre personnelle', type: 'MANGA', favoriteCount: 1, coverUrl: '' }],continue:[],latestReleases:[] }));
   await page.goto('/');
-  await expect(page.getByTestId('personal-shelf').getByText('Œuvre personnelle')).toBeVisible();
+  await expect(page.getByTestId('personal-shelf').getByRole('link', { name: 'Aperçu de Œuvre personnelle' })).toBeVisible();
   await expect(page.getByText('Connexion requise')).not.toBeVisible();
 });
 
 test('library and settings protect personal data', async ({ page }) => {
-  await page.route('**/api/v1/library*', route => json(route, {}, 401));
+  await page.route('**/api/v1/library/cards*', route => json(route, {}, 401));
   await page.route('**/api/v1/auth/session', route => json(route, {}, 401));
   await page.goto('/library');
   await expect(page.getByRole('heading', { name: 'Bibliothèque' })).toBeVisible();
@@ -48,7 +49,7 @@ test('library appends five rows at a time without repeating cards', async ({ pag
     coverUrl: `/covers/work-${index + 1}.webp`,
   }));
   const requestedOffsets: number[] = [];
-  await page.route('**/api/v1/library*', route => {
+  await page.route('**/api/v1/library/cards*', route => {
     const url = new URL(route.request().url());
     if(url.pathname.endsWith('/facets'))return json(route, { types: [{ value: 'MANGA', count: 65 }], themes: [], statuses: [], years: [], providers: [], formats: [], languages: [], contentRatings: [], demographics: [] });
     const limit = Number(url.searchParams.get('limit'));
@@ -81,24 +82,24 @@ test('library combines repeated filters, updates dynamic facets and hides provid
   await page.route('**/api/v1/library/facets*',route=>{
     const url=new URL(route.request().url());
     const anime=url.searchParams.getAll('type').includes('ANIME');
-    return json(route,{types:[{value:'ANIME',count:1},{value:'MANGA',count:2}],themes:[{value:'Action',count:anime?1:3},{value:'Drama',count:anime?0:1}],statuses:[],years:[],formats:[],languages:[],contentRatings:[],demographics:[]});
+    return json(route,{types:[{value:'ANIME',count:1},{value:'MANGA',count:2}],genres:[{value:'Action',count:anime?1:3},{value:'Drama',count:anime?0:1}],categories:[],themes:[],statuses:[],years:[]});
   });
-  await page.route('**/api/v1/library*',route=>{
+  await page.route('**/api/v1/library/cards*',route=>{
     const url=new URL(route.request().url());
     resultQueries.push(url.search);return json(route,{items:[{id:'filtered',title:'Résultat',type:'ANIME',favoriteCount:1,coverUrl:null}],total:1,nextOffset:1,hasMore:false});
   });
-  await page.goto('/library');await expect(page.getByText('Résultat')).toBeVisible();
+  await page.goto('/library');await expect(page.getByRole('link',{name:'Aperçu de Résultat'})).toBeVisible();
   await expect(page.getByLabel('Filtrer par fournisseur')).toHaveCount(0);
   await page.getByLabel('Filtrer par types').click();
-  await page.locator('.facet-menu label').filter({hasText:'ANIME'}).locator('input').check();
-  await page.locator('.facet-menu label').filter({hasText:'MANGA'}).locator('input').check();
+  await page.getByRole('button',{name:'ANIME : neutre'}).click();
+  await page.getByRole('button',{name:'MANGA : neutre'}).click();
   await expect(page).toHaveURL(/type=ANIME.*type=MANGA/);
-  await page.getByLabel('Filtrer par thèmes').click();
-  await expect(page.locator('.facet-menu label').filter({hasText:'Drama'})).toHaveCount(0);
-  await page.locator('.facet-menu label').filter({hasText:'Action'}).locator('input').check();
-  await expect(page).toHaveURL(/theme=Action/);
-  await expect.poll(()=>resultQueries.at(-1)??'').toContain('theme=Action');
-  expect(resultQueries.at(-1)).toContain('type=MANGA');expect(resultQueries.at(-1)).toContain('theme=Action');expect(resultQueries.at(-1)).toContain('offset=0');
+  await page.getByLabel('Filtrer par genres').click();
+  await expect(page.getByRole('button',{name:/Drama :/})).toHaveCount(0);
+  await page.getByRole('button',{name:'Action : neutre'}).click();
+  await expect(page).toHaveURL(/genre=Action/);
+  await expect.poll(()=>resultQueries.at(-1)??'').toContain('genre=Action');
+  expect(resultQueries.at(-1)).toContain('type=MANGA');expect(resultQueries.at(-1)).toContain('genre=Action');expect(resultQueries.at(-1)).toContain('offset=0');
 });
 
 test('register and login redirect to the extension settings anchor', async ({ page }) => {

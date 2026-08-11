@@ -7,7 +7,7 @@ export const REQUIRED_RUNTIME_TABLES = [
   'graphile_worker.jobs',
 ] as const;
 
-export const BOOTSTRAP_SCHEMA_VERSION = '2026-08-08-runtime-v14';
+export const BOOTSTRAP_SCHEMA_VERSION = '2026-08-10-runtime-v16';
 
 export async function inspectRuntimeSchema(db: { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> }) {
   const names = REQUIRED_RUNTIME_TABLES.map((name) => name === 'graphile_worker.jobs' ? name : `public.${name}`);

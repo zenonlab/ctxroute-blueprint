@@ -45,6 +45,10 @@ import {
   repairMissingPositionsRequestContract,
   sourceReportContract,
   sourceCheckContract,
+  reviewReportContract,
+  userReportContract,
+  adminReportDecisionContract,
+  catalogCardSummaryContract,
 } from "@favlib/contracts";
 import {
   CONNECTOR_VERSIONS,
@@ -66,6 +70,7 @@ import {
   libraryFilterKeys,
   libraryFilterSql,
   libraryFilterValues,
+  libraryCardProjectionSql,
   libraryProjectionSql,
   libraryQuerySchema,
   retainSelected,
@@ -264,6 +269,12 @@ app.addHook("onRequest", async (req, reply) => {
       : `req_${randomUUID()}`;
   reply.header("X-Request-Id", id);
   (req as any).requestId = id;
+});
+app.addHook("onSend",async(req,reply,payload)=>{
+  if(req.method==='GET'&&req.url.startsWith('/api/v1/')&&!req.url.startsWith('/api/v1/public/')&&req.url!=='/api/v1/health'){
+    reply.header('Cache-Control','private, max-age=30').header('Vary','Cookie');
+  }
+  return payload;
 });
 function err(
   reply: any,
@@ -559,7 +570,7 @@ app.get("/api/v1/reviews", async (req: any) => {
 });
 app.get("/api/v1/reviews/:id", async (req: any, reply: any) => {
   const review = await pool.query(
-    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",i.payload->>'title' AS "rawFavoriteTitle",COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}',r.favorite_title) AS "sourceTitle",i.parse_artifact->'progression' AS progression,r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id LEFT JOIN bookmark_import_item i ON i.user_id=r.user_id AND i.installation_id=r.installation_id AND i.bookmark_id=r.bookmark_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
+    `SELECT r.id,r.cluster_id AS "clusterId",r.installation_id AS "installationId",r.bookmark_id AS "bookmarkId",r.favorite_title AS "favoriteTitle",r.favorite_url AS "favoriteUrl",i.payload->>'title' AS "rawFavoriteTitle",COALESCE(i.parse_artifact#>>'{identity,title}',NULLIF(i.parse_artifact->>'displayTitle',''),r.favorite_title) AS "sourceTitle",i.parse_artifact->'progression' AS progression,r.provider,r.status,r.reason,r.review_mode AS mode,r.selected_candidate_id AS "selectedCandidateId",r.decision,r.created_at AS "createdAt",r.resolved_at AS "resolvedAt",cl.state AS "collectiveState",cl.epoch,(SELECT count(*)::int FROM favorite_review x WHERE x.user_id=r.user_id AND COALESCE(x.cluster_id::text,x.id::text)=COALESCE(r.cluster_id::text,r.id::text)) AS "favoriteCount" FROM favorite_review r LEFT JOIN review_title_cluster cl ON cl.id=r.cluster_id LEFT JOIN bookmark_import_item i ON i.user_id=r.user_id AND i.installation_id=r.installation_id AND i.bookmark_id=r.bookmark_id WHERE r.id=$1::uuid AND r.user_id=$2::uuid`,
     [req.params.id, req.user.id],
   );
   if (!review.rowCount) return err(reply, 404, "REVIEW_NOT_FOUND");
@@ -964,70 +975,15 @@ app.post("/api/v1/reviews/:id/manual", async (req: any, reply: any) => {
     });
 });
 app.post("/api/v1/reviews/:id/report", async (req: any, reply: any) => {
-  const p = z
-    .object({
-      reason: z.enum([
-        "WRONG_IDENTITY",
-        "WRONG_SEASON",
-        "WRONG_MEDIA_TYPE",
-        "PROVIDER_RECORD_CHANGED",
-      ]),
-      details: z.string().trim().max(500).optional(),
-    })
-    .strict()
-    .safeParse(req.body);
+  const p = reviewReportContract.safeParse(req.body);
   if (!p.success) return err(reply, 400, "VALIDATION_FAILED");
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const row = await client.query(
-      `SELECT r.cluster_id,cl.epoch,cl.suspension_cycles FROM favorite_review r JOIN review_title_cluster cl ON cl.id=r.cluster_id WHERE r.id=$1 AND r.user_id=$2 AND r.status='RESOLVED' AND EXISTS(SELECT 1 FROM bookmark_media_link l WHERE l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id AND l.status IN ('matched','accepted')) FOR UPDATE OF cl`,
-      [req.params.id, req.user.id],
-    );
-    if (!row.rowCount) {
-      await client.query("ROLLBACK");
-      return err(reply, 403, "ACTIVE_FAVORITE_REQUIRED");
-    }
-    const x = row.rows[0];
-    await client.query(
-      `INSERT INTO review_cluster_report(cluster_id,epoch,user_id,review_id,reason,details) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
-      [
-        x.cluster_id,
-        x.epoch,
-        req.user.id,
-        req.params.id,
-        p.data.reason,
-        p.data.details ?? null,
-      ],
-    );
-    const counts = await client.query(
-      `SELECT (SELECT count(DISTINCT r.user_id)::int FROM favorite_review r JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id WHERE r.cluster_id=$1 AND l.status IN ('matched','accepted')) AS owners,(SELECT count(*)::int FROM review_cluster_report WHERE cluster_id=$1 AND epoch=$2) AS reports`,
-      [x.cluster_id, x.epoch],
-    );
-    const owners = Number(counts.rows[0].owners),
-      reports = Number(counts.rows[0].reports),
-      quorum =
-        x.suspension_cycles >= 2
-          ? Math.max(2, Math.ceil(owners * 0.3))
-          : Math.max(1, Math.ceil(owners * 0.2));
-    if (reports >= quorum) {
-      await client.query(
-        `UPDATE review_title_cluster SET state='SUSPENDED',consensus_profile_id=NULL,epoch=epoch+1,suspension_cycles=suspension_cycles+1,updated_at=now() WHERE id=$1`,
-        [x.cluster_id],
-      );
-      await client.query(
-        `INSERT INTO review_revalidation(cluster_id,epoch,user_id,prior_review_id) SELECT $1,$2+1,r.user_id,r.id FROM favorite_review r WHERE r.cluster_id=$1 AND r.status='RESOLVED' ON CONFLICT DO NOTHING`,
-        [x.cluster_id, x.epoch],
-      );
-    }
-    await client.query("COMMIT");
-    return { ok: true, reports, quorum, suspended: reports >= quorum };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const row=await pool.query(`SELECT l.media_id FROM favorite_review r JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id WHERE r.id=$1 AND r.user_id=$2 AND r.status='RESOLVED' AND l.status IN ('matched','accepted') LIMIT 1`,[req.params.id,req.user.id]);
+  if(!row.rowCount)return err(reply,403,'ACTIVE_FAVORITE_REQUIRED');
+  const identity=(await reportingForMedia([row.rows[0].media_id],req.user.id)).get(row.rows[0].media_id)?.identity;
+  if(!identity)return err(reply,409,'REPORT_SUBJECT_STALE');
+  const submitted=await submitAdjudicatedReport(req.user.id,{family:'IDENTITY',mediaId:row.rows[0].media_id,subjectKey:identity.subjectKey,evidenceRevision:identity.evidenceRevision,reason:p.data.reason,details:p.data.details},req.requestId);
+  if(submitted.error!==undefined)return err(reply,409,submitted.error);
+  return reply.code(201).send({ok:true,caseId:submitted.caseId,status:'PENDING',suspended:false});
 });
 app.post("/api/v1/revalidations/:id/skip", async (req: any, reply: any) => {
   const row = await pool.query(
@@ -1837,6 +1793,100 @@ async function relatedLibraryMediaAllowed(rootMediaId:string,mediaId:string,user
   );
   return Boolean(allowed.rowCount);
 }
+type ReportingProjection={identity:{subjectKey:string;evidenceRevision:string;state:'REPORTABLE'|'PENDING'|'FINAL';caseId:string|null}|null;sources:Array<{subjectKey:string;evidenceRevision:string;canonicalUrl:string;domain:string;declaredLanguage:string|null;accessMode:string;lastVerifiedAt:string|null;state:'REPORTABLE'|'PENDING'|'FINAL';caseId:string|null}>;reportableCount:number};
+async function reportingForMedia(mediaIds:string[],userId:string){
+  const result=new Map<string,ReportingProjection>();
+  for(const mediaId of mediaIds)result.set(mediaId,{identity:null,sources:[],reportableCount:0});
+  if(!mediaIds.length)return result;
+  const identities=await pool.query(`SELECT m.id AS "mediaId",'identity:'||m.id AS "subjectKey",
+    md5(m.updated_at::text||'|'||COALESCE(string_agg(e.provider||':'||e.external_id,'|' ORDER BY e.provider,e.external_id),'')) AS "evidenceRevision",
+    c.id AS "caseId",c.status
+    FROM media m LEFT JOIN media_external_id e ON e.media_id=m.id
+    LEFT JOIN report_case c ON c.subject_key='identity:'||m.id AND c.evidence_revision=md5(m.updated_at::text||'|'||(SELECT COALESCE(string_agg(x.provider||':'||x.external_id,'|' ORDER BY x.provider,x.external_id),'') FROM media_external_id x WHERE x.media_id=m.id))
+    WHERE m.id=ANY($1::text[]) AND EXISTS(SELECT 1 FROM bookmark_media_link link WHERE link.user_id=$2 AND link.media_id=m.id AND link.status IN ('matched','accepted')) GROUP BY m.id,c.id,c.status`,[mediaIds,userId]);
+  for(const row of identities.rows){const projection=result.get(row.mediaId)!;projection.identity={subjectKey:row.subjectKey,evidenceRevision:row.evidenceRevision,state:row.status==='PENDING'?'PENDING':row.status?'FINAL':'REPORTABLE',caseId:row.caseId??null}}
+  const sources=await pool.query(`WITH visible AS (
+    SELECT DISTINCT ON(o.media_id,o.provenance->>'workUrl') o.media_id,o.user_id,o.checked_at,o.provenance,o.provenance->>'workUrl' AS work_url,
+      lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')) AS domain
+    FROM release_origin o WHERE o.media_id=ANY($1::text[]) AND (o.user_id IS NULL OR o.user_id=$2)
+      AND o.status='AVAILABLE' AND NULLIF(o.provenance->>'language','') IS NOT NULL
+      AND o.provenance->>'languageDetection' NOT IN ('undetected','ambiguous') AND o.provenance->>'workUrl' ~ '^https?://'
+      AND NOT EXISTS(SELECT 1 FROM source_association_decision d WHERE d.active AND d.verdict='BLOCK' AND d.media_id=o.media_id AND d.canonical_url=o.provenance->>'workUrl' AND (d.user_id IS NULL OR d.user_id=$2))
+    ORDER BY o.media_id,o.provenance->>'workUrl',o.checked_at DESC
+  ), subjects AS (SELECT *, 'source:'||media_id||':'||md5(work_url||CASE WHEN provenance->>'accessMode'='extension_private' THEN '|private:'||$2::text ELSE '|public' END) AS subject_key,
+    md5(COALESCE(provenance->>'snapshotHash','')||'|'||COALESCE(provenance->>'language','')||'|'||COALESCE(provenance->>'accessMode',CASE WHEN user_id IS NULL THEN 'public' ELSE 'public' END)||'|'||checked_at::text) AS evidence_revision FROM visible)
+  SELECT s.media_id AS "mediaId",s.subject_key AS "subjectKey",s.evidence_revision AS "evidenceRevision",s.work_url AS "canonicalUrl",s.domain,
+    s.provenance->>'language' AS "declaredLanguage",COALESCE(s.provenance->>'accessMode','public') AS "accessMode",s.checked_at AS "lastVerifiedAt",c.id AS "caseId",c.status
+  FROM subjects s LEFT JOIN report_case c ON c.subject_key=s.subject_key AND c.evidence_revision=s.evidence_revision ORDER BY s.media_id,s.domain`,[mediaIds,userId]);
+  for(const row of sources.rows){const projection=result.get(row.mediaId)!;projection.sources.push({...row,state:row.status==='PENDING'?'PENDING':row.status?'FINAL':'REPORTABLE',caseId:row.caseId??null})}
+  for(const projection of result.values())projection.reportableCount=(projection.identity?.state==='REPORTABLE'?1:0)+projection.sources.filter(source=>source.state==='REPORTABLE').length;
+  return result;
+}
+
+async function submitAdjudicatedReport(userId:string,input:z.infer<typeof userReportContract>,requestId:string|undefined):Promise<{error:string;caseId?:never}|{caseId:string;error?:never}>{
+  const reporting=(await reportingForMedia([input.mediaId],userId)).get(input.mediaId);
+  const subject=input.family==='IDENTITY'?reporting?.identity:reporting?.sources.find(source=>source.subjectKey===input.subjectKey&&source.canonicalUrl===input.canonicalUrl);
+  if(!subject||subject.subjectKey!==input.subjectKey||subject.evidenceRevision!==input.evidenceRevision)return {error:'REPORT_SUBJECT_STALE' as const};
+  if(subject.state==='FINAL')return {error:'REPORT_SUBJECT_FINAL' as const};
+  const sanitizedEvidence=input.family==='IDENTITY'
+    ?(await pool.query(`SELECT jsonb_build_object('mediaType',m.type,'seasonYear',m.season_year,'format',m.format,'providerProfiles',COALESCE((SELECT jsonb_agg(jsonb_build_object('provider',e.provider,'externalId',e.external_id)) FROM media_external_id e WHERE e.media_id=m.id),'[]'::jsonb),'parserProvenance',COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('parserId',i.parser_id,'parserVersion',i.parser_version,'parserFingerprint',i.parser_fingerprint,'seasonProvenance',i.parse_artifact#>'{identity,seasonProvenance}')) FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id WHERE l.media_id=m.id),'[]'::jsonb)) AS evidence FROM media m WHERE m.id=$1`,[input.mediaId])).rows[0]?.evidence??{}
+    :(await pool.query(`SELECT jsonb_build_object('sourceUrl',$2::text,'language',o.provenance->>'language','languageEvidence',o.provenance->'languageEvidence','accessMode',COALESCE(o.provenance->>'accessMode','public'),'snapshotHash',o.provenance->>'snapshotHash','connector',o.connector,'connectorVersion',COALESCE(o.provenance->>'connectorVersion','unknown'),'checkedAt',o.checked_at,'status',o.status) AS evidence FROM release_origin o WHERE o.media_id=$1 AND o.provenance->>'workUrl'=$2 AND (o.user_id IS NULL OR o.user_id=$3) ORDER BY o.checked_at DESC LIMIT 1`,[input.mediaId,input.canonicalUrl,userId])).rows[0]?.evidence??{};
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const reportCase=await client.query(`INSERT INTO report_case(family,subject_key,evidence_revision,media_id,sanitized_evidence) VALUES($1,$2,$3,$4,$5)
+      ON CONFLICT(subject_key,evidence_revision) DO UPDATE SET updated_at=report_case.updated_at RETURNING id,status`,[input.family,input.subjectKey,input.evidenceRevision,input.mediaId,sanitizedEvidence]);
+    if(reportCase.rows[0].status!=='PENDING'){await client.query('ROLLBACK');return {error:'REPORT_SUBJECT_FINAL' as const}}
+    const submission=await client.query('INSERT INTO report_submission(case_id,user_id,reason,details) VALUES($1,$2,$3,$4) ON CONFLICT(case_id,user_id) DO NOTHING RETURNING id',[reportCase.rows[0].id,userId,input.reason,input.details??null]);
+    if(!submission.rowCount){await client.query('ROLLBACK');return {error:'REPORT_ALREADY_PENDING' as const}}
+    await client.query(`UPDATE report_case SET report_count=report_count+1,reason_counts=jsonb_set(reason_counts,ARRAY[$2::text],to_jsonb(COALESCE((reason_counts->>$2)::int,0)+1),true),updated_at=now() WHERE id=$1`,[reportCase.rows[0].id,input.reason]);
+    await client.query('COMMIT');return {caseId:reportCase.rows[0].id};
+  }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
+}
+
+async function libraryCardPage(userId:string,query:unknown){
+  const parsed=libraryQuerySchema.safeParse(query??{});
+  if(!parsed.success)return {error:parsed.error} as const;
+  const {limit,offset,sort,direction}=parsed.data;
+  const orderBy={inventory:'"id"',title:'lower("title")',type:'"type"',year:'"seasonYear"',release:'"latestReleaseDate"',favorites:'"favoriteCount"'}[sort];
+  const result=await pool.query(
+    `WITH ${libraryCardProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql()})
+     SELECT "id","title","type","format",status,progress,availability,"favoriteCount","classificationStatus","coverUrl",count(*) OVER()::int AS "totalCount"
+     FROM filtered ORDER BY ${orderBy} ${direction.toUpperCase()} NULLS LAST,"id" LIMIT $18 OFFSET $19`,
+    [...libraryFilterValues(userId,parsed.data),limit,offset],
+  );
+  const total=result.rows[0]?.totalCount??0;
+  const items=result.rows.map(({totalCount:_,...row}:any)=>catalogCardSummaryContract.parse(row));
+  const nextOffset=offset+items.length;
+  return {data:{items,total,nextOffset,hasMore:nextOffset<total}} as const;
+}
+
+app.get('/api/v1/library/cards',async(req:any,reply:any)=>{
+  const page=await libraryCardPage(req.user.id,req.query);
+  if('error' in page)return err(reply,400,'VALIDATION_FAILED','Paramètres de filtre invalides.',page.error!.issues);
+  return page.data;
+});
+
+app.get('/api/v1/home',async(req:any,reply:any)=>{
+  const [myListPage,continuePage,pref]=await Promise.all([
+    libraryCardPage(req.user.id,{limit:6,offset:0}),
+    libraryCardPage(req.user.id,{limit:30,offset:0,sort:'inventory',direction:'asc'}),
+    pool.query('SELECT timezone FROM user_catalog_preference WHERE user_id=$1::uuid',[req.user.id]),
+  ]);
+  if('error' in myListPage||'error' in continuePage)return err(reply,500,'HOME_PROJECTION_FAILED');
+  const timeZone=pref.rows[0]?.timezone??'UTC',now=Date.now();
+  const latest=await calendarRows(req.user.id,{from:new Date(now-10*365*86_400_000).toISOString(),to:new Date(now+7*86_400_000).toISOString(),direction:'desc',favorites:true},timeZone);
+  return {myList:myListPage.data.items,continue:continuePage.data.items.filter(item=>Boolean(item.progress)).slice(0,6),latestReleases:latest.slice(0,6)};
+});
+
+app.get('/api/v1/header-summary',async(req:any)=>{
+  const pending=await pool.query(`SELECT count(DISTINCT COALESCE(review.cluster_id::text,review.id::text))::int AS count
+    FROM favorite_review review JOIN bookmark_media_link link ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id
+    WHERE review.user_id=$1 AND review.status='PENDING' AND link.status IN ('matched','accepted','review') AND link.media_id IS NOT NULL
+      AND favlib_content_allowed(link.media_id,$1::uuid) AND COALESCE(review.decision->>'kind','')<>'manual-queued'`,[req.user.id]);
+  return {role:req.user.role,pendingReviewCount:Number(pending.rows[0]?.count??0)};
+});
+
 app.get("/api/v1/library", async (req: any, reply: any) => {
   const parsed = libraryQuerySchema.safeParse(req.query ?? {});
   if (!parsed.success)
@@ -1863,12 +1913,14 @@ app.get("/api/v1/library", async (req: any, reply: any) => {
   const total = r.rows[0]?.totalCount ?? 0;
   const rows = r.rows.map(({ totalCount: _, ...row }: any) => row);
   const relatedByMedia = await libraryRelatedWorks(rows.map((row: any) => row.id), req.user.id);
+  const reportingByMedia=await reportingForMedia(rows.map((row:any)=>row.id),req.user.id);
   const items = rows.map((row: any) => ({
     ...row,
     coverUrl: row.coverProvenance
       ? `/api/v1/catalog/media/${encodeURIComponent(row.id)}/cover?v=${encodeURIComponent(row.coverProvenance.fetchedAt)}`
       : null,
     relatedWorks: relatedByMedia.get(row.id) ?? [],
+    reporting:reportingByMedia.get(row.id),
   }));
   const nextOffset = offset + items.length;
   return { items, total, nextOffset, hasMore: nextOffset < total };
@@ -1879,7 +1931,7 @@ app.get("/api/v1/library/inventory", async (req: any, reply: any) => {
   const {limit,offset}=parsed.data;
   const result=await pool.query(`SELECT i.installation_id AS "installationId",i.bookmark_id AS "bookmarkId",
       i.payload->>'title' AS "rawTitle",i.payload->>'url' AS "rawUrl",
-      COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}') AS "parsedTitle",i.classification_status AS "classificationStatus",
+      COALESCE(i.parse_artifact#>>'{identity,title}',NULLIF(i.parse_artifact->>'displayTitle','')) AS "parsedTitle",i.classification_status AS "classificationStatus",
       l.status AS "linkStatus",l.media_id AS "mediaId",
       i.parse_artifact->'provenance' AS provenance
     FROM bookmark_import_item i
@@ -1956,7 +2008,7 @@ app.get("/api/v1/library/facets", async (req: any, reply: any) => {
               ? `filtered CROSS JOIN LATERAL jsonb_array_elements_text(categories) category`
               : "filtered";
       const result = await pool.query(
-        `WITH ${libraryProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql(key)}) SELECT ${spec.expression} AS value,count(DISTINCT "id")::int AS count FROM ${source} WHERE ${spec.condition} GROUP BY ${spec.expression} ORDER BY ${spec.order}`,
+        `WITH ${libraryCardProjectionSql},filtered AS (SELECT * FROM projected WHERE ${libraryFilterSql(key)}) SELECT ${spec.expression} AS value,count(DISTINCT "id")::int AS count FROM ${source} WHERE ${spec.condition} GROUP BY ${spec.expression} ORDER BY ${spec.order}`,
         values,
       );
       return [key, result.rows] as const;
@@ -1991,6 +2043,15 @@ app.get("/api/v1/library/:rootMediaId/related/:mediaId", async (req:any,reply:an
   const relatedByMedia=await libraryRelatedWorks([mediaId],req.user.id,new Map([[mediaId,rootMediaId]]));
   return {...item,rootMediaId,relatedWorks:relatedByMedia.get(mediaId)??[]};
 });
+app.post('/api/v1/reports',async(req:any,reply:any)=>{
+  const parsed=userReportContract.safeParse(req.body);
+  if(!parsed.success)return err(reply,400,'VALIDATION_FAILED','Signalement invalide.',parsed.error.issues);
+  const owned=await pool.query("SELECT 1 FROM bookmark_media_link WHERE user_id=$1 AND media_id=$2 AND status IN ('matched','accepted','review') AND favlib_content_allowed(media_id,$1::uuid) LIMIT 1",[req.user.id,parsed.data.mediaId]);
+  if(!owned.rowCount)return err(reply,404,'MEDIA_NOT_IN_LIBRARY');
+  const submitted=await submitAdjudicatedReport(req.user.id,parsed.data,req.requestId);
+  if(submitted.error!==undefined)return err(reply,409,submitted.error);
+  return reply.code(201).send({ok:true,caseId:submitted.caseId,status:'PENDING'});
+});
 app.post("/api/v1/library/:mediaId/source-reports", async (req: any, reply: any) => {
   const parsed=sourceReportContract.safeParse({...req.body,mediaId:req.params.mediaId});
   if(!parsed.success)return err(reply,400,"VALIDATION_FAILED","Signalement invalide.",parsed.error.issues);
@@ -1999,7 +2060,14 @@ app.post("/api/v1/library/:mediaId/source-reports", async (req: any, reply: any)
   const origin=await pool.query("SELECT 1 FROM release_origin WHERE media_id=$1 AND (canonical_url=$2 OR provenance->>'workUrl'=$2) AND (user_id IS NULL OR user_id=$3) LIMIT 1",[req.params.mediaId,parsed.data.canonicalUrl,req.user.id]);
   if(!origin.rowCount)return err(reply,404,"SOURCE_NOT_FOUND");
   await pool.query("INSERT INTO source_report(user_id,media_id,canonical_url,reason,details) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,media_id,canonical_url) DO UPDATE SET reason=excluded.reason,details=excluded.details,created_at=now()",[req.user.id,req.params.mediaId,parsed.data.canonicalUrl,parsed.data.reason,parsed.data.details??null]);
-  return reply.code(201).send({ok:true,mediaId:req.params.mediaId,canonicalUrl:parsed.data.canonicalUrl});
+  if(parsed.data.reason==='DEAD_LINK')return reply.code(202).send({ok:true,mediaId:req.params.mediaId,canonicalUrl:parsed.data.canonicalUrl,classification:'AUTOMATED_HEALTH_FEEDBACK'});
+  const reporting=(await reportingForMedia([req.params.mediaId],req.user.id)).get(req.params.mediaId);
+  const source=reporting?.sources.find(subject=>subject.canonicalUrl===parsed.data.canonicalUrl);
+  if(!source)return err(reply,409,'REPORT_SUBJECT_STALE');
+  const reason=parsed.data.reason==='OTHER'?'OTHER_SOURCE':parsed.data.reason;
+  const submitted=await submitAdjudicatedReport(req.user.id,{family:'SOURCE',mediaId:req.params.mediaId,subjectKey:source.subjectKey,evidenceRevision:source.evidenceRevision,canonicalUrl:source.canonicalUrl,reason,details:parsed.data.details},req.requestId);
+  if(submitted.error!==undefined)return err(reply,409,submitted.error);
+  return reply.code(201).send({ok:true,caseId:submitted.caseId,status:'PENDING'});
 });
 app.post("/api/v1/library/:mediaId/source-check", async (req: any, reply: any) => {
   const parsed=sourceCheckContract.safeParse(req.body);
@@ -2309,8 +2377,8 @@ async function richCatalogRow(
     ])
   ).rows[0]?.selection;
   const [favorites, sources, providerPages,modalProjection] = await Promise.all([
-    pool.query(`SELECT i.bookmark_id AS "bookmarkId",i.payload->>'url' AS url,i.payload->>'title' AS title,COALESCE(NULLIF(i.parse_artifact->>'displayTitle',''),i.parse_artifact#>>'{identity,title}') AS "parsedTitle",i.parse_artifact->'progression' AS progression,COALESCE(d.name,'Profil') AS device,i.parser_id AS "parserId",i.parser_version AS "parserVersion",i.parse_artifact->'provenance' AS provenance FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l.user_id=$1 AND l.media_id=$2 AND l.status IN ('matched','accepted','review') AND i.event<>'removed' ORDER BY i.created_at DESC`,[userId,mediaId]),
-    pool.query(`SELECT DISTINCT ON (lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i'))) o.media_id AS "mediaId",o.connector,o.provenance->>'workUrl' AS "canonicalUrl",o.provenance->>'workUrl' AS "workUrl",'AVAILABLE' AS status,o.checked_at AS "checkedAt",NULL::text AS title,NULL::text AS chapter,lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')) AS domain,o.provenance->>'language' AS language,o.provenance FROM release_origin o WHERE o.media_id=$1 AND (o.user_id IS NULL OR o.user_id=$2) AND o.status='AVAILABLE' AND NULLIF(o.provenance->>'language','') IS NOT NULL AND o.provenance->>'languageDetection' NOT IN ('undetected','ambiguous') AND o.provenance->>'workUrl' ~ '^https?://' ORDER BY lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')),o.checked_at DESC`,[mediaId,userId]),
+    pool.query(`SELECT i.bookmark_id AS "bookmarkId",i.payload->>'url' AS url,i.payload->>'title' AS title,COALESCE(i.parse_artifact#>>'{identity,title}',NULLIF(i.parse_artifact->>'displayTitle','')) AS "parsedTitle",i.parse_artifact->'progression' AS progression,COALESCE(d.name,'Profil') AS device,i.parser_id AS "parserId",i.parser_version AS "parserVersion",i.parse_artifact->'provenance' AS provenance FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND l.installation_id=i.installation_id AND l.bookmark_id=i.bookmark_id LEFT JOIN extension_device d ON d.user_id=i.user_id AND d.installation_id=i.installation_id WHERE l.user_id=$1 AND l.media_id=$2 AND l.status IN ('matched','accepted','review') AND i.event<>'removed' ORDER BY i.created_at DESC`,[userId,mediaId]),
+    pool.query(`SELECT DISTINCT ON (lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i'))) o.media_id AS "mediaId",o.connector,o.provenance->>'workUrl' AS "canonicalUrl",o.provenance->>'workUrl' AS "workUrl",'AVAILABLE' AS status,o.checked_at AS "checkedAt",NULL::text AS title,NULL::text AS chapter,lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')) AS domain,o.provenance->>'language' AS language,o.provenance FROM release_origin o WHERE o.media_id=$1 AND (o.user_id IS NULL OR o.user_id=$2) AND o.status='AVAILABLE' AND NULLIF(o.provenance->>'language','') IS NOT NULL AND o.provenance->>'languageDetection' NOT IN ('undetected','ambiguous') AND o.provenance->>'workUrl' ~ '^https?://' AND NOT EXISTS(SELECT 1 FROM source_association_decision d WHERE d.active AND d.verdict='BLOCK' AND d.media_id=o.media_id AND d.canonical_url=o.provenance->>'workUrl' AND (d.user_id IS NULL OR d.user_id=$2)) ORDER BY lower(regexp_replace(o.provenance->>'workUrl','^https?://([^/:?#]+).*','\\1','i')),o.checked_at DESC`,[mediaId,userId]),
     pool.query(`SELECT provider,source_url AS "sourceUrl",status FROM media_metadata WHERE media_id=$1 AND provider IN ('anilist','mangaupdates','mangadex') AND status='ACTIVE' ORDER BY provider`,[mediaId]),
     pool.query(`SELECT
       (SELECT jsonb_build_object('provider',mm.provider,'status',mm.status,'latestChapter',mm.latest_chapter,'sourceUrl',mm.source_url,'metadata',COALESCE((SELECT jsonb_object_agg(a.field,a.value) FROM metadata_assertion a WHERE a.media_id=$1 AND a.provider=mm.provider),'{}'::jsonb)) FROM media_metadata mm WHERE mm.media_id=$1 AND mm.status='ACTIVE' LIMIT 1) AS metadata,
@@ -2324,6 +2392,7 @@ async function richCatalogRow(
       (SELECT count(*)::int FROM bookmark_media_link link WHERE link.user_id=$2 AND link.media_id=$1 AND link.status IN ('matched','accepted','review')) AS "favoriteCount"`,[mediaId,userId]),
   ]);
   const modal=modalProjection.rows[0]??{};
+  const reporting=(await reportingForMedia([mediaId],userId)).get(mediaId);
   return {
     ...base.rows[0],
     ...modal,
@@ -2354,6 +2423,7 @@ async function richCatalogRow(
     favorites: favorites.rows,
     sources: sources.rows,
     providerPages: providerPages.rows,
+    reporting,
   };
 }
 app.get("/api/v1/catalog/media/:mediaId", async (req: any, reply: any) => {
@@ -2801,6 +2871,7 @@ app.addHook("preHandler", async (req, reply) => {
     req.url.startsWith("/api/v1/extension/report") ||
     req.url.startsWith("/api/v1/extension/updates") ||
     req.url.startsWith("/api/v1/extension/config") ||
+    req.url.startsWith("/api/v1/extension/control") ||
     req.url.startsWith("/api/v1/extension/preferences") ||
     req.url.startsWith("/api/v1/extension/update-proposals") ||
     req.url.startsWith("/api/v1/extension/progression") ||
@@ -3368,7 +3439,8 @@ app.post(
           req.requestId,
         ],
       );
-    return { ok: true, accepted: p.data.items.length, cursor: nextCursor };
+    const receipt=await inventoryDiagnostic(req.user.id,req.device.installation_id);
+    return { ok: true, accepted: p.data.items.length, cursor: nextCursor, receipt:{...receipt,serverSyncedAt:new Date().toISOString()} };
   },
 );
 async function inventoryDiagnostic(userId: string, installationId: string) {
@@ -3658,6 +3730,17 @@ app.get("/api/v1/extension/config", async (req: any) => {
     role: req.user.role,
     sites: sites.rows,
   };
+});
+app.get('/api/v1/extension/control',async(req:any)=>{
+  const browser=/firefox/i.test(req.device.browser)?'firefox':/chrome|chromium/i.test(req.device.browser)?'chrome':null;
+  const [preference,release,sites,proposals,receipt]=await Promise.all([
+    pool.query('SELECT auto_update_favorites AS "autoUpdateFavorites",observe_navigation AS "observeNavigation",sync_minutes AS "syncMinutes",updated_at AS "updatedAt" FROM extension_preference WHERE user_id=$1',[req.user.id]),
+    browser?pool.query('SELECT version FROM extension_release WHERE browser=$1',[browser]):Promise.resolve({rows:[]}),
+    pool.query("SELECT id,domain,source FROM approved_site WHERE user_id=$1 AND (device_id IS NULL OR device_id=$2) ORDER BY domain",[req.user.id,req.device.id]),
+    pool.query(`SELECT id,bookmark_id AS "bookmarkId",expected_url AS "expectedUrl",expected_title AS "expectedTitle",new_url AS "newUrl",new_title AS "newTitle",domain,state,created_at AS "createdAt" FROM favorite_update_proposal WHERE user_id=$1 AND state='PENDING' AND (device_id=$2 OR device_id IS NULL) ORDER BY created_at,id`,[req.user.id,req.device.id]),
+    inventoryDiagnostic(req.user.id,req.device.installation_id),
+  ]);
+  return {protocol:EXTENSION_PROTOCOL,minimumProtocol:MINIMUM_EXTENSION_PROTOCOL,preferences:preference.rows[0]??{autoUpdateFavorites:false,observeNavigation:false,syncMinutes:await operationalValue('extension.syncMinutes'),updatedAt:null},availableVersion:release.rows[0]?.version??null,browser,role:req.user.role,sites:sites.rows,proposals:proposals.rows,receipt};
 });
 app.patch("/api/v1/extension/preferences", async (req: any, reply: any) => {
   const parsed = extensionPreferencesPatchContract.safeParse(req.body);
@@ -4593,6 +4676,57 @@ app.patch(
     return result.rows[0];
   },
 );
+const adminWarningSelect=`SELECT c.id,c.family,c.subject_key AS "subjectKey",c.evidence_revision AS "evidenceRevision",c.status,c.reason_counts AS "reasonCounts",c.report_count AS "reportCount",c.media_id AS "mediaId",
+  (SELECT t.text FROM media_title t WHERE t.media_id=c.media_id AND t.kind<>'personal' ORDER BY CASE t.kind WHEN 'official' THEN 0 ELSE 1 END,t.id LIMIT 1) AS title,
+  CASE WHEN c.family='SOURCE' THEN c.sanitized_evidence->>'sourceUrl' END AS "sourceUrl",c.sanitized_evidence AS evidence,c.verdict,c.decision_scope AS scope,c.created_at AS "createdAt",c.decided_at AS "decidedAt",c.reverted_at AS "revertedAt" FROM report_case c`;
+app.get('/api/v1/admin/warnings',async(req:any,reply:any)=>{
+  if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');
+  const rows=await pool.query(`${adminWarningSelect} ORDER BY (c.status='PENDING') DESC,c.created_at`);
+  return {items:rows.rows,pendingCount:rows.rows.filter((row:any)=>row.status==='PENDING').length};
+});
+app.get('/api/v1/admin/warnings/:id',async(req:any,reply:any)=>{
+  if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');
+  const row=await pool.query(`${adminWarningSelect} WHERE c.id=$1`,[req.params.id]);if(!row.rowCount)return err(reply,404,'WARNING_NOT_FOUND');
+  const alternatives=row.rows[0].family==='IDENTITY'?(await pool.query(`SELECT DISTINCT p.id,p.provider,p.provider_id AS "providerId",p.canonical_title AS "title",p.type,p.year,p.url FROM provider_profile p WHERE EXISTS(SELECT 1 FROM review_cluster_candidate candidate JOIN favorite_review review ON review.cluster_id=candidate.cluster_id JOIN bookmark_media_link link ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id WHERE candidate.profile_id=p.id AND link.media_id=$1) ORDER BY p.provider,p.canonical_title LIMIT 20`,[row.rows[0].mediaId])).rows:[];
+  const history=(await pool.query(`SELECT action,before_state AS "beforeState",after_state AS "afterState",created_at AS "createdAt" FROM report_case_audit_event WHERE case_id=$1 ORDER BY created_at`,[req.params.id])).rows;
+  return {...row.rows[0],alternatives,history};
+});
+app.get('/api/v1/admin/warnings/:id/preview',async(req:any,reply:any)=>{
+  if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');
+  const parsed=z.object({scope:z.enum(['SUBJECT','FAVORITE','CLUSTER','ASSOCIATION'])}).safeParse(req.query);if(!parsed.success)return err(reply,400,'VALIDATION_FAILED');
+  const row=await pool.query('SELECT family,media_id AS "mediaId",evidence_revision AS "evidenceRevision" FROM report_case WHERE id=$1 AND status=\'PENDING\'',[req.params.id]);if(!row.rowCount)return err(reply,404,'WARNING_NOT_PENDING');
+  let affected=1;
+  if(parsed.data.scope==='CLUSTER'){const count=await pool.query(`SELECT count(DISTINCT link.id)::int AS count FROM favorite_review seed JOIN favorite_review review ON review.cluster_id=seed.cluster_id JOIN bookmark_media_link link ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id WHERE seed.id=(SELECT review.id FROM report_submission submission JOIN report_case c ON c.id=submission.case_id JOIN favorite_review review ON review.user_id=submission.user_id JOIN bookmark_media_link l ON l.user_id=review.user_id AND l.installation_id=review.installation_id AND l.bookmark_id=review.bookmark_id AND l.media_id=c.media_id WHERE c.id=$1 ORDER BY submission.created_at,review.created_at LIMIT 1) AND link.status IN ('matched','accepted')`,[req.params.id]);affected=Number(count.rows[0]?.count??0)}
+  return {caseId:req.params.id,family:row.rows[0].family,scope:parsed.data.scope,affectedActiveFavorites:affected,evidenceRevision:row.rows[0].evidenceRevision};
+});
+app.post('/api/v1/admin/warnings/:id/decide',async(req:any,reply:any)=>{
+  if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');
+  const parsed=adminReportDecisionContract.safeParse(req.body);if(!parsed.success)return err(reply,400,'VALIDATION_FAILED','Décision invalide.',parsed.error.issues);
+  const client=await pool.connect();try{await client.query('BEGIN');const found=await client.query('SELECT * FROM report_case WHERE id=$1 FOR UPDATE',[req.params.id]);if(!found.rowCount||found.rows[0].status!=='PENDING'){await client.query('ROLLBACK');return err(reply,409,'WARNING_NOT_PENDING')}const warning=found.rows[0];if(warning.evidence_revision!==parsed.data.expectedEvidenceRevision){await client.query('ROLLBACK');return err(reply,409,'EVIDENCE_REVISION_CHANGED')}
+    if(warning.family==='SOURCE'){
+      if(parsed.data.scope!=='ASSOCIATION'||!['KEEP','BLOCK'].includes(parsed.data.verdict)){await client.query('ROLLBACK');return err(reply,400,'SOURCE_DECISION_INVALID')}
+      const privateScope=warning.sanitized_evidence?.accessMode==='extension_private';const owner=privateScope?(await client.query('SELECT user_id FROM report_submission WHERE case_id=$1 ORDER BY created_at LIMIT 1',[warning.id])).rows[0]?.user_id:null;
+      await client.query(`INSERT INTO source_association_decision(case_id,media_id,canonical_url,user_id,verdict,evidence_revision) VALUES($1,$2,$3,$4,$5,$6)`,[warning.id,warning.media_id,warning.sanitized_evidence.sourceUrl,owner,parsed.data.verdict,warning.evidence_revision]);
+    }else if(parsed.data.verdict==='CORRECT'){
+      if(!['FAVORITE','CLUSTER'].includes(parsed.data.scope)){await client.query('ROLLBACK');return err(reply,400,'IDENTITY_SCOPE_INVALID')}
+      let profile:any=null;if(parsed.data.providerProfileId)profile=(await client.query('SELECT * FROM provider_profile WHERE id=$1',[parsed.data.providerProfileId])).rows[0];
+      const provider=profile?.provider??parsed.data.provider;const rawProviderId=profile?.provider_id??parsed.data.providerId??(provider&&parsed.data.providerUrl?providerIdFromUrl(provider,parsed.data.providerUrl):null);
+      if(!provider||!rawProviderId){await client.query('ROLLBACK');return err(reply,400,'PROVIDER_PROFILE_REQUIRED')}
+      const providerId=String(rawProviderId);let newMedia=(await client.query('SELECT media_id FROM media_external_id WHERE provider=$1 AND external_id=$2 ORDER BY id LIMIT 1',[provider,providerId])).rows[0]?.media_id;
+      if(!newMedia){newMedia=`${provider}:${providerId}`;const current=await client.query('SELECT type FROM media WHERE id=$1',[warning.media_id]);await client.query('INSERT INTO media(id,type) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',[newMedia,provider==='anilist'?'ANIME':current.rows[0]?.type??'MANGA']);await client.query('INSERT INTO media_external_id(media_id,provider,external_id,provenance) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[newMedia,provider,providerId,{source:'admin-adjudication',caseId:warning.id,requestId:req.requestId}]);if(profile?.canonical_title)await client.query("INSERT INTO media_title(media_id,text,normalized_text,kind,title_type,connector,confidence,provenance) VALUES($1,$2,lower(regexp_replace($2,'[^[:alnum:]]+',' ','g')),'official','canonical',$3,1,$4) ON CONFLICT DO NOTHING",[newMedia,profile.canonical_title,provider,{source:'admin-adjudication',caseId:warning.id}]);await client.query("SELECT graphile_worker.add_job($1,$2,job_key := $3,max_attempts := 3,job_key_mode := 'replace')",[provider==='anilist'?'anilist-enrichment':'mangaupdates-enrichment',JSON.stringify({mediaId:newMedia,forceRefresh:true,providerId}),`admin-adjudication:${provider}:${providerId}`])}
+      const representative=await client.query(`SELECT link.id,link.media_id,review.id AS review_id,review.cluster_id FROM report_submission submission JOIN report_case c ON c.id=submission.case_id JOIN bookmark_media_link link ON link.user_id=submission.user_id AND link.media_id=c.media_id AND link.status IN ('matched','accepted') LEFT JOIN favorite_review review ON review.user_id=link.user_id AND review.installation_id=link.installation_id AND review.bookmark_id=link.bookmark_id WHERE c.id=$1 ORDER BY submission.created_at,link.created_at LIMIT 1`,[warning.id]);if(!representative.rowCount){await client.query('ROLLBACK');return err(reply,409,'ACTIVE_FAVORITE_REQUIRED')}const target=representative.rows[0];if(parsed.data.scope==='CLUSTER'&&!target.cluster_id){await client.query('ROLLBACK');return err(reply,409,'CLUSTER_NOT_AVAILABLE')}
+      await client.query("SELECT set_config('favlib.resolved_review_repair','on',true)");const updated=parsed.data.scope==='FAVORITE'?await client.query("UPDATE bookmark_media_link SET media_id=$1,status='matched',evidence=evidence||$2::jsonb WHERE id=$3 RETURNING id",[newMedia,JSON.stringify({adminOverrideCaseId:warning.id,previousMediaId:warning.media_id}),target.id]):await client.query(`UPDATE bookmark_media_link link SET media_id=$1,status='matched',evidence=evidence||$2::jsonb FROM favorite_review review WHERE review.cluster_id=$3 AND link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id AND link.status IN ('matched','accepted') RETURNING link.id`,[newMedia,JSON.stringify({adminOverrideCaseId:warning.id,previousMediaId:warning.media_id}),target.cluster_id]);
+      await client.query(`INSERT INTO admin_identity_override(case_id,scope,bookmark_link_id,review_id,cluster_id,old_media_id,new_media_id,chosen_profile_id,provenance) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[warning.id,parsed.data.scope,target.id,target.review_id,target.cluster_id,warning.media_id,newMedia,profile?.id??null,{source:'admin-adjudication',affectedActiveFavorites:updated.rowCount,requestId:req.requestId}]);
+    }else if(parsed.data.verdict!=='KEEP'){await client.query('ROLLBACK');return err(reply,400,'IDENTITY_DECISION_INVALID')}
+    const before={status:warning.status,verdict:warning.verdict,scope:warning.decision_scope};const updated=await client.query(`UPDATE report_case SET status='FINAL',verdict=$2,decision_scope=$3,chosen_profile_id=$4,chosen_provider=$5,chosen_provider_id=$6,actor_user_id=$7,request_id=$8,decided_at=now(),updated_at=now() WHERE id=$1 RETURNING *`,[warning.id,parsed.data.verdict,parsed.data.scope,parsed.data.providerProfileId??null,parsed.data.provider??null,parsed.data.providerId??null,req.user.id,req.requestId]);await client.query('INSERT INTO report_case_audit_event(case_id,actor_user_id,action,before_state,after_state,request_id) VALUES($1,$2,\'DECIDE\',$3,$4,$5)',[warning.id,req.user.id,before,{status:'FINAL',verdict:parsed.data.verdict,scope:parsed.data.scope},req.requestId]);await client.query("INSERT INTO admin_audit_event(actor_user_id,action,target_type,target_id,summary,request_id) VALUES($1,'warning.decide','report_case',$2,$3,$4)",[req.user.id,warning.id,{verdict:parsed.data.verdict,scope:parsed.data.scope,evidenceRevision:warning.evidence_revision},req.requestId]);await client.query('COMMIT');return {ok:true,id:updated.rows[0].id,status:'FINAL'}
+  }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
+});
+app.post('/api/v1/admin/warnings/:id/revert',async(req:any,reply:any)=>{
+  if(req.user.role!=='admin')return err(reply,403,'FORBIDDEN');const parsed=z.object({confirm:z.literal(true)}).strict().safeParse(req.body);if(!parsed.success)return err(reply,400,'CONFIRMATION_REQUIRED');const client=await pool.connect();try{await client.query('BEGIN');const found=await client.query("SELECT * FROM report_case WHERE id=$1 AND status='FINAL' FOR UPDATE",[req.params.id]);if(!found.rowCount){await client.query('ROLLBACK');return err(reply,409,'WARNING_NOT_FINAL')}const warning=found.rows[0];if(warning.family==='SOURCE')await client.query('UPDATE source_association_decision SET active=false,reverted_at=now() WHERE case_id=$1 AND active',[warning.id]);else{const override=(await client.query('SELECT * FROM admin_identity_override WHERE case_id=$1 AND active FOR UPDATE',[warning.id])).rows[0];if(override){await client.query("SELECT set_config('favlib.resolved_review_repair','on',true)");if(override.scope==='FAVORITE')await client.query('UPDATE bookmark_media_link SET media_id=$1,evidence=evidence||$2::jsonb WHERE id=$3',[override.old_media_id,JSON.stringify({adminOverrideRevertedCaseId:warning.id}),override.bookmark_link_id]);else await client.query('UPDATE bookmark_media_link link SET media_id=$1,evidence=evidence||$2::jsonb FROM favorite_review review WHERE review.cluster_id=$3 AND link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id',[override.old_media_id,JSON.stringify({adminOverrideRevertedCaseId:warning.id}),override.cluster_id]);await client.query('UPDATE admin_identity_override SET active=false,reverted_at=now() WHERE id=$1',[override.id])}}
+    await client.query("UPDATE report_case SET status='REVERTED',reverted_at=now(),updated_at=now() WHERE id=$1",[warning.id]);await client.query("INSERT INTO report_case_audit_event(case_id,actor_user_id,action,before_state,after_state,request_id) VALUES($1,$2,'REVERT',$3,$4,$5)",[warning.id,req.user.id,{status:'FINAL',verdict:warning.verdict},{status:'REVERTED'},req.requestId]);await client.query('COMMIT');return {ok:true,status:'REVERTED'}
+  }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
+});
+
 app.get("/api/v1/admin/metrics", async (req: any, reply: any) => {
   if (req.user.role !== "admin") return err(reply, 403, "FORBIDDEN");
   const workerSchema = await pool.query(
@@ -4601,7 +4735,7 @@ app.get("/api/v1/admin/metrics", async (req: any, reply: any) => {
   const jobQuery = workerSchema.rows[0].jobs
     ? pool.query("SELECT count(*)::int AS count FROM graphile_worker.jobs")
     : Promise.resolve({ rows: [{ count: 0 }] });
-  const [users, devices, jobs, stale, notifications] = await Promise.all([
+  const [users, devices, jobs, stale, notifications,warnings] = await Promise.all([
     pool.query("SELECT count(*)::int AS count FROM app_user"),
     pool.query(
       "SELECT count(*)::int AS count FROM extension_device WHERE revoked_at IS NULL",
@@ -4613,6 +4747,7 @@ app.get("/api/v1/admin/metrics", async (req: any, reply: any) => {
     pool.query(
       "SELECT count(*)::int AS count FROM personal_notification WHERE read_at IS NULL",
     ),
+    pool.query("SELECT count(*)::int AS count FROM report_case WHERE status='PENDING'"),
   ]);
   return {
     users: users.rows[0].count,
@@ -4620,6 +4755,7 @@ app.get("/api/v1/admin/metrics", async (req: any, reply: any) => {
     pendingJobs: jobs.rows[0].count,
     staleSnapshots: stale.rows[0].count,
     unreadNotifications: notifications.rows[0].count,
+    pendingWarnings:warnings.rows[0].count,
   };
 });
 app.get("/api/v1/admin/diagnostics", async (req: any, reply: any) => {
@@ -5368,7 +5504,9 @@ app.get("/api/v1/extension/page-resolution", async (req: any, reply: any) => {
   if (!match.mediaId || !["matched", "accepted"].includes(match.status))
     return { state: "associating" };
   const details = await pool.query(
-    `SELECT m.id,m.type,m.format,favlib_display_title(m.id,$2::uuid)->>'title' AS title,favlib_display_title(m.id,$2::uuid) AS "titleSelection" FROM media m WHERE m.id=$1 AND ${contentAllowedSql('m.id','$2')}`,
+    `SELECT m.id,m.type,m.format,favlib_display_title(m.id,$2::uuid)->>'title' AS title,favlib_display_title(m.id,$2::uuid) AS "titleSelection",
+      EXISTS(SELECT 1 FROM media_cover c LEFT JOIN catalog_image_asset asset ON asset.sha256=c.asset_sha256 WHERE c.media_id IN (SELECT m.id UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=m.id) AND c.status='ACTIVE' AND COALESCE(asset.data,c.data) IS NOT NULL) AS "hasCover"
+    FROM media m WHERE m.id=$1 AND ${contentAllowedSql('m.id','$2')}`,
     [match.mediaId, req.user.id],
   );
   if (!details.rowCount) return { state: "excluded" };
@@ -5386,7 +5524,7 @@ app.get("/api/v1/extension/page-resolution", async (req: any, reply: any) => {
     },
     sourceIdentity: wanted,
     progress: progress.rows[0] ?? null,
-    coverUrl: `/api/v1/extension/favorites/${encodeURIComponent(match.mediaId)}/cover`,
+    coverUrl: details.rows[0].hasCover ? `/api/v1/extension/favorites/${encodeURIComponent(match.mediaId)}/cover` : null,
   };
 });
 app.get("/api/v1/extension/favorites", async (req: any, reply: any) => {
@@ -5408,7 +5546,7 @@ app.get("/api/v1/extension/favorites", async (req: any, reply: any) => {
     m.type,m.format,
     (SELECT jsonb_build_object('kind',p.position_kind,'number',p.position_number::numeric,'raw',p.position_raw,'updatedAt',p.updated_at) FROM favorite_progress p WHERE p.user_id=$1 AND p.media_id=m.id ORDER BY p.updated_at DESC LIMIT 1) AS progress,
     (SELECT jsonb_build_object('kind',pp.available_position_kind,'number',pp.available_position_number,'raw',pp.available_position_raw) FROM provider_progress pp WHERE pp.media_id=m.id AND pp.status='ACTIVE' AND pp.available_position_kind IS NOT NULL ORDER BY pp.updated_at DESC LIMIT 1) AS availability,
-    CASE WHEN EXISTS(SELECT 1 FROM media_cover c WHERE c.media_id=m.id AND c.status='ACTIVE') THEN '/api/v1/extension/favorites/'||replace(m.id,'/','%2F')||'/cover' END AS "coverUrl"
+    CASE WHEN EXISTS(SELECT 1 FROM media_cover c LEFT JOIN catalog_image_asset asset ON asset.sha256=c.asset_sha256 WHERE c.media_id IN (SELECT m.id UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=m.id) AND c.status='ACTIVE' AND COALESCE(asset.data,c.data) IS NOT NULL) THEN '/api/v1/extension/favorites/'||replace(m.id,'/','%2F')||'/cover' END AS "coverUrl"
   FROM favorites f JOIN media m ON m.id=f.media_id WHERE ${contentAllowedSql('m.id')}
   ORDER BY COALESCE((SELECT max(p.updated_at) FROM favorite_progress p WHERE p.user_id=$1 AND p.media_id=m.id),m.created_at) DESC,m.id LIMIT $2`,
     [req.user.id, parsed.data],
@@ -5421,7 +5559,8 @@ app.get(
     const cover = await pool.query(
       `SELECT c.mime_type,COALESCE(a.data,c.data) AS data,c.provider,c.attribution FROM media_cover c
     LEFT JOIN catalog_image_asset a ON a.sha256=c.asset_sha256
-    WHERE c.media_id=$1 AND c.status='ACTIVE' AND ${contentAllowedSql('c.media_id','$2')} AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.media_id=c.media_id AND l.user_id=$2 AND l.status IN ('matched','accepted') AND i.event<>'removed')`,
+    WHERE c.media_id IN (SELECT $1::text UNION SELECT im.target_media_id FROM media_identity_merge im WHERE im.source_media_id=$1) AND c.status='ACTIVE' AND COALESCE(a.data,c.data) IS NOT NULL AND ${contentAllowedSql('c.media_id','$2')} AND EXISTS(SELECT 1 FROM bookmark_media_link l JOIN bookmark_import_item i ON i.user_id=l.user_id AND i.installation_id=l.installation_id AND i.bookmark_id=l.bookmark_id WHERE l.media_id=$1 AND l.user_id=$2 AND l.status IN ('matched','accepted') AND i.event<>'removed')
+    ORDER BY (c.media_id=$1) DESC LIMIT 1`,
       [req.params.mediaId, req.user.id],
     );
     if (!cover.rowCount || !cover.rows[0].data)
