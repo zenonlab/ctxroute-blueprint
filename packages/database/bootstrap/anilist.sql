@@ -44,7 +44,6 @@ CREATE TABLE IF NOT EXISTS source_snapshot (id uuid PRIMARY KEY DEFAULT gen_rand
 CREATE TABLE IF NOT EXISTS release_announcement (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE, release_key text NOT NULL, provider text NOT NULL, status text NOT NULL CHECK(status IN ('SCHEDULED','ANNOUNCED')), announced_at timestamptz NOT NULL, provenance jsonb NOT NULL, UNIQUE(provider,release_key));
 CREATE TABLE IF NOT EXISTS release_origin (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES app_user(id) ON DELETE CASCADE, scope_key text NOT NULL, media_id text NOT NULL REFERENCES media(id) ON DELETE CASCADE, release_key text NOT NULL, connector text NOT NULL, canonical_url text NOT NULL, status text NOT NULL CHECK(status IN ('AVAILABLE','STALE','ERROR')), checked_at timestamptz NOT NULL, provenance jsonb NOT NULL, UNIQUE(scope_key,release_key,connector,canonical_url));
 CREATE TABLE IF NOT EXISTS domain_favicon_cache (domain text PRIMARY KEY, mime_type text, data bytea, fetched_at timestamptz NOT NULL DEFAULT now(), error text);
-ALTER TABLE user_catalog_preference ADD COLUMN IF NOT EXISTS preferred_languages text[] NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS site_metadata_cache (domain text PRIMARY KEY, language text, detection_method text NOT NULL, manifest_url text, raw_url text NOT NULL, detected_at timestamptz NOT NULL DEFAULT now(), error text);
 CREATE TABLE IF NOT EXISTS source_check_lease (scope_key text PRIMARY KEY, owner text NOT NULL, expires_at timestamptz NOT NULL, acquired_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS personal_notification (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE, release_key text NOT NULL, kind text NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), read_at timestamptz, UNIQUE(user_id,release_key,kind));
@@ -703,6 +702,7 @@ CREATE TABLE IF NOT EXISTS user_catalog_preference (
   timezone text NOT NULL DEFAULT 'UTC',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE user_catalog_preference ADD COLUMN IF NOT EXISTS preferred_languages text[] NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS calendar_feed (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE, label text NOT NULL, filters jsonb NOT NULL DEFAULT '{}'::jsonb,

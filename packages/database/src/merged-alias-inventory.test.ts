@@ -25,4 +25,7 @@ describe('merged alias inventory cleanup',()=>{
     expect(migration).not.toContain('DELETE FROM bookmark_import_item');
     expect(migration).not.toContain('DELETE FROM favorite_review');
   });
+  it('creates catalogue preferences before extending their synthetic bootstrap schema',()=>{
+    expect(bootstrap.indexOf('CREATE TABLE IF NOT EXISTS user_catalog_preference')).toBeLessThan(bootstrap.indexOf("ALTER TABLE user_catalog_preference ADD COLUMN IF NOT EXISTS preferred_languages"));
+  });
 });
