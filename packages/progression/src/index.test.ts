@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptObservation, buildLinearAnimeChain, chapterDisplay, comparePosition, consolidate, globalAnimePosition, greatestAvailable, normalizeSerializationStatus, position } from './index.js';
+import { acceptObservation, buildLinearAnimeChain, chapterDisplay, comparePosition, consolidate, globalAnimePosition, greatestAvailable, normalizeSerializationStatus, position, projectGlobalAnimeEpisode } from './index.js';
 
 const high = (raw: string, observedAt = '2026-01-01T00:00:00Z') => ({ mediaId: 'm1', source: 'fixture', position: position(raw), confidence: 'high' as const, observedAt, consented: true });
 
@@ -81,5 +81,20 @@ describe('global anime work progression',()=>{
   });
   it('does not chain a one-sided provider relation',()=>{
     expect(buildLinearAnimeChain([{id:'a1',format:'TV',episodeTotal:12,relations:[{id:'a2',kind:'SEQUEL'}]},{id:'a2',format:'TV',episodeTotal:12,relations:[]}],'a1')).toEqual({status:'proved',rootId:'a1',members:[{id:'a1',order:0,episodeTotal:12,offset:0}]});
+  });
+  it('converts global episodes across proved part boundaries without changing identity',()=>{
+    const chain=buildLinearAnimeChain([
+      {id:'p1',format:'TV',episodeTotal:12,relations:[{id:'p2',kind:'SEQUEL'}]},
+      {id:'p2',format:'TV',episodeTotal:12,relations:[{id:'p1',kind:'PREQUEL'},{id:'p3',kind:'SEQUEL'}]},
+      {id:'p3',format:'TV',episodeTotal:12,relations:[{id:'p2',kind:'PREQUEL'}]},
+    ],'p2');
+    expect(projectGlobalAnimeEpisode(chain,12)).toEqual({seasonMediaId:'p1',season:1,localEpisode:12,globalEpisode:12});
+    expect(projectGlobalAnimeEpisode(chain,13)).toEqual({seasonMediaId:'p2',season:2,localEpisode:1,globalEpisode:13});
+    expect(projectGlobalAnimeEpisode(chain,25)).toEqual({seasonMediaId:'p3',season:3,localEpisode:1,globalEpisode:25});
+  });
+  it('refuses a global conversion when a boundary is unknown, branched, cyclic, or out of range',()=>{
+    const incomplete=buildLinearAnimeChain([{id:'p1',format:'TV',episodeTotal:12,relations:[{id:'p2',kind:'SEQUEL'}]},{id:'p2',format:'TV',episodeTotal:null,relations:[{id:'p1',kind:'PREQUEL'}]}],'p1');
+    expect(projectGlobalAnimeEpisode(incomplete,13)).toBeNull();
+    expect(projectGlobalAnimeEpisode({status:'ambiguous',reason:'CYCLE',candidates:['p1']},13)).toBeNull();
   });
 });

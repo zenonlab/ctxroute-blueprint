@@ -12,6 +12,19 @@ describe('favorite reviews', () => {
   it('keeps an exact title and its parenthesized variant', () => {
     expect(isParenthesizedAmbiguity('Existence', [{ id: 1, title: 'Existence' }, { id: 2, title: 'Existence (Wang)' }])).toBe(true);
   });
+  it('reapplies a same-user parsed-title lock without opening a pending question', async () => {
+    const calls:string[]=[];
+    const query=vi.fn(async(sql:string)=>{calls.push(sql);
+      if(sql.startsWith('SELECT l.installation'))return {rows:[{installationId:'device-b',bookmarkId:'bookmark-b',rawFavoriteTitle:'Synthetic Locked Work',favoriteUrl:'https://reader.invalid/work',parseArtifact:{identity:{title:'Synthetic Locked Work'}}}]};
+      if(sql.startsWith('INSERT INTO review_title_cluster'))return {rows:[{id:'cluster'}]};
+      if(sql.startsWith('SELECT outcome,profile_id'))return {rows:[{outcome:'MATCH',mediaId:'synthetic-media',sourceReviewId:'prior-review'}]};
+      if(sql.startsWith('INSERT INTO favorite_review'))return {rows:[{id:'reused-review'}]};
+      return {rows:[]};
+    });
+    await expect(openFavoriteReview(query,{userId:'user-a',title:'Synthetic Locked Work',url:'https://reader.invalid/work?changed=1',provider:'mangaupdates',candidates:[]})).resolves.toBe('reused-review');
+    expect(calls.some(sql=>sql.includes("'PENDING'"))).toBe(false);
+    expect(calls.some(sql=>sql.startsWith('UPDATE bookmark_media_link SET media_id'))).toBe(true);
+  });
   it('is idempotent across worker retries and stores complete candidates', async () => {
     const calls: string[] = []; const query = vi.fn(async (sql: string) => { calls.push(sql); if (sql.startsWith('SELECT l.installation')) return { rows: [{ installationId: 'i', bookmarkId: 'b' }] }; if (sql.startsWith('INSERT INTO favorite_review')) return { rows: [{ id: 'review-1' }] }; if (sql.startsWith('INSERT INTO provider_profile')) return { rows: [{ id: 'profile-1' }] }; if (sql.startsWith("SELECT count(")) return { rows: [{ count: 1 }] }; return { rows: [] }; });
     await openFavoriteReview(query, { userId: 'u', title: 'Existence', url: 'https://example.test/existence', provider: 'mangaupdates', candidates: [{ id: 1, title: 'Existence', hitTitle: 'Existence', authors: ['A'] }, { id: 2, title: 'Existence (Wang)', hitTitle: 'Existence' }] });

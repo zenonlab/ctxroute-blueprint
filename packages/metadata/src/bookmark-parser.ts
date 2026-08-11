@@ -65,9 +65,9 @@ export type FavoriteProgression = {
 };
 
 /** Increment only when the generic evidence policy changes. */
-export const FAVORITE_PARSER_ID = "favorite-parser-v12" as const;
-export const FAVORITE_IDENTITY_PARSER_VERSION = 12;
-export const FAVORITE_PROGRESS_PARSER_VERSION = 9;
+export const FAVORITE_PARSER_ID = "favorite-parser-v13" as const;
+export const FAVORITE_IDENTITY_PARSER_VERSION = 13;
+export const FAVORITE_PROGRESS_PARSER_VERSION = 10;
 
 export type FavoriteParseArtifact = {
   parser: typeof FAVORITE_PARSER_ID;
@@ -95,6 +95,8 @@ export type FavoriteParseArtifact = {
   };
   segments: Array<{ raw: string; cleaned: string | null; transformations: string[]; excludedAs?: "progression" | "numeric" | "release" }>;
   displayTitle: string | null;
+  /** Season identity evidence is independent from release progression. */
+  seasonEvidence?: { season?: number; urlSeason?: number; titleSeason?: number; conflict: boolean };
   progression: FavoriteProgression | null;
   status: "parsed" | "identity-missing";
   diagnostics: string[];
@@ -102,13 +104,55 @@ export type FavoriteParseArtifact = {
 
 const noise = /^(?:vostfr|vf|vo|sub|dub|scan|scans|english|français)$/iu;
 const marker = /(chapter|chapitre|chap|ch|episode|épisode|ep|volume|vol)[-_.\s]*#?\s*(\d+(?:[.,]\d+)?)/giu;
-const seasonMarker = /(?:season|saison)\s*(\d+)/iu;
+const seasonLabel = "s|season|saison|temporada|stagione|staffel|seizoen|sesong|säsong|kausi|sezon|sezona|sezonas|сезон";
+const seasonMarker = new RegExp(`(?:${seasonLabel})[-_.\\s]*(\\d{1,2})`, "iu");
 const insignificant = new Set(["the", "a", "an", "of", "and", "et", "de", "la", "le", "les", "des", "episode", "chapter", "chapitre", "saison", "season", "vostfr", "vf", "vo", "sub", "dub"]);
 const normalize = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const compact = (value: string) => normalize(value).replace(/\s/gu, "");
 const words = (value: string) => normalize(value).split(" ").filter((word) => word.length > 1 && !insignificant.has(word));
 const numberValue = (raw: string) => Number(raw.replace(",", "."));
 const kindFor = (label: string): FavoriteProgression["kind"] => /^vol/iu.test(label) ? "volume" : /^(?:ep|épisode)/iu.test(label) ? "episode" : "chapter";
+
+export type ExplicitAnimeSeasonTitle = {
+  base: string;
+  season: number;
+  rawMarker: string;
+  evidence: "explicit-season-marker" | "bare-trailing-number";
+};
+
+/** Shared season-title parser. `S4`, `Season 4`, and `Saison 4` are explicit
+ * evidence; a bare final number remains distinguishable and cannot silently
+ * become season identity without independent provider corroboration. */
+export function parseExplicitAnimeSeasonTitle(value: string): ExplicitAnimeSeasonTitle | null {
+  const title=value.replace(/\s+/gu," ").trim();
+  const explicit=title.match(new RegExp(`^(.*\\S)\\s+((?:${seasonLabel})[-_.\\s]*(\\d{1,2}))$`,"iu"));
+  if(explicit){
+    const season=Number(explicit[3]);
+    return season>0?{base:explicit[1].trim(),season,rawMarker:explicit[2],evidence:"explicit-season-marker"}:null;
+  }
+  const ordinal=title.match(/^(.*\S)\s+((\d{1,2})(?:st|nd|rd|th)[-_.\s]+season)$/iu);
+  if(ordinal){
+    const season=Number(ordinal[3]);
+    return season>0?{base:ordinal[1].trim(),season,rawMarker:ordinal[2],evidence:"explicit-season-marker"}:null;
+  }
+  const bare=title.match(/^(.*\S)\s+(\d{1,2})$/u);
+  if(!bare)return null;
+  const season=Number(bare[2]);
+  return season>0?{base:bare[1].trim(),season,rawMarker:bare[2],evidence:"bare-trailing-number"}:null;
+}
+
+/** URL-only explicit evidence. A compact labelled suffix is accepted only by
+ * URL extraction; title parsing still requires a separator and preserves bare
+ * trailing numbers as non-authoritative provenance. */
+export function parseExplicitAnimeSeasonUrlSegment(value: string): ExplicitAnimeSeasonTitle | null {
+  const segment=value.replace(/[_.-]+/gu," ").replace(/\s+/gu," ").trim();
+  const standalone=segment.match(new RegExp(`^((?:${seasonLabel})\\s*(\\d{1,2}))$`,"iu"));
+  if(standalone){const season=Number(standalone[2]);return season>0?{base:"",season,rawMarker:standalone[1],evidence:"explicit-season-marker"}:null;}
+  const attached=value.match(new RegExp(`^(.+?)[_.\\-\\s]*((?:${seasonLabel})[-_.\\s]*(\\d{1,2}))$`,"iu"));
+  if(!attached?.[1])return null;
+  const season=Number(attached[3]);
+  return season>0?{base:attached[1],season,rawMarker:attached[2],evidence:"explicit-season-marker"}:null;
+}
 
 function boundedDistance(left: string, right: string, maximum: number) {
   if (Math.abs(left.length - right.length) > maximum) return maximum + 1;
@@ -286,11 +330,17 @@ export function parseFavorite(input: { title: string; url: string; source?: Book
   // context, not a safer work title than the URL identity. Human text still
   // replaces opaque/structured routing slugs only through the proofs above.
   const displayTitle = identity?.title ?? segments.find(segment => segment.cleaned)?.cleaned ?? parseBookmarkTitle(input.title);
+  const titleSeason=parseExplicitAnimeSeasonTitle(parseBookmarkTitle(input.title) ?? input.title)?.season;
+  const urlSeason=source?.season;
+  const seasonConflict=urlSeason!==undefined&&titleSeason!==undefined&&urlSeason!==titleSeason;
+  const seasonEvidence=(urlSeason!==undefined||titleSeason!==undefined)
+    ? {season:seasonConflict?undefined:(urlSeason??titleSeason),urlSeason,titleSeason,conflict:seasonConflict}
+    : undefined;
   return {
     parser: FAVORITE_PARSER_ID, version: FAVORITE_IDENTITY_PARSER_VERSION,
     fingerprint: fingerprint(JSON.stringify({ parser: FAVORITE_PARSER_ID, raw })), raw,
     provenance: { rawTitle: raw.title, rawUrl: raw.url, identityTransformations: identity?.transformations ?? [] },
-    identity, segments,
+    identity, segments, seasonEvidence,
     displayTitle, progression, status: identity ? "parsed" : "identity-missing",
     diagnostics: identity ? [] : [opaqueSlug ? "OPAQUE_IDENTITY_UNCORROBORATED" : "URL_IDENTITY_MISSING"],
   };

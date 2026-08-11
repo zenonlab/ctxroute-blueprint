@@ -56,17 +56,44 @@ export async function openFavoriteReview(query: Query, input: {
   // such as `Lw931574`.
   const rawFavoriteTitle = link.rows[0]?.rawFavoriteTitle ?? link.rows[0]?.favoriteTitle ?? input.title;
   const favoriteUrl = link.rows[0]?.favoriteUrl || input.url || '';
-  const artifact = link.rows[0]?.parseArtifact as {identity?:{title?:string}|null;displayTitle?:string|null}|undefined;
+  const artifact = link.rows[0]?.parseArtifact as {identity?:{title?:string}|null;displayTitle?:string|null;seasonEvidence?:{season?:number;urlSeason?:number;titleSeason?:number;conflict?:boolean};progression?:{season?:number;provenance?:{urlSeason?:number;titleSeason?:number}}|null}|undefined;
   // New imports consume the API-owned v3 artifact without reparsing. The
   // fallback is limited to rows created before the additive migration.
   const legacyPrepared = artifact ? undefined : prepareTitleCandidates({ bookmarkTitle: rawFavoriteTitle, url: favoriteUrl });
   const favoriteTitle = artifact?.identity?.title ?? artifact?.displayTitle ?? legacyPrepared?.sourceTitle ?? legacyPrepared?.personal ?? rawFavoriteTitle.trim();
   const mediaType = input.provider === 'anilist' ? 'ANIME' : 'MANGA';
-  const clusterKey = collectiveTitleKey({ provider: input.provider, mediaType, parsedTitle: favoriteTitle });
+  // Only season evidence already emitted by the shared parser participates in
+  // the AniList key. A bare trailing number stays part of the parsed title.
+  const parsedProgression=artifact?.progression;
+  const parsedSeason=artifact?.seasonEvidence?.season ?? parsedProgression?.season;
+  const explicitSeason=input.provider==='anilist'&&Number.isInteger(parsedSeason)
+    && !artifact?.seasonEvidence?.conflict
+    && (artifact?.seasonEvidence?.urlSeason===parsedSeason || artifact?.seasonEvidence?.titleSeason===parsedSeason || parsedProgression?.provenance?.urlSeason===parsedSeason || parsedProgression?.provenance?.titleSeason===parsedSeason)
+    ? parsedSeason : undefined;
+  const clusterKey = collectiveTitleKey({ provider: input.provider, mediaType, parsedTitle: favoriteTitle, explicitSeason });
   const cluster = await query(`INSERT INTO review_title_cluster(cluster_key,provider,media_type,parsed_title,raw_title_sample)
     VALUES($1,$2,$3,$4,$5) ON CONFLICT(cluster_key) DO UPDATE SET updated_at=now() RETURNING id`,
     [clusterKey,input.provider,mediaType,favoriteTitle,rawFavoriteTitle]);
   const clusterId = cluster.rows[0]?.id ?? clusterKey;
+  const locked=await query(`SELECT outcome,profile_id AS "profileId",media_id AS "mediaId",source_review_id AS "sourceReviewId"
+    FROM user_title_resolution_lock WHERE user_id=$1 AND cluster_key=$2 AND provider=$3`,[input.userId,clusterKey,input.provider]);
+  if(locked.rows?.[0]){
+    const lock=locked.rows[0];
+    if(lock.outcome==='MATCH'&&lock.mediaId){
+      await query(`UPDATE bookmark_media_link SET media_id=$1,status='matched',evidence=evidence||$2::jsonb
+        WHERE user_id=$3 AND installation_id=$4 AND bookmark_id=$5`,[lock.mediaId,JSON.stringify({resolution:'user-title-lock',provider:input.provider,sourceReviewId:lock.sourceReviewId}),input.userId,installationId,bookmarkId]);
+      const reused=await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason,cluster_id,decision,resolved_at)
+        VALUES($1,$2,$3,$4,$5,$6,'RESOLVED','LOCKED_USER_DECISION',$7,$8::jsonb,now())
+        ON CONFLICT(user_id,installation_id,bookmark_id,provider) DO NOTHING RETURNING id`,[input.userId,installationId,bookmarkId,favoriteTitle,favoriteUrl,input.provider,clusterId,JSON.stringify({kind:'user-title-lock-reuse',sourceReviewId:lock.sourceReviewId,provider:input.provider,mediaId:lock.mediaId})]);
+      return reused.rows?.[0]?.id??lock.sourceReviewId;
+    }
+    if(lock.outcome==='NO_MATCH'){
+      const reused=await query(`INSERT INTO favorite_review(user_id,installation_id,bookmark_id,favorite_title,favorite_url,provider,status,reason,cluster_id,decision,resolved_at)
+        VALUES($1,$2,$3,$4,$5,$6,'NO_MATCH','LOCKED_USER_DECISION',$7,$8::jsonb,now())
+        ON CONFLICT(user_id,installation_id,bookmark_id,provider) DO NOTHING RETURNING id`,[input.userId,installationId,bookmarkId,favoriteTitle,favoriteUrl,input.provider,clusterId,JSON.stringify({kind:'user-title-lock-reuse',sourceReviewId:lock.sourceReviewId})]);
+      return reused.rows?.[0]?.id??lock.sourceReviewId;
+    }
+  }
   const reusable = await query(`SELECT min(COALESCE(NULLIF(r.decision->>'mediaId',''),l.media_id)) AS "mediaId",min(e.external_id) AS "providerId",min(r.id::text) AS "sourceReviewId"
     FROM favorite_review r
     JOIN bookmark_media_link l ON l.user_id=r.user_id AND l.installation_id=r.installation_id AND l.bookmark_id=r.bookmark_id

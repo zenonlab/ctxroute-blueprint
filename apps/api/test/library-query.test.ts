@@ -86,6 +86,12 @@ describe('library multi-value query',()=>{
     expect(detail).toContain('r.id=$1::uuid AND r.user_id=$2::uuid');
     expect(detail).not.toContain('active_link.status');
   });
+  it('does not advertise siblings while a manual review is already queued for their parsed-title group',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const header=server.slice(server.indexOf("app.get('/api/v1/header-summary'"),server.indexOf('app.get("/api/v1/library"'));
+    expect(header).toContain("queued.decision->>'kind'='manual-queued'");
+    expect(header).toContain('COALESCE(queued.cluster_id::text,queued.id::text)=COALESCE(review.cluster_id::text,review.id::text)');
+  });
 
   it('keeps covers attached to a merged target visible without changing the favorite media id',()=>{
     expect(libraryProjectionSql).toContain('media_identity_merge im JOIN media_cover c ON c.media_id=im.target_media_id');
@@ -230,5 +236,11 @@ describe('library multi-value query',()=>{
     expect(route).toContain('new Map([[mediaId,rootMediaId]])');
     expect(route).toContain('rootMediaId,relatedWorks:');
     expect(server.slice(server.indexOf('async function relatedLibraryMediaAllowed'),server.indexOf('app.get("/api/v1/library"'))).not.toContain('popularity');
+  });
+  it('adds related works to the owned detail response, including an empty graph',()=>{
+    const server=readFileSync(resolve(process.cwd(),'src/server.ts'),'utf8');
+    const route=server.slice(server.indexOf('app.get("/api/v1/library/:mediaId"'),server.indexOf('app.get("/api/v1/library/:rootMediaId/related/:mediaId"'));
+    expect(route).toContain('libraryRelatedWorks([req.params.mediaId],req.user.id)');
+    expect(route).toContain('relatedWorks:relatedByMedia.get(req.params.mediaId)??[]');
   });
 });

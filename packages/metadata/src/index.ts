@@ -2,11 +2,11 @@ import { isIP } from "node:net";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { load as loadHtml } from "cheerio";
 import { safeRequest } from "@favlib/safe-http";
-import { FAVORITE_PARSER_ID, FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, parseFavorite, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
+import { FAVORITE_PARSER_ID, FAVORITE_PROGRESS_PARSER_VERSION as sharedFavoriteProgressParserVersion, parseBookmarkTitle as sharedParseBookmarkTitle, parseExplicitAnimeSeasonTitle, parseExplicitAnimeSeasonUrlSegment, parseFavorite, progressionFromFavorite as sharedProgressionFromFavorite } from '@favlib/metadata/bookmark-parser';
 export { declaredLanguageEvidence, declaredLanguageSignals, detectLanguage, detectLanguageFromDocument, detectLanguageFromUrl, languageMatches, normalizeLanguage, resolvePageLanguage, visibleDocumentText } from '@favlib/metadata/language';
 export type { DeclaredLanguageEvidence, DetectedLanguage, LanguageDetectionMethod, LanguageEvidence, LanguageSignal, ResolvedLanguage } from '@favlib/metadata/language';
-export { FAVORITE_IDENTITY_PARSER_VERSION, FAVORITE_PARSER_ID, parseFavorite } from '@favlib/metadata/bookmark-parser';
-export type { FavoriteParseArtifact, FavoriteProgression } from '@favlib/metadata/bookmark-parser';
+export { FAVORITE_IDENTITY_PARSER_VERSION, FAVORITE_PARSER_ID, parseExplicitAnimeSeasonTitle, parseExplicitAnimeSeasonUrlSegment, parseFavorite } from '@favlib/metadata/bookmark-parser';
+export type { ExplicitAnimeSeasonTitle, FavoriteParseArtifact, FavoriteProgression } from '@favlib/metadata/bookmark-parser';
 
 export type SearchClient = (
   input: RequestInfo | URL,
@@ -73,6 +73,8 @@ export type SourceIdentity = {
   title: string;
   slug?: string;
   rawSlug?: string;
+  /** Explicit labelled season carried by the source URL adapter. */
+  season?: number;
   releaseSuffix?: string;
   release?: {
     raw: string;
@@ -674,7 +676,7 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
       /[-_.](?:chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_.]?\d.*$/i,
       "",
     );
-  const title = cleanUrlTitle(titleSegment === parts[index + 1] ? slug : titleSegment ?? slug, parts) ?? titleCandidateFromBookmark(slugTitle(slug))
+  let title = cleanUrlTitle(titleSegment === parts[index + 1] ? slug : titleSegment ?? slug, parts) ?? titleCandidateFromBookmark(slugTitle(slug))
     ?.replace(/\s+\d{4,}$/, "")
     .trim();
   if (!title || title.length < 2) return null;
@@ -687,6 +689,17 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
     : releaseRaw?.match(/(?:chapter|chapitre|chap|ch)/iu) ? "chapter"
       : releaseRaw?.match(/(?:volume|vol)/iu) ? "volume"
         : releaseRaw?.match(/(?:season|saison)/iu) ? "season" : releaseRaw ? "release" : undefined;
+  const resolvedType=pathType ?? typeFrom(pathText);
+  // `/season4/` and compact `/titleseason4/` both carry a label.  A bare URL
+  // number is deliberately excluded, and the original segment remains rawSlug.
+  const seasonEvidence=resolvedType === "ANIME"
+    ? [...parts].reverse().map(part=>({part,parsed:parseExplicitAnimeSeasonUrlSegment(part)})).find((entry):entry is {part:string;parsed:NonNullable<ReturnType<typeof parseExplicitAnimeSeasonUrlSegment>>}=>Boolean(entry.parsed))
+    : undefined;
+  if (seasonEvidence?.parsed.base && seasonEvidence.part === rawSlug) {
+    // This is a display/search alias derived from explicit URL syntax. The
+    // exact source spelling remains `rawSlug` in the parse artifact.
+    title = `${slugTitle(seasonEvidence.parsed.base)} Season ${seasonEvidence.parsed.season}`;
+  }
   const stable = host.replace(/^v\d+\./, "");
   return {
     key: `${stable}:${normalizeTitle(slug).replace(/ /g, "-")}`,
@@ -697,9 +710,10 @@ export function sourceIdentityFromUrl(value: string): SourceIdentity | null {
     release: releaseRaw ? { raw: releaseRaw, number: releaseNumber, kind: releaseKind,
       provenance: embeddedRelease ? "URL_SLUG_SUFFIX" : "URL_PATH" } : undefined,
     canonicalUrl: `https://${host}/${parts.slice(0, slugPathIndex + 1).join("/")}`,
-    type: pathType ?? typeFrom(pathText),
+    type: resolvedType,
+    season: seasonEvidence?.parsed.season,
     strategy: evidence.length ? "adapter" : "generic",
-    evidence,
+    evidence: [...evidence,...(seasonEvidence?["EXPLICIT_URL_SEASON"]:[])],
   };
 }
 export function sourceDispositionFromUrl(v: string): SourceDisposition {
@@ -1890,7 +1904,7 @@ const ORDINAL_WORDS = new Map(Object.entries({
   nineteenth: "19", twentieth: "20",
 }));
 
-export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v15";
+export const PROVIDER_TITLE_MATCHER_VERSION = "provider-title-v17";
 export type ProviderTitleMatchMethod =
   | "ordered-exact"
   | "explicit-season"
@@ -1904,7 +1918,7 @@ export type ProviderTitleMatchDecision<T> = {
   providerTitle?: string;
   providerId?: string;
   matcherVersion: typeof PROVIDER_TITLE_MATCHER_VERSION;
-  rawProvenance: { aliases: string[] };
+  rawProvenance: { aliases: string[]; [key:string]:unknown };
 };
 
 /** Identity-bearing title tokens. This deliberately normalizes grammar and
@@ -1998,8 +2012,9 @@ export function decideProviderTitleMatch<T>(input: {
   id: (candidate: T) => string;
   titles: (candidate: T) => string[];
   explicitSeason?: (alias: string, candidate: T) => boolean;
+  provenance?: Record<string,unknown>;
 }): ProviderTitleMatchDecision<T> {
-  const rawProvenance = { aliases: [...input.aliases] };
+  const rawProvenance = { aliases: [...input.aliases], ...input.provenance };
   const unique = [...new Map(input.candidates.map(candidate => [input.id(candidate), candidate] as const)).values()];
   const chooseLevel = (method: ProviderTitleMatchMethod, matches: Array<{candidate:T;alias:string;title:string}>) => {
     const byId = [...new Map(matches.map(match => [input.id(match.candidate), match] as const)).values()];
@@ -2081,21 +2096,24 @@ export function decideAniListTitleMatch(aliases:string[],items:AniListMedia[]) {
   const titles = (item: AniListMedia) => [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
     .filter((value): value is string => Boolean(value?.trim()));
   const eligible=items.filter(item=>item.type==='ANIME');
-  return decideProviderTitleMatch({aliases,candidates:eligible,id:item=>String(item.id),titles,explicitSeason:aniListExplicitSeasonMatch});
+  const seasonTitleEvidence=aliases.map(rawTitle=>({rawTitle,parsed:parseExplicitAnimeSeasonTitle(rawTitle)})).filter((entry):entry is {rawTitle:string;parsed:NonNullable<ReturnType<typeof parseExplicitAnimeSeasonTitle>>}=>Boolean(entry.parsed));
+  return decideProviderTitleMatch({aliases,candidates:eligible,id:item=>String(item.id),titles,explicitSeason:aniListExplicitSeasonMatch,provenance:seasonTitleEvidence.length?{seasonTitleEvidence}:undefined});
 }
 
 /** AniList may carry the localized base title and the explicit season number
  * in different title fields. The trailing source number is used only when a
  * provider title independently says `Season N`; it is never rewritten alone. */
 export function aniListExplicitSeasonMatch(alias: string, item: AniListMedia) {
-  const parsed = normalizeTitle(alias).match(/^(.*\S)\s+(\d{1,2})$/u);
+  const parsed = parseExplicitAnimeSeasonTitle(alias);
   if (!parsed) return false;
-  const [, aliasBase, season] = parsed;
+  const {base:aliasBase,season}=parsed;
   const titles = [item.title.english,item.title.romaji,item.title.userPreferred,item.title.native,...item.synonyms]
     .filter((title):title is string=>Boolean(title?.trim()));
   const hasBase = titles.some(title => {
-    const providerBase = title.split(/[:：]/u,1)[0]?.trim() ?? title;
-    return normalizeTitle(providerBase) === aliasBase || compactTitleKey(providerBase) === compactTitleKey(aliasBase);
+    const parsedProviderTitle=parseExplicitAnimeSeasonTitle(title);
+    const providerBases=[parsedProviderTitle?.base,title,title.split(/[:：]/u,1)[0]?.trim()]
+      .filter((value):value is string=>Boolean(value));
+    return providerBases.some(providerBase=>normalizeTitle(providerBase) === normalizeTitle(aliasBase) || compactTitleKey(providerBase) === compactTitleKey(aliasBase));
   });
   const hasSeason = titles.some(title => {
     const normalized = normalizeTitle(title);

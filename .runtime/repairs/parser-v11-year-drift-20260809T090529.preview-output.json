@@ -1,0 +1,18 @@
+{
+  "mode": "preview",
+  "proofPath": "/Users/hazenawsky/FavLib/.runtime/repairs/parser-v11-year-drift-20260809T090529.json",
+  "previewHash": "0d08bf14aaf729b4bb96c9ae8112a15ce5bac2b61829dc5ed0ef10a5f7ff94ee",
+  "parser": "favorite-parser-v11",
+  "version": 11,
+  "progressionVersion": 9,
+  "staleImports": 1,
+  "progressionsChanged": 1,
+  "removedProgressCandidates": 0,
+  "corroboratedTitleRepairs": 0,
+  "mangaUpdatesRechecks": 1838,
+  "protectedReviews": 213,
+  "technicalPendingReviews": 0,
+  "itemKeys": [
+    "2542979431904bbd352057cb31ff8aa806e5c4506bc0bc33649cf8be87bb5245"
+  ]
+}

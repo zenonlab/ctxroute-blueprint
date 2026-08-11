@@ -6,6 +6,12 @@ export type AvailablePosition = Position & { kind: 'episode' | 'chapter'; proven
 export type AnimeChainNode = { id: string; format?: string | null; episodeTotal?: number | null; relations: Array<{ id: string; kind: string }> };
 export type AnimeChainMember = { id: string; order: number; episodeTotal: number | null; offset: number | null };
 export type AnimeChainResult = { status: 'proved'; rootId: string; members: AnimeChainMember[] } | { status: 'ambiguous'; reason: 'BRANCH'|'CYCLE'|'MISSING_MEMBER'; candidates: string[] };
+export type AnimeGlobalEpisodeProjection = {
+  seasonMediaId: string;
+  season: number;
+  localEpisode: number;
+  globalEpisode: number;
+};
 
 const mainAnimeFormats = new Set(['TV','TV_SHORT','ONA']);
 
@@ -55,6 +61,23 @@ export function buildLinearAnimeChain(nodes: AnimeChainNode[], seedId: string): 
 export function globalAnimePosition(member: AnimeChainMember, localEpisode?: number | null): number | null {
   if(member.offset===null)return null;
   return member.offset+(localEpisode??0);
+}
+
+/**
+ * Converts a global episode only when every boundary used by the conversion is
+ * provider-proved.  This intentionally does not infer an identity from title
+ * digits: callers supply an already resolved chain and retain their raw input.
+ */
+export function projectGlobalAnimeEpisode(chain: AnimeChainResult, globalEpisode: number): AnimeGlobalEpisodeProjection | null {
+  if (chain.status !== 'proved' || !Number.isInteger(globalEpisode) || globalEpisode < 1) return null;
+  for (const member of chain.members) {
+    if (member.offset === null || member.episodeTotal === null || member.episodeTotal < 1) return null;
+    const first = member.offset + 1;
+    const last = member.offset + member.episodeTotal;
+    if (globalEpisode >= first && globalEpisode <= last)
+      return { seasonMediaId: member.id, season: member.order + 1, localEpisode: globalEpisode - member.offset, globalEpisode };
+  }
+  return null;
 }
 
 const numberPattern = /(?:episode|chapter|volume|tome|ep|ch|vol)?\s*(\d+(?:\.\d+)?)/i;

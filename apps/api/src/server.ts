@@ -781,6 +781,14 @@ async function resolveReview(
         userId,
       ],
     );
+    // A deliberate candidate choice becomes the user's current parsed-title
+    // answer. Historical reviews stay intact; reimports consult this lock.
+    await client.query(`INSERT INTO user_title_resolution_lock(user_id,cluster_key,provider,outcome,profile_id,media_id,source_review_id)
+      SELECT r.user_id,cl.cluster_key,r.provider,'MATCH',c.profile_id,$2,r.id
+      FROM favorite_review r JOIN review_title_cluster cl ON cl.id=r.cluster_id
+      JOIN favorite_review_candidate c ON c.id=$3
+      WHERE r.id=$1 AND r.user_id=$4
+      ON CONFLICT(user_id,cluster_key) DO UPDATE SET outcome='MATCH',profile_id=excluded.profile_id,media_id=excluded.media_id,source_review_id=excluded.source_review_id,updated_at=now()`,[reviewId,mediaId,candidateId,userId]);
     const siblings = await client.query(
       `WITH sibling AS (SELECT pending.id,pending.installation_id,pending.bookmark_id FROM favorite_review source JOIN favorite_review pending ON pending.user_id=source.user_id AND COALESCE(pending.cluster_id::text,pending.id::text)=COALESCE(source.cluster_id::text,source.id::text) AND pending.id<>source.id AND pending.status='PENDING' AND pending.decision IS NULL WHERE source.id=$1 AND source.user_id=$2),linked AS (UPDATE bookmark_media_link l SET media_id=$4,status='matched',evidence=l.evidence||$5::jsonb FROM sibling s WHERE l.user_id=$2 AND l.installation_id=s.installation_id AND l.bookmark_id=s.bookmark_id RETURNING s.id) UPDATE favorite_review r SET status='RESOLVED',selected_candidate_id=$3,decision=jsonb_build_object('kind','same-user-cluster','sourceReviewId',$1::text,'provider',$6::text,'providerId',$7::text,'profileHash',$8::text),resolved_at=now() FROM sibling s WHERE r.id=s.id RETURNING r.id`,
       [
@@ -896,6 +904,11 @@ app.post("/api/v1/reviews/:id/no-match", async (req: any, reply: any) => {
     [req.params.id, req.user.id, JSON.stringify({ kind: "no-match" })],
   );
   if (!r.rowCount) return err(reply, 404, "REVIEW_NOT_FOUND");
+  await pool.query(`INSERT INTO user_title_resolution_lock(user_id,cluster_key,provider,outcome,profile_id,media_id,source_review_id)
+    SELECT source.user_id,cluster.cluster_key,source.provider,'NO_MATCH',NULL,NULL,source.id
+    FROM favorite_review source JOIN review_title_cluster cluster ON cluster.id=source.cluster_id
+    WHERE source.id=$1 AND source.user_id=$2
+    ON CONFLICT(user_id,cluster_key) DO UPDATE SET outcome='NO_MATCH',profile_id=NULL,media_id=NULL,source_review_id=excluded.source_review_id,updated_at=now()`,[req.params.id,req.user.id]);
   await refreshReviewQueue(req.user.id);
   return { ok: true, status: "NO_MATCH" };
 });
@@ -1883,7 +1896,13 @@ app.get('/api/v1/header-summary',async(req:any)=>{
   const pending=await pool.query(`SELECT count(DISTINCT COALESCE(review.cluster_id::text,review.id::text))::int AS count
     FROM favorite_review review JOIN bookmark_media_link link ON link.user_id=review.user_id AND link.installation_id=review.installation_id AND link.bookmark_id=review.bookmark_id
     WHERE review.user_id=$1 AND review.status='PENDING' AND link.status IN ('matched','accepted','review') AND link.media_id IS NOT NULL
-      AND favlib_content_allowed(link.media_id,$1::uuid) AND COALESCE(review.decision->>'kind','')<>'manual-queued'`,[req.user.id]);
+      AND favlib_content_allowed(link.media_id,$1::uuid)
+      -- A manual lookup is already in flight for the entire parsed-title
+      -- group. Do not advertise its undecided siblings as actionable cards.
+      AND NOT EXISTS(SELECT 1 FROM favorite_review queued
+        WHERE queued.user_id=review.user_id
+          AND COALESCE(queued.cluster_id::text,queued.id::text)=COALESCE(review.cluster_id::text,review.id::text)
+          AND queued.status='PENDING' AND queued.decision->>'kind'='manual-queued')`,[req.user.id]);
   return {role:req.user.role,pendingReviewCount:Number(pending.rows[0]?.count??0)};
 });
 
@@ -2034,7 +2053,8 @@ app.get("/api/v1/library/:mediaId", async (req: any, reply: any) => {
     req.headers["x-timezone"],
   );
   if (!item) return err(reply, 404, "MEDIA_NOT_IN_LIBRARY");
-  return item;
+  const relatedByMedia=await libraryRelatedWorks([req.params.mediaId],req.user.id);
+  return {...item,relatedWorks:relatedByMedia.get(req.params.mediaId)??[]};
 });
 app.get("/api/v1/library/:rootMediaId/related/:mediaId", async (req:any,reply:any)=>{
   const rootMediaId=String(req.params.rootMediaId),mediaId=String(req.params.mediaId);
@@ -2387,7 +2407,7 @@ async function richCatalogRow(
       COALESCE((SELECT jsonb_agg(DISTINCT a.value_text) FROM (SELECT jsonb_array_elements_text(value) AS value_text FROM metadata_assertion WHERE media_id=$1 AND field='categories' AND jsonb_typeof(value)='array') a),'[]'::jsonb) AS categories,
       (SELECT value #>> '{}' FROM metadata_assertion WHERE media_id=$1 AND field='language' ORDER BY confidence DESC,asserted_at DESC LIMIT 1) AS language,
       (SELECT max(value #>> '{}') FROM metadata_assertion WHERE media_id=$1 AND field='latestReleaseDate') AS "latestReleaseDate",
-      (SELECT jsonb_build_object('kind',fp.position_kind,'number',COALESCE(fp.global_position_number,fp.position_number::numeric),'raw',fp.position_raw,'season',fp.season,'localNumber',fp.local_position_number,'globalNumber',fp.global_position_number,'updatedAt',fp.updated_at) FROM favorite_progress fp WHERE fp.user_id=$2 AND fp.media_id=$1 ORDER BY fp.updated_at DESC LIMIT 1) AS progress,
+      (SELECT jsonb_build_object('kind',fp.position_kind,'number',COALESCE(fp.global_position_number,fp.position_number::numeric),'raw',fp.position_raw,'season',fp.season,'seasonMediaId',observation.provenance->>'seasonMediaId','localNumber',fp.local_position_number,'globalNumber',fp.global_position_number,'provenance',observation.provenance,'updatedAt',fp.updated_at) FROM favorite_progress fp LEFT JOIN progression_observation observation ON observation.id=fp.observation_id WHERE fp.user_id=$2 AND fp.media_id=$1 ORDER BY fp.updated_at DESC LIMIT 1) AS progress,
       (SELECT jsonb_build_object('kind',pp.available_position_kind,'number',COALESCE(pp.global_position_number,pp.available_position_number),'raw',pp.available_position_raw,'season',pp.season,'localNumber',pp.local_position_number,'globalNumber',pp.global_position_number,'provider',pp.provider,'provenance',pp.available_position_provenance,'verifiedAt',pp.last_checked_at) FROM provider_progress pp WHERE pp.media_id=$1 AND pp.status='ACTIVE' AND pp.available_position_kind IS NOT NULL ORDER BY pp.updated_at DESC LIMIT 1) AS availability,
       (SELECT count(*)::int FROM bookmark_media_link link WHERE link.user_id=$2 AND link.media_id=$1 AND link.status IN ('matched','accepted','review')) AS "favoriteCount"`,[mediaId,userId]),
   ]);

@@ -49,9 +49,9 @@ const task:Task=async(_payload,helpers:Helpers)=>{
   await backfillKnownProviderAvailability(helpers,Math.max(batch,2_000));
   const cycle=Math.floor(Date.now()/600000);
   const due=await helpers.query(`SELECT m.id AS "mediaId",m.type
-    FROM media m JOIN bookmark_media_link l ON l.media_id=m.id AND l.status IN ('matched','accepted','review')
-    LEFT JOIN media_metadata mm ON mm.media_id=m.id AND mm.status='ACTIVE'
-    WHERE m.type IN ('ANIME','MANGA','MANHWA','MANHUA') AND mm.media_id IS NULL
+    FROM media m
+    WHERE m.type IN ('ANIME','MANGA','MANHWA','MANHUA')
+      AND EXISTS(SELECT 1 FROM bookmark_media_link l WHERE l.media_id=m.id AND l.status IN ('matched','accepted','review'))
       AND (
         NOT EXISTS (SELECT 1 FROM media_enrichment_state es WHERE es.media_id=m.id AND es.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END AND es.purpose='metadata')
         OR EXISTS (SELECT 1 FROM media_enrichment_state es WHERE es.media_id=m.id AND es.provider=CASE WHEN m.type='ANIME' THEN 'anilist' ELSE 'mangaupdates' END AND es.purpose='metadata' AND es.connector_version<>CASE WHEN m.type='ANIME' THEN $2::text ELSE $3::text END)

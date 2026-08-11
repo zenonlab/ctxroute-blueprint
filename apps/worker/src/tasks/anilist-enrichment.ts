@@ -543,8 +543,8 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
     // Search identity-rich phrases first. Previously the long provider variant
     // list was sliced before anchors, silently dropping the discovery fallback.
     const pendingVariants = [...new Set([
-      ...anilistAnchorVariants(aliases),
-      ...anilistProviderVariants(aliases),
+      ...anilistAnchorVariants(identityAliases),
+      ...anilistProviderVariants(identityAliases),
     ])].slice(0, 32);
     const observedVariants = new Set<string>();
     for (
@@ -593,6 +593,12 @@ export async function enrichAniList(payload: unknown, h: Helpers) {
           continue;
         }
         if (aniListFormatAllowed(formatEvidence, candidate.format)) eligible.push(candidate);
+      }
+      const explicitSeasonDecision=decideAniListTitleMatch(identityAliases,eligible);
+      if(explicitSeasonDecision.status==='MATCH'&&explicitSeasonDecision.method==='explicit-season'){
+        selected=explicitSeasonDecision.candidate;
+        selectedResolutionCode='EXPLICIT_SEASON';
+        await h.query("UPDATE bookmark_media_link SET evidence=evidence||$2::jsonb WHERE media_id=$1 AND status IN ('matched','accepted','review')",[mediaId,JSON.stringify({resolution:selectedResolutionCode,matcherVersion:explicitSeasonDecision.matcherVersion,matchedAlias:explicitSeasonDecision.matchedAlias,providerTitle:explicitSeasonDecision.providerTitle,rawProvenance:explicitSeasonDecision.rawProvenance})]);
       }
     }
     if (!selected) {

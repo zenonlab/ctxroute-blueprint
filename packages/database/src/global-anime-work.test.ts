@@ -24,9 +24,16 @@ describe('global anime work persistence contract',()=>{
 
   it('keeps season media identities independent',()=>{
     expect(worker).not.toContain('merge_media_identity');
-    expect(worker).toContain('animeSeasonMediaId');
+    expect(worker).not.toContain('UPDATE bookmark_media_link l SET media_id=$1');
+    expect(worker).toContain('A bookmark remains attached to the resolved AniList season');
     expect(enrichment).toContain('ANILIST_IDENTITY_CONFLICT');
     expect(enrichment).toContain("String(sourceIdentity.rows[0].external_id) !== String(m.id)");
+  });
+
+  it('does not mutate personal links as part of the schema migration',()=>{
+    const migration=readFileSync(new URL('../migrations/0073_restore_anime_season_favorite_links.sql',import.meta.url),'utf8');
+    expect(migration).not.toContain('UPDATE bookmark_media_link');
+    expect(migration).toContain('Schema-only migration');
   });
 
   it('enriches related anime formats without adding them to numeric progression',()=>{

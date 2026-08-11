@@ -1,6 +1,8 @@
 .physical-card-placeholder{display:none;width:100%;height:auto}
 .media-card-back-scroll,.media-related-panel{overscroll-behavior:auto}
 .physical-card.media-modal:not(.is-modal-open):focus-within{transform:none!important;filter:none!important}
+.physical-card.media-modal.is-modal-open.is-flipped.is-physics{transform:translate(var(--return-x,0px),var(--return-y,0px)) scale(var(--return-scale-x,1),var(--return-scale-y,1))!important}
+.physical-card.media-modal[data-modal-phase="closing"] .physical-card-front :is(.poster-copy,.card-topline,.continue-progress){opacity:0!important}
 
 @media (hover:hover) and (pointer:fine){
   .related-work-card.card.media-card{--discovery-tilt-x:0deg;--discovery-tilt-y:0deg;transform:none!important;filter:none!important;overflow:visible!important;perspective:700px;cursor:pointer;user-select:none}

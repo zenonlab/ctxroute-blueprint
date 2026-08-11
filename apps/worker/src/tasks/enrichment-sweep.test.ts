@@ -17,7 +17,7 @@ describe('enrichment sweep', () => {
     const jobs: { task: string; payload: any; key: string }[] = [];
     const helpers = {
       query: async (sql: string, values?: unknown[]) => {
-        if (sql.includes('FROM media m JOIN bookmark_media_link') && sql.includes('mm.media_id IS NULL')) {
+        if (sql.includes('FROM media m') && sql.includes("purpose='metadata'")) {
           return { rows: [{ mediaId: 'anime-1', type: 'ANIME' }] };
         }
         if (sql.includes('FROM media m JOIN bookmark_media_link') && sql.includes('c.media_id IS NULL')) {
@@ -39,7 +39,7 @@ describe('enrichment sweep', () => {
     let dueSql = '';
     const helpers = {
       query: async (sql: string) => {
-        if (sql.includes('FROM media m JOIN bookmark_media_link') && sql.includes("purpose='metadata'")) dueSql = sql;
+        if (sql.includes('FROM media m') && sql.includes("purpose='metadata'")) dueSql = sql;
         return { rows: [] };
       },
     };
@@ -48,6 +48,8 @@ describe('enrichment sweep', () => {
     expect(dueSql).toContain('es.attempt_count<$4::int');
     expect(dueSql).toContain('es.invalidated_at IS NOT NULL');
     expect(dueSql).not.toContain("es.status<>'SUCCESS'");
+    expect(dueSql).not.toContain('mm.media_id IS NULL');
+    expect(dueSql).toContain('EXISTS(SELECT 1 FROM bookmark_media_link l');
   });
 
   it('cleans merged empty projections and retries inconsistent success states',async()=>{

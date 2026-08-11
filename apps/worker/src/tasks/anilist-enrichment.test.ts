@@ -199,11 +199,23 @@ describe("AniList enrichment resolution", () => {
 
   it("uses the parser source identity instead of a copied personal title", async () => {
     const clean = { ...anime, id: 1, title: { userPreferred: "Dororo", english: "Dororo" }, synonyms: [] };
-    const copied = { ...anime, id: 2, title: { userPreferred: "Dororo to Hyakkimaru", english: "Dororo to Hyakkimaru" }, synonyms: [] };
-    searchAniList.mockResolvedValue([copied, clean]);
+    searchAniList.mockResolvedValue([clean]);
     fetchAniList.mockResolvedValue(clean);
-    const helpers = { logger:{warn:vi.fn()}, query:vi.fn(async(sql:string)=>sql.includes("SELECT m.type,COALESCE")?{rows:[{type:"ANIME",titles:["Dororo","Dororo to Hyakkimaru"],source_titles:["Dororo"],year:null,anilist_id:null}]}:{rows:[]}) };
+    const helpers = { logger:{warn:vi.fn()}, query:vi.fn(async(sql:string)=>sql.includes("SELECT m.type,COALESCE")?{rows:[{type:"ANIME",titles:["Dororo","Synthetic Copied Browser Caption 08 VOSTFR"],source_titles:["Dororo"],year:null,anilist_id:null}]}:{rows:[]}) };
     const result=await enrichAniList({mediaId:"source:clean-parser-title"},helpers);
     expect(result).toMatchObject({status:"SUCCESS",externalId:1});
+    expect(searchAniList.mock.calls.map(([query])=>query)).not.toContain("Synthetic Copied Browser Caption 08 VOSTFR");
+  });
+
+  it("stops discovery after one unique explicit-season result batch",async()=>{
+    searchAniList.mockClear();
+    const root={...anime,id:3,title:{english:'Synthetic: Northern Relay',romaji:'Synthetic: Northern Relay',userPreferred:'Synthetic: Northern Relay'},synonyms:[]};
+    const sequel={...anime,id:4,title:{english:'Synthetic: Northern Relay Season 4',romaji:'Synthetic: Northern Relay 4th Season',userPreferred:'Synthetic: Northern Relay 4th Season'},synonyms:[]};
+    searchAniList.mockResolvedValue([root,sequel]);
+    fetchAniList.mockResolvedValue(sequel);
+    const helpers={logger:{warn:vi.fn()},query:vi.fn(async(sql:string)=>sql.includes('SELECT m.type,COALESCE')?{rows:[{type:'ANIME',titles:['Synthetic: Northern Relay S4'],source_titles:['Synthetic: Northern Relay S4'],source_urls:[],year:null,anilist_id:null}]}:{rows:[],rowCount:0})};
+    const result=await enrichAniList({mediaId:'source:synthetic-season'},helpers);
+    expect(result).toEqual({status:'SUCCESS',externalId:4,mediaId:'anilist:4'});
+    expect(searchAniList).toHaveBeenCalledTimes(2);
   });
 });

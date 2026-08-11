@@ -18,12 +18,12 @@ export function tiltAt(point:CardPoint){
   return {x:(.5-point.y)*14,y:(point.x-.5)*17,glareX:point.x*100,glareY:point.y*100,shadowX:(.5-point.x)*20};
 }
 
-export const motionDuration=(reduced:boolean)=>reduced?0:640;
+export const motionDuration=(reduced:boolean)=>reduced?0:420;
 
 export type SpringState={position:number;velocity:number};
 export function stepSpring(state:SpringState,target:number,deltaSeconds:number):SpringState{
   const dt=Math.min(.032,Math.max(0,deltaSeconds));
-  const acceleration=240*(target-state.position)-30*state.velocity;
+  const acceleration=520*(target-state.position)-42*state.velocity;
   const velocity=state.velocity+acceleration*dt;
   return {position:state.position+velocity*dt,velocity};
 }

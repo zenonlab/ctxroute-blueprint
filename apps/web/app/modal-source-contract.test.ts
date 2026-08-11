@@ -40,6 +40,16 @@ describe('refonte de la modal œuvre',()=>{
     expect(physicalCard).toContain('trigger.current?.focus({preventScroll:true})');
     expect(physicalCard).not.toContain('>Fermer</button>');
   });
+  it('verrouille le cycle modal jusqu’à la fin du handoff',()=>{
+    expect(physicalCard).toContain("type ModalPhase='closed'|'opening'|'open'|'closing'|'handoff'");
+    expect(physicalCard).toContain('const transitionId=useRef(0)');
+    expect(physicalCard).toContain("phase.current!=='closed'||!claimModal(owner.current)");
+    expect(physicalCard).toContain("phase.current!=='open'");
+    expect(physicalCard).not.toContain('pendingClose');
+    expect(physicalCard).toContain("transitionTo('handoff')");
+    expect(physicalCard).toContain('slot.removeAttribute(\'style\')');
+    expect(physicalCard).toContain('transitionTo(\'closed\');releaseModal(owner.current)');
+  });
   it('restaure les onglets textuels et le sélecteur compact',()=>{
     expect(source).toContain("{id:'links',label:'Liens'}");
     expect(source).toContain("{id:'info',label:'Informations'}");
@@ -50,8 +60,8 @@ describe('refonte de la modal œuvre',()=>{
     expect(styles).toContain('.media-card-tabs button:hover,.media-card-tabs button:focus-visible{background:var(--surface-3)');
     expect(styles).toContain('.media-card-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0');
     expect(styles).toContain('.related-work-row{display:grid');
-    expect(source).toContain('<WorkHeaderIdentity work={item}/>');
-    expect(source).toContain('<WorkHeaderIdentity work={work} showContext/>');
+    expect(source).toContain('<WorkHeaderIdentity work={item} context={selectedProgress');
+    expect(source).toContain('<WorkHeaderIdentity work={work} context={relatedWorkContext(work)}/>');
     expect(source).toContain("`Partie ${work.sequenceOrder===null?'—':work.sequenceOrder+1}`");
     expect(source).not.toContain('related-work-current">Active');
     expect(styles).toContain('.media-card-heading-kicker strong{color:var(--accent)');
@@ -95,5 +105,6 @@ describe('refonte de la modal œuvre',()=>{
     expect(styles).toContain('.physical-card.media-modal.is-modal-open.is-flipped .physical-card-rotor{transform:rotateY(180deg)}');
     expect(tiltStyles).toContain('.media-card:not(.review-hover)>.physical-card-rotor>.physical-card-front>a>.poster');
     expect(motionFixes).toContain('.related-work-card.card.media-card>.poster');
+    expect(motionFixes).toContain('[data-modal-phase="closing"] .physical-card-front');
   });
 });

@@ -67,6 +67,11 @@ export default async function manualReviewProvider(payload:unknown,h:Helpers){
     ) UPDATE favorite_review r SET status='RESOLVED',selected_candidate_id=c.id,
       decision=$5::jsonb,resolved_at=now(),reason=NULL FROM affected a JOIN favorite_review_candidate c ON c.review_id=a.id AND c.profile_id=$6
       WHERE r.id=a.id`,[reviewId,userId,mediaId,JSON.stringify({resolution:'manual-review-queue',provider,providerId:resolvedProviderId}),JSON.stringify({kind:'manual',provider,id:resolvedProviderId,rawId:providerId,profileHash:payloadHash}),profile.rows[0].id]);
+  await h.query(`INSERT INTO user_title_resolution_lock(user_id,cluster_key,provider,outcome,profile_id,media_id,source_review_id)
+    SELECT r.user_id,cl.cluster_key,r.provider,'MATCH',$3,$4,r.id
+    FROM favorite_review r JOIN review_title_cluster cl ON cl.id=r.cluster_id
+    WHERE r.id=$1 AND r.user_id=$2
+    ON CONFLICT(user_id,cluster_key) DO UPDATE SET outcome='MATCH',profile_id=excluded.profile_id,media_id=excluded.media_id,source_review_id=excluded.source_review_id,updated_at=now()`,[reviewId,userId,profile.rows[0].id,mediaId]);
   // The manual lookup proves identity, but provider_profile is only review
   // evidence. Hand the fixed provider ID to the canonical enrichment lane so
   // status, positions, payload provenance and covers use the same persistence

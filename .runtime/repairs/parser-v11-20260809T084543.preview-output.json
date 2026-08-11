@@ -1,0 +1,15 @@
+{
+  "mode": "preview",
+  "proofPath": "/Users/hazenawsky/FavLib/.runtime/repairs/parser-v11-20260809T084543.json",
+  "previewHash": "1bb0ca4c7cfdbf8cc481ced1e42e1b51846d6111486dada8fb878c80fe129759",
+  "parser": "favorite-parser-v11",
+  "version": 11,
+  "progressionVersion": 9,
+  "staleImports": 0,
+  "progressionsChanged": 0,
+  "corroboratedTitleRepairs": 0,
+  "mangaUpdatesRechecks": 1838,
+  "protectedReviews": 213,
+  "technicalPendingReviews": 0,
+  "itemKeys": []
+}

@@ -125,6 +125,13 @@ describe('Wave 2 UI contracts', () => {
     expect(source).not.toContain('les cartes affichent le titre canonique du fournisseur');
   });
 
+  it('clamps image-card titles to two lines on mobile',()=>{
+    const styles=readFileSync(resolve(process.cwd(),'app/mobile-card-title.css'),'utf8');
+    expect(styles).toContain('@media (max-width:640px){.media-card .poster-copy strong');
+    expect(styles).toContain('-webkit-line-clamp:2');
+    expect(styles).toContain('-webkit-box-orient:vertical');
+  });
+
   it('never mutates progression while rendering a GET page',()=>{
     const source=readFileSync(resolve(process.cwd(),'app/favlib-app.tsx'),'utf8');
     expect(source).not.toContain("fetch('/api/v1/library/repair-missing-positions'");

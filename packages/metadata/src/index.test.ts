@@ -366,6 +366,18 @@ describe("AniList catalogue", () => {
     expect(aniListExplicitSeasonMatch('Synthetic Evolution 3',sequel)).toBe(false);
     expect(aniListExplicitSeasonMatch('Synthetic Evolution 2',{...sequel,title:{romaji:'Synthetic Evolution: Continued Path'}})).toBe(false);
   });
+  it("routes an explicit S4 marker to the independently corroborated fourth anime part",()=>{
+    const part3={id:3,type:'ANIME',title:{romaji:'Synthetic Northern Relay: Earlier Route',english:'Synthetic Northern Relay Season 3'},synonyms:[],popularity:999999} as any;
+    const part4={id:4,type:'ANIME',title:{romaji:'Synthetic Northern Relay: Final Route',english:'Synthetic Northern Relay Season 4'},synonyms:[],popularity:1} as any;
+    expect(decideAniListTitleMatch(['Synthetic Northern Relay S4'],[part3,part4])).toMatchObject({status:'MATCH',method:'explicit-season',providerId:'4',matchedAlias:'Synthetic Northern Relay S4',rawProvenance:{aliases:['Synthetic Northern Relay S4'],seasonTitleEvidence:[{rawTitle:'Synthetic Northern Relay S4',parsed:{base:'Synthetic Northern Relay',season:4,rawMarker:'S4',evidence:'explicit-season-marker'}}]}});
+    expect(aniListExplicitSeasonMatch('Synthetic Northern Relay S4',part3)).toBe(false);
+  });
+  it("preserves a colon inside the identity base when the provider uses an ordinal season marker",()=>{
+    const root={id:3,type:'ANIME',title:{romaji:'Synthetic: Northern Relay'},synonyms:[],popularity:999999} as any;
+    const sequel={id:4,type:'ANIME',title:{romaji:'Synthetic: Northern Relay 4th Season'},synonyms:[],popularity:1} as any;
+    expect(decideAniListTitleMatch(['Synthetic: Northern Relay S4'],[root,sequel])).toMatchObject({status:'MATCH',method:'explicit-season',providerId:'4'});
+    expect(aniListExplicitSeasonMatch('Synthetic: Northern Relay S4',root)).toBe(false);
+  });
   it("keeps an explicit subtitle extension for review symmetrically", () => {
     const anime={id:1,type:'ANIME',title:{romaji:'Synthetic Cleric: Office Worker Survival Path'},synonyms:[],startDate:{year:2023}} as any;
     expect(preferredAniListMediaMatch(['Synthetic Cleric'],[anime])).toBeUndefined();
@@ -473,6 +485,17 @@ describe("AniList catalogue", () => {
       bookmarkTitle: "Watch My Series",
       url: "https://reader.example/saison1/vostfr/",
     }).personal).toBe("My Series");
+  });
+
+  it("carries labelled URL season evidence through the shared source identity", () => {
+    expect(sourceIdentityFromUrl("https://video.example/anime/synthetic-relay-saison4/")).toMatchObject({
+      title: "Synthetic Relay Season 4", rawSlug: "synthetic-relay-saison4", type: "ANIME", season: 4,
+      evidence: expect.arrayContaining(["EXPLICIT_URL_SEASON"]),
+    });
+    expect(sourceIdentityFromUrl("https://video.example/anime/synthetic-relay/season4/")).toMatchObject({
+      type: "ANIME", season: 4, evidence: expect.arrayContaining(["EXPLICIT_URL_SEASON"]),
+    });
+    expect(sourceIdentityFromUrl("https://reader.example/manga/synthetic-relay/4/")?.season).toBeUndefined();
   });
 
   it("resolves source releases without using the personal bookmark title", () => {
