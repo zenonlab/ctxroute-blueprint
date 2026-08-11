@@ -277,6 +277,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@favlib/config':
+        specifier: workspace:*
+        version: link:../config
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.11.10)(gel@2.2.0)(pg@8.22.0)

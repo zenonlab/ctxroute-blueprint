@@ -89,6 +89,7 @@ export function runtimeEnvironment(env: NodeJS.ProcessEnv = process.env) {
     restoreDatabaseUrl: env.RESTORE_DATABASE_URL,
     targetEmail: env.TARGET_EMAIL,
     workerConcurrency: Math.min(24, Math.max(1, Number.parseInt(env.FAVLIB_WORKER_CONCURRENCY ?? '16', 10) || 16)),
+    workerRole: z.enum(['all','reading','interactive']).parse(env.FAVLIB_WORKER_ROLE??'all'),
   };
 }
 

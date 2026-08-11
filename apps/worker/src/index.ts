@@ -25,8 +25,7 @@ import { recoverProviderRequestOwner } from '@favlib/database/provider-queue';
 
 const runtime=runtimeEnvironment();
 const connectionString=runtime.databaseUrl;
-const workerRole=process.env.FAVLIB_WORKER_ROLE??'all';
-if(workerRole!=='all'&&workerRole!=='reading'&&workerRole!=='interactive')throw new Error(`Unsupported worker role: ${workerRole}`);
+const workerRole=runtime.workerRole;
 type WorkerRole=keyof typeof ROLE_TASK_NAMES;
 const role=workerRole as WorkerRole;
 const heartbeatService=workerRole==='all'?'worker':`worker-${workerRole}`;

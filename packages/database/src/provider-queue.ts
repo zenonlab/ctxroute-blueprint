@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { runtimeEnvironment } from '@favlib/config';
 
 type Query={query:(sql:string,values?:unknown[])=>Promise<{rows?:any[];rowCount?:number|null}>};
 export type ProviderQueueName='anilist'|'mangaupdates'|'mangadex';
@@ -11,7 +12,7 @@ export async function recoverProviderRequestOwner(db:Query,ownerService:string,e
 
 export async function acquireProviderRequest(db:Query,input:{provider:ProviderQueueName;kind:string;priority?:number;scopeKey?:string|null;userId?:string|null;spacingMs:number;ownerService?:string}){
   const id=randomUUID();
-  const owner=input.ownerService??process.env.FAVLIB_WORKER_ROLE??'api';
+  const owner=input.ownerService??runtimeEnvironment().workerRole;
   await db.query(`INSERT INTO provider_request_waitlist(id,provider,request_kind,priority,scope_key,user_id,state,not_before,owner_service)
     VALUES($1,$2,$3,$4,$5,$6,'WAITING',now(),$7)`,[id,input.provider,input.kind,input.priority??50,input.scopeKey??null,input.userId??null,owner]);
   for(;;){

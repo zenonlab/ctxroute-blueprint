@@ -1,8 +1,8 @@
 import { Client } from 'pg';
+import { runtimeEnvironment } from '@favlib/config';
 import { collectiveTitleKey, prepareTitleCandidates, type MediaType } from '@favlib/metadata';
 
-const databaseUrl=process.env.DATABASE_URL;
-if(!databaseUrl)throw new Error('DATABASE_URL_REQUIRED');
+const databaseUrl=runtimeEnvironment().databaseUrl;
 const client=new Client({connectionString:databaseUrl});
 await client.connect();
 try{
