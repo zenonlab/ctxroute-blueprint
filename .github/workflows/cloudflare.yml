@@ -1,0 +1,104 @@
+name: Deploy Tobirink to Cloudflare
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target Cloudflare environment
+        type: choice
+        options: [preview, production, cutover]
+        default: preview
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 24 }
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify:central-config && pnpm lint && pnpm typecheck && pnpm test
+      - name: Verify generated Fastify route inventory
+        run: pnpm --filter @tobirink/cloudflare routes:generate && git diff --exit-code -- apps/cloudflare/fastify-route-registry.json
+      - name: Reject public route configuration before parity
+        run: pnpm cloudflare:check-route-config
+      - name: Build signed-extension inputs
+        run: pnpm --filter @tobirink/extension build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tobirink-extension-${{ github.sha }}
+          path: apps/web/public/downloads/
+          if-no-files-found: error
+
+  preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event.inputs.environment == 'preview'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: cloudflare-preview
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 24 }
+      - run: corepack enable
+      - name: Apply isolated D1 migrations
+        working-directory: apps/cloudflare
+        run: npx --yes wrangler@4.123.0 d1 migrations apply tobirink-preview --remote --env preview
+        env: { CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}', CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' }
+      - name: Deploy route-less preview Worker
+        working-directory: apps/cloudflare
+        run: npx --yes wrangler@4.123.0 deploy --env preview
+        env: { CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}', CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' }
+
+  # Production is intentionally manual. The cloudflare-production GitHub
+  # environment must require a reviewer before it can attach the public route.
+  production:
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.environment == 'production' || github.event.inputs.environment == 'cutover')
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: cloudflare-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 24 }
+      - run: corepack enable
+      - name: Block production until strict Fastify to Cloudflare parity
+        run: pnpm cloudflare:check-cutover-parity
+      - name: Apply production D1 migrations before Worker replacement
+        working-directory: apps/cloudflare
+        run: npx --yes wrangler@4.123.0 d1 migrations apply tobirink-production --remote --env production
+        env: { CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}', CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' }
+      - name: Deploy production Worker
+        working-directory: apps/cloudflare
+        run: npx --yes wrangler@4.123.0 deploy --env production
+        env: { CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}', CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' }
+
+  # A separate protected environment makes the irreversible hostname attachment
+  # an explicit second approval after the route-less Worker was deployed.
+  cutover:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'cutover'
+    needs: production
+    runs-on: ubuntu-latest
+    environment: cloudflare-production-cutover
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 24 }
+      - run: corepack enable
+      - name: Revalidate strict parity after deployment
+        run: pnpm cloudflare:check-cutover-parity
+      - name: Attach both approved public hostnames
+        working-directory: apps/cloudflare
+        run: npx --yes wrangler@4.123.0 deploy --env production --route 'tobirink.com/*' --route 'media.tobirink.com/*'
+        env: { CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}', CLOUDFLARE_ACCOUNT_ID: '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' }
