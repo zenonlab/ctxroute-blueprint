@@ -139,7 +139,7 @@ function isSafeTemplateCommand(value) {
   if (!commands) return false;
   return commands.every(line => {
     if (/^find\b[^\n]*\s-(?:delete|exec)\b/iu.test(unquotedText(line))) return false;
-    return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|add|commit|push)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
+    return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
   });
 }
 
