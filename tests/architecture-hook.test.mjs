@@ -59,11 +59,23 @@ test('blocks a shell write command during discovery', () => {
 
 test('allows a validation command during discovery', () => {
   const result = run({ cmd: 'npm test' }, { toolName: 'exec_command' });
-  assert.doesNotMatch(result.stdout, /decision":"block/u);
+  assert.equal(result.stdout, '');
+});
+
+test('allows quoted search alternatives without hook noise', () => {
+  const result = run({ cmd: "rg -n 'TODO|FIXME' ." }, { toolName: 'exec_command' });
+  assert.equal(result.stdout, '');
 });
 
 test('allows the documented template setup commands during discovery', () => {
   for (const cmd of ['npm run setup:check', 'npm run setup']) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
+  }
+});
+
+test('allows the automatic Git workflow during discovery', () => {
+  for (const cmd of ['git remote -v', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
   }

@@ -40,9 +40,6 @@ if (isShellTool(toolName) && config.status === 'initialized' && isDirectMutation
 }
 
 if (!paths.length) {
-  if (isShellTool(toolName) && command) {
-    context('Command has no verifiable path; Git hooks will check produced files.');
-  }
   process.exit(0);
 }
 
@@ -138,9 +135,79 @@ function isShellTool(name) {
 
 function isSafeTemplateCommand(value) {
   if (!value.trim()) return true;
-  if (/[;|><`]|\$\(|\b(?:rm|mv|cp|touch|mkdir|install|tee|truncate|dd)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b/iu.test(value)) return false;
-  const commands = value.split(/\r?\n|&&/u).map(line => line.trim()).filter(Boolean);
-  return commands.every(line => /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|rev-parse|ls-files)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line));
+  const commands = splitSafeShellCommands(value);
+  if (!commands) return false;
+  return commands.every(line => {
+    if (/^find\b[^\n]*\s-(?:delete|exec)\b/iu.test(unquotedText(line))) return false;
+    return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
+  });
+}
+
+function splitSafeShellCommands(value) {
+  const commands = [];
+  let start = 0;
+  let quote = '';
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = '';
+      else if (quote === '"' && (character === '`' || (character === '$' && value[index + 1] === '('))) return null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '`' || (character === '$' && value[index + 1] === '(') || /[;|><]/u.test(character)) return null;
+    const separatorLength = character === '\n' ? 1 : character === '&' && value[index + 1] === '&' ? 2 : 0;
+    if (!separatorLength) {
+      if (character === '&') return null;
+      continue;
+    }
+    const command = value.slice(start, index).trim();
+    if (command) commands.push(command);
+    index += separatorLength - 1;
+    start = index + 1;
+  }
+
+  if (quote || escaped) return null;
+  const command = value.slice(start).trim();
+  if (command) commands.push(command);
+  return commands;
+}
+
+function unquotedText(value) {
+  let result = '';
+  let quote = '';
+  let escaped = false;
+  for (const character of value) {
+    if (escaped) {
+      escaped = false;
+      result += ' ';
+    } else if (character === '\\' && quote !== "'") {
+      escaped = true;
+      result += ' ';
+    } else if (quote) {
+      if (character === quote) quote = '';
+      result += ' ';
+    } else if (character === "'" || character === '"') {
+      quote = character;
+      result += ' ';
+    } else {
+      result += character;
+    }
+  }
+  return result;
 }
 
 function isDirectMutationCommand(value) {
