@@ -75,7 +75,7 @@ test('allows the documented template setup commands during discovery', () => {
 });
 
 test('allows the automatic Git workflow during discovery', () => {
-  for (const cmd of ['git remote -v', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
+  for (const cmd of ['git remote -v', 'git fetch origin', 'git pull --ff-only', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
   }
