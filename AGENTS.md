@@ -11,7 +11,7 @@ While `.project/project-config.json` has `"status": "template"`, before writing 
 5. Choose the test strategy in `docs/02-quality-strategy.md`.
 6. Add required ADRs under `docs/decisions/`.
 7. Remove guide comments and placeholders, record only real decisions and commands, then change `.project/project-config.json` to `initialized`.
-8. Validate the complete structure and request confirmation before any deletion or commit.
+8. Validate the complete structure, request confirmation before any deletion, and commit verified work automatically.
 
 If the request already provides this information, use it directly and report only important missing decisions.
 
@@ -65,5 +65,6 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Branches: `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/`, `perf/`.
 - Commits: `type(scope): short description`.
 - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.
-- Request confirmation before deletion or commit.
+- Request confirmation before deletion.
+- Commit verified functional steps automatically without requesting confirmation.
 - Never delete automatically.

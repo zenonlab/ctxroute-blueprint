@@ -140,7 +140,7 @@ function isSafeTemplateCommand(value) {
   if (!value.trim()) return true;
   if (/[;|><`]|\$\(|\b(?:rm|mv|cp|touch|mkdir|install|tee|truncate|dd)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b/iu.test(value)) return false;
   const commands = value.split(/\r?\n|&&/u).map(line => line.trim()).filter(Boolean);
-  return commands.every(line => /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|rev-parse|ls-files)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line));
+  return commands.every(line => /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|rev-parse|ls-files|add|commit)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line));
 }
 
 function isDirectMutationCommand(value) {

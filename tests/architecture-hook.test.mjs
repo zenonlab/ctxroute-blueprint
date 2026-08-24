@@ -69,6 +69,13 @@ test('allows the documented template setup commands during discovery', () => {
   }
 });
 
+test('allows automatic commit commands during discovery', () => {
+  for (const cmd of ['git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"']) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
+  }
+});
+
 test('allows a new module with C4 evidence after initialization', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/containers.md' }, { cwd });
