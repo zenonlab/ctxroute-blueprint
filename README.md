@@ -32,7 +32,8 @@ The generated product remains stack-neutral. The template tooling requires
 6. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
    [architecture decision records](docs/decisions/README.md), [C4 diagrams](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
-7. Approve the cleanup and first project commit only when the starter is fully initialized.
+7. Approve any starter-file cleanup only when the starter is fully initialized;
+   verified project commits are created automatically.
 
 `npm run setup` installs the pinned dependencies and Mermaid browser, enables
 the repository Git hooks, validates CTXRoute, and runs the complete test suite.
@@ -75,8 +76,8 @@ For prerequisite diagnostics without installing anything, run
 npm run validate
 ```
 
-The agent must not delete starter guides or create the first derived-project
-commit without user confirmation. See the [repository contribution rules](CONTRIBUTING.md)
+The agent must not delete starter guides without user confirmation. It creates
+verified commits automatically. See the [repository contribution rules](CONTRIBUTING.md)
 and [security policy](SECURITY.md) for project-level guidance.
 
 ## License
