@@ -21,7 +21,7 @@ if (!allowedHooks.has(hookName)) {
 
 const hookPath = join(projectRoot, 'node_modules', 'ctxroute', 'src', 'hooks', hookName);
 if (!existsSync(hookPath)) {
-  console.error('CTXRoute is not installed. Run npm run setup.');
+  console.error('CTXRoute is not installed. Run npm install.');
   process.exit(0);
 }
 

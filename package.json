@@ -16,6 +16,7 @@
     "npm": ">=10"
   },
   "scripts": {
+    "postinstall": "node .githooks/postinstall.mjs",
     "setup": "node .githooks/setup.mjs",
     "setup:check": "node .githooks/setup.mjs --check",
     "test": "node --test tests/*.test.mjs",
@@ -27,6 +28,6 @@
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.12.0",
-    "ctxroute": "https://github.com/zenonlab/ctxroute/archive/a2a3f372c4426f8e1286a6fbb0cb33bdbc374145.tar.gz"
+    "ctxroute": "https://github.com/zenonlab/ctxroute/archive/76b45a57543c940c51e382a41adb749faa44bbc4.tar.gz"
   }
 }

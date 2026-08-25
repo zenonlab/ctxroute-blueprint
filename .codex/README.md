@@ -10,16 +10,24 @@ and cleanup.
 
 `.codex/architecture-policy.json` only locates that configuration and declares
 allowed states. CTXRoute loads relevant rules from `.claude/hooks/docs/` through
-the portable `.codex/hooks/ctxroute.mjs` wrapper.
+the shared lifecycle dispatcher. Codex selects its portable shells; Claude
+selects CTXRoute's native shells. The dispatcher executes those project-local
+entry points directly instead of starting a nested wrapper process.
 
 ```mermaid
 flowchart TD
-    Request[Requested write] --> Route[CTXRoute context injection]
-    Route --> PreTool[PreToolUse policy]
-    PreTool --> Config[Fail-closed configuration]
-    Config --> Edit[Authorized write]
-    Edit --> PostTool[PostToolUse audit]
-    PostTool --> Index[Git index]
+    Session[SessionStart] --> SessionContext[CTXRoute session context]
+    Request[Requested action] --> PreTool[PreToolUse dispatcher]
+    PreTool --> Governance[Governance policy]
+    Governance -->|allow| Route[CTXRoute context injection]
+    Governance -->|block| Refusal[Immediate refusal with reason]
+    Route -->|allow| Edit[Authorized action]
+    Route -->|deny| Refusal
+    Edit --> PostTool[PostToolUse dispatcher]
+    PostTool --> Guard[CTXRoute document guard]
+    Guard -->|allow| Audit[Local change audit]
+    Guard -->|block| Refusal
+    Audit --> Index[Git index]
     Index --> PreCommit[Authoritative pre-commit]
     PreCommit --> Architecture[Architecture and ADR checks]
     PreCommit --> Documentation[Links, placeholders, and Mermaid]
@@ -28,8 +36,14 @@ flowchart TD
     Documentation --> PrePush
     Quality --> PrePush
     PrePush --> Commands[Complete project commands]
-    Commands --> Stop[Stop and final audit]
+    Commands --> Stop[Stop dispatcher and final audit]
+    Prompt[UserPromptSubmit] --> Count[Turn counter]
+    Count --> Canary[Canary]
+    Compact[PreCompact] --> Reset[CTXRoute reset]
 ```
 
 PreToolUse provides immediate feedback. Git hooks remain authoritative because
 they inspect the index and capture files produced by commands or external tools.
+The registered lifecycle handlers intentionally omit custom status messages.
+Read-only tools skip the architecture subprocess, and PostToolUse is limited to
+mutation-capable tools to reduce lifecycle noise and process startup overhead.

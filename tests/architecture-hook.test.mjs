@@ -68,17 +68,29 @@ test('allows quoted search alternatives without hook noise', () => {
 });
 
 test('allows the documented template setup commands during discovery', () => {
-  for (const cmd of ['npm run setup:check', 'npm run setup']) {
+  for (const cmd of ['npm run setup:check', 'npm run setup', 'npm install --package-lock-only --ignore-scripts']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
   }
 });
 
+test('blocks dependency refreshes that can execute lifecycle scripts', () => {
+  for (const cmd of ['npm install', 'npm install --package-lock-only', 'npm install --package-lock-only --ignore-scripts --foreground-scripts']) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.match(result.stdout, /read and validation commands/u, cmd);
+  }
+});
+
 test('allows the automatic Git workflow during discovery', () => {
-  for (const cmd of ['git remote -v', 'git fetch origin', 'git pull --ff-only', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
+  for (const cmd of ['git switch -c perf/quiet-hooks', 'git switch main', 'git remote -v', 'git fetch origin', 'git pull --ff-only', 'git clone . ../project-copy', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
   }
+});
+
+test('rejects destructive branch replacement during discovery', () => {
+  const result = run({ cmd: 'git switch -C perf/quiet-hooks' }, { toolName: 'exec_command' });
+  assert.match(result.stdout, /read and validation commands/u);
 });
 
 test('allows a new module with C4 evidence after initialization', () => {

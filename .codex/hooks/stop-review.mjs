@@ -29,8 +29,8 @@ const lines = [
   syntaxFailures.length ? `Syntax failures: ${syntaxFailures.join(', ')}` : 'JSON, JavaScript, and supported shell syntax checked for relevant files.',
   validationFailures.length ? `Failed validations: ${validationFailures.join(' | ')}` : 'Configuration, CTXRoute, architecture, and documentation validated.',
   configFailures.length ? `Configuration: ${configFailures.join(', ')}` : `Project status: ${config.status}. Available commands: ${commandNames.join(', ') || 'none'}.`,
-  'Never delete automatically.',
-  'If relevant tests pass, request confirmation before deletion or commit.',
+  'Never delete automatically; request confirmation before deletion.',
+  'If relevant tests pass, commit verified work automatically without requesting confirmation.',
 ];
 
 process.stdout.write(JSON.stringify({ decision: 'block', reason: lines.join('\n') }));

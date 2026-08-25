@@ -20,19 +20,28 @@ The generated product remains stack-neutral. The template tooling requires
 1. Select **Use this template** on GitHub.
 2. Clone the generated repository and enter its root directory.
 3. Install Git, Node.js 22+, and npm 10+.
-4. Run:
+4. Install the pinned dependencies:
 
    ```sh
-   npm run setup
+   npm install
    ```
 
-5. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
+   The `postinstall` check verifies CTXRoute, its lifecycle entry points, and
+   the Codex and Claude project configurations. It also warns when legacy
+   global CTXRoute hooks would run alongside the project-local dispatchers.
+5. In Codex, open `/hooks` and approve the six workspace definitions. This is
+   the only local activation step; the repository never changes Codex trust
+   settings stored outside the workspace. Claude reads the tracked
+   `.claude/settings.json` configuration.
+6. Run `npm run setup` when you also want to install the Mermaid browser,
+   enable the repository Git hooks, and execute the complete validation suite.
+7. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
    agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), then
    initialize the project from your requirements.
-6. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
+8. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
    [architecture decision records](docs/decisions/README.md), [C4 diagrams](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
-7. Approve any starter-file cleanup only when the starter is fully initialized;
+9. Approve any starter-file cleanup only when the starter is fully initialized;
    verified project commits are created automatically.
 
 `npm run setup` installs the pinned dependencies and Mermaid browser, enables
@@ -64,8 +73,20 @@ Rule documents live in CTXRoute's canonical
 both Codex and Claude-compatible tooling.
 
 CTXRoute never modifies global agent settings during installation. The tracked
-`.codex/` and `.claude/` configurations remain local to this project and work
-with both Codex and Claude agents.
+`.codex/` and `.claude/` configurations remain local to this project. Each
+agent receives the same doctrine from `AGENTS.md`; Claude loads it through the
+native `@AGENTS.md` import in `CLAUDE.md`.
+
+Keep only the project-local lifecycle definitions once they are approved.
+Legacy CTXRoute commands in the global Codex `config.toml` run in addition to
+workspace hooks, producing duplicate progress messages and extra process
+startup latency. The installer reports this condition but never edits the
+global configuration. Lifecycle handlers omit custom status messages, and
+`PostToolUse` runs only for tools that can change repository state.
+
+Codex Cloud can run `npm install` before the agent starts, so CTXRoute is
+installed and verified automatically. Hook activation still depends on the
+workspace trust policy; installation cannot bypass that security boundary.
 
 For prerequisite diagnostics without installing anything, run
 `npm run setup:check`.

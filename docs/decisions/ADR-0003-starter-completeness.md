@@ -20,9 +20,9 @@ Full architecture and documentation audits inspect tracked files and
 non-ignored working-tree files, while respecting the repository's `.gitignore`
 rules for generated and operating-system artifacts.
 
-Keep `AGENTS.md` as the authoritative doctrine. Provide `CLAUDE.md` as a concise
-Claude-compatible entry point that directs agents to that doctrine without
-duplicating it.
+Keep `AGENTS.md` as the authoritative doctrine. Make `CLAUDE.md` contain the
+single native Claude Code import `@AGENTS.md`, so Claude loads the doctrine
+rather than receiving a prose pointer that can be ignored or drift.
 
 Do not enforce starter-path existence after initialization, because an approved
 derived-project cleanup may revise or remove template-only material.
@@ -39,3 +39,4 @@ Incomplete templates now fail setup, local validation, and CI before product
 work begins. Ignored generated and operating-system artifacts do not create
 false product or documentation failures. Tests and fixture repositories must
 materialize the declared starter structure while exercising template status.
+Claude and Codex receive one doctrine from the same tracked source.
