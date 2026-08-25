@@ -20,9 +20,10 @@ Expose one project-local lifecycle dispatcher for each of the six supported
 events: `SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`,
 `PreCompact`, and `Stop`. The dispatcher invokes the existing governance hooks
 and CTXRoute shells sequentially, merges non-blocking output, and immediately
-returns a refusal without changing its reason. Codex uses the CTXRoute Codex
-shells through the portable wrapper; Claude uses CTXRoute's native Claude
-shells. Both agents load the same tracked rule corpus.
+returns a refusal without changing its reason. The dispatcher resolves both
+Codex and Claude entry points directly from the project-local CTXRoute package,
+avoiding a nested wrapper process. Both agents load the same tracked rule
+corpus.
 
 Keep exactly one configured handler per event in both `.codex/hooks.json` and
 `.claude/settings.json`. Run governance before context injection on
@@ -34,6 +35,13 @@ package, the six required entry points, both hook configurations, and the
 Claude doctrine import. It reports one manual Codex action: open `/hooks` and
 approve the six workspace definitions. It never changes Codex trust settings,
 which are stored outside the repository.
+
+Do not configure custom lifecycle status messages. Restrict `PostToolUse` to
+mutation-capable tools, and skip the architecture subprocess on read-only
+`PreToolUse` events while retaining CTXRoute routing. Diagnose legacy global
+CTXRoute commands during `postinstall`: global and project hooks are additive,
+so keeping both causes duplicate progress output and avoidable process startup.
+The diagnostic is read-only and never rewrites user configuration.
 
 ## Alternatives
 

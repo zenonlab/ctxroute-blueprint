@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
@@ -35,6 +36,26 @@ export function inspectInstallation(root = process.cwd()) {
   return failures;
 }
 
+export function inspectGlobalCtxrouteHooks(configPath = join(process.env.CODEX_HOME?.trim() || join(homedir(), '.codex'), 'config.toml')) {
+  let source;
+  try { source = readFileSync(configPath, 'utf8'); }
+  catch { return []; }
+
+  const hooks = [];
+  let event = '';
+  for (const line of source.split(/\r?\n/u)) {
+    const header = line.match(/^\s*\[\[hooks\.([A-Za-z]+)\.hooks\]\]\s*$/u);
+    if (header) {
+      event = header[1];
+      continue;
+    }
+    if (/^\s*\[/u.test(line)) event = '';
+    const command = event && line.match(/^\s*command\s*=\s*["']([^"']*ctxroute[^"']*)["']\s*$/iu);
+    if (command) hooks.push({ event, command: command[1] });
+  }
+  return hooks;
+}
+
 function inspectHarness(root, relativePath, harness, failures) {
   const config = readJson(join(root, relativePath), failures, relativePath);
   const actualEvents = Object.keys(config?.hooks ?? {});
@@ -46,6 +67,10 @@ function inspectHarness(root, relativePath, harness, failures) {
     const expected = `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`;
     if (entries.length !== 1 || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} must contain exactly one local lifecycle handler.`);
     if (!Number.isFinite(entries[0]?.timeout) || entries[0].timeout <= 0) failures.push(`${relativePath} ${event} must declare an explicit positive timeout.`);
+    if ('statusMessage' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
+    if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write|exec_command|Bash|Shell') {
+      failures.push(`${relativePath} PostToolUse must target only mutation-capable tools.`);
+    }
   }
 }
 
@@ -62,4 +87,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   }
   console.log('CTXRoute and six lifecycle hooks are installed and verified.');
   console.log('Codex local step: open /hooks and approve the six workspace definitions.');
+  const globalHooks = inspectGlobalCtxrouteHooks();
+  if (globalHooks.length) {
+    console.warn(`Warning: ${globalHooks.length} global CTXRoute hook(s) were found in Codex config. Disable the legacy global definitions after approving this workspace to avoid duplicate runs and latency.`);
+  }
 }

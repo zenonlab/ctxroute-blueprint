@@ -6,8 +6,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude SessionStart",
-            "timeout": 30,
-            "statusMessage": "Loading project context"
+            "timeout": 30
           }
         ]
       }
@@ -19,21 +18,19 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude PreToolUse",
-            "timeout": 45,
-            "statusMessage": "Checking policy and routing context"
+            "timeout": 45
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "*",
+        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
         "hooks": [
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse",
-            "timeout": 45,
-            "statusMessage": "Validating and auditing changes"
+            "timeout": 45
           }
         ]
       }
@@ -44,8 +41,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude UserPromptSubmit",
-            "timeout": 30,
-            "statusMessage": "Updating CTXRoute lifecycle state"
+            "timeout": 30
           }
         ]
       }
@@ -56,8 +52,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude PreCompact",
-            "timeout": 15,
-            "statusMessage": "Resetting routed context"
+            "timeout": 15
           }
         ]
       }
@@ -68,8 +63,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude Stop",
-            "timeout": 120,
-            "statusMessage": "Running final step audit"
+            "timeout": 120
           }
         ]
       }

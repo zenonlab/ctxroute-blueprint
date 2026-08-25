@@ -11,7 +11,8 @@ and cleanup.
 `.codex/architecture-policy.json` only locates that configuration and declares
 allowed states. CTXRoute loads relevant rules from `.claude/hooks/docs/` through
 the shared lifecycle dispatcher. Codex selects its portable shells; Claude
-selects CTXRoute's native shells.
+selects CTXRoute's native shells. The dispatcher executes those project-local
+entry points directly instead of starting a nested wrapper process.
 
 ```mermaid
 flowchart TD
@@ -43,3 +44,6 @@ flowchart TD
 
 PreToolUse provides immediate feedback. Git hooks remain authoritative because
 they inspect the index and capture files produced by commands or external tools.
+The registered lifecycle handlers intentionally omit custom status messages.
+Read-only tools skip the architecture subprocess, and PostToolUse is limited to
+mutation-capable tools to reduce lifecycle noise and process startup overhead.

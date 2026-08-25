@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dispatch, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
-import { inspectInstallation } from '../.githooks/postinstall.mjs';
+import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -19,7 +19,9 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
       assert.equal(handlers.length, 1, `${file} ${event}`);
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
+      assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
     }
+    assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
 });
 
@@ -46,6 +48,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   }
   assert.equal(handlerPlan('claude', 'PreToolUse', root)[1].name, 'doc-inject.js');
   assert.equal(handlerPlan('claude', 'PostToolUse', root)[0].name, 'doc-write-guard.js');
+  assert.match(handlerPlan('codex', 'PreToolUse', root)[1].path, /node_modules\/ctxroute\/src\/hooks\/codex-doc-inject\.js$/u);
+  assert.doesNotMatch(handlerPlan('codex', 'PreToolUse', root)[1].path, /\.codex\/hooks\/ctxroute\.mjs$/u);
 });
 
 test('the lifecycle dispatcher executes sequentially and merges non-blocking context', () => {
@@ -62,6 +66,18 @@ test('the lifecycle dispatcher executes sequentially and merges non-blocking con
   });
   assert.deepEqual(called, ['pre-tool-architecture.mjs', 'codex-doc-inject.js']);
   assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-architecture.mjs\n\ncodex-doc-inject.js');
+});
+
+test('the lifecycle dispatcher skips architecture policy for read-only tools', () => {
+  const called = [];
+  dispatch({
+    harness: 'codex',
+    event: 'PreToolUse',
+    input: JSON.stringify({ tool_name: 'view_image', tool_input: { path: 'reference.png' } }),
+    root,
+    execute(handler) { called.push(handler.name); return { outputs: [] }; },
+  });
+  assert.deepEqual(called, ['codex-doc-inject.js']);
 });
 
 test('the lifecycle dispatcher returns the first refusal unchanged', () => {
@@ -123,6 +139,23 @@ test('postinstall diagnoses a missing CTXRoute installation', () => {
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd, encoding: 'utf8' });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /CTXRoute 2\.0\.0 is not installed; run npm install/u);
+});
+
+test('postinstall detects legacy global CTXRoute hooks without changing them', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'global-ctxroute-hooks-'));
+  const configPath = join(cwd, 'config.toml');
+  writeFileSync(configPath, [
+    '[[hooks.PreToolUse]]',
+    'matcher = "*"',
+    '[[hooks.PreToolUse.hooks]]',
+    'type = "command"',
+    'command = "node /opt/ctxroute/codex-doc-inject.js"',
+    '[hooks.state]',
+    'command = "node /opt/ctxroute/ignored-state.js"',
+  ].join('\n'));
+  assert.deepEqual(inspectGlobalCtxrouteHooks(configPath), [
+    { event: 'PreToolUse', command: 'node /opt/ctxroute/codex-doc-inject.js' },
+  ]);
 });
 
 test('both lifecycle dialects inject a matching project rule', () => {

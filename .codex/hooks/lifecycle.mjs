@@ -16,9 +16,8 @@ export const lifecycleEvents = [
 
 export function handlerPlan(harness, event, root = projectRoot) {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
-  const codex = (name, ...args) => ({ name, path: join(root, '.codex', 'hooks', 'ctxroute.mjs'), args: [name, ...args] });
-  const claude = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
-  const ctxroute = harness === 'codex' ? codex : harness === 'claude' ? claude : null;
+  const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
+  const ctxroute = harness === 'codex' || harness === 'claude' ? direct : null;
   if (!ctxroute) return [];
 
   return {
@@ -72,7 +71,7 @@ export function isBlocking(output) {
 }
 
 export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler }) {
-  const plan = handlerPlan(harness, event, root);
+  const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
   if (!lifecycleEvents.includes(event) || !plan.length) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
@@ -92,6 +91,15 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
     }
   }
   return mergeOutputs(event, outputs, notices);
+}
+
+function applicableHandlers(plan, event, input) {
+  if (event !== 'PreToolUse') return plan;
+  let toolName;
+  try { toolName = JSON.parse(input || '{}')?.tool_name; }
+  catch { return plan; }
+  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
+  return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 
 function executeHandler(handler, input, root) {

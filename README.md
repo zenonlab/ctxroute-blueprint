@@ -27,7 +27,8 @@ The generated product remains stack-neutral. The template tooling requires
    ```
 
    The `postinstall` check verifies CTXRoute, its lifecycle entry points, and
-   the Codex and Claude project configurations.
+   the Codex and Claude project configurations. It also warns when legacy
+   global CTXRoute hooks would run alongside the project-local dispatchers.
 5. In Codex, open `/hooks` and approve the six workspace definitions. This is
    the only local activation step; the repository never changes Codex trust
    settings stored outside the workspace. Claude reads the tracked
@@ -75,6 +76,13 @@ CTXRoute never modifies global agent settings during installation. The tracked
 `.codex/` and `.claude/` configurations remain local to this project. Each
 agent receives the same doctrine from `AGENTS.md`; Claude loads it through the
 native `@AGENTS.md` import in `CLAUDE.md`.
+
+Keep only the project-local lifecycle definitions once they are approved.
+Legacy CTXRoute commands in the global Codex `config.toml` run in addition to
+workspace hooks, producing duplicate progress messages and extra process
+startup latency. The installer reports this condition but never edits the
+global configuration. Lifecycle handlers omit custom status messages, and
+`PostToolUse` runs only for tools that can change repository state.
 
 Codex Cloud can run `npm install` before the agent starts, so CTXRoute is
 installed and verified automatically. Hook activation still depends on the
