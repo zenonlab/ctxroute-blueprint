@@ -48,8 +48,9 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   }
   assert.equal(handlerPlan('claude', 'PreToolUse', root)[1].name, 'doc-inject.js');
   assert.equal(handlerPlan('claude', 'PostToolUse', root)[0].name, 'doc-write-guard.js');
-  assert.match(handlerPlan('codex', 'PreToolUse', root)[1].path, /node_modules\/ctxroute\/src\/hooks\/codex-doc-inject\.js$/u);
-  assert.doesNotMatch(handlerPlan('codex', 'PreToolUse', root)[1].path, /\.codex\/hooks\/ctxroute\.mjs$/u);
+  const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
+  assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
+  assert.notEqual(codexInjection.path, join(root, '.codex', 'hooks', 'ctxroute.mjs'));
 });
 
 test('the lifecycle dispatcher executes sequentially and merges non-blocking context', () => {
