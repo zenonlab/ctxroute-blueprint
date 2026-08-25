@@ -68,9 +68,16 @@ test('allows quoted search alternatives without hook noise', () => {
 });
 
 test('allows the documented template setup commands during discovery', () => {
-  for (const cmd of ['npm run setup:check', 'npm run setup']) {
+  for (const cmd of ['npm run setup:check', 'npm run setup', 'npm install --package-lock-only --ignore-scripts']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
+  }
+});
+
+test('blocks dependency refreshes that can execute lifecycle scripts', () => {
+  for (const cmd of ['npm install', 'npm install --package-lock-only', 'npm install --package-lock-only --ignore-scripts --foreground-scripts']) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.match(result.stdout, /read and validation commands/u, cmd);
   }
 });
 

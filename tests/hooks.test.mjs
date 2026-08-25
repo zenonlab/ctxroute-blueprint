@@ -43,6 +43,20 @@ test('an active Stop hook does not loop', () => {
   assert.match(result.stdout, /continue/u);
 });
 
+test('Stop requires confirmation only for deletion, not verified commits', () => {
+  const cwd = starterWorkspace();
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  writeFileSync(join(cwd, 'change.json'), '{}\n');
+  const result = run('.codex/hooks/stop-review.mjs', {}, { cwd });
+  assert.match(result.stdout, /request confirmation before deletion/u);
+  assert.match(result.stdout, /commit verified work automatically without requesting confirmation/u);
+  assert.doesNotMatch(result.stdout, /confirmation before deletion or commit/u);
+});
+
 test('Stop recognizes valid JSON', () => {
   const cwd = starterWorkspace();
   git(cwd, ['init', '-q']);

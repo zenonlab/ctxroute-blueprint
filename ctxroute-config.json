@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/zenonlab/ctxroute/a2a3f372c4426f8e1286a6fbb0cb33bdbc374145/ctxroute-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/zenonlab/ctxroute/76b45a57543c940c51e382a41adb749faa44bbc4/ctxroute-config.schema.json",
   "enabled": true,
   "showNotification": true,
   "mode": "smart",

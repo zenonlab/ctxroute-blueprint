@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-08-24
+- Last reviewed: 2026-08-26
 
 ## Context
 
@@ -29,3 +30,8 @@ Node.js 22+ is required by the pinned CTXRoute version. `npm run setup` installs
 and validates the engine, Mermaid browser, and repository Git hooks. Tracked
 hook configuration works on Windows, macOS, and Linux. Dependency updates
 require an explicit commit review and ADR update.
+
+The reviewed CTXRoute pin is
+`76b45a57543c940c51e382a41adb749faa44bbc4`. It preserves version 2.0.0 and
+the six hook entry points used by the template while incorporating the current
+upstream address-consistency and mutation-runner fixes.

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = process.cwd();
-const commit = 'a2a3f372c4426f8e1286a6fbb0cb33bdbc374145';
+const commit = '76b45a57543c940c51e382a41adb749faa44bbc4';
 const failures = [];
 const packageJson = readJson('package.json');
 const packageLock = readJson('package-lock.json');
