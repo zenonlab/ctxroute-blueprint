@@ -1,0 +1,78 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude SessionStart",
+            "timeout": 30,
+            "statusMessage": "Loading project context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude PreToolUse",
+            "timeout": 45,
+            "statusMessage": "Checking policy and routing context"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse",
+            "timeout": 45,
+            "statusMessage": "Validating and auditing changes"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude UserPromptSubmit",
+            "timeout": 30,
+            "statusMessage": "Updating CTXRoute lifecycle state"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude PreCompact",
+            "timeout": 15,
+            "statusMessage": "Resetting routed context"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude Stop",
+            "timeout": 120,
+            "statusMessage": "Running final step audit"
+          }
+        ]
+      }
+    ]
+  }
+}

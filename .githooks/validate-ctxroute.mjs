@@ -1,15 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { inspectInstallation } from './postinstall.mjs';
 
 const root = process.cwd();
 const commit = '76b45a57543c940c51e382a41adb749faa44bbc4';
 const failures = [];
 const packageJson = readJson('package.json');
 const packageLock = readJson('package-lock.json');
-const hooks = readJson('.codex/hooks.json');
 const config = readJson('ctxroute-config.json');
 const installedPackage = readJson('node_modules/ctxroute/package.json');
+failures.push(...inspectInstallation(root));
 
 const archiveUrl = `https://github.com/zenonlab/ctxroute/archive/${commit}.tar.gz`;
 if (packageJson?.devDependencies?.ctxroute !== archiveUrl) {
@@ -23,35 +24,9 @@ if (lockEntry?.resolved !== archiveUrl) {
 
 if (installedPackage?.version !== '2.0.0') failures.push('CTXRoute 2.0.0 is not installed');
 
-const expected = new Map([
-  ['SessionStart', new Map([['session-inject.js', 'node ./.codex/hooks/ctxroute.mjs session-inject.js --budget 0']])],
-  ['PreToolUse', new Map([['codex-doc-inject.js', 'node ./.codex/hooks/ctxroute.mjs codex-doc-inject.js --budget 0']])],
-  ['PostToolUse', new Map([['codex-doc-write-guard.js', 'node ./.codex/hooks/ctxroute.mjs codex-doc-write-guard.js']])],
-  ['UserPromptSubmit', new Map([
-    ['turn-count.js', 'node ./.codex/hooks/ctxroute.mjs turn-count.js'],
-    ['canary-check.js', 'node ./.codex/hooks/ctxroute.mjs canary-check.js'],
-  ])],
-  ['PreCompact', new Map([['ctxroute-reset.js', 'node ./.codex/hooks/ctxroute.mjs ctxroute-reset.js']])],
-]);
-
-for (const [event, entries] of expected) {
-  const commands = (hooks?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []).map(hook => hook.command ?? '');
-  for (const [name, expectedCommand] of entries) {
-    const matching = commands.filter(command => command === expectedCommand);
-    if (matching.length !== 1) failures.push(`${event}: expected exactly one portable CTXRoute hook ${name}`);
-  }
-}
-
-for (const event of ['SessionStart', 'PreToolUse']) {
-  const emitters = (hooks?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []).filter(hook => /(?:session-inject|codex-doc-inject)\.js/u.test(hook.command ?? ''));
-  if (!emitters.length || emitters.some(hook => hook.additionalContextLimit !== 0 || !hook.command.includes('--budget 0'))) {
-    failures.push(`${event}: CTXRoute emitter must declare additionalContextLimit 0 and --budget 0`);
-  }
-}
-
 if (config?.enabled !== true || config?.frames !== 1) failures.push('ctxroute-config.json must enable CTXRoute with one Codex frame');
 
-const requiredHooks = [...expected.values()].flatMap(entries => [...entries.keys()]);
+const requiredHooks = ['session-inject.js', 'codex-doc-inject.js', 'codex-doc-write-guard.js', 'turn-count.js', 'canary-check.js', 'ctxroute-reset.js'];
 for (const name of requiredHooks) {
   if (!existsSync(resolve('node_modules', 'ctxroute', 'src', 'hooks', name))) failures.push(`Installed CTXRoute hook is missing: ${name}`);
 }

@@ -1,0 +1,141 @@
+import { spawnSync } from 'node:child_process';
+import process from 'node:process';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+export const lifecycleEvents = [
+  'SessionStart',
+  'PreToolUse',
+  'PostToolUse',
+  'UserPromptSubmit',
+  'PreCompact',
+  'Stop',
+];
+
+export function handlerPlan(harness, event, root = projectRoot) {
+  const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
+  const codex = (name, ...args) => ({ name, path: join(root, '.codex', 'hooks', 'ctxroute.mjs'), args: [name, ...args] });
+  const claude = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
+  const ctxroute = harness === 'codex' ? codex : harness === 'claude' ? claude : null;
+  if (!ctxroute) return [];
+
+  return {
+    SessionStart: [ctxroute('session-inject.js', '--budget', '0')],
+    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', '0')],
+    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-audit.mjs')],
+    UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js')],
+    PreCompact: [ctxroute('ctxroute-reset.js')],
+    Stop: [local('stop-review.mjs')],
+  }[event] ?? [];
+}
+
+export function mergeOutputs(event, outputs, notices = []) {
+  const merged = {};
+  const hookSpecificOutput = {};
+  const contexts = [];
+  const systemMessages = [...notices];
+
+  for (const output of outputs) {
+    if (!output || typeof output !== 'object') continue;
+    for (const [key, value] of Object.entries(output)) {
+      if (key === 'hookSpecificOutput' || key === 'systemMessage') continue;
+      merged[key] = value;
+    }
+    if (typeof output.systemMessage === 'string' && output.systemMessage.trim()) systemMessages.push(output.systemMessage.trim());
+    if (output.hookSpecificOutput && typeof output.hookSpecificOutput === 'object') {
+      for (const [key, value] of Object.entries(output.hookSpecificOutput)) {
+        if (key === 'additionalContext') {
+          if (typeof value === 'string' && value.trim()) contexts.push(value.trim());
+        } else {
+          hookSpecificOutput[key] = value;
+        }
+      }
+    }
+  }
+
+  if (contexts.length) hookSpecificOutput.additionalContext = contexts.join('\n\n');
+  if (Object.keys(hookSpecificOutput).length) {
+    hookSpecificOutput.hookEventName ??= event;
+    merged.hookSpecificOutput = hookSpecificOutput;
+  }
+  if (systemMessages.length) merged.systemMessage = systemMessages.join(' · ');
+  return Object.keys(merged).length ? merged : null;
+}
+
+export function isBlocking(output) {
+  return output?.decision === 'block'
+    || output?.permissionDecision === 'deny'
+    || output?.hookSpecificOutput?.permissionDecision === 'deny'
+    || output?.continue === false;
+}
+
+export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler }) {
+  const plan = handlerPlan(harness, event, root);
+  if (!lifecycleEvents.includes(event) || !plan.length) {
+    return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
+  }
+
+  const outputs = [];
+  const notices = [];
+  for (const handler of plan) {
+    const result = execute(handler, input, root);
+    if (result.error) {
+      notices.push(`Lifecycle ${event} handler ${handler.name} failed open: ${result.error}`);
+      continue;
+    }
+    if (result.stderr) notices.push(`Lifecycle ${event} handler ${handler.name}: ${result.stderr}`);
+    for (const output of result.outputs ?? []) {
+      if (isBlocking(output)) return output;
+      outputs.push(output);
+    }
+  }
+  return mergeOutputs(event, outputs, notices);
+}
+
+function executeHandler(handler, input, root) {
+  const result = spawnSync(process.execPath, [handler.path, ...handler.args], {
+    cwd: root,
+    env: ctxrouteEnvironment(root),
+    input,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  const stderr = String(result.stderr ?? '').trim();
+  if (result.error || (result.status !== 0 && result.status !== null)) {
+    return { error: result.error?.message ?? `exit ${result.status}`, stderr, outputs: [] };
+  }
+
+  const stdout = String(result.stdout ?? '').trim();
+  if (!stdout) return { stderr, outputs: [] };
+  try {
+    return { stderr, outputs: [JSON.parse(stdout)] };
+  } catch {
+    return { error: `invalid JSON output: ${stdout.slice(0, 160)}`, stderr, outputs: [] };
+  }
+}
+
+function ctxrouteEnvironment(root) {
+  return {
+    ...process.env,
+    CTXROUTE_CONFIG_PATH: join(root, 'ctxroute-config.json'),
+    CTXROUTE_DOCS_DIR: join(root, 'docs', 'mcp'),
+    CTXROUTE_FILEDOCS_DIR: join(root, '.claude', 'hooks', 'docs'),
+    CTXROUTE_FLEET_HOOKS_DIR: join(root, '.claude', 'hooks'),
+    CTXROUTE_SESSIONDOCS_DIR: join(root, 'docs', 'session'),
+    CTXROUTE_STATE_DIR: join(root, '.ctxroute', 'state'),
+  };
+}
+
+async function stdin() {
+  let value = '';
+  process.stdin.setEncoding('utf8');
+  for await (const chunk of process.stdin) value += chunk;
+  return value || '{}';
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const result = dispatch({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
+  if (result) process.stdout.write(JSON.stringify(result));
+}

@@ -1,12 +1,13 @@
 {
-  "description": "CTXRoute context injection and architecture-first project governance.",
+  "description": "Six portable lifecycle dispatchers for CTXRoute and architecture-first governance.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs session-inject.js --budget 0",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex SessionStart",
+            "timeout": 30,
             "additionalContextLimit": 0,
             "statusMessage": "Loading project context"
           }
@@ -19,43 +20,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs codex-doc-inject.js --budget 0",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PreToolUse",
+            "timeout": 45,
             "additionalContextLimit": 0,
-            "statusMessage": "Routing relevant context"
-          }
-        ]
-      },
-      {
-        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ./.codex/hooks/pre-tool-architecture.mjs",
-            "additionalContextLimit": 800,
-            "statusMessage": "Checking architecture policy"
+            "statusMessage": "Checking policy and routing context"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "apply_patch|Edit|Write",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs codex-doc-write-guard.js",
-            "statusMessage": "Checking routed documentation"
-          }
-        ]
-      },
-      {
-        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ./.codex/hooks/post-tool-audit.mjs",
-            "additionalContextLimit": 1200,
-            "statusMessage": "Auditing generated changes"
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PostToolUse",
+            "timeout": 45,
+            "additionalContextLimit": 0,
+            "statusMessage": "Validating and auditing changes"
           }
         ]
       }
@@ -65,8 +47,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/stop-review.mjs",
-            "additionalContextLimit": 1200,
+            "command": "node ./.codex/hooks/lifecycle.mjs codex Stop",
+            "timeout": 120,
+            "additionalContextLimit": 0,
             "statusMessage": "Running final step audit"
           }
         ]
@@ -77,11 +60,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs turn-count.js"
-          },
-          {
-            "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs canary-check.js"
+            "command": "node ./.codex/hooks/lifecycle.mjs codex UserPromptSubmit",
+            "timeout": 30,
+            "statusMessage": "Updating CTXRoute lifecycle state"
           }
         ]
       }
@@ -91,7 +72,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/ctxroute.mjs ctxroute-reset.js"
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PreCompact",
+            "timeout": 15,
+            "statusMessage": "Resetting routed context"
           }
         ]
       }

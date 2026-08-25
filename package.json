@@ -16,6 +16,7 @@
     "npm": ">=10"
   },
   "scripts": {
+    "postinstall": "node .githooks/postinstall.mjs",
     "setup": "node .githooks/setup.mjs",
     "setup:check": "node .githooks/setup.mjs --check",
     "test": "node --test tests/*.test.mjs",
