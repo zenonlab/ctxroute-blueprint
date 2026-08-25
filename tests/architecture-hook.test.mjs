@@ -82,7 +82,7 @@ test('blocks dependency refreshes that can execute lifecycle scripts', () => {
 });
 
 test('allows the automatic Git workflow during discovery', () => {
-  for (const cmd of ['git switch -c perf/quiet-hooks', 'git remote -v', 'git fetch origin', 'git pull --ff-only', 'git clone . ../project-copy', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
+  for (const cmd of ['git switch -c perf/quiet-hooks', 'git switch main', 'git remote -v', 'git fetch origin', 'git pull --ff-only', 'git clone . ../project-copy', 'git add AGENTS.md', 'git commit -m "docs(agent): allow automatic commits"', 'git push', 'gh auth status', 'gh auth switch --user vegetatitan', 'gh api /user']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
   }
