@@ -29,7 +29,7 @@
     { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },
     { "id": "crg", "type": "backend", "label": "Ephemeral CRG runner", "sublabel": "uvx child process", "pos": [700, 220], "size": [180, 66] },
     { "id": "sqlite", "type": "database", "label": "SQLite/WAL", "sublabel": "Local update state", "pos": [1000, 220], "size": [180, 66] },
-    { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS", "pos": [1030, 40], "size": [180, 66] },
+    { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
     { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] }
   ],
   "boundaries": [

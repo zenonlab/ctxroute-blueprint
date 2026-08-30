@@ -27,4 +27,6 @@ ownership of multilingual post-hook analysis.
 ## Consequences
 
 Governance is explicit and testable. Some actions require an extra approval
-step, while existing infrastructure remains reusable and unchanged.
+step, while existing infrastructure remains reusable and unchanged. The
+policy is versioned as JSON and evaluated by a short-lived Node.js CLI; it does
+not grant access to memory or MCP/A2A providers by itself.

@@ -31,6 +31,7 @@
     "workspace:check": "node scripts/check-workspaces.mjs",
     "crg:update": "node scripts/crg-runner.mjs",
     "watch:crg": "node scripts/watch-crg.mjs",
+    "governance:check": "node scripts/agent-governance.mjs context.scope",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",

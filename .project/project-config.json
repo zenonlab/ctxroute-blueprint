@@ -26,6 +26,7 @@
     "workspaceCheck": "npm run workspace:check",
     "crgUpdate": "npm run crg:update",
     "crgWatcher": "npm run watch:crg",
+    "governanceCheck": "npm run governance:check",
     "mermaid": null
   },
   "quality": {
