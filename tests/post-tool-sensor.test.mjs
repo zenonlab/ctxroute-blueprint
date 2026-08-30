@@ -38,6 +38,16 @@ test('PostToolUse forwards an unsafe SQL sink diagnostic to the agent context', 
   assert.match(output.hookSpecificOutput.additionalContext, /"verdict":"UNSAFE"/u);
   assert.equal(output.decision, 'block');
 });
+test('PostToolUse forwards diagnostics from a Svelte component', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'post-tool-sensor-svelte-'));
+  const path = join(directory, 'Query.svelte');
+  writeFileSync(path, '<script>db.query(`SELECT * FROM users WHERE id = ${userId}`);</script>\n');
+  const result = run({ tool_name: 'Edit', tool_input: { file_path: path } });
+  assert.equal(result.status, 0);
+  const output = JSON.parse(result.stdout);
+  assert.match(output.hookSpecificOutput.additionalContext, /sensor\/sql-injection/u);
+  assert.equal(output.decision, 'block');
+});
 
 test('PostToolUse does not treat an intentional delete as a read failure', () => {
   const result = run({ tool_name: 'Delete', tool_input: { file_path: 'removed.js' } });
