@@ -25,4 +25,7 @@ blueprint constraints.
 
 Updates may be delayed by the debounce window, but concurrency and resource
 usage are predictable. CRG failures are observable and do not corrupt the
-workspace or create a resident service.
+workspace or create a resident service. The implementation stores a bounded
+execution record in the local WAL database and exposes a native watcher CLI.
+Shutdown propagates an `AbortSignal` to the active child so cancellation is
+explicit and testable.

@@ -24,6 +24,8 @@
     "integration": null,
     "build": "npm run build:docs",
     "workspaceCheck": "npm run workspace:check",
+    "crgUpdate": "npm run crg:update",
+    "crgWatcher": "npm run watch:crg",
     "mermaid": null
   },
   "quality": {

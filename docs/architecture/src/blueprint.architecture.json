@@ -9,7 +9,7 @@
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
       { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "grammars", "diagnostics"], "note": "Tree-sitter parses supported source files before rules classify them." },
-      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state." },
+      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
     ]
   },

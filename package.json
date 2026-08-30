@@ -29,6 +29,8 @@
     "sensor": "node .githooks/sensor",
     "check:updates": "node .githooks/archify updates",
     "workspace:check": "node scripts/check-workspaces.mjs",
+    "crg:update": "node scripts/crg-runner.mjs",
+    "watch:crg": "node scripts/watch-crg.mjs",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",

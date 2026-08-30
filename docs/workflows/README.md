@@ -9,4 +9,7 @@ and exits. SQLite is opened in WAL mode for the duration of the update and is
 closed before the runner reports completion. SIGINT and SIGTERM stop new work,
 terminate the active child, close resources, and exit cleanly.
 
+The watcher passes an `AbortSignal` to the runner so shutdown cancellation
+terminates the active `uvx` process through the child-process API.
+
 The architecture JSON IR is the executable diagram source for this flow.
