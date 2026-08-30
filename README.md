@@ -3,7 +3,7 @@
 [![Validate](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml/badge.svg)](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml)
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm 10+](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
-[![Mermaid](https://img.shields.io/badge/diagrams-Mermaid-ff3670?logo=mermaid&logoColor=white)](https://mermaid.js.org/)
+[![Archify](https://img.shields.io/badge/architecture-Archify-06b6d4)](https://github.com/tt-a1i/archify)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 An architecture-first [GitHub template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository)
@@ -13,7 +13,7 @@ database, deployment platform, or test framework.
 The generated product remains stack-neutral. The template tooling requires
 [Node.js 22+](https://nodejs.org/) and [npm 10+](https://www.npmjs.com/) to run
 [CTXRoute](https://github.com/zenonlab/ctxroute), governance hooks, tests, and
-[Mermaid](https://mermaid.js.org/).
+[Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor.
 
 ## Create a project
 
@@ -33,18 +33,17 @@ The generated product remains stack-neutral. The template tooling requires
    the only local activation step; the repository never changes Codex trust
    settings stored outside the workspace. Claude reads the tracked
    `.claude/settings.json` configuration.
-6. Run `npm run setup` when you also want to install the Mermaid browser,
-   enable the repository Git hooks, and execute the complete validation suite.
+6. Run `npm run setup` to enable repository Git hooks and execute the complete validation suite.
 7. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
    agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), then
    initialize the project from your requirements.
 8. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
-   [architecture decision records](docs/decisions/README.md), [C4 diagrams](docs/architecture/README.md),
+   [architecture decision records](docs/decisions/README.md), [Archify architecture](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
 9. Approve any starter-file cleanup only when the starter is fully initialized;
    verified project commits are created automatically.
 
-`npm run setup` installs the pinned dependencies and Mermaid browser, enables
+`npm run setup` installs the pinned dependencies and Archify skill, enables
 the repository Git hooks, validates CTXRoute, and runs the complete test suite.
 It refreshes the ignored `node_modules/` directory but does not change global
 Codex settings, delete tracked project files, or create commits.
@@ -96,6 +95,13 @@ For prerequisite diagnostics without installing anything, run
 ```sh
 npm run validate
 ```
+
+Architecture commands are `npm run validate:architecture`, `npm run build:docs`,
+and `npm run preview:docs`. Scan supported source with
+`npm run sensor -- <paths>` and check Archify release awareness with
+`npm run check:updates`. Updating Archify is explicit: review the release,
+update `.project/archify-pin.json`, reinstall to regenerate `skills-lock.json`,
+run doctor and all tests, then commit the reviewed change.
 
 The agent must not delete starter guides without user confirmation. It creates
 verified commits automatically. See the [repository contribution rules](CONTRIBUTING.md)

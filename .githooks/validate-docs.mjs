@@ -1,53 +1,23 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
-import { createRequire } from 'node:module';
 import { isIgnoredPath, loadProjectConfig, validateProjectConfig } from './project-policy.mjs';
-
-const require = createRequire(import.meta.url);
-const mermaidCli = join(dirname(require.resolve('@mermaid-js/mermaid-cli')), 'cli.js');
 
 const allMode = process.argv.includes('--all');
 const indexMode = process.argv.includes('--index');
 const files = indexMode ? indexFiles() : allMode ? repositoryDocs() : stagedFiles();
-const targets = files.filter(file => /\.(?:md|mmd)$/iu.test(file));
+const targets = files.filter(file => file.endsWith('.md'));
 const failures = [];
-const temporary = mkdtempSync(join(tmpdir(), 'diagram-validation-'));
-const puppeteerConfig = join(temporary, 'puppeteer.json');
 const { config, failures: configFailures } = indexMode ? loadIndexConfig() : loadProjectConfig();
-
-if (process.platform === 'linux') {
-  writeFileSync(puppeteerConfig, JSON.stringify({ args: ['--no-sandbox', '--disable-setuid-sandbox'] }));
-}
 
 failures.push(...configFailures);
 
-try {
-  rejectStarterGuidesWhenInitialized(targets);
-  validateRequiredArchitecture();
-  for (const file of targets) {
-    const source = readSource(file);
-    if (file.endsWith('.md')) validateLinks(file, source);
-    const diagrams = file.endsWith('.mmd') ? [source] : extractMermaid(source);
-    if (!diagrams.length && file.endsWith('.mmd')) failures.push(`${file}: empty diagram`);
-    for (const [index, diagram] of diagrams.entries()) validateDiagram(file, index, diagram);
-  }
-} finally {
-  rmSync(temporary, { recursive: true, force: true });
-}
+rejectStarterGuidesWhenInitialized(targets);
+validateRequiredArchitecture();
+for (const file of targets) validateLinks(file, readSource(file));
 
 function validateRequiredArchitecture() {
-  if (config?.status !== 'initialized') return;
-  const expected = new Map([
-    ['docs/architecture/context.md', 'C4Context'],
-    ['docs/architecture/containers.md', 'C4Container'],
-  ]);
-  for (const [file, diagramType] of expected) {
-    if (!(config.architecture?.documents ?? []).includes(file)) failures.push(`${file}: required document missing from architecture.documents`);
-    else if (!existsSync(file)) failures.push(`${file}: required document is missing`);
-    else if (!new RegExp(`\`\`\`mermaid\\s*\\n${diagramType}\\b`, 'u').test(readSource(file))) failures.push(`${file}: ${diagramType} diagram required after initialization`);
-  }
+  for (const file of config?.architecture?.documents ?? []) if (!existsSync(file)) failures.push(`${file}: required architecture source is missing`);
 }
 
 if (failures.length) {
@@ -79,44 +49,6 @@ function validateLinks(file, source) {
     if (repositoryPath.startsWith('..') || repositoryPath === '') failures.push(`${file}: local link outside repository "${rawTarget}"`);
     else if (!existsSync(absolute)) failures.push(`${file}: local link not found "${rawTarget}"`);
   }
-}
-
-function validateDiagram(file, index, source) {
-  const trimmed = source.trim();
-  const label = `${file}${file.endsWith('.md') ? `#${index + 1}` : ''}`;
-  if (!trimmed) return failures.push(`${label}: empty diagram`);
-  if (/Project under development|Replace the placeholders|TODO/u.test(trimmed)) return failures.push(`${label}: placeholder forbidden in a diagram`);
-  if (!/^(?:flowchart|graph|sequenceDiagram|stateDiagram|erDiagram|classDiagram|C4Context|C4Container|C4Component|architecture)\b/mu.test(trimmed)) return failures.push(`${label}: unsupported Mermaid type`);
-  validateC4Identifiers(label, trimmed);
-
-  const stem = `${file}-${index}`.replace(/\W/gu, '_');
-  const input = join(temporary, `${stem}.mmd`);
-  const output = join(temporary, `${stem}.svg`);
-  writeFileSync(input, trimmed);
-  try {
-    const puppeteerArgs = process.platform === 'linux' ? ['-p', puppeteerConfig] : [];
-    execFileSync(process.execPath, [mermaidCli, '-i', input, '-o', output, '-q', ...puppeteerArgs], { stdio: 'pipe' });
-  } catch (error) {
-    failures.push(`${label}: invalid Mermaid (${String(error.stderr ?? '').trim().split(/\r?\n/u).at(-1) ?? 'render failed'})`);
-  }
-}
-
-function validateC4Identifiers(label, source) {
-  if (!/^C4/mu.test(source)) return;
-  const definitions = new Set();
-  for (const match of source.matchAll(/^\s*(?:Person|Person_Ext|System|System_Ext|SystemDb|Container|ContainerDb|Component|ComponentDb|System_Boundary|Container_Boundary)\s*\(\s*([A-Za-z_][\w-]*)/gmu)) {
-    if (definitions.has(match[1])) failures.push(`${label}: duplicate C4 identifier "${match[1]}"`);
-    definitions.add(match[1]);
-  }
-  for (const match of source.matchAll(/^\s*(?:Rel|BiRel|Rel_U|Rel_D|Rel_L|Rel_R)\s*\(\s*([A-Za-z_][\w-]*)\s*,\s*([A-Za-z_][\w-]*)/gmu)) {
-    for (const identifier of [match[1], match[2]]) {
-      if (!definitions.has(identifier)) failures.push(`${label}: relation to unknown C4 identifier "${identifier}"`);
-    }
-  }
-}
-
-function extractMermaid(source) {
-  return [...source.matchAll(/```mermaid\s*\n([\s\S]*?)```/giu)].map(match => match[1]);
 }
 
 function readSource(file) {

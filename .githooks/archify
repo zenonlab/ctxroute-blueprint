@@ -1,0 +1,50 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join, resolve } from 'node:path';
+import process from 'node:process';
+
+const root = resolve(process.cwd());
+const skill = join(root, '.agents', 'skills', 'archify');
+const cli = join(skill, 'bin', 'archify.mjs');
+const source = join(root, 'docs', 'architecture', 'src', 'blueprint.architecture.json');
+const output = join(root, 'dist', 'architecture', 'blueprint.html');
+const command = process.argv[2] ?? 'verify';
+if (command === 'restore') {
+  const lockPath = join(root, 'skills-lock.json');
+  const lockSource = readFileSync(lockPath);
+  const pin = verifyLock();
+  run(process.execPath, [join(root, 'node_modules', 'skills', 'bin', 'cli.mjs'), 'experimental_install']);
+  writeFileSync(lockPath, lockSource);
+  verifyInstalled(pin, true);
+  run(process.execPath, [cli, 'doctor']);
+}
+else if (command === 'verify') { verify(); run(process.execPath, [cli, 'doctor']); }
+else if (command === 'validate') { verify(); run(process.execPath, [cli, 'validate', 'architecture', source, '--quality', 'showcase', '--json']); }
+else if (command === 'build') { verify(); run(process.execPath, [cli, 'deliver', 'architecture', source, output, '--quality', 'showcase', '--json']); }
+else if (command === 'preview') { verify(); run(process.execPath, [cli, 'preview', 'architecture', source, output, '--quality', 'showcase']); }
+else if (command === 'updates') { verify(); run(process.execPath, [join(skill, 'scripts', 'check-update.mjs')]); }
+else fail(`Unknown Archify command: ${command}`);
+
+function verify(remote = false) {
+  const pin = verifyLock();
+  verifyInstalled(pin, remote);
+}
+function verifyLock() {
+  const pin = json('.project/archify-pin.json');
+  const lock = json('skills-lock.json').skills?.archify;
+  if (lock?.source !== pin.repository || lock?.ref !== pin.tag || lock?.computedHash !== pin.computedHash) fail('Archify lock does not match its pin.');
+  return pin;
+}
+function verifyInstalled(pin, remote = false) {
+  if (!existsSync(cli)) fail('Archify is not restored; run npm install or npm ci.');
+  if (!readFileSync(join(skill, 'SKILL.md'), 'utf8').includes(`version: "${pin.version}"`)) fail(`Archify ${pin.version} is not installed.`);
+  if (remote) {
+    const result = spawnSync('git', ['ls-remote', `https://github.com/${pin.repository}.git`, `refs/tags/${pin.tag}`, `refs/tags/${pin.tag}^{}`], { cwd: root, encoding: 'utf8' });
+    if (result.status !== 0) fail(`Unable to verify Archify tag: ${result.stderr.trim()}`);
+    const hashes = result.stdout.trim().split(/\r?\n/u).map(line => line.split(/\s/u)[0]);
+    if (!hashes.includes(pin.tagObject) || !hashes.includes(pin.commit)) fail('Archify remote tag object or peeled commit does not match the reviewed pin.');
+  }
+}
+function json(path) { try { return JSON.parse(readFileSync(join(root, path), 'utf8')); } catch { fail(`${path} is missing or invalid.`); } }
+function run(file, args) { const result = spawnSync(file, args, { cwd: root, stdio: 'inherit' }); if (result.error) fail(result.error.message); if (result.status !== 0) process.exit(result.status ?? 1); }
+function fail(message) { console.error(message); process.exit(1); }

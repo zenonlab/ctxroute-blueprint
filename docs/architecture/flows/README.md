@@ -1,4 +1,4 @@
 # Flows
 
-Add Mermaid sequence, state, process, or data diagrams when C4 does not describe
-the flow sufficiently.
+Add typed Archify workflow, sequence, data-flow, or lifecycle JSON IR when the
+primary architecture map does not describe the flow sufficiently.

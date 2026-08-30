@@ -18,8 +18,8 @@ test('Git blocks a new module without a diagram in the same change', () => {
   assert.equal(blocked.status, 1);
   assert.match(blocked.stderr, /Architecture diagram required/u);
 
-  writeFileSync(join(cwd, 'docs/architecture/containers.md'), `${readFileSync(join(cwd, 'docs/architecture/containers.md'), 'utf8')}\nService responsibility.\n`);
-  git(cwd, ['add', 'docs/architecture/containers.md']);
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{"service":true}\n');
+  git(cwd, ['add', 'docs/architecture/src/blueprint.architecture.json']);
   const allowed = spawnSync('node', [validator], { cwd, encoding: 'utf8' });
   assert.equal(allowed.status, 0);
 });
@@ -64,7 +64,7 @@ test('the documentation audit ignores files excluded by Git', () => {
 
 function repository() {
   const cwd = mkdtempSync(join(tmpdir(), 'git-architecture-'));
-  for (const directory of ['.codex', '.project', 'docs/architecture', 'docs/decisions', 'src', 'tests']) mkdirSync(join(cwd, directory), { recursive: true });
+  for (const directory of ['.codex', '.project', 'docs/architecture/src', 'docs/decisions', 'src', 'tests']) mkdirSync(join(cwd, directory), { recursive: true });
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
   config.status = 'initialized';
@@ -73,8 +73,7 @@ function repository() {
   config.codeExtensions = ['.rb'];
   config.quality.mutation.decision = 'not-applicable';
   writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
-  writeFileSync(join(cwd, 'docs/architecture/context.md'), '# Context\n\n```mermaid\nC4Context\n  Person(user, "User")\n  System(system, "System")\n  Rel(user, system, "Uses")\n```\n');
-  writeFileSync(join(cwd, 'docs/architecture/containers.md'), '# Containers\n\n```mermaid\nC4Container\n  Person(user, "User")\n  Container(app, "App", "Ruby")\n  Rel(user, app, "Uses")\n```\n');
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ private: true }));
   writeFileSync(join(cwd, '.gitignore'), '.DS_Store\n');
   git(cwd, ['init', '-q']);
