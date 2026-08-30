@@ -28,15 +28,23 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users WHERE id = $1;').length, 0);
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users WHERE id = ${id};')[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('query.sql', '-- SELECT x + ${notCode}\nSELECT x FROM users;').length, 0);
+  assert.equal(analyzeSource('app.js', "db.query('SELECT * FROM users WHERE id = ' + userId)", { config: { sql: { sinks: ['query'] } } })[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('app.js', "db.query('SELECT * FROM users WHERE id = $1', [userId])", { config: { sql: { sinks: ['query'] } } }).length, 0);
+  assert.equal(analyzeSource('app.js', "const sql = 'SELECT * FROM users WHERE id = ' + userId; db.query(sql)", { config: { sql: { sinks: ['query'] } } })[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('app.py', "cursor.execute(f'SELECT * FROM users WHERE id = {user_id}')", { config: { sql: { sinks: ['execute'] } } })[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('query.sql', 'SELECT * FROM users;', { config: { sql: { requireLimit: true, maxRows: 100 } } })[0].rule, 'sensor/sql-unbounded-query');
+  assert.equal(analyzeSource('query.sql', 'SELECT * FROM users LIMIT 100;', { config: { sql: { requireLimit: true, maxRows: 100 } } }).length, 0);
 });
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
   assert.equal(analyzeSource('page.html', '<style>main { color: red }</style>').at(0).rule, 'sensor/ui-mixed-markup');
   assert.equal(analyzeSource('page.css', 'main { color: red }').length, 0);
   assert.equal(analyzeSource('page.css', '<div>bad</div>').at(0).rule, 'sensor/ui-mixed-markup');
+  assert.equal(analyzeSource('page.js', "element.innerHTML = '<style>main { color: red }</style>'").at(0).rule, 'sensor/ui-mixed-markup');
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
+  assert.equal(analyzeSource('template.js', 'const html = `<style>main { color: red }</style>`;').length, 0);
   assert.equal(analyzeSource('debug.js', 'console.log(value);').at(0).rule, 'sensor/anti-slop/debug-output');
 });
 test('unsupported and missing paths are explicit errors', () => {

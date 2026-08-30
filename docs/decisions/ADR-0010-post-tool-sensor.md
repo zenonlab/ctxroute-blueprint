@@ -33,6 +33,11 @@ recurrences independently. No hook edits AGENTS.md, permissions, or global
 CTXRoute configuration. UNSAFE and ERROR results block subsequent validation
 or commit controls; WARN results remain informational.
 
+Configured SQL sinks in JS/TS/Python are analyzed as well as standalone SQL
+files. Optional `requireLimit` detects unbounded result sets without making a
+rate-limit or query allowlist policy mandatory for derived products. A
+rate-limit gateway remains an application responsibility.
+
 High-confidence injection and execution risks are UNSAFE. UI layering and
 anti-slop findings are WARN by default. Unsupported or absent files produce
 explicit ERROR diagnostics and are never treated as safe. Adding an adapter or

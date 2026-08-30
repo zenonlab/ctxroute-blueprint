@@ -1,1 +1,1 @@
-{"schemaVersion":1,"complexity":{"maxNodes":2000,"maxDepth":80},"dangerousCommands":["rm -rf","mkfs","dd if=",":(){","shutdown","reboot"]}
+{"schemaVersion":1,"complexity":{"maxNodes":2000,"maxDepth":80},"dangerousCommands":["rm -rf","mkfs","dd if=",":(){","shutdown","reboot"],"sql":{"sinks":["query","execute","prepare","$queryRawUnsafe"],"requireLimit":false,"maxRows":1000}}

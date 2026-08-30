@@ -22,7 +22,7 @@
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [520, 270], "size": [170, 66] },
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [520, 410], "size": [180, 66] },
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
-    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Short-lived Node.js CLI", "pos": [270, 520], "size": [180, 66] },
+    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + SQL sink analysis", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
     { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "JS / TS / Py / SQL / HTML / CSS", "pos": [520, 700], "size": [220, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },

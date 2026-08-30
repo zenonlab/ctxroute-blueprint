@@ -25,7 +25,7 @@ export function analyzeSource(path, source, { config = {} } = {}) {
   const diagnostics = [];
   const grammar = grammars.get(extension);
   if (grammar) analyzeAst(path, source, grammar, config, diagnostics);
-  else if (extension === '.sql') analyzeSql(path, source, diagnostics);
+  else if (extension === '.sql') analyzeSql(path, source, diagnostics, config);
   else if (extension === '.html' || extension === '.htm') analyzeHtml(path, source, diagnostics);
   else if (extension === '.css' || extension === '.scss' || extension === '.sass') analyzeCss(path, source, diagnostics);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
@@ -40,14 +40,18 @@ function analyzePath(path, root, config, diagnostics) {
 function analyzeAst(path, source, grammar, config, diagnostics) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0;
-  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config); });
+  let count = 0; let maxDepth = 0; const state = { sqlVariables: new Set() };
+  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
   if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
 }
 
-function inspectAst(path, source, node, diagnostics, config) {
+function inspectAst(path, source, node, diagnostics, config, state) {
   const text = source.slice(node.startIndex, node.endIndex);
+  if (node.type === 'variable_declarator' || node.type === 'assignment_expression') {
+    const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
+    if (left && looksLikeDynamicSql(text)) state.sqlVariables.add(left);
+  }
   if (node.type === 'call_expression' || node.type === 'call') {
     const name = node.childForFieldName('function')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
@@ -58,24 +62,29 @@ function inspectAst(path, source, node, diagnostics, config) {
       if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
     }
     if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
-    if (/\.innerHTML\s*=|\.outerHTML\s*=/u.test(text) && /<style\b|<script\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
+    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(node.childForFieldName('arguments')?.namedChild(0)?.text ?? ''))) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is constructed from untrusted string data.'));
+    if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !/\blimit\s+\d+\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
   if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
   if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
-  if (node.type === 'template_string' && /<(?:style|script)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime template; keep UI structure and styles in their respective layers.'));
+  if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
 }
 
-function analyzeSql(path, source, diagnostics) {
+function analyzeSql(path, source, diagnostics, config = {}) {
   const code = maskSql(source);
   for (const match of code.matchAll(/(?:select|insert|update|delete|where|from)[\s\S]{0,180}(?:\+|\|\||\$\{)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is constructed from untrusted string data.'));
   for (const match of code.matchAll(/\b(?:execute|query|prepare)\s*\([^\n;]*(?:\$\{|\+|\|\|)[^\n;]*\)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is constructed from untrusted string data.'));
+  if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !/\blimit\s+\d+\b/iu.test(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
 }
 function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
 function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
 function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function defaultConfig(root) { try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); } catch { return { dangerousCommands: [], complexity: { maxNodes: 2000, maxDepth: 80 } }; } }
+function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text); }
+function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(/u.test(text); }
+function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', '$queryRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }
 function firstError(node) { if (node.isError || node.isMissing) return node; for (const child of node.namedChildren) { const result = firstError(child); if (result) return result; } return node; }
 function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }
