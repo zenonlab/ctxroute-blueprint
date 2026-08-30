@@ -35,3 +35,14 @@ npm test
 
 Le flux canonique est : changement → sélection ADR → injection du contexte →
 validation.
+
+Les protections issues de la mémoire des problèmes suivent le même principe :
+SQLite détecte et résout le problème, puis CTXRoute injecte une règle approuvée
+scopée par fichier et outil. La règle contient uniquement le vocabulaire
+CTXRoute (`tool`, `scope`, `mode`) ; elle ne contient pas `problem-memory`,
+`events` ou `tools`, et ne modifie jamais automatiquement `AGENTS.md`.
+
+Un ADR invalide ou remplacé bloque une modification gouvernée. Plusieurs ADRs
+applicables produisent le statut `partial` et un diagnostic explicite ; la
+contradiction sémantique entre leurs textes reste hors périmètre sans
+analyseur dédié.

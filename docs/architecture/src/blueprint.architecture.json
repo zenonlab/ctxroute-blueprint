@@ -32,8 +32,8 @@
     { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
     { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] },
     { "id": "decisionMemory", "type": "database", "label": "ADR decision memory", "sublabel": "Scoped metadata and durable context", "pos": [1030, 310], "size": [190, 72] },
-    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision checks", "pos": [1030, 430], "size": [190, 66] },
-    { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "Signatures, evidence, resolutions", "pos": [708, 400], "size": [190, 72] }
+    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision / overlap checks", "pos": [1030, 430], "size": [190, 66] },
+    { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "SQLite detection; scoped rules", "pos": [708, 400], "size": [190, 72] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
@@ -55,7 +55,7 @@
     { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "WAL transaction" },
     { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
     { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" },
-    { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope and revision", "variant": "security", "labelAt": [1125, 400] }
+    { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope, revision, and overlap", "variant": "security", "labelAt": [1125, 400] }
   ],
   "cards": [
     { "dot": "cyan", "title": "Versioned", "items": ["Architecture JSON IR", "Rules and lockfiles", "No generated HTML"] },

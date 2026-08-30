@@ -194,30 +194,60 @@ export function applyPersistentInstruction(problemId, resolution, projectRoot = 
   const numericId = Number(problemId);
   if (!Number.isSafeInteger(numericId) || numericId < 1) throw new TypeError('Problem id must be a positive integer');
   const scope = resolution.scope ?? {};
-  const paths = scope.paths ?? [];
-  if (!Array.isArray(paths) || paths.some(path => typeof path !== 'string' || path.startsWith('/') || path.includes('..'))) {
-    throw new TypeError('Instruction paths must be repository-relative and contain no parent traversal');
-  }
+  const paths = validateInstructionPaths(scope.paths);
+  const tools = validateInstructionTools(scope.tools);
   const directory = join(projectRoot, '.claude', 'hooks', 'docs', 'problem-memory');
   mkdirSync(directory, { recursive: true });
-  const artifactPath = join(directory, `problem-${numericId}.md`);
-  const events = Array.isArray(scope.events) ? scope.events : [];
-  const tools = Array.isArray(scope.tools) ? scope.tools : [];
   const content = fieldText(resolution.content ?? resolution.summary);
-  writeFileSync(artifactPath, [
-    '---',
-    `scope: [${paths.map(formatYaml).join(', ')}]`,
-    'review: on-change',
-    'problem-memory: approved',
-    `events: [${events.map(formatYaml).join(', ')}]`,
-    `tools: [${tools.map(formatYaml).join(', ')}]`,
-    '---',
-    `# Problem ${numericId} protection`,
-    '',
-    content,
-    '',
-  ].join('\n'), { encoding: 'utf8', flag: 'wx' });
-  return artifactPath;
+  const artifacts = [];
+  let index = 0;
+  for (const path of paths) {
+    for (const tool of tools) {
+      const artifactPath = join(directory, `problem-${numericId}-${index}.md`);
+      writeFileSync(artifactPath, [
+        '---',
+        `tool: ${formatYaml(tool)}`,
+        `scope: [${formatYaml(path)}]`,
+        'mode: dumb',
+        '---',
+        `# Problem ${numericId} protection`,
+        '',
+        content,
+        '',
+      ].join('\n'), { encoding: 'utf8', flag: 'wx' });
+      artifacts.push(artifactPath);
+      index += 1;
+    }
+  }
+  return artifacts[0];
+}
+
+export function validateInstructionPaths(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new TypeError('Instruction paths must contain at least one repository-relative file');
+  }
+  return paths.map(path => {
+    if (typeof path !== 'string') throw new TypeError('Instruction paths must be strings');
+    const normalized = path.trim().replace(/\\/gu, '/');
+    if (!normalized || normalized === '.' || normalized.endsWith('/') || normalized.includes('*')
+      || normalized.startsWith('/') || normalized.startsWith('//') || /^[A-Za-z]:\//u.test(normalized)
+      || normalized.split('/').some(segment => segment === '..' || segment === '.')) {
+      throw new TypeError('Instruction paths must be unambiguous repository-relative files without globs or parent traversal');
+    }
+    return normalized;
+  });
+}
+
+export function validateInstructionTools(tools) {
+  if (!Array.isArray(tools) || tools.length === 0) {
+    throw new TypeError('Instruction tools must contain at least one exact CTXRoute tool');
+  }
+  return tools.map(tool => {
+    if (typeof tool !== 'string' || !tool.trim() || tool.trim() === '*' || /[\r\n]/u.test(tool)) {
+      throw new TypeError('Instruction tools must be non-empty exact tool names');
+    }
+    return tool.trim();
+  });
 }
 
 function formatYaml(value) {

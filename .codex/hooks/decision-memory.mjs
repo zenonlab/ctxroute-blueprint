@@ -31,6 +31,25 @@ export function applicableAdrs(paths, root = process.cwd()) {
   return loadAdrs(root).filter(adr => !adr.errors.length && !adr.metadata['superseded-by'] && normalized.some(path => matchScope(path, adr.metadata.scope)));
 }
 
+export function decisionDiagnostics(paths, root = process.cwd()) {
+  const normalized = paths.map(normalizePath).filter(Boolean);
+  const adrs = loadAdrs(root);
+  const invalid = adrs.filter(adr => adr.errors.length).map(adr => adr.file);
+  const superseded = adrs
+    .filter(adr => adr.metadata?.['superseded-by'] && normalized.some(path => matchScope(path, adr.metadata.scope)))
+    .map(adr => `${adr.file} -> ${adr.metadata['superseded-by']}`);
+  const applicable = applicableAdrs(normalized, root);
+  return {
+    status: applicable.length > 1 ? 'partial' : 'complete',
+    invalid,
+    superseded,
+    applicable: applicable.map(adr => adr.file),
+    message: applicable.length > 1
+      ? 'Multiple ADRs apply; semantic contradiction is outside scope without a dedicated analyzer.'
+      : '',
+  };
+}
+
 export function validateMetadata(metadata, file = '') {
   const errors = [];
   if (!metadata || !Array.isArray(metadata.scope) || !metadata.scope.length || metadata.scope.some(value => typeof value !== 'string' || !value.trim())) errors.push(`${file}: scope must be a non-empty string array`);

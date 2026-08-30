@@ -139,6 +139,20 @@ test('allows a contract with a real ADR', () => {
   assert.equal(result.stdout, '');
 });
 
+test('blocks governed changes while an ADR is invalid or superseded', () => {
+  for (const metadata of [
+    '# invalid ADR\n',
+    '---\nscope:\n  - src/**\nreview: on-change\nsuperseded-by: ADR-0002-current.md\n---\nold\n',
+  ]) {
+    const cwd = initializedWorkspace();
+    mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+    writeFileSync(join(cwd, 'docs/decisions/ADR-0001-old.md'), metadata);
+    const result = run({ patch: '*** Update File: src/existing.rb' }, { cwd });
+    assert.match(result.stdout, /Write blocked/u);
+    assert.match(result.stdout, /ADR/u);
+  }
+});
+
 test('recognizes an Archify source changed in a previous step', () => {
   const cwd = initializedWorkspace();
   git(cwd, ['init', '-q']);

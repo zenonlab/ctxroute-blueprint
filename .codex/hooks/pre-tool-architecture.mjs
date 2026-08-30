@@ -13,7 +13,7 @@ import {
   loadProjectConfig,
   normalizePath,
 } from '../../.githooks/project-policy.mjs';
-import { applicableAdrs, loadAdrs } from './decision-memory.mjs';
+import { applicableAdrs, decisionDiagnostics, loadAdrs } from './decision-memory.mjs';
 
 let input;
 try { input = JSON.parse(await stdin()); }
@@ -47,8 +47,14 @@ if (!paths.length) {
 
 const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
 const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
-if (invalidDecisionPaths.length && !paths.some(path => path.startsWith('docs/decisions/'))) context(`Invalid ADR metadata requires repair before unrelated changes: ${invalidDecisionPaths.join(', ')}`);
 const relevantAdrs = applicableAdrs(changePaths);
+const decisionStatus = decisionDiagnostics(changePaths);
+if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: invalid ADR metadata must be repaired before changing governed files.', `ADRs: ${invalidDecisionPaths.join(', ')}`]);
+}
+if (decisionStatus.superseded.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: a superseded ADR still covers the requested change.', `ADRs: ${decisionStatus.superseded.join(', ')}`, 'Revise or add the replacement ADR before changing governed files.']);
+}
 const architectureEvidence = changePaths.some(path => isArchitectureEvidence(path, config));
 const adrEvidence = changePaths.some(isAdr);
 const contractPaths = paths.filter(path => isContractPath(path, config));
@@ -97,14 +103,15 @@ if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
 }
 
 if (paths.some(path => isSourcePath(path, config))) {
-  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionContext(relevantAdrs)}`);
+  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionContext(relevantAdrs, decisionStatus)}`);
 } else if (relevantAdrs.length) {
-  context(formatDecisionContext(relevantAdrs));
+  context(formatDecisionContext(relevantAdrs, decisionStatus));
 }
 
-function formatDecisionContext(adrs) {
+function formatDecisionContext(adrs, status = decisionDiagnostics([])) {
   if (!adrs.length) return '';
-  return `\n\nApplicable architectural decisions (read before acting):\n${adrs.map(adr => `- ${adr.file}\n${adr.body.trim()}`).join('\n\n')}`;
+  const overlap = status.status === 'partial' ? `\n\nDecision status: partial. ${status.message}` : '';
+  return `\n\nApplicable architectural decisions (read before acting):${overlap}\n${adrs.map(adr => `- ${adr.file}\n${adr.body.trim()}`).join('\n\n')}`;
 }
 
 function extractPaths(value) {

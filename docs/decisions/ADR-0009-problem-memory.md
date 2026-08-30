@@ -34,9 +34,23 @@ must be scoped, validated, and approved by the agent control boundary.
 Approved resolutions are recorded through the controlled `resolve` command and
 are injected on later recurrences as context. The command never activates a
 hook or changes agent trust settings.
-An approved `persistent-instruction` resolution may materialize one scoped
-rule under `.claude/hooks/docs/problem-memory/`; writing `AGENTS.md` is not an
+An approved `persistent-instruction` resolution may materialize one CTXRoute
+rule per file/tool pair under `.claude/hooks/docs/problem-memory/`. Each rule
+uses only CTXRoute vocabulary: an exact `tool` trigger, a repository-relative
+`scope`, and an explicit cadence. Legacy `problem-memory`, `events`, and
+`tools` front-matter keys are never generated. Ambiguous, absolute, globbed,
+or parent-traversing scopes are rejected. Writing `AGENTS.md` is not an
 automatic path because it would broaden the rule beyond the recurring problem.
+
+SQLite remains detection and resolution memory only. CTXRoute remains the
+injection engine, and the local hook remains a proposal/resolution adapter;
+approved protections do not alter permissions, global configuration, or
+repository doctrine.
+
+ADR metadata remains matched by repository-relative scope. Invalid or
+superseded ADRs block governed changes until repaired or replaced. Multiple
+applicable ADRs are reported as `partial`; semantic contradiction between
+their texts is outside scope until a dedicated analyzer exists.
 
 Persist records as SQLite tables in the project-local state directory using WAL
 mode and parameterized statements. Bound and redact evidence before persistence.

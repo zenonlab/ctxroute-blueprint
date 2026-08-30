@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -12,6 +12,8 @@ import {
   normalizeText,
   normalizeStructuralMessage,
   resolveProblem,
+  validateInstructionPaths,
+  validateInstructionTools,
 } from '../.codex/hooks/problem-memory.mjs';
 
 test('normalization removes volatile values while preserving the cause', () => {
@@ -100,7 +102,7 @@ test('resolutions can be recorded through the controlled CLI', () => {
   check.close();
 });
 
-test('approved persistent instructions create a scoped CTXRoute rule', () => {
+test('approved persistent instructions create valid scoped CTXRoute rules', () => {
   const directory = mkdtempSync(join(tmpdir(), 'problem-memory-protection-'));
   const store = new ProblemStore(directory);
   const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
@@ -112,11 +114,66 @@ test('approved persistent instructions create a scoped CTXRoute rule', () => {
     summary: 'Check the lockfile before retrying.',
     scope: { paths: ['package-lock.json'], events: ['PreToolUse'], tools: ['Edit'] },
   }, directory, directory);
-  const artifactPath = join(directory, '.claude', 'hooks', 'docs', 'problem-memory', `problem-${record.id}.md`);
+  const artifactPath = join(directory, '.claude', 'hooks', 'docs', 'problem-memory', `problem-${record.id}-0.md`);
   assert.equal(artifact, true);
   assert.equal(existsSync(artifactPath), true);
-  assert.match(readFileSync(artifactPath, 'utf8'), /package-lock\.json/u);
-  assert.match(readFileSync(artifactPath, 'utf8'), /Check the lockfile/u);
+  const rule = readFileSync(artifactPath, 'utf8');
+  assert.match(rule, /tool: "Edit"/u);
+  assert.match(rule, /scope: \["package-lock\.json"\]/u);
+  assert.doesNotMatch(rule, /problem-memory|events:|tools:/u);
+  assert.match(rule, /Check the lockfile/u);
+});
+
+test('generated CTXRoute rules inject only for the declared tool and scope', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-ctxroute-'));
+  const store = new ProblemStore(directory);
+  const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
+  const record = store.record(observation, buildSignatures(observation));
+  store.close();
+  resolveProblem(record.id, {
+    type: 'persistent-instruction',
+    approved: true,
+    summary: 'Check the lockfile before retrying.',
+    scope: { paths: ['package-lock.json'], tools: ['Edit'] },
+  }, directory, directory);
+
+  const hook = join(new URL('..', import.meta.url).pathname, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
+  const environment = {
+    ...process.env,
+    CTXROUTE_CONFIG_PATH: join(new URL('..', import.meta.url).pathname, 'ctxroute-config.json'),
+    CTXROUTE_FILEDOCS_DIR: join(directory, '.claude/hooks/docs'),
+    CTXROUTE_STATE_DIR: join(directory, 'state'),
+  };
+  const run = toolInput => spawnSync(process.execPath, [hook, '--budget', '0'], {
+    cwd: directory,
+    env: environment,
+    input: JSON.stringify({ session_id: `proof-${Date.now()}`, cwd: directory, tool_name: 'Edit', tool_input: toolInput }),
+    encoding: 'utf8',
+  });
+  const covered = run({ file_path: 'package-lock.json' });
+  assert.equal(covered.status, 0, covered.stderr);
+  assert.match(covered.stdout, /Check the lockfile/u);
+  const homonym = run({ file_path: 'package.json' });
+  assert.equal(homonym.status, 0, homonym.stderr);
+  assert.doesNotMatch(homonym.stdout, /Check the lockfile/u);
+  const wrongTool = spawnSync(process.execPath, [hook, '--budget', '0'], {
+    cwd: directory,
+    env: environment,
+    input: JSON.stringify({ session_id: `proof-wrong-${Date.now()}`, cwd: directory, tool_name: 'Write', tool_input: { file_path: 'package-lock.json' } }),
+    encoding: 'utf8',
+  });
+  assert.equal(wrongTool.status, 0, wrongTool.stderr);
+  assert.doesNotMatch(wrongTool.stdout, /Check the lockfile/u);
+});
+
+test('persistent instruction scopes reject ambiguous, absolute, and traversing values', () => {
+  assert.throws(() => validateInstructionPaths([]), /at least one/u);
+  assert.throws(() => validateInstructionPaths(['/tmp/file']), /repository-relative/u);
+  assert.throws(() => validateInstructionPaths(['C:\\tmp\\file']), /repository-relative/u);
+  assert.throws(() => validateInstructionPaths(['docs/../file']), /parent traversal/u);
+  assert.throws(() => validateInstructionPaths(['docs/*']), /unambiguous/u);
+  assert.throws(() => validateInstructionTools([]), /at least one/u);
+  assert.throws(() => validateInstructionTools(['*']), /exact/u);
 });
 
 test('persistent instructions cannot be written without approval', () => {

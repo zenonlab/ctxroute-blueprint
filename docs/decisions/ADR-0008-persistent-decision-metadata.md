@@ -30,8 +30,12 @@ injected in numeric filename order before a matching change. An ADR marked
 `revised: true` and remains the source of truth.
 
 PreToolUse blocks architectural and contract changes with no applicable valid
-ADR. PostToolUse repeats the check and validates modified decisions. Tests and
-generated files are exempt from the architectural requirement.
+ADR, and also blocks governed changes while any invalid or superseded ADR
+requires repair or replacement. PostToolUse repeats the check and validates
+modified decisions. When multiple ADRs apply, the diagnostic reports
+`partial`; it does not infer semantic contradiction without a dedicated
+analyzer. Tests and generated files are exempt from the architectural
+requirement.
 
 ## Alternatives
 
