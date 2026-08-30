@@ -38,3 +38,15 @@ test('PostToolUse forwards an unsafe SQL sink diagnostic to the agent context', 
   assert.match(output.hookSpecificOutput.additionalContext, /"verdict":"UNSAFE"/u);
   assert.equal(output.decision, 'block');
 });
+
+test('PostToolUse does not treat an intentional delete as a read failure', () => {
+  const result = run({ tool_name: 'Delete', tool_input: { file_path: 'removed.js' } });
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+});
+
+test('PostToolUse fails open with a visible message for invalid JSON', () => {
+  const result = spawnSync(process.execPath, [hook], { cwd: root, input: '{', encoding: 'utf8' });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /invalid JSON input/u);
+});
