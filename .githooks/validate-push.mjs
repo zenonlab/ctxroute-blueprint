@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { loadProjectConfig } from './project-policy.mjs';
 
 const preCommit = process.argv.includes('--pre-commit');
@@ -22,6 +22,9 @@ if (preCommit) {
 
 for (const [name, command] of commands) {
   console.error(`Running ${name}: ${command}`);
-  const result = spawnSync(command, { cwd: process.cwd(), shell: true, stdio: 'inherit' });
+  const env = { ...process.env };
+  const localGitVariables = execFileSync('git', ['rev-parse', '--local-env-vars'], { cwd: process.cwd(), encoding: 'utf8' }).trim().split(/\r?\n/u);
+  for (const variable of localGitVariables) delete env[variable];
+  const result = spawnSync(command, { cwd: process.cwd(), env, shell: true, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
