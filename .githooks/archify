@@ -9,7 +9,7 @@ const cli = join(skill, 'bin', 'archify.mjs');
 const source = join(root, 'docs', 'architecture', 'src', 'blueprint.architecture.json');
 const output = join(root, 'dist', 'architecture', 'blueprint.html');
 const command = process.argv[2] ?? 'verify';
-if (command === 'restore') { run(join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'skills.cmd' : 'skills'), ['experimental_install']); verify(true); run(process.execPath, [cli, 'doctor']); }
+if (command === 'restore') { run(process.execPath, [join(root, 'node_modules', 'skills', 'bin', 'cli.mjs'), 'experimental_install']); verify(true); run(process.execPath, [cli, 'doctor']); }
 else if (command === 'verify') { verify(); run(process.execPath, [cli, 'doctor']); }
 else if (command === 'validate') { verify(); run(process.execPath, [cli, 'validate', 'architecture', source, '--quality', 'showcase', '--json']); }
 else if (command === 'build') { verify(); run(process.execPath, [cli, 'deliver', 'architecture', source, output, '--quality', 'showcase', '--json']); }
