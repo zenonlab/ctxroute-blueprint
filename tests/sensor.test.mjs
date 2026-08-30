@@ -53,6 +53,14 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.verdict, 'UNSAFE');
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
+test('SQL tracking follows Python builders and import aliases in one scan', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-python-cross-file-'));
+  writeFileSync(join(directory, 'queries.py'), "def build_query(user_id):\n    return f'SELECT * FROM users WHERE id = {user_id}'\n");
+  writeFileSync(join(directory, 'app.py'), "from queries import build_query as make_query\ncursor.execute(make_query(user_id))\n");
+  const result = analyzePaths(['app.py', 'queries.py'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['execute'] } } });
+  assert.equal(result.verdict, 'UNSAFE');
+  assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.py'), true);
+});
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
   assert.equal(analyzeSource('page.html', '<style>main { color: red }</style>').at(0).rule, 'sensor/ui-mixed-markup');

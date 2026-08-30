@@ -49,8 +49,8 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
 function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Set(), taintedVariables: new Set() };
-  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Set(); state.importedSqlFunctions ??= new Set();
+  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
+  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Set(); state.importedSqlFunctions ??= new Map();
   state.taintedVariables ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
@@ -84,7 +84,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const firstArgumentName = firstArgument?.text ?? '';
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
-    const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || (state.sqlExports.has(calledBuilder) && state.importedSqlFunctions.has(calledBuilder));
+    const importedBuilder = state.importedSqlFunctions.get(calledBuilder);
+    const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || state.sqlExports.has(importedBuilder ?? calledBuilder);
     if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
@@ -118,7 +119,9 @@ function collectDynamicExports(paths, root) {
     try {
       const source = readFileSync(resolve(root, path), 'utf8'); const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
       walk(tree.rootNode, 0, node => {
-        if ((node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node) && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) exports.add(node.childForFieldName('name')?.text ?? '');
+        const pythonModuleFunction = grammar === Python && node.type === 'function_definition' && node.parent?.type === 'module';
+        const exportedFunction = (node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node);
+        if ((pythonModuleFunction || exportedFunction) && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) exports.add(node.childForFieldName('name')?.text ?? '');
       });
     } catch { /* the normal scan emits the authoritative read/syntax diagnostic */ }
   }
@@ -126,9 +129,12 @@ function collectDynamicExports(paths, root) {
 }
 function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
 function collectImportedNames(source) {
-  const names = new Set();
+  const names = new Map();
   for (const match of source.matchAll(/\bimport\s*\{([^}]+)\}|\bfrom\s+[A-Za-z0-9_./-]+\s+import\s+([^\n]+)/gu)) {
-    for (const item of (match[1] ?? match[2]).split(',')) names.add((item.trim().split(/\s+as\s+/iu).at(-1) ?? '').trim());
+    for (const item of (match[1] ?? match[2]).split(',')) {
+      const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
+      if (parts[0]) names.set(parts.at(-1), parts[0]);
+    }
   }
   return names;
 }

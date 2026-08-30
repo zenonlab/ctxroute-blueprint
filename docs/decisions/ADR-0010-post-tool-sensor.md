@@ -52,11 +52,11 @@ The SQL check also follows dynamic query builders and variables within the
 same parsed file. It is intentionally not whole-program taint analysis, so
 framework-specific sinks and cross-module flows require explicit adapter work.
 
-For an explicit multi-file scan, the bounded tracker also follows exported
-JavaScript/TypeScript builders when the consuming file imports the builder.
-It propagates configured HTTP, environment, and CLI taint sources through
-local variables and imported builders. It does not infer arbitrary module
-resolution or Python package dataflow.
+For an explicit multi-file scan, the bounded tracker follows exported
+JavaScript/TypeScript builders and module-level Python builders when the
+consuming file imports them, including simple aliases. It propagates configured
+HTTP, environment, and CLI taint sources through local variables and imported
+builders. It does not infer arbitrary module resolution or package dataflow.
 
 The versioned Sensor configuration is validated before scanning. A missing,
 malformed, or incompatible rules file produces `sensor/configuration` with an
