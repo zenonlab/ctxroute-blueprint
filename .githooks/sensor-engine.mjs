@@ -67,7 +67,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const rightBuilder = right?.childForFieldName('function')?.text ?? rightText.split('(')[0];
     const importedBuilder = importedBinding(rightBuilder, state);
     const resolvedBuilder = isResolvedSqlExport(importedBuilder, state);
-    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || resolvedBuilder)) state.sqlVariables.add(left);
+    if (left && ((looksLikeDynamicSql(text) && !isSafeParameterizedSql(text, config)) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || resolvedBuilder)) state.sqlVariables.add(left);
     if (left && (state.sqlFunctions.has(rightBuilder) || resolvedBuilder)) state.sqlFunctions.add(left);
     if (left && (looksLikeUntrustedSource(text, config) || state.taintedVariables.has(rightText) || state.taintedVariables.has(rightText.split('.')[0]))) state.taintedVariables.add(left);
   }
@@ -90,7 +90,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
     const importedBuilder = importedBinding(calledBuilder, state);
     const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || isResolvedSqlExport(importedBuilder, state);
-    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
+    if (isSqlSink(name, config) && ((looksLikeDynamicSql(text) && !isSafeParameterizedSql(text, config)) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
     const callableText = enclosingCallable(node)?.text ?? text;
@@ -250,6 +250,7 @@ function validateConfig(config) {
       if (config.sql.maxRows !== undefined && (!Number.isInteger(config.sql.maxRows) || config.sql.maxRows < 1)) errors.push('sql.maxRows must be a positive integer');
       if (config.sql.taintSources !== undefined && (!Array.isArray(config.sql.taintSources) || config.sql.taintSources.some(value => typeof value !== 'string' || !value))) errors.push('sql.taintSources must be an array of non-empty strings');
       if (config.sql.rateLimitGuards !== undefined && (!Array.isArray(config.sql.rateLimitGuards) || config.sql.rateLimitGuards.some(value => typeof value !== 'string' || !value))) errors.push('sql.rateLimitGuards must be an array of non-empty strings');
+      if (config.sql.safeBuilders !== undefined && (!Array.isArray(config.sql.safeBuilders) || config.sql.safeBuilders.some(value => typeof value !== 'string' || !value))) errors.push('sql.safeBuilders must be an array of non-empty strings');
     }
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
@@ -264,6 +265,7 @@ function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+
 function enclosingCallable(node) { let parent = node.parent; while (parent) { if (/^(?:function|function_declaration|function_definition|method_definition|arrow_function|generator_function|lambda)$/u.test(parent.type)) return parent; parent = parent.parent; } return null; }
 function hasRateLimitGuard(text, config) { const guards = config.sql?.rateLimitGuards ?? ['rateLimit', 'rateLimiter', 'throttle', 'quota', 'limiter']; return guards.some(guard => new RegExp(`\\b${escapeRegExp(guard)}\\b`, 'iu').test(text)); }
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }
+function isSafeParameterizedSql(text, config) { const builders = config.sql?.safeBuilders ?? ['sql', 'Prisma.sql', 'drizzle.sql', 'kysely.sql']; return builders.some(builder => new RegExp('(?:^|[=(,:]\\s*)' + escapeRegExp(builder) + '\\s*`[\\s\\S]*?\\$\\{', 'u').test(text)); }
 function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(|%\s+[A-Za-z_]/u.test(text); }
 function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'rawQuery', 'queryRaw', 'executeRaw', 'raw_sql', 'execute_sql', 'whereRaw', 'havingRaw', 'orderByRaw', 'joinRaw', 'literal', 'text', 'Raw', 'RawSQL', 'extra', 'fromSqlRaw', 'executeSqlRaw', 'fetch', 'fetchrow', 'fetchval', 'executemany', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }

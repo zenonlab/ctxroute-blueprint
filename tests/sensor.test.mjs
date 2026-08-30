@@ -39,6 +39,9 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('orm.ts', "sequelize.literal('ORDER BY ' + field)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.py', "text(f'SELECT * FROM users WHERE id = {user_id}')")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.py', "RawSQL('id = %s', [user_id])").length, 0);
+  assert.equal(analyzeSource('orm.ts', "const statement = sql`SELECT * FROM users WHERE id = ${userId}`; db.execute(statement);").length, 0);
+  assert.equal(analyzeSource('orm.ts', "db.execute(sql`SELECT * FROM users WHERE id = ${userId}`);").length, 0);
+  assert.equal(analyzeSource('orm.ts', "db.execute(sql.raw(`SELECT * FROM users WHERE id = ${userId}`));")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "prisma.$queryRawUnsafe(`SELECT * FROM users WHERE id = ${userId}`)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('route.ts', "const id = req.query.id; db.query(id)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('route.py', "user_id = request.query_params['id']\ncursor.execute(user_id)")[0].rule, 'sensor/sql-injection');

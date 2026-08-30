@@ -45,7 +45,9 @@ remains an application responsibility.
 The default sink registry covers common raw/query entry points used by Prisma,
 Knex, TypeORM, Sequelize, Django, and SQLAlchemy. Derived products can replace
 that registry in `sql.sinks`; safe parameterized APIs are not marked unsafe just
-because they belong to an ORM.
+because they belong to an ORM. Tagged SQL builders such as `sql` and
+`Prisma.sql` are configurable through `sql.safeBuilders`; raw variants remain
+analyzable sinks.
 
 Products may also opt into `requireMutationFilter` to classify unfiltered
 `UPDATE` and `DELETE` statements as `UNSAFE`; this is disabled by default for
