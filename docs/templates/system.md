@@ -1,4 +1,4 @@
-# Subsystem — name
+# Subsystem authoring template
 
 ## Responsibility
 
@@ -12,4 +12,4 @@
 
 ## Diagram
 
-<!-- Add a diagram when the flow is non-trivial. -->
+Use the project architecture JSON IR when the flow is non-trivial.

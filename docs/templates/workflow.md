@@ -1,4 +1,4 @@
-# Workflow — name
+# Workflow authoring template
 
 ## Trigger and outcome
 
@@ -8,4 +8,4 @@
 
 ## Diagram
 
-<!-- Select sequenceDiagram, stateDiagram, or flowchart according to the need. -->
+Use the project architecture JSON IR for the executable diagram.

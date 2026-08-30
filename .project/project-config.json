@@ -1,20 +1,20 @@
 {
   "schemaVersion": 1,
-  "status": "template",
+  "status": "initialized",
   "tooling": {
     "runtime": "node",
     "packageManager": "npm"
   },
   "decisions": {
-    "language": null,
-    "runtime": null,
-    "frontend": null,
-    "backend": null,
-    "storage": null,
-    "deployment": null,
-    "observability": null,
-    "security": null,
-    "performance": null
+    "language": "JavaScript ES modules with ephemeral Python CLI integration",
+    "runtime": "Node.js 22 and npm 10",
+    "frontend": "none",
+    "backend": "none; local CLI orchestration",
+    "storage": "SQLite with WAL for local CRG state",
+    "deployment": "GitHub repository and cross-platform GitHub Actions",
+    "observability": "Stable JSON diagnostics and bounded lifecycle logs",
+    "security": "Fixed argument vectors, no shell interpolation, AST Sensor, and ASK/NEVER/ALWAYS governance",
+    "performance": "Debounced events, single-flight updates, bounded child output, and clean process termination"
   },
   "commands": {
     "test": "npm test",
@@ -27,17 +27,17 @@
   },
   "quality": {
     "mutation": {
-      "decision": null,
+      "decision": "not-applicable",
       "preCommit": false,
       "prePush": false
     }
   },
   "directories": {
-    "source": [],
+    "source": ["packages/", "scripts/"],
     "tests": ["tests/"],
     "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/"]
   },
-  "codeExtensions": [],
+  "codeExtensions": [".js", ".mjs", ".json"],
   "architecture": {
     "documents": [
       "docs/architecture/src/blueprint.architecture.json"

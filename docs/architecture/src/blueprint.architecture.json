@@ -4,11 +4,13 @@
   "meta": {
     "title": "CTXRoute Blueprint Infrastructure",
     "quality_profile": "showcase",
-    "viewBox": [1180, 650],
+    "viewBox": [1300, 650],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "grammars", "diagnostics"], "note": "Tree-sitter parses supported source files before rules classify them." }
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "grammars", "diagnostics"], "note": "Tree-sitter parses supported source files before rules classify them." },
+      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state." },
+      { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
     ]
   },
   "components": [
@@ -22,26 +24,38 @@
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Short-lived Node.js CLI", "pos": [270, 520], "size": [180, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
-    { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Stable verdict contract", "pos": [790, 520], "size": [180, 66] }
+    { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Stable verdict contract", "pos": [790, 520], "size": [180, 66] },
+    { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
+    { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },
+    { "id": "crg", "type": "backend", "label": "Ephemeral CRG runner", "sublabel": "uvx child process", "pos": [700, 220], "size": [180, 66] },
+    { "id": "sqlite", "type": "database", "label": "SQLite/WAL", "sublabel": "Local update state", "pos": [1000, 220], "size": [180, 66] },
+    { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS", "pos": [1030, 40], "size": [180, 66] },
+    { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
-    { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] }
+    { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop"] }
   ],
   "connections": [
     { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 180] },
     { "id": "dispatch-context", "from": "lifecycle", "to": "ctxroute", "label": "inject relevant context", "labelAt": [480, 180] },
     { "id": "contributors-archify", "from": "contributors", "to": "archifyAdapter", "label": "validate / build", "labelAt": [320, 440] },
-    { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify", "label": "verified invocation", "labelAt": [485, 250] },
+    { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify" },
     { "id": "ir-adapter", "from": "jsonIr", "to": "archifyAdapter", "label": "typed source" },
     { "id": "adapter-html", "from": "archifyAdapter", "to": "html", "label": "deliver self-contained artifact", "labelAt": [620, 395] },
     { "id": "contributors-sensor", "from": "contributors", "to": "sensor", "label": "scan paths", "variant": "security" },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse AST", "labelAt": [485, 510] },
-    { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] }
+    { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] },
+    { "id": "workspace-watcher", "from": "workspace", "to": "watcher", "label": "file events" },
+    { "id": "watcher-crg", "from": "watcher", "to": "crg", "label": "coalesced update", "variant": "emphasis", "labelAt": [575, 205] },
+    { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "WAL transaction" },
+    { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
+    { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" }
   ],
   "cards": [
     { "dot": "cyan", "title": "Versioned", "items": ["Architecture JSON IR", "Rules and lockfiles", "No generated HTML"] },
     { "dot": "emerald", "title": "Reproducible", "items": ["Exact npm versions", "Archify tag and hashes", "Node.js 22 CI on three operating systems"] },
-    { "dot": "rose", "title": "Out of scope", "items": ["CRG and watchers", "Memory and MCP/A2A", "Agent control loops"] }
+    { "dot": "rose", "title": "Bounded", "items": ["Single-flight CRG updates", "SQLite/WAL local state", "Explicit agent permissions"] }
   ]
 }

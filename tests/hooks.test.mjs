@@ -353,15 +353,20 @@ test('setup prerequisite check is available before dependency installation', () 
 function starterWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'starter-validation-'));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.status = 'template';
+  for (const key of Object.keys(config.decisions)) config.decisions[key] = null;
+  config.directories.source = [];
+  config.codeExtensions = [];
+  config.quality.mutation.decision = null;
   for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture/src']) mkdirSync(join(cwd, directory), { recursive: true });
   for (const file of config.starter.rootFiles) {
     if (file === 'package.json') continue;
     writeFileSync(join(cwd, file), file.endsWith('.json') ? '{}\n' : '');
   }
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
-  writeFileSync(join(cwd, '.project/project-config.json'), readFileSync(join(root, '.project/project-config.json')));
+  writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
-  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs' } }));
+  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs', 'build:docs': 'node build' } }));
   return cwd;
 }
 

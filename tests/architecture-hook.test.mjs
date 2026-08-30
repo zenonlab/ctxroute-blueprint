@@ -11,10 +11,26 @@ const hook = join(root, '.codex/hooks/pre-tool-architecture.mjs');
 
 function run(tool_input, options = {}) {
   return spawnSync('node', [hook], {
-    cwd: options.cwd ?? root,
+    cwd: options.cwd ?? templateWorkspace(),
     input: JSON.stringify({ tool_name: options.toolName ?? 'apply_patch', tool_input }),
     encoding: 'utf8',
   });
+}
+
+function templateWorkspace() {
+  const cwd = mkdtempSync(join(tmpdir(), 'architecture-template-'));
+  const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.status = 'template';
+  for (const key of Object.keys(config.decisions)) config.decisions[key] = null;
+  config.directories.source = [];
+  config.codeExtensions = [];
+  config.quality.mutation.decision = null;
+  for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture/src']) mkdirSync(join(cwd, directory), { recursive: true });
+  for (const file of config.starter.rootFiles) writeFileSync(join(cwd, file), file === 'package.json' ? JSON.stringify({ scripts: { 'build:docs': 'node build' } }) : '');
+  writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
+  writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
+  return cwd;
 }
 
 test('blocks a new product file without architecture evidence', () => {

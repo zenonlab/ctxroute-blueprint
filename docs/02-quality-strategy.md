@@ -1,24 +1,26 @@
 # Quality strategy
 
-<!-- Guide: select only levels useful to the project and record tools that are actually installed. Mutation testing is recommended for critical or algorithmic logic, parsers, validators, and business rules. It is usually unnecessary for simple UI or glue code. Run targeted mutation tests before important commits and the complete mutation suite before major releases. -->
-
 ## Test matrix
 
 | Type | Required? | Tool | Command | Rationale |
 | --- | --- | --- | --- | --- |
-| Unit | to be decided | to be decided | to be decided | to be decided |
-| Integration | to be decided | to be decided | to be decided | to be decided |
-| End-to-end | to be decided | to be decided | to be decided | to be decided |
-| Contract | to be decided | to be decided | to be decided | to be decided |
-| Property | to be decided | to be decided | to be decided | to be decided |
-| Snapshot | to be decided | to be decided | to be decided | to be decided |
-| Performance | to be decided | to be decided | to be decided | to be decided |
+| Unit | yes | Node.js built-in test runner | `npm test` | Event coalescing, process lifecycle, permissions, and pure helpers. |
+| Integration | yes | Node.js built-in test runner | `npm test` | Watcher-to-runner behavior with fake commands and temporary SQLite files. |
+| End-to-end | no | — | — | No deployed product runtime exists. |
+| Contract | yes | Node.js assertions | `npm test` | JSON diagnostics, workspace scripts, and governance outcomes. |
+| Property | no | — | — | The bounded orchestration logic is small and example-driven. |
+| Snapshot | no | — | — | Stable JSON is asserted structurally. |
+| Performance | yes | Node.js timers and process limits | `npm test` | Coalescing and single-flight behavior under bursts. |
 | Security | blueprint infrastructure | tree-sitter Sensor | `npm run sensor -- <paths>` | AST-aware unsafe-code diagnostics |
-| Mutation | to be decided | to be decided | to be decided | to be decided |
+| Mutation | no | — | — | No mutation runner is installed; critical behavior is covered by integration tests. |
 
 ## Decision rule
 
-Describe the covered risk, target scope, and execution timing for every selected test level.
+Unit, integration, contract, and performance checks run on every change through
+`npm test` and CI. Architecture, documentation, configuration, CTXRoute, and
+Sensor checks remain part of `npm run validate`. Security behavior is covered
+by the existing Sensor suite and governance tests. Mutation testing is
+explicitly disabled because no mutation runner is installed.
 
-Record the mutation decision in `.project/project-config.json`. Hooks run the
-command only when `preCommit` or `prePush` is `true`.
+The mutation decision is recorded in `.project/project-config.json`; hooks do
+not run mutation testing.
