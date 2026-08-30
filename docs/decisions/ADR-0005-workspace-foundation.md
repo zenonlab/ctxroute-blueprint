@@ -1,3 +1,12 @@
+---
+scope:
+  - package.json
+  - package-lock.json
+  - packages/**
+  - repos/**
+review: on-change
+revised: true
+---
 # ADR-0005 — npm workspace foundation
 
 - Status: accepted

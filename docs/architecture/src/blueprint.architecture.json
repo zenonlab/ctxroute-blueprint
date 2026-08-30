@@ -30,12 +30,14 @@
     { "id": "crg", "type": "backend", "label": "Ephemeral CRG runner", "sublabel": "uvx child process", "pos": [700, 220], "size": [180, 66] },
     { "id": "sqlite", "type": "database", "label": "SQLite/WAL", "sublabel": "Local update state", "pos": [1000, 220], "size": [180, 66] },
     { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
-    { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] }
+    { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] },
+    { "id": "decisionMemory", "type": "database", "label": "ADR decision memory", "sublabel": "Scoped metadata and durable context", "pos": [1030, 310], "size": [190, 72] },
+    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision checks", "pos": [1030, 430], "size": [190, 66] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
-    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop"] }
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator"] }
   ],
   "connections": [
     { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 180] },
@@ -51,7 +53,8 @@
     { "id": "watcher-crg", "from": "watcher", "to": "crg", "label": "coalesced update", "variant": "emphasis", "labelAt": [575, 205] },
     { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "WAL transaction" },
     { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
-    { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" }
+    { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" },
+    { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope and revision", "variant": "security", "labelAt": [1125, 400] }
   ],
   "cards": [
     { "dot": "cyan", "title": "Versioned", "items": ["Architecture JSON IR", "Rules and lockfiles", "No generated HTML"] },

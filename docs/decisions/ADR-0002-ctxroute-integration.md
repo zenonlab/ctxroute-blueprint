@@ -1,3 +1,13 @@
+---
+scope:
+  - .codex/**
+  - .claude/**
+  - ctxroute-config.json
+  - package.json
+  - package-lock.json
+review: on-change
+revised: true
+---
 # ADR-0002 — CTXRoute integration
 
 - Status: accepted

@@ -98,7 +98,7 @@ function applicableHandlers(plan, event, input) {
   let toolName;
   try { toolName = JSON.parse(input || '{}')?.tool_name; }
   catch { return plan; }
-  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
+  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell|Read|read_file|readFile)$/iu.test(String(toolName))) return plan;
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 

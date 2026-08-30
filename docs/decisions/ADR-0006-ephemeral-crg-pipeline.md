@@ -1,3 +1,12 @@
+---
+scope:
+  - scripts/**
+  - package.json
+  - package-lock.json
+  - .ctxroute/state/**
+review: on-change
+revised: true
+---
 # ADR-0006 — Ephemeral CRG update pipeline
 
 - Status: accepted

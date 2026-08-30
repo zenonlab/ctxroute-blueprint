@@ -1,3 +1,12 @@
+---
+scope:
+  - .codex/**
+  - .githooks/**
+  - package.json
+  - package-lock.json
+review: on-change
+revised: true
+---
 # ADR-0001 — Node.js for template governance
 
 - Status: accepted

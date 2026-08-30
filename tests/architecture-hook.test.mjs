@@ -109,10 +109,16 @@ test('rejects destructive branch replacement during discovery', () => {
   assert.match(result.stdout, /read and validation commands/u);
 });
 
-test('allows a new module with Archify evidence after initialization', () => {
+test('requires both an ADR and Archify evidence for a new module', () => {
+  const cwd = initializedWorkspace();
+  const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json\n*** Add File: docs/decisions/ADR-0001-service.md' }, { cwd });
+  assert.doesNotMatch(result.stdout, /decision":"block/u);
+});
+
+test('blocks a new module with only Archify evidence', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json' }, { cwd });
-  assert.doesNotMatch(result.stdout, /decision":"block/u);
+  assert.match(result.stdout, /applicable ADR/u);
 });
 
 test('blocks code outside declared directories after initialization', () => {
@@ -141,7 +147,7 @@ test('recognizes an Archify source changed in a previous step', () => {
   git(cwd, ['add', '.']);
   git(cwd, ['commit', '-qm', 'chore: fixture']);
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{"changed":true}\n');
-  const result = run({ patch: '*** Add File: src/service.rb' }, { cwd });
+  const result = run({ patch: '*** Add File: src/service.rb\n*** Add File: docs/decisions/ADR-0001-service.md' }, { cwd });
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 

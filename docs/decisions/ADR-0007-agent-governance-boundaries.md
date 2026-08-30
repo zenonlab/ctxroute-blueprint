@@ -1,3 +1,12 @@
+---
+scope:
+  - scripts/agent-governance.json
+  - scripts/agent-governance.mjs
+  - .codex/hooks/**
+  - .claude/hooks/**
+review: on-change
+revised: true
+---
 # ADR-0007 — Agent governance and control-loop boundaries
 
 - Status: accepted
