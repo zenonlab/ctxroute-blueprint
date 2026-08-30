@@ -1,9 +1,14 @@
 # CTXRoute Blueprint
 
 [![Validate](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml/badge.svg)](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml)
+[![GitHub Template](https://img.shields.io/badge/GitHub-template-181717?logo=github)](https://github.com/zenonlab/ctxroute-blueprint/generate)
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm 10+](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
-[![Archify](https://img.shields.io/badge/architecture-Archify-06b6d4)](https://github.com/tt-a1i/archify)
+[![CTXRoute](https://img.shields.io/badge/context-CTXRoute-7c3aed)](https://github.com/zenonlab/ctxroute)
+[![Archify v2.16.0](https://img.shields.io/badge/architecture-Archify_v2.16.0-06b6d4)](https://github.com/tt-a1i/archify/releases/tag/v2.16.0)
+[![tree-sitter Sensor](https://img.shields.io/badge/security-tree--sitter_Sensor-ef4444)](https://tree-sitter.github.io/tree-sitter/)
+[![Codex + Claude](https://img.shields.io/badge/agents-Codex_%2B_Claude-111827)](AGENTS.md)
+[![Linux, macOS, Windows](https://img.shields.io/badge/CI-Linux_%7C_macOS_%7C_Windows-2563eb)](.github/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 An architecture-first [GitHub template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository)
@@ -15,32 +20,46 @@ The generated product remains stack-neutral. The template tooling requires
 [CTXRoute](https://github.com/zenonlab/ctxroute), governance hooks, tests, and
 [Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor.
 
+The blueprint combines five infrastructure layers:
+
+- **Agent governance:** one shared doctrine for Codex and Claude, enforced by
+  project-local lifecycle and Git hooks.
+- **Context routing:** CTXRoute injects only the project guidance relevant to
+  the current action.
+- **Architecture:** Archify validates versioned JSON IR and generates an
+  interactive artifact outside Git.
+- **Static safety:** the tree-sitter Sensor analyzes supported source files and
+  emits stable JSON diagnostics.
+- **Portable validation:** Node.js 22 CI runs on Linux, macOS, and Windows.
+
 ## Create a project
 
 1. Select **Use this template** on GitHub.
 2. Clone the generated repository and enter its root directory.
 3. Install Git, Node.js 22+, and npm 10+.
-4. Install the pinned dependencies:
+4. Bootstrap the repository:
 
    ```sh
-   npm install
+   npm run setup
    ```
 
-   The `postinstall` check verifies CTXRoute, its lifecycle entry points, and
-   the Codex and Claude project configurations. It also warns when legacy
+   Setup runs `npm ci`, restores the pinned Archify skill, runs Archify Doctor,
+   verifies CTXRoute and the agent configurations, enables the repository Git
+   hooks, and executes the complete validation suite. It also warns when legacy
    global CTXRoute hooks would run alongside the project-local dispatchers.
 5. In Codex, open `/hooks` and approve the six workspace definitions. This is
    the only local activation step; the repository never changes Codex trust
    settings stored outside the workspace. Claude reads the tracked
    `.claude/settings.json` configuration.
-6. Run `npm run setup` to enable repository Git hooks and execute the complete validation suite.
-7. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
+6. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
    agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), then
-   initialize the project from your requirements.
-8. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
+   initialize the project from your requirements. While the project status is
+   `template`, governance blocks product-code writes until the decisions,
+   architecture, and quality strategy are complete.
+7. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
    [architecture decision records](docs/decisions/README.md), [Archify architecture](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
-9. Approve any starter-file cleanup only when the starter is fully initialized;
+8. Approve any starter-file cleanup only when the starter is fully initialized;
    verified project commits are created automatically.
 
 `npm run setup` installs the pinned dependencies and Archify skill, enables
@@ -53,9 +72,9 @@ Codex settings, delete tracked project files, or create commits.
 infrastructure. Product source directories and commands are created only after
 project discovery.
 
-[`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md) provide the project rules
-for both Codex and Claude agents. They are intentionally kept aligned; the
-repository doctrine designates `AGENTS.md` as the canonical source.
+[`AGENTS.md`](AGENTS.md) is the single source of project doctrine for both
+Codex and Claude. [`CLAUDE.md`](CLAUDE.md) imports it directly instead of
+duplicating the rules.
 
 `.project/project-config.json` is the source of
 truth for source directories, code extensions, contracts, commands, and
@@ -92,16 +111,76 @@ For prerequisite diagnostics without installing anything, run
 
 ## Validate
 
+Run the complete repository gate:
+
 ```sh
 npm run validate
 ```
 
-Architecture commands are `npm run validate:architecture`, `npm run build:docs`,
-and `npm run preview:docs`. Scan supported source with
-`npm run sensor -- <paths>` and check Archify release awareness with
-`npm run check:updates`. Updating Archify is explicit: review the release,
-update `.project/archify-pin.json`, reinstall to regenerate `skills-lock.json`,
-run doctor and all tests, then commit the reviewed change.
+For a full local verification after initialization:
+
+```sh
+npm run validate
+npm run build:docs
+npm run sensor -- <paths>
+git status --porcelain
+```
+
+The final command must produce no output. Generated documentation belongs under
+the ignored `dist/` directory and must never be committed.
+
+## Architecture with Archify
+
+The versioned architecture source is
+[`docs/architecture/src/blueprint.architecture.json`](docs/architecture/src/blueprint.architecture.json).
+It is validated at Archify's `showcase` quality level.
+
+```sh
+npm run validate:architecture
+npm run build:docs
+npm run preview:docs
+```
+
+`build:docs` generates `dist/architecture/blueprint.html`; `preview:docs`
+builds it and starts the local interactive preview. The generated HTML is not a
+source file and must not be edited manually.
+
+Archify is pinned to version `v2.16.0` in
+[`skills-lock.json`](skills-lock.json) and
+[`.project/archify-pin.json`](.project/archify-pin.json). Updates are always
+explicit: review the upstream release, tag, commit, and hash; update the pin;
+regenerate the lock through installation; run Archify Doctor, validation,
+tests, and the documentation build; then confirm a clean Git state before
+committing.
+
+Use `npm run check:updates` to check release awareness; it never performs a
+silent update.
+
+## Sensor
+
+The Sensor parses JavaScript, JSX, TypeScript, TSX, and Python with tree-sitter.
+It reports one stable JSON object containing a verdict and ordered diagnostics.
+Standalone comments and strings are ignored, while command literals passed to
+recognized shell APIs are inspected.
+
+```sh
+npm run sensor -- src/example.ts scripts/check.py
+```
+
+Verdicts and exit codes are:
+
+| Verdict | Meaning | Exit code |
+| --- | --- | ---: |
+| `SAFE` | No diagnostic | `0` |
+| `WARN` | Configured complexity limit exceeded | `1` |
+| `UNSAFE` | Dangerous executable construct detected | `2` |
+| `ERROR` | Invalid input, unsupported language, read, or syntax error | `2` |
+
+Rules and thresholds live in
+[`.project/sensor-rules.json`](.project/sensor-rules.json). The Sensor covers
+dynamic evaluation, dynamic function construction, dangerous shell commands,
+`shell: true`, direct secret-to-network output, syntax errors, and excessive AST
+complexity.
 
 The agent must not delete starter guides without user confirmation. It creates
 verified commits automatically. See the [repository contribution rules](CONTRIBUTING.md)
