@@ -24,7 +24,7 @@ export function handlerPlan(harness, event, root = projectRoot) {
   return {
     SessionStart: [ctxroute('session-inject.js', '--budget', '0')],
     PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', '0')],
-    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
+    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],

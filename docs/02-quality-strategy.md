@@ -11,7 +11,7 @@
 | Property | no | — | — | The bounded orchestration logic is small and example-driven. |
 | Snapshot | no | — | — | Stable JSON is asserted structurally. |
 | Performance | yes | Node.js timers and process limits | `npm test` | Coalescing and single-flight behavior under bursts. |
-| Security | blueprint infrastructure | tree-sitter Sensor | `npm run sensor -- <paths>` | AST-aware unsafe-code diagnostics |
+| Security | blueprint infrastructure | tree-sitter Sensor and markup adapters | `npm run sensor -- <paths>` | AST-aware and comment/string-safe diagnostics |
 | Mutation | no | — | — | No mutation runner is installed; critical behavior is covered by integration tests. |
 
 ## Decision rule
@@ -23,4 +23,6 @@ by the existing Sensor suite and governance tests. Mutation testing is
 explicitly disabled because no mutation runner is installed.
 
 The mutation decision is recorded in `.project/project-config.json`; hooks do
-not run mutation testing.
+not run mutation testing. PostToolUse integration tests cover path extraction,
+multi-language ordering, CTXRoute context transmission, explicit unsupported
+files, and the boundary that prevents policy or global configuration changes.

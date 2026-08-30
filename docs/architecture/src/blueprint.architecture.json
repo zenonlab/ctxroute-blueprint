@@ -4,7 +4,7 @@
   "meta": {
     "title": "CTXRoute Blueprint Transition Infrastructure",
     "quality_profile": "showcase",
-    "viewBox": [1300, 650],
+    "viewBox": [1300, 850],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
@@ -23,6 +23,8 @@
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [520, 410], "size": [180, 66] },
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Short-lived Node.js CLI", "pos": [270, 520], "size": [180, 66] },
+    { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
+    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "JS / TS / Py / SQL / HTML / CSS", "pos": [520, 700], "size": [220, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Stable verdict contract", "pos": [790, 520], "size": [180, 66] },
     { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
@@ -36,18 +38,21 @@
     { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "SQLite detection; scoped rules", "pos": [708, 400], "size": [190, 72] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
+    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor", "postToolUse", "sensorAdapters"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
     { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory"] }
   ],
   "connections": [
-    { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 180] },
+    { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 300] },
     { "id": "dispatch-context", "from": "lifecycle", "to": "ctxroute", "label": "inject relevant context", "labelAt": [480, 180] },
     { "id": "contributors-archify", "from": "contributors", "to": "archifyAdapter", "label": "validate / build", "labelAt": [320, 440] },
     { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify" },
     { "id": "ir-adapter", "from": "jsonIr", "to": "archifyAdapter", "label": "typed source" },
     { "id": "adapter-html", "from": "archifyAdapter", "to": "html", "label": "deliver self-contained artifact", "labelAt": [620, 395] },
     { "id": "contributors-sensor", "from": "contributors", "to": "sensor", "label": "scan paths", "variant": "security" },
+    { "id": "dispatch-post-tool", "from": "lifecycle", "to": "postToolUse", "label": "after mutation", "variant": "emphasis", "fromSide": "left", "toSide": "left", "via": [[230, 133], [230, 200], [20, 200], [20, 713]], "labelAt": [120, 215] },
+    { "id": "post-tool-sensor", "from": "postToolUse", "to": "sensor", "label": "reuse path extraction", "labelAt": [245, 600] },
+    { "id": "sensor-adapters", "from": "sensor", "to": "sensorAdapters", "label": "select adapter", "labelAt": [485, 660] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse AST", "labelAt": [485, 510] },
     { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] },
     { "id": "workspace-watcher", "from": "workspace", "to": "watcher", "label": "file events" },

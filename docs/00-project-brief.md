@@ -5,8 +5,8 @@
 - Name: CTXRoute Blueprint transition infrastructure
 - Problem solved: provide reproducible workspace coordination, bounded CRG updates, and explicit agent governance around existing blueprint tooling.
 - Users: contributors and coding agents working in the three-repository workspace.
-- In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, and CI.
-- Out of scope: changing CTXRoute, replacing Archify or Sensor, a persistent Python service, and duplicating issue #7 multilingual post-hook analysis.
+- In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, and the extensible multilingual PostToolUse Sensor.
+- Out of scope: changing CTXRoute, replacing Archify, a persistent Python service, and imposing Sensor rules on derived products.
 
 ## Constraints
 
@@ -24,6 +24,7 @@
 - Tests: Node.js built-in test runner for unit, integration, contract, and performance checks.
 - Deployment: source repository and GitHub Actions only; no production deployment.
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
+- Post-hook analysis: JS/TS/JSX/TSX, Python, SQL, HTML, and CSS adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
 
 ## Success criteria
 
@@ -32,4 +33,5 @@
 - File events produce at most one bounded CRG subprocess per coalesced update and leave no persistent Python process.
 - SQLite uses WAL and closes cleanly on success, failure, and signal.
 - Governance rules make ASK, NEVER, and ALWAYS decisions explicit and auditable.
+- PostToolUse returns schema-versioned SAFE/WARN/UNSAFE/ERROR diagnostics; UNSAFE/ERROR remain visible to validation and Git controls.
 - Architecture, tests, Sensor diagnostics, and Linux/macOS/Windows CI remain green.

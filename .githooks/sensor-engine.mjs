@@ -1,0 +1,85 @@
+import Parser from 'tree-sitter';
+import JavaScript from 'tree-sitter-javascript';
+import TypeScript from 'tree-sitter-typescript';
+import Python from 'tree-sitter-python';
+import { readFileSync } from 'node:fs';
+import { extname, resolve } from 'node:path';
+
+const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
+const grammars = new Map([
+  ['.js', JavaScript], ['.jsx', JavaScript], ['.mjs', JavaScript], ['.cjs', JavaScript],
+  ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
+]);
+
+export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
+  const diagnostics = [];
+  if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
+  for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics);
+  diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
+  const verdict = diagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
+  return { schemaVersion: 1, verdict, diagnostics };
+}
+
+export function analyzeSource(path, source, { config = {} } = {}) {
+  const extension = extname(path).toLowerCase();
+  const diagnostics = [];
+  const grammar = grammars.get(extension);
+  if (grammar) analyzeAst(path, source, grammar, config, diagnostics);
+  else if (extension === '.sql') analyzeSql(path, source, diagnostics);
+  else if (extension === '.html' || extension === '.htm') analyzeHtml(path, source, diagnostics);
+  else if (extension === '.css' || extension === '.scss' || extension === '.sass') analyzeCss(path, source, diagnostics);
+  else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
+  return diagnostics;
+}
+
+function analyzePath(path, root, config, diagnostics) {
+  try { diagnostics.push(...analyzeSource(path, readFileSync(resolve(root, path), 'utf8'), { config })); }
+  catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
+}
+
+function analyzeAst(path, source, grammar, config, diagnostics) {
+  const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
+  if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
+  let count = 0; let maxDepth = 0;
+  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config); });
+  const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
+  if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
+}
+
+function inspectAst(path, source, node, diagnostics, config) {
+  const text = source.slice(node.startIndex, node.endIndex);
+  if (node.type === 'call_expression' || node.type === 'call') {
+    const name = node.childForFieldName('function')?.text ?? '';
+    if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
+    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Debug output should not ship in production code.'));
+    if (isShell(name)) {
+      const first = node.childForFieldName('arguments')?.namedChild(0); const command = literal(first, source).toLowerCase();
+      if (command && (config.dangerousCommands ?? []).some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
+      if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
+    }
+    if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
+    if (/\.innerHTML\s*=|\.outerHTML\s*=/u.test(text) && /<style\b|<script\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
+  }
+  if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
+  if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
+  if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
+  if (node.type === 'template_string' && /<(?:style|script)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime template; keep UI structure and styles in their respective layers.'));
+}
+
+function analyzeSql(path, source, diagnostics) {
+  const code = maskSql(source);
+  for (const match of code.matchAll(/(?:select|insert|update|delete|where|from)[\s\S]{0,180}(?:\+|\|\||\$\{)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is constructed from untrusted string data.'));
+  for (const match of code.matchAll(/\b(?:execute|query|prepare)\s*\([^\n;]*(?:\$\{|\+|\|\|)[^\n;]*\)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is constructed from untrusted string data.'));
+}
+function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
+function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
+function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
+function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
+function defaultConfig(root) { try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); } catch { return { dangerousCommands: [], complexity: { maxNodes: 2000, maxDepth: 80 } }; } }
+function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }
+function firstError(node) { if (node.isError || node.isMissing) return node; for (const child of node.namedChildren) { const result = firstError(child); if (result) return result; } return node; }
+function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }
+function isShell(name) { return /(?:^|\.)(?:exec|execSync|spawn|spawnSync|system|popen|run)$/u.test(name); }
+function isNetwork(name) { return /^(?:fetch|axios(?:\.[a-z]+)?|https?\.(?:request|get)|requests\.(?:get|post|put|patch|delete))$/u.test(name); }
+function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? -1) + 1, column: (node?.startPosition.column ?? -1) + 1, rule, severity, message }; }
+function lineDiagnostic(path, source, index, rule, severity, message) { const before = source.slice(0, index); return { path, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, severity, message }; }
