@@ -14,7 +14,7 @@ the shared lifecycle dispatcher. Codex selects its portable shells; Claude
 selects CTXRoute's native shells. The dispatcher executes those project-local
 entry points directly instead of starting a nested wrapper process.
 
-```mermaid
+```text
 flowchart TD
     Session[SessionStart] --> SessionContext[CTXRoute session context]
     Request[Requested action] --> PreTool[PreToolUse dispatcher]
@@ -30,7 +30,7 @@ flowchart TD
     Audit --> Index[Git index]
     Index --> PreCommit[Authoritative pre-commit]
     PreCommit --> Architecture[Architecture and ADR checks]
-    PreCommit --> Documentation[Links, placeholders, and Mermaid]
+    PreCommit --> Documentation[Links, placeholders, and Archify]
     PreCommit --> Quality[Targeted mutation testing when configured]
     Architecture --> PrePush[Pre-push]
     Documentation --> PrePush

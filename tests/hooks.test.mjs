@@ -198,9 +198,9 @@ test('PostToolUse reminds about documentation after a code change', () => {
   assert.match(result.stdout, /Update documentation/u);
 });
 
-test('PostToolUse audits documents and Mermaid diagrams', () => {
+test('PostToolUse audits documents and Archify sources', () => {
   const result = run('.codex/hooks/post-tool-audit.mjs', { tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/runtime-loop.mmd' } });
-  assert.match(result.stdout, /Mermaid/u);
+  assert.match(result.stdout, /Archify JSON IR/u);
 });
 
 test('an active Stop hook does not loop', () => {
@@ -293,14 +293,6 @@ test('documentation rejects guides after initialization', () => {
   assert.match(result.stderr, /guide or placeholder/u);
 });
 
-test('invalid Mermaid is rejected', () => {
-  const cwd = starterWorkspace();
-  writeFileSync(join(cwd, 'docs/bad.md'), '# Diagram\n\n```mermaid\nflowchart TD\n  A -->\n```\n');
-  const result = spawnSync('node', [join(root, '.githooks/validate-docs.mjs'), '--all'], { cwd, encoding: 'utf8' });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /invalid Mermaid/u);
-});
-
 test('mutation configured for pre-commit is executed', () => {
   const cwd = starterWorkspace();
   const configPath = join(cwd, '.project/project-config.json');
@@ -361,13 +353,14 @@ test('setup prerequisite check is available before dependency installation', () 
 function starterWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'starter-validation-'));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
-  for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture']) mkdirSync(join(cwd, directory), { recursive: true });
+  for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture/src']) mkdirSync(join(cwd, directory), { recursive: true });
   for (const file of config.starter.rootFiles) {
     if (file === 'package.json') continue;
     writeFileSync(join(cwd, file), file.endsWith('.json') ? '{}\n' : '');
   }
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
   writeFileSync(join(cwd, '.project/project-config.json'), readFileSync(join(root, '.project/project-config.json')));
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs' } }));
   return cwd;
 }
@@ -383,8 +376,6 @@ function initializedWorkspace() {
   config.quality.mutation.decision = 'not-applicable';
   writeFileSync(configPath, JSON.stringify(config));
   mkdirSync(join(cwd, 'src'));
-  writeFileSync(join(cwd, 'docs/architecture/context.md'), '# Context\n\n```mermaid\nC4Context\n  Person(user, "User")\n  System(system, "System")\n  Rel(user, system, "Uses")\n```\n');
-  writeFileSync(join(cwd, 'docs/architecture/containers.md'), '# Containers\n\n```mermaid\nC4Container\n  Person(user, "User")\n  Container(app, "App", "JavaScript")\n  Rel(user, app, "Uses")\n```\n');
   return cwd;
 }
 

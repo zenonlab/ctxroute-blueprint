@@ -16,7 +16,6 @@ if (checkOnly) {
 }
 
 run('Install pinned dependencies', process.execPath, [npmCli, 'ci']);
-run('Install the Mermaid browser', process.execPath, [npmCli, 'exec', '--yes=false', '--', 'puppeteer', 'browsers', 'install', 'chrome-headless-shell']);
 run('Enable repository Git hooks', 'git', ['config', 'core.hooksPath', '.githooks']);
 run('Validate the complete starter', process.execPath, [npmCli, 'run', 'validate']);
 

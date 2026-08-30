@@ -17,7 +17,7 @@ function run(tool_input, options = {}) {
   });
 }
 
-test('blocks a new product file without C4 evidence', () => {
+test('blocks a new product file without architecture evidence', () => {
   const result = run({ command: '*** Add File: src/new-module.ts' });
   assert.match(result.stdout, /Write blocked/u);
 });
@@ -93,15 +93,15 @@ test('rejects destructive branch replacement during discovery', () => {
   assert.match(result.stdout, /read and validation commands/u);
 });
 
-test('allows a new module with C4 evidence after initialization', () => {
+test('allows a new module with Archify evidence after initialization', () => {
   const cwd = initializedWorkspace();
-  const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/containers.md' }, { cwd });
+  const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json' }, { cwd });
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
 test('blocks code outside declared directories after initialization', () => {
   const cwd = initializedWorkspace();
-  const result = run({ patch: '*** Add File: application.rb\n*** Update File: docs/architecture/containers.md' }, { cwd });
+  const result = run({ patch: '*** Add File: application.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json' }, { cwd });
   assert.match(result.stdout, /outside declared directories/u);
 });
 
@@ -117,14 +117,14 @@ test('allows a contract with a real ADR', () => {
   assert.equal(result.stdout, '');
 });
 
-test('recognizes a C4 document changed in a previous step', () => {
+test('recognizes an Archify source changed in a previous step', () => {
   const cwd = initializedWorkspace();
   git(cwd, ['init', '-q']);
   git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
   git(cwd, ['config', 'user.name', 'Fixture']);
   git(cwd, ['add', '.']);
   git(cwd, ['commit', '-qm', 'chore: fixture']);
-  writeFileSync(join(cwd, 'docs/architecture/containers.md'), '# Containers\n\nNew service.\n');
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{"changed":true}\n');
   const result = run({ patch: '*** Add File: src/service.rb' }, { cwd });
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
@@ -145,7 +145,7 @@ test('allows only invalid configuration repair', () => {
 
 function initializedWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'architecture-hook-'));
-  for (const directory of ['.codex', '.project', 'docs/architecture', 'src']) mkdirSync(join(cwd, directory), { recursive: true });
+  for (const directory of ['.codex', '.project', 'docs/architecture/src', 'src']) mkdirSync(join(cwd, directory), { recursive: true });
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
   config.status = 'initialized';
@@ -154,8 +154,7 @@ function initializedWorkspace() {
   config.codeExtensions = ['.rb'];
   config.quality.mutation.decision = 'not-applicable';
   writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
-  writeFileSync(join(cwd, 'docs/architecture/context.md'), '# Context\n');
-  writeFileSync(join(cwd, 'docs/architecture/containers.md'), '# Containers\n');
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
   return cwd;
 }
 

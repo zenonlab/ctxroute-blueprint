@@ -17,7 +17,7 @@ if (codePaths.length || policyPaths.length || docPaths.length) {
   }
   if (docPaths.length) {
     lines.push(`Documentation : ${docPaths.join(', ')}`);
-    lines.push('Check consistency, links, Mermaid, and related documents.');
+    lines.push('Check consistency, links, Archify JSON IR, and related documents.');
   }
   if (policyPaths.length) {
     lines.push(`Instructions/hooks : ${policyPaths.join(', ')}`);

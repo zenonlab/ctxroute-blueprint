@@ -13,7 +13,7 @@
 | Property | to be decided | to be decided | to be decided | to be decided |
 | Snapshot | to be decided | to be decided | to be decided | to be decided |
 | Performance | to be decided | to be decided | to be decided | to be decided |
-| Security | to be decided | to be decided | to be decided | to be decided |
+| Security | blueprint infrastructure | tree-sitter Sensor | `npm run sensor -- <paths>` | AST-aware unsafe-code diagnostics |
 | Mutation | to be decided | to be decided | to be decided | to be decided |
 
 ## Decision rule
