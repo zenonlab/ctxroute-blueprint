@@ -31,6 +31,9 @@ problem recurrence threshold is independent from CTXRoute's generic threshold.
 When a recurring record has no known resolution, emit an auditable proposal;
 automatic hook activation is never performed by the memory hook. A protection
 must be scoped, validated, and approved by the agent control boundary.
+Approved resolutions are recorded through the controlled `resolve` command and
+are injected on later recurrences as context. The command never activates a
+hook or changes agent trust settings.
 
 Persist records as SQLite tables in the project-local state directory using WAL
 mode and parameterized statements. Bound and redact evidence before persistence.

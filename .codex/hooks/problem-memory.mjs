@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
-const root = resolve(new URL('../..', import.meta.url).pathname);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const MAX_FIELD_LENGTH = 4000;
 
 export function normalizeText(value) {
   return String(value ?? '')
@@ -13,7 +15,8 @@ export function normalizeText(value) {
     .replace(/\b\d+(?:\.\d+)?\b/gu, '<n>')
     .replace(/\s+/gu, ' ')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .slice(0, MAX_FIELD_LENGTH);
 }
 
 export function normalizeStructuralMessage(value) {
@@ -26,7 +29,7 @@ export function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value)
-      .filter(([key]) => !/^time|timestamp|session|request|run|duration|pid$/iu.test(key))
+      .filter(([key]) => !/^(?:time|timestamp|session|request|run|duration|pid)(?:_|$)/iu.test(key))
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, item]) => [key, canonicalize(item)]));
   }
@@ -54,13 +57,15 @@ export function extractObservation(input, event) {
 
   const explicit = value.problem ?? value.problem_detected;
   const result = value.tool_result ?? value.tool_response ?? value.result ?? value.error ?? value.failure;
-  const failed = value.success === false || value.is_error === true || value.exit_code > 0
+  const failed = value.success === false || value.ok === false || value.is_error === true
+    || value.exit_code > 0 || value.exitCode > 0 || value.status === 'error'
+    || Boolean(value.error_message)
     || (result && (result.is_error === true || result.success === false || result.error));
   const userReported = event === 'UserPromptSubmit' && (explicit || value.problemDetected === true);
   if (!failed && !userReported) return null;
 
   const details = typeof explicit === 'object' ? explicit : {};
-  const message = details.message ?? value.error ?? value.failure ?? result?.error
+  const message = details.message ?? value.error_message ?? value.error ?? value.failure ?? result?.error
     ?? value.message ?? value.prompt ?? value.raw ?? 'unspecified problem';
   const tool = value.tool_name ?? value.tool ?? details.tool ?? 'user';
   const target = value.tool_input?.file_path ?? value.file_path ?? details.target ?? '';
@@ -73,8 +78,8 @@ export function extractObservation(input, event) {
     tool: String(tool),
     target: String(target),
     code: String(code),
-    message: String(message),
-    stack: String(stack),
+    message: fieldText(message),
+    stack: fieldText(stack),
     evidence: redactEvidence(canonicalize(value)),
   };
 }
@@ -86,8 +91,7 @@ export function buildSignatures(observation) {
     tool: observation.tool,
     target: observation.target,
     code: observation.code,
-    message: normalizeStructuralMessage(observation.message),
-    message: observation.message,
+    message: normalizeText(observation.message),
     stack: observation.stack,
   });
   const structural = canonicalize({
@@ -96,11 +100,19 @@ export function buildSignatures(observation) {
     tool: observation.tool,
     target: observation.target,
     code: observation.code,
+    message: normalizeStructuralMessage(observation.message),
   });
   return {
     exactSignature: digest(exact),
     structuralSignature: digest(structural),
   };
+}
+
+function fieldText(value) {
+  if (value && typeof value === 'object') {
+    try { return JSON.stringify(value).slice(0, MAX_FIELD_LENGTH); } catch { return '[unserializable]'; }
+  }
+  return String(value ?? '').slice(0, MAX_FIELD_LENGTH);
 }
 
 function digest(value) {
@@ -143,7 +155,26 @@ export class ProblemStore {
     return { id: Number(result.lastInsertRowid), occurrences: 1, match: 'new', first_seen: now, last_seen: now };
   }
 
+  resolve(problemId, resolution, now = new Date().toISOString()) {
+    if (!resolution || typeof resolution !== 'object' || !resolution.type || !resolution.summary) {
+      throw new TypeError('A resolution requires type and summary');
+    }
+    const result = this.database.prepare(`UPDATE problems SET resolution_json = ?, protection_status = ?, last_seen = ? WHERE id = ?`)
+      .run(JSON.stringify(redactEvidence(resolution)), resolution.protectionStatus ?? 'resolved', now, problemId);
+    return result.changes > 0;
+  }
+
+  get(problemId) {
+    return this.database.prepare('SELECT * FROM problems WHERE id = ?').get(problemId);
+  }
+
   close() { this.database.close(); }
+}
+
+export function resolveProblem(problemId, resolution, stateDirectory) {
+  const store = new ProblemStore(stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
+  try { return store.resolve(Number(problemId), resolution); }
+  finally { store.close(); }
 }
 
 function appendEvidence(serialized, evidence) {
@@ -166,14 +197,36 @@ function requireConfig() {
 }
 
 function emit(observation, record, config) {
-  if (record.match === 'new' || record.occurrences < config.recurrenceThreshold) return null;
+  const threshold = validThreshold(config.recurrenceThreshold);
+  if (record.match === 'new' || record.occurrences < threshold) return null;
+  let resolution = null;
+  try { resolution = record.resolution_json ? JSON.parse(record.resolution_json) : null; } catch { resolution = null; }
+  const proposal = resolution ? null : {
+    type: 'protection-proposal',
+    allowedActions: ['correction', 'refactor', 'persistent-instruction', 'specific-hook'],
+    approvalRequired: true,
+    scope: { event: observation.event, tool: observation.tool, target: observation.target },
+  };
   return {
-    systemMessage: `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). Reuse its recorded context before asking the user again. Protection mode: ${config.protectionMode}.`,
+    systemMessage: resolution
+      ? `Recurring problem recognized (${record.occurrences} occurrences). Reuse the approved resolution before asking the user again.`
+      : `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). A protection proposal requires approval.`,
     hookSpecificOutput: {
       hookEventName: observation.event,
-      additionalContext: JSON.stringify({ problemMemory: { problemId: record.id, occurrences: record.occurrences, signatureMatch: record.match } }),
+      additionalContext: JSON.stringify({ problemMemory: {
+        problemId: record.id,
+        occurrences: record.occurrences,
+        signatureMatch: record.match,
+        resolution,
+        proposal,
+      } }),
     },
   };
+}
+
+function validThreshold(value) {
+  const threshold = Number(value);
+  return Number.isInteger(threshold) && threshold >= 2 ? threshold : 3;
 }
 
 export function handle(input, event, options = {}) {
@@ -188,6 +241,15 @@ export function handle(input, event, options = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+  if (process.argv[2] === 'resolve') {
+    try {
+      const result = resolveProblem(process.argv[3], JSON.parse(process.argv[4] ?? '{}'));
+      process.stdout.write(JSON.stringify({ resolved: result }));
+    } catch (error) {
+      process.stderr.write(`Problem memory resolution failed: ${error.message}`);
+      process.exitCode = 1;
+    }
+  } else {
   let input = '';
   process.stdin.setEncoding('utf8');
   for await (const chunk of process.stdin) input += chunk;
@@ -196,5 +258,6 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.
     if (output) process.stdout.write(JSON.stringify(output));
   } catch (error) {
     process.stderr.write(`Problem memory failed open: ${error.message}`);
+  }
   }
 }

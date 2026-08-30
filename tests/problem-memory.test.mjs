@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -10,6 +11,7 @@ import {
   handle,
   normalizeText,
   normalizeStructuralMessage,
+  resolveProblem,
 } from '../.codex/hooks/problem-memory.mjs';
 
 test('normalization removes volatile values while preserving the cause', () => {
@@ -17,13 +19,15 @@ test('normalization removes volatile values while preserving the cause', () => {
   assert.equal(normalizeStructuralMessage('failed for alpha'), 'failed for <var>');
 });
 
-test('problem signatures are deterministic and separate structural context from stack noise', () => {
+test('problem signatures are deterministic and retain normalized cause in structural matching', () => {
   const first = extractObservation({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed for alpha', stack: 'a:1' }, 'PostToolUse');
   const second = extractObservation({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed for beta', stack: 'b:2' }, 'PostToolUse');
   const left = buildSignatures(first);
   const right = buildSignatures(second);
   assert.notEqual(left.exactSignature, right.exactSignature);
   assert.equal(left.structuralSignature, right.structuralSignature);
+  const unrelated = extractObservation({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'permission denied' }, 'PostToolUse');
+  assert.notEqual(left.structuralSignature, buildSignatures(unrelated).structuralSignature);
 });
 
 test('ordinary prompts are ignored unless explicitly marked as problems', () => {
@@ -60,6 +64,40 @@ test('handle emits a proposal only at the configured recurrence threshold', () =
   const result = handle(input, 'PostToolUse', { config, stateDirectory: directory });
   assert.match(result.systemMessage, /Recurring problem recognized/u);
   assert.match(result.hookSpecificOutput.additionalContext, /problemId/u);
+  assert.match(result.hookSpecificOutput.additionalContext, /approvalRequired/u);
+});
+
+test('a recorded resolution is reused on recurrence', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-resolution-'));
+  const store = new ProblemStore(directory);
+  const observation = extractObservation({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed' }, 'PostToolUse');
+  const signatures = buildSignatures(observation);
+  const first = store.record(observation, signatures);
+  assert.equal(store.resolve(first.id, { type: 'correction', summary: 'Run npm install before retrying' }), true);
+  store.close();
+  const result = handle(JSON.stringify({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed' }), 'PostToolUse', {
+    config: { enabled: true, recordOn: ['PostToolUse'], recurrenceThreshold: 2, protectionMode: 'propose' },
+    stateDirectory: directory,
+  });
+  assert.match(result.hookSpecificOutput.additionalContext, /Run npm install/u);
+  assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /approvalRequired/u);
+});
+
+test('resolutions can be recorded through the controlled CLI', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-cli-'));
+  const store = new ProblemStore(directory);
+  const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
+  const record = store.record(observation, buildSignatures(observation));
+  store.close();
+  const output = execFileSync(process.execPath, ['.codex/hooks/problem-memory.mjs', 'resolve', String(record.id), JSON.stringify({ type: 'persistent-instruction', summary: 'Keep the lockfile pinned' })], {
+    cwd: new URL('..', import.meta.url),
+    env: { ...process.env, CTXROUTE_STATE_DIR: directory },
+    encoding: 'utf8',
+  });
+  assert.deepEqual(JSON.parse(output), { resolved: true });
+  const check = new ProblemStore(directory);
+  assert.equal(JSON.parse(check.get(record.id).resolution_json).summary, 'Keep the lockfile pinned');
+  check.close();
 });
 
 test('the hook fails open when disabled', () => {
