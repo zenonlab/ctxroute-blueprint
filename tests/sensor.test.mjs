@@ -104,6 +104,16 @@ test('SQL tracking detects Python percent formatting and preserves parameterized
   assert.equal(analyzeSource('format.py', "cursor.execute('SELECT * FROM users WHERE id = %s' % user_id)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('format.py', "cursor.execute('SELECT * FROM users WHERE id = %s', [user_id])").length, 0);
 });
+test('one action analyzes multiple language adapters with stable diagnostic ordering', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-multi-language-'));
+  writeFileSync(join(directory, 'page.vue'), '<script>eval(input);</script>\n');
+  writeFileSync(join(directory, 'query.sql'), 'SELECT * FROM users WHERE id = ${user_id};\n');
+  writeFileSync(join(directory, 'styles.css'), '<div>wrong</div>\n');
+  const result = analyzePaths(['styles.css', 'query.sql', 'page.vue'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'UNSAFE');
+  assert.deepEqual(result.diagnostics.map(item => item.path), ['page.vue', 'query.sql', 'styles.css']);
+  assert.deepEqual(result.diagnostics.map(item => item.rule), ['sensor/dynamic-eval', 'sensor/sql-injection', 'sensor/ui-mixed-markup']);
+});
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
   assert.equal(analyzeSource('page.html', '<style>main { color: red }</style>').at(0).rule, 'sensor/ui-mixed-markup');
