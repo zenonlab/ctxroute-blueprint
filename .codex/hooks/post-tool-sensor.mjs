@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 const input = await parseInput();
 if (input) {
-  const sourceLike = /\.(?:c|cc|cpp|cs|css|go|html?|java|js|jsx|mjs|php|py|rb|rs|sass|scss|sql|swift|ts|tsx|vue)$/iu;
+  const sourceLike = /\.(?:c|cc|cpp|cs|css|go|html?|java|js|jsx|mjs|php|py|rb|rs|sass|scss|svelte|sql|swift|ts|tsx|vue)$/iu;
   const deletion = /\b(?:delete|remove|unlink)\b/iu.test(String(input.tool_name ?? ''));
   const entries = extractPathEntries(input.tool_input ?? input);
   const supported = entries

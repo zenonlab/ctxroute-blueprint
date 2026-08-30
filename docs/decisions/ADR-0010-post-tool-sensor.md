@@ -23,9 +23,11 @@ revised: true
 
 PostToolUse reuses the existing path extraction and invokes one Sensor engine
 with registered adapters for JavaScript, TypeScript, JSX/TSX, Python, SQL,
-HTML, and CSS. Rules are versioned configuration and each diagnostic has a
-stable rule identifier and JSON contract. AST parsing is used where grammars
-exist; markup adapters mask comments and strings before structural checks.
+HTML, CSS, Vue, and Svelte. Rules are versioned configuration and each
+diagnostic has a stable rule identifier and JSON contract. AST parsing is used
+where grammars exist; markup and single-file-component adapters mask comments
+and strings before structural checks and delegate embedded script/style blocks
+to the existing language adapters.
 
 CTXRoute remains the context-injection and guidance layer. Sensor diagnostics
 are returned in the agent context, while SQLite problem memory may retain
@@ -34,9 +36,11 @@ CTXRoute configuration. UNSAFE and ERROR results block subsequent validation
 or commit controls; WARN results remain informational.
 
 Configured SQL sinks in JS/TS/Python are analyzed as well as standalone SQL
-files. Optional `requireLimit` detects unbounded result sets without making a
-rate-limit or query allowlist policy mandatory for derived products. A
-rate-limit gateway remains an application responsibility.
+files. Optional `requireLimit` detects unbounded result sets, and optional
+`requireRateLimit` warns when a request-scoped operation lacks a configured
+guard such as `rateLimit` or `throttle`. Neither option makes a runtime rate
+limit or query allowlist policy mandatory for derived products; enforcement
+remains an application responsibility.
 
 The default sink registry covers common raw/query entry points used by Prisma,
 Knex, TypeORM, Sequelize, Django, and SQLAlchemy. Derived products can replace

@@ -48,6 +48,8 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users LIMIT $1;', { config: { sql: { requireLimit: true, maxRows: 100 } } }).length, 0);
   assert.equal(analyzeSource('query.sql', 'DELETE FROM users;', { config: { sql: { requireMutationFilter: true } } })[0].rule, 'sensor/sql-unfiltered-mutation');
   assert.equal(analyzeSource('query.sql', 'UPDATE users SET active = false WHERE id = $1;', { config: { sql: { requireMutationFilter: true } } }).length, 0);
+  assert.equal(analyzeSource('route.ts', "function handler(req) { const id = req.query.id; return db.query('SELECT * FROM users WHERE id = $1', [id]); }", { config: { sql: { sinks: ['query'], requireRateLimit: true } } })[0].rule, 'sensor/sql-missing-rate-limit');
+  assert.equal(analyzeSource('route.ts', "function handler(req) { rateLimit(req); const id = req.query.id; return db.query('SELECT * FROM users WHERE id = $1', [id]); }", { config: { sql: { sinks: ['query'], requireRateLimit: true } } }).length, 0);
 });
 test('SQL tracking follows explicit exported/imported builders in one scan', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-cross-file-'));
@@ -83,12 +85,32 @@ test('SQL tracking resolves CommonJS member aliases', () => {
   const result = analyzePaths(['app.cjs', 'queries.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.cjs'), true);
 });
+test('SQL tracking resolves ES namespace/default imports and local aliases', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-esm-imports-'));
+  writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\nexport default buildQuery;\n");
+  writeFileSync(join(directory, 'namespace.js'), "import * as queries from './queries';\ndb.query(queries.buildQuery(userId));\n");
+  writeFileSync(join(directory, 'default.js'), "import makeQuery from './queries';\ndb.query(makeQuery(userId));\n");
+  writeFileSync(join(directory, 'alias.js'), "import { buildQuery } from './queries';\nconst makeQuery = buildQuery;\ndb.query(makeQuery(userId));\n");
+  const config = { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } };
+  const result = analyzePaths(['namespace.js', 'default.js', 'alias.js', 'queries.js'], { root: directory, config });
+  for (const path of ['namespace.js', 'default.js', 'alias.js']) assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === path), true, path);
+});
+test('SQL tracking detects Python percent formatting and preserves parameterized formatting', () => {
+  assert.equal(analyzeSource('format.py', "cursor.execute('SELECT * FROM users WHERE id = %s' % user_id)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('format.py', "cursor.execute('SELECT * FROM users WHERE id = %s', [user_id])").length, 0);
+});
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
   assert.equal(analyzeSource('page.html', '<style>main { color: red }</style>').at(0).rule, 'sensor/ui-mixed-markup');
   assert.equal(analyzeSource('page.css', 'main { color: red }').length, 0);
   assert.equal(analyzeSource('page.css', '<div>bad</div>').at(0).rule, 'sensor/ui-mixed-markup');
   assert.equal(analyzeSource('page.js', "element.innerHTML = '<style>main { color: red }</style>'").at(0).rule, 'sensor/ui-mixed-markup');
+});
+test('Vue and Svelte single-file components analyze embedded code without false UI mixing alerts', () => {
+  assert.equal(analyzeSource('Card.vue', '<template><main>Hello</main></template><style>main { color: red }</style>').length, 0);
+  assert.equal(analyzeSource('Card.svelte', '<h1>Hello</h1>').length, 0);
+  assert.equal(analyzeSource('Card.svelte', '<script>db.query(`SELECT * FROM users WHERE id = ${userId}`);</script><style>main { color: red }</style>').at(0).rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('Card.vue', '<script lang="ts">eval(input);</script>').at(0).rule, 'sensor/dynamic-eval');
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);

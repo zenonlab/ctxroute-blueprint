@@ -34,6 +34,7 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   else if (extension === '.sql') analyzeSql(path, source, diagnostics, config);
   else if (extension === '.html' || extension === '.htm') analyzeHtml(path, source, diagnostics);
   else if (extension === '.css' || extension === '.scss' || extension === '.sass') analyzeCss(path, source, diagnostics);
+  else if (extension === '.vue' || extension === '.svelte') analyzeSingleFileComponent(path, source, diagnostics, config);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   return diagnostics;
 }
@@ -64,7 +65,10 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const right = node.childForFieldName('value') ?? node.childForFieldName('right');
     const rightText = right?.text ?? '';
     const rightBuilder = right?.childForFieldName('function')?.text ?? rightText.split('(')[0];
-    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || isResolvedSqlExport(state.importedSqlFunctions.get(rightBuilder), state))) state.sqlVariables.add(left);
+    const importedBuilder = importedBinding(rightBuilder, state);
+    const resolvedBuilder = isResolvedSqlExport(importedBuilder, state);
+    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || resolvedBuilder)) state.sqlVariables.add(left);
+    if (left && (state.sqlFunctions.has(rightBuilder) || resolvedBuilder)) state.sqlFunctions.add(left);
     if (left && (looksLikeUntrustedSource(text, config) || state.taintedVariables.has(rightText) || state.taintedVariables.has(rightText.split('.')[0]))) state.taintedVariables.add(left);
   }
   if (node.type === 'function_declaration' || node.type === 'function_definition') {
@@ -89,6 +93,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
+    const callableText = enclosingCallable(node)?.text ?? text;
+    if (isSqlSink(name, config) && config.sql?.requireRateLimit && looksLikeUntrustedSource(callableText, config) && !hasRateLimitGuard(callableText, config)) diagnostics.push(diagnostic(path, node, 'sensor/sql-missing-rate-limit', 'WARN', 'A request-scoped SQL operation has no configured rate-limit guard.'));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
   if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
@@ -105,6 +111,22 @@ function analyzeSql(path, source, diagnostics, config = {}) {
 }
 function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
 function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
+function analyzeSingleFileComponent(path, source, diagnostics, config) {
+  const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu;
+  const stylePattern = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/giu;
+  for (const match of source.matchAll(scriptPattern)) {
+    const language = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? '.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? '.ts' : '.js';
+    appendEmbeddedDiagnostics(path, source, match.index + match[0].indexOf(match[2]), analyzeSource(`${path}${language}`, match[2], { config }), diagnostics);
+  }
+  for (const match of source.matchAll(stylePattern)) {
+    const language = /\blang\s*=\s*["'](?:scss|sass)["']/iu.test(match[1]) ? '.scss' : '.css';
+    appendEmbeddedDiagnostics(path, source, match.index + match[0].indexOf(match[2]), analyzeSource(`${path}${language}`, match[2], { config }), diagnostics);
+  }
+}
+function appendEmbeddedDiagnostics(path, source, offset, embedded, diagnostics) {
+  const lineOffset = source.slice(0, offset).split('\n').length - 1;
+  for (const item of embedded) diagnostics.push({ ...item, path, line: item.line + lineOffset });
+}
 function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function defaultConfig(root) {
@@ -114,22 +136,40 @@ function defaultConfig(root) {
 function collectDynamicExports(paths, root) {
   const exports = new Map();
   for (const path of paths) {
-    const grammar = grammars.get(extname(path).toLowerCase());
-    if (!grammar) continue;
     try {
-      const source = readFileSync(resolve(root, path), 'utf8'); const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
-      walk(tree.rootNode, 0, node => {
-        const pythonModuleFunction = grammar === Python && node.type === 'function_definition' && node.parent?.type === 'module';
-        const exportedFunction = (node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node);
-        const name = node.childForFieldName('name')?.text ?? '';
-        if ((pythonModuleFunction || exportedFunction) && name && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) {
-          if (!exports.has(name)) exports.set(name, new Set());
-          exports.get(name).add(resolve(root, path));
+      const source = readFileSync(resolve(root, path), 'utf8');
+      const extension = extname(path).toLowerCase();
+      const grammar = grammars.get(extension);
+      if (grammar) indexDynamicExports(source, grammar, path, root, exports);
+      else if (extension === '.vue' || extension === '.svelte') {
+        for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)) {
+          const language = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? '.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? '.ts' : '.js';
+          indexDynamicExports(match[2], grammars.get(language), path, root, exports);
         }
-      });
+      }
     } catch { /* the normal scan emits the authoritative read/syntax diagnostic */ }
   }
   return exports;
+}
+function indexDynamicExports(source, grammar, path, root, exports) {
+  if (!grammar) return;
+  const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
+  walk(tree.rootNode, 0, node => {
+    const pythonModuleFunction = grammar === Python && node.type === 'function_definition' && node.parent?.type === 'module';
+    const exportedFunction = (node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node);
+    const name = node.childForFieldName('name')?.text ?? '';
+    const exportedDefault = exportedFunction && /^export\s+default\b/u.test(source.slice(node.parent?.startIndex ?? node.startIndex, node.parent?.endIndex ?? node.endIndex));
+    if ((pythonModuleFunction || exportedFunction) && name && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) {
+      for (const exportName of exportedDefault ? [name, 'default'] : [name]) {
+        if (!exports.has(exportName)) exports.set(exportName, new Set());
+        exports.get(exportName).add(resolve(root, path));
+      }
+    }
+  });
+  for (const match of source.matchAll(/\bexport\s+default\s+([A-Za-z_$][\w$]*)\s*;?/gu)) {
+    const candidates = exports.get(match[1]);
+    if (candidates) exports.set('default', new Set([...(exports.get('default') ?? []), ...candidates]));
+  }
 }
 function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
 function collectImportedNames(source) {
@@ -140,6 +180,8 @@ function collectImportedNames(source) {
       if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[2] });
     }
   }
+  for (const match of source.matchAll(/\bimport\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names.set(match[1], { namespace: true, module: match[2] });
+  for (const match of source.matchAll(/\bimport\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names.set(match[1], { original: 'default', module: match[2] });
   for (const match of source.matchAll(/\bfrom\s+([A-Za-z0-9_./-]+)\s+import\s+([^\n]+)/gu)) {
     for (const item of match[2].split(',')) {
       const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
@@ -163,7 +205,8 @@ function collectImportedNames(source) {
 function importedBinding(name, state) {
   const direct = state.importedSqlFunctions.get(name);
   if (direct) return direct;
-  const [namespace, member] = name.split('.');
+  const [namespace, ...members] = name.split('.');
+  const member = members.at(-1);
   const binding = state.importedSqlFunctions.get(namespace);
   return binding?.namespace && member ? { original: member, module: binding.module } : null;
 }
@@ -179,9 +222,11 @@ function resolveImportedModule(consumer, specifier, root) {
   if (!specifier) return null;
   const extension = extname(consumer).toLowerCase();
   if (!specifier.startsWith('.') && !specifier.startsWith('/') && extension !== '.py') return null;
-  const base = specifier.startsWith('.') || !specifier.includes('/') || specifier.startsWith('/')
-    ? resolve(specifier.startsWith('/') ? '' : resolve(consumer, '..'), specifier)
+  const consumerDirectory = resolve(consumer, '..');
+  const pythonRelative = extension === '.py' && specifier.startsWith('.')
+    ? resolve(consumerDirectory, specifier.replace(/^\.+/u, dots => '../'.repeat(Math.max(0, dots.length - 1))))
     : null;
+  const base = specifier.startsWith('/') ? resolve('', specifier) : pythonRelative ?? resolve(consumerDirectory, specifier);
   if (!base) return null;
   const candidates = [base, ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => `${base}${extension}`), ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => resolve(base, `index${extension}`))];
   return candidates.find(candidate => candidate === resolve(root, candidate) && fileExists(candidate)) ?? null;
@@ -201,8 +246,10 @@ function validateConfig(config) {
       if (!Array.isArray(config.sql.sinks) || config.sql.sinks.some(value => typeof value !== 'string' || !value)) errors.push('sql.sinks must be a non-empty array of strings');
       if (config.sql.requireLimit !== undefined && typeof config.sql.requireLimit !== 'boolean') errors.push('sql.requireLimit must be boolean');
       if (config.sql.requireMutationFilter !== undefined && typeof config.sql.requireMutationFilter !== 'boolean') errors.push('sql.requireMutationFilter must be boolean');
+      if (config.sql.requireRateLimit !== undefined && typeof config.sql.requireRateLimit !== 'boolean') errors.push('sql.requireRateLimit must be boolean');
       if (config.sql.maxRows !== undefined && (!Number.isInteger(config.sql.maxRows) || config.sql.maxRows < 1)) errors.push('sql.maxRows must be a positive integer');
       if (config.sql.taintSources !== undefined && (!Array.isArray(config.sql.taintSources) || config.sql.taintSources.some(value => typeof value !== 'string' || !value))) errors.push('sql.taintSources must be an array of non-empty strings');
+      if (config.sql.rateLimitGuards !== undefined && (!Array.isArray(config.sql.rateLimitGuards) || config.sql.rateLimitGuards.some(value => typeof value !== 'string' || !value))) errors.push('sql.rateLimitGuards must be an array of non-empty strings');
     }
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
@@ -214,8 +261,11 @@ function looksLikeUntrustedSource(text, config = {}) {
 }
 function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
 function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }
-function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(/u.test(text); }
-function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'rawQuery', 'raw_sql', 'execute_sql', 'whereRaw', 'havingRaw', 'orderByRaw', 'joinRaw', 'literal', 'text', 'RawSQL', 'extra', 'fromSqlRaw', 'executeSqlRaw', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
+function enclosingCallable(node) { let parent = node.parent; while (parent) { if (/^(?:function|function_declaration|function_definition|method_definition|arrow_function|generator_function|lambda)$/u.test(parent.type)) return parent; parent = parent.parent; } return null; }
+function hasRateLimitGuard(text, config) { const guards = config.sql?.rateLimitGuards ?? ['rateLimit', 'rateLimiter', 'throttle', 'quota', 'limiter']; return guards.some(guard => new RegExp(`\\b${escapeRegExp(guard)}\\b`, 'iu').test(text)); }
+function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }
+function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(|%\s+[A-Za-z_]/u.test(text); }
+function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'rawQuery', 'queryRaw', 'executeRaw', 'raw_sql', 'execute_sql', 'whereRaw', 'havingRaw', 'orderByRaw', 'joinRaw', 'literal', 'text', 'Raw', 'RawSQL', 'extra', 'fromSqlRaw', 'executeSqlRaw', 'fetch', 'fetchrow', 'fetchval', 'executemany', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }
 function firstError(node) { if (node.isError || node.isMissing) return node; for (const child of node.namedChildren) { const result = firstError(child); if (result) return result; } return node; }
 function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }
