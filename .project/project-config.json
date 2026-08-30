@@ -23,6 +23,7 @@
     "mutation": null,
     "integration": null,
     "build": "npm run build:docs",
+    "workspaceCheck": "npm run workspace:check",
     "mermaid": null
   },
   "quality": {

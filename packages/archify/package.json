@@ -1,0 +1,9 @@
+{
+  "name": "@ctxroute-blueprint/archify",
+  "version": "0.0.0-blueprint",
+  "private": true,
+  "description": "Workspace boundary for the pinned Archify documentation skill.",
+  "engines": { "node": ">=22" },
+  "blueprintSource": "tt-a1i/archify",
+  "integration": "external-pinned-skill"
+}

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Architecture-first, stack-neutral GitHub template with CTXRoute-powered agent context.",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -25,6 +28,7 @@
     "preview:docs": "node .githooks/archify preview",
     "sensor": "node .githooks/sensor",
     "check:updates": "node .githooks/archify updates",
+    "workspace:check": "node scripts/check-workspaces.mjs",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",
