@@ -40,7 +40,7 @@ function analyzePath(path, root, config, diagnostics) {
 function analyzeAst(path, source, grammar, config, diagnostics) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = { sqlVariables: new Set() };
+  let count = 0; let maxDepth = 0; const state = { sqlVariables: new Set(), sqlFunctions: new Set() };
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
   if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
@@ -52,6 +52,10 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
     if (left && looksLikeDynamicSql(text)) state.sqlVariables.add(left);
   }
+  if (node.type === 'function_declaration' || node.type === 'function_definition') {
+    const name = node.childForFieldName('name')?.text ?? '';
+    if (name && looksLikeDynamicSql(text)) state.sqlFunctions.add(name);
+  }
   if (node.type === 'call_expression' || node.type === 'call') {
     const name = node.childForFieldName('function')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
@@ -62,7 +66,10 @@ function inspectAst(path, source, node, diagnostics, config, state) {
       if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
     }
     if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
-    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(node.childForFieldName('arguments')?.namedChild(0)?.text ?? ''))) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
+    const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
+    const firstArgumentName = firstArgument?.text ?? '';
+    const dynamicBuilder = state.sqlFunctions.has(firstArgument?.childForFieldName('function')?.text ?? '') || state.sqlFunctions.has(firstArgumentName.split('(')[0]);
+    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !/\blimit\s+\d+\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));

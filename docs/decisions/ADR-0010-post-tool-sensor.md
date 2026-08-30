@@ -38,6 +38,10 @@ files. Optional `requireLimit` detects unbounded result sets without making a
 rate-limit or query allowlist policy mandatory for derived products. A
 rate-limit gateway remains an application responsibility.
 
+The SQL check also follows dynamic query builders and variables within the
+same parsed file. It is intentionally not whole-program taint analysis, so
+framework-specific sinks and cross-module flows require explicit adapter work.
+
 PostToolUse analyzes the new path of a rename and skips an intentionally
 deleted path; an unexpectedly absent path during another mutation remains an
 explicit `sensor/read-error`. Invalid hook input is reported visibly while the
