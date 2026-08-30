@@ -34,6 +34,9 @@ must be scoped, validated, and approved by the agent control boundary.
 Approved resolutions are recorded through the controlled `resolve` command and
 are injected on later recurrences as context. The command never activates a
 hook or changes agent trust settings.
+An approved `persistent-instruction` resolution may materialize one scoped
+rule under `.claude/hooks/docs/problem-memory/`; writing `AGENTS.md` is not an
+automatic path because it would broaden the rule beyond the recurring problem.
 
 Persist records as SQLite tables in the project-local state directory using WAL
 mode and parameterized statements. Bound and redact evidence before persistence.

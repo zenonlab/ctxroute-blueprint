@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -171,10 +171,57 @@ export class ProblemStore {
   close() { this.database.close(); }
 }
 
-export function resolveProblem(problemId, resolution, stateDirectory) {
+export function resolveProblem(problemId, resolution, stateDirectory, projectRoot = root) {
+  if (resolution?.type === 'persistent-instruction' && resolution.approved !== true) {
+    throw new TypeError('A persistent instruction requires approved: true');
+  }
   const store = new ProblemStore(stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
-  try { return store.resolve(Number(problemId), resolution); }
-  finally { store.close(); }
+  try {
+    if (!store.get(Number(problemId))) return false;
+    if (resolution.type === 'persistent-instruction' && resolution.approved === true) {
+      applyPersistentInstruction(problemId, resolution, projectRoot);
+    }
+    return store.resolve(Number(problemId), resolution);
+  } finally {
+    store.close();
+  }
+}
+
+export function applyPersistentInstruction(problemId, resolution, projectRoot = root) {
+  if (resolution?.type !== 'persistent-instruction' || resolution.approved !== true) {
+    throw new TypeError('A persistent instruction requires approved: true');
+  }
+  const numericId = Number(problemId);
+  if (!Number.isSafeInteger(numericId) || numericId < 1) throw new TypeError('Problem id must be a positive integer');
+  const scope = resolution.scope ?? {};
+  const paths = scope.paths ?? [];
+  if (!Array.isArray(paths) || paths.some(path => typeof path !== 'string' || path.startsWith('/') || path.includes('..'))) {
+    throw new TypeError('Instruction paths must be repository-relative and contain no parent traversal');
+  }
+  const directory = join(projectRoot, '.claude', 'hooks', 'docs', 'problem-memory');
+  mkdirSync(directory, { recursive: true });
+  const artifactPath = join(directory, `problem-${numericId}.md`);
+  const events = Array.isArray(scope.events) ? scope.events : [];
+  const tools = Array.isArray(scope.tools) ? scope.tools : [];
+  const content = fieldText(resolution.content ?? resolution.summary);
+  writeFileSync(artifactPath, [
+    '---',
+    `scope: [${paths.map(formatYaml).join(', ')}]`,
+    'review: on-change',
+    'problem-memory: approved',
+    `events: [${events.map(formatYaml).join(', ')}]`,
+    `tools: [${tools.map(formatYaml).join(', ')}]`,
+    '---',
+    `# Problem ${numericId} protection`,
+    '',
+    content,
+    '',
+  ].join('\n'), { encoding: 'utf8', flag: 'wx' });
+  return artifactPath;
+}
+
+function formatYaml(value) {
+  return JSON.stringify(String(value));
 }
 
 function appendEvidence(serialized, evidence) {

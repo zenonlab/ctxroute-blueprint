@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -89,7 +89,7 @@ test('resolutions can be recorded through the controlled CLI', () => {
   const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
   const record = store.record(observation, buildSignatures(observation));
   store.close();
-  const output = execFileSync(process.execPath, ['.codex/hooks/problem-memory.mjs', 'resolve', String(record.id), JSON.stringify({ type: 'persistent-instruction', summary: 'Keep the lockfile pinned' })], {
+  const output = execFileSync(process.execPath, ['.codex/hooks/problem-memory.mjs', 'resolve', String(record.id), JSON.stringify({ type: 'correction', summary: 'Keep the lockfile pinned' })], {
     cwd: new URL('..', import.meta.url),
     env: { ...process.env, CTXROUTE_STATE_DIR: directory },
     encoding: 'utf8',
@@ -98,6 +98,34 @@ test('resolutions can be recorded through the controlled CLI', () => {
   const check = new ProblemStore(directory);
   assert.equal(JSON.parse(check.get(record.id).resolution_json).summary, 'Keep the lockfile pinned');
   check.close();
+});
+
+test('approved persistent instructions create a scoped CTXRoute rule', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-protection-'));
+  const store = new ProblemStore(directory);
+  const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
+  const record = store.record(observation, buildSignatures(observation));
+  store.close();
+  const artifact = resolveProblem(record.id, {
+    type: 'persistent-instruction',
+    approved: true,
+    summary: 'Check the lockfile before retrying.',
+    scope: { paths: ['package-lock.json'], events: ['PreToolUse'], tools: ['Edit'] },
+  }, directory, directory);
+  const artifactPath = join(directory, '.claude', 'hooks', 'docs', 'problem-memory', `problem-${record.id}.md`);
+  assert.equal(artifact, true);
+  assert.equal(existsSync(artifactPath), true);
+  assert.match(readFileSync(artifactPath, 'utf8'), /package-lock\.json/u);
+  assert.match(readFileSync(artifactPath, 'utf8'), /Check the lockfile/u);
+});
+
+test('persistent instructions cannot be written without approval', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-unapproved-'));
+  const store = new ProblemStore(directory);
+  const observation = extractObservation({ success: false, error: 'failed' }, 'PostToolUse');
+  const record = store.record(observation, buildSignatures(observation));
+  store.close();
+  assert.throws(() => resolveProblem(record.id, { type: 'persistent-instruction', summary: 'Do this' }, directory), /approved/u);
 });
 
 test('the hook fails open when disabled', () => {
