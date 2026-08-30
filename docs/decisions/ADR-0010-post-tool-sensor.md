@@ -43,9 +43,10 @@ limit or query allowlist policy mandatory for derived products; enforcement
 remains an application responsibility.
 
 The default sink registry covers common raw/query entry points used by Prisma,
-Knex, TypeORM, Sequelize, Django, and SQLAlchemy. Derived products can replace
-that registry in `sql.sinks`; safe parameterized APIs are not marked unsafe just
-because they belong to an ORM. Tagged SQL builders such as `sql` and
+Knex, TypeORM, Sequelize, Django, SQLAlchemy, SQLite drivers, and async database
+clients. Derived products can replace that registry in `sql.sinks`; safe
+parameterized APIs are not marked unsafe just because they belong to an ORM.
+Tagged SQL builders such as `sql` and
 `Prisma.sql` are configurable through `sql.safeBuilders`; raw variants remain
 analyzable sinks.
 

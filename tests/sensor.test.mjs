@@ -36,6 +36,8 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('app.py', "def build_query(user_id):\n    return f'SELECT * FROM users WHERE id = {user_id}'\ncursor.execute(build_query(user_id))", { config: { sql: { sinks: ['execute'] } } })[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "knex.raw('SELECT * FROM users WHERE id = ' + userId)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "query.whereRaw('id = ' + userId)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('driver.ts', "sqlite.run('SELECT * FROM users WHERE id = ' + userId)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('driver.py', "await pool.fetch_one(f'SELECT * FROM users WHERE id = {user_id}')")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "sequelize.literal('ORDER BY ' + field)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.py', "text(f'SELECT * FROM users WHERE id = {user_id}')")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.py', "RawSQL('id = %s', [user_id])").length, 0);
