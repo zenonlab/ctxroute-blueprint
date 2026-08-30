@@ -29,8 +29,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   const expected = {
     SessionStart: ['session-inject.js'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-audit.mjs'],
-    UserPromptSubmit: ['turn-count.js', 'canary-check.js'],
+    PostToolUse: ['codex-doc-write-guard.js', 'problem-memory.mjs', 'post-tool-audit.mjs'],
+    UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
   };
@@ -127,7 +127,7 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
       return { outputs: [] };
     },
   });
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.match(result.systemMessage, /turn-count\.js failed open: simulated failure/u);
 });
 

@@ -32,12 +32,13 @@
     { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
     { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] },
     { "id": "decisionMemory", "type": "database", "label": "ADR decision memory", "sublabel": "Scoped metadata and durable context", "pos": [1030, 310], "size": [190, 72] },
-    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision checks", "pos": [1030, 430], "size": [190, 66] }
+    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision checks", "pos": [1030, 430], "size": [190, 66] },
+    { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "Signatures, evidence, resolutions", "pos": [708, 400], "size": [190, 72] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
-    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator"] }
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory"] }
   ],
   "connections": [
     { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 180] },
