@@ -25,7 +25,7 @@
 - Deployment: source repository and GitHub Actions only; no production deployment.
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
 - Post-hook analysis: JS/TS/JSX/TSX, Python, SQL, HTML, and CSS adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
-- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits are configurable, while request rate limiting and query allowlists remain product responsibilities.
+- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits and mutation predicates are configurable, while request rate limiting and query allowlists remain product responsibilities.
 
 ## Success criteria
 

@@ -70,7 +70,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const firstArgumentName = firstArgument?.text ?? '';
     const dynamicBuilder = state.sqlFunctions.has(firstArgument?.childForFieldName('function')?.text ?? '') || state.sqlFunctions.has(firstArgumentName.split('(')[0]);
     if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
-    if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !/\blimit\s+\d+\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
+    if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
+    if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
   if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
@@ -82,7 +83,8 @@ function analyzeSql(path, source, diagnostics, config = {}) {
   const code = maskSql(source);
   for (const match of code.matchAll(/(?:select|insert|update|delete|where|from)[\s\S]{0,180}(?:\+|\|\||\$\{)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
   for (const match of code.matchAll(/\b(?:execute|query|prepare)\s*\([^\n;]*(?:\$\{|\+|\|\|)[^\n;]*\)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
-  if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !/\blimit\s+\d+\b/iu.test(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
+  if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !hasSqlLimit(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
+  if (config.sql?.requireMutationFilter && isUnfilteredMutation(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
 }
 function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
 function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
@@ -90,6 +92,8 @@ function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function defaultConfig(root) { try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); } catch { return { dangerousCommands: [], complexity: { maxNodes: 2000, maxDepth: 80 } }; } }
 function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text); }
+function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
+function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }
 function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(/u.test(text); }
 function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', '$queryRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }

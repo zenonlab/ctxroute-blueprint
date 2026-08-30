@@ -38,6 +38,11 @@ files. Optional `requireLimit` detects unbounded result sets without making a
 rate-limit or query allowlist policy mandatory for derived products. A
 rate-limit gateway remains an application responsibility.
 
+Products may also opt into `requireMutationFilter` to classify unfiltered
+`UPDATE` and `DELETE` statements as `UNSAFE`; this is disabled by default for
+migrations and maintenance jobs. A parameterized `LIMIT` is accepted as a
+bound, but its runtime maximum remains a product responsibility.
+
 The SQL check also follows dynamic query builders and variables within the
 same parsed file. It is intentionally not whole-program taint analysis, so
 framework-specific sinks and cross-module flows require explicit adapter work.
