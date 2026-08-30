@@ -49,8 +49,9 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
 function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Set() };
+  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Set(), taintedVariables: new Set() };
   state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Set(); state.importedSqlFunctions ??= new Set();
+  state.taintedVariables ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
   if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
@@ -58,9 +59,13 @@ function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) 
 
 function inspectAst(path, source, node, diagnostics, config, state) {
   const text = source.slice(node.startIndex, node.endIndex);
-  if (node.type === 'variable_declarator' || node.type === 'assignment_expression') {
+  if (node.type === 'variable_declarator' || node.type === 'assignment_expression' || node.type === 'assignment') {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
-    if (left && looksLikeDynamicSql(text)) state.sqlVariables.add(left);
+    const right = node.childForFieldName('value') ?? node.childForFieldName('right');
+    const rightText = right?.text ?? '';
+    const rightBuilder = right?.childForFieldName('function')?.text ?? rightText.split('(')[0];
+    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || (state.sqlExports.has(rightBuilder) && state.importedSqlFunctions.has(rightBuilder)))) state.sqlVariables.add(left);
+    if (left && (looksLikeUntrustedSource(text, config) || state.taintedVariables.has(rightText) || state.taintedVariables.has(rightText.split('.')[0]))) state.taintedVariables.add(left);
   }
   if (node.type === 'function_declaration' || node.type === 'function_definition') {
     const name = node.childForFieldName('name')?.text ?? '';
@@ -80,7 +85,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const firstArgumentName = firstArgument?.text ?? '';
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
     const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || (state.sqlExports.has(calledBuilder) && state.importedSqlFunctions.has(calledBuilder));
-    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
+    if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
   }
@@ -140,11 +145,16 @@ function validateConfig(config) {
       if (config.sql.requireLimit !== undefined && typeof config.sql.requireLimit !== 'boolean') errors.push('sql.requireLimit must be boolean');
       if (config.sql.requireMutationFilter !== undefined && typeof config.sql.requireMutationFilter !== 'boolean') errors.push('sql.requireMutationFilter must be boolean');
       if (config.sql.maxRows !== undefined && (!Number.isInteger(config.sql.maxRows) || config.sql.maxRows < 1)) errors.push('sql.maxRows must be a positive integer');
+      if (config.sql.taintSources !== undefined && (!Array.isArray(config.sql.taintSources) || config.sql.taintSources.some(value => typeof value !== 'string' || !value))) errors.push('sql.taintSources must be an array of non-empty strings');
     }
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
 function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text); }
+function looksLikeUntrustedSource(text, config = {}) {
+  const sources = config.sql?.taintSources ?? ['req.query', 'req.params', 'req.body', 'request.args', 'request.form', 'request.json', 'request.query_params', 'request.path_params', 'request.GET', 'request.POST', 'request.body', 'searchParams', 'URLSearchParams', 'process.argv', 'process.env', 'os.environ', 'os.getenv'];
+  return sources.some(source => text.includes(source));
+}
 function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
 function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }
 function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(/u.test(text); }

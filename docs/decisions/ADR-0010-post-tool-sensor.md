@@ -54,7 +54,9 @@ framework-specific sinks and cross-module flows require explicit adapter work.
 
 For an explicit multi-file scan, the bounded tracker also follows exported
 JavaScript/TypeScript builders when the consuming file imports the builder.
-It does not infer arbitrary module resolution or Python package dataflow.
+It propagates configured HTTP, environment, and CLI taint sources through
+local variables and imported builders. It does not infer arbitrary module
+resolution or Python package dataflow.
 
 The versioned Sensor configuration is validated before scanning. A missing,
 malformed, or incompatible rules file produces `sensor/configuration` with an

@@ -36,6 +36,9 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('app.py', "def build_query(user_id):\n    return f'SELECT * FROM users WHERE id = {user_id}'\ncursor.execute(build_query(user_id))", { config: { sql: { sinks: ['execute'] } } })[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "knex.raw('SELECT * FROM users WHERE id = ' + userId)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "prisma.$queryRawUnsafe(`SELECT * FROM users WHERE id = ${userId}`)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('route.ts', "const id = req.query.id; db.query(id)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('route.py', "user_id = request.query_params['id']\ncursor.execute(user_id)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('safe.ts', "const id = 42; db.query('SELECT * FROM users WHERE id = $1', [id])").length, 0);
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users;', { config: { sql: { requireLimit: true, maxRows: 100 } } })[0].rule, 'sensor/sql-unbounded-query');
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users LIMIT 100;', { config: { sql: { requireLimit: true, maxRows: 100 } } }).length, 0);
   assert.equal(analyzeSource('query.sql', 'SELECT * FROM users LIMIT $1;', { config: { sql: { requireLimit: true, maxRows: 100 } } }).length, 0);
