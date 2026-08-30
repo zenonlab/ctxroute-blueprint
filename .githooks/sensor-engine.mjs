@@ -19,17 +19,18 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
     return { schemaVersion: 1, verdict: 'ERROR', diagnostics };
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
-  for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics);
+  const sharedState = { sqlExports: collectDynamicExports(paths, root) };
+  for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
   diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = diagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
   return { schemaVersion: 1, verdict, diagnostics };
 }
 
-export function analyzeSource(path, source, { config = {} } = {}) {
+export function analyzeSource(path, source, { config = {}, state } = {}) {
   const extension = extname(path).toLowerCase();
   const diagnostics = [];
   const grammar = grammars.get(extension);
-  if (grammar) analyzeAst(path, source, grammar, config, diagnostics);
+  if (grammar) analyzeAst(path, source, grammar, config, diagnostics, state);
   else if (extension === '.sql') analyzeSql(path, source, diagnostics, config);
   else if (extension === '.html' || extension === '.htm') analyzeHtml(path, source, diagnostics);
   else if (extension === '.css' || extension === '.scss' || extension === '.sass') analyzeCss(path, source, diagnostics);
@@ -37,15 +38,19 @@ export function analyzeSource(path, source, { config = {} } = {}) {
   return diagnostics;
 }
 
-function analyzePath(path, root, config, diagnostics) {
-  try { diagnostics.push(...analyzeSource(path, readFileSync(resolve(root, path), 'utf8'), { config })); }
+function analyzePath(path, root, config, diagnostics, sharedState) {
+  try {
+    const source = readFileSync(resolve(root, path), 'utf8');
+    diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, importedSqlFunctions: collectImportedNames(source) } }));
+  }
   catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
 }
 
-function analyzeAst(path, source, grammar, config, diagnostics) {
+function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = { sqlVariables: new Set(), sqlFunctions: new Set() };
+  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Set() };
+  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Set(); state.importedSqlFunctions ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
   if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
@@ -73,7 +78,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const firstArgumentName = firstArgument?.text ?? '';
-    const dynamicBuilder = state.sqlFunctions.has(firstArgument?.childForFieldName('function')?.text ?? '') || state.sqlFunctions.has(firstArgumentName.split('(')[0]);
+    const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
+    const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || (state.sqlExports.has(calledBuilder) && state.importedSqlFunctions.has(calledBuilder));
     if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
@@ -98,6 +104,28 @@ function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])
 function defaultConfig(root) {
   try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
   catch (error) { return { __sensorConfigError: error.message }; }
+}
+function collectDynamicExports(paths, root) {
+  const exports = new Set();
+  for (const path of paths) {
+    const grammar = grammars.get(extname(path).toLowerCase());
+    if (!grammar) continue;
+    try {
+      const source = readFileSync(resolve(root, path), 'utf8'); const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
+      walk(tree.rootNode, 0, node => {
+        if ((node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node) && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) exports.add(node.childForFieldName('name')?.text ?? '');
+      });
+    } catch { /* the normal scan emits the authoritative read/syntax diagnostic */ }
+  }
+  exports.delete(''); return exports;
+}
+function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
+function collectImportedNames(source) {
+  const names = new Set();
+  for (const match of source.matchAll(/\bimport\s*\{([^}]+)\}|\bfrom\s+[A-Za-z0-9_./-]+\s+import\s+([^\n]+)/gu)) {
+    for (const item of (match[1] ?? match[2]).split(',')) names.add((item.trim().split(/\s+as\s+/iu).at(-1) ?? '').trim());
+  }
+  return names;
 }
 function validateConfig(config) {
   if (config?.__sensorConfigError) return [diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', `Sensor rules could not be loaded: ${config.__sensorConfigError}`)];

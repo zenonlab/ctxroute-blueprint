@@ -40,6 +40,14 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('query.sql', 'DELETE FROM users;', { config: { sql: { requireMutationFilter: true } } })[0].rule, 'sensor/sql-unfiltered-mutation');
   assert.equal(analyzeSource('query.sql', 'UPDATE users SET active = false WHERE id = $1;', { config: { sql: { requireMutationFilter: true } } }).length, 0);
 });
+test('SQL tracking follows explicit exported/imported builders in one scan', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-cross-file-'));
+  writeFileSync(join(directory, 'queries.ts'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
+  writeFileSync(join(directory, 'app.ts'), "import { buildQuery } from './queries';\ndb.query(buildQuery(userId));\n");
+  const result = analyzePaths(['app.ts', 'queries.ts'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'UNSAFE');
+  assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
+});
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
   assert.equal(analyzeSource('page.html', '<style>main { color: red }</style>').at(0).rule, 'sensor/ui-mixed-markup');
