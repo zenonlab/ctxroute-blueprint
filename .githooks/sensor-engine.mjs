@@ -13,6 +13,11 @@ const grammars = new Map([
 
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
+  const configurationErrors = validateConfig(config);
+  if (configurationErrors.length) {
+    diagnostics.push(...configurationErrors);
+    return { schemaVersion: 1, verdict: 'ERROR', diagnostics };
+  }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
   for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics);
   diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
@@ -90,7 +95,27 @@ function analyzeHtml(path, source, diagnostics) { const match = source.match(/<s
 function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
 function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
-function defaultConfig(root) { try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); } catch { return { dangerousCommands: [], complexity: { maxNodes: 2000, maxDepth: 80 } }; } }
+function defaultConfig(root) {
+  try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
+  catch (error) { return { __sensorConfigError: error.message }; }
+}
+function validateConfig(config) {
+  if (config?.__sensorConfigError) return [diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', `Sensor rules could not be loaded: ${config.__sensorConfigError}`)];
+  const errors = [];
+  if (!config || typeof config !== 'object' || Array.isArray(config)) errors.push('configuration must be an object');
+  else {
+    if (config.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
+    if (!Array.isArray(config.dangerousCommands) || config.dangerousCommands.some(value => typeof value !== 'string')) errors.push('dangerousCommands must be an array of strings');
+    if (config.complexity && (!Number.isInteger(config.complexity.maxNodes) || !Number.isInteger(config.complexity.maxDepth) || config.complexity.maxNodes < 1 || config.complexity.maxDepth < 1)) errors.push('complexity.maxNodes and complexity.maxDepth must be positive integers');
+    if (config.sql) {
+      if (!Array.isArray(config.sql.sinks) || config.sql.sinks.some(value => typeof value !== 'string' || !value)) errors.push('sql.sinks must be a non-empty array of strings');
+      if (config.sql.requireLimit !== undefined && typeof config.sql.requireLimit !== 'boolean') errors.push('sql.requireLimit must be boolean');
+      if (config.sql.requireMutationFilter !== undefined && typeof config.sql.requireMutationFilter !== 'boolean') errors.push('sql.requireMutationFilter must be boolean');
+      if (config.sql.maxRows !== undefined && (!Number.isInteger(config.sql.maxRows) || config.sql.maxRows < 1)) errors.push('sql.maxRows must be a positive integer');
+    }
+  }
+  return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
+}
 function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text); }
 function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
 function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }

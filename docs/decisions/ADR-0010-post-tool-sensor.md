@@ -47,6 +47,10 @@ The SQL check also follows dynamic query builders and variables within the
 same parsed file. It is intentionally not whole-program taint analysis, so
 framework-specific sinks and cross-module flows require explicit adapter work.
 
+The versioned Sensor configuration is validated before scanning. A missing,
+malformed, or incompatible rules file produces `sensor/configuration` with an
+`ERROR` verdict instead of falling back to an implicit safe policy.
+
 PostToolUse analyzes the new path of a rename and skips an intentionally
 deleted path; an unexpectedly absent path during another mutation remains an
 explicit `sensor/read-error`. Invalid hook input is reported visibly while the

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzeSource } from '../.githooks/sensor-engine.mjs';
+import { analyzePaths, analyzeSource } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -56,4 +56,11 @@ test('unsupported and missing paths are explicit errors', () => {
   assert.equal(run('rb', 'puts 1').body.verdict, 'ERROR');
   const missing = spawnSync(process.execPath, [sensor, 'missing.sql'], { cwd: root, encoding: 'utf8' });
   assert.equal(JSON.parse(missing.stdout).diagnostics[0].rule, 'sensor/read-error');
+});
+test('invalid or missing Sensor configuration is never treated as safe', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-config-'));
+  writeFileSync(join(directory, 'safe.js'), 'const value = 1;');
+  assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 2 } }).verdict, 'ERROR');
+  assert.equal(analyzePaths(['safe.js'], { root: directory }).diagnostics[0].rule, 'sensor/configuration');
+  assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], complexity: { maxNodes: 10, maxDepth: 10 }, sql: { sinks: ['query'], requireLimit: false, maxRows: 100 } } }).verdict, 'SAFE');
 });
