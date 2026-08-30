@@ -1,0 +1,57 @@
+import Parser from 'tree-sitter';
+import JavaScript from 'tree-sitter-javascript';
+import TypeScript from 'tree-sitter-typescript';
+import Python from 'tree-sitter-python';
+import { readFileSync } from 'node:fs';
+import { extname, resolve } from 'node:path';
+import process from 'node:process';
+
+const root = process.cwd();
+const config = JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8'));
+const diagnostics = [];
+const paths = process.argv.slice(2).sort();
+if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
+for (const path of paths) scan(path);
+diagnostics.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
+const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
+const verdict = diagnostics.reduce((value, item) => rank[item.severity] > rank[value] ? item.severity : value, 'SAFE');
+process.stdout.write(`${JSON.stringify({ schemaVersion: 1, verdict, diagnostics })}\n`);
+process.exit(verdict === 'SAFE' ? 0 : verdict === 'WARN' ? 1 : 2);
+
+function scan(path) {
+  const grammar = grammarFor(path);
+  if (!grammar) return diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extname(path) || '(none)'}.`));
+  let source;
+  try { source = readFileSync(resolve(root, path), 'utf8'); } catch (error) { return diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
+  const parser = new Parser();
+  parser.setLanguage(grammar);
+  const tree = parser.parse(source);
+  if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
+  let count = 0;
+  let maxDepth = 0;
+  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspect(path, source, node); });
+  if (count > config.complexity.maxNodes || maxDepth > config.complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${config.complexity.maxNodes} / ${config.complexity.maxDepth}.`));
+}
+
+function inspect(path, source, node) {
+  const text = source.slice(node.startIndex, node.endIndex);
+  if (node.type === 'call_expression' || node.type === 'call') {
+    const name = node.childForFieldName('function')?.text ?? '';
+    if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
+    if (isShell(name)) {
+      const first = node.childForFieldName('arguments')?.namedChild(0);
+      const command = literal(first, source).toLowerCase();
+      if (command && config.dangerousCommands.some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
+      if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
+    }
+    if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
+  }
+  if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
+}
+function grammarFor(path) { const extension = extname(path).toLowerCase(); if (['.js', '.jsx', '.mjs', '.cjs'].includes(extension)) return JavaScript; if (extension === '.ts') return TypeScript.typescript; if (extension === '.tsx') return TypeScript.tsx; if (extension === '.py') return Python; return null; }
+function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }
+function firstError(node) { if (node.isError || node.isMissing) return node; for (const child of node.namedChildren) { const result = firstError(child); if (result) return result; } return node; }
+function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }
+function isShell(name) { return /(?:^|\.)(?:exec|execSync|spawn|spawnSync|system|popen|run)$/u.test(name); }
+function isNetwork(name) { return /^(?:fetch|axios(?:\.[a-z]+)?|https?\.(?:request|get)|requests\.(?:get|post|put|patch|delete))$/u.test(name); }
+function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? -1) + 1, column: (node?.startPosition.column ?? -1) + 1, rule, severity, message }; }

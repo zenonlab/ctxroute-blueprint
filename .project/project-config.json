@@ -22,8 +22,8 @@
     "typecheck": null,
     "mutation": null,
     "integration": null,
-    "build": null,
-    "mermaid": "npm run validate:docs"
+    "build": "npm run build:docs",
+    "mermaid": null
   },
   "quality": {
     "mutation": {
@@ -40,8 +40,7 @@
   "codeExtensions": [],
   "architecture": {
     "documents": [
-      "docs/architecture/context.md",
-      "docs/architecture/containers.md"
+      "docs/architecture/src/blueprint.architecture.json"
     ]
   },
   "contracts": {
@@ -100,7 +99,8 @@
       "THIRD_PARTY_NOTICES.md",
       "ctxroute-config.json",
       "package.json",
-      "package-lock.json"
+      "package-lock.json",
+      "skills-lock.json"
     ]
   }
 }

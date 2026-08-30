@@ -16,18 +16,26 @@
     "npm": ">=10"
   },
   "scripts": {
-    "postinstall": "node .githooks/postinstall.mjs",
+    "postinstall": "node .githooks/archify restore && node .githooks/postinstall.mjs",
     "setup": "node .githooks/setup.mjs",
     "setup:check": "node .githooks/setup.mjs --check",
     "test": "node --test tests/*.test.mjs",
-    "validate:architecture": "node .githooks/validate-architecture.mjs --all",
+    "validate:architecture": "node .githooks/archify validate && node .githooks/validate-architecture.mjs --all",
+    "build:docs": "node .githooks/archify build",
+    "preview:docs": "node .githooks/archify preview",
+    "sensor": "node .githooks/sensor",
+    "check:updates": "node .githooks/archify updates",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",
     "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:architecture && npm run validate:docs -- --all && npm test"
   },
   "devDependencies": {
-    "@mermaid-js/mermaid-cli": "^11.12.0",
-    "ctxroute": "https://github.com/zenonlab/ctxroute/archive/76b45a57543c940c51e382a41adb749faa44bbc4.tar.gz"
+    "ctxroute": "https://github.com/zenonlab/ctxroute/archive/76b45a57543c940c51e382a41adb749faa44bbc4.tar.gz",
+    "skills": "1.5.23",
+    "tree-sitter": "0.21.1",
+    "tree-sitter-javascript": "0.23.1",
+    "tree-sitter-python": "0.21.0",
+    "tree-sitter-typescript": "0.23.2"
   }
 }
