@@ -19,7 +19,7 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
     return { schemaVersion: 1, verdict: 'ERROR', diagnostics };
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
-  const sharedState = { sqlExports: collectDynamicExports(paths, root) };
+  const sharedState = { root, sqlExports: collectDynamicExports(paths, root) };
   for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
   diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = diagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
@@ -41,7 +41,7 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
 function analyzePath(path, root, config, diagnostics, sharedState) {
   try {
     const source = readFileSync(resolve(root, path), 'utf8');
-    diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, importedSqlFunctions: collectImportedNames(source) } }));
+    diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, path, importedSqlFunctions: collectImportedNames(source) } }));
   }
   catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
 }
@@ -49,8 +49,8 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
 function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Set(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
-  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Set(); state.importedSqlFunctions ??= new Map();
+  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
+  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Map(); state.importedSqlFunctions ??= new Map();
   state.taintedVariables ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
@@ -64,7 +64,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const right = node.childForFieldName('value') ?? node.childForFieldName('right');
     const rightText = right?.text ?? '';
     const rightBuilder = right?.childForFieldName('function')?.text ?? rightText.split('(')[0];
-    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || (state.sqlExports.has(rightBuilder) && state.importedSqlFunctions.has(rightBuilder)))) state.sqlVariables.add(left);
+    if (left && (looksLikeDynamicSql(text) || looksLikeUntrustedSource(text, config) || state.sqlVariables.has(rightText) || state.taintedVariables.has(rightText) || state.sqlFunctions.has(rightBuilder) || isResolvedSqlExport(state.importedSqlFunctions.get(rightBuilder), state))) state.sqlVariables.add(left);
     if (left && (looksLikeUntrustedSource(text, config) || state.taintedVariables.has(rightText) || state.taintedVariables.has(rightText.split('.')[0]))) state.taintedVariables.add(left);
   }
   if (node.type === 'function_declaration' || node.type === 'function_definition') {
@@ -84,8 +84,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const firstArgumentName = firstArgument?.text ?? '';
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
-    const importedBuilder = state.importedSqlFunctions.get(calledBuilder);
-    const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || state.sqlExports.has(importedBuilder ?? calledBuilder);
+    const importedBuilder = importedBinding(calledBuilder, state);
+    const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || isResolvedSqlExport(importedBuilder, state);
     if (isSqlSink(name, config) && (looksLikeDynamicSql(text) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
     if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
     if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
@@ -112,7 +112,7 @@ function defaultConfig(root) {
   catch (error) { return { __sensorConfigError: error.message }; }
 }
 function collectDynamicExports(paths, root) {
-  const exports = new Set();
+  const exports = new Map();
   for (const path of paths) {
     const grammar = grammars.get(extname(path).toLowerCase());
     if (!grammar) continue;
@@ -121,22 +121,73 @@ function collectDynamicExports(paths, root) {
       walk(tree.rootNode, 0, node => {
         const pythonModuleFunction = grammar === Python && node.type === 'function_definition' && node.parent?.type === 'module';
         const exportedFunction = (node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node);
-        if ((pythonModuleFunction || exportedFunction) && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) exports.add(node.childForFieldName('name')?.text ?? '');
+        const name = node.childForFieldName('name')?.text ?? '';
+        if ((pythonModuleFunction || exportedFunction) && name && looksLikeDynamicSql(source.slice(node.startIndex, node.endIndex))) {
+          if (!exports.has(name)) exports.set(name, new Set());
+          exports.get(name).add(resolve(root, path));
+        }
       });
     } catch { /* the normal scan emits the authoritative read/syntax diagnostic */ }
   }
-  exports.delete(''); return exports;
+  return exports;
 }
 function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
 function collectImportedNames(source) {
   const names = new Map();
-  for (const match of source.matchAll(/\bimport\s*\{([^}]+)\}|\bfrom\s+[A-Za-z0-9_./-]+\s+import\s+([^\n]+)/gu)) {
+  for (const match of source.matchAll(/\bimport\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/gu)) {
     for (const item of (match[1] ?? match[2]).split(',')) {
       const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
-      if (parts[0]) names.set(parts.at(-1), parts[0]);
+      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[2] });
     }
   }
+  for (const match of source.matchAll(/\bfrom\s+([A-Za-z0-9_./-]+)\s+import\s+([^\n]+)/gu)) {
+    for (const item of match[2].split(',')) {
+      const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
+      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[1] });
+    }
+  }
+  for (const match of source.matchAll(/\b(?:const|let|var)\s*\{([^}]+)\}\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/gu)) {
+    for (const item of match[1].split(',')) {
+      const parts = item.trim().split(/\s*:\s*/u).map(value => value.trim());
+      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[2] });
+    }
+  }
+  for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)\.([A-Za-z_$][\w$]*)/gu)) {
+    names.set(match[1], { original: match[3], module: match[2] });
+  }
+  for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/gu)) {
+    if (!names.has(match[1])) names.set(match[1], { namespace: true, module: match[2] });
+  }
   return names;
+}
+function importedBinding(name, state) {
+  const direct = state.importedSqlFunctions.get(name);
+  if (direct) return direct;
+  const [namespace, member] = name.split('.');
+  const binding = state.importedSqlFunctions.get(namespace);
+  return binding?.namespace && member ? { original: member, module: binding.module } : null;
+}
+function isResolvedSqlExport(binding, state) {
+  if (!binding) return false;
+  const candidates = state.sqlExports.get(binding.original);
+  if (!candidates?.size) return false;
+  const consumer = resolve(state.root ?? process.cwd(), state.path ?? '');
+  const imported = resolveImportedModule(consumer, binding.module, state.root ?? process.cwd());
+  return imported ? [...candidates].some(candidate => candidate === imported) : false;
+}
+function resolveImportedModule(consumer, specifier, root) {
+  if (!specifier) return null;
+  const extension = extname(consumer).toLowerCase();
+  if (!specifier.startsWith('.') && !specifier.startsWith('/') && extension !== '.py') return null;
+  const base = specifier.startsWith('.') || !specifier.includes('/') || specifier.startsWith('/')
+    ? resolve(specifier.startsWith('/') ? '' : resolve(consumer, '..'), specifier)
+    : null;
+  if (!base) return null;
+  const candidates = [base, ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => `${base}${extension}`), ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => resolve(base, `index${extension}`))];
+  return candidates.find(candidate => candidate === resolve(root, candidate) && fileExists(candidate)) ?? null;
+}
+function fileExists(path) {
+  try { return readFileSync(path, { encoding: 'utf8' }) !== undefined; } catch { return false; }
 }
 function validateConfig(config) {
   if (config?.__sensorConfigError) return [diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', `Sensor rules could not be loaded: ${config.__sensorConfigError}`)];
@@ -156,7 +207,7 @@ function validateConfig(config) {
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
-function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text); }
+function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text) || /\b(?:where|order\s+by|group\s+by|having|set|from|values)\b[\s\S]{0,120}(?:=|<|>|\?|\$\d|\$\{|\+)/iu.test(text) || /\b[A-Za-z_]\w*\s*(?:=|<|>)\s*/u.test(text); }
 function looksLikeUntrustedSource(text, config = {}) {
   const sources = config.sql?.taintSources ?? ['req.query', 'req.params', 'req.body', 'request.args', 'request.form', 'request.json', 'request.query_params', 'request.path_params', 'request.GET', 'request.POST', 'request.body', 'searchParams', 'URLSearchParams', 'process.argv', 'process.env', 'os.environ', 'os.getenv'];
   return sources.some(source => text.includes(source));
@@ -164,7 +215,7 @@ function looksLikeUntrustedSource(text, config = {}) {
 function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
 function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }
 function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(/u.test(text); }
-function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'rawQuery', 'raw_sql', 'execute_sql', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
+function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'rawQuery', 'raw_sql', 'execute_sql', 'whereRaw', 'havingRaw', 'orderByRaw', 'joinRaw', 'literal', 'text', 'RawSQL', 'extra', 'fromSqlRaw', 'executeSqlRaw', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }
 function firstError(node) { if (node.isError || node.isMissing) return node; for (const child of node.namedChildren) { const result = firstError(child); if (result) return result; } return node; }
 function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }

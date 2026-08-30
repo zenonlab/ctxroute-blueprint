@@ -35,6 +35,10 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('app.py', "cursor.execute(f'SELECT * FROM users WHERE id = {user_id}')", { config: { sql: { sinks: ['execute'] } } })[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('app.py', "def build_query(user_id):\n    return f'SELECT * FROM users WHERE id = {user_id}'\ncursor.execute(build_query(user_id))", { config: { sql: { sinks: ['execute'] } } })[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('orm.ts', "knex.raw('SELECT * FROM users WHERE id = ' + userId)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('orm.ts', "query.whereRaw('id = ' + userId)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('orm.ts', "sequelize.literal('ORDER BY ' + field)")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('orm.py', "text(f'SELECT * FROM users WHERE id = {user_id}')")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('orm.py', "RawSQL('id = %s', [user_id])").length, 0);
   assert.equal(analyzeSource('orm.ts', "prisma.$queryRawUnsafe(`SELECT * FROM users WHERE id = ${userId}`)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('route.ts', "const id = req.query.id; db.query(id)")[0].rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('route.py', "user_id = request.query_params['id']\ncursor.execute(user_id)")[0].rule, 'sensor/sql-injection');
@@ -60,6 +64,24 @@ test('SQL tracking follows Python builders and import aliases in one scan', () =
   const result = analyzePaths(['app.py', 'queries.py'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['execute'] } } });
   assert.equal(result.verdict, 'UNSAFE');
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.py'), true);
+});
+test('SQL tracking resolves CommonJS aliases and does not match an unrelated module', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-commonjs-cross-file-'));
+  writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
+  writeFileSync(join(directory, 'other.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = $1'; }\n");
+  writeFileSync(join(directory, 'unsafe.cjs'), "const { buildQuery: makeQuery } = require('./queries');\ndb.query(makeQuery(userId));\n");
+  writeFileSync(join(directory, 'safe.cjs'), "const { buildQuery } = require('./other');\ndb.query(buildQuery(userId));\n");
+  const config = { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } };
+  const result = analyzePaths(['safe.cjs', 'unsafe.cjs', 'queries.js', 'other.js'], { root: directory, config });
+  assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'unsafe.cjs'), true);
+  assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'safe.cjs'), false);
+});
+test('SQL tracking resolves CommonJS member aliases', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-commonjs-member-'));
+  writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
+  writeFileSync(join(directory, 'app.cjs'), "const queries = require('./queries');\ndb.query(queries.buildQuery(userId));\n");
+  const result = analyzePaths(['app.cjs', 'queries.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.cjs'), true);
 });
 test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.html', '<main>Hello</main>').length, 0);
