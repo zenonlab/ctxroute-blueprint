@@ -81,7 +81,7 @@ test('the lifecycle dispatcher skips architecture policy for read-only tools', (
   assert.deepEqual(called, ['codex-doc-inject.js']);
 });
 
-test('the lifecycle dispatcher loads ADR context when reading a decision-scoped file', () => {
+test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () => {
   const called = [];
   const result = dispatch({
     harness: 'codex',
@@ -90,11 +90,12 @@ test('the lifecycle dispatcher loads ADR context when reading a decision-scoped 
     root,
     execute(handler) {
       called.push(handler.name);
-      return { outputs: handler.name === 'pre-tool-architecture.mjs' ? [{ hookSpecificOutput: { additionalContext: 'ADR context' } }] : [] };
+      return { outputs: handler.name === 'pre-tool-architecture.mjs' ? [{ hookSpecificOutput: { additionalContext: 'Architecture gate' } }] : [] };
     },
   });
   assert.deepEqual(called, ['pre-tool-architecture.mjs', 'codex-doc-inject.js']);
-  assert.match(result.hookSpecificOutput.additionalContext, /ADR context/u);
+  assert.match(result.hookSpecificOutput.additionalContext, /Architecture gate/u);
+  assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
 });
 
 test('the lifecycle dispatcher returns the first refusal unchanged', () => {

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { applicableAdrs, decisionDiagnostics, matchScope, parseAdr } from '../.codex/hooks/decision-memory.mjs';
+import { applicableAdrs, decisionDiagnostics, matchScope, parseAdr, syncAdrRules } from '../.codex/hooks/decision-memory.mjs';
 
 test('matches exact paths and single or recursive globs', () => {
   assert.equal(matchScope('package.json', ['package.json']), true);
@@ -48,4 +49,28 @@ test('reports overlapping ADRs as partial without pretending to resolve semantic
   const result = decisionDiagnostics(['src/main.js'], root);
   assert.equal(result.status, 'partial');
   assert.match(result.message, /semantic contradiction is outside scope/u);
+});
+
+test('materializes ADR metadata for CTXRoute and injects it only in scope', () => {
+  const root = mkdtempSync(join(tmpdir(), 'decision-memory-ctxroute-'));
+  mkdirSync(join(root, 'docs/decisions'), { recursive: true });
+  mkdirSync(join(root, 'src'), { recursive: true });
+  mkdirSync(join(root, 'lib'), { recursive: true });
+  writeFileSync(join(root, 'docs/decisions/ADR-0001-rule.md'), '---\nscope:\n  - src/**\nreview: on-change\n---\n# Scoped decision\n\nUse the approved adapter.\n');
+  writeFileSync(join(root, 'src/main.js'), 'export default 1;\n');
+  writeFileSync(join(root, 'src/other.js'), 'export default 2;\n');
+  writeFileSync(join(root, 'lib/other.js'), 'export default 3;\n');
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['add', '.'], { cwd: root });
+  syncAdrRules(root);
+  const generated = readFileSync(join(root, '.claude/hooks/docs/adr-memory/adr-ADR-0001-rule.md'), 'utf8');
+  assert.match(generated, /tool: "\*"/u);
+  assert.doesNotMatch(generated, /problem-memory|events:|tools:/u);
+
+  const projectRoot = new URL('..', import.meta.url).pathname;
+  const hook = join(projectRoot, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
+  const env = { ...process.env, CTXROUTE_CONFIG_PATH: join(projectRoot, 'ctxroute-config.json'), CTXROUTE_FILEDOCS_DIR: join(root, '.claude/hooks/docs'), CTXROUTE_STATE_DIR: join(root, '.ctxroute/state') };
+  const run = filePath => spawnSync(process.execPath, [hook, '--budget', '0'], { cwd: root, env, input: JSON.stringify({ session_id: `adr-${filePath}`, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }), encoding: 'utf8' });
+  assert.match(run('src/main.js').stdout, /Use the approved adapter/u);
+  assert.doesNotMatch(run('lib/other.js').stdout, /Use the approved adapter/u);
 });

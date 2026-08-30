@@ -13,7 +13,7 @@ import {
   loadProjectConfig,
   normalizePath,
 } from '../../.githooks/project-policy.mjs';
-import { applicableAdrs, decisionDiagnostics, loadAdrs } from './decision-memory.mjs';
+import { decisionDiagnostics, loadAdrs, syncAdrRules } from './decision-memory.mjs';
 
 let input;
 try { input = JSON.parse(await stdin()); }
@@ -47,8 +47,8 @@ if (!paths.length) {
 
 const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
 const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
-const relevantAdrs = applicableAdrs(changePaths);
 const decisionStatus = decisionDiagnostics(changePaths);
+syncAdrRules(process.cwd());
 if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
   block(['Write blocked: invalid ADR metadata must be repaired before changing governed files.', `ADRs: ${invalidDecisionPaths.join(', ')}`]);
 }
@@ -67,7 +67,7 @@ if (mutationTool && contractPaths.length && !adrEvidence) {
 }
 
 const architecturalPaths = paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
-if (mutationTool && architecturalPaths.length && !relevantAdrs.length && !adrEvidence) {
+if (mutationTool && architecturalPaths.length && !decisionStatus.applicable.length && !adrEvidence) {
   block(['Write blocked: architectural change has no applicable ADR.', `Files: ${architecturalPaths.join(', ')}`, 'Write or revise an ADR with a matching scope before changing these files.']);
 }
 
@@ -103,15 +103,14 @@ if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
 }
 
 if (paths.some(path => isSourcePath(path, config))) {
-  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionContext(relevantAdrs, decisionStatus)}`);
-} else if (relevantAdrs.length) {
-  context(formatDecisionContext(relevantAdrs, decisionStatus));
+  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
+} else if (decisionStatus.applicable.length) {
+  context(formatDecisionStatus(decisionStatus));
 }
 
-function formatDecisionContext(adrs, status = decisionDiagnostics([])) {
-  if (!adrs.length) return '';
-  const overlap = status.status === 'partial' ? `\n\nDecision status: partial. ${status.message}` : '';
-  return `\n\nApplicable architectural decisions (read before acting):${overlap}\n${adrs.map(adr => `- ${adr.file}\n${adr.body.trim()}`).join('\n\n')}`;
+function formatDecisionStatus(status) {
+  if (status.status !== 'partial') return '';
+  return `\n\nDecision status: partial. ${status.message}`;
 }
 
 function extractPaths(value) {

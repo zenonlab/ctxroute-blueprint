@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
 const ADR_DIRECTORY = 'docs/decisions';
@@ -48,6 +49,38 @@ export function decisionDiagnostics(paths, root = process.cwd()) {
       ? 'Multiple ADRs apply; semantic contradiction is outside scope without a dedicated analyzer.'
       : '',
   };
+}
+
+export function syncAdrRules(root = process.cwd()) {
+  const directory = resolve(root, '.claude/hooks/docs/adr-memory');
+  mkdirSync(directory, { recursive: true });
+  const tracked = repositoryFiles(root);
+  const active = new Set();
+  for (const adr of loadAdrs(root)) {
+    const name = `adr-${adr.file.split('/').pop()}`;
+    const destination = join(directory, name);
+    const covered = !adr.errors.length && !adr.metadata['superseded-by']
+      ? tracked.filter(path => matchScope(path, adr.metadata.scope))
+      : [];
+    const source = covered.length
+      ? ['---', 'tool: "*"', `scope: ${JSON.stringify(covered)}`, 'mode: dumb', '---', '', `# ${adr.file}`, '', adr.body.trim(), ''].join('\n')
+      : ['---', 'inject: never', '---', '', `# ${adr.file} (inactive)`, ''].join('\n');
+    writeFileSync(destination, source, 'utf8');
+    active.add(name);
+  }
+  for (const entry of readdirSync(directory)) {
+    if (!/^adr-ADR-\d{4}-.+\.md$/u.test(entry) || active.has(entry)) continue;
+    writeFileSync(join(directory, entry), '---\ninject: never\n---\n', 'utf8');
+  }
+}
+
+function repositoryFiles(root) {
+  try {
+    return execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
+      .split('\0').map(normalizePath).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 export function validateMetadata(metadata, file = '') {

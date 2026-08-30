@@ -42,6 +42,11 @@ scopée par fichier et outil. La règle contient uniquement le vocabulaire
 CTXRoute (`tool`, `scope`, `mode`) ; elle ne contient pas `problem-memory`,
 `events` ou `tools`, et ne modifie jamais automatiquement `AGENTS.md`.
 
+Les ADRs valides sont synchronisés vers des documents CTXRoute générés dans
+`.claude/hooks/docs/adr-memory/`. Le hook local conserve la correspondance par
+scope et les blocages de gouvernance, mais ne transmet plus le corps des ADRs
+comme contexte ; l’injection est réalisée exclusivement par CTXRoute.
+
 Un ADR invalide ou remplacé bloque une modification gouvernée. Plusieurs ADRs
 applicables produisent le statut `partial` et un diagnostic explicite ; la
 contradiction sémantique entre leurs textes reste hors périmètre sans

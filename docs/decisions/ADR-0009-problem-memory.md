@@ -45,7 +45,9 @@ automatic path because it would broaden the rule beyond the recurring problem.
 SQLite remains detection and resolution memory only. CTXRoute remains the
 injection engine, and the local hook remains a proposal/resolution adapter;
 approved protections do not alter permissions, global configuration, or
-repository doctrine.
+repository doctrine. The same boundary applies to ADR context: valid ADRs are
+mirrored into ignored `.claude/hooks/docs/adr-memory/` documents, and CTXRoute
+alone injects the mirrored body.
 
 ADR metadata remains matched by repository-relative scope. Invalid or
 superseded ADRs block governed changes until repaired or replaced. Multiple
