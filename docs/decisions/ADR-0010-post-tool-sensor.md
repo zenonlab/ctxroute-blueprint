@@ -38,6 +38,11 @@ files. Optional `requireLimit` detects unbounded result sets without making a
 rate-limit or query allowlist policy mandatory for derived products. A
 rate-limit gateway remains an application responsibility.
 
+The default sink registry covers common raw/query entry points used by Prisma,
+Knex, TypeORM, Sequelize, Django, and SQLAlchemy. Derived products can replace
+that registry in `sql.sinks`; safe parameterized APIs are not marked unsafe just
+because they belong to an ORM.
+
 Products may also opt into `requireMutationFilter` to classify unfiltered
 `UPDATE` and `DELETE` statements as `UNSAFE`; this is disabled by default for
 migrations and maintenance jobs. A parameterized `LIMIT` is accepted as a
