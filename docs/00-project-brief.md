@@ -25,7 +25,7 @@
 - Deployment: source repository and GitHub Actions only; no production deployment.
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
 - Post-hook analysis: JS/TS/JSX/TSX, Python, SQL, HTML, CSS, Vue, and Svelte adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
-- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits, mutation predicates, and request-scoped rate-limit guards are configurable, while runtime enforcement and query allowlists remain product responsibilities.
+- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits, mutation predicates, and request-scoped rate-limit guards are configurable, while runtime enforcement and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
 
 ## Success criteria
 
@@ -34,5 +34,5 @@
 - File events produce at most one bounded CRG subprocess per coalesced update and leave no persistent Python process.
 - SQLite uses WAL and closes cleanly on success, failure, and signal.
 - Governance rules make ASK, NEVER, and ALWAYS decisions explicit and auditable.
-- PostToolUse returns schema-versioned SAFE/WARN/UNSAFE/ERROR diagnostics; UNSAFE/ERROR remain visible to validation and Git controls.
+- PostToolUse returns schema-versioned SAFE/WARN/UNSAFE/ERROR diagnostics plus explicit coverage metadata; UNSAFE/ERROR remain visible to validation and Git controls. A SAFE result is not runtime proof.
 - Architecture, tests, Sensor diagnostics, and Linux/macOS/Windows CI remain green.

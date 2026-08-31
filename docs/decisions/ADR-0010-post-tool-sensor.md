@@ -73,6 +73,15 @@ The versioned Sensor configuration is validated before scanning. A missing,
 malformed, or incompatible rules file produces `sensor/configuration` with an
 `ERROR` verdict instead of falling back to an implicit safe policy.
 
+The result also declares its coverage limits: `moduleScope` is
+`explicit-paths`, package resolution is disabled, `wholeProgramAnalysis` is
+false, and `rateLimitRuntimeProof` is false. Local import resolution may only
+match files included in the same `analyzePaths` action; a `SAFE` result never
+means that an unscanned dependency is safe or that a rate-limit middleware was
+executed at runtime. New languages are added through the adapter registry;
+product-specific sinks, builders, taint sources, and thresholds are added in
+the versioned rules file.
+
 PostToolUse analyzes the new path of a rename and skips an intentionally
 deleted path; an unexpectedly absent path during another mutation remains an
 explicit `sensor/read-error`. Invalid hook input is reported visibly while the

@@ -36,6 +36,7 @@ test('PostToolUse forwards an unsafe SQL sink diagnostic to the agent context', 
   const output = JSON.parse(result.stdout);
   assert.match(output.hookSpecificOutput.additionalContext, /sensor\/sql-injection/u);
   assert.match(output.hookSpecificOutput.additionalContext, /"verdict":"UNSAFE"/u);
+  assert.match(output.hookSpecificOutput.additionalContext, /"rateLimitRuntimeProof":false/u);
   assert.equal(output.decision, 'block');
 });
 test('PostToolUse forwards diagnostics from a Svelte component', () => {

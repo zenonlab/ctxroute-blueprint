@@ -6,35 +6,53 @@ import { readFileSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
+export const SENSOR_ADAPTERS = Object.freeze([
+  Object.freeze({ id: 'javascript', extensions: Object.freeze(['.js', '.jsx', '.mjs', '.cjs']) }),
+  Object.freeze({ id: 'typescript', extensions: Object.freeze(['.ts', '.tsx']) }),
+  Object.freeze({ id: 'python', extensions: Object.freeze(['.py']) }),
+  Object.freeze({ id: 'sql', extensions: Object.freeze(['.sql']) }),
+  Object.freeze({ id: 'html', extensions: Object.freeze(['.html', '.htm']) }),
+  Object.freeze({ id: 'css', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
+  Object.freeze({ id: 'single-file-component', extensions: Object.freeze(['.vue', '.svelte']) }),
+]);
+const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
 const grammars = new Map([
   ['.js', JavaScript], ['.jsx', JavaScript], ['.mjs', JavaScript], ['.cjs', JavaScript],
   ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
 ]);
+export const SENSOR_COVERAGE = Object.freeze({
+  moduleScope: 'explicit-paths',
+  packageResolution: 'disabled',
+  wholeProgramAnalysis: false,
+  rateLimitRuntimeProof: false,
+});
 
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
   const configurationErrors = validateConfig(config);
   if (configurationErrors.length) {
     diagnostics.push(...configurationErrors);
-    return { schemaVersion: 1, verdict: 'ERROR', diagnostics };
+    return sensorResult('ERROR', diagnostics);
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
-  const sharedState = { root, sqlExports: collectDynamicExports(paths, root) };
+  const scannedFiles = new Set(paths.map(path => resolve(root, path)));
+  const sharedState = { root, scannedFiles, sqlExports: collectDynamicExports(paths, root) };
   for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
   diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = diagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
-  return { schemaVersion: 1, verdict, diagnostics };
+  return sensorResult(verdict, diagnostics);
 }
 
 export function analyzeSource(path, source, { config = {}, state } = {}) {
   const extension = extname(path).toLowerCase();
   const diagnostics = [];
+  const adapter = adapterByExtension.get(extension);
   const grammar = grammars.get(extension);
   if (grammar) analyzeAst(path, source, grammar, config, diagnostics, state);
-  else if (extension === '.sql') analyzeSql(path, source, diagnostics, config);
-  else if (extension === '.html' || extension === '.htm') analyzeHtml(path, source, diagnostics);
-  else if (extension === '.css' || extension === '.scss' || extension === '.sass') analyzeCss(path, source, diagnostics);
-  else if (extension === '.vue' || extension === '.svelte') analyzeSingleFileComponent(path, source, diagnostics, config);
+  else if (adapter === 'sql') analyzeSql(path, source, diagnostics, config);
+  else if (adapter === 'html') analyzeHtml(path, source, diagnostics);
+  else if (adapter === 'css') analyzeCss(path, source, diagnostics);
+  else if (adapter === 'single-file-component') analyzeSingleFileComponent(path, source, diagnostics, config);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   return diagnostics;
 }
@@ -215,10 +233,10 @@ function isResolvedSqlExport(binding, state) {
   const candidates = state.sqlExports.get(binding.original);
   if (!candidates?.size) return false;
   const consumer = resolve(state.root ?? process.cwd(), state.path ?? '');
-  const imported = resolveImportedModule(consumer, binding.module, state.root ?? process.cwd());
+  const imported = resolveImportedModule(consumer, binding.module, state.root ?? process.cwd(), state.scannedFiles);
   return imported ? [...candidates].some(candidate => candidate === imported) : false;
 }
-function resolveImportedModule(consumer, specifier, root) {
+function resolveImportedModule(consumer, specifier, root, scannedFiles = new Set()) {
   if (!specifier) return null;
   const extension = extname(consumer).toLowerCase();
   if (!specifier.startsWith('.') && !specifier.startsWith('/') && extension !== '.py') return null;
@@ -229,7 +247,7 @@ function resolveImportedModule(consumer, specifier, root) {
   const base = specifier.startsWith('/') ? resolve('', specifier) : pythonRelative ?? resolve(consumerDirectory, specifier);
   if (!base) return null;
   const candidates = [base, ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => `${base}${extension}`), ...['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py'].map(extension => resolve(base, `index${extension}`))];
-  return candidates.find(candidate => candidate === resolve(root, candidate) && fileExists(candidate)) ?? null;
+  return candidates.find(candidate => candidate === resolve(root, candidate) && scannedFiles.has(candidate) && fileExists(candidate)) ?? null;
 }
 function fileExists(path) {
   try { return readFileSync(path, { encoding: 'utf8' }) !== undefined; } catch { return false; }
@@ -240,6 +258,9 @@ function validateConfig(config) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) errors.push('configuration must be an object');
   else {
     if (config.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
+    if (config.analysis !== undefined && (!config.analysis || typeof config.analysis !== 'object' || Array.isArray(config.analysis))) errors.push('analysis must be an object');
+    if (config.analysis?.moduleScope !== undefined && config.analysis.moduleScope !== 'explicit-paths') errors.push('analysis.moduleScope must equal explicit-paths');
+    if (config.analysis?.packageResolution !== undefined && config.analysis.packageResolution !== 'disabled') errors.push('analysis.packageResolution must equal disabled');
     if (!Array.isArray(config.dangerousCommands) || config.dangerousCommands.some(value => typeof value !== 'string')) errors.push('dangerousCommands must be an array of strings');
     if (config.complexity && (!Number.isInteger(config.complexity.maxNodes) || !Number.isInteger(config.complexity.maxDepth) || config.complexity.maxNodes < 1 || config.complexity.maxDepth < 1)) errors.push('complexity.maxNodes and complexity.maxDepth must be positive integers');
     if (config.sql) {
@@ -255,6 +276,7 @@ function validateConfig(config) {
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
+function sensorResult(verdict, diagnostics) { return { schemaVersion: 1, verdict, coverage: SENSOR_COVERAGE, diagnostics }; }
 function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text) || /\b(?:where|order\s+by|group\s+by|having|set|from|values)\b[\s\S]{0,120}(?:=|<|>|\?|\$\d|\$\{|\+)/iu.test(text) || /\b[A-Za-z_]\w*\s*(?:=|<|>)\s*/u.test(text); }
 function looksLikeUntrustedSource(text, config = {}) {
   const sources = config.sql?.taintSources ?? ['req.query', 'req.params', 'req.body', 'request.args', 'request.form', 'request.json', 'request.query_params', 'request.path_params', 'request.GET', 'request.POST', 'request.body', 'searchParams', 'URLSearchParams', 'process.argv', 'process.env', 'os.environ', 'os.getenv'];

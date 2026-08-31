@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzePaths, analyzeSource } from '../.githooks/sensor-engine.mjs';
+import { analyzePaths, analyzeSource, SENSOR_ADAPTERS, SENSOR_COVERAGE } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -63,6 +63,18 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   const result = analyzePaths(['app.ts', 'queries.ts'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
   assert.equal(result.verdict, 'UNSAFE');
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
+});
+test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
+  assert.deepEqual(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions), ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.sql', '.html', '.htm', '.css', '.scss', '.sass', '.vue', '.svelte']);
+  assert.deepEqual(SENSOR_COVERAGE, { moduleScope: 'explicit-paths', packageResolution: 'disabled', wholeProgramAnalysis: false, rateLimitRuntimeProof: false });
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-explicit-scope-'));
+  writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
+  writeFileSync(join(directory, 'app.js'), "import { buildQuery } from './queries';\ndb.query(buildQuery(userId));\n");
+  const result = analyzePaths(['app.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'SAFE');
+  assert.equal(result.coverage.moduleScope, 'explicit-paths');
+  assert.equal(result.coverage.wholeProgramAnalysis, false);
+  assert.equal(result.coverage.rateLimitRuntimeProof, false);
 });
 test('SQL tracking follows Python builders and import aliases in one scan', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-python-cross-file-'));
@@ -143,4 +155,6 @@ test('invalid or missing Sensor configuration is never treated as safe', () => {
   assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 2 } }).verdict, 'ERROR');
   assert.equal(analyzePaths(['safe.js'], { root: directory }).diagnostics[0].rule, 'sensor/configuration');
   assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], complexity: { maxNodes: 10, maxDepth: 10 }, sql: { sinks: ['query'], requireLimit: false, maxRows: 100 } } }).verdict, 'SAFE');
+  assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 1, analysis: { moduleScope: 'whole-program' }, dangerousCommands: [], sql: { sinks: ['query'] } } }).diagnostics[0].rule, 'sensor/configuration');
+  assert.equal(analyzePaths(['safe.js'], { root: directory, config: { schemaVersion: 1, analysis: [], dangerousCommands: [], sql: { sinks: ['query'] } } }).diagnostics[0].rule, 'sensor/configuration');
 });
