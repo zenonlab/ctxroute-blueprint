@@ -153,6 +153,15 @@ test('blocks governed changes while an ADR is invalid or superseded', () => {
   }
 });
 
+test('blocks governed changes when applicable ADRs declare an explicit conflict', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0001-one.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\nconflicts-with:\n  - ADR-0002-two.md\n---\none\n');
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0002-two.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\ntwo\n');
+  const result = run({ patch: '*** Update File: src/existing.rb' }, { cwd });
+  assert.match(result.stdout, /explicitly conflict/u);
+});
+
 test('recognizes an Archify source changed in a previous step', () => {
   const cwd = initializedWorkspace();
   git(cwd, ['init', '-q']);

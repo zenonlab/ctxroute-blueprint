@@ -51,6 +51,16 @@ test('reports overlapping ADRs as partial without pretending to resolve semantic
   assert.match(result.message, /semantic contradiction is outside scope/u);
 });
 
+test('reports explicit ADR conflicts for the PreToolUse boundary', () => {
+  const root = mkdtempSync(join(tmpdir(), 'decision-memory-conflict-'));
+  mkdirSync(join(root, 'docs/decisions'), { recursive: true });
+  writeFileSync(join(root, 'docs/decisions/ADR-0001-one.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\nconflicts-with:\n  - ADR-0002-two.md\n---\none\n');
+  writeFileSync(join(root, 'docs/decisions/ADR-0002-two.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\ntwo\n');
+  const result = decisionDiagnostics(['src/main.js'], root);
+  assert.equal(result.status, 'conflict');
+  assert.deepEqual(result.conflicts, ['docs/decisions/ADR-0001-one.md conflicts-with ADR-0002-two.md']);
+});
+
 test('materializes ADR metadata for CTXRoute and injects it only in scope', () => {
   const root = mkdtempSync(join(tmpdir(), 'decision-memory-ctxroute-'));
   mkdirSync(join(root, 'docs/decisions'), { recursive: true });

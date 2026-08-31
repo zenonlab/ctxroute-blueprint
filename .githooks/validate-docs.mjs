@@ -13,12 +13,82 @@ const { config, failures: configFailures } = indexMode ? loadIndexConfig() : loa
 failures.push(...configFailures);
 
 rejectStarterGuidesWhenInitialized(targets);
+validateDocumentContracts();
 validateRequiredArchitecture();
 for (const file of targets) validateLinks(file, readSource(file));
 
 function validateRequiredArchitecture() {
   for (const file of config?.architecture?.documents ?? []) if (!existsSync(file)) failures.push(`${file}: required architecture source is missing`);
 }
+
+function validateDocumentContracts() {
+  const manifest = readJson('docs/document-contracts.json');
+  if (!manifest) return;
+  if (manifest.schemaVersion !== 1 || manifest.policy !== 'schema-first' || !Array.isArray(manifest.documents) || !manifest.documents.length) {
+    failures.push('docs/document-contracts.json: schemaVersion 1, schema-first policy, and documents are required');
+    return;
+  }
+  const ids = new Set();
+  for (const document of manifest.documents) {
+    if (!document || typeof document !== 'object' || !document.id || ids.has(document.id)) {
+      failures.push('docs/document-contracts.json: every document contract needs a unique id');
+      continue;
+    }
+    ids.add(document.id);
+    if (!document.source && !document.sourceGlob) failures.push(`docs/document-contracts.json: ${document.id} needs source or sourceGlob`);
+    if (document.narrative && readOptionalSource(document.narrative) === null) failures.push(`${document.narrative}: narrative document contract source is missing`);
+    for (const file of document.source ? [document.source] : matchingDocuments(document.sourceGlob)) validateDocumentSource(document, file);
+  }
+}
+
+function validateDocumentSource(document, file) {
+  if (document.exclude?.includes(file)) return;
+  const source = readOptionalSource(file);
+  if (source === null) { failures.push(`${file}: document contract source is missing`); return; }
+  if (document.format === 'markdown' && document.requiredSections) {
+    for (const section of document.requiredSections) if (!new RegExp(`^#{1,6}\\s+${escapeRegExp(section)}\\s*$`, 'imu').test(source)) failures.push(`${file}: required section missing: ${section}`);
+  }
+  if (document.format === 'markdown-frontmatter') {
+    const frontMatter = source.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/u)?.[1] ?? '';
+    for (const key of document.requiredMetadata ?? []) if (!new RegExp(`^${escapeRegExp(key)}:`, 'mu').test(frontMatter)) failures.push(`${file}: required ADR metadata missing: ${key}`);
+  }
+  if (document.format === 'json') {
+    let parsed;
+    try { parsed = JSON.parse(source); } catch { failures.push(`${file}: invalid JSON document contract source`); return; }
+    for (const key of document.requiredKeys ?? []) if (!(key in parsed)) failures.push(`${file}: required JSON key missing: ${key}`);
+  }
+  if (document.format === 'archify-json-ir') {
+    let parsed;
+    try { parsed = JSON.parse(source); } catch { failures.push(`${file}: invalid architecture JSON IR`); return; }
+    if (parsed.schema_version !== 1 || parsed.diagram_type !== 'architecture') failures.push(`${file}: expected Archify architecture JSON IR schema_version 1`);
+  }
+}
+
+function readJson(file) {
+  const source = readOptionalSource(file);
+  if (source === null) { failures.push(`${file}: document contract manifest is missing`); return null; }
+  try { return JSON.parse(source); } catch { failures.push(`${file}: invalid JSON`); return null; }
+}
+
+function readOptionalSource(file) {
+  try { return readSource(file); } catch { return null; }
+}
+
+function matchingDocuments(pattern) {
+  if (indexMode) return indexFiles().filter(file => globPattern(pattern).test(file));
+  return repositoryFiles().filter(file => globPattern(pattern).test(file));
+}
+
+function repositoryFiles() {
+  try { return execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' }).split('\0').filter(Boolean); }
+  catch { return []; }
+}
+
+function globPattern(pattern) {
+  return new RegExp(`^${escapeRegExp(pattern).replace(/\\\\\*\\\\\\*/gu, '.*').replace(/\\\\\*/gu, '[^/]*')}$`, 'u');
+}
+
+function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }
 
 if (failures.length) {
   console.error([...new Set(failures)].join('\n'));

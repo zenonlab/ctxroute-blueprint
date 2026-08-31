@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +33,19 @@ test('SARIF CLI does not treat its flag as a source path', () => {
   const body = JSON.parse(result.stdout);
   assert.equal(body.version, '2.1.0');
   assert.equal(body.runs[0].results.some(item => item.locations[0].physicalLocation.artifactLocation.uri === '--sarif'), false);
+});
+test('staged Sensor blocks unsafe diagnostics before commit', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-staged-'));
+  const objects = join(directory, 'objects');
+  mkdirSync(objects);
+  const env = { ...process.env, GIT_INDEX_FILE: join(directory, 'index'), GIT_OBJECT_DIRECTORY: objects, GIT_ALTERNATE_OBJECT_DIRECTORIES: join(root, '.git/objects') };
+  const git = (args, input) => execFileSync('git', args, { cwd: root, env, input, stdio: 'pipe' });
+  git(['read-tree', 'HEAD']);
+  const blob = git(['hash-object', '-w', '--stdin'], 'spawn("tool", [], { shell: true });\n').toString().trim();
+  git(['update-index', '--add', '--cacheinfo', `100644,${blob},.sensor-staged-fixture.js`]);
+  const result = spawnSync(process.execPath, ['.githooks/validate-staged.mjs'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /sensor\/shell-true/u);
 });
 test('syntax errors exit 2', () => { const result = run('py', 'def broken(:\n'); assert.equal(result.status, 2); assert.equal(result.body.verdict, 'ERROR'); });
 test('diagnostics are path ordered', () => { const directory = mkdtempSync(join(tmpdir(), 'sensor-order-')); const a = join(directory, 'a.js'); const b = join(directory, 'b.js'); writeFileSync(a, 'eval(a);'); writeFileSync(b, 'eval(b);'); const result = spawnSync(process.execPath, [sensor, b, a], { cwd: root, encoding: 'utf8' }); assert.deepEqual(JSON.parse(result.stdout).diagnostics.map(item => item.path), [a, b]); });

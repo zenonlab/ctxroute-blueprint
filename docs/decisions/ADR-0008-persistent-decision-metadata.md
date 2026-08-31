@@ -33,8 +33,9 @@ PreToolUse blocks architectural and contract changes with no applicable valid
 ADR, and also blocks governed changes while any invalid or superseded ADR
 requires repair or replacement. PostToolUse repeats the check and validates
 modified decisions. When multiple ADRs apply, the diagnostic reports
-`partial`; it does not infer semantic contradiction without a dedicated
-analyzer. Valid ADR bodies are mirrored into ignored CTXRoute documents before
+`partial`; semantic contradiction is not inferred from prose. ADR authors may
+declare an auditable `conflicts-with` list; a matching explicit conflict is
+blocked until one ADR is revised or superseded. Valid ADR bodies are mirrored into ignored CTXRoute documents before
 injection; the local hook validates and synchronizes that corpus but does not
 inject decision text itself. Tests and generated files are exempt from the
 architectural requirement.

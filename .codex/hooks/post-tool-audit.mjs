@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { isSourcePath, isTestPath, isGeneratedPath, isContractPath, loadProjectConfig } from '../../.githooks/project-policy.mjs';
-import { applicableAdrs, loadAdrs, normalizePath } from './decision-memory.mjs';
+import { applicableAdrs, decisionDiagnostics, loadAdrs, normalizePath } from './decision-memory.mjs';
 import { extractPaths } from './path-extraction.mjs';
 
 const input = JSON.parse(await stdin());
@@ -13,6 +13,7 @@ const { config } = loadProjectConfig();
 const architecturalPaths = config ? paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config)) : [];
 const contractPaths = config ? paths.filter(path => isContractPath(path, config)) : [];
 const applicable = applicableAdrs(paths);
+const decisionStatus = decisionDiagnostics(paths);
 const changedDecisionPaths = paths.filter(path => /^docs\/decisions\/ADR-(?!0000-).+\.md$/u.test(path));
 const changedDecisions = loadAdrs().filter(adr => changedDecisionPaths.includes(adr.file));
 for (const path of changedDecisionPaths) {
@@ -24,6 +25,10 @@ for (const path of changedDecisionPaths) {
 }
 if ((architecturalPaths.length || contractPaths.length) && !applicable.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
   process.stdout.write(JSON.stringify({ decision: 'block', reason: `PostToolUse blocked: no applicable ADR for ${[...architecturalPaths, ...contractPaths].join(', ')}. Add or revise an ADR with a matching scope.` }));
+  process.exit(0);
+}
+if (decisionStatus.conflicts.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  process.stdout.write(JSON.stringify({ decision: 'block', reason: `PostToolUse blocked: applicable ADRs explicitly conflict. Revise or replace the conflicting ADR before changing governed files.` }));
   process.exit(0);
 }
 

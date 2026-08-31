@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "policy": "schema-first",
+  "documents": [
+    {
+      "id": "architecture",
+      "kind": "architecture-ir",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/blueprint.architecture.json",
+      "narrative": "docs/architecture/README.md",
+      "validator": "npm run validate:architecture"
+    },
+    {
+      "id": "project-brief",
+      "kind": "brief",
+      "format": "markdown",
+      "source": "docs/00-project-brief.md",
+      "requiredSections": ["Summary", "Constraints", "Decisions", "Success criteria"]
+    },
+    {
+      "id": "technology-decisions",
+      "kind": "decision-index",
+      "format": "markdown",
+      "source": "docs/01-technology-decisions.md"
+    },
+    {
+      "id": "quality-strategy",
+      "kind": "quality-strategy",
+      "format": "markdown",
+      "source": "docs/02-quality-strategy.md",
+      "requiredSections": ["Quality strategy", "Decision rule"]
+    },
+    {
+      "id": "architecture-decisions",
+      "kind": "adr-corpus",
+      "format": "markdown-frontmatter",
+      "sourceGlob": "docs/decisions/ADR-*.md",
+      "exclude": ["docs/decisions/ADR-0000-template.md"],
+      "requiredMetadata": ["scope", "review"]
+    },
+    {
+      "id": "sensor-rules",
+      "kind": "versioned-rule-config",
+      "format": "json",
+      "source": ".project/sensor-rules.json",
+      "requiredKeys": ["schemaVersion", "dangerousCommands", "sql"]
+    }
+  ]
+}

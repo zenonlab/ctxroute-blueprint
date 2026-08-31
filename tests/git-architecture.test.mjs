@@ -73,7 +73,8 @@ function repository() {
   config.codeExtensions = ['.rb'];
   config.quality.mutation.decision = 'not-applicable';
   writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
-  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{"schema_version":1,"diagram_type":"architecture"}\n');
+  writeFileSync(join(cwd, 'docs/document-contracts.json'), JSON.stringify({ schemaVersion: 1, policy: 'schema-first', documents: [{ id: 'architecture', kind: 'architecture-ir', format: 'archify-json-ir', source: 'docs/architecture/src/blueprint.architecture.json' }] }));
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ private: true }));
   writeFileSync(join(cwd, '.gitignore'), '.DS_Store\n');
   git(cwd, ['init', '-q']);

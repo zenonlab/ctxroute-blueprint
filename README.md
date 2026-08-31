@@ -158,13 +158,18 @@ silent update.
 
 ## Sensor
 
-The Sensor parses JavaScript, JSX, TypeScript, TSX, and Python with tree-sitter.
-It reports one stable JSON object containing a verdict and ordered diagnostics.
-Standalone comments and strings are ignored, while command literals passed to
-recognized shell APIs are inspected.
+The Sensor uses one registered engine for JavaScript, TypeScript, JSX/TSX,
+Python, SQL, HTML, CSS, Vue, Svelte, Rust, TOML, and declared lexical source
+and configuration formats. AST adapters are syntax-aware; lexical adapters
+provide bounded coverage only and do not claim type, package, or runtime
+analysis. It reports one stable JSON object containing a verdict, coverage
+limits, and ordered diagnostics. SARIF 2.1.0 is available for code-scanning
+integrations:
 
 ```sh
 npm run sensor -- src/example.ts scripts/check.py
+npm run sensor -- --sarif src/example.ts
+node .githooks/sensor --checklist --json
 ```
 
 Verdicts and exit codes are:
@@ -179,8 +184,15 @@ Verdicts and exit codes are:
 Rules and thresholds live in
 [`.project/sensor-rules.json`](.project/sensor-rules.json). The Sensor covers
 dynamic evaluation, dynamic function construction, dangerous shell commands,
-`shell: true`, direct secret-to-network output, syntax errors, and excessive AST
-complexity.
+`shell: true`, SQL injection, direct secret-to-network output, XSS, SSRF, path
+traversal, weak crypto, UI layering, syntax errors, and excessive AST
+complexity. `LIMIT` bounds SQL result rows; optional `requireRateLimit` is a
+separate request-rate heuristic and never proves runtime enforcement.
+
+Documentation follows the schema-first registry in
+[`docs/document-contracts.json`](docs/document-contracts.json). Structured
+sources are authoritative for typed facts; Markdown provides complementary
+context and is checked by `npm run validate:docs -- --all`.
 
 The agent must not delete starter guides without user confirmation. It creates
 verified commits automatically. See the [repository contribution rules](CONTRIBUTING.md)

@@ -7,7 +7,7 @@
     "viewBox": [1300, 850],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
-      { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
+      { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
       { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "91 extensions and 6 named files; no package, whole-program, or runtime rate-limit proof." },
       { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
@@ -21,6 +21,7 @@
     { "id": "archifyAdapter", "type": "backend", "label": "Archify adapter", "sublabel": "Restore / validate / build", "pos": [270, 310], "size": [180, 72] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [520, 270], "size": [170, 66] },
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [520, 410], "size": [180, 66] },
+    { "id": "documentContracts", "type": "database", "label": "Document contracts", "sublabel": "Schema-first registry", "pos": [790, 700], "size": [190, 66] },
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + risk rules + SARIF", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
@@ -39,7 +40,7 @@
     { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "SQLite detection; scoped rules", "pos": [708, 400], "size": [190, 72] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor", "postToolUse", "sensorAdapters"] },
+    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "documentContracts", "sensor", "postToolUse", "sensorAdapters"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
     { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory"] }
   ],

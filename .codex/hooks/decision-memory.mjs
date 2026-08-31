@@ -40,12 +40,19 @@ export function decisionDiagnostics(paths, root = process.cwd()) {
     .filter(adr => adr.metadata?.['superseded-by'] && normalized.some(path => matchScope(path, adr.metadata.scope)))
     .map(adr => `${adr.file} -> ${adr.metadata['superseded-by']}`);
   const applicable = applicableAdrs(normalized, root);
+  const applicableFiles = new Set(applicable.map(adr => adr.file.split('/').pop()));
+  const conflicts = applicable.flatMap(adr => (adr.metadata['conflicts-with'] ?? [])
+    .filter(target => applicableFiles.has(target))
+    .map(target => `${adr.file} conflicts-with ${target}`));
   return {
-    status: applicable.length > 1 ? 'partial' : 'complete',
+    status: conflicts.length ? 'conflict' : applicable.length > 1 ? 'partial' : 'complete',
     invalid,
     superseded,
+    conflicts,
     applicable: applicable.map(adr => adr.file),
-    message: applicable.length > 1
+    message: conflicts.length
+      ? 'Explicit ADR conflicts require revision or replacement before the change can continue.'
+      : applicable.length > 1
       ? 'Multiple ADRs apply; semantic contradiction is outside scope without a dedicated analyzer.'
       : '',
   };
@@ -89,6 +96,7 @@ export function validateMetadata(metadata, file = '') {
   if (metadata?.contracts !== undefined && (!Array.isArray(metadata.contracts) || metadata.contracts.some(value => typeof value !== 'string' || !value.trim()))) errors.push(`${file}: contracts must be a string array`);
   if (!['on-change', 'manual', 'never'].includes(metadata?.review)) errors.push(`${file}: review must be on-change, manual, or never`);
   if (metadata?.['superseded-by'] !== undefined && !/^ADR-\d{4}-.+\.md$/u.test(String(metadata['superseded-by']))) errors.push(`${file}: superseded-by must reference an ADR filename`);
+  if (metadata?.['conflicts-with'] !== undefined && (!Array.isArray(metadata['conflicts-with']) || metadata['conflicts-with'].some(value => !/^ADR-\d{4}-.+\.md$/u.test(String(value))))) errors.push(`${file}: conflicts-with must be an array of ADR filenames`);
   if (metadata?.revised !== undefined && metadata.revised !== true) errors.push(`${file}: revised must be true when present`);
   return errors;
 }

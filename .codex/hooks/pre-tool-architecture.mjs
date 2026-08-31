@@ -55,6 +55,9 @@ if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.star
 if (decisionStatus.superseded.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
   block(['Write blocked: a superseded ADR still covers the requested change.', `ADRs: ${decisionStatus.superseded.join(', ')}`, 'Revise or add the replacement ADR before changing governed files.']);
 }
+if (decisionStatus.conflicts.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: applicable ADRs explicitly conflict.', `Conflicts: ${decisionStatus.conflicts.join(', ')}`, 'Revise or replace the conflicting ADR before changing governed files.']);
+}
 const architectureEvidence = changePaths.some(path => isArchitectureEvidence(path, config));
 const adrEvidence = changePaths.some(isAdr);
 const contractPaths = paths.filter(path => isContractPath(path, config));
