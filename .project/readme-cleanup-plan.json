@@ -1,0 +1,32 @@
+{
+  "approved": true,
+  "goalId": "complete-readme-documentation",
+  "title": "Compléter et aligner la documentation README",
+  "steps": [
+    {
+      "id": "remove-stale-rules-reference",
+      "title": "Retirer la référence au dossier rules supprimé",
+      "acceptance": ["Le README ne cite plus rules/ comme infrastructure active"],
+      "files": ["README.md"],
+      "commands": ["rg -n 'rules/' README.md"],
+      "evidence": []
+    },
+    {
+      "id": "document-hooks-and-state",
+      "title": "Documenter les événements hooks et l’état local CTXRoute",
+      "acceptance": ["Les six événements sont listés", "Le rôle et le risque de suppression de .ctxroute sont expliqués"],
+      "files": ["README.md"],
+      "commands": ["npm run validate", "git diff --check"],
+      "evidence": []
+    },
+    {
+      "id": "replace-stale-c4-wording",
+      "title": "Remplacer la référence C4 obsolète dans l’index documentaire",
+      "acceptance": ["docs/README.md cite l’IR Archify comme source d’architecture"],
+      "files": ["docs/README.md"],
+      "commands": ["npm run validate", "git diff --check"],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": ["npm run validate", "git diff --check", "README local links"]
+}

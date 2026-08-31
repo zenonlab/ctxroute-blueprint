@@ -67,7 +67,7 @@ the repository Git hooks, validates CTXRoute, and runs the complete test suite.
 It refreshes the ignored `node_modules/` directory but does not change global
 Codex settings, delete tracked project files, or create commits.
 
-`.codex/`, `.claude/`, `.githooks/`, `.project/`, `rules/`, [`AGENTS.md`](AGENTS.md),
+`.codex/`, `.claude/`, `.githooks/`, `.project/`, [`AGENTS.md`](AGENTS.md),
 [`CLAUDE.md`](CLAUDE.md), and the documentation structure are reusable
 infrastructure. Product source directories and commands are created only after
 project discovery.
@@ -118,6 +118,11 @@ workspace hooks, producing duplicate progress messages and extra process
 startup latency. The installer reports this condition but never edits the
 global configuration. Lifecycle handlers omit custom status messages, and
 `PostToolUse` runs only for tools that can change repository state.
+
+The project-local lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
+`UserPromptSubmit`, `PreCompact`, and `Stop`. CTXRoute state and recurring
+problem memory live in the ignored `.ctxroute/` directory; deleting it removes
+local history but it is recreated automatically on the next run.
 
 Codex Cloud can run `npm install` before the agent starts, so CTXRoute is
 installed and verified automatically. Hook activation still depends on the

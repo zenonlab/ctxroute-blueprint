@@ -16,3 +16,9 @@
 
 - [ ] **Exécuter les commandes du pre-push sans shell** — PENDING
 - [ ] **Aligner la documentation composant sur Archify** — PENDING
+
+## Compléter et aligner la documentation README — ACTIVE
+
+- [ ] **Retirer la référence au dossier rules supprimé** — PENDING
+- [ ] **Documenter les événements hooks et l’état local CTXRoute** — PENDING
+- [ ] **Remplacer la référence C4 obsolète dans l’index documentaire** — PENDING
