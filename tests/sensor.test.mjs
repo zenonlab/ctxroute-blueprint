@@ -83,6 +83,15 @@ test('SQL parameters are safe while concatenation is unsafe', () => {
   assert.equal(analyzeSource('route.ts', "function handler(req) { const id = req.query.id; return db.query('SELECT * FROM users WHERE id = $1', [id]); }", { config: { sql: { sinks: ['query'], requireRateLimit: true } } })[0].rule, 'sensor/sql-missing-rate-limit');
   assert.equal(analyzeSource('route.ts', "function handler(req) { rateLimit(req); const id = req.query.id; return db.query('SELECT * FROM users WHERE id = $1', [id]); }", { config: { sql: { sinks: ['query'], requireRateLimit: true } } }).length, 0);
 });
+
+test('SQL and path checks inspect only the sink argument', () => {
+  const result = run('mjs', `import { readFileSync } from 'node:fs';
+const row = database.prepare('UPDATE problems SET last_seen = ?, occurrences = occurrences + 1').run(now, appendEvidence(evidence));
+const config = readFileSync('ctxroute-config.json', 'utf8');
+`);
+  assert.equal(result.body.diagnostics.some(item => item.rule === 'sensor/sql-injection'), false);
+  assert.equal(result.body.diagnostics.some(item => item.rule === 'sensor/path-traversal'), false);
+});
 test('SQL tracking follows explicit exported/imported builders in one scan', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-cross-file-'));
   writeFileSync(join(directory, 'queries.ts'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");

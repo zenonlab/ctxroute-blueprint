@@ -85,6 +85,10 @@ The versioned Sensor configuration is validated before scanning. A missing,
 malformed, or incompatible rules file produces `sensor/configuration` with an
 `ERROR` verdict instead of falling back to an implicit safe policy.
 
+AST parsing is bounded to 32,000 UTF-8 bytes per source. Larger syntax-aware
+files use the lexical adapter and receive an explicit `WARN` diagnostic so the
+parser limit cannot be mistaken for a clean AST result or an internal crash.
+
 The result also declares its coverage limits: `moduleScope` is
 `explicit-paths`, package resolution is disabled, `wholeProgramAnalysis` is
 false, and `rateLimitRuntimeProof` is false. Local import resolution may only

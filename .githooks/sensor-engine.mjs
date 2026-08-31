@@ -103,6 +103,11 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
 }
 
 function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
+  if (Buffer.byteLength(source, 'utf8') > 32000) {
+    analyzeLexical(path, source, diagnostics);
+    diagnostics.push(diagnostic(path, null, 'sensor/analysis-limit', 'WARN', 'Source exceeds the bounded AST parser input size; lexical checks were used instead.'));
+    return;
+  }
   const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
   let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
@@ -134,6 +139,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
   if (node.type === 'call_expression' || node.type === 'call') {
     const name = node.childForFieldName('function')?.text ?? '';
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
+    const callArgumentsText = node.childForFieldName('arguments')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
     if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Debug output should not ship in production code.'));
     if (isShell(name)) {
@@ -141,18 +147,19 @@ function inspectAst(path, source, node, diagnostics, config, state) {
       if (command && (config.dangerousCommands ?? []).some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
       if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
     }
-    if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
-    if (isNetwork(name) && (looksLikeUntrustedSource(text, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/ssrf', 'UNSAFE', 'A network destination is controlled by dynamic or untrusted data.'));
-    if (isPathSink(name) && (looksLikeUntrustedSource(text, config) || /\.\.[/\\]/u.test(text))) diagnostics.push(diagnostic(path, node, 'sensor/path-traversal', 'UNSAFE', 'A filesystem path may be controlled by untrusted data or contain traversal segments.'));
-    if (isRedirect(name) && (looksLikeUntrustedSource(text, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/open-redirect', 'WARN', 'A redirect destination is dynamic; validate it against an allowlist.'));
+    const argumentText = firstArgument?.text ?? '';
+    if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(callArgumentsText)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
+    if (isNetwork(name) && (looksLikeUntrustedSource(callArgumentsText, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/ssrf', 'UNSAFE', 'A network destination is controlled by dynamic or untrusted data.'));
+    if (isPathSink(name) && (looksLikeUntrustedPathSource(argumentText, config) || /\.\.[/\\]/u.test(argumentText))) diagnostics.push(diagnostic(path, node, 'sensor/path-traversal', 'UNSAFE', 'A filesystem path may be controlled by untrusted data or contain traversal segments.'));
+    if (isRedirect(name) && (looksLikeUntrustedSource(argumentText, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/open-redirect', 'WARN', 'A redirect destination is dynamic; validate it against an allowlist.'));
     if (isWeakCrypto(name) || /createHash\s*\(\s*['"](?:md5|sha1)/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/weak-crypto', 'WARN', 'A weak or legacy cryptographic primitive is used.'));
     const firstArgumentName = firstArgument?.text ?? '';
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
     const importedBuilder = importedBinding(calledBuilder, state);
     const dynamicBuilder = state.sqlFunctions.has(calledBuilder) || isResolvedSqlExport(importedBuilder, state);
-    if (isSqlSink(name, config) && ((looksLikeDynamicSql(text) && !isSafeParameterizedSql(text, config)) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
-    if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(text) && !hasSqlLimit(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
-    if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(text)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
+    if (isSqlSink(name, config) && ((isDynamicSqlArgument(firstArgument, argumentText, config) && !isSafeParameterizedSql(argumentText, config)) || state.sqlVariables.has(firstArgumentName) || state.taintedVariables.has(firstArgumentName) || dynamicBuilder)) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
+    if (isSqlSink(name, config) && config.sql?.requireLimit && looksLikeSql(argumentText) && !hasSqlLimit(argumentText)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
+    if (isSqlSink(name, config) && config.sql?.requireMutationFilter && isUnfilteredMutation(argumentText)) diagnostics.push(diagnostic(path, node, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
     const callableText = enclosingCallable(node)?.text ?? text;
     if (isSqlSink(name, config) && config.sql?.requireRateLimit && looksLikeUntrustedSource(callableText, config) && !hasRateLimitGuard(callableText, config)) diagnostics.push(diagnostic(path, node, 'sensor/sql-missing-rate-limit', 'WARN', 'A request-scoped SQL operation has no configured rate-limit guard.'));
   }
@@ -350,12 +357,21 @@ function looksLikeUntrustedSource(text, config = {}) {
   const sources = config.sql?.taintSources ?? ['req.query', 'req.params', 'req.body', 'request.args', 'request.form', 'request.json', 'request.query_params', 'request.path_params', 'request.GET', 'request.POST', 'request.body', 'searchParams', 'URLSearchParams', 'process.argv', 'process.env', 'os.environ', 'os.getenv'];
   return sources.some(source => text.includes(source));
 }
+function looksLikeUntrustedPathSource(text, config = {}) {
+  return looksLikeUntrustedSource(text, config) && !/process\.env|os\.environ|os\.getenv/u.test(text);
+}
 function hasSqlLimit(text) { return /\blimit\s+(?:\d+\b|\?|[$:](?:\d+|[A-Za-z_]\w*)\b)/iu.test(text); }
 function isUnfilteredMutation(text) { return /\b(?:update\b[\s\S]+?set|delete\s+from\b)[\s\S]*\b(?:where|using)\b/iu.test(text) ? false : /\b(?:update\b[\s\S]+?set|delete\s+from)\b/iu.test(text); }
 function enclosingCallable(node) { let parent = node.parent; while (parent) { if (/^(?:function|function_declaration|function_definition|method_definition|arrow_function|generator_function|lambda)$/u.test(parent.type)) return parent; parent = parent.parent; } return null; }
 function hasRateLimitGuard(text, config) { const guards = config.sql?.rateLimitGuards ?? ['rateLimit', 'rateLimiter', 'throttle', 'quota', 'limiter']; return guards.some(guard => new RegExp(`\\b${escapeRegExp(guard)}\\b`, 'iu').test(text)); }
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }
 function isSafeParameterizedSql(text, config) { const builders = config.sql?.safeBuilders ?? ['sql', 'Prisma.sql', 'drizzle.sql', 'kysely.sql']; return builders.some(builder => new RegExp('(?:^|[=(,:]\\s*)' + escapeRegExp(builder) + '\\s*`[\\s\\S]*?\\$\\{', 'u').test(text)); }
+function isDynamicSqlArgument(node, text, config) {
+  if (!node) return false;
+  if (node.type === 'string') return /^f['"]/u.test(text);
+  if (node.type === 'template_string') return /\$\{/u.test(text);
+  return looksLikeDynamicSql(text) && !isSafeParameterizedSql(text, config);
+}
 function looksLikeDynamicSql(text) { return looksLikeSql(text) && /\+|\|\||\$\{|\bf['"]|\.format\s*\(|%\s+[A-Za-z_]/u.test(text); }
 function isSqlSink(name, config) { const sinks = config.sql?.sinks ?? ['query', 'execute', 'prepare', 'raw', 'exec', 'run', 'all', 'get', 'rawQuery', 'queryRaw', 'executeRaw', 'raw_sql', 'execute_sql', 'whereRaw', 'havingRaw', 'orderByRaw', 'joinRaw', 'literal', 'text', 'Raw', 'RawSQL', 'extra', 'fromSqlRaw', 'executeSqlRaw', 'fetch', 'fetchrow', 'fetchval', 'fetch_all', 'fetch_one', 'fetch_val', 'executemany', 'execute_many', 'executeMany', '$queryRawUnsafe', '$executeRawUnsafe']; return sinks.some(sink => name === sink || name.endsWith(`.${sink}`)); }
 function walk(node, depth, visit) { visit(node, depth); for (const child of node.namedChildren) walk(child, depth + 1, visit); }

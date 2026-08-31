@@ -317,7 +317,7 @@ export function handle(input, event, options = {}) {
   finally { store.close(); }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   if (process.argv[2] === 'resolve') {
     try {
       const result = resolveProblem(process.argv[3], JSON.parse(process.argv[4] ?? '{}'));
