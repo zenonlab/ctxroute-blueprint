@@ -228,6 +228,13 @@ test('optional Ruby and PHP parsers never change lexical coverage when unavailab
   assert.equal(status.every(item => typeof item.available === 'boolean'), true);
   assert.equal(analyzeSource('safe.rb', '# puts "eval(x)"\nUser.find_by(id: params[:id])').length, 0);
 });
+test('Sensor deduplicates repeated paths within one action', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-deduplicate-'));
+  writeFileSync(join(directory, 'safe.js'), 'const value = 1;');
+  const result = analyzePaths(['safe.js', 'safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'SAFE');
+  assert.deepEqual(result.diagnostics, []);
+});
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
   assert.equal(analyzeSource('template.js', 'const html = `<style>main { color: red }</style>`;').length, 0);

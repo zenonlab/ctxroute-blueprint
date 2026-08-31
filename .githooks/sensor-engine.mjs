@@ -35,6 +35,7 @@ const grammars = new Map([
   ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
 ]);
 const require = createRequire(import.meta.url);
+const optionalGrammarCache = new Map();
 export const SENSOR_OPTIONAL_PARSERS = Object.freeze([
   Object.freeze({ id: 'ruby-ast', package: 'tree-sitter-ruby', extensions: Object.freeze(['.rb', '.rake', '.ru']) }),
   Object.freeze({ id: 'php-ast', package: 'tree-sitter-php', extensions: Object.freeze(['.php']) }),
@@ -84,9 +85,11 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
     return sensorResult('ERROR', diagnostics);
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
-  const scannedFiles = new Set(paths.map(path => resolve(root, path)));
-  const sharedState = { root, scannedFiles, sqlExports: collectDynamicExports(paths, root) };
-  for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
+  const uniquePaths = [...new Set(paths)];
+  const scannedFiles = new Set(uniquePaths.map(path => resolve(root, path)));
+  const sourceCache = new Map();
+  const sharedState = { root, scannedFiles, sourceCache, sqlExports: collectDynamicExports(uniquePaths, root, sourceCache) };
+  for (const path of [...uniquePaths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
   const stableDiagnostics = dedupeDiagnostics(diagnostics).sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = stableDiagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
   return sensorResult(verdict, stableDiagnostics);
@@ -118,17 +121,23 @@ function analyzeSourceLexicalFallback(path, source, adapter, diagnostics) {
 function optionalGrammar(extension) {
   const parser = SENSOR_OPTIONAL_PARSERS.find(item => item.extensions.includes(extension));
   if (!parser) return null;
+  if (optionalGrammarCache.has(parser.package)) return optionalGrammarCache.get(parser.package);
   try {
     const module = require(parser.package);
-    return module.default ?? module;
+    const grammar = module.default ?? module;
+    optionalGrammarCache.set(parser.package, grammar);
+    return grammar;
   } catch {
+    optionalGrammarCache.set(parser.package, null);
     return null;
   }
 }
 
 function analyzePath(path, root, config, diagnostics, sharedState) {
   try {
-    const source = readFileSync(resolve(root, path), 'utf8');
+    const absolutePath = resolve(root, path);
+    const source = sharedState.sourceCache.has(absolutePath) ? sharedState.sourceCache.get(absolutePath) : readFileSync(absolutePath, 'utf8');
+    sharedState.sourceCache.set(absolutePath, source);
     diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, path, importedSqlFunctions: collectImportedNames(source) } }));
   }
   catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
@@ -309,11 +318,13 @@ function defaultConfig(root) {
   try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
   catch (error) { return { __sensorConfigError: error.message }; }
 }
-function collectDynamicExports(paths, root) {
+function collectDynamicExports(paths, root, sourceCache = new Map()) {
   const exports = new Map();
   for (const path of paths) {
     try {
-      const source = readFileSync(resolve(root, path), 'utf8');
+      const absolutePath = resolve(root, path);
+      const source = sourceCache.has(absolutePath) ? sourceCache.get(absolutePath) : readFileSync(absolutePath, 'utf8');
+      sourceCache.set(absolutePath, source);
       const extension = extname(path).toLowerCase();
       const grammar = grammars.get(extension);
       if (grammar) indexDynamicExports(source, grammar, path, root, exports);
