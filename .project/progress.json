@@ -94,6 +94,47 @@
           "evidence": []
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "clean-up-architecture-documentation",
+      "title": "Assainir les références C4 et Archify",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "replace-stale-c4-reference",
+          "title": "Remplacer la référence C4 obsolète par la source Archify",
+          "status": "TODO",
+          "acceptance": [
+            "La règle de gouvernance cite le chemin Archify réel",
+            "Aucune référence C4 inexistante ne reste dans la règle"
+          ],
+          "files": [
+            ".claude/hooks/docs/project-governance.md"
+          ],
+          "commands": [
+            "rg -n 'C4|Archify' .claude/hooks/docs/project-governance.md"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "correct-architecture-readme-path",
+          "title": "Corriger le chemin source dans la documentation architecture",
+          "status": "TODO",
+          "acceptance": [
+            "La documentation pointe vers docs/architecture/src",
+            "Les validations documentaires passent"
+          ],
+          "files": [
+            "docs/architecture/README.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
