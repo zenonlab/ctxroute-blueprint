@@ -25,7 +25,7 @@ AST or whole-program guarantees. The first lexical set covers common Rust,
 Go, JVM, native, scripting, and configuration formats including Rust and TOML;
 additional languages require an explicit registry entry and tests.
 
-The repository exposes `npm run sensor:checklist` as a read-only CLI. It reports
+The repository exposes `node .githooks/sensor --checklist` as a read-only CLI. It reports
 the registry, bounded analysis contract, required configuration, architecture,
 and test evidence in human-readable or `--json` form. It does not modify files,
 permissions, hooks, or global configuration.
