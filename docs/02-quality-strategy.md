@@ -13,6 +13,7 @@
 | Performance | yes | Node.js timers and process limits | `npm test` | Coalescing and single-flight behavior under bursts. |
 | Security | blueprint infrastructure | tree-sitter Sensor, markup adapters, risk rules, lexical registry, SARIF export, and staged-blob validation | `npm run sensor -- <paths>` or `node .githooks/sensor --checklist --json` | AST/lexical diagnostics, application-risk rules, explicit-path module boundary, SARIF contract, staged `UNSAFE`/`ERROR` blocking, and declared no-runtime-proof coverage |
 | UI contract | yes | JSON contract validator | `npm run validate:ui` | Framework-neutral tokens, reusable component vocabulary, explicit states, accessibility expectations, and optional product adapters |
+| Progress contract | yes | Node.js assertions | `npm test` | Bounds, safe paths, evidence references, read-only validation, atomic approval, idempotence, generated view, and shared CLI/MCP core. |
 | Mutation | no | — | — | No mutation runner is installed; critical behavior is covered by integration tests. |
 
 ## Decision rule

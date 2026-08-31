@@ -27,6 +27,10 @@
     "crgUpdate": "npm run crg:update",
     "crgWatcher": "npm run watch:crg",
     "governanceCheck": "npm run governance:check",
+    "progressRead": "npm run progress:read",
+    "progressValidate": "npm run progress:validate",
+    "progressApprove": "npm run progress:approve",
+    "progressMcp": "npm run progress:mcp",
     "mermaid": null
   },
   "quality": {

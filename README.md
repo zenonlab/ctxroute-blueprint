@@ -81,6 +81,23 @@ truth for source directories, code extensions, contracts, commands, and
 mutation-testing policy. Invalid or incomplete configuration blocks product
 writes.
 
+## Progress checklist
+
+Approved agent plans are stored in [`.project/progress.json`](.project/progress.json).
+The generated [short view](docs/progress.md) is informational and must not be
+edited directly. Validation never writes; materialization requires a plan with
+short validation evidence and explicit `approved: true`:
+
+```sh
+npm run progress:read
+npm run progress:validate -- plan.json
+npm run progress:approve -- plan.json
+```
+
+The same bounded engine is exposed through the stdio MCP server with
+`npm run progress:mcp`. It supports multiple goals, atomic idempotent writes,
+safe repository-relative paths, and no raw logs, secrets, or conversation text.
+
 ## CTXRoute
 
 [CTXRoute](https://github.com/zenonlab/ctxroute) injects only relevant project
