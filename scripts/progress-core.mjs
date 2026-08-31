@@ -85,5 +85,9 @@ function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: go
 function isId(value) { return typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
 function text(value) { return typeof value === 'string' && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
 function shortReference(value) { return typeof value === 'string' && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && !/[\u0000-\u001f]/u.test(value); }
-function safePath(value) { return shortReference(value) && !isAbsolute(value) && !value.startsWith('~') && !value.split(/[\\/]+/u).includes('..') && relative('.', value) === value; }
+function safePath(value) {
+  if (!shortReference(value) || isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]+/u).includes('..')) return false;
+  const normalized = value.replaceAll('\\\\', '/');
+  return relative('.', value).replaceAll('\\\\', '/') === normalized;
+}
 async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
