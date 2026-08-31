@@ -14,6 +14,8 @@ export const SENSOR_ADAPTERS = Object.freeze([
   Object.freeze({ id: 'html', extensions: Object.freeze(['.html', '.htm']) }),
   Object.freeze({ id: 'css', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
   Object.freeze({ id: 'single-file-component', extensions: Object.freeze(['.vue', '.svelte']) }),
+  Object.freeze({ id: 'lexical-source', extensions: Object.freeze(['.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs', '.php', '.rb', '.swift', '.sh', '.bash', '.zsh']) }),
+  Object.freeze({ id: 'lexical-data', extensions: Object.freeze(['.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql']) }),
 ]);
 const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
 const grammars = new Map([
@@ -53,6 +55,7 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   else if (adapter === 'html') analyzeHtml(path, source, diagnostics);
   else if (adapter === 'css') analyzeCss(path, source, diagnostics);
   else if (adapter === 'single-file-component') analyzeSingleFileComponent(path, source, diagnostics, config);
+  else if (adapter === 'lexical-source' || adapter === 'lexical-data') analyzeLexical(path, source, diagnostics);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   return diagnostics;
 }
@@ -129,6 +132,11 @@ function analyzeSql(path, source, diagnostics, config = {}) {
 }
 function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
 function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
+function analyzeLexical(path, source, diagnostics) {
+  const code = maskLexical(source, extname(path).toLowerCase());
+  const match = code.match(/\beval\s*\(/iu);
+  if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
+}
 function analyzeSingleFileComponent(path, source, diagnostics, config) {
   const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu;
   const stylePattern = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/giu;
@@ -147,6 +155,11 @@ function appendEmbeddedDiagnostics(path, source, offset, embedded, diagnostics) 
 }
 function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
+function maskLexical(source, extension) {
+  const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//gu, match => match.replace(/[^\n]/gu, ' '));
+  const lineComment = ['.toml', '.yaml', '.yml', '.py', '.rb', '.sh', '.bash', '.zsh'].includes(extension) ? /#[^\n]*/gu : /\/\/[^\n]*/gu;
+  return withoutBlockComments.replace(lineComment, match => match.replace(/[^\n]/gu, ' ')).replace(/'(?:\\.|[^'\n])*'|"(?:\\.|[^"\n])*"|`(?:\\.|[^`\n])*`/gu, match => match.replace(/[^\n]/gu, ' '));
+}
 function defaultConfig(root) {
   try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
   catch (error) { return { __sensorConfigError: error.message }; }

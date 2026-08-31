@@ -2,6 +2,13 @@ import process from 'node:process';
 import { analyzePaths } from './sensor-engine.mjs';
 
 const paths = process.argv.slice(2);
-const result = analyzePaths(paths);
-process.stdout.write(`${JSON.stringify(result)}\n`);
-process.exitCode = result.verdict === 'SAFE' ? 0 : result.verdict === 'WARN' ? 1 : 2;
+if (paths[0] === '--checklist') {
+  const { runChecklist, formatChecklist } = await import('./sensor-checklist.mjs');
+  const result = runChecklist(process.cwd());
+  process.stdout.write(`${process.argv.includes('--json') ? JSON.stringify(result) : formatChecklist(result)}\n`);
+  process.exitCode = result.status === 'PASS' ? 0 : 1;
+} else {
+  const result = analyzePaths(paths);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  process.exitCode = result.verdict === 'SAFE' ? 0 : result.verdict === 'WARN' ? 1 : 2;
+}

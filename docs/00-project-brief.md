@@ -24,7 +24,7 @@
 - Tests: Node.js built-in test runner for unit, integration, contract, and performance checks.
 - Deployment: source repository and GitHub Actions only; no production deployment.
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
-- Post-hook analysis: JS/TS/JSX/TSX, Python, SQL, HTML, CSS, Vue, and Svelte adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
+- Post-hook analysis: AST adapters cover JS/TS/JSX/TSX, Python, SQL, HTML, CSS, Vue, and Svelte; lexical adapters cover common Rust, Go, JVM, native, scripting, and data/config formats including TOML. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
 - SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits, mutation predicates, and request-scoped rate-limit guards are configurable, while runtime enforcement and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
 
 ## Success criteria

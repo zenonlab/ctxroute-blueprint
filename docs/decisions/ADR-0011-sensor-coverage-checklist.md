@@ -12,6 +12,8 @@ scope:
   - tests/post-tool-sensor.test.mjs
 review: on-change
 revised: true
+contracts:
+  - package.json
 ---
 # ADR-0011 — Sensor coverage registry and checklist
 

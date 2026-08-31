@@ -65,7 +65,7 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
 test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
-  assert.deepEqual(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions), ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.sql', '.html', '.htm', '.css', '.scss', '.sass', '.vue', '.svelte']);
+  assert.deepEqual(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions), ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.sql', '.html', '.htm', '.css', '.scss', '.sass', '.vue', '.svelte', '.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs', '.php', '.rb', '.swift', '.sh', '.bash', '.zsh', '.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql']);
   assert.deepEqual(SENSOR_COVERAGE, { moduleScope: 'explicit-paths', packageResolution: 'disabled', wholeProgramAnalysis: false, rateLimitRuntimeProof: false });
   const directory = mkdtempSync(join(tmpdir(), 'sensor-explicit-scope-'));
   writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
@@ -139,13 +139,22 @@ test('Vue and Svelte single-file components analyze embedded code without false 
   assert.equal(analyzeSource('Card.svelte', '<script>db.query(`SELECT * FROM users WHERE id = ${userId}`);</script><style>main { color: red }</style>').at(0).rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('Card.vue', '<script lang="ts">eval(input);</script>').at(0).rule, 'sensor/dynamic-eval');
 });
+test('lexical adapters cover Rust, TOML, and common repository formats without comment/string false positives', () => {
+  assert.equal(analyzeSource('main.rs', 'fn main() { println!("ok"); }').length, 0);
+  assert.equal(analyzeSource('main.rs', '// eval(input)\nfn main() {}').length, 0);
+  assert.equal(analyzeSource('main.rs', 'fn main() { eval(input); }').at(0).rule, 'sensor/dynamic-eval');
+  assert.equal(analyzeSource('Cargo.toml', '# eval(input)\nname = "demo"').length, 0);
+  assert.equal(analyzeSource('config.toml', 'command = "eval(input)"').length, 0);
+  assert.equal(analyzeSource('config.yaml', 'command: eval(input)').at(0).rule, 'sensor/dynamic-eval');
+  assert.equal(analyzeSource('schema.graphql', 'type User { id: ID! }').length, 0);
+});
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
   assert.equal(analyzeSource('template.js', 'const html = `<style>main { color: red }</style>`;').length, 0);
   assert.equal(analyzeSource('debug.js', 'console.log(value);').at(0).rule, 'sensor/anti-slop/debug-output');
 });
 test('unsupported and missing paths are explicit errors', () => {
-  assert.equal(run('rb', 'puts 1').body.verdict, 'ERROR');
+  assert.equal(run('txt', 'plain text').body.verdict, 'ERROR');
   const missing = spawnSync(process.execPath, [sensor, 'missing.sql'], { cwd: root, encoding: 'utf8' });
   assert.equal(JSON.parse(missing.stdout).diagnostics[0].rule, 'sensor/read-error');
 });
