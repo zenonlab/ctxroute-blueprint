@@ -1,0 +1,9 @@
+{
+  "name": "@ctxroute-blueprint/code-review-graph",
+  "version": "0.0.0-blueprint",
+  "private": true,
+  "description": "Workspace boundary for the ephemeral code-review-graph bridge.",
+  "engines": { "node": ">=22" },
+  "blueprintSource": "code-review-graph",
+  "integration": "ephemeral-uvx-process"
+}

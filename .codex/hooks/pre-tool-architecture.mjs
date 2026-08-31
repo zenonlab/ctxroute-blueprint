@@ -13,6 +13,7 @@ import {
   loadProjectConfig,
   normalizePath,
 } from '../../.githooks/project-policy.mjs';
+import { decisionDiagnostics, loadAdrs, syncAdrRules } from './decision-memory.mjs';
 
 let input;
 try { input = JSON.parse(await stdin()); }
@@ -32,6 +33,7 @@ if (failures.length) {
 
 const toolName = String(input.tool_name ?? '');
 const command = commandText(toolInput);
+const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
 if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateCommand(command)) {
   block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
 }
@@ -44,15 +46,32 @@ if (!paths.length) {
 }
 
 const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
+const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
+const decisionStatus = decisionDiagnostics(changePaths);
+syncAdrRules(process.cwd());
+if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: invalid ADR metadata must be repaired before changing governed files.', `ADRs: ${invalidDecisionPaths.join(', ')}`]);
+}
+if (decisionStatus.superseded.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: a superseded ADR still covers the requested change.', `ADRs: ${decisionStatus.superseded.join(', ')}`, 'Revise or add the replacement ADR before changing governed files.']);
+}
+if (decisionStatus.conflicts.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: applicable ADRs explicitly conflict.', `Conflicts: ${decisionStatus.conflicts.join(', ')}`, 'Revise or replace the conflicting ADR before changing governed files.']);
+}
 const architectureEvidence = changePaths.some(path => isArchitectureEvidence(path, config));
 const adrEvidence = changePaths.some(isAdr);
 const contractPaths = paths.filter(path => isContractPath(path, config));
 
-if (contractPaths.length && !adrEvidence) {
+if (mutationTool && contractPaths.length && !adrEvidence) {
   block([
     'Write blocked: a contract or dependency requires an ADR in the same change.',
     `Contracts: ${contractPaths.join(', ')}`,
   ]);
+}
+
+const architecturalPaths = paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
+if (mutationTool && architecturalPaths.length && !decisionStatus.applicable.length && !adrEvidence) {
+  block(['Write blocked: architectural change has no applicable ADR.', `Files: ${architecturalPaths.join(', ')}`, 'Write or revise an ADR with a matching scope before changing these files.']);
 }
 
 if (config.status === 'template') {
@@ -87,7 +106,14 @@ if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
 }
 
 if (paths.some(path => isSourcePath(path, config))) {
-  context('Product code changed: verify documentation, side effects, and test strategy.');
+  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
+} else if (decisionStatus.applicable.length) {
+  context(formatDecisionStatus(decisionStatus));
+}
+
+function formatDecisionStatus(status) {
+  if (status.status !== 'partial') return '';
+  return `\n\nDecision status: partial. ${status.message}`;
 }
 
 function extractPaths(value) {

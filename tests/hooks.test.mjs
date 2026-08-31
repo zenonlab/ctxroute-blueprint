@@ -29,8 +29,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   const expected = {
     SessionStart: ['session-inject.js'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-audit.mjs'],
-    UserPromptSubmit: ['turn-count.js', 'canary-check.js'],
+    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
+    UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
   };
@@ -81,6 +81,23 @@ test('the lifecycle dispatcher skips architecture policy for read-only tools', (
   assert.deepEqual(called, ['codex-doc-inject.js']);
 });
 
+test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () => {
+  const called = [];
+  const result = dispatch({
+    harness: 'codex',
+    event: 'PreToolUse',
+    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/watch-crg.mjs' } }),
+    root,
+    execute(handler) {
+      called.push(handler.name);
+      return { outputs: handler.name === 'pre-tool-architecture.mjs' ? [{ hookSpecificOutput: { additionalContext: 'Architecture gate' } }] : [] };
+    },
+  });
+  assert.deepEqual(called, ['pre-tool-architecture.mjs', 'codex-doc-inject.js']);
+  assert.match(result.hookSpecificOutput.additionalContext, /Architecture gate/u);
+  assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
+});
+
 test('the lifecycle dispatcher returns the first refusal unchanged', () => {
   const reason = 'Architecture decision required.';
   let calls = 0;
@@ -111,7 +128,7 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
       return { outputs: [] };
     },
   });
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.match(result.systemMessage, /turn-count\.js failed open: simulated failure/u);
 });
 
@@ -353,15 +370,20 @@ test('setup prerequisite check is available before dependency installation', () 
 function starterWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'starter-validation-'));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.status = 'template';
+  for (const key of Object.keys(config.decisions)) config.decisions[key] = null;
+  config.directories.source = [];
+  config.codeExtensions = [];
+  config.quality.mutation.decision = null;
   for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture/src']) mkdirSync(join(cwd, directory), { recursive: true });
   for (const file of config.starter.rootFiles) {
     if (file === 'package.json') continue;
     writeFileSync(join(cwd, file), file.endsWith('.json') ? '{}\n' : '');
   }
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
-  writeFileSync(join(cwd, '.project/project-config.json'), readFileSync(join(root, '.project/project-config.json')));
+  writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
-  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs' } }));
+  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs', 'build:docs': 'node build' } }));
   return cwd;
 }
 

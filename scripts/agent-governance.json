@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "decisions": {
+    "ASK": [
+      "routing.change",
+      "middleware.change",
+      "memory.persist",
+      "mcp.connect",
+      "a2a.send",
+      "external.side_effect"
+    ],
+    "NEVER": [
+      "secret.exfiltration",
+      "safety.bypass",
+      "global.settings.change",
+      "persistent.daemon",
+      "unapproved.mutation"
+    ],
+    "ALWAYS": [
+      "context.scope",
+      "audit.emit",
+      "resource.bound",
+      "shutdown.clean",
+      "validate.before_mutate"
+    ]
+  },
+  "boundaries": {
+    "memory": "Agents may read scoped context; persistence requires ASK and explicit user approval.",
+    "mcpA2a": "Connections and outbound messages require ASK; secrets and safety bypasses are NEVER.",
+    "controlLoop": "The loop may plan and validate; only approved adapters may mutate state.",
+    "infrastructure": "CTXRoute routes context, Archify provides architecture evidence, and Sensor provides static safety diagnostics."
+  }
+}

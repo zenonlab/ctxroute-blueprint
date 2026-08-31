@@ -26,3 +26,6 @@ choice, or required C4 diagram is missing.
 - `templates/`: documentation templates to copy and adapt.
 
 Archify JSON IR is the versioned source; interactive HTML is generated under `dist/`.
+The schema-first document registry is [`document-contracts.json`](document-contracts.json);
+it declares authoritative structured sources and the Markdown context that
+complements them. `npm run validate:docs -- --all` validates the registry.

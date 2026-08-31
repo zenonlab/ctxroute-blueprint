@@ -11,10 +11,26 @@ const hook = join(root, '.codex/hooks/pre-tool-architecture.mjs');
 
 function run(tool_input, options = {}) {
   return spawnSync('node', [hook], {
-    cwd: options.cwd ?? root,
+    cwd: options.cwd ?? templateWorkspace(),
     input: JSON.stringify({ tool_name: options.toolName ?? 'apply_patch', tool_input }),
     encoding: 'utf8',
   });
+}
+
+function templateWorkspace() {
+  const cwd = mkdtempSync(join(tmpdir(), 'architecture-template-'));
+  const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.status = 'template';
+  for (const key of Object.keys(config.decisions)) config.decisions[key] = null;
+  config.directories.source = [];
+  config.codeExtensions = [];
+  config.quality.mutation.decision = null;
+  for (const directory of [...config.starter.infrastructureRoots, '.project', 'docs/architecture/src']) mkdirSync(join(cwd, directory), { recursive: true });
+  for (const file of config.starter.rootFiles) writeFileSync(join(cwd, file), file === 'package.json' ? JSON.stringify({ scripts: { 'build:docs': 'node build' } }) : '');
+  writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
+  writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
+  writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
+  return cwd;
 }
 
 test('blocks a new product file without architecture evidence', () => {
@@ -93,10 +109,16 @@ test('rejects destructive branch replacement during discovery', () => {
   assert.match(result.stdout, /read and validation commands/u);
 });
 
-test('allows a new module with Archify evidence after initialization', () => {
+test('requires both an ADR and Archify evidence for a new module', () => {
+  const cwd = initializedWorkspace();
+  const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json\n*** Add File: docs/decisions/ADR-0001-service.md' }, { cwd });
+  assert.doesNotMatch(result.stdout, /decision":"block/u);
+});
+
+test('blocks a new module with only Archify evidence', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json' }, { cwd });
-  assert.doesNotMatch(result.stdout, /decision":"block/u);
+  assert.match(result.stdout, /applicable ADR/u);
 });
 
 test('blocks code outside declared directories after initialization', () => {
@@ -117,6 +139,29 @@ test('allows a contract with a real ADR', () => {
   assert.equal(result.stdout, '');
 });
 
+test('blocks governed changes while an ADR is invalid or superseded', () => {
+  for (const metadata of [
+    '# invalid ADR\n',
+    '---\nscope:\n  - src/**\nreview: on-change\nsuperseded-by: ADR-0002-current.md\n---\nold\n',
+  ]) {
+    const cwd = initializedWorkspace();
+    mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+    writeFileSync(join(cwd, 'docs/decisions/ADR-0001-old.md'), metadata);
+    const result = run({ patch: '*** Update File: src/existing.rb' }, { cwd });
+    assert.match(result.stdout, /Write blocked/u);
+    assert.match(result.stdout, /ADR/u);
+  }
+});
+
+test('blocks governed changes when applicable ADRs declare an explicit conflict', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0001-one.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\nconflicts-with:\n  - ADR-0002-two.md\n---\none\n');
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0002-two.md'), '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\ntwo\n');
+  const result = run({ patch: '*** Update File: src/existing.rb' }, { cwd });
+  assert.match(result.stdout, /explicitly conflict/u);
+});
+
 test('recognizes an Archify source changed in a previous step', () => {
   const cwd = initializedWorkspace();
   git(cwd, ['init', '-q']);
@@ -125,7 +170,7 @@ test('recognizes an Archify source changed in a previous step', () => {
   git(cwd, ['add', '.']);
   git(cwd, ['commit', '-qm', 'chore: fixture']);
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{"changed":true}\n');
-  const result = run({ patch: '*** Add File: src/service.rb' }, { cwd });
+  const result = run({ patch: '*** Add File: src/service.rb\n*** Add File: docs/decisions/ADR-0001-service.md' }, { cwd });
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 

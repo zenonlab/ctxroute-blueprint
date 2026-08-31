@@ -1,3 +1,12 @@
+---
+scope:
+  - .project/**
+  - AGENTS.md
+  - CLAUDE.md
+  - docs/**
+review: on-change
+revised: true
+---
 # ADR-0003 — Validate starter completeness
 
 - Status: accepted

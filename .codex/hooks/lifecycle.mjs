@@ -16,6 +16,7 @@ export const lifecycleEvents = [
 
 export function handlerPlan(harness, event, root = projectRoot) {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
+  const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
   const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
   const ctxroute = harness === 'codex' || harness === 'claude' ? direct : null;
   if (!ctxroute) return [];
@@ -23,8 +24,8 @@ export function handlerPlan(harness, event, root = projectRoot) {
   return {
     SessionStart: [ctxroute('session-inject.js', '--budget', '0')],
     PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', '0')],
-    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-audit.mjs')],
-    UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js')],
+    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
+    UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],
   }[event] ?? [];
@@ -98,7 +99,7 @@ function applicableHandlers(plan, event, input) {
   let toolName;
   try { toolName = JSON.parse(input || '{}')?.tool_name; }
   catch { return plan; }
-  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
+  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell|Read|read_file|readFile)$/iu.test(String(toolName))) return plan;
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 

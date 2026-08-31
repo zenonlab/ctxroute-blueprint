@@ -1,0 +1,9 @@
+{
+  "name": "@ctxroute-blueprint/ctxroute",
+  "version": "0.0.0-blueprint",
+  "private": true,
+  "description": "Workspace boundary for the pinned CTXRoute integration.",
+  "engines": { "node": ">=22" },
+  "blueprintSource": "zenonlab/ctxroute",
+  "integration": "external-pinned-dependency"
+}

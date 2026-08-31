@@ -2,13 +2,15 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "CTXRoute Blueprint Infrastructure",
+    "title": "CTXRoute Blueprint Transition Infrastructure",
     "quality_profile": "showcase",
-    "viewBox": [1180, 650],
+    "viewBox": [1300, 850],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
-      { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "grammars", "diagnostics"], "note": "Tree-sitter parses supported source files before rules classify them." }
+      { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "91 extensions and 6 named files; no package, whole-program, or runtime rate-limit proof." },
+      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
+      { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
     ]
   },
   "components": [
@@ -19,29 +21,53 @@
     { "id": "archifyAdapter", "type": "backend", "label": "Archify adapter", "sublabel": "Restore / validate / build", "pos": [270, 310], "size": [180, 72] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [520, 270], "size": [170, 66] },
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [520, 410], "size": [180, 66] },
+    { "id": "documentContracts", "type": "database", "label": "Document contracts", "sublabel": "Schema-first registry", "pos": [790, 700], "size": [190, 66] },
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
-    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Short-lived Node.js CLI", "pos": [270, 520], "size": [180, 66] },
+    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + risk rules + SARIF", "pos": [270, 520], "size": [180, 66] },
+    { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
+    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "AST + lexical / 91 ext + named files", "pos": [520, 700], "size": [220, 66] },
+    { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [40, 500], "size": [190, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
-    { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Stable verdict contract", "pos": [790, 520], "size": [180, 66] }
+    { "id": "diagnostics", "type": "database", "label": "Diagnostics", "sublabel": "JSON/SARIF + confidence", "pos": [790, 520], "size": [180, 66] },
+    { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
+    { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },
+    { "id": "crg", "type": "backend", "label": "Ephemeral CRG runner", "sublabel": "uvx child process", "pos": [700, 220], "size": [180, 66] },
+    { "id": "sqlite", "type": "database", "label": "SQLite/WAL", "sublabel": "Local update state", "pos": [1000, 220], "size": [180, 66] },
+    { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
+    { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] },
+    { "id": "decisionMemory", "type": "database", "label": "ADR decision memory", "sublabel": "Scoped metadata and durable context", "pos": [1030, 310], "size": [190, 72] },
+    { "id": "decisionValidator", "type": "security", "label": "Decision validator", "sublabel": "Metadata / revision / overlap checks", "pos": [1030, 430], "size": [190, 66] },
+    { "id": "problemMemory", "type": "database", "label": "Problem memory", "sublabel": "SQLite detection; scoped rules", "pos": [708, 400], "size": [190, 72] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "sensor"] },
-    { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] }
+    { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "documentContracts", "sensor", "postToolUse", "sensorAdapters"] },
+    { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory"] }
   ],
   "connections": [
-    { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 180] },
+    { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 300] },
     { "id": "dispatch-context", "from": "lifecycle", "to": "ctxroute", "label": "inject relevant context", "labelAt": [480, 180] },
     { "id": "contributors-archify", "from": "contributors", "to": "archifyAdapter", "label": "validate / build", "labelAt": [320, 440] },
-    { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify", "label": "verified invocation", "labelAt": [485, 250] },
+    { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify" },
     { "id": "ir-adapter", "from": "jsonIr", "to": "archifyAdapter", "label": "typed source" },
     { "id": "adapter-html", "from": "archifyAdapter", "to": "html", "label": "deliver self-contained artifact", "labelAt": [620, 395] },
     { "id": "contributors-sensor", "from": "contributors", "to": "sensor", "label": "scan paths", "variant": "security" },
+    { "id": "dispatch-post-tool", "from": "lifecycle", "to": "postToolUse", "label": "after mutation", "variant": "emphasis", "fromSide": "left", "toSide": "left", "via": [[230, 133], [230, 200], [20, 200], [20, 713]], "labelAt": [120, 215] },
+    { "id": "post-tool-sensor", "from": "postToolUse", "to": "sensor", "label": "reuse path extraction", "labelAt": [245, 600] },
+    { "id": "sensor-adapters", "from": "sensor", "to": "sensorAdapters", "label": "select adapter", "labelAt": [485, 660] },
+    { "id": "sensor-checklist", "from": "contributors", "to": "sensorChecklist", "label": "audit coverage", "fromSide": "bottom", "toSide": "top", "via": [[115, 480], [135, 480]], "labelAt": [175, 470] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse AST", "labelAt": [485, 510] },
-    { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] }
+    { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] },
+    { "id": "workspace-watcher", "from": "workspace", "to": "watcher", "label": "file events" },
+    { "id": "watcher-crg", "from": "watcher", "to": "crg", "label": "coalesced update", "variant": "emphasis", "labelAt": [575, 205] },
+    { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "WAL transaction" },
+    { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
+    { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" },
+    { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope, revision, and overlap", "variant": "security", "labelAt": [1125, 400] }
   ],
   "cards": [
     { "dot": "cyan", "title": "Versioned", "items": ["Architecture JSON IR", "Rules and lockfiles", "No generated HTML"] },
     { "dot": "emerald", "title": "Reproducible", "items": ["Exact npm versions", "Archify tag and hashes", "Node.js 22 CI on three operating systems"] },
-    { "dot": "rose", "title": "Out of scope", "items": ["CRG and watchers", "Memory and MCP/A2A", "Agent control loops"] }
+    { "dot": "rose", "title": "Bounded", "items": ["Single-flight CRG updates", "Explicit Sensor paths", "No runtime proof claim"] }
   ]
 }

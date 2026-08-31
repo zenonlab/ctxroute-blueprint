@@ -1,3 +1,14 @@
+---
+scope:
+  - docs/architecture/**
+  - .githooks/archify
+  - .githooks/sensor
+  - package.json
+  - package-lock.json
+  - skills-lock.json
+review: on-change
+revised: true
+---
 # ADR-0004 — Archify and tree-sitter blueprint infrastructure
 
 - Status: accepted

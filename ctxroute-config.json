@@ -7,5 +7,17 @@
   "defaultDriftUnit": "turn",
   "frames": 1,
   "filterMode": "none",
-  "filterList": []
+  "filterList": [],
+  "problemMemory": {
+    "enabled": true,
+    "recordOn": ["UserPromptSubmit", "PostToolUse"],
+    "recurrenceThreshold": 3,
+    "matching": {
+      "exactSignature": true,
+      "structuralMatch": true,
+      "semanticMatch": false,
+      "minimumConfidence": 0.9
+    },
+    "protectionMode": "propose"
+  }
 }

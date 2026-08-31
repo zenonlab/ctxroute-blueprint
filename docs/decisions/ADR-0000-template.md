@@ -1,22 +1,20 @@
-# ADR-NNNN — Decision title
+# ADR authoring template
 
-<!-- Guide: copy this file, rename it, and replace every section. -->
-
-- Status: proposed | accepted | superseded
-- Date: YYYY-MM-DD
+- Status: proposed, accepted, or superseded
+- Date: record the decision date
 
 ## Context
 
-Which problem or constraint requires a decision?
+Record the problem or constraint that requires a decision.
 
 ## Decision
 
-Which option was selected, and why?
+Record the selected option and why it was chosen.
 
 ## Alternatives
 
-Which options were evaluated and rejected?
+Record the evaluated and rejected alternatives.
 
 ## Consequences
 
-What are the benefits, costs, risks, and follow-up work?
+Record benefits, costs, risks, and follow-up work.
