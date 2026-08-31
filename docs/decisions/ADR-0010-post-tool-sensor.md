@@ -94,7 +94,13 @@ The result also declares its coverage limits: `moduleScope` is
 false, and `rateLimitRuntimeProof` is false. Local import resolution may only
 match files included in the same `analyzePaths` action; a `SAFE` result never
 means that an unscanned dependency is safe or that a rate-limit middleware was
-executed at runtime. New languages are added through the adapter registry;
+executed at runtime. Ruby/Rails source uses a bounded lexical adapter for Ruby,
+Rake, Rack, and Rails conventions, while ERB/Haml/Slim and common
+server-rendered template formats use an embedded template adapter. It detects
+high-confidence Ruby SQL interpolation/concatenation and dangerous Rails
+boundaries such as dynamic command execution, request-controlled file output,
+and unsafe rendering. ORM calls with ordinary parameter values remain outside
+the SQL injection rule. New languages are added through the adapter registry;
 product-specific sinks, builders, taint sources, and thresholds are added in
 the versioned rules file.
 

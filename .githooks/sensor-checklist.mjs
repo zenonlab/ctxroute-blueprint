@@ -8,6 +8,8 @@ export function runChecklist(root = process.cwd()) {
   const checks = [
     check('adapter-registry', SENSOR_ADAPTERS.length > 0, `${SENSOR_ADAPTERS.length} adapters`),
     check('rust', hasExtension('.rs'), 'Rust'),
+    check('ruby-rails', hasExtension('.rb') && hasExtension('.erb') && hasExtension('.haml') && hasExtension('.slim'), 'Ruby / Rails templates'),
+    check('template-families', hasExtension('.heex') && SENSOR_ADAPTERS.some(adapter => adapter.id === 'template'), 'Phoenix / Blade / common templates'),
     check('toml', hasExtension('.toml'), 'TOML'),
     check('common-config', ['.json', '.yaml', '.yml', '.xml'].every(hasExtension), 'JSON/YAML/XML'),
     check('bounded-module-scope', SENSOR_COVERAGE.moduleScope === 'explicit-paths' && SENSOR_COVERAGE.packageResolution === 'disabled' && !SENSOR_COVERAGE.wholeProgramAnalysis, SENSOR_COVERAGE.moduleScope),

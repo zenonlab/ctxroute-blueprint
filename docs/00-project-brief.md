@@ -27,6 +27,7 @@
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
 - Post-hook analysis: AST adapters cover JS/TS/JSX/TSX and Python; embedded/lexical adapters cover SQL, HTML, CSS, Vue/Svelte, 53 common source extensions, 18 data/config extensions, plus Dockerfile/Makefile/Justfile and `.env` names. The Sensor also reports high-confidence XSS, SSRF, path traversal, prototype pollution, weak crypto, open redirects, UI layering, and anti-slop findings, with optional SARIF output. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks. Lexical registration is coverage visibility, not a grammar or type-analysis guarantee.
 - SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size `LIMIT`, mutation predicates, and request-scoped request-rate guards are distinct configurable checks. `LIMIT` bounds returned rows; `rateLimit`/`throttle` bounds requests. Runtime enforcement, effective quotas, schema/dialect validation, and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
+- Template/framework coverage: Ruby/Rails source and ERB/Haml/Slim, plus common server-rendered template families, use explicit lexical or embedded adapters; framework-specific enforcement remains opt-in and does not select a product stack.
 
 ## Success criteria
 

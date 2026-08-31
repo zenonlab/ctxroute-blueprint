@@ -14,9 +14,10 @@ export const SENSOR_ADAPTERS = Object.freeze([
   Object.freeze({ id: 'html', mode: 'embedded', extensions: Object.freeze(['.html', '.htm']) }),
   Object.freeze({ id: 'css', mode: 'lexical', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
   Object.freeze({ id: 'single-file-component', mode: 'embedded', extensions: Object.freeze(['.vue', '.svelte']) }),
-  Object.freeze({ id: 'lexical-source', mode: 'lexical', filenames: Object.freeze(['Dockerfile', 'Makefile', 'Justfile']), extensions: Object.freeze([
+  Object.freeze({ id: 'template', mode: 'embedded', extensions: Object.freeze(['.erb', '.haml', '.slim', '.heex', '.leex', '.j2', '.jinja', '.jinja2', '.twig', '.tera', '.hbs', '.handlebars', '.liquid', '.ejs', '.pug', '.jade', '.cshtml', '.razor', '.jsp', '.jspx']) }),
+  Object.freeze({ id: 'lexical-source', mode: 'lexical', filenames: Object.freeze(['Dockerfile', 'Makefile', 'Justfile', 'Gemfile', 'Rakefile', 'config.ru']), extensions: Object.freeze([
     '.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs',
-    '.php', '.rb', '.swift', '.sh', '.bash', '.zsh', '.dart', '.ex', '.exs', '.erl', '.hrl',
+    '.php', '.rb', '.rake', '.ru', '.swift', '.sh', '.bash', '.zsh', '.dart', '.ex', '.exs', '.erl', '.hrl',
     '.fs', '.fsx', '.fsi', '.hs', '.lhs', '.lua', '.r', '.scala', '.sc', '.clj', '.cljs', '.cljc',
     '.groovy', '.m', '.mm', '.zig', '.nim', '.pl', '.pm', '.t', '.vb', '.vbs', '.v', '.sv',
     '.sol', '.move', '.asm', '.s', '.pas', '.f', '.for', '.f03', '.f90', '.f95'
@@ -40,6 +41,8 @@ export const SENSOR_COVERAGE = Object.freeze({
 });
 
 export function adapterForPath(path) {
+  const name = basename(path).toLowerCase();
+  if (name.endsWith('.blade.php')) return 'template';
   return adapterByExtension.get(extname(path).toLowerCase()) ?? adapterByFilename.get(basename(path));
 }
 
@@ -89,6 +92,7 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   else if (adapter === 'html') analyzeHtml(path, source, diagnostics);
   else if (adapter === 'css') analyzeCss(path, source, diagnostics);
   else if (adapter === 'single-file-component') analyzeSingleFileComponent(path, source, diagnostics, config);
+  else if (adapter === 'template') analyzeTemplate(path, source, diagnostics, config);
   else if (adapter === 'lexical-source' || adapter === 'lexical-data') analyzeLexical(path, source, diagnostics);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   return diagnostics;
@@ -195,7 +199,35 @@ function analyzeLexical(path, source, diagnostics) {
   const code = maskLexical(source, extname(path).toLowerCase());
   const match = code.match(/\beval\s*\(/iu);
   if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
+  if (['.rb', '.rake', '.ru'].includes(extname(path).toLowerCase()) || ['Gemfile', 'Rakefile', 'config.ru'].includes(basename(path))) analyzeRuby(path, source, diagnostics);
 }
+function analyzeTemplate(path, source, diagnostics, config) {
+  const rubyLike = /\.(?:erb|haml|slim)$/iu.test(path) || /(?:^|\.)blade\.php$/iu.test(path);
+  const embedded = source.replace(/<%[=#-]?[\s\S]*?%>|\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/gu, match => match.replace(/[^\n]/gu, ' '));
+  analyzeHtml(path, embedded, diagnostics);
+  if (rubyLike) {
+    for (const match of source.matchAll(/<%[=#-]?([\s\S]*?)%>/gu)) analyzeRuby(path, match[1], diagnostics, match.index + match[0].indexOf(match[1]));
+  } else {
+    for (const match of source.matchAll(/(?:\{\{|\{%)([\s\S]*?)(?:\}\}|%\})/gu)) analyzeTemplateCode(path, source, match[1], match.index + match[0].indexOf(match[1]), diagnostics);
+  }
+  const dynamicStyle = /style\s*(?:=|:)\s*["'][^"']*(?:\{\{|#\{)/iu;
+  if (dynamicStyle.test(source)) diagnostics.push(lineDiagnostic(path, source, source.search(dynamicStyle), 'sensor/ui-dynamic-style', 'WARN', 'Dynamic inline style should use named design tokens and a controlled style layer.'));
+  void config;
+}
+function analyzeTemplateCode(path, source, code, offset, diagnostics) {
+  if (/\b(?:eval|exec|system)\s*\(/iu.test(code)) diagnostics.push(lineDiagnostic(path, source, offset + code.search(/\b(?:eval|exec|system)\s*\(/iu), 'sensor/dynamic-execution', 'UNSAFE', 'Template code invokes dynamic execution.'));
+}
+function analyzeRuby(path, source, diagnostics, offset = 0) {
+  const code = maskRubyComments(source);
+  for (const match of code.matchAll(/\b(?:find_by_sql|find_by_query|execute|exec_query|select_all|connection\.execute|where|order|pluck|select)\s*\(?\s*(['"])(?=[\s\S]*#\{)([\s\S]*?)\1/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/sql-injection', 'UNSAFE', 'Ruby SQL query interpolates dynamic data; use bind parameters or an ORM parameter API.'));
+  for (const match of code.matchAll(/\b(?:find_by_sql|find_by_query|execute|exec_query|select_all|connection\.execute|where|order|pluck|select)\s*\(?[^\n;]*(?:\+|<<)[^\n;]*/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/sql-injection', 'UNSAFE', 'Ruby SQL query is constructed by concatenation; use bind parameters or an ORM parameter API.'));
+  for (const match of code.matchAll(/(?:^|[=;\s])(?:system|exec|spawn|Open3\.(?:capture|popen|pipeline))\s*\(?[^\n;]*(?:#\{|\+|params\[)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/dynamic-execution', 'UNSAFE', 'Ruby command execution uses dynamic data.'));
+  for (const match of code.matchAll(/\b(?:send_file|send_data)\s*\(?\s*(?:params\[|request\.)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/path-traversal', 'UNSAFE', 'Rails file output uses request-controlled data; validate an allowlisted path.'));
+  for (const match of code.matchAll(/\b(?:redirect_to|redirect_back)\s*\(?\s*(?:params\[|request\.)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/open-redirect', 'WARN', 'Rails redirect destination is request-controlled; validate it against an allowlist.'));
+  for (const match of code.matchAll(/\b(?:render\s+inline:|raw\s*\(|\.html_safe\b|params\.permit!)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/rails-unsafe-render', 'WARN', 'Rails rendering bypasses a safe view boundary; justify and sanitize the value.'));
+  for (const match of code.matchAll(/\b(?:User|Account|Record|Model)\.(?:new|create|update|update!|assign_attributes)\s*\(\s*params\b/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/rails-unpermitted-params', 'WARN', 'Rails model assignment should use an explicit params permit list.'));
+}
+function maskRubyComments(source) { return source.replace(/#(?!\{)[^\n]*/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function analyzeSingleFileComponent(path, source, diagnostics, config) {
   const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu;
   const stylePattern = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/giu;

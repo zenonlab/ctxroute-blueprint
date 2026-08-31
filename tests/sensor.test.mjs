@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
+import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -101,7 +101,7 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
 test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
-  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 91);
+  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 113);
   assert.equal(isSupportedSourcePath('Dockerfile'), true);
   assert.equal(isSupportedSourcePath('.env.local'), true);
   assert.equal(isSupportedSourcePath('unknown.xyz'), false);
@@ -194,6 +194,20 @@ test('lexical adapters cover Rust, TOML, and common repository formats without c
   assert.equal(analyzeSource('main.lua', 'eval(input)').at(0).rule, 'sensor/dynamic-eval');
   assert.equal(analyzeSource('Dockerfile', 'RUN echo "ok"').length, 0);
   assert.equal(analyzeSource('.env', 'COMMAND="eval(input)"').length, 0);
+});
+test('Rails Ruby and templates detect unsafe boundaries without flagging safe ORM usage', () => {
+  assert.equal(analyzeSource('users.rb', "User.where(id: params[:id]); User.find_by(name: params[:name])").length, 0);
+  assert.equal(analyzeSource('users.rb', "User.find_by_sql(\"SELECT * FROM users WHERE id = #{params[:id]}\")")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('users.rb', "connection.execute('SELECT * FROM users WHERE id = ' + params[:id])")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('users_controller.rb', 'send_file params[:path]')[0].rule, 'sensor/path-traversal');
+  assert.equal(analyzeSource('users_controller.rb', 'render inline: params[:template]')[0].rule, 'sensor/rails-unsafe-render');
+  assert.equal(analyzeSource('views/users.html.erb', '<img src="avatar.png"><%== params[:name] %>')[0].rule, 'sensor/ui-missing-alt');
+  assert.equal(analyzeSource('views/users.html.erb', '<%= User.name %>')[0]?.rule, undefined);
+  assert.equal(analyzeSource('views/users.html.erb', '<%= User.find_by_sql("SELECT * FROM users WHERE id = #{params[:id]}") %>')[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('views/users.html.haml', '.card{style: "color: #{params[:color]}"}')[0].rule, 'sensor/ui-dynamic-style');
+  assert.equal(adapterForPath('app/views/home.html.erb'), 'template');
+  assert.equal(adapterForPath('app/views/home.html.slim'), 'template');
+  assert.equal(adapterForPath('app/views/home.blade.php'), 'template');
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
