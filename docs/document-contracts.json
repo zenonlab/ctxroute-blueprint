@@ -52,6 +52,15 @@
       "source": ".project/ui-design-contract.json",
       "narrative": "docs/ui-design-contract.md",
       "requiredKeys": ["schemaVersion", "policy", "tokens", "components", "rules", "adapters"]
+    },
+    {
+      "id": "progress-checklist",
+      "kind": "progress-contract",
+      "format": "json",
+      "source": ".project/progress.json",
+      "narrative": "docs/progress.md",
+      "requiredKeys": ["schemaVersion", "goals"],
+      "validator": "npm run progress:validate"
     }
   ]
 }

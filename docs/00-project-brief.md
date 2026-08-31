@@ -5,13 +5,14 @@
 - Name: CTXRoute Blueprint transition infrastructure
 - Problem solved: provide reproducible workspace coordination, bounded CRG updates, and explicit agent governance around existing blueprint tooling.
 - Users: contributors and coding agents working in the three-repository workspace.
-- In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, and the extensible multilingual PostToolUse Sensor.
+- In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, the extensible multilingual PostToolUse Sensor, and the local progress checklist core with CLI/MCP adapters.
 - Out of scope: changing CTXRoute, replacing Archify, a persistent Python service, and imposing Sensor rules on derived products.
 - UI contract: provide framework-neutral tokens, component roles, states, accessibility expectations, and reuse guidance; framework-specific implementation remains a derived-product decision.
 
 ## Constraints
 
 - Performance: coalesce file events, allow one CRG update at a time, terminate each subprocess after completion, and keep memory bounded for Apple Silicon and CI runners.
+- Progress: keep `.project/progress.json` under 64 KiB, with at most 20 goals, 30 steps per goal, and 10 evidence references per step; use atomic writes and short references only.
 - Security: no dynamic evaluation or shell interpolation; validate paths, use fixed argument vectors, avoid secrets in diagnostics, and preserve ASK/NEVER/ALWAYS escalation boundaries.
 - Reliability: recover from failed updates, handle SIGINT/SIGTERM, close SQLite connections cleanly, and keep the blueprint usable when CRG is unavailable.
 - Platform: Node.js 22/npm 10; Linux, macOS, and Windows; no daemon or hosted service.
@@ -30,6 +31,7 @@
 - Template/framework coverage: Ruby/Rails source and ERB/Haml/Slim, plus common server-rendered template families, use explicit lexical or embedded adapters; framework-specific enforcement remains opt-in and does not select a product stack.
 - Diagnostic precision: every finding identifies its producing adapter and repeated identical findings are deduplicated deterministically. Blade PHP extraction is bounded and lexical; it is not a PHP AST or whole-program guarantee.
 - Optional parsing: derived products may provide `tree-sitter-ruby` or `tree-sitter-php`; the Sensor detects availability, runs AST syntax/complexity checks alongside lexical rules, and never treats an unavailable optional parser as a safe result.
+- Progress checklist: CLI and MCP call one shared core; validation is read-only, approval is explicit, `.project/progress.json` is authoritative, and `docs/progress.md` is generated.
 
 ## Success criteria
 

@@ -1,0 +1,93 @@
+import { mkdir, readFile, rename, open } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
+
+export const PROGRESS_PATH = '.project/progress.json';
+export const PROGRESS_VIEW_PATH = 'docs/progress.md';
+export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, evidence: 10, text: 500 };
+const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
+const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
+
+export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
+
+export async function readProgress(root = process.cwd()) {
+  try {
+    const source = await readFile(resolve(root, PROGRESS_PATH), 'utf8');
+    if (Buffer.byteLength(source) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
+    const value = JSON.parse(source); const errors = validateProgress(value);
+    if (errors.length) throw new Error(errors.join('; '));
+    return value;
+  } catch (error) { if (error.code === 'ENOENT') return emptyProgress(); throw new Error(`Cannot read progress checklist: ${error.message}`); }
+}
+
+export function validateProgress(value) {
+  const errors = [];
+  if (!value || value.schemaVersion !== 1 || !Array.isArray(value.goals)) return ['schemaVersion 1 and goals array are required'];
+  if (value.goals.length > LIMITS.goals) errors.push(`maximum ${LIMITS.goals} goals exceeded`);
+  const goalIds = new Set();
+  for (const goal of value.goals) {
+    if (!isId(goal?.id) || goalIds.has(goal.id)) errors.push('goal ids must be unique safe identifiers'); goalIds.add(goal?.id);
+    if (!text(goal?.title)) errors.push(`goal ${goal?.id ?? '(missing)'} needs a title`);
+    if (!Array.isArray(goal?.steps) || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs at most ${LIMITS.steps} steps`); continue; }
+    const stepIds = new Set();
+    for (const step of goal.steps) {
+      if (!isId(step?.id) || stepIds.has(step.id)) errors.push(`goal ${goal.id} has duplicate or invalid step id`); stepIds.add(step?.id);
+      if (!text(step?.title) || !STATUSES.has(step?.status)) errors.push(`step ${step?.id ?? '(missing)'} has invalid title or status`);
+      for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands, evidence: step?.evidence })) {
+        if (!Array.isArray(list) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} needs ${name}`);
+        for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`step ${step?.id ?? '(missing)'} contains an invalid ${name} reference`);
+      }
+      if ((step?.evidence?.length ?? 0) > LIMITS.evidence) errors.push(`step ${step.id} has too many evidence references`);
+    }
+  }
+  return errors;
+}
+
+export function validatePlan(plan, current = emptyProgress()) {
+  const errors = [];
+  if (!plan || typeof plan !== 'object') return { ok: false, errors: ['plan must be an object'] };
+  const goalId = plan.goalId ?? plan.id;
+  if (!isId(goalId)) errors.push('plan requires a safe goalId');
+  if (!text(plan.title)) errors.push('plan requires a title');
+  if (!Array.isArray(plan.steps) || !plan.steps.length || plan.steps.length > LIMITS.steps) errors.push(`plan requires 1-${LIMITS.steps} steps`);
+  const ids = new Set();
+  for (const step of plan.steps ?? []) {
+    if (!isId(step?.id) || ids.has(step.id)) errors.push('plan step ids must be unique safe identifiers'); ids.add(step?.id);
+    if (!text(step?.title)) errors.push('each step requires a title');
+    for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands })) {
+      if (!Array.isArray(list) || !list.length) errors.push(`step ${step?.id ?? '(missing)'} requires ${name}`);
+      for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`unsafe or invalid ${name} reference`);
+    }
+  }
+  const evidence = plan.validationEvidence ?? plan.evidence;
+  if (!Array.isArray(evidence) || !evidence.length || evidence.some(item => !shortReference(item))) errors.push('plan requires short validation evidence references');
+  const existing = current.goals?.find(goal => goal.id === goalId);
+  if (existing && JSON.stringify(normalizePlan(plan)) !== JSON.stringify(normalizeGoal(existing))) errors.push(`goal already exists with different content: ${goalId}`);
+  return { ok: errors.length === 0, errors, normalized: normalizePlan(plan) };
+}
+
+export async function approvePlan(plan, root = process.cwd()) {
+  if (plan?.approved !== true) throw new Error('explicit approval is required: approved must be true');
+  const current = await readProgress(root); const result = validatePlan(plan, current);
+  if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
+  const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
+  const json = `${JSON.stringify(next, null, 2)}\n`; if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
+  await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
+}
+
+export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, steps: goal.steps.map(step => ({ id: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) }));
+export function renderProgress(value) {
+  const lines = ['# Progress checklist', '', '> Generated from `.project/progress.json`; do not edit this view.', ''];
+  for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${step.status}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); lines.push(''); }
+  if (!value.goals.length) lines.push('_No goals approved yet._', ''); return lines.join('\n');
+}
+function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
+function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: goal.title, status: goal.status, steps: goal.steps }; }
+function isId(value) { return typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
+function text(value) { return typeof value === 'string' && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
+function shortReference(value) { return typeof value === 'string' && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && !/[\u0000-\u001f]/u.test(value); }
+function safePath(value) {
+  if (!shortReference(value) || isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]+/u).includes('..')) return false;
+  const normalized = value.replaceAll('\\', '/');
+  return relative('.', value).replaceAll('\\', '/') === normalized;
+}
+async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
