@@ -18,7 +18,8 @@ contrainte majeure doit être conservée dans `docs/decisions/`.
 ## Réutilisation automatique
 
 Avant une modification, `PreToolUse` extrait les fichiers ciblés, sélectionne
-les ADRs dont le périmètre correspond et injecte leur contenu dans le contexte.
+les ADRs dont le périmètre correspond et injecte leur contenu au premier geste
+correspondant (`mode: once`).
 L’agent doit relire ces décisions avant d’agir.
 
 Après une modification, `PostToolUse` vérifie qu’un changement architectural
@@ -33,8 +34,9 @@ npm run validate:decisions
 npm test
 ```
 
-Le flux canonique est : changement → sélection ADR → injection du contexte →
-validation.
+Le flux canonique est : changement → sélection ADR → injection contextuelle
+unique → validation. Après `PreCompact`, CTXRoute peut réinjecter la décision si
+le contexte a été vidé.
 
 Les protections issues de la mémoire des problèmes suivent le même principe :
 SQLite détecte et résout le problème, puis CTXRoute injecte une règle approuvée

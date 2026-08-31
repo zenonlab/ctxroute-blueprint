@@ -65,12 +65,14 @@ test('materializes ADR metadata for CTXRoute and injects it only in scope', () =
   syncAdrRules(root);
   const generated = readFileSync(join(root, '.claude/hooks/docs/adr-memory/adr-ADR-0001-rule.md'), 'utf8');
   assert.match(generated, /tool: "\*"/u);
+  assert.match(generated, /mode: once/u);
   assert.doesNotMatch(generated, /problem-memory|events:|tools:/u);
 
   const projectRoot = new URL('..', import.meta.url).pathname;
   const hook = join(projectRoot, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
   const env = { ...process.env, CTXROUTE_CONFIG_PATH: join(projectRoot, 'ctxroute-config.json'), CTXROUTE_FILEDOCS_DIR: join(root, '.claude/hooks/docs'), CTXROUTE_STATE_DIR: join(root, '.ctxroute/state') };
-  const run = filePath => spawnSync(process.execPath, [hook, '--budget', '0'], { cwd: root, env, input: JSON.stringify({ session_id: `adr-${filePath}`, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }), encoding: 'utf8' });
-  assert.match(run('src/main.js').stdout, /Use the approved adapter/u);
+  const run = (filePath, sessionId = `adr-${filePath}`) => spawnSync(process.execPath, [hook, '--budget', '0'], { cwd: root, env, input: JSON.stringify({ session_id: sessionId, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }), encoding: 'utf8' });
+  assert.match(run('src/main.js', 'same-context').stdout, /Use the approved adapter/u);
+  assert.doesNotMatch(run('src/main.js', 'same-context').stdout, /Use the approved adapter/u);
   assert.doesNotMatch(run('lib/other.js').stdout, /Use the approved adapter/u);
 });

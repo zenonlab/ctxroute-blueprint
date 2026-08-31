@@ -63,7 +63,7 @@ export function syncAdrRules(root = process.cwd()) {
       ? tracked.filter(path => matchScope(path, adr.metadata.scope))
       : [];
     const source = covered.length
-      ? ['---', 'tool: "*"', `scope: ${JSON.stringify(covered)}`, 'mode: dumb', '---', '', `# ${adr.file}`, '', adr.body.trim(), ''].join('\n')
+      ? ['---', 'tool: "*"', `scope: ${JSON.stringify(covered)}`, 'mode: once', '---', '', `# ${adr.file}`, '', adr.body.trim(), ''].join('\n')
       : ['---', 'inject: never', '---', '', `# ${adr.file} (inactive)`, ''].join('\n');
     writeFileSync(destination, source, 'utf8');
     active.add(name);
