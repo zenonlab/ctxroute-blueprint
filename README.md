@@ -28,7 +28,7 @@ The blueprint combines five infrastructure layers:
   the current action.
 - **Architecture:** Archify validates versioned JSON IR and generates an
   interactive artifact outside Git.
-- **Static safety:** the tree-sitter Sensor analyzes supported source files and
+- **Static safety:** the [tree-sitter Sensor](https://tree-sitter.github.io/tree-sitter/) analyzes supported source files and
   emits stable JSON diagnostics.
 - **Portable validation:** Node.js 22 CI runs on Linux, macOS, and Windows.
 
