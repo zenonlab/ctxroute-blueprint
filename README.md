@@ -180,13 +180,21 @@ silent update.
 
 ## Sensor
 
-The Sensor uses one registered engine for JavaScript, TypeScript, JSX/TSX,
-Python, SQL, HTML, CSS, Vue, Svelte, Rust, TOML, and declared lexical source
-and configuration formats. AST adapters are syntax-aware; lexical adapters
-provide bounded coverage only and do not claim type, package, or runtime
-analysis. It reports one stable JSON object containing a verdict, coverage
-limits, and ordered diagnostics. SARIF 2.1.0 is available for code-scanning
-integrations:
+The Sensor uses one registered engine with three explicit coverage levels:
+
+- **AST:** JavaScript, TypeScript, JSX/TSX, and Python.
+- **Dedicated analysis:** SQL, HTML, CSS, Vue, and Svelte.
+- **Lexical fallback:** Rust, Go, Java, Kotlin, C/C++, C#, PHP, Ruby, Swift,
+  Dart, Shell, Elixir, Erlang, Haskell, Lua, R, Scala, Solidity, and common
+  configuration formats including TOML, YAML, JSON, XML, Terraform, HCL, and
+  Protocol Buffers.
+
+AST adapters are syntax-aware. Dedicated and lexical adapters provide bounded
+coverage only; they do not claim type, package, dependency, or runtime
+analysis. Ruby and PHP AST parsers are optional and are not installed by the
+blueprint. The Sensor reports one stable JSON object containing a verdict,
+coverage limits, and ordered diagnostics. SARIF 2.1.0 is available for
+code-scanning integrations:
 
 ```sh
 npm run sensor -- src/example.ts scripts/check.py
