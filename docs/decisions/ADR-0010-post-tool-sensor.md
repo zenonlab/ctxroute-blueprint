@@ -25,10 +25,20 @@ PostToolUse reuses the existing path extraction and invokes one Sensor engine
 with registered syntax-aware and lexical adapters for JavaScript, TypeScript,
 JSX/TSX, Python, SQL, HTML, CSS, Vue, Svelte, Rust, TOML, and other declared
 common formats. Rules are versioned configuration and each
-diagnostic has a stable rule identifier and JSON contract. AST parsing is used
+diagnostic has a stable rule identifier and JSON contract. Each diagnostic also
+identifies the adapter that produced it; duplicate findings are removed by a
+stable path/position/rule/message key. AST parsing is used
 where grammars exist; markup and single-file-component adapters mask comments
 and strings before structural checks and delegate embedded script/style blocks
 to the existing language adapters.
+
+Ruby and PHP grammar packages are optional adapters, not mandatory blueprint
+dependencies. When installed by a derived product, they may replace the
+corresponding bounded lexical adapter; when absent, the checklist reports the
+capability as unavailable and the lexical result remains explicitly limited.
+The Sensor keeps the lexical checks alongside optional AST syntax/complexity
+checks, so enabling a parser cannot silently remove existing safety rules. The
+dispatcher and diagnostic contract do not change between parser modes.
 
 The registry also recognizes common extensionless repository files
 (`Dockerfile`, `Makefile`, `Justfile`) and environment files (`.env`,
@@ -94,7 +104,14 @@ The result also declares its coverage limits: `moduleScope` is
 false, and `rateLimitRuntimeProof` is false. Local import resolution may only
 match files included in the same `analyzePaths` action; a `SAFE` result never
 means that an unscanned dependency is safe or that a rate-limit middleware was
-executed at runtime. New languages are added through the adapter registry;
+executed at runtime. Ruby/Rails source uses a bounded lexical adapter for Ruby,
+Rake, Rack, and Rails conventions, while ERB/Haml/Slim and common
+server-rendered template formats use an embedded template adapter. Blade also
+extracts PHP blocks for bounded SQL, execution, and filesystem checks. It detects
+high-confidence Ruby SQL interpolation/concatenation and dangerous Rails
+boundaries such as dynamic command execution, request-controlled file output,
+and unsafe rendering. ORM calls with ordinary parameter values remain outside
+the SQL injection rule. New languages are added through the adapter registry;
 product-specific sinks, builders, taint sources, and thresholds are added in
 the versioned rules file.
 

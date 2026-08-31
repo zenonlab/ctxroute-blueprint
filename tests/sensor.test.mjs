@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
+import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, optionalParserStatus, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -101,7 +101,7 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
 test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
-  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 91);
+  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 113);
   assert.equal(isSupportedSourcePath('Dockerfile'), true);
   assert.equal(isSupportedSourcePath('.env.local'), true);
   assert.equal(isSupportedSourcePath('unknown.xyz'), false);
@@ -194,6 +194,46 @@ test('lexical adapters cover Rust, TOML, and common repository formats without c
   assert.equal(analyzeSource('main.lua', 'eval(input)').at(0).rule, 'sensor/dynamic-eval');
   assert.equal(analyzeSource('Dockerfile', 'RUN echo "ok"').length, 0);
   assert.equal(analyzeSource('.env', 'COMMAND="eval(input)"').length, 0);
+});
+test('Rails Ruby and templates detect unsafe boundaries without flagging safe ORM usage', () => {
+  assert.equal(analyzeSource('users.rb', "User.where(id: params[:id]); User.find_by(name: params[:name])").length, 0);
+  assert.equal(analyzeSource('users.rb', "User.find_by_sql(\"SELECT * FROM users WHERE id = #{params[:id]}\")")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('users.rb', "connection.execute('SELECT * FROM users WHERE id = ' + params[:id])")[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('users_controller.rb', 'send_file params[:path]')[0].rule, 'sensor/path-traversal');
+  assert.equal(analyzeSource('users_controller.rb', 'render inline: params[:template]')[0].rule, 'sensor/rails-unsafe-render');
+  assert.equal(analyzeSource('views/users.html.erb', '<img src="avatar.png"><%== params[:name] %>')[0].rule, 'sensor/ui-missing-alt');
+  assert.equal(analyzeSource('views/users.html.erb', '<%= User.name %>')[0]?.rule, undefined);
+  assert.equal(analyzeSource('views/users.html.erb', '<%= User.find_by_sql("SELECT * FROM users WHERE id = #{params[:id]}") %>')[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('views/users.html.haml', '.card{style: "color: #{params[:color]}"}')[0].rule, 'sensor/ui-dynamic-style');
+  assert.equal(adapterForPath('app/views/home.html.erb'), 'template');
+  assert.equal(adapterForPath('app/views/home.html.slim'), 'template');
+  assert.equal(adapterForPath('app/views/home.blade.php'), 'template');
+  assert.equal(analyzeSource('resources/views/users.blade.php', '<?php $query = "SELECT * FROM users WHERE id = " . $id; DB::raw($query); ?>')[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('resources/views/safe.blade.php', '<?php echo "DB::raw($query)"; // system($cmd)\n/* readfile($_GET[\'path\']) */ ?>').length, 0);
+});
+test('SQL policy modes distinguish result limits, mutation filters, and request rate limits', () => {
+  const base = { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'], maxRows: 100, requireLimit: true, requireMutationFilter: true, requireRateLimit: true } };
+  assert.equal(analyzeSource('query.ts', "function handler(req) { return db.query('SELECT * FROM users WHERE id = $1', [req.query.id]); }", { config: base }).map(item => item.rule).sort().join(','), 'sensor/sql-missing-rate-limit,sensor/sql-unbounded-query');
+  assert.equal(analyzeSource('query.ts', "function handler(req) { rateLimit(req); return db.query('SELECT * FROM users WHERE id = $1 LIMIT $1', [req.query.id]); }", { config: base }).length, 0);
+  assert.deepEqual(analyzeSource('query.sql', 'DELETE FROM users', { config: base }).map(item => item.rule), ['sensor/sql-unbounded-query', 'sensor/sql-unfiltered-mutation']);
+});
+test('diagnostics identify their adapter and retain stable unique locations', () => {
+  const diagnostics = analyzeSource('page.blade.php', '<img src="x"><img src="x">');
+  assert.equal(diagnostics[0].adapter, 'template');
+  assert.equal(new Set(diagnostics.map(item => `${item.line}:${item.column}:${item.rule}:${item.message}`)).size, diagnostics.length);
+});
+test('optional Ruby and PHP parsers never change lexical coverage when unavailable', () => {
+  const status = optionalParserStatus();
+  assert.deepEqual(status.map(item => item.id), ['ruby-ast', 'php-ast']);
+  assert.equal(status.every(item => typeof item.available === 'boolean'), true);
+  assert.equal(analyzeSource('safe.rb', '# puts "eval(x)"\nUser.find_by(id: params[:id])').length, 0);
+});
+test('Sensor deduplicates repeated paths within one action', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-deduplicate-'));
+  writeFileSync(join(directory, 'safe.js'), 'const value = 1;');
+  const result = analyzePaths(['safe.js', 'safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'SAFE');
+  assert.deepEqual(result.diagnostics, []);
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);

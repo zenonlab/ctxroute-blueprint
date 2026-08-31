@@ -7,6 +7,7 @@
 - Users: contributors and coding agents working in the three-repository workspace.
 - In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, and the extensible multilingual PostToolUse Sensor.
 - Out of scope: changing CTXRoute, replacing Archify, a persistent Python service, and imposing Sensor rules on derived products.
+- UI contract: provide framework-neutral tokens, component roles, states, accessibility expectations, and reuse guidance; framework-specific implementation remains a derived-product decision.
 
 ## Constraints
 
@@ -26,6 +27,9 @@
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
 - Post-hook analysis: AST adapters cover JS/TS/JSX/TSX and Python; embedded/lexical adapters cover SQL, HTML, CSS, Vue/Svelte, 53 common source extensions, 18 data/config extensions, plus Dockerfile/Makefile/Justfile and `.env` names. The Sensor also reports high-confidence XSS, SSRF, path traversal, prototype pollution, weak crypto, open redirects, UI layering, and anti-slop findings, with optional SARIF output. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks. Lexical registration is coverage visibility, not a grammar or type-analysis guarantee.
 - SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size `LIMIT`, mutation predicates, and request-scoped request-rate guards are distinct configurable checks. `LIMIT` bounds returned rows; `rateLimit`/`throttle` bounds requests. Runtime enforcement, effective quotas, schema/dialect validation, and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
+- Template/framework coverage: Ruby/Rails source and ERB/Haml/Slim, plus common server-rendered template families, use explicit lexical or embedded adapters; framework-specific enforcement remains opt-in and does not select a product stack.
+- Diagnostic precision: every finding identifies its producing adapter and repeated identical findings are deduplicated deterministically. Blade PHP extraction is bounded and lexical; it is not a PHP AST or whole-program guarantee.
+- Optional parsing: derived products may provide `tree-sitter-ruby` or `tree-sitter-php`; the Sensor detects availability, runs AST syntax/complexity checks alongside lexical rules, and never treats an unavailable optional parser as a safe result.
 
 ## Success criteria
 

@@ -24,9 +24,11 @@ separate from lexical adapters, so support for a file extension never implies
 AST or whole-program guarantees. The current lexical set covers common Rust,
 Go, JVM, native, scripting, mobile, functional, systems, infrastructure, and
 configuration formats, including Dockerfile/Makefile/Justfile and `.env`
-filenames. The registry currently contains 91 file extensions and 6
-extensionless filenames; additional languages require an explicit registry
-entry and tests.
+filenames. The registry currently contains 113 file extensions and 6
+extensionless filenames; this includes Ruby/Rails source and ERB/Haml/Slim plus
+common Phoenix, Blade, Jinja, Twig, Tera, Handlebars, Liquid, EJS, Pug, Razor,
+and JSP templates. Additional languages require an explicit registry entry and
+tests.
 
 The repository exposes `node .githooks/sensor --checklist` as a read-only CLI. It reports
 the registry, bounded analysis contract, required configuration, architecture,
