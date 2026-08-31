@@ -28,7 +28,7 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
 test('initialize refuses an incomplete template without changing status', () => {
   const configPath = join(root, '.project/project-config.json');
   const before = JSON.parse(readFileSync(configPath, 'utf8'));
-  const result = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'initialize'], {
+  const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], {
     cwd: root,
     encoding: 'utf8',
   });
