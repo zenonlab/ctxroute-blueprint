@@ -1,23 +1,24 @@
 {
   "schemaVersion": 1,
-  "status": "initialized",
+  "status": "template",
   "tooling": {
     "runtime": "node",
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "JavaScript ES modules with ephemeral Python CLI integration",
-    "runtime": "Node.js 22 and npm 10",
-    "frontend": "none",
-    "backend": "none; local CLI orchestration",
-    "storage": "SQLite with WAL for local CRG state",
-    "deployment": "GitHub repository and cross-platform GitHub Actions",
-    "observability": "Stable JSON diagnostics and bounded lifecycle logs",
-    "security": "Fixed argument vectors, no shell interpolation, AST Sensor, and ASK/NEVER/ALWAYS governance",
-    "performance": "Debounced events, single-flight updates, bounded child output, and clean process termination"
+    "language": "not applicable: blueprint tooling only",
+    "runtime": "Node.js 22+ for repository governance; derived product is undecided",
+    "frontend": "none: no product UI is selected",
+    "backend": "none: no product service is selected",
+    "storage": "none: product storage is undecided; local SQLite is tooling-only",
+    "deployment": "none: documentation artifacts only; derived product decides deployment",
+    "observability": "CI logs and sanitized validation artifacts only",
+    "security": "minimal CI permissions, pinned actions, local hooks, and Sensor gates",
+    "performance": "bounded setup and single-flight local tooling; product budgets undecided"
   },
   "commands": {
     "test": "npm test",
+    "initialize": "npm run initialize",
     "lint": null,
     "typecheck": null,
     "mutation": null,
@@ -91,7 +92,10 @@
       ".github/",
       ".project/",
       "docs/",
-      "rules/"
+      "packages/",
+      "scripts/",
+      "tests/",
+      ".devcontainer/"
     ],
     "rootFiles": [
       ".gitignore",

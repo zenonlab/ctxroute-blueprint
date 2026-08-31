@@ -90,6 +90,28 @@ test('allows the documented template setup commands during discovery', () => {
   }
 });
 
+test('allows blueprint validation commands during discovery', () => {
+  for (const cmd of [
+    'npm run workspace:check',
+    'npm run governance:check',
+    'npm run progress:read',
+    'npm run progress:validate -- plan.json',
+    'npm run sensor -- --checklist',
+    'npm run sensor -- --checklist --json',
+    'node .githooks/sensor --checklist --json',
+  ]) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
+  }
+});
+
+test('keeps blueprint state mutations blocked during discovery', () => {
+  for (const cmd of ['npm run progress:approve', 'npm run progress:mcp', 'npm run crg:update', 'npm run watch:crg']) {
+    const result = run({ cmd }, { toolName: 'exec_command' });
+    assert.match(result.stdout, /read and validation commands/u, cmd);
+  }
+});
+
 test('blocks dependency refreshes that can execute lifecycle scripts', () => {
   for (const cmd of ['npm install', 'npm install --package-lock-only', 'npm install --package-lock-only --ignore-scripts --foreground-scripts']) {
     const result = run({ cmd }, { toolName: 'exec_command' });

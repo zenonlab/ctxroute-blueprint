@@ -1,0 +1,5 @@
+{
+  "name": "CTXRoute Blueprint",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "npm run setup"
+}

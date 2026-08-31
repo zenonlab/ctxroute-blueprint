@@ -27,6 +27,16 @@ Expose `npm run setup` as the single cross-platform bootstrap command. It uses
 the lockfile, installs Mermaid's browser explicitly, enables repository-local
 Git hooks, and runs the full validation suite.
 
+During `template` status, PreToolUse allows the blueprint's read-only and
+validation commands, including workspace, governance, progress-read,
+progress-validate, and Sensor checklist checks. Progress approval, MCP startup,
+CRG updates, and the CRG watcher remain blocked because they mutate state or
+start a long-lived process.
+
+The template-to-initialized transition is owned by `npm run initialize`. It
+requires completed decisions, brief, quality strategy, and passing validation;
+direct edits to the status field are rejected by PreToolUse.
+
 ## Alternatives
 
 Shell-only tooling would reduce dependencies but weaken portability and
@@ -40,3 +50,6 @@ architecture of a derived product.
 
 Setup changes only repository-local state and dependency caches. It never edits
 global agent settings, deletes project files, or creates commits.
+
+The template command allowlist is explicit rather than derived from every npm
+script, so adding a future script cannot silently weaken the discovery boundary.

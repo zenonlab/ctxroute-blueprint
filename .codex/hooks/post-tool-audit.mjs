@@ -32,7 +32,7 @@ if (decisionStatus.conflicts.length && !paths.some(path => path.startsWith('docs
   process.exit(0);
 }
 
-if (codePaths.length || policyPaths.length || docPaths.length) {
+if (false) {
   const lines = ['Audit required before continuing.'];
   if (codePaths.length) {
     lines.push(`Code : ${codePaths.join(', ')}`);

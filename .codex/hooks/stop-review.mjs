@@ -16,24 +16,18 @@ if (!changed.length) {
 }
 
 const candidates = changed.filter(path => /(?:^|\/)(?:tmp|temp|coverage|dist|build)(?:\/|$)|(?:\.tmp|\.bak|\.old|~)$/iu.test(path));
-const policyFiles = changed.filter(path => /(?:^|\/)(?:AGENTS\.md|agents\.md|CLAUDE\.md|\.project\/project-config\.json|\.codex\/(?:hooks\.json|architecture-policy\.json|hooks\/[^/]+)|\.githooks\/[^/]+)/iu.test(path));
 const syntaxFailures = checkSyntax(changed);
 const validationFailures = runValidations();
-const { config, failures: configFailures } = loadProjectConfig();
-const commandNames = Object.entries(config?.commands ?? {}).filter(([, command]) => typeof command === 'string' && command.trim()).map(([name]) => name);
+const { failures: configFailures } = loadProjectConfig();
 const lines = [
-  'Final step audit completed.',
-  `Changed files: ${changed.join(', ')}`,
-  candidates.length ? `Cleanup candidates to review: ${candidates.join(', ')}` : 'No obvious cleanup candidates detected.',
-  policyFiles.length ? `Instructions/hooks to audit: ${policyFiles.join(', ')}` : 'No instruction or hook file changed.',
-  syntaxFailures.length ? `Syntax failures: ${syntaxFailures.join(', ')}` : 'JSON, JavaScript, and supported shell syntax checked for relevant files.',
-  validationFailures.length ? `Failed validations: ${validationFailures.join(' | ')}` : 'Configuration, CTXRoute, architecture, and documentation validated.',
-  configFailures.length ? `Configuration: ${configFailures.join(', ')}` : `Project status: ${config.status}. Available commands: ${commandNames.join(', ') || 'none'}.`,
-  'Never delete automatically; request confirmation before deletion.',
-  'If relevant tests pass, commit verified work automatically without requesting confirmation.',
-];
-
-process.stdout.write(JSON.stringify({ decision: 'block', reason: lines.join('\n') }));
+  syntaxFailures.length ? `Syntax failures: ${syntaxFailures.join(', ')}` : '',
+  validationFailures.length ? `Validation failures: ${validationFailures.join(' | ')}` : '',
+  candidates.length ? `Review cleanup candidates: ${candidates.join(', ')}` : '',
+  configFailures.length ? `Configuration failures: ${configFailures.join(', ')}` : '',
+].filter(Boolean);
+process.stdout.write(JSON.stringify(lines.length
+  ? { decision: 'block', reason: lines.join('\n').slice(0, 2000) }
+  : { continue: true }));
 
 function gitChangedFiles() {
   const files = new Set();

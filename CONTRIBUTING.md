@@ -17,6 +17,11 @@ Before contributing, run the idempotent project setup:
 npm run setup
 ```
 
+GitHub Actions repeats setup and contract checks on Linux, macOS, and Windows.
+GitHub Codespaces runs the same setup from `.devcontainer`. The blueprint does
+not deploy a product; CI artifacts are limited to Archify documentation, Sensor
+SARIF, and a sanitized summary.
+
 Pre-commit validates the Git index, architecture, links, placeholders,
 and targeted mutation testing when enabled. Pre-push runs the complete commands
 declared by the project.
