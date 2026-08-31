@@ -1,0 +1,24 @@
+{
+  "approved": true,
+  "goalId": "harden-prepush-hook",
+  "title": "Durcir le hook pre-push et aligner la documentation architecture",
+  "steps": [
+    {
+      "id": "remove-shell-execution",
+      "title": "Exécuter les commandes du pre-push sans shell",
+      "acceptance": ["Le hook n’utilise plus shell true", "Les commandes npm configurées restent exécutables sur macOS Linux et Windows"],
+      "files": [".githooks/validate-push.mjs"],
+      "commands": ["npm run validate", "npm test"],
+      "evidence": []
+    },
+    {
+      "id": "align-component-architecture-doc",
+      "title": "Aligner la documentation composant sur Archify",
+      "acceptance": ["La documentation ne présente plus C4 comme un artefact requis", "Le chemin Archify versionné est indiqué"],
+      "files": ["docs/architecture/components/README.md"],
+      "commands": ["npm run validate", "git diff --check"],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": ["npm run validate", "npm audit --omit=optional", "git diff --check"]
+}

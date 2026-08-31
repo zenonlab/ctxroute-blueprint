@@ -11,3 +11,8 @@
 
 - [ ] **Remplacer la référence C4 obsolète par la source Archify** — PENDING
 - [ ] **Corriger le chemin source dans la documentation architecture** — PENDING
+
+## Durcir le hook pre-push et aligner la documentation architecture — ACTIVE
+
+- [ ] **Exécuter les commandes du pre-push sans shell** — PENDING
+- [ ] **Aligner la documentation composant sur Archify** — PENDING
