@@ -99,6 +99,12 @@ deleted path; an unexpectedly absent path during another mutation remains an
 explicit `sensor/read-error`. Invalid hook input is reported visibly while the
 hook fails open.
 
+The repository pre-commit validation reuses the same Sensor rules against the
+staged blob contents. `UNSAFE` and `ERROR` diagnostics therefore block a commit
+without analyzing a different working-tree version; `WARN` diagnostics remain
+informational. This is a Git validation boundary, not an attempt to undo the
+already completed PostToolUse write.
+
 High-confidence injection and execution risks are UNSAFE. UI layering and
 anti-slop findings are WARN by default. Unsupported or absent files produce
 explicit ERROR diagnostics and are never treated as safe. Adding an adapter or
