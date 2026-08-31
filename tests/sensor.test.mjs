@@ -209,6 +209,7 @@ test('Rails Ruby and templates detect unsafe boundaries without flagging safe OR
   assert.equal(adapterForPath('app/views/home.html.slim'), 'template');
   assert.equal(adapterForPath('app/views/home.blade.php'), 'template');
   assert.equal(analyzeSource('resources/views/users.blade.php', '<?php $query = "SELECT * FROM users WHERE id = " . $id; DB::raw($query); ?>')[0].rule, 'sensor/sql-injection');
+  assert.equal(analyzeSource('resources/views/safe.blade.php', '<?php echo "DB::raw($query)"; // system($cmd)\n/* readfile($_GET[\'path\']) */ ?>').length, 0);
 });
 test('SQL policy modes distinguish result limits, mutation filters, and request rate limits', () => {
   const base = { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'], maxRows: 100, requireLimit: true, requireMutationFilter: true, requireRateLimit: true } };

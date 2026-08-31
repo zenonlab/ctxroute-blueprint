@@ -233,9 +233,22 @@ function analyzeRuby(path, source, diagnostics, offset = 0) {
 }
 function analyzePhp(path, source, diagnostics, offset = 0) {
   const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*/gu, match => match.replace(/[^\n]/gu, ' '));
-  for (const match of code.matchAll(/\b(?:DB::raw|whereRaw|orderByRaw|havingRaw|query|execute|exec|prepare)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.|\$\{)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/sql-injection', 'UNSAFE', 'PHP SQL query is constructed from dynamic data; use bind parameters or a query builder parameter API.'));
-  for (const match of code.matchAll(/\b(?:eval|system|shell_exec|passthru|exec)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/dynamic-execution', 'UNSAFE', 'PHP dynamic execution uses dynamic data.'));
-  for (const match of code.matchAll(/\b(?:readfile|file_get_contents|unlink|include|require)\s*\(\s*\$(?:_GET|_POST|_REQUEST|[A-Za-z_])/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/path-traversal', 'UNSAFE', 'PHP filesystem access uses request-controlled data; validate an allowlisted path.'));
+  for (const match of code.matchAll(/\b(?:DB::raw|whereRaw|orderByRaw|havingRaw|query|execute|exec|prepare)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.|\$\{)/gu)) if (isPhpCodePosition(source, match.index)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/sql-injection', 'UNSAFE', 'PHP SQL query is constructed from dynamic data; use bind parameters or a query builder parameter API.'));
+  for (const match of code.matchAll(/\b(?:eval|system|shell_exec|passthru|exec)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.)/gu)) if (isPhpCodePosition(source, match.index)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/dynamic-execution', 'UNSAFE', 'PHP dynamic execution uses dynamic data.'));
+  for (const match of code.matchAll(/\b(?:readfile|file_get_contents|unlink|include|require)\s*\(\s*\$(?:_GET|_POST|_REQUEST|[A-Za-z_])/gu)) if (isPhpCodePosition(source, match.index)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/path-traversal', 'UNSAFE', 'PHP filesystem access uses request-controlled data; validate an allowlisted path.'));
+}
+function isPhpCodePosition(source, index) {
+  let quote = null;
+  let blockComment = false;
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    const pair = source.slice(cursor, cursor + 2);
+    if (blockComment) { if (pair === '*/') { blockComment = false; cursor += 1; } continue; }
+    if (!quote && pair === '/*') { blockComment = true; cursor += 1; continue; }
+    if (!quote && (pair === '//' || source[cursor] === '#')) { const newline = source.indexOf('\n', cursor); if (newline < 0 || newline >= index) return false; cursor = newline; continue; }
+    if (quote) { if (source[cursor] === '\\') { cursor += 1; continue; } if (source[cursor] === quote) quote = null; continue; }
+    if (source[cursor] === '"' || source[cursor] === "'") quote = source[cursor];
+  }
+  return !quote && !blockComment;
 }
 function maskRubyComments(source) { return source.replace(/#(?!\{)[^\n]*/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function analyzeSingleFileComponent(path, source, diagnostics, config) {
