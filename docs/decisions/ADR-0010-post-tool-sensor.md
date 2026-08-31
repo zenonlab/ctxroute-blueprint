@@ -22,8 +22,9 @@ revised: true
 ## Decision
 
 PostToolUse reuses the existing path extraction and invokes one Sensor engine
-with registered adapters for JavaScript, TypeScript, JSX/TSX, Python, SQL,
-HTML, CSS, Vue, and Svelte. Rules are versioned configuration and each
+with registered syntax-aware and lexical adapters for JavaScript, TypeScript,
+JSX/TSX, Python, SQL, HTML, CSS, Vue, Svelte, Rust, TOML, and other declared
+common formats. Rules are versioned configuration and each
 diagnostic has a stable rule identifier and JSON contract. AST parsing is used
 where grammars exist; markup and single-file-component adapters mask comments
 and strings before structural checks and delegate embedded script/style blocks

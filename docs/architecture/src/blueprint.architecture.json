@@ -8,7 +8,7 @@
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "grammars", "diagnostics"], "note": "Registered adapters analyze explicit paths; the result declares that package, whole-program, and runtime rate-limit proof are unavailable." },
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "Registered AST and lexical adapters analyze explicit paths; the result declares that package, whole-program, and runtime rate-limit proof are unavailable." },
       { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
     ]
@@ -24,7 +24,8 @@
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + SQL sink analysis", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
-      { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "JS / TS / Py / SQL / HTML / CSS / SFC", "pos": [520, 700], "size": [220, 66] },
+    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "JS / TS / Py / SQL / HTML / CSS / SFC", "pos": [520, 700], "size": [220, 66] },
+    { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [790, 700], "size": [190, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Verdict + coverage limits", "pos": [790, 520], "size": [180, 66] },
     { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
@@ -53,6 +54,8 @@
     { "id": "dispatch-post-tool", "from": "lifecycle", "to": "postToolUse", "label": "after mutation", "variant": "emphasis", "fromSide": "left", "toSide": "left", "via": [[230, 133], [230, 200], [20, 200], [20, 713]], "labelAt": [120, 215] },
     { "id": "post-tool-sensor", "from": "postToolUse", "to": "sensor", "label": "reuse path extraction", "labelAt": [245, 600] },
     { "id": "sensor-adapters", "from": "sensor", "to": "sensorAdapters", "label": "select adapter", "labelAt": [485, 660] },
+    { "id": "sensor-checklist", "from": "contributors", "to": "sensorChecklist", "label": "audit coverage", "labelAt": [470, 760] },
+    { "id": "checklist-registry", "from": "sensorChecklist", "to": "sensorAdapters", "label": "read registry" },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse AST", "labelAt": [485, 510] },
     { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] },
     { "id": "workspace-watcher", "from": "workspace", "to": "watcher", "label": "file events" },
