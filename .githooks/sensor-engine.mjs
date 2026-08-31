@@ -77,9 +77,9 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
   const scannedFiles = new Set(paths.map(path => resolve(root, path)));
   const sharedState = { root, scannedFiles, sqlExports: collectDynamicExports(paths, root) };
   for (const path of [...paths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
-  diagnostics.sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
-  const verdict = diagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
-  return sensorResult(verdict, diagnostics);
+  const stableDiagnostics = dedupeDiagnostics(diagnostics).sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
+  const verdict = stableDiagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
+  return sensorResult(verdict, stableDiagnostics);
 }
 
 export function analyzeSource(path, source, { config = {}, state } = {}) {
@@ -95,7 +95,7 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   else if (adapter === 'template') analyzeTemplate(path, source, diagnostics, config);
   else if (adapter === 'lexical-source' || adapter === 'lexical-data') analyzeLexical(path, source, diagnostics);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
-  return diagnostics;
+  return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: item.adapter ?? adapter ?? 'unsupported' }));
 }
 
 function analyzePath(path, root, config, diagnostics, sharedState) {
@@ -202,11 +202,15 @@ function analyzeLexical(path, source, diagnostics) {
   if (['.rb', '.rake', '.ru'].includes(extname(path).toLowerCase()) || ['Gemfile', 'Rakefile', 'config.ru'].includes(basename(path))) analyzeRuby(path, source, diagnostics);
 }
 function analyzeTemplate(path, source, diagnostics, config) {
-  const rubyLike = /\.(?:erb|haml|slim)$/iu.test(path) || /(?:^|\.)blade\.php$/iu.test(path);
-  const embedded = source.replace(/<%[=#-]?[\s\S]*?%>|\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/gu, match => match.replace(/[^\n]/gu, ' '));
+  const rubyLike = /\.(?:erb|haml|slim)$/iu.test(path);
+  const blade = /(?:^|\.)blade\.php$/iu.test(path);
+  const embedded = source.replace(/<%[=#-]?[\s\S]*?%>|\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}|\{!![\s\S]*?!!\}|<\?(?:php)?[\s\S]*?\?>/gu, match => match.replace(/[^\n]/gu, ' '));
   analyzeHtml(path, embedded, diagnostics);
   if (rubyLike) {
     for (const match of source.matchAll(/<%[=#-]?([\s\S]*?)%>/gu)) analyzeRuby(path, match[1], diagnostics, match.index + match[0].indexOf(match[1]));
+  } else if (blade) {
+    for (const match of source.matchAll(/<\?(?:php)?([\s\S]*?)\?>|@php([\s\S]*?)@endphp/giu)) analyzePhp(path, match[1] ?? match[2], diagnostics, match.index + match[0].indexOf(match[1] ?? match[2]));
+    for (const match of source.matchAll(/(?:\{\{|\{!!|\{%)([\s\S]*?)(?:\}\}|!!\}|%\})/gu)) analyzeTemplateCode(path, source, match[1], match.index + match[0].indexOf(match[1]), diagnostics);
   } else {
     for (const match of source.matchAll(/(?:\{\{|\{%)([\s\S]*?)(?:\}\}|%\})/gu)) analyzeTemplateCode(path, source, match[1], match.index + match[0].indexOf(match[1]), diagnostics);
   }
@@ -226,6 +230,12 @@ function analyzeRuby(path, source, diagnostics, offset = 0) {
   for (const match of code.matchAll(/\b(?:redirect_to|redirect_back)\s*\(?\s*(?:params\[|request\.)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/open-redirect', 'WARN', 'Rails redirect destination is request-controlled; validate it against an allowlist.'));
   for (const match of code.matchAll(/\b(?:render\s+inline:|raw\s*\(|\.html_safe\b|params\.permit!)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/rails-unsafe-render', 'WARN', 'Rails rendering bypasses a safe view boundary; justify and sanitize the value.'));
   for (const match of code.matchAll(/\b(?:User|Account|Record|Model)\.(?:new|create|update|update!|assign_attributes)\s*\(\s*params\b/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/rails-unpermitted-params', 'WARN', 'Rails model assignment should use an explicit params permit list.'));
+}
+function analyzePhp(path, source, diagnostics, offset = 0) {
+  const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*/gu, match => match.replace(/[^\n]/gu, ' '));
+  for (const match of code.matchAll(/\b(?:DB::raw|whereRaw|orderByRaw|havingRaw|query|execute|exec|prepare)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.|\$\{)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/sql-injection', 'UNSAFE', 'PHP SQL query is constructed from dynamic data; use bind parameters or a query builder parameter API.'));
+  for (const match of code.matchAll(/\b(?:eval|system|shell_exec|passthru|exec)\s*\([^\n;]*(?:\$[A-Za-z_][\w]*|\.)/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/dynamic-execution', 'UNSAFE', 'PHP dynamic execution uses dynamic data.'));
+  for (const match of code.matchAll(/\b(?:readfile|file_get_contents|unlink|include|require)\s*\(\s*\$(?:_GET|_POST|_REQUEST|[A-Za-z_])/gu)) diagnostics.push(lineDiagnostic(path, source, offset + match.index, 'sensor/path-traversal', 'UNSAFE', 'PHP filesystem access uses request-controlled data; validate an allowlisted path.'));
 }
 function maskRubyComments(source) { return source.replace(/#(?!\{)[^\n]*/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function analyzeSingleFileComponent(path, source, diagnostics, config) {
@@ -384,6 +394,15 @@ function validateConfig(config) {
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
 function sensorResult(verdict, diagnostics) { return { schemaVersion: 1, verdict, coverage: SENSOR_COVERAGE, diagnostics }; }
+function dedupeDiagnostics(diagnostics) {
+  const seen = new Set();
+  return diagnostics.filter(item => {
+    const key = [item.path, item.line, item.column, item.rule, item.severity, item.message].join('\u0000');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 function looksLikeSql(text) { return /\b(?:select|insert|update|delete)\b/iu.test(text) || /\b(?:where|order\s+by|group\s+by|having|set|from|values)\b[\s\S]{0,120}(?:=|<|>|\?|\$\d|\$\{|\+)/iu.test(text) || /\b[A-Za-z_]\w*\s*(?:=|<|>)\s*/u.test(text); }
 function looksLikeUntrustedSource(text, config = {}) {
   const sources = config.sql?.taintSources ?? ['req.query', 'req.params', 'req.body', 'request.args', 'request.form', 'request.json', 'request.query_params', 'request.path_params', 'request.GET', 'request.POST', 'request.body', 'searchParams', 'URLSearchParams', 'process.argv', 'process.env', 'os.environ', 'os.getenv'];

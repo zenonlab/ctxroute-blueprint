@@ -208,6 +208,18 @@ test('Rails Ruby and templates detect unsafe boundaries without flagging safe OR
   assert.equal(adapterForPath('app/views/home.html.erb'), 'template');
   assert.equal(adapterForPath('app/views/home.html.slim'), 'template');
   assert.equal(adapterForPath('app/views/home.blade.php'), 'template');
+  assert.equal(analyzeSource('resources/views/users.blade.php', '<?php $query = "SELECT * FROM users WHERE id = " . $id; DB::raw($query); ?>')[0].rule, 'sensor/sql-injection');
+});
+test('SQL policy modes distinguish result limits, mutation filters, and request rate limits', () => {
+  const base = { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'], maxRows: 100, requireLimit: true, requireMutationFilter: true, requireRateLimit: true } };
+  assert.equal(analyzeSource('query.ts', "function handler(req) { return db.query('SELECT * FROM users WHERE id = $1', [req.query.id]); }", { config: base }).map(item => item.rule).sort().join(','), 'sensor/sql-missing-rate-limit,sensor/sql-unbounded-query');
+  assert.equal(analyzeSource('query.ts', "function handler(req) { rateLimit(req); return db.query('SELECT * FROM users WHERE id = $1 LIMIT $1', [req.query.id]); }", { config: base }).length, 0);
+  assert.deepEqual(analyzeSource('query.sql', 'DELETE FROM users', { config: base }).map(item => item.rule), ['sensor/sql-unbounded-query', 'sensor/sql-unfiltered-mutation']);
+});
+test('diagnostics identify their adapter and retain stable unique locations', () => {
+  const diagnostics = analyzeSource('page.blade.php', '<img src="x"><img src="x">');
+  assert.equal(diagnostics[0].adapter, 'template');
+  assert.equal(new Set(diagnostics.map(item => `${item.line}:${item.column}:${item.rule}:${item.message}`)).size, diagnostics.length);
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
