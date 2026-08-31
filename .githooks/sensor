@@ -1,7 +1,8 @@
 import process from 'node:process';
-import { analyzePaths } from './sensor-engine.mjs';
+import { analyzePaths, toSarif } from './sensor-engine.mjs';
 
-const paths = process.argv.slice(2);
+const sarif = process.argv.includes('--sarif');
+const paths = process.argv.slice(2).filter(path => path !== '--sarif');
 if (paths[0] === '--checklist') {
   const { runChecklist, formatChecklist } = await import('./sensor-checklist.mjs');
   const result = runChecklist(process.cwd());
@@ -9,6 +10,6 @@ if (paths[0] === '--checklist') {
   process.exitCode = result.status === 'PASS' ? 0 : 1;
 } else {
   const result = analyzePaths(paths);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  process.stdout.write(`${JSON.stringify(sarif ? toSarif(result) : result)}\n`);
   process.exitCode = result.verdict === 'SAFE' ? 0 : result.verdict === 'WARN' ? 1 : 2;
 }

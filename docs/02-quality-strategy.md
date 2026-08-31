@@ -11,7 +11,7 @@
 | Property | no | — | — | The bounded orchestration logic is small and example-driven. |
 | Snapshot | no | — | — | Stable JSON is asserted structurally. |
 | Performance | yes | Node.js timers and process limits | `npm test` | Coalescing and single-flight behavior under bursts. |
-| Security | blueprint infrastructure | tree-sitter Sensor, markup adapters, and lexical registry | `npm run sensor -- <paths>` or `node .githooks/sensor --checklist --json` | AST/lexical diagnostics, explicit-path module boundary, and declared no-runtime-proof coverage |
+| Security | blueprint infrastructure | tree-sitter Sensor, markup adapters, risk rules, lexical registry, and SARIF export | `npm run sensor -- <paths>` or `node .githooks/sensor --checklist --json` | AST/lexical diagnostics, application-risk rules, explicit-path module boundary, SARIF contract, and declared no-runtime-proof coverage |
 | Mutation | no | — | — | No mutation runner is installed; critical behavior is covered by integration tests. |
 
 ## Decision rule

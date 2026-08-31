@@ -47,6 +47,22 @@ export function isSupportedSourcePath(path) {
   return Boolean(adapterForPath(path));
 }
 
+export function toSarif(result) {
+  return {
+    version: '2.1.0',
+    $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+    runs: [{
+      tool: { driver: { name: 'Blueprint Sensor', informationUri: 'https://github.com/dmmulroy/anti-slop', rules: [...new Set(result.diagnostics.map(item => item.rule))].sort().map(id => ({ id })) } },
+      results: result.diagnostics.map(item => ({
+        ruleId: item.rule,
+        level: item.severity === 'UNSAFE' || item.severity === 'ERROR' ? 'error' : 'warning',
+        message: { text: item.message },
+        locations: [{ physicalLocation: { artifactLocation: { uri: item.path }, region: { startLine: item.line, startColumn: item.column } } }],
+      })),
+    }],
+  };
+}
+
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
   const configurationErrors = validateConfig(config);
@@ -99,6 +115,7 @@ function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) 
 
 function inspectAst(path, source, node, diagnostics, config, state) {
   const text = source.slice(node.startIndex, node.endIndex);
+  if (/comment$/u.test(node.type) && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
   if (node.type === 'variable_declarator' || node.type === 'assignment_expression' || node.type === 'assignment') {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
     const right = node.childForFieldName('value') ?? node.childForFieldName('right');
@@ -116,6 +133,7 @@ function inspectAst(path, source, node, diagnostics, config, state) {
   }
   if (node.type === 'call_expression' || node.type === 'call') {
     const name = node.childForFieldName('function')?.text ?? '';
+    const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
     if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Debug output should not ship in production code.'));
     if (isShell(name)) {
@@ -124,7 +142,10 @@ function inspectAst(path, source, node, diagnostics, config, state) {
       if (/shell\s*:\s*true|shell\s*=\s*True/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/shell-true', 'UNSAFE', 'Shell execution with shell=true is forbidden.'));
     }
     if (isNetwork(name) && /process\.env|import\.meta\.env|os\.environ|os\.getenv|environ\s*\[/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/secret-network-flow', 'UNSAFE', 'A secret source reaches a network output.'));
-    const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
+    if (isNetwork(name) && (looksLikeUntrustedSource(text, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/ssrf', 'UNSAFE', 'A network destination is controlled by dynamic or untrusted data.'));
+    if (isPathSink(name) && (looksLikeUntrustedSource(text, config) || /\.\.[/\\]/u.test(text))) diagnostics.push(diagnostic(path, node, 'sensor/path-traversal', 'UNSAFE', 'A filesystem path may be controlled by untrusted data or contain traversal segments.'));
+    if (isRedirect(name) && (looksLikeUntrustedSource(text, config) || !isLiteralNode(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/open-redirect', 'WARN', 'A redirect destination is dynamic; validate it against an allowlist.'));
+    if (isWeakCrypto(name) || /createHash\s*\(\s*['"](?:md5|sha1)/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/weak-crypto', 'WARN', 'A weak or legacy cryptographic primitive is used.'));
     const firstArgumentName = firstArgument?.text ?? '';
     const calledBuilder = firstArgument?.childForFieldName('function')?.text ?? firstArgumentName.split('(')[0];
     const importedBuilder = importedBinding(calledBuilder, state);
@@ -139,6 +160,8 @@ function inspectAst(path, source, node, diagnostics, config, state) {
   if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
   if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
   if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
+  if (node.type === 'jsx_attribute' && /^dangerouslySetInnerHTML\b/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'Raw HTML is injected into a JSX element.'));
+  if (node.type === 'property_identifier' && node.text === '__proto__') diagnostics.push(diagnostic(path, node, 'sensor/prototype-pollution', 'UNSAFE', 'Prototype mutation through __proto__ is forbidden.'));
 }
 
 function analyzeSql(path, source, diagnostics, config = {}) {
@@ -148,8 +171,19 @@ function analyzeSql(path, source, diagnostics, config = {}) {
   if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !hasSqlLimit(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
   if (config.sql?.requireMutationFilter && isUnfilteredMutation(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
 }
-function analyzeHtml(path, source, diagnostics) { const match = source.match(/<style\b[\s\S]*?<\/style\s*>/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.')); }
-function analyzeCss(path, source, diagnostics) { const code = maskCss(source); const match = code.match(/<\/?(?:html|body|div|style|script)\b/iu); if (match) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.')); }
+function analyzeHtml(path, source, diagnostics) {
+  const code = source.replace(/<!--[\s\S]*?-->/gu, match => match.replace(/[^\n]/gu, ' '));
+  const style = code.match(/<style\b[\s\S]*?<\/style\s*>/iu);
+  if (style) diagnostics.push(lineDiagnostic(path, source, style.index, 'sensor/ui-mixed-markup', 'WARN', 'CSS is embedded in HTML; keep styles in a dedicated stylesheet.'));
+  for (const match of code.matchAll(/\s+on[a-z]+\s*=\s*['"]/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-inline-handler', 'WARN', 'Inline event handlers mix behavior into markup; use a controlled handler.'));
+  for (const match of code.matchAll(/<img\b(?![^>]*\balt\s*=)[^>]*>/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/ui-missing-alt', 'WARN', 'Images must provide an alt attribute or an explicit decorative alternative.'));
+}
+function analyzeCss(path, source, diagnostics) {
+  const code = maskCss(source);
+  const markup = code.match(/<\/?(?:html|body|div|style|script)\b/iu);
+  if (markup) diagnostics.push(lineDiagnostic(path, source, markup.index, 'sensor/ui-mixed-markup', 'WARN', 'HTML markup is placed in a CSS file; keep structure and styles in their respective layers.'));
+  for (const match of code.matchAll(/!important\b/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/css-important', 'WARN', '!important should be justified because it weakens predictable cascade ownership.'));
+}
 function analyzeLexical(path, source, diagnostics) {
   const code = maskLexical(source, extname(path).toLowerCase());
   const match = code.match(/\beval\s*\(/iu);
@@ -329,5 +363,11 @@ function firstError(node) { if (node.isError || node.isMissing) return node; for
 function literal(node, source) { if (!node || !['string', 'template_string'].includes(node.type)) return ''; return source.slice(node.startIndex, node.endIndex).replace(/^['"`]|['"`]$/gu, ''); }
 function isShell(name) { return /(?:^|\.)(?:exec|execSync|spawn|spawnSync|system|popen|run)$/u.test(name); }
 function isNetwork(name) { return /^(?:fetch|axios(?:\.[a-z]+)?|https?\.(?:request|get)|requests\.(?:get|post|put|patch|delete))$/u.test(name); }
-function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? -1) + 1, column: (node?.startPosition.column ?? -1) + 1, rule, severity, message }; }
-function lineDiagnostic(path, source, index, rule, severity, message) { const before = source.slice(0, index); return { path, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, severity, message }; }
+function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? 0) + 1, column: (node?.startPosition.column ?? 0) + 1, rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
+function lineDiagnostic(path, source, index, rule, severity, message) { const before = source.slice(0, index); return { path, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
+function confidenceFor(rule) { return /sql-injection|dynamic-eval|dynamic-function|shell|secret|ssrf|path-traversal|xss|prototype-pollution/u.test(rule) ? 'HIGH' : 'MEDIUM'; }
+function categoryFor(rule) { if (/sql|secret|ssrf|path-traversal|xss|crypto|shell|eval|function|prototype/u.test(rule)) return 'security'; if (/ui|css/u.test(rule)) return 'architecture'; if (/anti-slop|complexity/u.test(rule)) return 'quality'; return 'safety'; }
+function isLiteralNode(node) { return Boolean(node && ['string', 'template_string', 'string_content', 'integer', 'float'].includes(node.type)); }
+function isPathSink(name) { return /(?:^|\.)(?:readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|open|sendFile|download|unlink|rm|rmdir)$/u.test(name); }
+function isRedirect(name) { return /(?:^|\.)(?:redirect|redirectTo|sendRedirect)$/u.test(name); }
+function isWeakCrypto(name) { return /(?:^|\.)(?:md5|sha1|createHash\(['"](?:md5|sha1)|des|rc4)$/iu.test(name); }

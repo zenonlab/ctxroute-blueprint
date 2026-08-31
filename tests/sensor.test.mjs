@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE } from '../.githooks/sensor-engine.mjs';
+import { analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -20,6 +20,20 @@ for (const [name, extension, source, rule] of [
   ['Python secret network flow', 'py', 'requests.post("https://example.test", data=os.getenv("TOKEN"))\n', 'sensor/secret-network-flow']
 ]) test(`${name} is unsafe`, () => { const result = run(extension, source); assert.equal(result.status, 2); assert.equal(result.body.verdict, 'UNSAFE'); assert.ok(result.body.diagnostics.some(item => item.rule === rule)); });
 test('comments and strings are ignored', () => { assert.equal(run('js', '// eval(input)\nconst text = "rm -rf /";').status, 0); });
+test('high-value application risks and SARIF contract are reported', () => {
+  const result = analyzeSource('route.ts', "fetch(userUrl); readFile(req.query.path); res.redirect(next); crypto.createHash('md5');", { config: { sql: { sinks: ['query'] } } });
+  assert.deepEqual(result.map(item => item.rule), ['sensor/ssrf', 'sensor/path-traversal', 'sensor/open-redirect', 'sensor/weak-crypto']);
+  assert.equal(result.every(item => item.confidence && item.category), true);
+  const sarif = toSarif({ diagnostics: result });
+  assert.equal(sarif.version, '2.1.0');
+  assert.equal(sarif.runs[0].results.length, 4);
+});
+test('SARIF CLI does not treat its flag as a source path', () => {
+  const result = spawnSync(process.execPath, [sensor, '--sarif', 'safe.js'], { cwd: root, encoding: 'utf8' });
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.version, '2.1.0');
+  assert.equal(body.runs[0].results.some(item => item.locations[0].physicalLocation.artifactLocation.uri === '--sarif'), false);
+});
 test('syntax errors exit 2', () => { const result = run('py', 'def broken(:\n'); assert.equal(result.status, 2); assert.equal(result.body.verdict, 'ERROR'); });
 test('diagnostics are path ordered', () => { const directory = mkdtempSync(join(tmpdir(), 'sensor-order-')); const a = join(directory, 'a.js'); const b = join(directory, 'b.js'); writeFileSync(a, 'eval(a);'); writeFileSync(b, 'eval(b);'); const result = spawnSync(process.execPath, [sensor, b, a], { cwd: root, encoding: 'utf8' }); assert.deepEqual(JSON.parse(result.stdout).diagnostics.map(item => item.path), [a, b]); });
 function run(extension, source) { const directory = mkdtempSync(join(tmpdir(), 'sensor-test-')); const path = join(directory, `fixture.${extension}`); writeFileSync(path, source); const result = spawnSync(process.execPath, [sensor, path], { cwd: root, encoding: 'utf8' }); return { ...result, body: JSON.parse(result.stdout) }; }
@@ -135,6 +149,10 @@ test('HTML and CSS layer violations are explicit', () => {
   assert.equal(analyzeSource('page.css', 'main { color: red }').length, 0);
   assert.equal(analyzeSource('page.css', '<div>bad</div>').at(0).rule, 'sensor/ui-mixed-markup');
   assert.equal(analyzeSource('page.js', "element.innerHTML = '<style>main { color: red }</style>'").at(0).rule, 'sensor/ui-mixed-markup');
+  assert.equal(analyzeSource('page.html', '<button onclick="go()">Go</button>').at(0).rule, 'sensor/ui-inline-handler');
+  assert.equal(analyzeSource('page.html', '<img src="avatar.png">').at(0).rule, 'sensor/ui-missing-alt');
+  assert.equal(analyzeSource('page.css', '.button { color: red !important; }').at(0).rule, 'sensor/css-important');
+  assert.equal(analyzeSource('page.tsx', '<div dangerouslySetInnerHTML={value} />').at(0).rule, 'sensor/xss');
 });
 test('Vue and Svelte single-file components analyze embedded code without false UI mixing alerts', () => {
   assert.equal(analyzeSource('Card.vue', '<template><main>Hello</main></template><style>main { color: red }</style>').length, 0);

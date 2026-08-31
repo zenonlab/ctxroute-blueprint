@@ -36,6 +36,11 @@ The registry also recognizes common extensionless repository files
 PostToolUse and the read-only coverage checklist; lexical coverage does not
 claim parser, type, or runtime semantics.
 
+Diagnostics also carry `confidence` and `category` fields, and the CLI can emit
+SARIF 2.1.0 with `--sarif` for code-scanning integrations. This is an export
+format only; it does not change verdicts or make a product's CI provider a
+blueprint dependency.
+
 CTXRoute remains the context-injection and guidance layer. Sensor diagnostics
 are returned in the agent context, while SQLite problem memory may retain
 recurrences independently. No hook edits AGENTS.md, permissions, or global
