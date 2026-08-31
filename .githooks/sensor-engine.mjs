@@ -3,21 +3,31 @@ import JavaScript from 'tree-sitter-javascript';
 import TypeScript from 'tree-sitter-typescript';
 import Python from 'tree-sitter-python';
 import { readFileSync } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
 export const SENSOR_ADAPTERS = Object.freeze([
-  Object.freeze({ id: 'javascript', extensions: Object.freeze(['.js', '.jsx', '.mjs', '.cjs']) }),
-  Object.freeze({ id: 'typescript', extensions: Object.freeze(['.ts', '.tsx']) }),
-  Object.freeze({ id: 'python', extensions: Object.freeze(['.py']) }),
-  Object.freeze({ id: 'sql', extensions: Object.freeze(['.sql']) }),
-  Object.freeze({ id: 'html', extensions: Object.freeze(['.html', '.htm']) }),
-  Object.freeze({ id: 'css', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
-  Object.freeze({ id: 'single-file-component', extensions: Object.freeze(['.vue', '.svelte']) }),
-  Object.freeze({ id: 'lexical-source', extensions: Object.freeze(['.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs', '.php', '.rb', '.swift', '.sh', '.bash', '.zsh']) }),
-  Object.freeze({ id: 'lexical-data', extensions: Object.freeze(['.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql']) }),
+  Object.freeze({ id: 'javascript', mode: 'AST', extensions: Object.freeze(['.js', '.jsx', '.mjs', '.cjs']) }),
+  Object.freeze({ id: 'typescript', mode: 'AST', extensions: Object.freeze(['.ts', '.tsx']) }),
+  Object.freeze({ id: 'python', mode: 'AST', extensions: Object.freeze(['.py']) }),
+  Object.freeze({ id: 'sql', mode: 'lexical', extensions: Object.freeze(['.sql']) }),
+  Object.freeze({ id: 'html', mode: 'embedded', extensions: Object.freeze(['.html', '.htm']) }),
+  Object.freeze({ id: 'css', mode: 'lexical', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
+  Object.freeze({ id: 'single-file-component', mode: 'embedded', extensions: Object.freeze(['.vue', '.svelte']) }),
+  Object.freeze({ id: 'lexical-source', mode: 'lexical', filenames: Object.freeze(['Dockerfile', 'Makefile', 'Justfile']), extensions: Object.freeze([
+    '.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs',
+    '.php', '.rb', '.swift', '.sh', '.bash', '.zsh', '.dart', '.ex', '.exs', '.erl', '.hrl',
+    '.fs', '.fsx', '.fsi', '.hs', '.lhs', '.lua', '.r', '.scala', '.sc', '.clj', '.cljs', '.cljc',
+    '.groovy', '.m', '.mm', '.zig', '.nim', '.pl', '.pm', '.t', '.vb', '.vbs', '.v', '.sv',
+    '.sol', '.move', '.asm', '.s', '.pas', '.f', '.for', '.f03', '.f90', '.f95'
+  ]) }),
+  Object.freeze({ id: 'lexical-data', mode: 'lexical', filenames: Object.freeze(['.env', '.env.example', '.env.local']), extensions: Object.freeze([
+    '.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql', '.ini', '.cfg',
+    '.conf', '.properties', '.env', '.tf', '.tfvars', '.hcl', '.cue', '.dhall', '.nix'
+  ]) }),
 ]);
 const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
+const adapterByFilename = new Map(SENSOR_ADAPTERS.flatMap(adapter => (adapter.filenames ?? []).map(filename => [filename, adapter.id])));
 const grammars = new Map([
   ['.js', JavaScript], ['.jsx', JavaScript], ['.mjs', JavaScript], ['.cjs', JavaScript],
   ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
@@ -28,6 +38,14 @@ export const SENSOR_COVERAGE = Object.freeze({
   wholeProgramAnalysis: false,
   rateLimitRuntimeProof: false,
 });
+
+export function adapterForPath(path) {
+  return adapterByExtension.get(extname(path).toLowerCase()) ?? adapterByFilename.get(basename(path));
+}
+
+export function isSupportedSourcePath(path) {
+  return Boolean(adapterForPath(path));
+}
 
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
@@ -48,7 +66,7 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
 export function analyzeSource(path, source, { config = {}, state } = {}) {
   const extension = extname(path).toLowerCase();
   const diagnostics = [];
-  const adapter = adapterByExtension.get(extension);
+  const adapter = adapterForPath(path);
   const grammar = grammars.get(extension);
   if (grammar) analyzeAst(path, source, grammar, config, diagnostics, state);
   else if (adapter === 'sql') analyzeSql(path, source, diagnostics, config);
@@ -157,8 +175,11 @@ function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskLexical(source, extension) {
   const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//gu, match => match.replace(/[^\n]/gu, ' '));
-  const lineComment = ['.toml', '.yaml', '.yml', '.py', '.rb', '.sh', '.bash', '.zsh'].includes(extension) ? /#[^\n]*/gu : /\/\/[^\n]*/gu;
-  return withoutBlockComments.replace(lineComment, match => match.replace(/[^\n]/gu, ' ')).replace(/'(?:\\.|[^'\n])*'|"(?:\\.|[^"\n])*"|`(?:\\.|[^`\n])*`/gu, match => match.replace(/[^\n]/gu, ' '));
+  const hashComments = ['.toml', '.yaml', '.yml', '.py', '.rb', '.sh', '.bash', '.zsh', '.ex', '.exs', '.r', '.pl', '.pm', '.t', '.nim', '.hcl', '.tf', '.tfvars', '.nix'].includes(extension);
+  const dashComments = ['.lua', '.hs', '.lhs', '.f', '.for', '.f03', '.f90', '.f95'].includes(extension);
+  const lineComments = [hashComments ? /#[^\n]*/gu : null, dashComments ? /--[^\n]*/gu : null, /\/\/[^\n]*/gu].filter(Boolean);
+  const maskedLines = lineComments.reduce((value, pattern) => value.replace(pattern, match => match.replace(/[^\n]/gu, ' ')), withoutBlockComments);
+  return maskedLines.replace(/'(?:\\.|[^'\n])*'|"(?:\\.|[^"\n])*"|`(?:\\.|[^`\n])*`/gu, match => match.replace(/[^\n]/gu, ' '));
 }
 function defaultConfig(root) {
   try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }

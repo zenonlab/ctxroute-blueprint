@@ -16,6 +16,8 @@ test('sensor checklist is read-only and passes in JSON and terminal formats', ()
   assert.equal(result.checks.find(item => item.name === 'toml').status, 'PASS');
   assert.equal(result.adapters.find(item => item.id === 'lexical-source').extensions.includes('.rs'), true);
   assert.equal(result.adapters.find(item => item.id === 'lexical-data').extensions.includes('.toml'), true);
+  assert.deepEqual(result.adapters.find(item => item.id === 'lexical-source').filenames, ['Dockerfile', 'Makefile', 'Justfile']);
+  assert.deepEqual(result.adapters.find(item => item.id === 'lexical-data').filenames, ['.env', '.env.example', '.env.local']);
   const text = spawnSync(process.execPath, [sensor, '--checklist'], { cwd: root, encoding: 'utf8' });
   assert.equal(text.status, 0);
   assert.match(text.stdout, /Sensor checklist/u);

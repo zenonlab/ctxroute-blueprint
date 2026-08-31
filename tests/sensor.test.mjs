@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { analyzePaths, analyzeSource, SENSOR_ADAPTERS, SENSOR_COVERAGE } from '../.githooks/sensor-engine.mjs';
+import { analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -65,7 +65,10 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
 test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
-  assert.deepEqual(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions), ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.py', '.sql', '.html', '.htm', '.css', '.scss', '.sass', '.vue', '.svelte', '.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs', '.php', '.rb', '.swift', '.sh', '.bash', '.zsh', '.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql']);
+  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 91);
+  assert.equal(isSupportedSourcePath('Dockerfile'), true);
+  assert.equal(isSupportedSourcePath('.env.local'), true);
+  assert.equal(isSupportedSourcePath('unknown.xyz'), false);
   assert.deepEqual(SENSOR_COVERAGE, { moduleScope: 'explicit-paths', packageResolution: 'disabled', wholeProgramAnalysis: false, rateLimitRuntimeProof: false });
   const directory = mkdtempSync(join(tmpdir(), 'sensor-explicit-scope-'));
   writeFileSync(join(directory, 'queries.js'), "export function buildQuery(id) { return 'SELECT * FROM users WHERE id = ' + id; }\n");
@@ -147,6 +150,10 @@ test('lexical adapters cover Rust, TOML, and common repository formats without c
   assert.equal(analyzeSource('config.toml', 'command = "eval(input)"').length, 0);
   assert.equal(analyzeSource('config.yaml', 'command: eval(input)').at(0).rule, 'sensor/dynamic-eval');
   assert.equal(analyzeSource('schema.graphql', 'type User { id: ID! }').length, 0);
+  assert.equal(analyzeSource('main.lua', '-- eval(input)\nprint("ok")').length, 0);
+  assert.equal(analyzeSource('main.lua', 'eval(input)').at(0).rule, 'sensor/dynamic-eval');
+  assert.equal(analyzeSource('Dockerfile', 'RUN echo "ok"').length, 0);
+  assert.equal(analyzeSource('.env', 'COMMAND="eval(input)"').length, 0);
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);

@@ -1,16 +1,15 @@
 import { extractPathEntries } from './path-extraction.mjs';
-import { analyzePaths, SENSOR_ADAPTERS } from '../../.githooks/sensor-engine.mjs';
+import { analyzePaths, isSupportedSourcePath } from '../../.githooks/sensor-engine.mjs';
 import process from 'node:process';
 import { existsSync } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 const input = await parseInput();
 if (input) {
-  const sourceLike = new Set(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions));
   const deletion = /\b(?:delete|remove|unlink)\b/iu.test(String(input.tool_name ?? ''));
   const entries = extractPathEntries(input.tool_input ?? input);
   const supported = entries
-    .filter(({ path, key }) => sourceLike.has(extname(path).toLowerCase()) && key !== 'old_path')
+    .filter(({ path, key }) => isSupportedSourcePath(path) && key !== 'old_path')
     .filter(({ path }) => path !== '.project/sensor-rules.json')
     .filter(({ path }) => !deletion || existsSync(resolve(process.cwd(), path)))
     .map(({ path }) => path);

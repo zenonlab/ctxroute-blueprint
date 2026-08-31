@@ -8,7 +8,7 @@
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "html"], "note": "Versioned JSON IR produces ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "AST and lexical adapters scan explicit paths; package, whole-program, and runtime rate-limit proof are unavailable." },
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "91 extensions and 6 named files; no package, whole-program, or runtime rate-limit proof." },
       { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "agent-governance", "label": "Agent governance", "focus": ["agents", "governance", "controlLoop", "ctxroute"], "note": "ASK, NEVER, and ALWAYS boundaries constrain agent side effects." }
     ]
@@ -24,7 +24,7 @@
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + SQL sink analysis", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
-    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "AST + lexical / Rust / TOML / SFC", "pos": [520, 700], "size": [220, 66] },
+    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "AST + lexical / 91 ext + named files", "pos": [520, 700], "size": [220, 66] },
     { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [40, 500], "size": [190, 66] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "JSON diagnostics", "sublabel": "Verdict + coverage limits", "pos": [790, 520], "size": [180, 66] },

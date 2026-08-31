@@ -30,6 +30,12 @@ where grammars exist; markup and single-file-component adapters mask comments
 and strings before structural checks and delegate embedded script/style blocks
 to the existing language adapters.
 
+The registry also recognizes common extensionless repository files
+(`Dockerfile`, `Makefile`, `Justfile`) and environment files (`.env`,
+`.env.example`, `.env.local`). The complete registry is the source of truth for
+PostToolUse and the read-only coverage checklist; lexical coverage does not
+claim parser, type, or runtime semantics.
+
 CTXRoute remains the context-injection and guidance layer. Sensor diagnostics
 are returned in the agent context, while SQLite problem memory may retain
 recurrences independently. No hook edits AGENTS.md, permissions, or global

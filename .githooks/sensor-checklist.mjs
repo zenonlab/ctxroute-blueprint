@@ -4,7 +4,7 @@ import { SENSOR_ADAPTERS, SENSOR_COVERAGE } from './sensor-engine.mjs';
 
 export function runChecklist(root = process.cwd()) {
   const hasExtension = extension => SENSOR_ADAPTERS.some(adapter => adapter.extensions.includes(extension));
-  const adapters = SENSOR_ADAPTERS.map(adapter => ({ id: adapter.id, mode: adapter.id === 'javascript' || adapter.id === 'typescript' || adapter.id === 'python' ? 'AST' : 'lexical-or-embedded', extensions: [...adapter.extensions], status: 'PASS' }));
+  const adapters = SENSOR_ADAPTERS.map(adapter => ({ id: adapter.id, mode: adapter.mode, ...(adapter.filenames ? { filenames: [...adapter.filenames] } : {}), extensions: [...adapter.extensions], status: 'PASS' }));
   const checks = [
     check('adapter-registry', SENSOR_ADAPTERS.length > 0, `${SENSOR_ADAPTERS.length} adapters`),
     check('rust', hasExtension('.rs'), 'Rust'),

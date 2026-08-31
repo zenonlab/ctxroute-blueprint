@@ -24,8 +24,8 @@
 - Tests: Node.js built-in test runner for unit, integration, contract, and performance checks.
 - Deployment: source repository and GitHub Actions only; no production deployment.
 - Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
-- Post-hook analysis: AST adapters cover JS/TS/JSX/TSX, Python, SQL, HTML, CSS, Vue, and Svelte; lexical adapters cover common Rust, Go, JVM, native, scripting, and data/config formats including TOML. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks.
-- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size limits, mutation predicates, and request-scoped rate-limit guards are configurable, while runtime enforcement and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
+- Post-hook analysis: AST adapters cover JS/TS/JSX/TSX and Python; embedded/lexical adapters cover SQL, HTML, CSS, Vue/Svelte, 53 common source extensions, 18 data/config extensions, plus Dockerfile/Makefile/Justfile and `.env` names. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks. Lexical registration is coverage visibility, not a grammar or type-analysis guarantee.
+- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size `LIMIT`, mutation predicates, and request-scoped request-rate guards are distinct configurable checks. `LIMIT` bounds returned rows; `rateLimit`/`throttle` bounds requests. Runtime enforcement, effective quotas, schema/dialect validation, and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
 
 ## Success criteria
 
