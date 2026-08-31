@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ProblemStore,
   buildSignatures,
@@ -92,7 +93,7 @@ test('resolutions can be recorded through the controlled CLI', () => {
   const record = store.record(observation, buildSignatures(observation));
   store.close();
   const output = execFileSync(process.execPath, ['.codex/hooks/problem-memory.mjs', 'resolve', String(record.id), JSON.stringify({ type: 'correction', summary: 'Keep the lockfile pinned' })], {
-    cwd: new URL('..', import.meta.url),
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
     env: { ...process.env, CTXROUTE_STATE_DIR: directory },
     encoding: 'utf8',
   });
@@ -137,10 +138,11 @@ test('generated CTXRoute rules inject only for the declared tool and scope', () 
     scope: { paths: ['package-lock.json'], tools: ['Edit'] },
   }, directory, directory);
 
-  const hook = join(new URL('..', import.meta.url).pathname, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
+  const projectRoot = fileURLToPath(new URL('..', import.meta.url));
+  const hook = join(projectRoot, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
   const environment = {
     ...process.env,
-    CTXROUTE_CONFIG_PATH: join(new URL('..', import.meta.url).pathname, 'ctxroute-config.json'),
+    CTXROUTE_CONFIG_PATH: join(projectRoot, 'ctxroute-config.json'),
     CTXROUTE_FILEDOCS_DIR: join(directory, '.claude/hooks/docs'),
     CTXROUTE_STATE_DIR: join(directory, 'state'),
   };
