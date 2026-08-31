@@ -28,7 +28,7 @@
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
     { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "AST + lexical / 113 ext + named files", "pos": [520, 700], "size": [220, 66] },
     { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [40, 500], "size": [190, 66] },
-    { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python", "pos": [520, 520], "size": [180, 66] },
+    { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Core + optional Ruby / PHP", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "Diagnostics", "sublabel": "JSON/SARIF + adapter + confidence", "pos": [790, 520], "size": [180, 66] },
     { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
     { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },

@@ -32,6 +32,14 @@ where grammars exist; markup and single-file-component adapters mask comments
 and strings before structural checks and delegate embedded script/style blocks
 to the existing language adapters.
 
+Ruby and PHP grammar packages are optional adapters, not mandatory blueprint
+dependencies. When installed by a derived product, they may replace the
+corresponding bounded lexical adapter; when absent, the checklist reports the
+capability as unavailable and the lexical result remains explicitly limited.
+The Sensor keeps the lexical checks alongside optional AST syntax/complexity
+checks, so enabling a parser cannot silently remove existing safety rules. The
+dispatcher and diagnostic contract do not change between parser modes.
+
 The registry also recognizes common extensionless repository files
 (`Dockerfile`, `Makefile`, `Justfile`) and environment files (`.env`,
 `.env.example`, `.env.local`). The complete registry is the source of truth for

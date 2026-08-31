@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
+import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, optionalParserStatus, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -221,6 +221,12 @@ test('diagnostics identify their adapter and retain stable unique locations', ()
   const diagnostics = analyzeSource('page.blade.php', '<img src="x"><img src="x">');
   assert.equal(diagnostics[0].adapter, 'template');
   assert.equal(new Set(diagnostics.map(item => `${item.line}:${item.column}:${item.rule}:${item.message}`)).size, diagnostics.length);
+});
+test('optional Ruby and PHP parsers never change lexical coverage when unavailable', () => {
+  const status = optionalParserStatus();
+  assert.deepEqual(status.map(item => item.id), ['ruby-ast', 'php-ast']);
+  assert.equal(status.every(item => typeof item.available === 'boolean'), true);
+  assert.equal(analyzeSource('safe.rb', '# puts "eval(x)"\nUser.find_by(id: params[:id])').length, 0);
 });
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);

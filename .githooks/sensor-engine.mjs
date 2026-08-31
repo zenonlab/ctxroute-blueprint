@@ -3,6 +3,7 @@ import JavaScript from 'tree-sitter-javascript';
 import TypeScript from 'tree-sitter-typescript';
 import Python from 'tree-sitter-python';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { basename, extname, resolve } from 'node:path';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
@@ -33,6 +34,11 @@ const grammars = new Map([
   ['.js', JavaScript], ['.jsx', JavaScript], ['.mjs', JavaScript], ['.cjs', JavaScript],
   ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
 ]);
+const require = createRequire(import.meta.url);
+export const SENSOR_OPTIONAL_PARSERS = Object.freeze([
+  Object.freeze({ id: 'ruby-ast', package: 'tree-sitter-ruby', extensions: Object.freeze(['.rb', '.rake', '.ru']) }),
+  Object.freeze({ id: 'php-ast', package: 'tree-sitter-php', extensions: Object.freeze(['.php']) }),
+]);
 export const SENSOR_COVERAGE = Object.freeze({
   moduleScope: 'explicit-paths',
   packageResolution: 'disabled',
@@ -48,6 +54,10 @@ export function adapterForPath(path) {
 
 export function isSupportedSourcePath(path) {
   return Boolean(adapterForPath(path));
+}
+
+export function optionalParserStatus() {
+  return SENSOR_OPTIONAL_PARSERS.map(parser => ({ ...parser, available: optionalGrammar(parser.extensions[0]) !== null }));
 }
 
 export function toSarif(result) {
@@ -86,8 +96,11 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   const extension = extname(path).toLowerCase();
   const diagnostics = [];
   const adapter = adapterForPath(path);
-  const grammar = grammars.get(extension);
-  if (grammar) analyzeAst(path, source, grammar, config, diagnostics, state);
+  const grammar = grammars.get(extension) ?? optionalGrammar(extension);
+  if (grammar) {
+    analyzeAst(path, source, grammar, config, diagnostics, state);
+    if (!grammars.has(extension)) analyzeSourceLexicalFallback(path, source, adapter, diagnostics);
+  }
   else if (adapter === 'sql') analyzeSql(path, source, diagnostics, config);
   else if (adapter === 'html') analyzeHtml(path, source, diagnostics);
   else if (adapter === 'css') analyzeCss(path, source, diagnostics);
@@ -96,6 +109,21 @@ export function analyzeSource(path, source, { config = {}, state } = {}) {
   else if (adapter === 'lexical-source' || adapter === 'lexical-data') analyzeLexical(path, source, diagnostics);
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: item.adapter ?? adapter ?? 'unsupported' }));
+}
+
+function analyzeSourceLexicalFallback(path, source, adapter, diagnostics) {
+  if (adapter === 'lexical-source') analyzeLexical(path, source, diagnostics);
+}
+
+function optionalGrammar(extension) {
+  const parser = SENSOR_OPTIONAL_PARSERS.find(item => item.extensions.includes(extension));
+  if (!parser) return null;
+  try {
+    const module = require(parser.package);
+    return module.default ?? module;
+  } catch {
+    return null;
+  }
 }
 
 function analyzePath(path, root, config, diagnostics, sharedState) {
