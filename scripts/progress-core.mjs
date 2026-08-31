@@ -76,8 +76,8 @@ export async function approvePlan(plan, root = process.cwd()) {
 
 export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, steps: goal.steps.map(step => ({ id: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) }));
 export function renderProgress(value) {
-  const lines = ['# Progress checklist', '', '> Generated from `.project/progress.json`; do not edit this view.', ''];
-  for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${step.status}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); lines.push(''); }
+  const lines = ['# Progress checklist', ''];
+  for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) { const displayStatus = step.status === 'TODO' ? 'PENDING' : step.status; lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${displayStatus}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); } lines.push(''); }
   if (!value.goals.length) lines.push('_No goals approved yet._', ''); return lines.join('\n');
 }
 function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }

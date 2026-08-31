@@ -1,4 +1,99 @@
 {
   "schemaVersion": 1,
-  "goals": []
+  "goals": [
+    {
+      "schemaVersion": 1,
+      "id": "finalize-external-tickets-9-19",
+      "title": "Finaliser les tickets externes GitHub #9 et #19",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "inspect-repository-and-github-state",
+          "title": "Inspecter le dépôt et l’état GitHub des tickets #9 et #19",
+          "status": "TODO",
+          "acceptance": [
+            "État des branches, PR, issue et checks relevé",
+            "Contraintes d’architecture et de Sensor confirmées"
+          ],
+          "files": [
+            "AGENTS.md",
+            "CLAUDE.md",
+            ".project/progress.json",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/decisions/ADR-0010-post-tool-sensor.md"
+          ],
+          "commands": [
+            "git status --short --branch",
+            "gh pr view 19",
+            "gh issue view 9"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "update-and-verify-dependencies",
+          "title": "Mettre à jour Tree-sitter et vérifier la compatibilité du Sensor",
+          "status": "TODO",
+          "acceptance": [
+            "Versions tree-sitter demandées présentes",
+            "package-lock.json régénéré",
+            "Parsing JS/TS/Python et diagnostics inchangés",
+            "Fallback lexical Ruby/PHP inchangé"
+          ],
+          "files": [
+            "package.json",
+            "package-lock.json",
+            ".githooks/sensor"
+          ],
+          "commands": [
+            "npm ci",
+            "npm run setup:check",
+            "npm run workspace:check",
+            "npm run validate",
+            "node .githooks/sensor --checklist --json",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "validate-cross-platform-ci",
+          "title": "Vérifier les checks CI Linux macOS et Windows de la PR #19",
+          "status": "TODO",
+          "acceptance": [
+            "PR #19 sans conflit",
+            "Checks Node 22 Linux macOS Windows verts",
+            "mergeStateStatus CLEAN"
+          ],
+          "files": [
+            ".github/workflows/ci.yml"
+          ],
+          "commands": [
+            "npm run build:docs",
+            "gh pr checks 19"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "close-ticket-and-clean-worktree",
+          "title": "Fusionner la maintenance et clôturer l’issue #9",
+          "status": "TODO",
+          "acceptance": [
+            "PR #19 fusionnée uniquement après checks verts",
+            "Issue #9 commentée puis fermée avec référence à PR #22",
+            "Aucun reliquat externe lié au ticket 9",
+            "Worktree propre"
+          ],
+          "files": [
+            ".project/progress.json"
+          ],
+          "commands": [
+            "gh pr merge 19",
+            "gh issue comment 9",
+            "gh issue close 9",
+            "git status --short"
+          ],
+          "evidence": []
+        }
+      ]
+    }
+  ]
 }
