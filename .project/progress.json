@@ -1,4 +1,238 @@
 {
   "schemaVersion": 1,
-  "goals": []
+  "goals": [
+    {
+      "schemaVersion": 1,
+      "id": "finalize-external-tickets-9-19",
+      "title": "Finaliser les tickets externes GitHub #9 et #19",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "inspect-repository-and-github-state",
+          "title": "Inspecter le dépôt et l’état GitHub des tickets #9 et #19",
+          "status": "TODO",
+          "acceptance": [
+            "État des branches, PR, issue et checks relevé",
+            "Contraintes d’architecture et de Sensor confirmées"
+          ],
+          "files": [
+            "AGENTS.md",
+            "CLAUDE.md",
+            ".project/progress.json",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/decisions/ADR-0010-post-tool-sensor.md"
+          ],
+          "commands": [
+            "git status --short --branch",
+            "gh pr view 19",
+            "gh issue view 9"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "update-and-verify-dependencies",
+          "title": "Mettre à jour Tree-sitter et vérifier la compatibilité du Sensor",
+          "status": "TODO",
+          "acceptance": [
+            "Versions tree-sitter demandées présentes",
+            "package-lock.json régénéré",
+            "Parsing JS/TS/Python et diagnostics inchangés",
+            "Fallback lexical Ruby/PHP inchangé"
+          ],
+          "files": [
+            "package.json",
+            "package-lock.json",
+            ".githooks/sensor"
+          ],
+          "commands": [
+            "npm ci",
+            "npm run setup:check",
+            "npm run workspace:check",
+            "npm run validate",
+            "node .githooks/sensor --checklist --json",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "validate-cross-platform-ci",
+          "title": "Vérifier les checks CI Linux macOS et Windows de la PR #19",
+          "status": "TODO",
+          "acceptance": [
+            "PR #19 sans conflit",
+            "Checks Node 22 Linux macOS Windows verts",
+            "mergeStateStatus CLEAN"
+          ],
+          "files": [
+            ".github/workflows/ci.yml"
+          ],
+          "commands": [
+            "npm run build:docs",
+            "gh pr checks 19"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "close-ticket-and-clean-worktree",
+          "title": "Fusionner la maintenance et clôturer l’issue #9",
+          "status": "TODO",
+          "acceptance": [
+            "PR #19 fusionnée uniquement après checks verts",
+            "Issue #9 commentée puis fermée avec référence à PR #22",
+            "Aucun reliquat externe lié au ticket 9",
+            "Worktree propre"
+          ],
+          "files": [
+            ".project/progress.json"
+          ],
+          "commands": [
+            "gh pr merge 19",
+            "gh issue comment 9",
+            "gh issue close 9",
+            "git status --short"
+          ],
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "clean-up-architecture-documentation",
+      "title": "Assainir les références C4 et Archify",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "replace-stale-c4-reference",
+          "title": "Remplacer la référence C4 obsolète par la source Archify",
+          "status": "TODO",
+          "acceptance": [
+            "La règle de gouvernance cite le chemin Archify réel",
+            "Aucune référence C4 inexistante ne reste dans la règle"
+          ],
+          "files": [
+            ".claude/hooks/docs/project-governance.md"
+          ],
+          "commands": [
+            "rg -n 'C4|Archify' .claude/hooks/docs/project-governance.md"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "correct-architecture-readme-path",
+          "title": "Corriger le chemin source dans la documentation architecture",
+          "status": "TODO",
+          "acceptance": [
+            "La documentation pointe vers docs/architecture/src",
+            "Les validations documentaires passent"
+          ],
+          "files": [
+            "docs/architecture/README.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "harden-prepush-hook",
+      "title": "Durcir le hook pre-push et aligner la documentation architecture",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "remove-shell-execution",
+          "title": "Exécuter les commandes du pre-push sans shell",
+          "status": "TODO",
+          "acceptance": [
+            "Le hook n’utilise plus shell true",
+            "Les commandes npm configurées restent exécutables sur macOS Linux et Windows"
+          ],
+          "files": [
+            ".githooks/validate-push.mjs"
+          ],
+          "commands": [
+            "npm run validate",
+            "npm test"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "align-component-architecture-doc",
+          "title": "Aligner la documentation composant sur Archify",
+          "status": "TODO",
+          "acceptance": [
+            "La documentation ne présente plus C4 comme un artefact requis",
+            "Le chemin Archify versionné est indiqué"
+          ],
+          "files": [
+            "docs/architecture/components/README.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "complete-readme-documentation",
+      "title": "Compléter et aligner la documentation README",
+      "status": "ACTIVE",
+      "steps": [
+        {
+          "id": "remove-stale-rules-reference",
+          "title": "Retirer la référence au dossier rules supprimé",
+          "status": "TODO",
+          "acceptance": [
+            "Le README ne cite plus rules/ comme infrastructure active"
+          ],
+          "files": [
+            "README.md"
+          ],
+          "commands": [
+            "rg -n 'rules/' README.md"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "document-hooks-and-state",
+          "title": "Documenter les événements hooks et l’état local CTXRoute",
+          "status": "TODO",
+          "acceptance": [
+            "Les six événements sont listés",
+            "Le rôle et le risque de suppression de .ctxroute sont expliqués"
+          ],
+          "files": [
+            "README.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "replace-stale-c4-wording",
+          "title": "Remplacer la référence C4 obsolète dans l’index documentaire",
+          "status": "TODO",
+          "acceptance": [
+            "docs/README.md cite l’IR Archify comme source d’architecture"
+          ],
+          "files": [
+            "docs/README.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
+    }
+  ]
 }

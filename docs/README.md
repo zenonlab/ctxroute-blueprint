@@ -12,7 +12,8 @@ This repository is a GitHub starter. Discovery documents remain guides while `.p
 6. Replace guides with real project documentation and change the configuration to `initialized`.
 
 Initialization fails if a decision, source directory, code extension, mutation
-choice, or required C4 diagram is missing.
+choice, or required architecture evidence is missing. The versioned Archify JSON
+IR is the architecture source of truth.
 
 ## Structure
 
