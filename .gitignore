@@ -3,6 +3,7 @@ node_modules/
 .agents/skills/
 .claude/skills/
 .ctxroute/state/
+ci-summary.md
 .claude/hooks/docs/adr-memory/
 coverage/
 dist/

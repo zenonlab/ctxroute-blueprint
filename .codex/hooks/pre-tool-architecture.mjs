@@ -38,7 +38,10 @@ if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateComm
   block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
 }
 if (isShellTool(toolName) && config.status === 'initialized' && isDirectMutationCommand(command)) {
-  block('Write blocked: use a traceable editing tool for project files; direct shell writes cannot verify associated C4 documents and ADRs.');
+  block('Write blocked: use a traceable editing tool for project files; direct shell writes cannot verify associated Archify evidence and ADRs.');
+}
+if (paths.includes('.project/project-config.json') && /["']status["']\s*:\s*["']initialized["']/u.test(addedContent(toolInput))) {
+  block('Write blocked: use npm run initialize to transition the blueprint; status must not be changed manually.');
 }
 
 if (!paths.length) {
@@ -80,7 +83,7 @@ if (config.status === 'template') {
     block([
       'Write blocked: the project is still in template mode.',
       `Product files: ${projectPaths.join(', ')}`,
-      'Complete the brief, decisions, C4 diagrams, and quality strategy, then set the configuration to initialized before writing product code.',
+      'Complete the brief, decisions, Archify architecture evidence, and quality strategy, then set the configuration to initialized before writing product code.',
     ]);
   }
   process.exit(0);
@@ -101,7 +104,7 @@ if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
   block([
     'Write blocked: structural change has no associated diagram.',
     `Files: ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}`,
-    'Update a C4, components, or flows document in the same change.',
+    'Update the Archify source or a components/flows document in the same change.',
   ]);
 }
 
@@ -167,6 +170,13 @@ function isSafeTemplateCommand(value) {
     if (/^find\b[^\n]*\s-(?:delete|exec)\b/iu.test(unquotedText(line))) return false;
     if (/^npm\s+install\b/u.test(line)) return line === 'npm install --package-lock-only --ignore-scripts';
     if (/^git\s+switch(?:\s+-c)?\s+[A-Za-z0-9._/-]+$/u.test(line)) return true;
+    if (/^npm\s+run\s+(?:workspace:check|governance:check|progress:read)$/u.test(line)) return true;
+    if (line === 'npm run initialize') return true;
+    if (/^npm\s+run\s+validate:coherence$/u.test(line)) return true;
+    if (/^sh\s+-n\s+\.githooks\/(?:pre-commit|pre-push|commit-msg)(?:\s+\.githooks\/(?:pre-commit|pre-push|commit-msg))*$/u.test(line)) return true;
+    if (/^npm\s+run\s+progress:validate\s+--\s+[A-Za-z0-9._/-]+$/u.test(line)) return true;
+    if (/^npm\s+run\s+sensor\s+--\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
+    if (/^node\s+\.githooks\/sensor\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
     return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|fetch|pull|clone|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
   });
 }

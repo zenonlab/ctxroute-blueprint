@@ -39,3 +39,7 @@ Governance is explicit and testable. Some actions require an extra approval
 step, while existing infrastructure remains reusable and unchanged. The
 policy is versioned as JSON and evaluated by a short-lived Node.js CLI; it does
 not grant access to memory or MCP/A2A providers by itself.
+
+Successful hook validations are silent. Lifecycle context is bounded; blocking
+Sensor diagnostics remain visible while full reports belong in CI or local
+validation output.

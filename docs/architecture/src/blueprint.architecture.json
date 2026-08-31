@@ -4,7 +4,7 @@
   "meta": {
     "title": "CTXRoute Blueprint Transition Infrastructure",
     "quality_profile": "showcase",
-    "viewBox": [1300, 950],
+    "viewBox": [1300, 1100],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged while governance boundaries constrain agent side effects." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
@@ -42,12 +42,19 @@
     { "id": "progressCore", "type": "backend", "label": "Progress core", "sublabel": "Validate / approve / atomic write", "pos": [300, 800], "size": [200, 66] },
     { "id": "progressJson", "type": "database", "label": "Progress JSON", "sublabel": ".project/progress.json source", "pos": [560, 800], "size": [200, 66] },
     { "id": "progressView", "type": "frontend", "label": "Progress Markdown", "sublabel": "Generated short view", "pos": [820, 800], "size": [200, 66] },
-    { "id": "progressInterfaces", "type": "backend", "label": "CLI + MCP", "sublabel": "Shared read/validate/approve", "pos": [40, 800], "size": [200, 66] }
+    { "id": "progressInterfaces", "type": "backend", "label": "CLI + MCP", "sublabel": "Shared read/validate/approve", "pos": [40, 800], "size": [200, 66] },
+    { "id": "initializer", "type": "security", "label": "Controlled initializer", "sublabel": "Checks decisions before status transition", "pos": [40, 900], "size": [220, 66] },
+    { "id": "bootstrap", "type": "backend", "label": "Bootstrap setup", "sublabel": "Node 22 / npm 10 / idempotent", "pos": [40, 1000], "size": [180, 66] },
+    { "id": "codespaces", "type": "cloud", "label": "GitHub Codespaces", "sublabel": "devcontainer post-create", "pos": [270, 980], "size": [190, 66] },
+    { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "CI on push and pull request", "pos": [520, 980], "size": [190, 66] },
+    { "id": "ciArtifacts", "type": "database", "label": "CI artifacts", "sublabel": "Archify / Sensor / summary", "pos": [760, 980], "size": [190, 66] },
+    { "id": "docsPublish", "type": "frontend", "label": "Manual docs publication", "sublabel": "Archify artifact only", "pos": [1000, 980], "size": [200, 66] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "documentContracts", "uiContract", "sensor", "postToolUse", "sensorAdapters"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
-    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressInterfaces"] }
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressInterfaces"] },
+    { "kind": "region", "label": "Installation and CI boundary", "wraps": ["bootstrap", "initializer", "codespaces", "githubActions", "ciArtifacts", "docsPublish"] }
   ],
   "connections": [
     { "id": "agents-dispatch", "from": "agents", "to": "lifecycle", "label": "lifecycle events", "variant": "emphasis", "labelAt": [230, 300] },
@@ -71,11 +78,12 @@
     { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope, revision, and overlap", "variant": "security", "labelAt": [1125, 400] },
     { "id": "interfaces-core", "from": "progressInterfaces", "to": "progressCore", "label": "shared operations", "labelAt": [270, 880] },
     { "id": "core-json", "from": "progressCore", "to": "progressJson", "label": "atomic approved write", "variant": "security", "labelAt": [530, 880] },
-    { "id": "core-view", "from": "progressCore", "to": "progressView", "label": "generate view", "fromSide": "bottom", "toSide": "bottom", "via": [[400, 900], [920, 900]], "labelAt": [660, 920] }
+    { "id": "core-view", "from": "progressCore", "to": "progressView", "label": "generate view", "fromSide": "bottom", "toSide": "bottom", "via": [[400, 900], [920, 900]], "labelAt": [660, 920] },
+    { "id": "initialize-bootstrap", "from": "initializer", "to": "bootstrap", "fromSide": "bottom", "toSide": "top" }
   ],
   "cards": [
     { "dot": "cyan", "title": "Versioned", "items": ["Architecture JSON IR", "Rules and lockfiles", "No generated HTML"] },
     { "dot": "emerald", "title": "Reproducible", "items": ["Exact npm versions", "Archify tag and hashes", "Node.js 22 CI on three operating systems"] },
-    { "dot": "rose", "title": "Bounded", "items": ["Single-flight CRG updates", "Explicit Sensor paths", "No runtime proof claim"] }
+    { "dot": "rose", "title": "Bounded", "items": ["Single-flight CRG updates", "Explicit Sensor paths", "Silent successful hooks and capped context", "No runtime proof claim"] }
   ]
 }

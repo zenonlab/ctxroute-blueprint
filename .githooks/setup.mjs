@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const checkOnly = process.argv.includes('--check');
 const npmCli = process.env.npm_execpath;
@@ -8,15 +9,19 @@ if (!npmCli) fail('Run setup through npm: npm run setup');
 
 const npmVersion = capture(process.execPath, [npmCli, '--version']);
 requireVersion('npm', npmVersion, 10);
-capture('git', ['--version']);
+const gitVersion = capture('git', ['--version']);
+console.log(`Setup prerequisites: Node.js ${process.versions.node}, npm ${npmVersion}, ${gitVersion}.`);
+if (!existsSync('package-lock.json')) fail('package-lock.json is required; run npm install to create it.');
+console.log('Lockfile: package-lock.json found.');
 
 if (checkOnly) {
   console.log(`Setup prerequisites are available: Node.js ${process.versions.node}, npm ${npmVersion}.`);
   process.exit(0);
 }
 
-run('Install pinned dependencies', process.execPath, [npmCli, 'ci']);
+run('Install pinned dependencies (CTXRoute + Archify restore via postinstall)', process.execPath, [npmCli, 'ci']);
 run('Enable repository Git hooks', 'git', ['config', 'core.hooksPath', '.githooks']);
+run('Verify Git hooks activation', 'git', ['config', '--get', 'core.hooksPath']);
 run('Validate the complete starter', process.execPath, [npmCli, 'run', 'validate']);
 
 console.log('CTXRoute Blueprint setup is complete.');

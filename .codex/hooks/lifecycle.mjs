@@ -14,6 +14,9 @@ export const lifecycleEvents = [
   'Stop',
 ];
 
+const MAX_CONTEXT_LENGTH = 4096;
+const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
+
 export function handlerPlan(harness, event, root = projectRoot) {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
   const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
@@ -43,11 +46,11 @@ export function mergeOutputs(event, outputs, notices = []) {
       if (key === 'hookSpecificOutput' || key === 'systemMessage') continue;
       merged[key] = value;
     }
-    if (typeof output.systemMessage === 'string' && output.systemMessage.trim()) systemMessages.push(output.systemMessage.trim());
+    if (typeof output.systemMessage === 'string' && output.systemMessage.trim()) systemMessages.push(limit(output.systemMessage.trim(), MAX_SYSTEM_MESSAGE_LENGTH));
     if (output.hookSpecificOutput && typeof output.hookSpecificOutput === 'object') {
       for (const [key, value] of Object.entries(output.hookSpecificOutput)) {
         if (key === 'additionalContext') {
-          if (typeof value === 'string' && value.trim()) contexts.push(value.trim());
+          if (typeof value === 'string' && value.trim()) contexts.push(limit(value.trim(), MAX_CONTEXT_LENGTH));
         } else {
           hookSpecificOutput[key] = value;
         }
@@ -55,13 +58,18 @@ export function mergeOutputs(event, outputs, notices = []) {
     }
   }
 
-  if (contexts.length) hookSpecificOutput.additionalContext = contexts.join('\n\n');
+  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), MAX_CONTEXT_LENGTH);
   if (Object.keys(hookSpecificOutput).length) {
     hookSpecificOutput.hookEventName ??= event;
     merged.hookSpecificOutput = hookSpecificOutput;
   }
   if (systemMessages.length) merged.systemMessage = systemMessages.join(' · ');
   return Object.keys(merged).length ? merged : null;
+}
+
+function limit(value, maximum) {
+  if (value.length <= maximum) return value;
+  return `${value.slice(0, maximum - 32)}\n[… contexte tronqué …]`;
 }
 
 export function isBlocking(output) {

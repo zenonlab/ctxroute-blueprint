@@ -22,6 +22,7 @@
     "postinstall": "node .githooks/archify restore && node .githooks/postinstall.mjs",
     "setup": "node .githooks/setup.mjs",
     "setup:check": "node .githooks/setup.mjs --check",
+    "initialize": "node .githooks/initialize.mjs",
     "test": "node --test tests/*.test.mjs",
     "validate:architecture": "node .githooks/archify validate && node .githooks/validate-architecture.mjs --all",
     "build:docs": "node .githooks/archify build",
@@ -40,6 +41,9 @@
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",
     "validate:ui": "node .githooks/validate-ui-design.mjs",
+    "validate:coherence": "node scripts/check-coherence.mjs",
+    "check:coherence": "node scripts/check-coherence.mjs",
+    "ci:summary": "node scripts/ci-summary.mjs",
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm test"
   },

@@ -1,44 +1,63 @@
 # Project brief
 
+This repository is the stack-neutral CTXRoute blueprint itself. It is not a
+product project and must not initialize a frontend, backend, storage, or cloud
+deployment by default. Product decisions remain placeholders for a derived
+repository.
+
 ## Summary
 
-- Name: CTXRoute Blueprint transition infrastructure
-- Problem solved: provide reproducible workspace coordination, bounded CRG updates, and explicit agent governance around existing blueprint tooling.
-- Users: contributors and coding agents working in the three-repository workspace.
-- In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, the extensible multilingual PostToolUse Sensor, and the local progress checklist core with CLI/MCP adapters.
-- Out of scope: changing CTXRoute, replacing Archify, a persistent Python service, and imposing Sensor rules on derived products.
-- UI contract: provide framework-neutral tokens, component roles, states, accessibility expectations, and reuse guidance; framework-specific implementation remains a derived-product decision.
+- Name: `[project name]`
+- Problem solved: `[the user or business problem]`
+- Users: `[primary users, operators, and stakeholders]`
+- In scope: `[capabilities delivered by this project]`
+- Out of scope: `[explicit exclusions and future work]`
+- Product shape: `[CLI, library, web app, mobile app, worker, pipeline, or other]`
+
+## Discovery context
+
+- Expected usage and traffic: `[users, concurrency, latency, availability]`
+- Data and lifecycle: `[data types, volume, retention, consistency, recovery]`
+- Integrations: `[APIs, devices, browsers, queues, files, providers]`
+- Team and ownership: `[skills, operators, support model, delivery cadence]`
+- Risk and compliance: `[privacy, regulatory, abuse, loss, and availability risks]`
+- Deployment environments: `[local, cloud, on-premises, edge, mobile, or mixed]`
+- Expected change: `[UI, domain, integration, data, or scale changes]`
 
 ## Constraints
 
-- Performance: coalesce file events, allow one CRG update at a time, terminate each subprocess after completion, and keep memory bounded for Apple Silicon and CI runners.
-- Progress: keep `.project/progress.json` under 64 KiB, with at most 20 goals, 30 steps per goal, and 10 evidence references per step; use atomic writes and short references only.
-- Security: no dynamic evaluation or shell interpolation; validate paths, use fixed argument vectors, avoid secrets in diagnostics, and preserve ASK/NEVER/ALWAYS escalation boundaries.
-- Reliability: recover from failed updates, handle SIGINT/SIGTERM, close SQLite connections cleanly, and keep the blueprint usable when CRG is unavailable.
-- Platform: Node.js 22/npm 10; Linux, macOS, and Windows; no daemon or hosted service.
+- Performance: `[budgets, latency, throughput, memory, and scale limits]`
+- Security: `[trust boundaries, identity, secrets, abuse cases, and verification]`
+- Reliability: `[availability, failure recovery, backup, and graceful shutdown]`
+- Platform: `[supported operating systems, devices, runtimes, and browsers]`
+- Delivery: `[release, migration, rollback, and support constraints]`
+
+## Template-provided baseline
+
+The blueprint supplies repository governance, architecture evidence, optional
+CTXRoute context routing, Archify documentation validation, and a Sensor for
+static diagnostics. These are tooling constraints of the template, not product
+architecture choices. A derived project may keep, adapt, or remove them during
+the approved initialization and cleanup process.
 
 ## Decisions
 
-- Language and runtime: JavaScript ES modules on Node.js 22; Python only through ephemeral `uvx`.
-- Frontend: none; Archify HTML is documentation output.
-- Backend: none; behavior is local CLI/workspace orchestration.
-- Storage: local SQLite configured with WAL for CRG state; no remote persistence.
-- Tests: Node.js built-in test runner for unit, integration, contract, and performance checks.
-- Deployment: source repository and GitHub Actions only; no production deployment.
-- Observability: stable JSON diagnostics plus bounded lifecycle logs without secrets.
-- Post-hook analysis: AST adapters cover JS/TS/JSX/TSX and Python; embedded/lexical adapters cover SQL, HTML, CSS, Vue/Svelte, 53 common source extensions, 18 data/config extensions, plus Dockerfile/Makefile/Justfile and `.env` names. The Sensor also reports high-confidence XSS, SSRF, path traversal, prototype pollution, weak crypto, open redirects, UI layering, and anti-slop findings, with optional SARIF output. All adapters share one Sensor engine; CTXRoute injects guidance and SQLite records recurrence without activating hooks. Lexical registration is coverage visibility, not a grammar or type-analysis guarantee.
-- SQL policy: configured DB sinks are checked across JS/TS/Python; optional result-size `LIMIT`, mutation predicates, and request-scoped request-rate guards are distinct configurable checks. `LIMIT` bounds returned rows; `rateLimit`/`throttle` bounds requests. Runtime enforcement, effective quotas, schema/dialect validation, and query allowlists remain product responsibilities. Multi-file resolution is bounded to explicit scan paths; package and whole-program analysis are out of scope.
-- Template/framework coverage: Ruby/Rails source and ERB/Haml/Slim, plus common server-rendered template families, use explicit lexical or embedded adapters; framework-specific enforcement remains opt-in and does not select a product stack.
-- Diagnostic precision: every finding identifies its producing adapter and repeated identical findings are deduplicated deterministically. Blade PHP extraction is bounded and lexical; it is not a PHP AST or whole-program guarantee.
-- Optional parsing: derived products may provide `tree-sitter-ruby` or `tree-sitter-php`; the Sensor detects availability, runs AST syntax/complexity checks alongside lexical rules, and never treats an unavailable optional parser as a safe result.
-- Progress checklist: CLI and MCP call one shared core; validation is read-only, approval is explicit, `.project/progress.json` is authoritative, and `docs/progress.md` is generated.
+- Language: `[choice and reason]`
+- Runtime: `[choice, supported versions, and lifecycle policy]`
+- Frontend: `[choice or explicitly none, with user-flow evidence]`
+- Backend: `[choice or explicitly none, with trust-boundary evidence]`
+- Storage: `[choice, consistency, recovery, and migration strategy]`
+- Deployment: `[environments, release, rollback, and ownership]`
+- Observability: `[logs, metrics, traces, alerts, redaction, and retention]`
+- Security: `[threat model, controls, and verification level]`
+- Performance: `[budgets and validation method]`
+
+See [`docs/01-technology-decisions.md`](01-technology-decisions.md) for the
+questions, trade-offs, and research anchors used to make these decisions.
 
 ## Success criteria
 
-- `npm ci` and root commands work from a clean clone on Node.js 22.
-- Workspace packages are discoverable through npm workspaces without changing blueprint status semantics.
-- File events produce at most one bounded CRG subprocess per coalesced update and leave no persistent Python process.
-- SQLite uses WAL and closes cleanly on success, failure, and signal.
-- Governance rules make ASK, NEVER, and ALWAYS decisions explicit and auditable.
-- PostToolUse returns schema-versioned SAFE/WARN/UNSAFE/ERROR diagnostics plus explicit coverage metadata; UNSAFE/ERROR remain visible to validation and Git controls. A SAFE result is not runtime proof.
-- Architecture, tests, Sensor diagnostics, and Linux/macOS/Windows CI remain green.
+- `[observable product outcome]`
+- `[quality and security acceptance criteria]`
+- `[operational readiness and recovery criteria]`
+- `[architecture, tests, and cross-platform CI evidence]`

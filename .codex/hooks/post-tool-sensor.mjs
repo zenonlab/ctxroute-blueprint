@@ -15,10 +15,14 @@ if (input) {
     .map(({ path }) => path);
   if (supported.length) {
     const result = analyzePaths(supported);
-    const serialized = JSON.stringify(result);
-    const output = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `PostToolUse Sensor diagnostics:\n${serialized}` } };
-    if (result.verdict === 'UNSAFE' || result.verdict === 'ERROR') { output.decision = 'block'; output.reason = `PostToolUse Sensor ${result.verdict}: ${result.diagnostics.map(item => `${item.path}:${item.line} ${item.rule}`).join(', ')}`; }
-    process.stdout.write(JSON.stringify(output));
+    if (result.verdict !== 'SAFE') {
+      const blocking = result.verdict === 'UNSAFE' || result.verdict === 'ERROR';
+      const details = result.diagnostics.slice(0, 5).map(item => `${item.path}:${item.line} ${item.rule}`).join(', ');
+      const summary = JSON.stringify({ verdict: result.verdict, coverage: result.coverage, diagnostics: result.diagnostics.slice(0, 5) });
+      const output = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `Sensor ${result.verdict}: ${result.diagnostics.length} diagnostic(s)${details ? ` — ${details}` : ''}\n${summary.slice(0, 3500)}` } };
+      if (blocking) { output.decision = 'block'; output.reason = `PostToolUse Sensor ${result.verdict}: ${details}`; }
+      process.stdout.write(JSON.stringify(output));
+    }
   }
 }
 

@@ -89,6 +89,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   console.log('Codex local step: open /hooks and approve the six workspace definitions.');
   const globalHooks = inspectGlobalCtxrouteHooks();
   if (globalHooks.length) {
-    console.warn(`Warning: ${globalHooks.length} global CTXRoute hook(s) were found in Codex config. Disable the legacy global definitions after approving this workspace to avoid duplicate runs and latency.`);
+    console.warn(`Warning: ${globalHooks.length} global CTXRoute hook(s) were found in Codex config. Local project hooks are valid, but the global definitions will run in addition and may cause duplicate output. Disable the legacy global definitions manually after approving this workspace.`);
   }
 }
