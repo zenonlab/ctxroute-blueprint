@@ -7,6 +7,7 @@
 - Users: contributors and coding agents working in the three-repository workspace.
 - In scope: npm workspace foundation, Node.js watcher, ephemeral `uvx code-review-graph update`, SQLite/WAL lifecycle, resource/error/concurrency controls, governance boundaries, architecture evidence, and the extensible multilingual PostToolUse Sensor.
 - Out of scope: changing CTXRoute, replacing Archify, a persistent Python service, and imposing Sensor rules on derived products.
+- UI contract: provide framework-neutral tokens, component roles, states, accessibility expectations, and reuse guidance; framework-specific implementation remains a derived-product decision.
 
 ## Constraints
 

@@ -19,6 +19,6 @@ if (failures.length) { console.error([...new Set(failures)].join('\n')); process
 console.log(JSON.stringify({ decisions: adrs.length, scopes: adrs.reduce((count, adr) => count + (adr.metadata?.scope?.length ?? 0), 0) }));
 
 function stagedFiles() {
-  try { return execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean).map(normalizePath); }
+  try { return execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=M', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean).map(normalizePath); }
   catch { return []; }
 }

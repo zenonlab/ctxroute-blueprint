@@ -44,6 +44,14 @@
       "format": "json",
       "source": ".project/sensor-rules.json",
       "requiredKeys": ["schemaVersion", "dangerousCommands", "sql"]
+    },
+    {
+      "id": "ui-design-contract",
+      "kind": "ui-contract",
+      "format": "json",
+      "source": ".project/ui-design-contract.json",
+      "narrative": "docs/ui-design-contract.md",
+      "requiredKeys": ["schemaVersion", "policy", "tokens", "components", "rules", "adapters"]
     }
   ]
 }

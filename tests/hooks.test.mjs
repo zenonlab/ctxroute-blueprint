@@ -345,6 +345,17 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.match(result.stdout, /Project governance/u);
 });
 
+test('CTXRoute injects UI contract guidance for conventional product UI paths', () => {
+  const session = `ui-contract-${process.pid}-${Date.now()}`;
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: 'src/Button.tsx' } }),
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /UI design contract/u);
+});
+
 test('CTXRoute wrapper directs missing installations to npm install', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'ctxroute-wrapper-'));
   const hookDirectory = join(cwd, '.codex/hooks');

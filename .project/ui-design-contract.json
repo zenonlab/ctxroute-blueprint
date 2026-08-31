@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "policy": "framework-neutral",
+  "tokens": {
+    "color": ["color.surface", "color.text", "color.primary", "color.danger"],
+    "spacing": ["space.1", "space.2", "space.3", "space.4", "space.6", "space.8"],
+    "typography": ["type.body", "type.label", "type.heading"],
+    "radius": ["radius.sm", "radius.md", "radius.lg"],
+    "motion": ["motion.standard", "motion.reduced"]
+  },
+  "components": [
+    { "id": "action", "role": "trigger an operation", "anatomy": ["label", "icon"], "variants": ["primary", "secondary", "danger", "quiet"], "states": ["default", "hover", "focus", "disabled", "busy"], "slots": [], "accessibility": ["name", "keyboard", "focus-visible"], "tokenPolicy": "tokens-only" },
+    { "id": "field", "role": "collect one value", "anatomy": ["label", "control", "hint", "error"], "variants": ["text", "select", "choice"], "states": ["empty", "filled", "focused", "disabled", "invalid", "valid"], "slots": ["label", "hint", "error"], "accessibility": ["label", "description", "error-association", "keyboard"], "tokenPolicy": "tokens-only" },
+    { "id": "surface", "role": "group related content", "anatomy": ["content", "header", "footer"], "variants": ["plain", "raised", "outlined"], "states": ["default", "interactive", "disabled"], "slots": ["header", "content", "footer"], "accessibility": ["landmark-when-needed", "reading-order"], "tokenPolicy": "tokens-only" },
+    { "id": "dialog", "role": "interrupt with focused content", "anatomy": ["title", "description", "content", "actions", "dismiss"], "variants": ["default", "alert"], "states": ["closed", "open", "focus", "busy"], "slots": ["title", "description", "content", "actions"], "accessibility": ["label", "focus-management", "escape", "inert-background"], "tokenPolicy": "tokens-only" }
+  ],
+  "rules": { "reuseBeforeCreate": true, "noArbitraryValues": true, "noInlineStyle": true, "noLayerFusion": true, "requiredEvidence": ["component-usage", "token-usage", "accessibility-review"], "allowedCustomComponents": "documented-with-rationale" },
+  "adapters": { "framework": "selected-by-derived-product", "required": false, "contractOnly": true }
+}
