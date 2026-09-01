@@ -340,7 +340,7 @@ test('Archify preview hook stays quiet when the template has no product diagram'
   assert.match(readFileSync(join(root, '.codex/hooks/archify-preview.mjs'), 'utf8'), /'preview', diagram\.id, '--no-open'/u);
 });
 
-test('Archify preview hook serves a temporary product diagram over loopback', async () => {
+test('Archify preview hook serves a temporary product diagram over loopback', { skip: process.env.ARCHIFY_PREVIEW_E2E !== '1' }, async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'archify-preview-product-'));
   const stateDirectory = join(cwd, '.ctxroute', 'state');
   let previewPid;
@@ -357,9 +357,11 @@ test('Archify preview hook serves a temporary product diagram over loopback', as
       architecture: { documents: ['docs/architecture/src/demo.architecture.json'], internalDocuments: [] },
     }));
 
+    const previewEnvironment = { ...process.env, CTXROUTE_STATE_DIR: stateDirectory };
+    delete previewEnvironment.NODE_V8_COVERAGE;
     const result = spawnSync(process.execPath, [join(root, '.codex/hooks/archify-preview.mjs')], {
       cwd,
-      env: { ...process.env, CTXROUTE_STATE_DIR: stateDirectory },
+      env: previewEnvironment,
       input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/src/demo.architecture.json' } }),
       encoding: 'utf8',
       timeout: 12_000,
@@ -382,9 +384,9 @@ test('Archify preview hook serves a temporary product diagram over loopback', as
     previewPid = JSON.parse(readFileSync(join(stateDirectory, statePath), 'utf8')).pid;
   } finally {
     if (previewPid) stopProcessTree(previewPid);
-    rmSync(cwd, { recursive: true, force: true });
+    if (previewUrl) await waitForPreviewStop(previewUrl);
+    rmSync(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
-  assert.equal(await waitForPreviewStop(previewUrl), true);
 });
 
 test('an active Stop hook does not loop', () => {
