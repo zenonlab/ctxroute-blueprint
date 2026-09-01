@@ -23,7 +23,7 @@ export function loadProjectConfig(cwd = process.cwd()) {
   return { config, failures: validateProjectConfig(config, cwd, policy) };
 }
 
-export function validateProjectConfig(config, cwd = process.cwd(), policy = { supportedStatuses: ['template', 'initialized'] }) {
+export function inspectProjectConfig(config, cwd = process.cwd(), policy = { supportedStatuses: ['template', 'initialized'] }) {
   const failures = [];
   const statuses = policy.supportedStatuses ?? ['template', 'initialized'];
   if (config.schemaVersion !== 1) failures.push('schemaVersion must equal 1');
@@ -43,10 +43,16 @@ export function validateProjectConfig(config, cwd = process.cwd(), policy = { su
     ['directories.tests', config.directories?.tests],
     ['directories.generated', config.directories?.generated],
     ['architecture.documents', config.architecture?.documents],
+    ['architecture.internalDocuments', config.architecture?.internalDocuments],
     ['starter.infrastructureRoots', config.starter?.infrastructureRoots],
     ['starter.rootFiles', config.starter?.rootFiles],
   ];
   for (const [name, values] of pathCollections) validatePaths(name, values, failures);
+  const productDocuments = config.architecture?.documents ?? [];
+  const internalDocuments = config.architecture?.internalDocuments ?? [];
+  for (const document of productDocuments) {
+    if (internalDocuments.includes(document)) failures.push(`architecture document cannot be both product and internal: ${document}`);
+  }
   if (config.status === 'template') validateStarterStructure(config, cwd, failures);
   if (!Array.isArray(config.codeExtensions)) failures.push('codeExtensions must be an array');
   else if (config.codeExtensions.some(extension => typeof extension !== 'string' || !/^\.[a-z0-9][a-z0-9.+-]*$/iu.test(extension))) failures.push('codeExtensions must contain extensions such as .ts or .rb');
@@ -66,6 +72,7 @@ export function validateProjectConfig(config, cwd = process.cwd(), policy = { su
     }
     if (!Array.isArray(config.directories?.source) || config.directories.source.length === 0) failures.push('directories.source must be set after initialization');
     if (!Array.isArray(config.codeExtensions) || config.codeExtensions.length === 0) failures.push('codeExtensions must be set after initialization');
+    if (!Array.isArray(config.architecture?.documents) || config.architecture.documents.length === 0) failures.push('architecture.documents must declare at least one product diagram after initialization');
     if (!['required', 'recommended', 'not-applicable'].includes(mutation?.decision)) failures.push('quality.mutation.decision must be required, recommended, or not-applicable after initialization');
     for (const document of config.architecture?.documents ?? []) {
       if (!existsSync(resolve(cwd, document))) failures.push(`Missing architecture document: ${document}`);
@@ -74,6 +81,8 @@ export function validateProjectConfig(config, cwd = process.cwd(), policy = { su
 
   return [...new Set(failures)];
 }
+
+export const validateProjectConfig = inspectProjectConfig;
 
 export function normalizePath(path, cwd = process.cwd()) {
   if (typeof path !== 'string') return '';
@@ -116,6 +125,8 @@ export function isContractPath(path, config) {
 
 export function isArchitectureEvidence(path, config) {
   if ((config.architecture?.documents ?? []).includes(path)) return true;
+  if ((config.architecture?.internalDocuments ?? []).includes(path)) return true;
+  if (/^docs\/architecture\/src\/.+\.json$/iu.test(path)) return true;
   return /^docs\/architecture\/(?:components|flows)\/(?!README\.md$).+\.(?:md|mmd)$/iu.test(path);
 }
 

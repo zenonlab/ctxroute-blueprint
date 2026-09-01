@@ -5,10 +5,20 @@
     {
       "id": "architecture",
       "kind": "architecture-ir",
+      "audience": "internal",
       "format": "archify-json-ir",
       "source": "docs/architecture/src/blueprint.architecture.json",
       "narrative": "docs/architecture/README.md",
       "validator": "npm run validate:architecture"
+    },
+    {
+      "id": "traffic-dataflow",
+      "kind": "traffic-dataflow-ir",
+      "audience": "internal",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/traffic.dataflow.json",
+      "narrative": "docs/architecture/README.md",
+      "validator": "node .githooks/archify validate internal"
     },
     {
       "id": "project-brief",

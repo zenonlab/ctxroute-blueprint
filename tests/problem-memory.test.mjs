@@ -146,7 +146,7 @@ test('generated CTXRoute rules inject only for the declared tool and scope', () 
     CTXROUTE_FILEDOCS_DIR: join(directory, '.claude/hooks/docs'),
     CTXROUTE_STATE_DIR: join(directory, 'state'),
   };
-  const run = toolInput => spawnSync(process.execPath, [hook, '--budget', '0'], {
+  const run = toolInput => spawnSync(process.execPath, [hook, '--budget', '3500'], {
     cwd: directory,
     env: environment,
     input: JSON.stringify({ session_id: `proof-${Date.now()}`, cwd: directory, tool_name: 'Edit', tool_input: toolInput }),
@@ -158,7 +158,7 @@ test('generated CTXRoute rules inject only for the declared tool and scope', () 
   const homonym = run({ file_path: 'package.json' });
   assert.equal(homonym.status, 0, homonym.stderr);
   assert.doesNotMatch(homonym.stdout, /Check the lockfile/u);
-  const wrongTool = spawnSync(process.execPath, [hook, '--budget', '0'], {
+  const wrongTool = spawnSync(process.execPath, [hook, '--budget', '3500'], {
     cwd: directory,
     env: environment,
     input: JSON.stringify({ session_id: `proof-wrong-${Date.now()}`, cwd: directory, tool_name: 'Write', tool_input: { file_path: 'package-lock.json' } }),

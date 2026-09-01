@@ -1,13 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import process from 'node:process';
+import { archifyOutput, productDiagramViolations, selectArchifyDiagrams } from '../scripts/archify-registry.mjs';
 
 const root = resolve(process.cwd());
 const skill = join(root, '.agents', 'skills', 'archify');
 const cli = join(skill, 'bin', 'archify.mjs');
-const source = architectureSource();
-const output = join(root, 'dist', 'architecture', `${basename(source, '.json')}.html`);
 const command = process.argv[2] ?? 'verify';
 if (command === 'restore') {
   const lockPath = join(root, 'skills-lock.json');
@@ -19,10 +18,7 @@ if (command === 'restore') {
   run(process.execPath, [cli, 'doctor']);
 }
 else if (command === 'verify') { verify(); run(process.execPath, [cli, 'doctor']); }
-else if (command === 'validate') { verify(); run(process.execPath, [cli, 'validate', 'architecture', source, '--quality', 'showcase', '--json']); }
-else if (command === 'build') { verify(); run(process.execPath, [cli, 'deliver', 'architecture', source, output, '--quality', 'showcase', '--json']); }
-else if (command === 'visual-check') { verify(); run(process.execPath, [cli, 'visual-check', output, '--json']); }
-else if (command === 'preview') { verify(); run(process.execPath, [cli, 'preview', 'architecture', source, output, '--quality', 'showcase']); }
+else if (['validate', 'build', 'visual-check', 'preview'].includes(command)) { verify(); executeDiagrams(command, process.argv[3] ?? 'all'); }
 else if (command === 'updates') { verify(); run(process.execPath, [join(skill, 'scripts', 'check-update.mjs')]); }
 else fail(`Unknown Archify command: ${command}`);
 
@@ -46,17 +42,29 @@ function verifyInstalled(pin, remote = false) {
     if (!hashes.includes(pin.tagObject) || !hashes.includes(pin.commit)) fail('Archify remote tag object or peeled commit does not match the reviewed pin.');
   }
 }
-function architectureSource() {
-  const fallback = 'docs/architecture/src/blueprint.architecture.json';
-  let configured;
-  try {
-    const config = JSON.parse(readFileSync(join(root, '.project', 'project-config.json'), 'utf8'));
-    configured = config?.architecture?.project ?? config?.architecture?.documents?.[0];
-  } catch {
-    configured = null;
+function executeDiagrams(action, selector) {
+  if (selector === 'internal' && action !== 'validate') fail('Internal blueprint diagrams are validation-only and cannot be built, previewed, or visually published.');
+  let diagrams;
+  try { diagrams = selectArchifyDiagrams(selector, root); }
+  catch (error) { fail(error.message); }
+  if (action === 'preview' && diagrams.length > 1) fail(`Preview needs one product selector. Available: ${diagrams.map(diagram => diagram.id).join(', ')}`);
+  if (!diagrams.length) {
+    if (action === 'preview') fail('No product Archify diagram exists yet. Create one under docs/architecture/src/.');
+    process.stdout.write(`${JSON.stringify({ ok: true, command: action, selector, diagrams: 0, audience: selector === 'internal' ? 'internal' : 'product' })}\n`);
+    return;
   }
-  const relative = typeof configured === 'string' && configured && existsSync(join(root, configured)) ? configured : fallback;
-  return join(root, relative);
+  for (const diagram of diagrams) {
+    const source = join(root, diagram.source);
+    const output = archifyOutput(root, diagram);
+    if (diagram.audience === 'product') {
+      const violations = productDiagramViolations(json(diagram.source));
+      if (violations.length) fail(`${diagram.source}: product diagram exposes blueprint internals: ${violations.join(', ')}`);
+    }
+    if (action === 'validate') run(process.execPath, [cli, 'validate', diagram.type, source, '--quality', 'showcase', '--json']);
+    if (action === 'build') run(process.execPath, [cli, 'deliver', diagram.type, source, output, '--quality', 'showcase', '--json']);
+    if (action === 'visual-check') run(process.execPath, [cli, 'visual-check', output, '--json']);
+    if (action === 'preview') run(process.execPath, [cli, 'preview', diagram.type, source, output, '--quality', 'showcase']);
+  }
 }
 function json(path) { try { return JSON.parse(readFileSync(join(root, path), 'utf8')); } catch { fail(`${path} is missing or invalid.`); } }
 function run(file, args) { const result = spawnSync(file, args, { cwd: root, stdio: 'inherit' }); if (result.error) fail(result.error.message); if (result.status !== 0) process.exit(result.status ?? 1); }

@@ -236,6 +236,8 @@ function initializedWorkspace() {
   config.directories.source = ['src/'];
   config.codeExtensions = ['.rb'];
   config.quality.mutation.decision = 'not-applicable';
+  config.architecture.documents = ['docs/architecture/src/blueprint.architecture.json'];
+  config.architecture.internalDocuments = [];
   writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
   return cwd;

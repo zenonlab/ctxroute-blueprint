@@ -207,9 +207,9 @@ but repository security features still require owner or organization policy.
 
 ## Architecture with Archify
 
-The versioned architecture source is
-[`docs/architecture/src/blueprint.architecture.json`](docs/architecture/src/blueprint.architecture.json).
-It is validated at Archify's `showcase` quality level.
+Product diagrams are versioned under `docs/architecture/src/` and validated at
+Archify's `showcase` quality level. Blueprint control-plane diagrams are
+maintainer-only inputs and are never included in product builds or previews.
 
 ```sh
 npm run validate:architecture
@@ -218,11 +218,24 @@ npm run archify:visual-check
 npm run preview:docs
 ```
 
-`build:docs` generates `dist/architecture/blueprint.architecture.html`;
+`build:docs` generates one HTML artifact per source under
+`dist/architecture/`. The agent chooses the Archify type that matches the
+step: `architecture` for components and boundaries, `workflow` for procedures
+and hooks, `sequence` for call traces, `dataflow` for traffic and lineage, and
+`lifecycle` for state transitions. Select a source, or use `all`:
+
+```sh
+npm run archify:validate -- dataflow
+npm run build:docs -- all
+npm run archify:visual-check -- dataflow
+npm run preview:docs -- traffic.dataflow
+```
+
 `archify:visual-check` checks containment at four desktop resolutions and
-writes screenshots, a contact sheet, and a JSON receipt beside it. Its
+writes screenshots, a contact sheet, and a JSON receipt beside each artifact. Its
 automated `visualReview` remains `pending` until human review. `preview:docs`
-builds it and starts the local interactive preview. The generated HTML is not a
+accepts one source or type selector, builds it, and starts its local interactive
+preview; when several product diagrams exist, selection is explicit. The generated HTML is not a
 source file and must not be edited manually.
 
 Archify is pinned to version `v2.16.0` in

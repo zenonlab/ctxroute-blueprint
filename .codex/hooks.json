@@ -34,7 +34,7 @@
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex PostToolUse",
             "timeout": 45,
-            "additionalContextLimit": 0
+            "additionalContextLimit": 1200
           }
         ]
       }
@@ -46,7 +46,7 @@
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex Stop",
             "timeout": 120,
-            "additionalContextLimit": 0
+            "additionalContextLimit": 1200
           }
         ]
       }
@@ -57,7 +57,8 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex UserPromptSubmit",
-            "timeout": 30
+            "timeout": 30,
+            "additionalContextLimit": 1200
           }
         ]
       }
@@ -68,7 +69,8 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex PreCompact",
-            "timeout": 15
+            "timeout": 15,
+            "additionalContextLimit": 1200
           }
         ]
       }

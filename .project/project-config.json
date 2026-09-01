@@ -52,10 +52,11 @@
   },
   "codeExtensions": [".js", ".mjs", ".json"],
   "architecture": {
-    "documents": [
-      "docs/architecture/src/blueprint.architecture.json"
-    ],
-    "project": "docs/architecture/src/blueprint.architecture.json"
+    "documents": [],
+    "internalDocuments": [
+      "docs/architecture/src/blueprint.architecture.json",
+      "docs/architecture/src/traffic.dataflow.json"
+    ]
   },
   "contracts": {
     "patterns": [

@@ -4,12 +4,13 @@ import { get as requestLoopback } from 'node:http';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { selectArchifyDiagrams } from '../../scripts/archify-registry.mjs';
 
 const root = resolve(process.cwd());
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const input = await readInput();
   if (input && isRelevantMutation(input)) {
-    const preview = await ensurePreview();
+    const preview = await ensurePreview(input);
     if (preview) {
       process.stdout.write(JSON.stringify({
         hookSpecificOutput: {
@@ -21,17 +22,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }
 }
 
-async function ensurePreview() {
+async function ensurePreview(input) {
   const stateDirectory = resolve(process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
-  const statePath = join(stateDirectory, 'archify-preview.json');
-  const source = architectureSource();
+  const diagram = selectPreviewDiagram(input, selectArchifyDiagrams('all', root));
+  if (!diagram) return null;
+  const source = diagram.source;
+  const statePath = join(stateDirectory, `archify-preview-${diagram.id}.json`);
   mkdirSync(stateDirectory, { recursive: true });
   const existing = readJson(statePath);
   if (existing?.source === source && existing?.pid && existing?.url && processAlive(existing.pid) && await isHealthy(existing.url)) return existing;
 
-  const logPath = join(stateDirectory, 'archify-preview.log');
+  const logPath = join(stateDirectory, `archify-preview-${diagram.id}.log`);
   const log = openSync(logPath, 'a');
-  const child = spawn(process.execPath, ['.githooks/archify', 'preview'], {
+  const child = spawn(process.execPath, ['.githooks/archify', 'preview', diagram.id], {
     cwd: root,
     detached: true,
     stdio: ['ignore', log, log],
@@ -51,6 +54,14 @@ async function ensurePreview() {
   }
   appendFileSync(logPath, `\nArchify preview hook timeout for pid ${child.pid}.\n`);
   return null;
+}
+
+export function selectPreviewDiagram(input, diagrams) {
+  if (!Array.isArray(diagrams) || diagrams.length === 0) return null;
+  const mutation = JSON.stringify(input?.tool_input ?? {});
+  const matching = diagrams.filter(diagram => mutation.includes(diagram.source) || mutation.includes(diagram.id));
+  if (matching.length === 1) return matching[0];
+  return diagrams.length === 1 ? diagrams[0] : null;
 }
 
 function isRelevantMutation(value) {
@@ -75,17 +86,6 @@ export function normalizePreviewUrl(value) {
     return url.href;
   } catch {
     return null;
-  }
-}
-
-function architectureSource() {
-  const fallback = 'docs/architecture/src/blueprint.architecture.json';
-  try {
-    const config = JSON.parse(readFileSync(join(root, '.project', 'project-config.json'), 'utf8'));
-    const configured = config?.architecture?.project ?? config?.architecture?.documents?.[0];
-    return typeof configured === 'string' && configured && existsSync(resolve(root, configured)) ? configured : fallback;
-  } catch {
-    return fallback;
   }
 }
 

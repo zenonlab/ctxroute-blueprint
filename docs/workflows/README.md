@@ -18,8 +18,9 @@ normal write. The handler acquires an atomic lock and runs
 Concurrent calls skip while one update is active. A 30-second timeout, bounded
 stdout/stderr, and fail-open diagnostics keep agent work responsive.
 
-SessionStart checks graph status, builds missing state, and injects one short
-instruction. PreToolUse permits generated graph maintenance and
+SessionStart checks graph status or builds missing state. A healthy graph adds
+no context; only a bounded diagnostic is emitted when CRG fails open.
+PreToolUse permits generated graph maintenance and
 `apply_refactor_tool` only with `dry_run: true`; real changes continue through
 normal editing tools and all CTXRoute/Sensor controls.
 

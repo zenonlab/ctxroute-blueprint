@@ -16,7 +16,7 @@ execFileSync('git', ['config', 'user.name', 'CRG smoke'], { cwd: fixture });
 execFileSync('git', ['add', '.'], { cwd: fixture });
 execFileSync('git', ['commit', '-qm', 'chore: fixture'], { cwd: fixture });
 
-await expectSuccess(['--version'], output => output.includes(CRG_VERSION), 'exact version');
+await expectSuccess(['--version'], output => output.trim() === `code-review-graph ${CRG_VERSION}`, 'exact version');
 await expectSuccess(['build', '--repo', fixture], null, 'fixture build');
 writeFileSync(join(fixture, 'src', 'math.py'), 'def add(left, right):\n    """Add two values."""\n    return left + right\n');
 await expectSuccess(['update', '--repo', fixture, '--skip-flows'], null, 'incremental update');
@@ -32,20 +32,36 @@ const transport = new StdioClientTransport({
 });
 let stderr = '';
 transport.stderr?.on('data', chunk => { stderr += chunk; });
+let names;
+let schemaCharacters;
 try {
   await client.connect(transport);
   const listed = await client.listTools();
-  const names = listed.tools.map(tool => tool.name);
+  names = listed.tools.map(tool => tool.name);
+  schemaCharacters = JSON.stringify(listed.tools).length;
   if (names.length !== CRG_MCP_TOOLS.length || names.some(name => !CRG_MCP_TOOLS.includes(name))) throw new Error(`unexpected CRG tool allowlist: ${names.join(', ')}`);
+  if (schemaCharacters >= 8000) throw new Error(`CRG MCP schemas exceed 8,000 characters: ${schemaCharacters}`);
   if (!names.includes('list_graph_stats_tool')) throw new Error('official read tool list_graph_stats_tool is missing');
   const response = await client.callTool({ name: 'list_graph_stats_tool', arguments: { repo_root: fixture } });
   if (response.isError) throw new Error(`read tool failed: ${JSON.stringify(response.content)}`);
-  console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, readTool: 'list_graph_stats_tool' }));
 } catch (error) {
   throw new Error(`${error.message}${stderr ? `\nMCP stderr:\n${stderr.slice(0, 2000)}` : ''}`);
 } finally {
   await client.close();
 }
+
+const progressClient = new Client({ name: 'ctxroute-progress-budget-smoke', version: '1.0.0' });
+const progressTransport = new StdioClientTransport({ command: process.execPath, args: [resolve(root, 'scripts/progress-mcp.mjs')], cwd: fixture, stderr: 'pipe' });
+let progressSchemaCharacters;
+try {
+  await progressClient.connect(progressTransport);
+  progressSchemaCharacters = JSON.stringify((await progressClient.listTools()).tools).length;
+  if (progressSchemaCharacters >= 6000) throw new Error(`Progress MCP schemas exceed 6,000 characters: ${progressSchemaCharacters}`);
+  if (schemaCharacters + progressSchemaCharacters >= 14000) throw new Error(`Combined MCP schemas exceed 14,000 characters: ${schemaCharacters + progressSchemaCharacters}`);
+} finally {
+  await progressClient.close();
+}
+console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, schemaCharacters, progressSchemaCharacters, combinedSchemaCharacters: schemaCharacters + progressSchemaCharacters, readTool: 'list_graph_stats_tool' }));
 
 async function expectSuccess(args, predicate, label) {
   const result = await runCrgCommand({ root, args, timeoutMs: 30_000 });

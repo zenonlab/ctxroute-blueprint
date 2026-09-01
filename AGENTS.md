@@ -7,7 +7,7 @@ While `.project/project-config.json` has `"status": "template"`, before writing 
 1. Read every starter document and the complete user request.
 2. Identify goals, constraints, and genuinely missing information.
 3. Define language, runtime, frontend, backend, storage, tests, deployment, observability, security, and performance constraints in `docs/00-project-brief.md`.
-4. Produce and showcase-validate the Archify JSON IR declared by `architecture.documents`.
+4. At the end of each architecture-relevant step, produce or update the product-only Archify JSON IR that best matches the result (`architecture`, `workflow`, `sequence`, `dataflow`, or `lifecycle`) and showcase-validate it. Never expose blueprint control-plane components in a product diagram; `all` selects only product sources.
 5. Choose the test strategy in `docs/02-quality-strategy.md`.
 6. Add required ADRs under `docs/decisions/`.
 7. Remove guide comments and placeholders, record only real decisions and commands, then change `.project/project-config.json` to `initialized`.

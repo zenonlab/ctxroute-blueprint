@@ -39,7 +39,8 @@ The official graph at `.code-review-graph/graph.db` and the project virtual
 environment are ignored.
 
 CTXRoute remains the sole lifecycle dispatcher. SessionStart checks or builds
-the graph and injects a short usage instruction. Successful normal writes run
+the graph, stays silent when healthy, and emits only a bounded fail-open
+diagnostic on failure. Successful normal writes run
 one `update --skip-flows` behind a cross-process single-flight lock, a
 30-second timeout, bounded output, and fail-open diagnostics. No CRG daemon,
 watcher, generated CRG hooks, or synthetic update database is used.

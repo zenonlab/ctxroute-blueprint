@@ -28,6 +28,7 @@ test('a real stdio client lists and calls all Progress MCP tools', { skip: proce
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
+    assert.ok(JSON.stringify(listed.tools).length < 6000, 'Progress MCP schemas must remain below 6,000 characters');
     for (const name of ['progress_read', 'progress_status']) {
       const response = await client.callTool({ name, arguments: {} });
       assert.notEqual(response.isError, true, name);

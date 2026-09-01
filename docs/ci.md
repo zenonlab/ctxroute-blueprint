@@ -11,9 +11,10 @@ gate `npm run validate`, audite les dépendances et génère la documentation. L
 Sensor couvre tous les fichiers suivis du blueprint avec
 une baseline versionnée ; seules les nouvelles alertes bloquantes sont publiées
 dans GitHub code scanning. Les artefacts contiennent aussi le rapport JSON
-complet, le smoke CRG, le HTML Archify et un résumé. Sur Linux,
-`archify:visual-check` produit les captures clair/sombre, la contact sheet et le
-reçu JSON aux quatre résolutions ; le containment est bloquant tandis que
+complet, le smoke CRG et un résumé. Lorsqu'un projet déclare des diagrammes
+produit, ils contiennent également le HTML Archify et, sur Linux, les captures
+clair/sombre, la contact sheet et le reçu JSON aux quatre résolutions ; le
+containment est bloquant tandis que
 `visualReview` reste `pending`. Les chemins et diagnostics
 exportés doivent rester exempts de secrets.
 

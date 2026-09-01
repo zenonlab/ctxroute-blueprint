@@ -21,7 +21,7 @@ function validateRequiredArchitecture() {
   for (const file of config?.architecture?.documents ?? []) if (!existsSync(file)) failures.push(`${file}: required architecture source is missing`);
 }
 
-function validateDocumentContracts() {
+export function validateDocumentContracts() {
   const manifest = readJson('docs/document-contracts.json');
   if (!manifest) return;
   if (manifest.schemaVersion !== 1 || manifest.policy !== 'schema-first' || !Array.isArray(manifest.documents) || !manifest.documents.length) {
@@ -37,11 +37,11 @@ function validateDocumentContracts() {
     ids.add(document.id);
     if (!document.source && !document.sourceGlob) failures.push(`docs/document-contracts.json: ${document.id} needs source or sourceGlob`);
     if (document.narrative && readOptionalSource(document.narrative) === null) failures.push(`${document.narrative}: narrative document contract source is missing`);
-    for (const file of document.source ? [document.source] : matchingDocuments(document.sourceGlob)) validateDocumentSource(document, file);
+    for (const file of document.source ? [document.source] : matchingDocuments(document.sourceGlob)) inspectDocumentSource(document, file);
   }
 }
 
-function validateDocumentSource(document, file) {
+export function inspectDocumentSource(document, file) {
   if (document.exclude?.includes(file)) return;
   const source = readOptionalSource(file);
   if (source === null) { failures.push(`${file}: document contract source is missing`); return; }
@@ -60,7 +60,7 @@ function validateDocumentSource(document, file) {
   if (document.format === 'archify-json-ir') {
     let parsed;
     try { parsed = JSON.parse(source); } catch { failures.push(`${file}: invalid architecture JSON IR`); return; }
-    if (parsed.schema_version !== 1 || parsed.diagram_type !== 'architecture') failures.push(`${file}: expected Archify architecture JSON IR schema_version 1`);
+    if (parsed.schema_version !== 1 || !['architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle'].includes(parsed.diagram_type)) failures.push(`${file}: expected Archify JSON IR schema_version 1 and a supported diagram type`);
   }
 }
 
