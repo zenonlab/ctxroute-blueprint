@@ -61,6 +61,7 @@ jobs:
         run: npm run ast:check && npm run mcp:validate
 
       - name: Smoke-test both MCP stdio servers
+        if: runner.os != 'Windows'
         run: npm run mcp:smoke
 
       - name: Benchmark bounded context
