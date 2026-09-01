@@ -105,8 +105,24 @@ test('allows blueprint validation commands during discovery', () => {
   }
 });
 
+test('allows CRG graph commands that only write generated graph state', () => {
+  for (const command of ['crg:build', 'crg:update', 'crg:status', 'crg:review', 'crg:mcp', 'crg:smoke']) {
+    const result = run({ cmd: `npm run ${command}` }, { toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, command);
+  }
+});
+
+test('allows CRG refactor previews and blocks real refactors', () => {
+  const preview = run({ refactor_id: 'fixture', dry_run: true }, { toolName: 'apply_refactor_tool' });
+  assert.doesNotMatch(preview.stdout, /decision":"block/u);
+  assert.match(preview.stdout, /normal editing tools/u);
+  const mutation = run({ refactor_id: 'fixture', dry_run: false }, { toolName: 'apply_refactor_tool' });
+  assert.match(mutation.stdout, /decision":"block/u);
+  assert.match(mutation.stdout, /dry_run: true/u);
+});
+
 test('keeps blueprint state mutations blocked during discovery', () => {
-  for (const cmd of ['npm run progress:approve', 'npm run progress:mcp', 'npm run crg:update', 'npm run watch:crg']) {
+  for (const cmd of ['npm run progress:approve', 'npm run progress:mcp']) {
     const result = run({ cmd }, { toolName: 'exec_command' });
     assert.match(result.stdout, /read and validation commands/u, cmd);
   }

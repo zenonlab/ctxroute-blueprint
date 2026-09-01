@@ -3,7 +3,7 @@ command = "npm"
 args = ["run", "progress:mcp"]
 cwd = "."
 
-[mcp_servers.ctxroute-context-ast]
+[mcp_servers.code-review-graph]
 command = "npm"
-args = ["run", "context:mcp"]
+args = ["run", "crg:mcp"]
 cwd = "."

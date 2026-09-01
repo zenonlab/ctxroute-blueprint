@@ -3,8 +3,10 @@
   "version": "0.0.0-blueprint",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Workspace boundary for the ephemeral code-review-graph bridge.",
+  "description": "Workspace boundary for the pinned official code-review-graph runtime.",
   "engines": { "node": ">=22.13.0" },
-  "blueprintSource": "code-review-graph",
-  "integration": "ephemeral-uvx-process"
+  "blueprintSource": "tirth8205/code-review-graph",
+  "integration": "uv-frozen-project",
+  "upstreamVersion": "2.3.8",
+  "upstreamCommit": "2c6dae32643572ee528eb9b77dbcc17f58f3a8c9"
 }

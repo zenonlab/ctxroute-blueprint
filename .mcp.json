@@ -5,10 +5,10 @@
       "command": "npm",
       "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "progress:mcp"]
     },
-    "ctxroute-context-ast": {
+    "code-review-graph": {
       "type": "stdio",
       "command": "npm",
-      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "context:mcp"]
+      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "crg:mcp"]
     }
   }
 }

@@ -17,7 +17,7 @@ test('one registry declares language, grammar, extractor, availability, and fall
 });
 
 test('the AST runtime pipeline cannot import or call LLM and network clients', () => {
-  for (const path of ['.githooks/ast-registry.mjs', '.githooks/sensor-engine.mjs', 'scripts/context-ast.mjs', 'scripts/ast-check.mjs']) {
+  for (const path of ['.githooks/ast-registry.mjs', '.githooks/sensor-engine.mjs', 'scripts/ast-check.mjs']) {
     const source = readFileSync(join(root, path), 'utf8');
     assert.doesNotMatch(source, /(?:from\s+['"](?:node:)?(?:http|https|net|tls)['"]|\bfetch\s*\(|\bOpenAI\b|\bAnthropic\b|api\.openai\.com|api\.anthropic\.com)/u, path);
   }

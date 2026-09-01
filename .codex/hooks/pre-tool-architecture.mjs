@@ -34,6 +34,17 @@ if (failures.length) {
 const toolName = String(input.tool_name ?? '');
 const command = commandText(toolInput);
 const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
+if (toolName === 'apply_refactor_tool') {
+  if (toolInput.dry_run === true) {
+    context('CRG refactor preview allowed. Apply accepted changes with normal editing tools so architecture and Sensor controls remain active.');
+    process.exit(0);
+  }
+  block('Write blocked: apply_refactor_tool is restricted to dry_run: true; use normal editing tools for real changes.');
+}
+if (isShellTool(toolName) && isCrgGraphCommand(command)) {
+  context('CRG graph maintenance allowed: generated writes are confined to .code-review-graph/.');
+  process.exit(0);
+}
 if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateCommand(command)) {
   block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
 }
@@ -170,7 +181,7 @@ function isSafeTemplateCommand(value) {
     if (/^find\b[^\n]*\s-(?:delete|exec)\b/iu.test(unquotedText(line))) return false;
     if (/^npm\s+install\b/u.test(line)) return line === 'npm install --package-lock-only --ignore-scripts';
     if (/^git\s+switch(?:\s+-c)?\s+[A-Za-z0-9._/-]+$/u.test(line)) return true;
-    if (/^npm\s+run\s+(?:workspace:check|governance:check|progress:read)$/u.test(line)) return true;
+    if (/^npm\s+run\s+(?:workspace:check|governance:check|progress:read|crg:(?:build|update|status|review|mcp|smoke))$/u.test(line)) return true;
     if (line === 'npm run initialize') return true;
     if (/^npm\s+run\s+validate:coherence$/u.test(line)) return true;
     if (/^sh\s+-n\s+\.githooks\/(?:pre-commit|pre-push|commit-msg)(?:\s+\.githooks\/(?:pre-commit|pre-push|commit-msg))*$/u.test(line)) return true;
@@ -179,6 +190,11 @@ function isSafeTemplateCommand(value) {
     if (/^node\s+\.githooks\/sensor\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
     return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|fetch|pull|clone|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
   });
+}
+
+function isCrgGraphCommand(value) {
+  const commands = splitSafeShellCommands(value);
+  return Boolean(commands?.length) && commands.every(line => /^npm\s+run\s+crg:(?:build|update|status|review|mcp|smoke)$/u.test(line));
 }
 
 function splitSafeShellCommands(value) {

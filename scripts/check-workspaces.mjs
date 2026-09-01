@@ -6,7 +6,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const expected = new Map([
   ['packages/ctxroute', 'zenonlab/ctxroute'],
   ['packages/archify', 'tt-a1i/archify'],
-  ['packages/code-review-graph', 'code-review-graph'],
+  ['packages/code-review-graph', 'tirth8205/code-review-graph'],
 ]);
 const failures = [];
 const rootPackage = await readJson(join(root, 'package.json'), 'package.json');

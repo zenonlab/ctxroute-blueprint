@@ -10,16 +10,24 @@ if (!npmCli) fail('Run setup through npm: npm run setup');
 const npmVersion = capture(process.execPath, [npmCli, '--version']);
 requireVersion('npm', npmVersion, [10, 0, 0]);
 const gitVersion = capture('git', ['--version']);
-console.log(`Setup prerequisites: Node.js ${process.versions.node}, npm ${npmVersion}, ${gitVersion}.`);
+const pythonVersion = capture('python3', ['--version']).replace(/^Python\s+/u, '');
+requireVersion('Python', pythonVersion, [3, 10, 0]);
+const uvVersion = capture('uv', ['--version']).match(/\d+\.\d+\.\d+/u)?.[0] ?? '';
+if (uvVersion !== '0.11.2') fail(`uv 0.11.2 is required; found ${uvVersion || 'unknown'}.`);
+console.log(`Setup prerequisites: Node.js ${process.versions.node}, npm ${npmVersion}, Python ${pythonVersion}, uv ${uvVersion}, ${gitVersion}.`);
 if (!existsSync('package-lock.json')) fail('package-lock.json is required; run npm install to create it.');
+if (!existsSync('packages/code-review-graph/uv.lock')) fail('packages/code-review-graph/uv.lock is required; run uv lock --project packages/code-review-graph.');
 console.log('Lockfile: package-lock.json found.');
 
 if (checkOnly) {
-  console.log(`Setup prerequisites are available: Node.js ${process.versions.node}, npm ${npmVersion}.`);
+  console.log(`Setup prerequisites are available: Node.js ${process.versions.node}, npm ${npmVersion}, Python ${pythonVersion}, uv ${uvVersion}.`);
   process.exit(0);
 }
 
 run('Install pinned dependencies (CTXRoute + Archify restore via postinstall)', process.execPath, [npmCli, 'ci']);
+run('Synchronize code-review-graph from the frozen uv lock', 'uv', ['sync', '--project', 'packages/code-review-graph', '--frozen', '--python', '3.12']);
+run('Verify code-review-graph 2.3.8', process.execPath, [npmCli, 'run', 'crg:version']);
+run('Build the initial code-review-graph graph', process.execPath, [npmCli, 'run', 'crg:build']);
 run('Enable repository Git hooks', 'git', ['config', 'core.hooksPath', '.githooks']);
 run('Verify Git hooks activation', 'git', ['config', '--get', 'core.hooksPath']);
 run('Validate the complete starter', process.execPath, [npmCli, 'run', 'validate']);

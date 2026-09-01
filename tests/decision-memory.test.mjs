@@ -11,7 +11,7 @@ test('matches exact paths and single or recursive globs', () => {
   assert.equal(matchScope('package.json', ['package.json']), true);
   assert.equal(matchScope('packages/ctxroute/src/index.js', ['packages/ctxroute/**']), true);
   assert.equal(matchScope('packages/ctxroute/src/index.js', ['packages/*/package.json']), false);
-  assert.equal(matchScope('scripts/watch-crg.mjs', ['scripts/*']), true);
+  assert.equal(matchScope('scripts/crg-runner.mjs', ['scripts/*']), true);
 });
 
 test('selects several applicable ADRs in numeric order and skips superseded decisions', () => {

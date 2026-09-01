@@ -39,9 +39,9 @@ test('initialize refuses an incomplete template without changing status', () => 
 
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
-    SessionStart: ['session-inject.js'],
+    SessionStart: ['session-inject.js', 'crg-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
+    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-crg.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
@@ -98,7 +98,7 @@ test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () 
   const result = dispatch({
     harness: 'codex',
     event: 'PreToolUse',
-    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/watch-crg.mjs' } }),
+    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/crg-runner.mjs' } }),
     root,
     execute(handler) {
       called.push(handler.name);

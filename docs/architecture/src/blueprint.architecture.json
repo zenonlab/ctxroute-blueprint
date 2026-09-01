@@ -6,10 +6,10 @@
     "quality_profile": "showcase",
     "viewBox": [1300, 1100],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop", "progressMcp", "contextMcp"], "note": "Lifecycle CTXRoute, blocking Sensor, Progress MCP, and Context MCP remain independent branches; clients own both stdio transports." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop", "progressMcp", "crg"], "note": "CTXRoute owns lifecycle hooks; clients own the Progress and official code-review-graph stdio transports." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
       { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "Blueprint sources use a justified baseline; 113 extensions and 9 named files remain bounded without whole-program or runtime proof." },
-      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
+      { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "lifecycle", "crg", "sqlite"], "note": "Frozen official CRG commands maintain the real local graph; CTXRoute triggers bounded single-flight updates after successful writes." },
       { "id": "ui-contract", "label": "UI contract", "focus": ["contributors", "uiContract", "ctxroute", "sensor"], "note": "Framework-neutral tokens and component roles guide derived products without selecting a frontend stack." }
     ]
   },
@@ -31,9 +31,8 @@
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python / Ruby pinned", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "Diagnostics", "sublabel": "JSON/SARIF + adapter + confidence", "pos": [790, 520], "size": [180, 66] },
     { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
-    { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },
-    { "id": "crg", "type": "backend", "label": "Ephemeral CRG runner", "sublabel": "uvx child process", "pos": [700, 220], "size": [180, 66] },
-    { "id": "sqlite", "type": "database", "label": "SQLite/WAL", "sublabel": "Local update state", "pos": [1000, 220], "size": [180, 66] },
+    { "id": "crg", "type": "backend", "label": "code-review-graph v2.3.8", "sublabel": "Frozen CLI + official MCP", "pos": [700, 220], "size": [210, 66] },
+    { "id": "sqlite", "type": "database", "label": "CRG graph.db", "sublabel": "Ignored local knowledge graph", "pos": [1000, 220], "size": [180, 66] },
     { "id": "governance", "type": "security", "label": "Permission matrix", "sublabel": "ASK / NEVER / ALWAYS JSON", "pos": [1030, 40], "size": [180, 66] },
     { "id": "controlLoop", "type": "backend", "label": "Agent control loop", "sublabel": "Plan / validate / approved mutate", "pos": [790, 40], "size": [200, 66] },
     { "id": "decisionMemory", "type": "database", "label": "ADR decision memory", "sublabel": "Scoped metadata and durable context", "pos": [1030, 310], "size": [190, 72] },
@@ -43,7 +42,6 @@
     { "id": "progressJson", "type": "database", "label": "Progress JSON", "sublabel": ".project/progress.json source", "pos": [560, 800], "size": [200, 66] },
     { "id": "progressView", "type": "frontend", "label": "Progress Markdown", "sublabel": "Generated short view", "pos": [820, 800], "size": [200, 66] },
     { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "4 stdio checklist tools", "pos": [40, 800], "size": [200, 66] },
-    { "id": "contextMcp", "type": "backend", "label": "Context MCP", "sublabel": "5 scoped AST tools / token budget", "pos": [1040, 800], "size": [220, 66] },
     { "id": "initializer", "type": "security", "label": "Controlled initializer", "sublabel": "Checks decisions before status transition", "pos": [40, 900], "size": [220, 66] },
     { "id": "bootstrap", "type": "backend", "label": "Quality gates", "sublabel": "Lint / test / verify", "pos": [40, 1000], "size": [180, 66] },
     { "id": "codespaces", "type": "cloud", "label": "GitHub Codespaces", "sublabel": "devcontainer post-create", "pos": [270, 980], "size": [190, 66] },
@@ -54,7 +52,7 @@
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "documentContracts", "uiContract", "sensor", "postToolUse", "sensorAdapters"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
-    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressMcp", "contextMcp"] },
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressMcp"] },
     { "kind": "region", "label": "Installation and CI boundary", "wraps": ["bootstrap", "initializer", "codespaces", "githubActions", "ciArtifacts", "docsPublish"] }
   ],
   "connections": [
@@ -71,16 +69,14 @@
     { "id": "sensor-checklist", "from": "contributors", "to": "sensorChecklist", "label": "audit coverage", "fromSide": "bottom", "toSide": "top", "via": [[115, 480], [135, 480]], "labelAt": [175, 470] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse AST", "labelAt": [485, 510] },
     { "id": "sensor-diagnostics", "from": "sensor", "to": "diagnostics", "label": "emit verdicts", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "via": [[360, 620], [880, 620]], "labelAt": [680, 635] },
-    { "id": "workspace-watcher", "from": "workspace", "to": "watcher", "label": "file events" },
-    { "id": "watcher-crg", "from": "watcher", "to": "crg", "label": "coalesced update", "variant": "emphasis", "labelAt": [575, 205] },
-    { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "WAL transaction" },
+    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "via": [[355, 195], [805, 195]], "labelAt": [580, 190] },
+    { "id": "crg-sqlite", "from": "crg", "to": "sqlite", "label": "build / incremental update", "labelAt": [955, 300] },
     { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
     { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" },
     { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope, revision, and overlap", "variant": "security", "labelAt": [1125, 400] },
     { "id": "agents-progress-mcp", "from": "agents", "to": "progressMcp", "label": "client-owned stdio", "fromSide": "left", "toSide": "left", "via": [[25, 133], [5, 133], [5, 833], [25, 833]], "labelAt": [65, 780] },
-    { "id": "agents-context-mcp", "from": "agents", "to": "contextMcp", "label": "client-owned stdio", "fromSide": "right", "toSide": "top", "via": [[210, 133], [210, 15], [1280, 15], [1280, 780], [1150, 780]], "labelAt": [1200, 780] },
+    { "id": "agents-context-mcp", "from": "agents", "to": "crg", "label": "client-owned official stdio", "fromSide": "right", "toSide": "top", "via": [[220, 133], [220, 15], [1280, 15], [1280, 195], [805, 195]], "labelAt": [600, 25] },
     { "id": "progress-mcp-core", "from": "progressMcp", "to": "progressCore", "label": "shared operations", "labelAt": [270, 880] },
-    { "id": "context-mcp-registry", "from": "contextMcp", "to": "sensorAdapters", "label": "read-only AST queries", "fromSide": "right", "toSide": "right", "via": [[1280, 833], [1280, 650], [760, 650], [760, 733]], "labelAt": [1030, 645] },
     { "id": "core-json", "from": "progressCore", "to": "progressJson", "label": "atomic approved write", "variant": "security", "labelAt": [530, 880] },
     { "id": "core-view", "from": "progressCore", "to": "progressView", "label": "generate view", "fromSide": "bottom", "toSide": "bottom", "via": [[400, 900], [920, 900]], "labelAt": [660, 920] },
     { "id": "initialize-bootstrap", "from": "initializer", "to": "bootstrap", "fromSide": "bottom", "toSide": "top" }
