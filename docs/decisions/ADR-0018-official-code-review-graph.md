@@ -44,7 +44,13 @@ one `update --skip-flows` behind a cross-process single-flight lock, a
 30-second timeout, bounded output, and fail-open diagnostics. No CRG daemon,
 watcher, generated CRG hooks, or synthetic update database is used.
 
-The only project MCP servers are Progress and official code-review-graph.
+The only project MCP servers are Progress and official code-review-graph. The
+CRG MCP default exposure is an exact six-tool allowlist: minimal context,
+impact radius, graph query, review context, graph stats, and architecture
+overview. Build, refactor, embedding, wiki, and secondary exploration remain
+available through controlled CLI commands when needed. The MCP schema budget
+is kept below 8,000 characters for CRG and 14,000 characters combined with
+Progress.
 The Sensor keeps its own pinned Tree-sitter registry solely for security
 checks. `apply_refactor_tool` is allowed only with `dry_run: true`; accepted
 changes use normal editors so architecture, Sensor, and audit hooks remain in

@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1280, 520],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "crg", "graph"], "note": "CTXRoute owns lifecycle dispatch; clients own the Progress and official CRG stdio transports." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "crg", "graph"], "note": "Progress owns per-goal mode and steps; Stop provides bounded handoff; CTXRoute owns lifecycle dispatch and clients own the stdio transports." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -17,7 +17,7 @@
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "Sole hook orchestrator", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Approved checklist state", "pos": [30, 230], "size": [170, 60] },
+    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Mode + checklist state", "pos": [30, 230], "size": [170, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },
     { "id": "graph", "type": "database", "label": "CRG graph.db", "sublabel": "Ignored local graph", "pos": [790, 230], "size": [190, 60] },
@@ -31,6 +31,7 @@
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-progress", "from": "agents", "to": "progressMcp", "label": "client-owned stdio", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [190, 170] },
+    { "id": "progress-stop", "from": "progressMcp", "to": "lifecycle", "label": "mode / next / evidence", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [250, 304] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },

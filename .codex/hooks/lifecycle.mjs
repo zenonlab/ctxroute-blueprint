@@ -15,6 +15,7 @@ export const lifecycleEvents = [
 ];
 
 const MAX_CONTEXT_LENGTH = 4096;
+const CTXROUTE_BUDGET = '3500';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot) {
@@ -25,8 +26,8 @@ export function handlerPlan(harness, event, root = projectRoot) {
   if (!ctxroute) return [];
 
   return {
-    SessionStart: [ctxroute('session-inject.js', '--budget', '0'), local('crg-context.mjs')],
-    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', '0')],
+    SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('crg-context.mjs')],
+    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', CTXROUTE_BUDGET)],
     PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-crg.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs'), local('archify-preview.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],

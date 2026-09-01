@@ -39,6 +39,7 @@ mentions, puis met à jour le commentaire sticky avec seulement `actions: read`
 et `pull-requests: write`.
 
 Après le premier run distant réussi, rendre le check **CRG risk gate**
-obligatoire sur `main`. Le workflow de commentaire ne doit pas être obligatoire.
+obligatoire sur `main`, en le conservant avec les quatre checks déjà requis,
+`strict: true`. Le workflow de commentaire ne doit pas être obligatoire.
 Les Actions internes à l'Action composite CRG sont des dépendances transitives
 du commit officiel et sont réévaluées lors de toute mise à jour du pin.

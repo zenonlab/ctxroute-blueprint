@@ -7,11 +7,15 @@ export const CRG_PROJECT = 'packages/code-review-graph';
 export const CRG_VERSION = '2.3.8';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
+export const CRG_MCP_TOOLS = Object.freeze(['get_minimal_context_tool', 'get_impact_radius_tool', 'query_graph_tool', 'get_review_context_tool', 'list_graph_stats_tool', 'get_architecture_overview_tool']);
 
 export function crgInvocation(args, root = process.cwd()) {
+  const boundedArgs = args[0] === 'serve' && !args.includes('--tools')
+    ? [...args, '--tools', CRG_MCP_TOOLS.join(',')]
+    : args;
   return {
     executable: 'uv',
-    args: ['run', '--project', resolve(root, CRG_PROJECT), '--frozen', 'code-review-graph', ...args],
+    args: ['run', '--project', resolve(root, CRG_PROJECT), '--frozen', 'code-review-graph', ...boundedArgs],
   };
 }
 
@@ -83,7 +87,7 @@ function publicArgs(command, root) {
     update: ['update', '--repo', root, '--skip-flows'],
     status: ['status', '--repo', root],
     review: ['detect-changes', '--repo', root, '--brief'],
-    mcp: ['serve', '--repo', root],
+    mcp: ['serve', '--repo', root, '--tools', CRG_MCP_TOOLS.join(',')],
     version: ['--version'],
   }[command];
 }

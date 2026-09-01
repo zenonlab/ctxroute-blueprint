@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
-import { CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
+import { CRG_MCP_TOOLS, CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
 
 const nodeChild = source => () => spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -18,6 +18,8 @@ test('CRG invocation is frozen, project-local, and exactly pinned', () => {
   assert.deepEqual(invocation.args.slice(0, 3), ['run', '--project', '/workspace/packages/code-review-graph']);
   assert.ok(invocation.args.includes('--frozen'));
   assert.equal(CRG_VERSION, '2.3.8');
+  const mcp = crgInvocation(['serve', '--repo', '/workspace'], '/workspace');
+  assert.deepEqual(mcp.args.slice(-2), ['--tools', CRG_MCP_TOOLS.join(',')]);
 });
 
 test('CRG update builds a missing graph and updates an existing graph', async () => {

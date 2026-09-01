@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { CRG_VERSION, crgInvocation, runCrgCommand } from './crg-runner.mjs';
+import { CRG_VERSION, CRG_MCP_TOOLS, crgInvocation, runCrgCommand } from './crg-runner.mjs';
 
 const root = process.cwd();
 const fixture = mkdtempSync(join(tmpdir(), 'ctxroute-crg-smoke-'));
@@ -36,8 +36,8 @@ try {
   await client.connect(transport);
   const listed = await client.listTools();
   const names = listed.tools.map(tool => tool.name);
+  if (names.length !== CRG_MCP_TOOLS.length || names.some(name => !CRG_MCP_TOOLS.includes(name))) throw new Error(`unexpected CRG tool allowlist: ${names.join(', ')}`);
   if (!names.includes('list_graph_stats_tool')) throw new Error('official read tool list_graph_stats_tool is missing');
-  if (!names.includes('apply_refactor_tool')) throw new Error('official apply_refactor_tool is missing');
   const response = await client.callTool({ name: 'list_graph_stats_tool', arguments: { repo_root: fixture } });
   if (response.isError) throw new Error(`read tool failed: ${JSON.stringify(response.content)}`);
   console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, readTool: 'list_graph_stats_tool' }));
