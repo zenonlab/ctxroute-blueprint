@@ -283,10 +283,11 @@ test('Sensor recursively scans supported files passed as a directory', () => {
   const result = spawnSync(process.execPath, [sensor, directory], { cwd: root, encoding: 'utf8' });
   const body = JSON.parse(result.stdout);
   assert.equal(body.verdict, 'ERROR');
-  assert.equal(body.diagnostics.some(item => item.path.endsWith('nested/safe.ts')), false);
-  assert.equal(body.diagnostics.some(item => item.path.endsWith('nested/broken.py') && item.rule === 'sensor/syntax-error'), true);
+  const diagnosticPaths = body.diagnostics.map(item => item.path.replaceAll('\\', '/'));
+  assert.equal(diagnosticPaths.some(item => item.endsWith('nested/safe.ts')), false);
+  assert.equal(body.diagnostics.some(item => item.path.replaceAll('\\', '/').endsWith('nested/broken.py') && item.rule === 'sensor/syntax-error'), true);
   assert.equal(body.diagnostics.some(item => item.path.includes('node_modules')), false);
-  assert.equal(body.diagnostics.some(item => item.path.endsWith('notes.txt')), false);
+  assert.equal(diagnosticPaths.some(item => item.endsWith('notes.txt')), false);
 });
 test('invalid or missing Sensor configuration is never treated as safe', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-config-'));

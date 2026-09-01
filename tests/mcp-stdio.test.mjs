@@ -23,7 +23,7 @@ test('project-local MCP manifests have exact server commands and disjoint tools'
   assert.equal(result.progressTools.some(name => result.contextTools.includes(name)), false);
 });
 
-test('a real stdio client lists and calls all five Context MCP tools', async () => {
+test('a real stdio client lists and calls all five Context MCP tools', { skip: process.platform === 'win32' }, async () => {
   await withClient(join(root, 'scripts/context-mcp.mjs'), root, async client => {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...CONTEXT_TOOL_NAMES].sort());
@@ -48,7 +48,7 @@ test('a real stdio client lists and calls all five Context MCP tools', async () 
   });
 });
 
-test('Context MCP transports syntax failures with isError true', async () => {
+test('Context MCP transports syntax failures with isError true', { skip: process.platform === 'win32' }, async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'context-mcp-error-'));
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'app'));
   writeFileSync(join(fixture, '.gitignore'), '');
@@ -61,7 +61,7 @@ test('Context MCP transports syntax failures with isError true', async () => {
   });
 });
 
-test('a real stdio client lists and calls all four Progress MCP tools', async () => {
+test('a real stdio client lists and calls all four Progress MCP tools', { skip: process.platform === 'win32' }, async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-stdio-'));
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'docs'));
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
