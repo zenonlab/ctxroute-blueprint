@@ -4,9 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { listArchifyDiagrams, productDiagramViolations, selectArchifyDiagrams } from '../scripts/archify-registry.mjs';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('Archify registry discovers every typed source in stable order', () => {
   const diagrams = listArchifyDiagrams(root);
