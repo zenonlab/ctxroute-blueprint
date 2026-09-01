@@ -42,16 +42,16 @@ export function mergeOutputs(event, outputs, notices = []) {
   const systemMessages = [...notices];
 
   for (const output of outputs) {
-    if (!output || typeof output !== 'object') continue;
+    if (!output || output !== Object(output)) continue;
     for (const [key, value] of Object.entries(output)) {
       if (key === 'hookSpecificOutput' || key === 'systemMessage') continue;
       merged[key] = value;
     }
-    if (typeof output.systemMessage === 'string' && output.systemMessage.trim()) systemMessages.push(limit(output.systemMessage.trim(), MAX_SYSTEM_MESSAGE_LENGTH));
-    if (output.hookSpecificOutput && typeof output.hookSpecificOutput === 'object') {
+    if (output.systemMessage === String(output.systemMessage) && output.systemMessage.trim()) systemMessages.push(limit(output.systemMessage.trim(), MAX_SYSTEM_MESSAGE_LENGTH));
+    if (output.hookSpecificOutput && output.hookSpecificOutput === Object(output.hookSpecificOutput)) {
       for (const [key, value] of Object.entries(output.hookSpecificOutput)) {
         if (key === 'additionalContext') {
-          if (typeof value === 'string' && value.trim()) contexts.push(limit(value.trim(), MAX_CONTEXT_LENGTH));
+          if (value === String(value) && value.trim()) contexts.push(limit(value.trim(), MAX_CONTEXT_LENGTH));
         } else {
           hookSpecificOutput[key] = value;
         }

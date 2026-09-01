@@ -11,8 +11,8 @@
     "viewBox": [1068, 620],
     "views": [
       { "id": "coverage", "label": "Coverage contract", "focus": ["config", "packs", "catalog", "parser", "ir", "rules", "outputs"], "note": "PASS requires a loaded parser; PARTIAL, MISSING, and N/A remain distinct." },
-      { "id": "reproducibility", "label": "Reproducibility", "focus": ["config", "packs", "catalog", "parser"], "note": "Only catalogue package names and exact versions may reach npm." },
-      { "id": "diagnostics", "label": "Diagnostics", "focus": ["parser", "ir", "rules", "outputs"], "note": "Syntax, quality, security, and UI evidence shares stable locations and rule IDs." }
+      { "id": "reproducibility", "label": "Reproducibility", "focus": ["config", "packs", "catalog", "parser"], "note": "Only qualified catalogue package names, exact versions, and checksums may reach npm." },
+      { "id": "diagnostics", "label": "Diagnostics", "focus": ["parser", "ir", "rules", "outputs"], "note": "Syntax, quality, security, and UI evidence shares stable host locations and rule IDs." }
     ]
   },
   "stages": [
@@ -21,8 +21,8 @@
   "nodes": [
     { "id": "config", "type": "database", "label": "Project config", "sublabel": "required languages", "stage": 0, "row": 0, "tag": "versioned" },
     { "id": "packs", "type": "backend", "label": "Pack resolver", "sublabel": "exact dependencies", "stage": 1, "row": 0, "tag": "allowlist" },
-    { "id": "catalog", "type": "database", "label": "Language catalogue", "sublabel": "capabilities + status", "stage": 1, "row": 2, "tag": "113 + 9" },
-    { "id": "parser", "type": "backend", "label": "Parser / extractor", "sublabel": "syntax + offsets", "stage": 2, "row": 0, "tag": "Node 22" },
+    { "id": "catalog", "type": "database", "label": "Catalogue v2", "sublabel": "evidence matrix", "stage": 1, "row": 2, "tag": "115 + 9" },
+    { "id": "parser", "type": "backend", "label": "Parser / extractor", "sublabel": "fixtures + offsets", "stage": 2, "row": 0, "tag": "Node 22" },
     { "id": "ir", "type": "messagebus", "label": "Normalized evidence", "sublabel": "calls, imports, literals", "stage": 3, "row": 0, "tag": "bounded" },
     { "id": "rules", "type": "security", "label": "Rule engine", "sublabel": "quality + security", "stage": 3, "row": 2, "tag": "stable IDs" },
     { "id": "outputs", "type": "database", "label": "Evidence outputs", "sublabel": "JSON + SARIF + hooks", "stage": 4, "row": 0, "tag": "schema 2" }

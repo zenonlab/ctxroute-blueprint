@@ -3,7 +3,26 @@ import { basename, extname } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const freeze = values => Object.freeze(values);
-const capabilities = values => Object.freeze({ quality: 'MISSING', security: 'MISSING', ui: 'N/A', dataConfig: 'N/A', ...values });
+const CAPABILITIES = ['quality', 'security', 'ui', 'dataConfig'];
+const evidence = value => Object.freeze({
+  parserLoaded: false,
+  fixtures: Object.freeze({ valid: false, invalid: false, positions: false }),
+  rules: Object.freeze({}),
+  platforms: Object.freeze([]),
+  provenance: null,
+  checksum: null,
+  ...value,
+});
+const capabilityState = (name, proof, parserKind) => {
+  if (proof === 'N/A') return 'N/A';
+  if (!proof) return 'MISSING';
+  const parserProven = parserKind === 'structured' || proof.parser === true;
+  const fixturesProven = proof.fixtures === true;
+  const rulesProven = proof.rules === true;
+  const platformsProven = proof.platforms === true;
+  return parserProven && fixturesProven && rulesProven && platformsProven ? 'PASS' : 'PARTIAL';
+};
+const capabilities = (proof, parserKind) => Object.freeze(Object.fromEntries(CAPABILITIES.map(name => [name, capabilityState(name, proof?.[name], parserKind)])));
 const entry = value => Object.freeze({
   package: null, version: null, variant: null, grammar: null, extractor: null, mode: 'lexical',
   parserKind: 'lexical', support: 'partial', fallbackAllowed: true,
@@ -11,27 +30,33 @@ const entry = value => Object.freeze({
   ...value,
   language: value.language ?? value.id,
   aliases: freeze(value.aliases ?? []), extensions: freeze(value.extensions ?? []), filenames: freeze(value.filenames ?? []),
-  platforms: freeze(value.platforms ?? ['linux', 'darwin', 'win32']), capabilities: capabilities(value.capabilities),
+  platforms: freeze(value.platforms ?? ['linux', 'darwin', 'win32']),
+  qualification: evidence(value.qualification),
+  capabilities: capabilities(value.capabilityEvidence, value.parserKind ?? 'lexical'),
 });
-const ast = value => entry({ parserKind: 'native', support: 'stable', fallbackAllowed: true, fallbackReason: 'The required grammar could not be loaded.', capabilities: { quality: 'PASS', security: 'PASS' }, ...value });
-const structured = value => entry({ parserKind: 'structured', support: 'stable', fallbackAllowed: false, fallbackReason: null, capabilities: { quality: 'PARTIAL', security: 'PARTIAL', dataConfig: 'PASS' }, ...value });
-const partial = value => entry({ parserKind: value.extractor ? 'extractor' : 'lexical', support: 'partial', capabilities: { quality: 'PARTIAL', security: 'PARTIAL' }, ...value });
-const missing = value => entry({ parserKind: 'lexical', support: 'missing', fallbackReason: 'No Node 22 parser pack has been verified for this language.', ...value });
+const fullProof = Object.freeze({ parser: true, fixtures: true, rules: true, platforms: true });
+const qualified = (provenance, checksum = null) => ({ parserLoaded: true, fixtures: { valid: true, invalid: true, positions: true }, rules: { common: true, security: true }, platforms: ['linux', 'darwin', 'win32'], provenance, checksum });
+const ast = value => entry({ parserKind: 'native', support: 'stable', fallbackAllowed: true, fallbackReason: 'The required grammar could not be loaded.', capabilityEvidence: { quality: fullProof, security: fullProof, ui: 'N/A', dataConfig: 'N/A' }, qualification: qualified(`npm:${value.package}@${value.version}`), ...value });
+const structured = value => entry({ parserKind: 'structured', support: 'stable', fallbackAllowed: false, fallbackReason: null, capabilityEvidence: { quality: { parser: true, fixtures: true, rules: false, platforms: true }, security: { parser: true, fixtures: true, rules: false, platforms: true }, ui: 'N/A', dataConfig: fullProof }, qualification: qualified('node:json'), ...value });
+const partial = value => entry({ parserKind: value.extractor ? 'extractor' : 'lexical', support: 'partial', capabilityEvidence: { quality: { parser: false, fixtures: true, rules: true, platforms: true }, security: { parser: false, fixtures: true, rules: true, platforms: true }, ui: value.extractor ? { parser: false, fixtures: true, rules: true, platforms: true } : 'N/A', dataConfig: 'N/A' }, ...value });
+const missing = value => entry({ parserKind: 'lexical', support: 'missing', fallbackReason: 'No Node 22 parser pack has been verified for this language.', capabilityEvidence: { quality: null, security: value.capabilities?.dataConfig ? 'N/A' : null, ui: 'N/A', dataConfig: value.capabilities?.dataConfig ? null : 'N/A' }, ...value });
 
-export const CATALOG_VERSION = 1;
+export const CATALOG_VERSION = 2;
 export const LANGUAGE_CATALOG = Object.freeze([
-  ast({ id: 'javascript', aliases: ['js', 'jsx', 'node'], extensions: ['.js', '.jsx', '.mjs', '.cjs'], package: 'tree-sitter-javascript', version: '0.23.1', mode: 'AST' }),
-  ast({ id: 'typescript', aliases: ['ts'], extensions: ['.ts'], package: 'tree-sitter-typescript', version: '0.23.2', variant: 'typescript', mode: 'AST' }),
-  ast({ id: 'tsx', aliases: ['typescript-react'], extensions: ['.tsx'], package: 'tree-sitter-typescript', version: '0.23.2', variant: 'tsx', mode: 'AST' }),
-  ast({ id: 'python', aliases: ['py'], extensions: ['.py'], package: 'tree-sitter-python', version: '0.21.0', mode: 'AST' }),
-  ast({ id: 'ruby', aliases: ['rb'], extensions: ['.rb', '.rake', '.ru'], filenames: ['Gemfile', 'Rakefile', 'config.ru'], package: 'tree-sitter-ruby', version: '0.23.1', mode: 'AST' }),
-  ast({ id: 'erb', language: 'ruby', aliases: ['html-erb'], sensorAdapter: 'template', extensions: ['.erb'], package: 'tree-sitter-ruby', version: '0.23.1', mode: 'embedded', parserKind: 'extractor', extractor: 'erb-ruby-mask', capabilities: { quality: 'PASS', security: 'PASS', ui: 'PARTIAL' } }),
-  structured({ id: 'json', extensions: ['.json'], mode: 'structured', capabilities: { quality: 'PARTIAL', security: 'PARTIAL', dataConfig: 'PARTIAL' } }),
-  partial({ id: 'sql', extensions: ['.sql'], mode: 'lexical', capabilities: { quality: 'PARTIAL', security: 'PASS', dataConfig: 'PARTIAL' } }),
-  partial({ id: 'html', extensions: ['.html', '.htm'], mode: 'embedded', extractor: 'html', capabilities: { quality: 'PARTIAL', security: 'PARTIAL', ui: 'PARTIAL' } }),
-  partial({ id: 'css', extensions: ['.css', '.scss', '.sass'], mode: 'lexical', capabilities: { quality: 'PARTIAL', security: 'N/A', ui: 'PARTIAL' } }),
-  partial({ id: 'vue', extensions: ['.vue'], mode: 'embedded', extractor: 'script-style-blocks', capabilities: { quality: 'PARTIAL', security: 'PARTIAL', ui: 'PARTIAL' } }),
-  partial({ id: 'svelte', extensions: ['.svelte'], mode: 'embedded', extractor: 'script-style-blocks', capabilities: { quality: 'PARTIAL', security: 'PARTIAL', ui: 'PARTIAL' } }),
+  ast({ id: 'javascript', aliases: ['js', 'jsx', 'node'], extensions: ['.js', '.jsx', '.mjs', '.cjs'], package: 'tree-sitter-javascript', version: '0.23.1', mode: 'AST', qualification: qualified('npm:tree-sitter-javascript@0.23.1', 'sha512-/bnhbrTD9frUYHQTiYnPcxyHORIw157ERBa6dqzaKxvR/x3PC4Yzd+D1pZIMS6zNg2v3a8BZ0oK7jHqsQo9fWA==') }),
+  ast({ id: 'typescript', aliases: ['ts'], extensions: ['.ts'], package: 'tree-sitter-typescript', version: '0.23.2', variant: 'typescript', mode: 'AST', qualification: qualified('npm:tree-sitter-typescript@0.23.2', 'sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==') }),
+  ast({ id: 'tsx', aliases: ['typescript-react'], extensions: ['.tsx'], package: 'tree-sitter-typescript', version: '0.23.2', variant: 'tsx', mode: 'AST', qualification: qualified('npm:tree-sitter-typescript@0.23.2', 'sha512-e04JUUKxTT53/x3Uq1zIL45DoYKVfHH4CZqwgZhPg5qYROl5nQjV+85ruFzFGZxu+QeFVbRTPDRnqL9UbU4VeA==') }),
+  ast({ id: 'python', aliases: ['py'], extensions: ['.py'], package: 'tree-sitter-python', version: '0.21.0', mode: 'AST', qualification: qualified('npm:tree-sitter-python@0.21.0', 'sha512-IUKx7JcTVbByUx1iHGFS/QsIjx7pqwTMHL9bl/NGyhyyydbfNrpruo2C7W6V4KZrbkkCOlX8QVrCoGOFW5qecg==') }),
+  ast({ id: 'ruby', aliases: ['rb'], extensions: ['.rb', '.rake', '.ru'], filenames: ['Gemfile', 'Rakefile', 'config.ru'], package: 'tree-sitter-ruby', version: '0.23.1', mode: 'AST', qualification: qualified('npm:tree-sitter-ruby@0.23.1', 'sha512-d9/RXgWjR6HanN7wTYhS5bpBQLz1VkH048Vm3CodPGyJVnamXMGb8oEhDypVCBq4QnHui9sTXuJBBP3WtCw5RA==') }),
+  ast({ id: 'erb', language: 'ruby', aliases: ['html-erb'], sensorAdapter: 'template', extensions: ['.erb'], package: 'tree-sitter-ruby', version: '0.23.1', mode: 'embedded', parserKind: 'extractor', extractor: 'erb-ruby-mask', qualification: qualified('npm:tree-sitter-ruby@0.23.1', 'sha512-d9/RXgWjR6HanN7wTYhS5bpBQLz1VkH048Vm3CodPGyJVnamXMGb8oEhDypVCBq4QnHui9sTXuJBBP3WtCw5RA=='), capabilityEvidence: { quality: fullProof, security: fullProof, ui: { parser: true, fixtures: true, rules: true, platforms: false }, dataConfig: 'N/A' } }),
+  structured({ id: 'json', extensions: ['.json'], mode: 'structured' }),
+  partial({ id: 'sql', extensions: ['.sql'], mode: 'lexical', capabilityEvidence: { quality: { parser: false, fixtures: true, rules: true, platforms: true }, security: { parser: false, fixtures: true, rules: true, platforms: true }, ui: 'N/A', dataConfig: { parser: false, fixtures: true, rules: true, platforms: true } } }),
+  partial({ id: 'html', extensions: ['.html', '.htm'], mode: 'embedded', extractor: 'html' }),
+  partial({ id: 'css', extensions: ['.css', '.scss', '.sass'], mode: 'lexical', capabilityEvidence: { quality: { parser: false, fixtures: true, rules: true, platforms: true }, security: 'N/A', ui: { parser: false, fixtures: true, rules: true, platforms: true }, dataConfig: 'N/A' } }),
+  partial({ id: 'vue', extensions: ['.vue'], mode: 'embedded', extractor: 'script-style-blocks' }),
+  partial({ id: 'svelte', extensions: ['.svelte'], mode: 'embedded', extractor: 'script-style-blocks' }),
+  partial({ id: 'astro', extensions: ['.astro'], mode: 'embedded', extractor: 'astro-frontmatter-script-style' }),
+  partial({ id: 'notebook', aliases: ['jupyter', 'ipynb'], extensions: ['.ipynb'], mode: 'embedded', extractor: 'notebook-cells', capabilityEvidence: { quality: { parser: false, fixtures: true, rules: true, platforms: true }, security: { parser: false, fixtures: true, rules: true, platforms: true }, ui: 'N/A', dataConfig: { parser: false, fixtures: true, rules: true, platforms: true } } }),
   partial({ id: 'template', extensions: ['.haml', '.slim', '.heex', '.leex', '.j2', '.jinja', '.jinja2', '.twig', '.tera', '.hbs', '.handlebars', '.liquid', '.ejs', '.pug', '.jade', '.cshtml', '.razor', '.jsp', '.jspx'], mode: 'embedded', extractor: 'template-blocks', capabilities: { quality: 'PARTIAL', security: 'PARTIAL', ui: 'PARTIAL' } }),
   partial({ id: 'blade', language: 'php', aliases: ['laravel-blade'], sensorAdapter: 'template', mode: 'embedded', extractor: 'blade-php', match: path => path.toLowerCase().endsWith('.blade.php'), capabilities: { quality: 'PARTIAL', security: 'PARTIAL', ui: 'PARTIAL' } }),
   missing({ id: 'rust', extensions: ['.rs'] }), missing({ id: 'go', extensions: ['.go'] }), missing({ id: 'java', extensions: ['.java'] }),
@@ -60,11 +85,11 @@ export const LANGUAGE_CATALOG = Object.freeze([
 ]);
 
 export const LANGUAGE_PRESETS = Object.freeze({
-  web: freeze(['javascript', 'typescript', 'tsx', 'json', 'html', 'css', 'vue', 'svelte']),
+  web: freeze(['javascript', 'typescript', 'tsx', 'json', 'html', 'css', 'vue', 'svelte', 'astro']),
   backend: freeze(['javascript', 'typescript', 'python', 'ruby', 'go', 'java', 'kotlin', 'php', 'csharp']),
   systems: freeze(['rust', 'go', 'c', 'cpp', 'zig', 'assembly']), mobile: freeze(['swift', 'kotlin', 'dart', 'objective-c']),
-  templates: freeze(['erb', 'template', 'blade', 'html', 'vue', 'svelte']),
-  'data-config': freeze(['json', 'sql', 'yaml', 'toml', 'xml', 'proto', 'graphql', 'ini', 'properties', 'env', 'terraform', 'cue', 'dhall', 'nix', 'dockerfile', 'makefile', 'justfile']),
+  templates: freeze(['erb', 'template', 'blade', 'html', 'vue', 'svelte', 'astro']),
+  'data-config': freeze(['json', 'notebook', 'sql', 'yaml', 'toml', 'xml', 'proto', 'graphql', 'ini', 'properties', 'env', 'terraform', 'cue', 'dhall', 'nix', 'dockerfile', 'makefile', 'justfile']),
   all: freeze(LANGUAGE_CATALOG.map(item => item.id)),
 });
 
@@ -111,7 +136,8 @@ export function grammarStatus(loader = require) {
     return { id: item.id, language: item.language, extensions: item.extensions, filenames: item.filenames, package: item.package, version: item.version,
       variant: item.variant, mode: resolved.actualMode, parserKind: item.parserKind, extractor: item.extractor, available: resolved.available,
       syntaxAware: resolved.syntaxAware, status: resolved.status, capabilities: item.capabilities, fallbackAllowed: item.fallbackAllowed,
-      fallback: resolved.fallback, fallbackReason: resolved.fallbackReason, runtime: 'Node.js 22 / tree-sitter@0.21.1' };
+      fallback: resolved.fallback, fallbackReason: resolved.fallbackReason, runtime: 'Node.js 22 / tree-sitter@0.21.1', platforms: item.platforms,
+      qualification: item.qualification };
   });
 }
 

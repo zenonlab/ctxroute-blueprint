@@ -32,7 +32,7 @@ if (decisionStatus.conflicts.length && !paths.some(path => path.startsWith('docs
   process.exit(0);
 }
 
-if (false) {
+if (process.env.CODEX_POST_TOOL_AUDIT === '1') {
   const lines = ['Audit required before continuing.'];
   if (codePaths.length) {
     lines.push(`Code : ${codePaths.join(', ')}`);

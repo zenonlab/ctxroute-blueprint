@@ -20,7 +20,7 @@ export function validateGovernancePolicy(value = policy) {
     if (seen.has(action)) failures.push(`action ${action} is assigned to both ${seen.get(action)} and ${name}`);
     seen.set(action, name);
   }
-  for (const name of ['memory', 'mcpA2a', 'controlLoop', 'infrastructure']) if (typeof value.boundaries?.[name] !== 'string' || !value.boundaries[name].trim()) failures.push(`boundaries.${name} must be documented`);
+  for (const name of ['memory', 'mcpA2a', 'controlLoop', 'infrastructure']) if (value.boundaries?.[name] !== String(value.boundaries?.[name]) || !value.boundaries[name].trim()) failures.push(`boundaries.${name} must be documented`);
   return failures;
 }
 

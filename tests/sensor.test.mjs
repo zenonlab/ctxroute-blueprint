@@ -135,7 +135,7 @@ test('SQL tracking follows explicit exported/imported builders in one scan', () 
   assert.equal(result.diagnostics.some(item => item.rule === 'sensor/sql-injection' && item.path === 'app.ts'), true);
 });
 test('Sensor exposes bounded adapter coverage and never resolves an unscanned local module', () => {
-  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 113);
+  assert.equal(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions).length, 115);
   assert.equal(isSupportedSourcePath('Dockerfile'), true);
   assert.equal(isSupportedSourcePath('.env.local'), true);
   assert.equal(isSupportedSourcePath('unknown.xyz'), false);
@@ -158,6 +158,14 @@ test('official anti-slop rules run once for a JavaScript and TypeScript batch', 
   const result = analyzePaths(['unsafe.ts', 'safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
   assert.equal(result.verdict, 'ERROR');
   assert.equal(result.diagnostics.some(item => item.rule === 'anti-slop/no-object-parameters' && item.severity === 'ERROR' && item.mode === 'oxlint'), true);
+});
+test('official anti-slop diagnostics from composite scripts map to host coordinates', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-composite-anti-slop-'));
+  writeFileSync(join(directory, 'Page.astro'), '<main>Hello</main>\n<script lang="ts">\nfunction save(value: object) { return value; }\n</script>\n');
+  const result = analyzePaths(['Page.astro'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  const diagnostic = result.diagnostics.find(item => item.rule === 'anti-slop/no-object-parameters');
+  assert.equal(diagnostic.path, 'Page.astro');
+  assert.equal(diagnostic.line, 3);
 });
 test('SQL tracking follows Python builders and import aliases in one scan', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-python-cross-file-'));
@@ -226,6 +234,14 @@ test('Vue and Svelte single-file components analyze embedded code without false 
   assert.equal(analyzeSource('Card.svelte', '<script>db.query(`SELECT * FROM users WHERE id = ${userId}`);</script><style>main { color: red }</style>').at(0).rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('Card.vue', '<script lang="ts">eval(input);</script>').at(0).rule, 'sensor/dynamic-eval');
 });
+test('Astro frontmatter and notebook cells preserve host positions', () => {
+  const astro = analyzeSource('Page.astro', '---\nconst value = 1;\neval(input);\n---\n<main>Hello</main>');
+  assert.equal(astro.find(item => item.rule === 'sensor/dynamic-eval').line, 3);
+  assert.equal(astro.find(item => item.rule === 'sensor/dynamic-eval').column, 1);
+  const notebookSource = JSON.stringify({ metadata: { kernelspec: { language: 'python' } }, cells: [{ cell_type: 'code', source: ['value = 1\\n', 'eval(input)\\n'] }] }, null, 2);
+  const notebook = analyzeSource('analysis.ipynb', notebookSource);
+  assert.equal(notebook.some(item => item.rule === 'sensor/dynamic-eval' && item.path === 'analysis.ipynb'), true);
+});
 test('lexical fallbacks are explicit and avoid comment/string false positives', () => {
   assert.equal(analyzeSource('main.rs', 'fn main() { println!("ok"); }').at(0).rule, 'sensor/parser-unavailable');
   assert.equal(analyzeSource('main.rs', '// eval(input)\nfn main() {}').every(item => item.rule !== 'sensor/dynamic-eval'), true);
@@ -293,6 +309,12 @@ test('Ruby rules use AST metadata and lexical fallback only when grammar loading
   assert.equal(analyzeSource('image.html.erb', '<img src="x">')[0].grammar, null);
   const fallback = analyzeSource('fallback.rb', 'system(params[:command])', { grammarLoader() { throw new Error('simulated missing grammar'); } });
   assert.equal(fallback.every(item => item.mode === 'lexical' && item.grammar === null && item.fallback === 'lexical' && item.fallbackReason === 'simulated missing grammar'), true);
+});
+test('Ruby security capability covers SSRF and weak crypto with safe neighbours', () => {
+  assert.equal(analyzeSource('network.rb', 'Net::HTTP.get(params[:url])')[0].rule, 'sensor/ssrf');
+  assert.equal(analyzeSource('crypto.rb', 'Digest::MD5.hexdigest(value)')[0].rule, 'sensor/weak-crypto');
+  assert.equal(analyzeSource('safe-network.rb', 'Net::HTTP.get(URI("https://example.test"))').some(item => item.rule === 'sensor/ssrf'), false);
+  assert.equal(analyzeSource('safe-crypto.rb', 'Digest::SHA256.hexdigest(value)').some(item => item.rule === 'sensor/weak-crypto'), false);
 });
 test('Sensor deduplicates repeated paths within one action', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-deduplicate-'));

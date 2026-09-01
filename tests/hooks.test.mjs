@@ -378,9 +378,10 @@ test('Stop recognizes valid JSON', () => {
 
 test('commit-msg accepts Conventional Commits', () => {
   const directory = mkdtempSync(join(tmpdir(), 'hooks-test-'));
-  const message = join(directory, 'message');
+  mkdirSync(join(directory, '.git'));
+  const message = join(directory, '.git', 'COMMIT_EDITMSG');
   writeFileSync(message, 'feat(core): add deterministic loop\n');
-  const result = spawnSync('node', [join(root, '.githooks/validate-commit-message.mjs'), message], { encoding: 'utf8' });
+  const result = spawnSync('node', [join(root, '.githooks/validate-commit-message.mjs'), message], { cwd: directory, encoding: 'utf8' });
   assert.equal(result.status, 0);
 });
 

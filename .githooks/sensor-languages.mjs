@@ -1,13 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { catalogEntry, grammarStatus, LANGUAGE_CATALOG, LANGUAGE_PRESETS, registryEntry } from './ast-registry.mjs';
+import { catalogEntry, CATALOG_VERSION, grammarStatus, LANGUAGE_CATALOG, LANGUAGE_PRESETS, registryEntry } from './ast-registry.mjs';
+import { qualifyLanguages } from './sensor-qualification.mjs';
 
 const ROOT = process.cwd();
 const PROJECT_PATH = resolve(ROOT, '.project/project-config.json');
 const PACKAGE_PATH = resolve(ROOT, 'package.json');
 const LOCK_PATH = resolve(ROOT, 'package-lock.json');
-const INSTALLABLE = item => item && (item.package || item.parserKind === 'structured') && item.support === 'stable';
+const INSTALLABLE = item => Boolean(item && (item.package || item.parserKind === 'structured') && item.support === 'stable' && item.qualification?.parserLoaded && item.qualification?.fixtures?.valid && item.qualification?.fixtures?.invalid && item.qualification?.fixtures?.positions);
 
 export function languageStatus(root = ROOT) {
   const project = readJson(resolve(root, '.project/project-config.json'));
@@ -27,23 +28,28 @@ export function languageStatus(root = ROOT) {
     const lockVersion = item.package ? lock.packages?.[`node_modules/${item.package}`]?.version ?? null : null;
     const exact = !item.package || manifestVersion === item.version;
     const locked = !item.package || lockVersion === item.version;
+    const installable = INSTALLABLE(item);
+    const unavailableReason = installable ? null : unavailableReasonFor(item);
+    const runtimeCapabilities = Object.fromEntries(Object.entries(item.capabilities).map(([name, capability]) => [name, capability === 'PASS' && !loaded.syntaxAware ? 'MISSING' : capability]));
     return { id: item.id, configured: configured.includes(item.id), support: loaded.status, parser: loaded.syntaxAware ? 'loaded' : loaded.fallback ? 'fallback' : 'missing',
-      syntaxAware: loaded.syntaxAware, package: item.package, version: item.version, manifestVersion, lockVersion, exact, locked, capabilities: item.capabilities,
-      installCommand: `npm run sensor:languages -- install ${item.id}` };
+      syntaxAware: loaded.syntaxAware, package: item.package, version: item.version, manifestVersion, lockVersion, exact, locked, capabilities: runtimeCapabilities, capabilityEvidence: item.capabilityEvidence,
+      installable, provenance: item.qualification?.provenance ?? null, checksum: item.qualification?.checksum ?? null,
+      platforms: item.platforms, qualification: item.qualification, unavailableReason,
+      installCommand: installable ? `npm run sensor:languages -- install ${item.id}` : null };
   });
   const selected = languages.filter(item => item.configured);
-  return { schemaVersion: 1, catalogVersion: 1, status: selected.every(item => item.syntaxAware && item.exact && item.locked) && extensionIssues.length === 0 ? 'PASS' : 'FAIL', configured, extensionIssues, languages };
+  return { schemaVersion: 2, catalogVersion: CATALOG_VERSION, status: selected.every(item => item.installable && item.syntaxAware && item.exact && item.locked) && extensionIssues.length === 0 ? 'PASS' : 'FAIL', configured, extensionIssues, languages };
 }
 
 export function listLanguages() {
   const status = languageStatus();
-  return { ...status, presets: LANGUAGE_PRESETS };
+  return { ...status, presets: presetStatuses(status.languages) };
 }
 
 export function installLanguages(ids, { preset } = {}) {
   const requested = normalizeRequested(ids, preset);
   const unavailable = requested.filter(item => !INSTALLABLE(item));
-  if (unavailable.length) throw new Error(`No verified Node 22 parser pack is available for: ${unavailable.map(item => item.id).join(', ')}. Their catalogue status remains MISSING/PARTIAL.`);
+  if (unavailable.length) throw new Error(`Preset is BLOCKED before mutation: ${unavailable.map(item => `${item.id} (${unavailableReasonFor(item)})`).join(', ')}.`);
   mutateWithRollback(() => {
     const project = readJson(PROJECT_PATH);
     project.quality ??= {};
@@ -93,7 +99,8 @@ export function runLanguageCli(argv = process.argv.slice(2)) {
   else if (command === 'install') result = installLanguages(args, { preset });
   else if (command === 'sync') result = syncLanguages();
   else if (command === 'remove') result = removeLanguages(args);
-  else throw new Error(`Unknown command "${command}". Expected list, status, install, remove, or sync.`);
+  else if (command === 'qualify') result = { schemaVersion: 2, qualifications: qualifyLanguages(args.length ? args : LANGUAGE_CATALOG.filter(INSTALLABLE).map(item => item.id)) };
+  else throw new Error(`Unknown command "${command}". Expected list, status, install, remove, sync, or qualify.`);
   process.stdout.write(`${json ? JSON.stringify(result) : formatStatus(result)}\n`);
   if ((command === 'status' || command === 'sync') && result.status !== 'PASS') process.exitCode = 1;
 }
@@ -113,6 +120,25 @@ function dependencySpecs(items) {
   for (const item of items) if (item.package) packages.set(item.package, item.version);
   if (![...items].some(item => item.package)) packages.delete('tree-sitter');
   return [...packages].map(([name, version]) => `${name}@${version}`);
+}
+
+function presetStatuses(languages) {
+  const byId = new Map(languages.map(item => [item.id, item]));
+  return Object.fromEntries(Object.entries(LANGUAGE_PRESETS).map(([name, ids]) => {
+    const packs = ids.map(id => byId.get(id)).filter(Boolean);
+    const blocked = packs.filter(item => !item.installable).map(item => ({ id: item.id, reason: item.unavailableReason }));
+    return [name, { status: blocked.length ? 'BLOCKED' : 'READY', packs: ids, blocked }];
+  }));
+}
+
+function unavailableReasonFor(item) {
+  if (!item) return 'unknown catalogue language';
+  if (item.support !== 'stable') return item.fallbackReason ?? 'parser pack is not qualified';
+  if (!item.package && item.parserKind !== 'structured') return 'no installable parser package is pinned';
+  if (!item.qualification?.parserLoaded) return 'parser load evidence is missing';
+  if (!item.qualification?.fixtures?.valid || !item.qualification?.fixtures?.invalid) return 'valid and invalid fixture evidence is incomplete';
+  if (!item.qualification?.fixtures?.positions) return 'position evidence is incomplete';
+  return 'qualification evidence is incomplete';
 }
 
 function assertLoadable(items) {
@@ -143,6 +169,7 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 function formatStatus(result) {
+  if (result.qualifications) return ['Sensor parser qualification', ...result.qualifications.map(item => `[${item.status}] ${item.id}: ${item.platform}${item.reason ? ` — ${item.reason}` : ''}`)].join('\n');
   const configured = new Set(result.configured ?? []);
   return ['Sensor language packs', ...result.languages.filter(item => configured.size === 0 || configured.has(item.id)).map(item => `[${item.support}] ${item.id}: parser=${item.parser}${item.package ? ` ${item.package}@${item.version}` : ''}`), ...(result.extensionIssues ?? []).map(issue => `[MISSING] codeExtensions ${issue}`), `Result: ${result.status}`].join('\n');
 }

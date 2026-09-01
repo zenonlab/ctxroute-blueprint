@@ -14,8 +14,20 @@ test('language status compares configured parsers, manifest, and lockfile', () =
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);
   assert.equal(body.status, 'PASS');
+  assert.equal(body.catalogVersion, 2);
   assert.equal(body.languages.find(item => item.id === 'javascript').locked, true);
   assert.equal(body.languages.find(item => item.id === 'rust').support, 'MISSING');
+  assert.equal(body.languages.find(item => item.id === 'rust').installCommand, null);
+  assert.match(body.languages.find(item => item.id === 'rust').unavailableReason, /No Node 22 parser pack/u);
+});
+
+test('list exposes atomic preset readiness and blocked packs', () => {
+  const result = runFixture(['list', '--json'], ['javascript', 'json']);
+  assert.equal(result.status, 0, result.stderr);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.presets.web.status, 'BLOCKED');
+  assert.ok(body.presets.web.blocked.some(item => item.id === 'astro'));
+  assert.equal(body.presets.web.packs.includes('astro'), true);
 });
 
 test('install is idempotent for a structured built-in pack', () => {

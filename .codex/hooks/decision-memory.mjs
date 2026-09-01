@@ -24,7 +24,7 @@ export function loadAdrs(root = process.cwd()) {
 }
 
 export function matchScope(path, scope) {
-  return Array.isArray(scope) && scope.some(pattern => typeof pattern === 'string' && globPattern(pattern).test(normalizePath(path)));
+  return Array.isArray(scope) && scope.some(pattern => pattern === String(pattern) && globPattern(pattern).test(normalizePath(path)));
 }
 
 export function applicableAdrs(paths, root = process.cwd()) {
@@ -92,8 +92,8 @@ function repositoryFiles(root) {
 
 export function validateMetadata(metadata, file = '') {
   const errors = [];
-  if (!metadata || !Array.isArray(metadata.scope) || !metadata.scope.length || metadata.scope.some(value => typeof value !== 'string' || !value.trim())) errors.push(`${file}: scope must be a non-empty string array`);
-  if (metadata?.contracts !== undefined && (!Array.isArray(metadata.contracts) || metadata.contracts.some(value => typeof value !== 'string' || !value.trim()))) errors.push(`${file}: contracts must be a string array`);
+  if (!metadata || !Array.isArray(metadata.scope) || !metadata.scope.length || metadata.scope.some(value => value !== String(value) || !value.trim())) errors.push(`${file}: scope must be a non-empty string array`);
+  if (metadata?.contracts !== undefined && (!Array.isArray(metadata.contracts) || metadata.contracts.some(value => value !== String(value) || !value.trim()))) errors.push(`${file}: contracts must be a string array`);
   if (!['on-change', 'manual', 'never'].includes(metadata?.review)) errors.push(`${file}: review must be on-change, manual, or never`);
   if (metadata?.['superseded-by'] !== undefined && !/^ADR-\d{4}-.+\.md$/u.test(String(metadata['superseded-by']))) errors.push(`${file}: superseded-by must reference an ADR filename`);
   if (metadata?.['conflicts-with'] !== undefined && (!Array.isArray(metadata['conflicts-with']) || metadata['conflicts-with'].some(value => !/^ADR-\d{4}-.+\.md$/u.test(String(value))))) errors.push(`${file}: conflicts-with must be an array of ADR filenames`);
@@ -102,7 +102,7 @@ export function validateMetadata(metadata, file = '') {
 }
 
 export function normalizePath(value) {
-  return typeof value === 'string' ? value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '') : '';
+  return value === String(value) ? value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '') : '';
 }
 
 function parseYamlSubset(source) {

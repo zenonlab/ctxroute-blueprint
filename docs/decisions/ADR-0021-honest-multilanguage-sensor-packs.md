@@ -21,8 +21,9 @@ contracts:
 
 ## Decision
 
-The Sensor catalogue classifies all 113 legacy extensions and 9 filenames but
-separates recognition from syntax support. `PASS` requires a grammar or a real
+The Sensor v2 catalogue classifies all 115 extensions and 9 filenames,
+including Astro and Jupyter notebooks, but separates recognition from syntax
+support. `PASS` requires a grammar or a real
 structured parser loaded on Node 22. Extractors and lexical checks report
 `PARTIAL`; formats without a verified parser report `MISSING`; irrelevant
 capabilities report `N/A`. A lexical fallback can never become syntax-aware.
@@ -34,9 +35,19 @@ schema 2 retains the verdict and diagnostics contracts and adds per-file
 language, parser, syntax-awareness, and capability evidence.
 
 Language packs are managed only by `sensor:languages`. Identifiers and package
-names come from the catalogue, versions are exact, the npm lockfile is checked,
-and failed mutations restore project configuration, package manifest, and
-lockfile. Setup runs `sync`; hooks and scans never install dependencies.
+names come from the catalogue, versions and checksums are exact, the npm
+lockfile is checked, and failed mutations restore project configuration,
+package manifest, and lockfile. `qualify` executes valid, invalid, and located
+fixtures in a temporary workspace. Presets expose `READY` or `BLOCKED` and are
+rejected before mutation when any pack lacks complete evidence. Setup runs
+`sync`; hooks and scans never install dependencies.
+
+Parser ASTs are projected into a normalized IR covering imports, calls,
+arguments, assignments, literals, interpolation, error blocks, HTML elements,
+and attributes. Composite scripts are materialized only in an ephemeral
+workspace for one official Oxlint batch, then diagnostics are mapped to host
+coordinates. Vue, Svelte, Astro, HTML/template scripts, and notebook code cells
+share this mapping boundary.
 
 Official anti-slop source is vendored from immutable commit
 `e8c4880471b23ab7f216fba7b27d173a6ef07d4c` with MIT licence, checksum,
@@ -54,8 +65,10 @@ catalogue entries remain visible as `PARTIAL` or `MISSING` until a compatible
 parser and fixture matrix are added. Presets containing an unavailable parser
 fail before mutation instead of pretending installation succeeded.
 
-The blueprint baseline freezes audited pre-existing official-rule debt by exact
-path/rule occurrence. New occurrences remain blocking.
+The blueprint baseline has no exceptions. The 69 pre-existing
+`anti-slop/no-runtime-typeof` errors and the commit-message path false positive
+were removed. Stale entries and all unexpected blocking diagnostics fail the
+gate.
 
 ## Alternatives
 

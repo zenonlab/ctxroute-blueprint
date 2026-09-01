@@ -13,7 +13,7 @@ export function evaluateBaseline(diagnostics, baseline) {
   const allowance = Object.create(null);
   for (const exception of baseline?.exceptions ?? []) {
     const key = `${exception.path}\0${exception.rule}`;
-    if (typeof exception.path !== 'string' || typeof exception.rule !== 'string' || !Number.isInteger(exception.occurrences) || exception.occurrences < 1 || typeof exception.justification !== 'string' || exception.justification.trim().length < 20 || Object.hasOwn(allowance, key)) failures.push(`invalid or duplicate baseline exception: ${exception.path ?? '(missing)'} ${exception.rule ?? '(missing)'}`);
+    if (exception.path !== String(exception.path) || exception.rule !== String(exception.rule) || !Number.isInteger(exception.occurrences) || exception.occurrences < 1 || exception.justification !== String(exception.justification) || exception.justification.trim().length < 20 || Object.hasOwn(allowance, key)) failures.push(`invalid or duplicate baseline exception: ${exception.path ?? '(missing)'} ${exception.rule ?? '(missing)'}`);
     else allowance[key] = { remaining: exception.occurrences, exception };
   }
 

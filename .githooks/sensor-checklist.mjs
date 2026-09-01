@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { grammarStatus, SENSOR_COVERAGE } from './sensor-engine.mjs';
+import { CATALOG_VERSION } from './ast-registry.mjs';
 
 export function runChecklist(root = process.cwd()) {
   const statuses = grammarStatus();
@@ -11,7 +12,7 @@ export function runChecklist(root = process.cwd()) {
   const configured = project?.quality?.sensor?.languages ?? [];
   const configuredStatuses = configured.map(id => adapters.find(item => item.id === id)).filter(Boolean);
   const checks = [
-    check('catalog-classification', extensionCount === 113 && filenameCount === 9, `${extensionCount} extensions / ${filenameCount} filenames`),
+    check('catalog-classification', extensionCount === 115 && filenameCount === 9, `${extensionCount} extensions / ${filenameCount} filenames`),
     check('no-false-pass', adapters.every(item => item.status !== 'PASS' || item.syntaxAware), `${adapters.filter(item => item.status === 'PASS').length} syntax-aware PASS / ${adapters.filter(item => item.status === 'PARTIAL').length} PARTIAL / ${adapters.filter(item => item.status === 'MISSING').length} MISSING`),
     check('configured-languages', configured.length > 0 && configuredStatuses.length === configured.length, configured.join(', ')),
     check('configured-parsers', configuredStatuses.every(item => item.syntaxAware), configuredStatuses.map(item => `${item.id}: ${item.status}`).join(', ')),
@@ -21,7 +22,7 @@ export function runChecklist(root = process.cwd()) {
     check('architecture', existsSync(resolve(root, 'docs/architecture/src/blueprint.architecture.json')), 'Archify source'),
     check('tests', existsSync(resolve(root, 'tests/sensor.test.mjs')) && existsSync(resolve(root, 'tests/sensor-languages.test.mjs')), 'engine + language packs'),
   ];
-  return { schemaVersion: 2, catalogVersion: 1, status: checks.every(item => item.status === 'PASS') ? 'PASS' : 'FAIL', adapters, configured, checks };
+  return { schemaVersion: 2, catalogVersion: CATALOG_VERSION, status: checks.every(item => item.status === 'PASS') ? 'PASS' : 'FAIL', adapters, configured, checks };
 }
 
 export function formatChecklist(result) { return ['Sensor checklist', ...result.checks.map(item => `[${item.status}] ${item.name}: ${item.detail}`), `Result: ${result.status}`].join('\n'); }

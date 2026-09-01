@@ -6,19 +6,19 @@ const defaultPath = '.project/ui-design-contract.json';
 
 export function validateUiContract(document) {
   const errors = [];
-  if (!document || typeof document !== 'object' || Array.isArray(document)) return ['contract must be an object'];
+  if (!document || document !== Object(document) || Array.isArray(document)) return ['contract must be an object'];
   if (document.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
   if (document.policy !== 'framework-neutral') errors.push('policy must be framework-neutral');
   for (const category of ['color', 'spacing', 'typography', 'radius', 'motion']) {
     const values = document.tokens?.[category];
-    if (!Array.isArray(values) || !values.length || values.some(value => typeof value !== 'string' || !value)) errors.push(`tokens.${category} must be a non-empty array of strings`);
+    if (!Array.isArray(values) || !values.length || values.some(value => value !== String(value) || !value)) errors.push(`tokens.${category} must be a non-empty array of strings`);
     else if (new Set(values).size !== values.length) errors.push(`tokens.${category} must not contain duplicates`);
   }
   if (!Array.isArray(document.components) || !document.components.length) errors.push('components must be a non-empty array');
   else {
     const ids = new Set();
     for (const component of document.components) {
-      if (!component || typeof component !== 'object' || !component.id || typeof component.id !== 'string') { errors.push('every component needs a string id'); continue; }
+      if (!component || component !== Object(component) || !component.id || component.id !== String(component.id)) { errors.push('every component needs a string id'); continue; }
       if (ids.has(component.id)) errors.push(`component id is duplicated: ${component.id}`);
       ids.add(component.id);
       for (const field of ['anatomy', 'variants', 'states', 'slots', 'accessibility']) {
@@ -29,7 +29,7 @@ export function validateUiContract(document) {
     }
   }
   const rules = document.rules;
-  for (const key of ['reuseBeforeCreate', 'noArbitraryValues', 'noInlineStyle', 'noLayerFusion']) if (typeof rules?.[key] !== 'boolean') errors.push(`rules.${key} must be boolean`);
+  for (const key of ['reuseBeforeCreate', 'noArbitraryValues', 'noInlineStyle', 'noLayerFusion']) if (rules?.[key] !== true && rules?.[key] !== false) errors.push(`rules.${key} must be boolean`);
   if (!Array.isArray(rules?.requiredEvidence) || !rules.requiredEvidence.length) errors.push('rules.requiredEvidence must be a non-empty array');
   if (rules?.allowedCustomComponents !== 'documented-with-rationale') errors.push('rules.allowedCustomComponents must require documented-with-rationale');
   if (document.adapters?.framework !== 'selected-by-derived-product' || document.adapters?.required !== false || document.adapters?.contractOnly !== true) errors.push('adapters must remain optional, product-selected, and contract-only');

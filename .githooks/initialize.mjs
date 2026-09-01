@@ -7,7 +7,7 @@ const config = JSON.parse(readFileSync(configPath, 'utf8'));
 if (config.status === 'initialized') { run('Validate initialized blueprint', npm, ['run', 'validate']); console.log('Blueprint is already initialized.'); process.exit(0); }
 if (config.status !== 'template') fail(`Cannot initialize from status ${config.status ?? '(missing)'}.`);
 const missing = Object.entries(config.decisions ?? {})
-  .filter(([, value]) => typeof value !== 'string' || !value.trim() || /\[[^\]]+\]/u.test(value))
+  .filter(([, value]) => value !== String(value) || !value.trim() || /\[[^\]]+\]/u.test(value))
   .map(([name]) => `decision: ${name}`);
 for (const file of ['docs/00-project-brief.md', 'docs/01-technology-decisions.md', 'docs/02-quality-strategy.md']) {
   if (/\[[^\]]+\]/u.test(readFileSync(file, 'utf8'))) missing.push(`placeholder: ${file}`);

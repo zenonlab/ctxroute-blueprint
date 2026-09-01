@@ -40,10 +40,20 @@ contract, or major quality constraints belong in an ADR.
 
 ## Sensor and CRG boundary
 
-The Sensor catalogue classifies recognition separately from support. JavaScript,
-TypeScript/TSX, Python, Ruby/ERB, and JSON have verified syntax parsing. Other
-formats are `PARTIAL` or `MISSING` until their Node 22 parser and fixture matrix
-are verified. A fallback reports itself and never claims syntax-aware coverage.
+The Sensor v2 catalogue classifies recognition, parsing, common rules, and
+ecosystem rules separately. JavaScript, TypeScript/TSX, Python, Ruby/ERB, and
+JSON have verified syntax parsing. Other formats are `PARTIAL` or `MISSING`
+until their Node 22 parser and valid/invalid fixture matrix are verified. Astro
+and notebook cells are recognized composite sources with host diagnostic
+mapping, but remain `PARTIAL` until their own parser packs are qualified. A
+fallback reports itself and never claims syntax-aware coverage.
+
+`npm run sensor:languages -- qualify --json` runs parser fixtures in a temporary
+workspace without changing project manifests. Pack and preset status includes
+provenance, checksum, platform evidence, `READY`/`BLOCKED`, and exact blocking
+reasons. A blocked preset performs no mutation. The blocking anti-slop baseline
+is empty; stale exceptions and new blocking diagnostics fail validation, and
+`npm run lint:anti-slop` is part of `npm run validate`.
 The vendored official JS/TS anti-slop rules keep `anti-slop/*` IDs; common
 blueprint heuristics use `sensor/quality/*`.
 

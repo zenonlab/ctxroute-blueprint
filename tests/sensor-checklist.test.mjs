@@ -13,7 +13,8 @@ test('sensor checklist reports honest syntax coverage in JSON and terminal forma
   const result = JSON.parse(json.stdout);
   assert.equal(result.schemaVersion, 2);
   assert.equal(result.status, 'PASS');
-  assert.equal(result.checks.find(item => item.name === 'catalog-classification').detail, '113 extensions / 9 filenames');
+  assert.equal(result.catalogVersion, 2);
+  assert.equal(result.checks.find(item => item.name === 'catalog-classification').detail, '115 extensions / 9 filenames');
   assert.equal(result.checks.find(item => item.name === 'no-false-pass').status, 'PASS');
   assert.equal(result.adapters.find(item => item.id === 'javascript').status, 'PASS');
   assert.equal(result.adapters.find(item => item.id === 'javascript').syntaxAware, true);
