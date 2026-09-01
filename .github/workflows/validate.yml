@@ -60,6 +60,9 @@ jobs:
           npm run crg:version
           npm run mcp:validate
 
+      - name: Smoke-test Progress MCP transport
+        run: npm run mcp:smoke
+
       - name: Smoke-test official CRG transport
         if: runner.os != 'Windows'
         shell: bash
