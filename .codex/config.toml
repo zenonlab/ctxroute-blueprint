@@ -1,0 +1,9 @@
+[mcp_servers.ctxroute-progress]
+command = "npm"
+args = ["run", "progress:mcp"]
+cwd = "."
+
+[mcp_servers.ctxroute-context-ast]
+command = "npm"
+args = ["run", "context:mcp"]
+cwd = "."

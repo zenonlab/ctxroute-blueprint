@@ -1,45 +1,12 @@
 import Parser from 'tree-sitter';
-import JavaScript from 'tree-sitter-javascript';
-import TypeScript from 'tree-sitter-typescript';
-import Python from 'tree-sitter-python';
+import { adapterMetadata, AST_REGISTRY, extractEmbeddedSource, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { basename, extname, resolve } from 'node:path';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
-export const SENSOR_ADAPTERS = Object.freeze([
-  Object.freeze({ id: 'javascript', mode: 'AST', extensions: Object.freeze(['.js', '.jsx', '.mjs', '.cjs']) }),
-  Object.freeze({ id: 'typescript', mode: 'AST', extensions: Object.freeze(['.ts', '.tsx']) }),
-  Object.freeze({ id: 'python', mode: 'AST', extensions: Object.freeze(['.py']) }),
-  Object.freeze({ id: 'sql', mode: 'lexical', extensions: Object.freeze(['.sql']) }),
-  Object.freeze({ id: 'html', mode: 'embedded', extensions: Object.freeze(['.html', '.htm']) }),
-  Object.freeze({ id: 'css', mode: 'lexical', extensions: Object.freeze(['.css', '.scss', '.sass']) }),
-  Object.freeze({ id: 'single-file-component', mode: 'embedded', extensions: Object.freeze(['.vue', '.svelte']) }),
-  Object.freeze({ id: 'template', mode: 'embedded', extensions: Object.freeze(['.erb', '.haml', '.slim', '.heex', '.leex', '.j2', '.jinja', '.jinja2', '.twig', '.tera', '.hbs', '.handlebars', '.liquid', '.ejs', '.pug', '.jade', '.cshtml', '.razor', '.jsp', '.jspx']) }),
-  Object.freeze({ id: 'lexical-source', mode: 'lexical', filenames: Object.freeze(['Dockerfile', 'Makefile', 'Justfile', 'Gemfile', 'Rakefile', 'config.ru']), extensions: Object.freeze([
-    '.rs', '.go', '.java', '.kt', '.kts', '.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.cs',
-    '.php', '.rb', '.rake', '.ru', '.swift', '.sh', '.bash', '.zsh', '.dart', '.ex', '.exs', '.erl', '.hrl',
-    '.fs', '.fsx', '.fsi', '.hs', '.lhs', '.lua', '.r', '.scala', '.sc', '.clj', '.cljs', '.cljc',
-    '.groovy', '.m', '.mm', '.zig', '.nim', '.pl', '.pm', '.t', '.vb', '.vbs', '.v', '.sv',
-    '.sol', '.move', '.asm', '.s', '.pas', '.f', '.for', '.f03', '.f90', '.f95'
-  ]) }),
-  Object.freeze({ id: 'lexical-data', mode: 'lexical', filenames: Object.freeze(['.env', '.env.example', '.env.local']), extensions: Object.freeze([
-    '.toml', '.yaml', '.yml', '.json', '.xml', '.proto', '.graphql', '.gql', '.ini', '.cfg',
-    '.conf', '.properties', '.env', '.tf', '.tfvars', '.hcl', '.cue', '.dhall', '.nix'
-  ]) }),
-]);
+export { AST_REGISTRY, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
 const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
 const adapterByFilename = new Map(SENSOR_ADAPTERS.flatMap(adapter => (adapter.filenames ?? []).map(filename => [filename, adapter.id])));
-const grammars = new Map([
-  ['.js', JavaScript], ['.jsx', JavaScript], ['.mjs', JavaScript], ['.cjs', JavaScript],
-  ['.ts', TypeScript.typescript], ['.tsx', TypeScript.tsx], ['.py', Python],
-]);
-const require = createRequire(import.meta.url);
-const optionalGrammarCache = new Map();
-export const SENSOR_OPTIONAL_PARSERS = Object.freeze([
-  Object.freeze({ id: 'ruby-ast', package: 'tree-sitter-ruby', extensions: Object.freeze(['.rb', '.rake', '.ru']) }),
-  Object.freeze({ id: 'php-ast', package: 'tree-sitter-php', extensions: Object.freeze(['.php']) }),
-]);
 export const SENSOR_COVERAGE = Object.freeze({
   moduleScope: 'explicit-paths',
   packageResolution: 'disabled',
@@ -48,17 +15,20 @@ export const SENSOR_COVERAGE = Object.freeze({
 });
 
 export function adapterForPath(path) {
-  const name = basename(path).toLowerCase();
-  if (name.endsWith('.blade.php')) return 'template';
-  return adapterByExtension.get(extname(path).toLowerCase()) ?? adapterByFilename.get(basename(path));
+  const resolved = resolveRegistryEntry(path);
+  return resolved?.sensorAdapter ?? resolved?.id ?? adapterByExtension.get(extname(path).toLowerCase()) ?? adapterByFilename.get(basename(path));
 }
 
 export function isSupportedSourcePath(path) {
   return Boolean(adapterForPath(path));
 }
 
-export function optionalParserStatus() {
-  return SENSOR_OPTIONAL_PARSERS.map(parser => ({ ...parser, available: optionalGrammar(parser.extensions[0]) !== null }));
+export function optionalParserStatus(loader) {
+  return SENSOR_OPTIONAL_PARSERS.map(parser => {
+    const sample = parser.extensions[0] ? `sample${parser.extensions[0]}` : parser.filenames[0];
+    const resolved = resolveRegistryEntry(sample, loader);
+    return { id: `${parser.id}-ast`, package: parser.package, extensions: parser.extensions, mode: resolved.actualMode, available: resolved.available, fallback: resolved.fallback, fallbackReason: resolved.fallbackReason };
+  });
 }
 
 export function toSarif(result) {
@@ -95,43 +65,36 @@ export function analyzePaths(paths, { root = process.cwd(), config = defaultConf
   return sensorResult(verdict, stableDiagnostics);
 }
 
-export function analyzeSource(path, source, { config = {}, state } = {}) {
+export function analyzeSource(path, source, { config = {}, state, grammarLoader } = {}) {
   const extension = extname(path).toLowerCase();
   const diagnostics = [];
-  const adapter = adapterForPath(path);
-  const grammar = grammars.get(extension) ?? optionalGrammar(extension);
-  if (grammar) {
-    analyzeAst(path, source, grammar, config, diagnostics, state);
-    if (!grammars.has(extension)) analyzeSourceLexicalFallback(path, source, adapter, diagnostics);
-  }
-  else if (adapter === 'sql') analyzeSql(path, source, diagnostics, config);
-  else if (adapter === 'html') analyzeHtml(path, source, diagnostics);
-  else if (adapter === 'css') analyzeCss(path, source, diagnostics);
-  else if (adapter === 'single-file-component') analyzeSingleFileComponent(path, source, diagnostics, config);
-  else if (adapter === 'template') analyzeTemplate(path, source, diagnostics, config);
-  else if (adapter === 'lexical-source' || adapter === 'lexical-data') analyzeLexical(path, source, diagnostics);
+  const resolved = resolveRegistryEntry(path, grammarLoader);
+  const registryId = resolved?.id;
+  const adapter = resolved?.sensorAdapter ?? registryId;
+  const run = (operation, metadata) => {
+    const start = diagnostics.length;
+    operation();
+    for (let index = start; index < diagnostics.length; index += 1) Object.assign(diagnostics[index], metadata);
+  };
+  if (resolved?.grammar) {
+    if (registryId === 'erb') run(() => analyzeHtml(path, source.replace(/<%[\s\S]*?%>/gu, match => match.replace(/[^\n\r]/gu, ' ')), diagnostics), { mode: 'embedded', grammar: null, fallback: null, fallbackReason: null });
+    const parserSource = extractEmbeddedSource(resolved, source);
+    run(() => analyzeAst(path, source, parserSource, resolved, config, diagnostics, state), { mode: resolved.mode, grammar: resolved.package, fallback: null, fallbackReason: null });
+  } else if ((registryId === 'ruby' || registryId === 'erb') && resolved?.fallback === 'lexical') {
+    run(() => analyzeRuby(path, source, diagnostics), { mode: 'lexical', grammar: null, fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+    diagnostics.push({ ...diagnostic(path, null, 'sensor/parser-unavailable', 'WARN', `${resolved.package} unavailable; lexical fallback used.`), mode: 'lexical', grammar: null, fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+  } else if (registryId === 'sql') run(() => analyzeSql(path, source, diagnostics, config), lexicalMetadata());
+  else if (registryId === 'html') run(() => analyzeHtml(path, source, diagnostics), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'css') run(() => analyzeCss(path, source, diagnostics), lexicalMetadata());
+  else if (registryId === 'single-file-component') run(() => analyzeSingleFileComponent(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'template' || registryId === 'blade') run(() => analyzeTemplate(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'lexical-source' || registryId === 'lexical-data') run(() => analyzeLexical(path, source, diagnostics), lexicalMetadata());
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
-  return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: item.adapter ?? adapter ?? 'unsupported' }));
+  const metadata = adapterMetadata(path, grammarLoader);
+  return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: adapter ?? metadata.adapter, mode: item.mode ?? metadata.mode, grammar: Object.hasOwn(item, 'grammar') ? item.grammar : metadata.grammar, fallback: Object.hasOwn(item, 'fallback') ? item.fallback : metadata.fallback, fallbackReason: Object.hasOwn(item, 'fallbackReason') ? item.fallbackReason : metadata.fallbackReason }));
 }
 
-function analyzeSourceLexicalFallback(path, source, adapter, diagnostics) {
-  if (adapter === 'lexical-source') analyzeLexical(path, source, diagnostics);
-}
-
-function optionalGrammar(extension) {
-  const parser = SENSOR_OPTIONAL_PARSERS.find(item => item.extensions.includes(extension));
-  if (!parser) return null;
-  if (optionalGrammarCache.has(parser.package)) return optionalGrammarCache.get(parser.package);
-  try {
-    const module = require(parser.package);
-    const grammar = module.default ?? module;
-    optionalGrammarCache.set(parser.package, grammar);
-    return grammar;
-  } catch {
-    optionalGrammarCache.set(parser.package, null);
-    return null;
-  }
-}
+function lexicalMetadata() { return { mode: 'lexical', grammar: null, fallback: null, fallbackReason: null }; }
 
 function analyzePath(path, root, config, diagnostics, sharedState) {
   try {
@@ -143,25 +106,21 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
   catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
 }
 
-function analyzeAst(path, source, grammar, config, diagnostics, inheritedState) {
-  if (Buffer.byteLength(source, 'utf8') > 32000) {
-    analyzeLexical(path, source, diagnostics);
-    diagnostics.push(diagnostic(path, null, 'sensor/analysis-limit', 'WARN', 'Source exceeds the bounded AST parser input size; lexical checks were used instead.'));
-    return;
-  }
-  const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
+function analyzeAst(path, source, parserSource, entry, config, diagnostics, inheritedState) {
+  const tree = parseTree(entry.grammar, parserSource);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
   let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
   state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Map(); state.importedSqlFunctions ??= new Map();
   state.taintedVariables ??= new Set();
-  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state); });
+  walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state, entry.language); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
   if (count > complexity.maxNodes || maxDepth > complexity.maxDepth) diagnostics.push(diagnostic(path, tree.rootNode, 'sensor/excessive-complexity', 'WARN', `AST complexity ${count} nodes / depth ${maxDepth} exceeds ${complexity.maxNodes} / ${complexity.maxDepth}.`));
 }
 
-function inspectAst(path, source, node, diagnostics, config, state) {
+function inspectAst(path, source, node, diagnostics, config, state, language) {
   const text = source.slice(node.startIndex, node.endIndex);
   if (/comment$/u.test(node.type) && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
+  if (language === 'ruby' || language === 'erb') inspectRubyAst(path, source, node, diagnostics, config);
   if (node.type === 'variable_declarator' || node.type === 'assignment_expression' || node.type === 'assignment') {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
     const right = node.childForFieldName('value') ?? node.childForFieldName('right');
@@ -210,6 +169,59 @@ function inspectAst(path, source, node, diagnostics, config, state) {
   if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
   if (node.type === 'jsx_attribute' && /^dangerouslySetInnerHTML\b/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'Raw HTML is injected into a JSX element.'));
   if (node.type === 'property_identifier' && node.text === '__proto__') diagnostics.push(diagnostic(path, node, 'sensor/prototype-pollution', 'UNSAFE', 'Prototype mutation through __proto__ is forbidden.'));
+}
+
+function inspectRubyAst(path, source, node, diagnostics, config) {
+  if (node.type !== 'call') {
+    if (node.type === 'element_reference' && isRawErbNode(source, node) && rubyRequestControlled(node)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'ERB raw output renders request-controlled data without escaping.'));
+    return;
+  }
+  const receiver = node.childForFieldName('receiver');
+  const method = node.childForFieldName('method')?.text ?? node.namedChildren[0]?.text ?? '';
+  const name = receiver ? `${receiver.text}.${method}` : method;
+  const argumentsNode = node.childForFieldName('arguments');
+  const firstArgument = argumentsNode?.namedChildren[0];
+  const dynamic = rubyDynamic(firstArgument);
+  const requestControlled = rubyRequestControlled(firstArgument);
+  const sqlSinks = new Set(['find_by_sql', 'find_by_query', 'execute', 'exec_query', 'select_all', 'where', 'order', 'pluck', 'select']);
+  const shellSinks = /^(?:system|exec|spawn|Open3\.(?:capture\d?|popen\d?|pipeline))$/u;
+  const fileSinks = /^(?:send_file|send_data|File\.(?:write|binwrite|open)|IO\.write)$/u;
+  const redirectSinks = new Set(['redirect_to', 'redirect_back']);
+
+  if (method === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
+  if (sqlSinks.has(method) && dynamic) diagnostics.push(diagnostic(path, node, 'sensor/sql-injection', 'UNSAFE', 'Ruby SQL query is dynamically constructed; use bind parameters or an ORM parameter API.'));
+  if (shellSinks.test(name) && (dynamic || requestControlled || !rubyLiteral(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/dynamic-execution', 'UNSAFE', 'Ruby command execution uses dynamic data.'));
+  if (shellSinks.test(name) && rubyLiteral(firstArgument)) {
+    const command = unquote(firstArgument.text).toLowerCase();
+    if ((config.dangerousCommands ?? []).some(value => command.includes(String(value).toLowerCase()))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
+  }
+  if (fileSinks.test(name) && requestControlled) diagnostics.push(diagnostic(path, node, 'sensor/path-traversal', 'UNSAFE', 'Rails file output uses request-controlled data; validate an allowlisted path.'));
+  if (redirectSinks.has(method) && requestControlled) diagnostics.push(diagnostic(path, node, 'sensor/open-redirect', 'WARN', 'Rails redirect destination is request-controlled; validate it against an allowlist.'));
+  const inlinePair = argumentsNode?.namedChildren.find(child => child.type === 'pair' && /^(?:inline|html):/u.test(child.text));
+  if (method === 'render' && inlinePair && rubyRequestControlled(inlinePair)) diagnostics.push(diagnostic(path, node, 'sensor/rails-unsafe-render', 'WARN', 'Rails inline rendering uses request-controlled data.'));
+  if ((method === 'raw' && requestControlled) || method === 'html_safe') diagnostics.push(diagnostic(path, node, 'sensor/rails-unsafe-render', 'WARN', 'Rails rendering bypasses automatic HTML escaping; sanitize the value.'));
+  if (receiver?.text === 'params' && method === 'permit!') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'params.permit! bypasses an explicit strong-parameter allowlist.'));
+  if (/^[A-Z]/u.test(receiver?.text ?? '') && /^(?:new|create|create!|update|update!|assign_attributes)$/u.test(method) && firstArgument?.text === 'params') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'Rails model assignment should use an explicit params permit list.'));
+  if (/^(?:puts|p|pp|print|warn|byebug|debugger)$/u.test(method) || name === 'binding.irb') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Ruby debug output or an interactive breakpoint should not ship in production code.'));
+}
+
+function rubyDynamic(node) {
+  if (!node) return false;
+  if (node.type === 'interpolation') return true;
+  if (node.type === 'binary' && node.children.some(child => child.text === '+' || child.text === '<<')) return true;
+  return node.namedChildren.some(rubyDynamic);
+}
+function rubyRequestControlled(node) {
+  if (!node) return false;
+  if (node.type === 'identifier' && /^(?:params|request)$/u.test(node.text)) return true;
+  if (node.type === 'call' && /^(?:params|request)$/u.test(node.childForFieldName('receiver')?.text ?? '')) return true;
+  return node.namedChildren.some(rubyRequestControlled);
+}
+function rubyLiteral(node) { return Boolean(node && /^(?:string|string_array|symbol|simple_symbol)$/u.test(node.type) && !rubyDynamic(node)); }
+function unquote(value) { return value.replace(/^['"]|['"]$/gu, ''); }
+function isRawErbNode(source, node) {
+  const open = source.lastIndexOf('<%', node.startIndex);
+  return open >= 0 && /^<%==/u.test(source.slice(open, open + 4)) && source.indexOf('%>', open) >= node.endIndex;
 }
 
 function analyzeSql(path, source, diagnostics, config = {}) {
@@ -326,23 +338,24 @@ function collectDynamicExports(paths, root, sourceCache = new Map()) {
       const source = sourceCache.has(absolutePath) ? sourceCache.get(absolutePath) : readFileSync(absolutePath, 'utf8');
       sourceCache.set(absolutePath, source);
       const extension = extname(path).toLowerCase();
-      const grammar = grammars.get(extension);
-      if (grammar) indexDynamicExports(source, grammar, path, root, exports);
+      const resolved = resolveRegistryEntry(path);
+      if (resolved?.grammar && !['ruby', 'erb'].includes(resolved.language)) indexDynamicExports(source, resolved.grammar, resolved.language, path, root, exports);
       else if (extension === '.vue' || extension === '.svelte') {
         for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)) {
-          const language = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? '.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? '.ts' : '.js';
-          indexDynamicExports(match[2], grammars.get(language), path, root, exports);
+          const extensionPath = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? 'embedded.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? 'embedded.ts' : 'embedded.js';
+          const embedded = resolveRegistryEntry(extensionPath);
+          indexDynamicExports(match[2], embedded?.grammar, embedded?.language, path, root, exports);
         }
       }
     } catch { /* the normal scan emits the authoritative read/syntax diagnostic */ }
   }
   return exports;
 }
-function indexDynamicExports(source, grammar, path, root, exports) {
+function indexDynamicExports(source, grammar, language, path, root, exports) {
   if (!grammar) return;
-  const parser = new Parser(); parser.setLanguage(grammar); const tree = parser.parse(source);
+  const tree = parseTree(grammar, source);
   walk(tree.rootNode, 0, node => {
-    const pythonModuleFunction = grammar === Python && node.type === 'function_definition' && node.parent?.type === 'module';
+    const pythonModuleFunction = language === 'python' && node.type === 'function_definition' && node.parent?.type === 'module';
     const exportedFunction = (node.type === 'function_declaration' || node.type === 'variable_declarator') && isExported(node);
     const name = node.childForFieldName('name')?.text ?? '';
     const exportedDefault = exportedFunction && /^export\s+default\b/u.test(source.slice(node.parent?.startIndex ?? node.startIndex, node.parent?.endIndex ?? node.endIndex));
@@ -357,6 +370,11 @@ function indexDynamicExports(source, grammar, path, root, exports) {
     const candidates = exports.get(match[1]);
     if (candidates) exports.set('default', new Set([...(exports.get('default') ?? []), ...candidates]));
   }
+}
+function parseTree(grammar, source) {
+  const parser = new Parser();
+  parser.setLanguage(grammar);
+  return parser.parse(source, undefined, { bufferSize: Math.max(32_768, Buffer.byteLength(source, 'utf8') + 1) });
 }
 function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
 function collectImportedNames(source) {

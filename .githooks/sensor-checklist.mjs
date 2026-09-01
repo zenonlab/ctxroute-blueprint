@@ -4,14 +4,14 @@ import { optionalParserStatus, SENSOR_ADAPTERS, SENSOR_COVERAGE } from './sensor
 
 export function runChecklist(root = process.cwd()) {
   const hasExtension = extension => SENSOR_ADAPTERS.some(adapter => adapter.extensions.includes(extension));
-  const optionalParsers = optionalParserStatus().map(parser => ({ id: parser.id, package: parser.package, available: parser.available, fallback: parser.available ? null : 'lexical' }));
-  const adapters = SENSOR_ADAPTERS.map(adapter => ({ id: adapter.id, mode: adapter.mode, ...(adapter.filenames ? { filenames: [...adapter.filenames] } : {}), extensions: [...adapter.extensions], status: 'PASS' }));
+  const optionalParsers = optionalParserStatus().map(parser => ({ id: parser.id, package: parser.package, mode: parser.mode, available: parser.available, fallback: parser.fallback, fallbackReason: parser.fallbackReason }));
+  const adapters = SENSOR_ADAPTERS.map(adapter => ({ id: adapter.id, language: adapter.language, mode: adapter.mode, grammar: adapter.package, variant: adapter.variant, extractor: adapter.extractor, fallbackAllowed: adapter.fallbackAllowed, ...(adapter.filenames.length ? { filenames: [...adapter.filenames] } : {}), extensions: [...adapter.extensions], status: 'PASS' }));
   const checks = [
     check('adapter-registry', SENSOR_ADAPTERS.length > 0, `${SENSOR_ADAPTERS.length} adapters`),
     check('rust', hasExtension('.rs'), 'Rust'),
     check('ruby-rails', hasExtension('.rb') && hasExtension('.erb') && hasExtension('.haml') && hasExtension('.slim'), 'Ruby / Rails templates'),
     check('template-families', hasExtension('.heex') && SENSOR_ADAPTERS.some(adapter => adapter.id === 'template'), 'Phoenix / Blade / common templates'),
-    check('optional-parsers', true, optionalParsers.map(parser => `${parser.id}: ${parser.available ? 'available' : 'unavailable; lexical fallback'}`).join(', ')),
+    check('ruby-grammars', optionalParsers.every(parser => parser.available), optionalParsers.map(parser => `${parser.id}: ${parser.available ? parser.mode : `${parser.fallback}; ${parser.fallbackReason}`}`).join(', ')),
     check('toml', hasExtension('.toml'), 'TOML'),
     check('common-config', ['.json', '.yaml', '.yml', '.xml'].every(hasExtension), 'JSON/YAML/XML'),
     check('bounded-module-scope', SENSOR_COVERAGE.moduleScope === 'explicit-paths' && SENSOR_COVERAGE.packageResolution === 'disabled' && !SENSOR_COVERAGE.wholeProgramAnalysis, SENSOR_COVERAGE.moduleScope),

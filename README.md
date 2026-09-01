@@ -98,6 +98,29 @@ The same bounded engine is exposed through the stdio MCP server with
 `npm run progress:mcp`. It supports multiple goals, atomic idempotent writes,
 safe repository-relative paths, and no raw logs, secrets, or conversation text.
 
+## Local MCP servers
+
+The repository exposes two independent stdio servers:
+
+- `ctxroute-progress` runs `npm run progress:mcp` and exposes four checklist
+  tools.
+- `ctxroute-context-ast` runs `npm run context:mcp` and exposes five read-only
+  AST context tools.
+
+Codex reads the tracked project configuration in [`.codex/config.toml`](.codex/config.toml),
+and Claude reads the tracked [`.mcp.json`](.mcp.json). These files never alter
+user-global configuration. A trusted client must approve project MCP servers;
+open a new local session or restart the client if it has already cached the
+project manifest. Use `/mcp` in the client to inspect the loaded servers and
+`npm run mcp:validate` or `npm run mcp:smoke` for mechanical verification.
+
+Context searches default to the `product` scope. Blueprint searches require
+`scope: "blueprint"`; one request cannot mix both scopes. The server rejects
+absolute paths, traversal, ignored/generated paths and symlinks leaving the
+workspace. Every response identifies its scope, actual mode, grammar,
+`gpt-tokenizer@4.0.0` count, and truncation state without returning full source
+by default.
+
 ## CTXRoute
 
 [CTXRoute](https://github.com/zenonlab/ctxroute) injects only relevant project
@@ -118,6 +141,9 @@ workspace hooks, producing duplicate progress messages and extra process
 startup latency. The installer reports this condition but never edits the
 global configuration. Lifecycle handlers omit custom status messages, and
 `PostToolUse` runs only for tools that can change repository state.
+PostToolUse runs CTXRoute guards, the blocking Sensor, problem memory, audit,
+and Archify preview. It does not start either MCP server; Codex and Claude own
+the stdio transports.
 
 The project-local lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `PreCompact`, and `Stop`. CTXRoute state and recurring
@@ -180,19 +206,23 @@ silent update.
 
 ## Sensor
 
-The Sensor uses one registered engine with three explicit coverage levels:
+The Sensor and Context MCP share one executable language registry with three
+explicit coverage levels:
 
-- **AST:** JavaScript, TypeScript, JSX/TSX, and Python.
-- **Dedicated analysis:** SQL, HTML, CSS, Vue, and Svelte.
-- **Lexical fallback:** Rust, Go, Java, Kotlin, C/C++, C#, PHP, Ruby, Swift,
+- **AST:** JavaScript, TypeScript, JSX/TSX, Python, and Ruby.
+- **Embedded AST:** Ruby blocks extracted from ERB without changing offsets.
+- **Dedicated/lexical:** SQL, HTML, CSS, Vue, Svelte, Rust, Go, Java, Kotlin,
+  C/C++, C#, PHP, Swift,
   Dart, Shell, Elixir, Erlang, Haskell, Lua, R, Scala, Solidity, and common
   configuration formats including TOML, YAML, JSON, XML, Terraform, HCL, and
   Protocol Buffers.
 
 AST adapters are syntax-aware. Dedicated and lexical adapters provide bounded
 coverage only; they do not claim type, package, dependency, or runtime
-analysis. Ruby and PHP AST parsers are optional and are not installed by the
-blueprint. The Sensor reports one stable JSON object containing a verdict,
+analysis. Ruby is a required, exact Tree-sitter dependency; PHP remains
+explicitly lexical and is never advertised as AST. A Ruby lexical fallback is
+used only when its grammar genuinely cannot load, and every diagnostic records
+the actual rule mode, grammar, fallback and reason. The Sensor reports one stable JSON object containing a verdict,
 coverage limits, and ordered diagnostics. SARIF 2.1.0 is available for
 code-scanning integrations:
 

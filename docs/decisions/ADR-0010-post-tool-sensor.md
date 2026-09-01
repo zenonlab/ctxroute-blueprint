@@ -32,13 +32,13 @@ where grammars exist; markup and single-file-component adapters mask comments
 and strings before structural checks and delegate embedded script/style blocks
 to the existing language adapters.
 
-Ruby and PHP grammar packages are optional adapters, not mandatory blueprint
-dependencies. When installed by a derived product, they may replace the
-corresponding bounded lexical adapter; when absent, the checklist reports the
-capability as unavailable and the lexical result remains explicitly limited.
-The Sensor keeps the lexical checks alongside optional AST syntax/complexity
-checks, so enabling a parser cannot silently remove existing safety rules. The
-dispatcher and diagnostic contract do not change between parser modes.
+Ruby is a required exact Tree-sitter dependency and ERB uses the same grammar
+through a same-length embedded extractor. Ruby SQL, shell, file, redirect,
+rendering, strong-parameter, unfinished-marker/debug, and complexity rules inspect AST nodes;
+lexical Ruby rules run only if grammar loading genuinely fails. PHP remains an
+explicit lexical adapter. The dispatcher and verdict contract do not change
+between parser modes, while diagnostics record the actual mode, grammar,
+fallback and reason.
 
 The registry also recognizes common extensionless repository files
 (`Dockerfile`, `Makefile`, `Justfile`) and environment files (`.env`,
@@ -95,18 +95,18 @@ The versioned Sensor configuration is validated before scanning. A missing,
 malformed, or incompatible rules file produces `sensor/configuration` with an
 `ERROR` verdict instead of falling back to an implicit safe policy.
 
-AST parsing is bounded to 32,000 UTF-8 bytes per source. Larger syntax-aware
-files use the lexical adapter and receive an explicit `WARN` diagnostic so the
-parser limit cannot be mistaken for a clean AST result or an internal crash.
+AST parsing does not silently switch modes because of file size. Resource
+limits must fail visibly; they cannot cause installed Ruby grammar rules to be
+reported or executed as lexical analysis.
 
 The result also declares its coverage limits: `moduleScope` is
 `explicit-paths`, package resolution is disabled, `wholeProgramAnalysis` is
 false, and `rateLimitRuntimeProof` is false. Local import resolution may only
 match files included in the same `analyzePaths` action; a `SAFE` result never
 means that an unscanned dependency is safe or that a rate-limit middleware was
-executed at runtime. Ruby/Rails source uses a bounded lexical adapter for Ruby,
-Rake, Rack, and Rails conventions, while ERB/Haml/Slim and common
-server-rendered template formats use an embedded template adapter. Blade also
+executed at runtime. Ruby, Rake, and Rack source uses the required Ruby AST;
+ERB uses an embedded Ruby AST with preserved offsets. Haml/Slim and common
+server-rendered formats remain embedded/lexical template adapters. Blade also
 extracts PHP blocks for bounded SQL, execution, and filesystem checks. It detects
 high-confidence Ruby SQL interpolation/concatenation and dangerous Rails
 boundaries such as dynamic command execution, request-controlled file output,

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "verifiedOn": "2026-09-01",
+  "runtime": "tree-sitter@0.21.1",
+  "packages": {
+    "tree-sitter": "0.21.1",
+    "tree-sitter-javascript": "0.23.1",
+    "tree-sitter-python": "0.21.0",
+    "tree-sitter-ruby": "0.23.1",
+    "tree-sitter-typescript": "0.23.2"
+  },
+  "matrix": ["javascript", "typescript", "tsx", "python", "ruby", "erb"],
+  "commands": [
+    "npm run ast:check",
+    "node --test tests/context-ast.test.mjs tests/sensor.test.mjs tests/mcp-stdio.test.mjs"
+  ]
+}

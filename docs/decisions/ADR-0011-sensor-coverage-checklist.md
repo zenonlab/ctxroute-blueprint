@@ -19,12 +19,14 @@ contracts:
 
 ## Decision
 
-The Sensor keeps one executable adapter registry. Syntax-aware adapters remain
-separate from lexical adapters, so support for a file extension never implies
-AST or whole-program guarantees. The current lexical set covers common Rust,
+The Sensor and Context MCP share one executable adapter registry. Each entry
+declares language, extensions and filenames, exact grammar package/variant,
+actual mode, embedded extractor, availability, and fallback policy.
+Syntax-aware adapters remain separate from lexical adapters, so support for a
+file extension never implies AST or whole-program guarantees. The current lexical set covers common Rust,
 Go, JVM, native, scripting, mobile, functional, systems, infrastructure, and
 configuration formats, including Dockerfile/Makefile/Justfile and `.env`
-filenames. The registry currently contains 113 file extensions and 6
+filenames. The registry currently contains 113 file extensions and 9
 extensionless filenames; this includes Ruby/Rails source and ERB/Haml/Slim plus
 common Phoenix, Blade, Jinja, Twig, Tera, Handlebars, Liquid, EJS, Pug, Razor,
 and JSP templates. Additional languages require an explicit registry entry and
@@ -37,11 +39,13 @@ permissions, hooks, or global configuration.
 
 ## Consequences
 
-PostToolUse recognizes the same registry extensions as the CLI. Lexical support
-only masks comments and strings before a small high-confidence check; it does
-not claim a grammar, type analysis, SQL dataflow, or runtime behavior proof.
-Unsupported extensions still produce explicit `ERROR` when passed directly to
-the Sensor.
+PostToolUse recognizes the same registry extensions as the CLI. Ruby and ERB
+use the required Tree-sitter Ruby grammar; a clearly labelled lexical fallback
+is permitted only if that grammar is genuinely unavailable. PHP remains
+lexical. Lexical support only masks comments and strings before a small
+high-confidence check; it does not claim a grammar, type analysis, SQL
+dataflow, or runtime behavior proof. Unsupported extensions still produce
+explicit `ERROR` when passed directly to the Sensor.
 
 ## Alternatives
 

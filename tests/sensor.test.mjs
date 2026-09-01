@@ -20,6 +20,10 @@ for (const [name, extension, source, rule] of [
   ['Python secret network flow', 'py', 'requests.post("https://example.test", data=os.getenv("TOKEN"))\n', 'sensor/secret-network-flow']
 ]) test(`${name} is unsafe`, () => { const result = run(extension, source); assert.equal(result.status, 2); assert.equal(result.body.verdict, 'UNSAFE'); assert.ok(result.body.diagnostics.some(item => item.rule === rule)); });
 test('comments and strings are ignored', () => { assert.equal(run('js', '// eval(input)\nconst text = "rm -rf /";').status, 0); });
+test('AST rules inspect files larger than Tree-sitter default input buffer', () => {
+  const diagnostics = analyzeSource('large.js', `${'// parser buffer padding\n'.repeat(1600)}eval(input);`);
+  assert.equal(diagnostics.some(item => item.rule === 'sensor/dynamic-eval' && item.mode === 'AST'), true);
+});
 test('high-value application risks and SARIF contract are reported', () => {
   const result = analyzeSource('route.ts', "fetch(userUrl); readFile(req.query.path); res.redirect(next); crypto.createHash('md5');", { config: { sql: { sinks: ['query'] } } });
   assert.deepEqual(result.map(item => item.rule), ['sensor/ssrf', 'sensor/path-traversal', 'sensor/open-redirect', 'sensor/weak-crypto']);
@@ -222,11 +226,34 @@ test('diagnostics identify their adapter and retain stable unique locations', ()
   assert.equal(diagnostics[0].adapter, 'template');
   assert.equal(new Set(diagnostics.map(item => `${item.line}:${item.column}:${item.rule}:${item.message}`)).size, diagnostics.length);
 });
-test('optional Ruby and PHP parsers never change lexical coverage when unavailable', () => {
+test('registry reports installed Ruby/ERB grammars and keeps PHP explicitly lexical', () => {
   const status = optionalParserStatus();
-  assert.deepEqual(status.map(item => item.id), ['ruby-ast', 'php-ast']);
-  assert.equal(status.every(item => typeof item.available === 'boolean'), true);
+  assert.deepEqual(status.map(item => item.id), ['ruby-ast', 'erb-ast']);
+  assert.equal(status.every(item => item.available), true);
+  assert.equal(SENSOR_ADAPTERS.find(item => item.extensions.includes('.php')).mode, 'lexical');
   assert.equal(analyzeSource('safe.rb', '# puts "eval(x)"\nUser.find_by(id: params[:id])').length, 0);
+});
+
+test('Ruby rules use AST metadata and lexical fallback only when grammar loading fails', () => {
+  const sources = [
+    ['sql.rb', 'User.find_by_sql("SELECT * FROM users WHERE id = #{params[:id]}")'],
+    ['shell.rb', 'system("echo #{params[:name]}")'],
+    ['file.rb', 'File.write(params[:path], body)'],
+    ['redirect.rb', 'redirect_to params[:next]'],
+    ['render.rb', 'render inline: params[:template]'],
+    ['params.rb', 'User.create(params)'],
+    ['debug.rb', 'puts "debug"'],
+  ];
+  for (const [path, source] of sources) {
+    const diagnostics = analyzeSource(path, source);
+    assert.ok(diagnostics.length, path);
+    assert.equal(diagnostics.every(item => item.mode === 'AST' && item.grammar === 'tree-sitter-ruby' && item.fallback === null && item.fallbackReason === null), true, path);
+  }
+  assert.equal(analyzeSource('safe.rb', '# system(params[:x])\ntext = "render inline: params[:x]"').length, 0);
+  assert.equal(analyzeSource('unsafe.html.erb', '<%== params[:name] %>')[0].mode, 'embedded');
+  assert.equal(analyzeSource('image.html.erb', '<img src="x">')[0].grammar, null);
+  const fallback = analyzeSource('fallback.rb', 'system(params[:command])', { grammarLoader() { throw new Error('simulated missing grammar'); } });
+  assert.equal(fallback.every(item => item.mode === 'lexical' && item.grammar === null && item.fallback === 'lexical' && item.fallbackReason === 'simulated missing grammar'), true);
 });
 test('Sensor deduplicates repeated paths within one action', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-deduplicate-'));
@@ -244,6 +271,23 @@ test('unsupported and missing paths are explicit errors', () => {
   assert.equal(run('txt', 'plain text').body.verdict, 'ERROR');
   const missing = spawnSync(process.execPath, [sensor, 'missing.sql'], { cwd: root, encoding: 'utf8' });
   assert.equal(JSON.parse(missing.stdout).diagnostics[0].rule, 'sensor/read-error');
+});
+test('Sensor recursively scans supported files passed as a directory', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-recursive-'));
+  mkdirSync(join(directory, 'nested'), { recursive: true });
+  mkdirSync(join(directory, 'node_modules'), { recursive: true });
+  writeFileSync(join(directory, 'nested', 'safe.ts'), 'const value: number = 1;');
+  writeFileSync(join(directory, 'nested', 'broken.py'), 'def broken(:\n');
+  writeFileSync(join(directory, 'notes.txt'), 'not source');
+  writeFileSync(join(directory, 'node_modules', 'ignored.js'), 'eval(input);');
+  const result = spawnSync(process.execPath, [sensor, directory], { cwd: root, encoding: 'utf8' });
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.verdict, 'ERROR');
+  const diagnosticPaths = body.diagnostics.map(item => item.path.replaceAll('\\', '/'));
+  assert.equal(diagnosticPaths.some(item => item.endsWith('nested/safe.ts')), false);
+  assert.equal(body.diagnostics.some(item => item.path.replaceAll('\\', '/').endsWith('nested/broken.py') && item.rule === 'sensor/syntax-error'), true);
+  assert.equal(body.diagnostics.some(item => item.path.includes('node_modules')), false);
+  assert.equal(diagnosticPaths.some(item => item.endsWith('notes.txt')), false);
 });
 test('invalid or missing Sensor configuration is never treated as safe', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-config-'));
