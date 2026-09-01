@@ -14,87 +14,92 @@
 [![Linux, macOS, Windows](https://img.shields.io/badge/CI-Linux_%7C_macOS_%7C_Windows-2563eb)](.github/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-An architecture-first [GitHub template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository)
-for software projects. It does not impose a language, backend, frontend,
-database, deployment platform, or test framework.
+An architecture-first GitHub template for building software with Codex or
+Claude while keeping decisions, context, diagrams, checks, and review evidence
+inside the repository.
 
-The generated product remains stack-neutral. The template tooling requires
-[Node.js 22.13+](https://nodejs.org/) and [npm 10+](https://www.npmjs.com/) to run
-[CTXRoute](https://github.com/zenonlab/ctxroute), governance hooks, tests, and
-[Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor. Official
-[code-review-graph](https://github.com/tirth8205/code-review-graph) additionally
-requires Python 3.10+ and uv 0.11.2; Python 3.12 is the reference runtime.
+The generated product stays stack-neutral: the blueprint does not impose a
+language, backend, frontend, database, deployment platform, or test framework.
+Its local toolchain provides the guardrails needed to choose those technologies
+deliberately and verify the result.
 
-The blueprint combines six infrastructure layers:
+[Use this template](https://github.com/zenonlab/ctxroute-blueprint/generate) ·
+[Agent doctrine](AGENTS.md) ·
+[Architecture](docs/architecture/README.md) ·
+[Quality strategy](docs/02-quality-strategy.md) ·
+[Contributing](CONTRIBUTING.md)
 
-- **Agent governance:** one shared doctrine for Codex and Claude, enforced by
-  project-local lifecycle and Git hooks.
-- **Context routing:** CTXRoute injects only the project guidance relevant to
-  the current action.
-- **Code graph:** official code-review-graph v2.3.8 supplies MCP context,
-  incremental impact analysis, and fork-safe PR risk review.
-- **Architecture:** Archify validates versioned JSON IR and generates an
-  interactive artifact outside Git.
-- **Static safety:** the [tree-sitter Sensor](https://tree-sitter.github.io/tree-sitter/) analyzes supported source files and
-  emits stable JSON diagnostics.
-- **Portable validation:** Node.js 22 CI runs on Linux, macOS, and Windows.
+## What you get
 
-## Create a project
+| Capability | What it provides |
+| --- | --- |
+| Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
+| Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
+| Persistent execution | Progress MCP tracks approved goals, evidence, and collaborative or explicitly confirmed autonomous execution. |
+| Code intelligence | Official code-review-graph v2.3.8 provides bounded MCP context, impact analysis, and fork-safe PR risk review. |
+| Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
+| Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
+| Portable validation | Node.js 22 CI runs the same repository gate on Linux, macOS, and Windows. |
 
-1. Select **Use this template** on GitHub.
-2. Clone the generated repository and enter its root directory.
-3. Install Git, Node.js 22.13+, npm 10+, Python 3.10+, and uv 0.11.2.
-4. Bootstrap the repository:
+## Quick start
+
+Prerequisites: Git, Node.js 22.13+, npm 10+, Python 3.10+, and uv 0.11.2.
+Python 3.12 is the reference runtime for official code-review-graph.
+
+1. Select **Use this template** on GitHub, then clone the generated repository.
+2. Bootstrap and verify the workspace:
 
    ```sh
    npm run setup
    ```
 
-   Setup runs `npm ci`, restores the pinned Archify skill, runs Archify Doctor,
-   synchronizes the frozen CRG environment, builds the ignored real graph,
-   verifies CTXRoute and the agent configurations, enables the repository Git
-   hooks, and executes the complete validation suite. It also warns when legacy
-   global CTXRoute hooks would run alongside the project-local dispatchers.
-5. In Codex, open `/hooks` and approve the six workspace definitions. This is
-   the only local activation step; the repository never changes Codex trust
-   settings stored outside the workspace. Claude reads the tracked
-   `.claude/settings.json` configuration.
-6. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
-   agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), then
-   initialize the project from your requirements. While the project status is
-   `template`, governance blocks product-code writes until the decisions,
-   architecture, and quality strategy are complete.
-7. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
-   [architecture decision records](docs/decisions/README.md), [Archify architecture](docs/architecture/README.md),
+3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
+   reads the tracked `.claude/settings.json` configuration directly.
+4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
+   [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
+5. Review the generated [project brief](docs/00-project-brief.md),
+   [technology decisions](docs/01-technology-decisions.md),
+   [ADRs](docs/decisions/README.md), [architecture](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
-8. Approve any starter-file cleanup only when the starter is fully initialized;
-   verified project commits are created automatically.
+6. Approve starter-file cleanup only after initialization is complete.
+   Verified project commits are then created automatically.
 
-`npm run setup` installs the pinned dependencies and Archify skill, enables
-the repository Git hooks, validates CTXRoute, and runs the complete test suite.
-It refreshes the ignored `node_modules/` directory but does not change global
-Codex settings, delete tracked project files, or create commits.
+While `.project/project-config.json` has status `template`, governance blocks
+product-code writes until the decisions, architecture, and quality strategy are
+complete.
 
-`.codex/`, `.claude/`, `.githooks/`, `.project/`, [`AGENTS.md`](AGENTS.md),
-[`CLAUDE.md`](CLAUDE.md), and the documentation structure are reusable
-infrastructure. Product source directories and commands are created only after
-project discovery.
+### What setup does
 
-[`AGENTS.md`](AGENTS.md) is the single source of project doctrine for both
-Codex and Claude. [`CLAUDE.md`](CLAUDE.md) imports it directly instead of
-duplicating the rules.
+`npm run setup` installs pinned dependencies, restores the pinned Archify skill,
+runs Archify Doctor, synchronizes the frozen CRG environment, builds the ignored
+code graph, verifies CTXRoute and agent configuration, enables repository Git
+hooks, and executes the complete validation suite.
 
-`.project/project-config.json` is the source of
-truth for source directories, code extensions, contracts, commands, and
-mutation-testing policy. Invalid or incomplete configuration blocks product
-writes.
+Setup changes only workspace state. It may refresh ignored directories such as
+`node_modules/`, `.code-review-graph/`, and `.ctxroute/`, but it does not change
+global Codex or Claude settings, delete tracked project files, or create commits.
+It reports legacy global CTXRoute hooks without editing them.
 
-## Progress checklist
+For prerequisite diagnostics without installation, run:
 
-Approved agent plans are stored in [`.project/progress.json`](.project/progress.json).
+```sh
+npm run setup:check
+```
+
+## Agent execution and context
+
+[`AGENTS.md`](AGENTS.md) is the single project doctrine for both supported
+agents. [`CLAUDE.md`](CLAUDE.md) imports it directly instead of duplicating
+rules. The reusable control plane lives in `.codex/`, `.claude/`, `.githooks/`,
+`.project/`, and the documentation tree; product directories are created only
+after discovery.
+
+### Progress checklist
+
+Approved plans are stored in [`.project/progress.json`](.project/progress.json).
 The generated [short view](docs/progress.md) is informational and must not be
-edited directly. Validation never writes; materialization requires a plan with
-short validation evidence and explicit `approved: true`:
+edited directly. Validation is read-only; materialization requires short
+validation evidence and explicit `approved: true`.
 
 ```sh
 npm run progress:read
@@ -106,110 +111,82 @@ npm run progress:validate -- plan.json
 npm run progress:approve -- plan.json
 ```
 
-The same bounded engine is exposed through the stdio MCP server with
-`npm run progress:mcp`. It supports multiple goals, atomic idempotent writes,
-step evidence, and exactly two modes: `collaborative` (default) and
-`autonomous`. Autonomous mode is enabled only after an explicit user request
-and confirmation; it directs the agent to complete and verify the whole goal.
+Progress supports multiple goals, atomic idempotent writes, bounded step
+evidence, and exactly two execution modes:
 
-## Local MCP servers
+- `collaborative` is the default and keeps meaningful decisions with the user.
+- `autonomous` is enabled only after an explicit user request and directs the
+  agent to complete and verify the whole approved goal before returning.
+
+The CLI and the `ctxroute-progress` MCP server use the same progress core.
+
+### Local MCP servers
 
 The repository exposes two independent stdio servers:
 
 - `ctxroute-progress` runs `npm run progress:mcp` and exposes checklist,
-  step-update, next-step, and mode tools.
-- `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read/context
-  tools from official CRG v2.3.8 against `.code-review-graph/graph.db`.
+  step-update, next-step, and execution-mode tools.
+- `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read and
+  context tools from official CRG v2.3.8 against the ignored local graph.
 
-Codex reads the tracked project configuration in [`.codex/config.toml`](.codex/config.toml),
-and Claude reads the tracked [`.mcp.json`](.mcp.json). These files never alter
-user-global configuration. A trusted client must approve project MCP servers;
-open a new local session or restart the client if it has already cached the
-project manifest. Use `/mcp` in the client to inspect the loaded servers and
-`npm run mcp:validate`, `npm run mcp:smoke`, or `npm run crg:smoke` for
-mechanical verification.
+Codex reads [`.codex/config.toml`](.codex/config.toml); Claude reads
+[`.mcp.json`](.mcp.json). These project manifests never alter user-global
+configuration. A trusted client must approve project MCP servers. Restart the
+client if it has cached an older manifest, and use `/mcp` to inspect the loaded
+servers.
 
-CRG embeddings are off by default. Local embeddings require an explicit
+```sh
+npm run mcp:validate
+npm run mcp:smoke
+npm run crg:smoke
+```
+
+CRG embeddings are disabled by default. Local embeddings require an explicit
 optional installation and command. Cloud providers require their documented
 environment variable plus `CRG_ACCEPT_CLOUD_EMBEDDINGS=1`; never commit a key
 or provider configuration.
 
-## CTXRoute
+### CTXRoute lifecycle
 
-[CTXRoute](https://github.com/zenonlab/ctxroute) injects only relevant project
-context into agent actions. This repository pins a reviewed upstream commit and
-uses project-local wrappers so hook paths work on Windows, macOS, and Linux.
-Rule documents live in CTXRoute's canonical
-[`.claude/hooks/docs/`](.claude/hooks/docs/) directory and remain available to
-both Codex and Claude-compatible tooling.
+[CTXRoute](https://github.com/zenonlab/ctxroute) routes relevant project
+guidance to agent actions through one project-local dispatcher. Rules live in
+[`.claude/hooks/docs/`](.claude/hooks/docs/) and remain available to Codex and
+Claude-compatible tooling.
 
-CTXRoute never modifies global agent settings during installation. The tracked
-`.codex/` and `.claude/` configurations remain local to this project. Each
-agent receives the same doctrine from `AGENTS.md`; Claude loads it through the
-native `@AGENTS.md` import in `CLAUDE.md`.
+The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
+`UserPromptSubmit`, `PreCompact`, and `Stop`. Healthy CRG startup adds no
+context. Targeted documentation is injected before relevant tool calls, and
+only the minimum required context is restored after compaction.
 
-Keep only the project-local lifecycle definitions once they are approved.
-Legacy CTXRoute commands in the global Codex `config.toml` run in addition to
-workspace hooks, producing duplicate progress messages and extra process
-startup latency. The installer reports this condition but never edits the
-global configuration. Lifecycle handlers omit custom status messages, and
-`PostToolUse` runs only for tools that can change repository state.
-PostToolUse runs CTXRoute guards, the blocking Sensor, a bounded single-flight
-CRG update, problem memory, audit, and Archify preview. It does not start either
-MCP server; Codex and Claude own the stdio transports. CRG failures and its
-30-second timeout fail open with a visible bounded diagnostic.
+`PostToolUse` runs write guards, the blocking Sensor, a bounded single-flight
+CRG update, problem memory, documentation audit, and Archify preview support.
+It does not start MCP servers; the clients own their stdio transports. CRG
+failures and its 30-second timeout fail open with a short visible diagnostic.
 
-The project-local lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
-`UserPromptSubmit`, `PreCompact`, and `Stop`. CTXRoute state and recurring
-problem memory live in the ignored `.ctxroute/` directory; deleting it removes
-local history but it is recreated automatically on the next run.
+Keep only the project-local lifecycle definitions after approval. Legacy global
+CTXRoute hooks would run in addition to them, duplicating context and process
+startup. Local state and recurring problem memory live in ignored `.ctxroute/`;
+removing that directory clears local history and it is recreated on demand.
 
-Codex Cloud can run `npm install` before the agent starts, so CTXRoute is
-installed and verified automatically. Hook activation still depends on the
-workspace trust policy; installation cannot bypass that security boundary.
-
-For prerequisite diagnostics without installing anything, run
-`npm run setup:check`.
-
-## Validate
-
-Run the deterministic repository gate:
-
-```sh
-npm run validate
-```
-
-It includes lint, architecture and document contracts, workspace/governance
-coherence, the whole-blueprint Sensor baseline, and test coverage thresholds.
-`npm run crg:smoke` separately proves the pinned runtime, fixture build,
-incremental update, MCP startup, tool list, and a read call. For the full
-verification, including integration,
-dependency audit, and generated documentation:
-
-```sh
-npm run verify
-npm run sensor:blueprint
-git status --porcelain
-```
-
-The final command must produce no output. Generated documentation belongs under
-the ignored `dist/` directory and must never be committed.
-
-## GitHub repository protections
-
-GitHub templates copy repository files and branches, not the complete security
-posture of the source repository. After creating a project, configure branch
-protection or an organization ruleset, require the CI jobs relevant to the
-derived project, and enable Dependabot alerts, secret scanning with push
-protection, code scanning, and a working private vulnerability-reporting
-channel. The tracked workflow uploads unexpected Sensor diagnostics as SARIF,
-but repository security features still require owner or organization policy.
+Codex Cloud may run `npm install` before the agent starts, but hook activation
+still depends on workspace trust and cannot be bypassed by installation.
 
 ## Architecture with Archify
 
-Product diagrams are versioned under `docs/architecture/src/` and validated at
-Archify's `showcase` quality level. Blueprint control-plane diagrams are
-maintainer-only inputs and are never included in product builds or previews.
+Product diagram sources are versioned under `docs/architecture/src/` and must
+pass Archify's `showcase` profile. The agent chooses the view that best matches
+the completed step:
+
+| Type | Use it for |
+| --- | --- |
+| `architecture` | Components and boundaries |
+| `workflow` | Procedures, hooks, and CI/CD |
+| `sequence` | Calls, requests, and responses |
+| `dataflow` | Traffic, pipelines, and lineage |
+| `lifecycle` | States, retries, waiting, and terminal transitions |
+
+Blueprint control-plane sources are maintainer-only inputs. Product selectors,
+builds, previews, and visual checks cannot publish them.
 
 ```sh
 npm run validate:architecture
@@ -218,67 +195,76 @@ npm run archify:visual-check
 npm run preview:docs
 ```
 
-`build:docs` generates one HTML artifact per source under
-`dist/architecture/`. The agent chooses the Archify type that matches the
-step: `architecture` for components and boundaries, `workflow` for procedures
-and hooks, `sequence` for call traces, `dataflow` for traffic and lineage, and
-`lifecycle` for state transitions. Select a source, or use `all`:
+Every command accepts a product source ID or diagram type; `all` selects every
+product source, never internal sources.
 
 ```sh
 npm run archify:validate -- dataflow
 npm run build:docs -- all
 npm run archify:visual-check -- dataflow
-npm run preview:docs -- traffic.dataflow
+npm run preview:docs -- checkout.sequence
 ```
 
-`archify:visual-check` checks containment at four desktop resolutions and
-writes screenshots, a contact sheet, and a JSON receipt beside each artifact. Its
-automated `visualReview` remains `pending` until human review. `preview:docs`
-accepts one source or type selector, builds it, and starts its local interactive
-preview; when several product diagrams exist, selection is explicit. The generated HTML is not a
+Builds create one ignored HTML artifact per source under `dist/architecture/`.
+`archify:visual-check` verifies containment at four desktop resolutions and
+writes screenshots, a contact sheet, and a JSON receipt. Its automated
+`visualReview` remains `pending` until human review. Preview builds one explicit
+selection and starts the interactive local viewer. Generated HTML is never a
 source file and must not be edited manually.
 
-Archify is pinned to version `v2.16.0` in
-[`skills-lock.json`](skills-lock.json) and
-[`.project/archify-pin.json`](.project/archify-pin.json). Updates are always
-explicit: review the upstream release, tag, commit, and hash; update the pin;
-regenerate the lock through installation; run Archify Doctor, validation,
-tests, and the documentation build; then confirm a clean Git state before
-committing.
+Archify is pinned to v2.16.0 in [`skills-lock.json`](skills-lock.json) and
+[`.project/archify-pin.json`](.project/archify-pin.json). Updates are explicit:
+review the release and hash, update the pin, regenerate the lock, run Doctor and
+the full verification suite, then confirm a clean Git state. Use
+`npm run check:updates` for read-only release awareness.
 
-Use `npm run check:updates` to check release awareness; it never performs a
-silent update.
+## Safety and verification
 
-## Sensor
+### Local gate
 
-The Sensor owns one executable language registry with three explicit coverage
-levels. It is independent from CRG and remains the only blocking static safety
-boundary:
+Run the deterministic repository gate during development:
+
+```sh
+npm run validate
+```
+
+It covers configuration, decisions, architecture and document contracts,
+CTXRoute, lint, workspace coherence, the Sensor baseline, and test coverage.
+For final verification, including CRG and Progress MCP smoke tests, integration,
+dependency audit, and generated documentation, run:
+
+```sh
+npm run verify
+git status --porcelain
+```
+
+The final command must produce no output. Generated documentation belongs in
+ignored `dist/` and must never be committed.
+
+### Sensor
+
+The Sensor is independent from CRG and is the only blocking static-safety
+boundary. Its executable registry declares three coverage levels:
 
 - **AST:** JavaScript, TypeScript, JSX/TSX, Python, and Ruby.
-- **Embedded AST:** Ruby blocks extracted from ERB without changing offsets.
-- **Dedicated/lexical:** SQL, HTML, CSS, Vue, Svelte, Rust, Go, Java, Kotlin,
-  C/C++, C#, PHP, Swift,
-  Dart, Shell, Elixir, Erlang, Haskell, Lua, R, Scala, Solidity, and common
-  configuration formats including TOML, YAML, JSON, XML, Terraform, HCL, and
-  Protocol Buffers.
+- **Embedded AST:** Ruby extracted from ERB without changing source offsets.
+- **Dedicated or lexical:** SQL, HTML, CSS, Vue, Svelte, Rust, Go, Java,
+  Kotlin, C/C++, C#, PHP, Swift, Dart, Shell, Elixir, Erlang, Haskell, Lua, R,
+  Scala, Solidity, and common configuration formats including TOML, YAML, JSON,
+  XML, Terraform, HCL, and Protocol Buffers.
 
-AST adapters are syntax-aware. Dedicated and lexical adapters provide bounded
-coverage only; they do not claim type, package, dependency, or runtime
-analysis. Ruby is a required, exact Tree-sitter dependency; PHP remains
-explicitly lexical and is never advertised as AST. A Ruby lexical fallback is
-used only when its grammar genuinely cannot load, and every diagnostic records
-the actual rule mode, grammar, fallback and reason. The Sensor reports one stable JSON object containing a verdict,
-coverage limits, and ordered diagnostics. SARIF 2.1.0 is available for
-code-scanning integrations:
+Dedicated and lexical adapters provide bounded coverage; they do not claim
+type, package, dependency, or runtime analysis. Ruby uses an exact Tree-sitter
+dependency with a lexical fallback only when its grammar genuinely cannot load.
+PHP remains explicitly lexical. Every diagnostic records its actual adapter,
+mode, grammar, fallback, and reason.
 
 ```sh
 npm run sensor -- src/example.ts scripts/check.py
 npm run sensor -- --sarif src/example.ts
+npm run sensor:blueprint
 node .githooks/sensor --checklist --json
 ```
-
-Verdicts and exit codes are:
 
 | Verdict | Meaning | Exit code |
 | --- | --- | ---: |
@@ -288,23 +274,46 @@ Verdicts and exit codes are:
 | `ERROR` | Invalid input, unsupported language, read, or syntax error | `2` |
 
 Rules and thresholds live in
-[`.project/sensor-rules.json`](.project/sensor-rules.json). The Sensor covers
-dynamic evaluation, dynamic function construction, dangerous shell commands,
-`shell: true`, SQL injection, direct secret-to-network output, XSS, SSRF, path
-traversal, weak crypto, UI layering, syntax errors, and excessive AST
-complexity. `LIMIT` bounds SQL result rows; optional `requireRateLimit` is a
-separate request-rate heuristic and never proves runtime enforcement.
+[`.project/sensor-rules.json`](.project/sensor-rules.json). Checks include
+dynamic evaluation, dangerous shell execution, SQL injection, secret-to-network
+flow, dynamic function construction, `shell: true`, XSS, SSRF, path traversal,
+weak crypto, UI layering, syntax errors, and excessive AST complexity. `LIMIT`
+bounds SQL result rows; optional
+`requireRateLimit` is a separate request-rate heuristic and never proves runtime
+enforcement. SARIF 2.1.0 is available for code-scanning integrations.
+
+### CI and repository protection
+
+The tracked workflow validates Node.js 22 on Linux, macOS, and Windows, including
+the real Progress MCP transport. Linux and macOS additionally smoke-test the
+official CRG transport. Pull requests receive a fork-safe `CRG risk gate`, while
+unexpected Sensor diagnostics are uploaded as SARIF when permissions allow.
+
+GitHub templates copy files and branches, not the source repository's security
+settings. Configure branch protection or an organization ruleset for every
+derived project. Require the relevant CI jobs and enable Dependabot alerts,
+secret scanning with push protection, code scanning, and a private
+vulnerability-reporting channel.
+
+See [CI/CD](docs/ci.md), [contribution rules](CONTRIBUTING.md), and the
+[security policy](SECURITY.md) for the complete operational contract.
+
+## Repository contracts
+
+`.project/project-config.json` is the source of truth for project status,
+source directories, code extensions, commands, document contracts, and mutation
+policy. Invalid or incomplete configuration blocks product writes.
 
 Documentation follows the schema-first registry in
 [`docs/document-contracts.json`](docs/document-contracts.json). Structured
-sources are authoritative for typed facts; Markdown provides complementary
-context and is checked by `npm run validate:docs -- --all`.
+sources are authoritative for typed facts; Markdown adds context and is checked
+by `npm run validate:docs -- --all`.
 
-The agent must not delete starter guides without user confirmation. It creates
-verified commits automatically. See the [repository contribution rules](CONTRIBUTING.md)
-and [security policy](SECURITY.md) for project-level guidance.
+Starter guides are removed only with user confirmation after initialization.
+Verified changes are committed automatically according to
+[`AGENTS.md`](AGENTS.md).
 
 ## License
 
-CTXRoute Blueprint is licensed under Apache-2.0. CTXRoute remains available under
-its own MIT license; see `THIRD_PARTY_NOTICES.md`.
+CTXRoute Blueprint is licensed under Apache-2.0. CTXRoute remains available
+under its own MIT license; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
