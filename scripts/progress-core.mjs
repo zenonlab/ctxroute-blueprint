@@ -14,13 +14,13 @@ export async function readProgress(root = process.cwd()) {
   try {
     const source = await readFile(resolve(root, PROGRESS_PATH), 'utf8');
     if (Buffer.byteLength(source) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
-    const value = JSON.parse(source); const errors = validateProgress(value);
+    const value = JSON.parse(source); const errors = inspectProgressChecklist(value);
     if (errors.length) throw new Error(errors.join('; '));
     return { ...value, goals: value.goals.map(goal => ({ ...goal, executionMode: goal.executionMode ?? 'collaborative', modeOffered: goal.modeOffered ?? false })) };
   } catch (error) { if (error.code === 'ENOENT') return emptyProgress(); throw new Error(`Cannot read progress checklist: ${error.message}`); }
 }
 
-export function validateProgress(value) {
+function inspectProgressChecklist(value) {
   const errors = [];
   if (!value || value.schemaVersion !== 1 || !Array.isArray(value.goals)) return ['schemaVersion 1 and goals array are required'];
   if (value.goals.length > LIMITS.goals) errors.push(`maximum ${LIMITS.goals} goals exceeded`);
@@ -44,6 +44,9 @@ export function validateProgress(value) {
   }
   return errors;
 }
+
+// Kept as the public API name used by the CLI, MCP server, and consumers.
+export const validateProgress = inspectProgressChecklist;
 
 export function validatePlan(plan, current = emptyProgress()) {
   const errors = [];

@@ -69,6 +69,10 @@ test('architecture evidence recognizes a newly typed Archify source', () => {
   assert.equal(isArchitectureEvidence('docs/architecture/src/checkout.lifecycle.json', { architecture: { documents: [], internalDocuments: [] } }), true);
 });
 
+test('architecture evidence rejects unrelated documentation', () => {
+  assert.equal(isArchitectureEvidence('docs/guide.md', { architecture: { documents: [], internalDocuments: [] } }), false);
+});
+
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
     SessionStart: ['session-inject.js', 'crg-context.mjs'],

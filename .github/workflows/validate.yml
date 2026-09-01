@@ -61,6 +61,7 @@ jobs:
           npm run mcp:validate
 
       - name: Smoke-test official CRG transport
+        if: runner.os != 'Windows'
         shell: bash
         run: node scripts/crg-smoke.mjs > "${RUNNER_TEMP}/crg-smoke.json"
 

@@ -50,3 +50,21 @@ test('collaborative handoff detection requires every bounded next step and recog
   assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'TODO' }] }), false);
   assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }, { status: 'BLOCKED' }] }), true);
 });
+test('autonomous offer detection accepts the English agent wording', () => {
+  assert.equal(hasAutonomousOffer('I can switch this goal to autonomous mode.'), true);
+});
+test('autonomous offer detection rejects unrelated automation wording', () => {
+  assert.equal(hasAutonomousOffer('The test suite runs automatically.'), false);
+});
+test('next-step handoff detection rejects an empty final response', () => {
+  assert.equal(hasNextStepHandoff('', [{ stepId: 'step-1', title: 'Verify' }]), false);
+});
+test('next-step handoff detection accepts a step identifier', () => {
+  assert.equal(hasNextStepHandoff('Next: step-1', [{ stepId: 'step-1', title: 'Verify' }]), true);
+});
+test('external blocking requires at least one unfinished step', () => {
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }] }), false);
+});
+test('external blocking rejects a mixed blocked and active goal', () => {
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'IN_PROGRESS' }] }), false);
+});
