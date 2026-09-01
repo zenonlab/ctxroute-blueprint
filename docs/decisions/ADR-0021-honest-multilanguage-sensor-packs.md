@@ -70,6 +70,11 @@ The blueprint baseline has no exceptions. The 69 pre-existing
 were removed. Stale entries and all unexpected blocking diagnostics fail the
 gate.
 
+Vendored anti-slop sources remain covered by their functional Sensor fixtures,
+but are excluded from the blueprint's aggregate Node coverage threshold. That
+threshold measures maintained integration code rather than imported upstream
+implementation details.
+
 ## Alternatives
 
 Keeping broad lexical adapters as `PASS` would preserve false confidence.
