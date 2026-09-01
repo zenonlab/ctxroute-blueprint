@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Agent Traffic and Evidence Flow",
+    "subtitle": "Requests become bounded context, verified changes, and review evidence",
+    "output": "traffic.dataflow.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 780],
+    "views": [
+      { "id": "context-route", "label": "Context routing", "focus": ["request", "agent", "ctxroute", "mcp"], "note": "Follow a request into bounded context and tool calls." },
+      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "stop", "mcp", "archify"], "note": "Follow implementation traffic through MCP and diagram checks." },
+      { "id": "review-evidence", "label": "Review evidence", "focus": ["archify", "stop", "artifacts"], "note": "Follow the checked diagram into local evidence." }
+    ]
+  },
+  "stages": [
+    { "label": "Inputs" },
+    { "label": "Dispatch" },
+    { "label": "Context + tools" },
+    { "label": "Checks" },
+    { "label": "Evidence" }
+  ],
+  "nodes": [
+    { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
+    { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 1, "row": 0, "tag": "consumer" },
+    { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "bounded context", "stage": 2, "row": 0, "tag": "3500 chars" },
+    { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "MCP calls", "stage": 2, "row": 2, "tag": "allowlist" },
+    { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
+    { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "handoff", "stage": 3, "row": 2, "tag": "final guard" },
+    { "id": "artifacts", "type": "database", "label": "Local evidence", "sublabel": "HTML + receipt", "stage": 4, "row": 0, "tag": "bounded output" }
+  ],
+  "flows": [
+    { "from": "request", "to": "agent", "label": "intent", "classification": "user input", "variant": "emphasis", "route": "straight" },
+    { "from": "agent", "to": "ctxroute", "label": "hook event", "classification": "lifecycle", "variant": "emphasis", "route": "straight" },
+    { "from": "ctxroute", "to": "mcp", "label": "MCP call", "classification": "allowlisted", "variant": "default", "route": "straight", "labelDy": 35 },
+    { "from": "mcp", "to": "archify", "label": "verification target", "classification": "traffic check", "variant": "emphasis", "route": "vertical-channel" },
+    { "from": "archify", "to": "artifacts", "label": "HTML receipt", "classification": "rendered evidence", "variant": "default", "route": "straight" },
+    { "from": "agent", "to": "stop", "label": "stop", "classification": "completion attempt", "variant": "security", "route": "bottom-channel" },
+    { "from": "stop", "to": "archify", "label": "traffic target", "classification": "dataflow check", "variant": "emphasis", "route": "straight", "labelDy": 85 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Routing contract", "items": ["Session start stays quiet when CRG is healthy", "PreToolUse injects only targeted documentation", "MCP schemas remain bounded and allowlisted"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop selects the traffic data-flow source explicitly", "Progress records the active mode and step evidence", "Archify validates both the architecture map and the traffic map"] },
+    { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
+  ]
+}

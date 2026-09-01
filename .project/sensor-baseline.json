@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "path": ".githooks/validate-commit-message.mjs",
+      "rule": "sensor/path-traversal",
+      "occurrences": 1,
+      "justification": "Git owns the commit-msg hook argument; the validator only reads that transient message file and performs no write."
+    }
+  ]
+}

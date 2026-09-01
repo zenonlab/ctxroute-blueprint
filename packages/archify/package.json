@@ -2,8 +2,9 @@
   "name": "@ctxroute-blueprint/archify",
   "version": "0.0.0-blueprint",
   "private": true,
+  "license": "Apache-2.0",
   "description": "Workspace boundary for the pinned Archify documentation skill.",
-  "engines": { "node": ">=22" },
+  "engines": { "node": ">=22.13.0" },
   "blueprintSource": "tt-a1i/archify",
   "integration": "external-pinned-skill"
 }

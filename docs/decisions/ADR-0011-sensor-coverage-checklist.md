@@ -19,7 +19,7 @@ contracts:
 
 ## Decision
 
-The Sensor and Context MCP share one executable adapter registry. Each entry
+The Sensor owns one executable adapter registry. Each entry
 declares language, extensions and filenames, exact grammar package/variant,
 actual mode, embedded extractor, availability, and fallback policy.
 Syntax-aware adapters remain separate from lexical adapters, so support for a
@@ -46,6 +46,9 @@ lexical. Lexical support only masks comments and strings before a small
 high-confidence check; it does not claim a grammar, type analysis, SQL
 dataflow, or runtime behavior proof. Unsupported extensions still produce
 explicit `ERROR` when passed directly to the Sensor.
+
+Official code-review-graph maintains its own parser and graph for context. It
+does not share this registry and cannot replace or bypass the Sensor gate.
 
 ## Alternatives
 

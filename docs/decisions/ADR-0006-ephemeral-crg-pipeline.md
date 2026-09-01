@@ -1,15 +1,14 @@
 ---
 scope:
-  - scripts/**
-  - package.json
-  - package-lock.json
-  - .ctxroute/state/**
+  - scripts/watch-crg.mjs
+  - .ctxroute/state/code-review-graph.sqlite
 review: on-change
 revised: true
+superseded-by: ADR-0018-official-code-review-graph.md
 ---
 # ADR-0006 — Ephemeral CRG update pipeline
 
-- Status: accepted
+- Status: superseded by ADR-0018
 - Date: 2026-08-30
 
 ## Context

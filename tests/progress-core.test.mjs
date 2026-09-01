@@ -1,16 +1,70 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { emptyProgress, readProgress, validatePlan, approvePlan, progressStatus } from '../scripts/progress-core.mjs';
+import { fileURLToPath } from 'node:url';
+import { LIMITS, emptyProgress, readProgress, validateProgress, validatePlan, approvePlan, progressStatus, progressNext, updateProgressStep, setProgressMode, markModeOffered, renderProgress } from '../scripts/progress-core.mjs';
+import { hasAutonomousOffer, hasNextStepHandoff, isExternallyBlocked } from '../scripts/progress-handoff.mjs';
 
 const plan = (overrides = {}) => ({ goalId: 'goal-9', title: 'Checklist', validationEvidence: ['tests/progress-core.test.mjs'], steps: [{ id: 'step-1', title: 'Define contract', acceptance: ['Schema validated'], files: ['.project/progress.json'], commands: ['npm test'], evidence: [] }], ...overrides });
 const root = () => mkdtempSync(join(tmpdir(), 'progress-'));
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('empty checklist is read-only and has stable shape', async () => { const directory = root(); assert.deepEqual(await readProgress(directory), emptyProgress()); assert.equal(existsSync(join(directory, '.project/progress.json')), false); });
+test('published template starts without maintainer progress or tracked plan artifacts', async () => {
+  const progress = await readProgress(repositoryRoot);
+  assert.deepEqual(progress, emptyProgress());
+  assert.equal(readFileSync(join(repositoryRoot, 'docs/progress.md'), 'utf8'), renderProgress(progress));
+  assert.deepEqual(readdirSync(join(repositoryRoot, '.project')).filter(name => /-plan\.json$/u.test(name)), []);
+});
 test('validate-plan is read-only and rejects missing acceptance, files, commands, evidence', async () => { const directory = root(); const result = validatePlan({ goalId: 'goal-9', title: 'Bad', steps: [{ id: 'step-1', title: 'Bad' }] }, await readProgress(directory)); assert.equal(result.ok, false); assert.equal(existsSync(join(directory, '.project/progress.json')), false); assert.ok(result.errors.length >= 4); });
 test('approval writes JSON and generated Markdown atomically and is idempotent', async () => { const directory = root(); const first = await approvePlan({ ...plan(), approved: true }, directory); const json = readFileSync(join(directory, '.project/progress.json'), 'utf8'); const markdown = readFileSync(join(directory, 'docs/progress.md'), 'utf8'); assert.deepEqual(JSON.parse(json), first); assert.match(markdown, /Checklist — ACTIVE/u); const second = await approvePlan({ ...plan(), approved: true }, directory); assert.deepEqual(second, first); });
 test('multiple goals preserve insertion order and status is compact', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); await approvePlan({ ...plan({ goalId: 'goal-10', title: 'Second' }), approved: true }, directory); assert.deepEqual(progressStatus(await readProgress(directory)).map(item => item.id), ['goal-9', 'goal-10']); });
 test('approval is explicit and rejects paths, secrets, duplicate steps, and limits', async () => { const directory = root(); await assert.rejects(() => approvePlan(plan(), directory), /approved must be true/u); assert.equal(validatePlan({ ...plan(), steps: [{ ...plan().steps[0], files: ['../secret'] }], validationEvidence: ['ok'] }).ok, false); assert.equal(validatePlan({ ...plan(), steps: [{ ...plan().steps[0], id: 'step-1' }, { ...plan().steps[0], id: 'step-1' }] }).ok, false); assert.equal(validatePlan({ ...plan(), validationEvidence: ['apiKey: hidden'] }).ok, false); });
 test('invalid stored JSON is rejected', async () => { const directory = root(); const path = join(directory, '.project/progress.json'); mkdirSync(join(directory, '.project')); writeFileSync(path, '{invalid'); await assert.rejects(() => readProgress(directory), /Cannot read progress checklist/u); });
+test('stored progress validation accepts both execution modes and rejects unknown modes', () => { const value = { schemaVersion: 1, goals: [{ id: 'goal-9', title: 'Modes', status: 'ACTIVE', executionMode: 'autonomous', modeOffered: true, steps: [{ id: 'step-1', title: 'Verify', status: 'TODO', acceptance: ['ok'], files: ['.project/progress.json'], commands: ['npm test'], evidence: [] }] }] }; assert.deepEqual(validateProgress(value), []); assert.match(validateProgress({ ...value, goals: [{ ...value.goals[0], executionMode: 'manual' }] })[0], /executionMode/u); });
+test('stored progress validation rejects duplicate goal identifiers', () => { const goal = { id: 'goal-9', title: 'Goal', status: 'ACTIVE', steps: [] }; assert.match(validateProgress({ schemaVersion: 1, goals: [goal, goal] }).join(' '), /goal ids/u); });
+test('stored progress validation rejects malformed step references', () => { const goal = { id: 'goal-9', title: 'Goal', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Step', status: 'TODO', acceptance: ['ok'], files: ['../outside'], commands: ['npm test'], evidence: [] }] }; assert.match(validateProgress({ schemaVersion: 1, goals: [goal] }).join(' '), /invalid files/u); });
+test('stored progress validation bounds evidence references', () => { const evidence = Array.from({ length: LIMITS.evidence + 1 }, (_, index) => `proof-${index}`); const goal = { id: 'goal-9', title: 'Goal', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Step', status: 'DONE', acceptance: ['ok'], files: ['src/app.js'], commands: ['npm test'], evidence }] }; assert.match(validateProgress({ schemaVersion: 1, goals: [goal] }).join(' '), /too many evidence/u); });
+test('stored progress validation requires the versioned root shape', () => { assert.deepEqual(validateProgress({ schemaVersion: 2, goals: [] }), ['schemaVersion 1 and goals array are required']); });
+test('stored progress validation accepts an empty versioned checklist', () => { assert.deepEqual(validateProgress(emptyProgress()), []); });
+test('stored progress validation bounds the number of goals', () => { const goals = Array.from({ length: LIMITS.goals + 1 }, (_, index) => ({ id: `goal-${index}`, title: `Goal ${index}`, status: 'ACTIVE', steps: [] })); assert.match(validateProgress({ schemaVersion: 1, goals }).join(' '), /maximum/u); });
+test('legacy goals migrate implicitly to collaborative mode', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); const value = await readProgress(directory); delete value.goals[0].executionMode; delete value.goals[0].modeOffered; writeFileSync(join(directory, '.project/progress.json'), JSON.stringify(value)); assert.equal(progressStatus(await readProgress(directory))[0].executionMode, 'collaborative'); });
+test('mode requires explicit confirmation and can return to collaborative', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); await assert.rejects(() => setProgressMode('goal-9', 'autonomous', false, directory), /userConfirmed/u); await setProgressMode('goal-9', 'autonomous', true, directory); assert.equal((await readProgress(directory)).goals[0].executionMode, 'autonomous'); await setProgressMode('goal-9', 'collaborative', false, directory); assert.equal((await readProgress(directory)).goals[0].executionMode, 'collaborative'); });
+test('mode offer persistence marks the active goal once', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); await markModeOffered('goal-9', directory); assert.equal((await readProgress(directory)).goals[0].modeOffered, true); });
+test('mode offer persistence rejects unknown goals', async () => { await assert.rejects(() => markModeOffered('missing', root()), /Unknown goal/u); });
+test('mode offer persistence is idempotent', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); await markModeOffered('goal-9', directory); const first = await readProgress(directory); await markModeOffered('goal-9', directory); assert.deepEqual(await readProgress(directory), first); });
+test('step updates are bounded, idempotent, and recalculate goal status', async () => { const directory = root(); const two = { ...plan(), steps: [{ ...plan().steps[0], id: 'step-1' }, { ...plan().steps[0], id: 'step-2', title: 'Verify' }] }; await approvePlan({ ...two, approved: true }, directory); await assert.rejects(() => updateProgressStep({ goalId: 'goal-9', stepId: 'step-1', status: 'DONE' }, directory), /evidence/u); const update = { goalId: 'goal-9', stepId: 'step-1', status: 'DONE', evidence: ['npm test'] }; await updateProgressStep(update, directory); await updateProgressStep(update, directory); assert.equal((await readProgress(directory)).goals[0].status, 'ACTIVE'); await updateProgressStep({ goalId: 'goal-9', stepId: 'step-2', status: 'BLOCKED' }, directory); assert.equal((await readProgress(directory)).goals[0].status, 'BLOCKED'); });
+test('progress next prioritizes active, blocked, then todo and limits three', async () => { const directory = root(); const steps = Array.from({ length: 5 }, (_, index) => ({ id: `step-${index + 1}`, title: `Step ${index + 1}`, acceptance: ['ok'], files: ['.project/progress.json'], commands: ['npm test'], status: index === 0 ? 'TODO' : index === 1 ? 'BLOCKED' : index === 2 ? 'IN_PROGRESS' : 'TODO' })); await approvePlan({ goalId: 'goal-9', title: 'Many', validationEvidence: ['npm test'], steps, approved: true }, directory); const next = progressNext(await readProgress(directory), 'goal-9'); assert.deepEqual(next.next.map(step => step.stepId), ['step-3', 'step-2', 'step-1']); });
+test('progress next reports a completed goal without candidates', () => { const value = { schemaVersion: 1, goals: [{ id: 'goal-9', title: 'Done', status: 'DONE', executionMode: 'collaborative', steps: [{ id: 'step-1', title: 'Step', status: 'DONE', evidence: ['npm test'] }] }] }; assert.deepEqual(progressNext(value, 'goal-9').next, []); assert.equal(progressNext(value, 'goal-9').complete, true); });
+test('progress next defaults legacy goals to collaborative mode', () => { const value = { goals: [{ id: 'goal-9', title: 'Legacy', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Step', status: 'TODO', evidence: [] }] }] }; assert.equal(progressNext(value, 'goal-9').mode, 'collaborative'); });
+test('progress next keeps stable order within one priority', () => { const steps = ['a', 'b', 'c', 'd'].map(id => ({ id, title: id, status: 'TODO', evidence: [] })); const value = { goals: [{ id: 'goal-9', steps }] }; assert.deepEqual(progressNext(value, 'goal-9').next.map(step => step.stepId), ['a', 'b', 'c']); });
+test('progress next rejects an unknown goal', () => { assert.throws(() => progressNext({ goals: [] }, 'missing'), /Unknown goal/u); });
+test('collaborative handoff detection requires every bounded next step and recognizes the autonomous offer', () => {
+  const steps = [{ stepId: 'step-1', title: 'Define contract' }, { stepId: 'step-2', title: 'Verify transport' }];
+  assert.equal(hasNextStepHandoff('Next: step-1 only', steps), false);
+  assert.equal(hasNextStepHandoff('Next: Define contract, then step-2.', steps), true);
+  assert.equal(hasAutonomousOffer('Je peux passer ce goal en mode automatique.'), true);
+  assert.equal(hasAutonomousOffer('Voici les prochaines étapes.'), false);
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'TODO' }] }), false);
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }, { status: 'BLOCKED' }] }), true);
+});
+test('autonomous offer detection accepts the English agent wording', () => {
+  assert.equal(hasAutonomousOffer('I can switch this goal to autonomous mode.'), true);
+});
+test('autonomous offer detection rejects unrelated automation wording', () => {
+  assert.equal(hasAutonomousOffer('The test suite runs automatically.'), false);
+});
+test('next-step handoff detection rejects an empty final response', () => {
+  assert.equal(hasNextStepHandoff('', [{ stepId: 'step-1', title: 'Verify' }]), false);
+});
+test('next-step handoff detection accepts a step identifier', () => {
+  assert.equal(hasNextStepHandoff('Next: step-1', [{ stepId: 'step-1', title: 'Verify' }]), true);
+});
+test('external blocking requires at least one unfinished step', () => {
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }] }), false);
+});
+test('external blocking rejects a mixed blocked and active goal', () => {
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'IN_PROGRESS' }] }), false);
+});

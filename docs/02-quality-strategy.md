@@ -8,14 +8,15 @@ proportionate level of verification.
 
 | Type | Project choice | Questions to answer | Evidence |
 | --- | --- | --- | --- |
-| Unit | required | Governance, Sensor, and progress rules | `npm test` must pass |
-| Integration | required | npm install, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup` and smoke fixtures |
+| Unit | required | Governance, Sensor, and progress rules | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
+| Static lint | required | JavaScript tooling and tests | `npm run lint` must pass with the pinned ESLint configuration |
+| Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
 | End-to-end | not applicable | The blueprint has no product UI or runtime | No product deployment |
 | Contract | required | Six lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
-| Property / fuzz | not applicable | No product input surface is selected | Reconsider in the derived project |
-| Performance | required | Setup and CI remain bounded; CRG watcher remains single-flight | Existing bounded-process tests |
-| Security | required | Minimal CI permissions, pinned actions, Sensor unsafe/error gates, no secret diagnostics | `npm audit --audit-level=high` and Sensor checklist |
-| Accessibility | not applicable | Generated Archify HTML is documentation infrastructure only | Validate artifact structure |
+| Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
+| Performance | required | CRG updates remain single-flight, time-bounded, and output-bounded | runner unit tests plus `npm run crg:smoke` |
+| Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
+| Accessibility | not applicable | Generated Archify HTML is documentation infrastructure only | 9/9 showcase checks and `npm run archify:visual-check` |
 | Migration / recovery | not applicable | No product data or deployment is owned by the blueprint | Derived project decision |
 
 ## Template baseline
@@ -37,17 +38,15 @@ owner, and an acceptance threshold.
 The project brief records the chosen strategy. Durable security, dependency,
 contract, or major quality constraints belong in an ADR.
 
-## AST Sensor and context boundary
+## Sensor and CRG boundary
 
-The Sensor and Context MCP share one executable registry and pinned Tree-sitter
-grammars for JavaScript, TypeScript/TSX, Python, and Ruby. ERB uses embedded
+The Sensor owns an executable registry and pinned Tree-sitter grammars for
+JavaScript, TypeScript/TSX, Python, and Ruby. ERB uses embedded
 Ruby extraction without changing source offsets. PHP and grammar-free formats
 remain explicitly lexical or embedded. Diagnostics report the actual mode,
 grammar, and any fallback reason.
 
-The separate Context MCP provides bounded symbols, summaries, definitions,
-syntax-aware references, and relevant context. It rejects path escapes,
-ignored/generated paths, and mixed product/blueprint scopes. Responses are
-counted with `gpt-tokenizer@4.0.0` and structurally truncated. Run
-`npm run ast:check`, `npm run mcp:smoke`, and `npm run context:benchmark` for
-the corresponding mechanical evidence.
+Official CRG supplies code context and impact analysis through its own graph
+and MCP; it never replaces the blocking Sensor. Run `npm run ast:check` for
+Sensor grammar compatibility and `npm run crg:smoke` for the exact CRG version,
+fixture build, incremental update, transport, tool list, and read call.

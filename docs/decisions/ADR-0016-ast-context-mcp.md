@@ -1,28 +1,17 @@
 ---
 scope:
-  - .githooks/ast-registry.mjs
-  - .githooks/sensor-engine.mjs
   - scripts/context-ast.mjs
   - scripts/context-mcp.mjs
-  - scripts/ast-check.mjs
-  - scripts/ast-update.mjs
   - scripts/context-benchmark.mjs
-  - scripts/validate-mcp-installation.mjs
-  - .codex/config.toml
-  - .mcp.json
-  - .github/workflows/validate.yml
-  - .project/ast-compatibility.json
-  - .project/project-config.json
-  - tests/ast-infrastructure.test.mjs
-  - tests/mcp-stdio.test.mjs
-  - package.json
-  - package-lock.json
+  - tests/context-ast.test.mjs
+  - .project/context-benchmark.json
 review: on-change
 revised: true
+superseded-by: ADR-0018-official-code-review-graph.md
 ---
 # ADR-0016 — AST context MCP boundary
 
-- Status: accepted
+- Status: superseded by ADR-0018
 - Date: 2026-09-01
 
 The Sensor and context MCP are separate pipelines. Sensor remains the
@@ -46,8 +35,9 @@ negations, and configured generated directories apply even to direct paths.
 Global searches have strict `product` and `blueprint` scopes and reject mixed
 requests. Every response uses a structural budget counted by the exact
 `gpt-tokenizer@4.0.0` package and never returns complete source by default.
-The benchmark reports observed counts, ratio, tokenizer, bytes and duration;
-it makes no fixed reduction promise.
+The benchmark reports observed counts, ratio, tokenizer, bytes and duration.
+Versioned thresholds prevent repository regressions without presenting the
+observed reduction as a universal promise.
 
 Codex loads both stdio servers from project-scoped `.codex/config.toml` and
 Claude loads them from project-scoped `.mcp.json`. Client configuration owns

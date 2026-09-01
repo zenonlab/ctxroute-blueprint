@@ -1,0 +1,2 @@
+# Consumed through PIP_CONSTRAINT by the pinned official composite Action.
+code-review-graph==2.3.8

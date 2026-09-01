@@ -11,7 +11,7 @@ test('matches exact paths and single or recursive globs', () => {
   assert.equal(matchScope('package.json', ['package.json']), true);
   assert.equal(matchScope('packages/ctxroute/src/index.js', ['packages/ctxroute/**']), true);
   assert.equal(matchScope('packages/ctxroute/src/index.js', ['packages/*/package.json']), false);
-  assert.equal(matchScope('scripts/watch-crg.mjs', ['scripts/*']), true);
+  assert.equal(matchScope('scripts/crg-runner.mjs', ['scripts/*']), true);
 });
 
 test('selects several applicable ADRs in numeric order and skips superseded decisions', () => {
@@ -82,7 +82,7 @@ test('materializes ADR metadata for CTXRoute and injects it only in scope', () =
   const projectRoot = fileURLToPath(new URL('..', import.meta.url));
   const hook = join(projectRoot, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
   const env = { ...process.env, CTXROUTE_CONFIG_PATH: join(projectRoot, 'ctxroute-config.json'), CTXROUTE_FILEDOCS_DIR: join(root, '.claude/hooks/docs'), CTXROUTE_STATE_DIR: join(root, '.ctxroute/state') };
-  const run = (filePath, sessionId = `adr-${filePath}`) => spawnSync(process.execPath, [hook, '--budget', '0'], { cwd: root, env, input: JSON.stringify({ session_id: sessionId, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }), encoding: 'utf8' });
+  const run = (filePath, sessionId = `adr-${filePath}`) => spawnSync(process.execPath, [hook, '--budget', '3500'], { cwd: root, env, input: JSON.stringify({ session_id: sessionId, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }), encoding: 'utf8' });
   assert.match(run('src/main.js', 'same-context').stdout, /Use the approved adapter/u);
   assert.doesNotMatch(run('src/main.js', 'same-context').stdout, /Use the approved adapter/u);
   assert.doesNotMatch(run('lib/other.js').stdout, /Use the approved adapter/u);

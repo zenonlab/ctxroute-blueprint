@@ -126,6 +126,13 @@ without analyzing a different working-tree version; `WARN` diagnostics remain
 informational. This is a Git validation boundary, not an attempt to undo the
 already completed PostToolUse write.
 
+CI and `npm run validate` also scan every tracked or non-ignored blueprint
+source under `.codex/hooks/`, `.githooks/`, and `scripts/`. A versioned baseline
+may accept only an exact path/rule occurrence with a substantive justification;
+new, excess, malformed, or stale blocking entries fail validation. SARIF code
+scanning exports unexpected blocking diagnostics only, while the JSON artifact
+retains the complete result and accepted evidence.
+
 High-confidence injection and execution risks are UNSAFE. UI layering and
 anti-slop findings are WARN by default. Unsupported or absent files produce
 explicit ERROR diagnostics and are never treated as safe. Adding an adapter or

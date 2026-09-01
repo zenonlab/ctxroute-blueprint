@@ -7,7 +7,7 @@
   },
   "decisions": {
     "language": "not applicable: blueprint tooling only",
-    "runtime": "Node.js 22+ for repository governance; derived product is undecided",
+    "runtime": "Node.js 22.13+ for repository governance; derived product is undecided",
     "frontend": "none: no product UI is selected",
     "backend": "none: no product service is selected",
     "storage": "none: product storage is undecided; local SQLite is tooling-only",
@@ -17,24 +17,25 @@
     "performance": "bounded setup and single-flight local tooling; product budgets undecided"
   },
   "commands": {
-    "test": "npm test",
+    "test": "npm run test:coverage",
     "initialize": "npm run initialize",
-    "lint": null,
+    "lint": "npm run lint",
     "typecheck": null,
     "mutation": null,
-    "integration": null,
+    "integration": "npm run integration",
     "build": "npm run build:docs",
     "workspaceCheck": "npm run workspace:check",
     "crgUpdate": "npm run crg:update",
-    "crgWatcher": "npm run watch:crg",
     "governanceCheck": "npm run governance:check",
     "progressRead": "npm run progress:read",
     "progressValidate": "npm run progress:validate",
     "progressApprove": "npm run progress:approve",
     "progressMcp": "npm run progress:mcp",
-    "contextMcp": "npm run context:mcp",
     "astCheck": "npm run ast:check",
-    "contextBenchmark": "npm run context:benchmark",
+    "crgMcp": "npm run crg:mcp",
+    "crgSmoke": "npm run crg:smoke",
+    "performance": "npm run crg:smoke",
+    "sensorBlueprint": "npm run sensor:blueprint",
     "mermaid": null
   },
   "quality": {
@@ -47,14 +48,15 @@
   "directories": {
     "source": ["packages/", "scripts/"],
     "tests": ["tests/"],
-    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/"]
+    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/", ".code-review-graph/", "packages/code-review-graph/.venv/"]
   },
   "codeExtensions": [".js", ".mjs", ".json"],
   "architecture": {
-    "documents": [
-      "docs/architecture/src/blueprint.architecture.json"
-    ],
-    "project": "docs/architecture/src/blueprint.architecture.json"
+    "documents": [],
+    "internalDocuments": [
+      "docs/architecture/src/blueprint.architecture.json",
+      "docs/architecture/src/traffic.dataflow.json"
+    ]
   },
   "contracts": {
     "patterns": [
@@ -103,6 +105,7 @@
     ],
     "rootFiles": [
       ".gitignore",
+      "eslint.config.mjs",
       ".mcp.json",
       ".gitmessage",
       ".gitattributes",

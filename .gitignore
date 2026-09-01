@@ -3,6 +3,9 @@ node_modules/
 .agents/skills/
 .claude/skills/
 .ctxroute/state/
+.code-review-graph/
+packages/code-review-graph/.venv/
+.project/*-plan.json
 ci-summary.md
 .claude/hooks/docs/adr-memory/
 coverage/

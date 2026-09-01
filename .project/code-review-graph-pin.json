@@ -1,0 +1,10 @@
+{
+  "repository": "tirth8205/code-review-graph",
+  "tag": "v2.3.8",
+  "tagObject": "751a20a9ba9ec80223916120110211d69327d2b7",
+  "commit": "2c6dae32643572ee528eb9b77dbcc17f58f3a8c9",
+  "version": "2.3.8",
+  "python": "3.12",
+  "minimumPython": "3.10",
+  "uv": "0.11.2"
+}

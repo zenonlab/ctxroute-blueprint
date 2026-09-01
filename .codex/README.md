@@ -17,6 +17,7 @@ entry points directly instead of starting a nested wrapper process.
 ```text
 flowchart TD
     Session[SessionStart] --> SessionContext[CTXRoute session context]
+    Session --> CRGStatus[CRG status or initial build]
     Request[Requested action] --> PreTool[PreToolUse dispatcher]
     PreTool --> Governance[Governance policy]
     Governance -->|allow| Route[CTXRoute context injection]
@@ -25,7 +26,9 @@ flowchart TD
     Route -->|deny| Refusal
     Edit --> PostTool[PostToolUse dispatcher]
     PostTool --> Guard[CTXRoute document guard]
-    Guard -->|allow| Audit[Local change audit]
+    Guard -->|allow| Sensor[Blocking Sensor]
+    Sensor --> CRGUpdate[CRG single-flight update]
+    CRGUpdate --> Audit[Local change audit]
     Guard -->|block| Refusal
     Audit --> Index[Git index]
     Index --> PreCommit[Authoritative pre-commit]
@@ -49,7 +52,11 @@ Read-only tools skip the architecture subprocess, and PostToolUse is limited to
 mutation-capable tools to reduce lifecycle noise and process startup overhead.
 
 The lifecycle is independent from the two project-scoped MCP servers declared
-in `.codex/config.toml`: `ctxroute-progress` and `ctxroute-context-ast` are
+in `.codex/config.toml`: `ctxroute-progress` and `code-review-graph` are
 started by the Codex client over stdio. No PostToolUse handler starts or proxies
 an MCP transport. A trusted project and a refreshed Codex session may be needed
 before `/mcp` shows a newly added manifest.
+
+CRG's `apply_refactor_tool` is permitted only for `dry_run: true`. Normal edit
+tools own accepted mutations so architecture, Sensor, and audit enforcement
+cannot be bypassed.

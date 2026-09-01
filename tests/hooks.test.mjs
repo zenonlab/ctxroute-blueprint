@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dispatch, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
+import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
+import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -20,9 +22,18 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
+      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
+});
+
+test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () => {
+  assert.deepEqual(sessionStartOutput({ code: 0, timedOut: false }), { continue: true });
+  const failed = sessionStartOutput({ code: 1, timedOut: false, stderr: 'index unavailable' });
+  assert.deepEqual(Object.keys(failed), ['systemMessage']);
+  assert.match(failed.systemMessage, /index unavailable/u);
+  assert.ok(failed.systemMessage.length < 500);
 });
 
 test('initialize refuses an incomplete template without changing status', () => {
@@ -37,11 +48,36 @@ test('initialize refuses an incomplete template without changing status', () => 
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, before.status);
 });
 
+test('project configuration inspection accepts the declared internal/product split', () => {
+  const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  assert.deepEqual(validateProjectConfig(config, root, { supportedStatuses: ['template', 'initialized'] }), []);
+});
+
+test('project configuration inspection rejects overlapping diagram audiences', () => {
+  const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.architecture.documents = [config.architecture.internalDocuments[0]];
+  assert.match(validateProjectConfig(config, root, { supportedStatuses: ['template', 'initialized'] }).join(' '), /both product and internal/u);
+});
+
+test('architecture evidence recognizes explicitly declared sources', () => {
+  const config = { architecture: { documents: ['docs/architecture/src/product.sequence.json'], internalDocuments: ['docs/architecture/src/control.dataflow.json'] } };
+  assert.equal(isArchitectureEvidence('docs/architecture/src/product.sequence.json', config), true);
+  assert.equal(isArchitectureEvidence('docs/architecture/src/control.dataflow.json', config), true);
+});
+
+test('architecture evidence recognizes a newly typed Archify source', () => {
+  assert.equal(isArchitectureEvidence('docs/architecture/src/checkout.lifecycle.json', { architecture: { documents: [], internalDocuments: [] } }), true);
+});
+
+test('architecture evidence rejects unrelated documentation', () => {
+  assert.equal(isArchitectureEvidence('docs/guide.md', { architecture: { documents: [], internalDocuments: [] } }), false);
+});
+
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
-    SessionStart: ['session-inject.js'],
+    SessionStart: ['session-inject.js', 'crg-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
+    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-crg.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
@@ -98,7 +134,7 @@ test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () 
   const result = dispatch({
     harness: 'codex',
     event: 'PreToolUse',
-    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/watch-crg.mjs' } }),
+    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/crg-runner.mjs' } }),
     root,
     execute(handler) {
       called.push(handler.name);
@@ -231,6 +267,24 @@ test('PostToolUse audits documents and Archify sources', () => {
   assert.equal(result.stdout, '');
 });
 
+test('Archify preview health checks accept only unauthenticated loopback HTTP URLs', async () => {
+  const { normalizePreviewUrl, selectPreviewDiagram } = await import('../.codex/hooks/archify-preview.mjs');
+  assert.equal(normalizePreviewUrl('http://127.0.0.1:4173/preview'), 'http://127.0.0.1:4173/preview');
+  assert.equal(normalizePreviewUrl('http://localhost:4173/preview'), 'http://localhost:4173/preview');
+  assert.equal(normalizePreviewUrl('https://127.0.0.1:4173/preview'), null);
+  assert.equal(normalizePreviewUrl('http://example.test/preview'), null);
+  assert.equal(normalizePreviewUrl('http://user:password@localhost:4173/preview'), null);
+  const diagrams = [{ id: 'system.architecture', source: 'docs/architecture/src/system.architecture.json' }, { id: 'traffic.dataflow', source: 'docs/architecture/src/traffic.dataflow.json' }];
+  assert.deepEqual(selectPreviewDiagram({ tool_input: { file_path: diagrams[1].source } }, diagrams), diagrams[1]);
+  assert.equal(selectPreviewDiagram({ tool_input: { file_path: 'src/app.ts' } }, diagrams), null);
+});
+
+test('Archify preview hook stays quiet when the template has no product diagram', () => {
+  const result = run('.codex/hooks/archify-preview.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+});
+
 test('an active Stop hook does not loop', () => {
   const result = run('.codex/hooks/stop-review.mjs', { stop_hook_active: true });
   assert.match(result.stdout, /continue/u);
@@ -344,7 +398,7 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.equal(validation.status, 0, validation.stderr);
 
   const session = `test-${process.pid}-${Date.now()}`;
-  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
     cwd: root,
     input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: '*** Update File: package.json' } }),
     encoding: 'utf8',
@@ -353,9 +407,31 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.match(result.stdout, /Project governance/u);
 });
 
+test('CTXRoute reinjects bounded context after PreCompact', () => {
+  const session = `compact-${process.pid}-${Date.now()}`;
+  const input = JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: '*** Update File: package.json' } });
+  const inject = () => spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], { cwd: root, input, encoding: 'utf8' });
+  const first = inject();
+  assert.equal(first.status, 0, first.stderr);
+  const firstContext = JSON.parse(first.stdout).hookSpecificOutput.additionalContext;
+  assert.match(firstContext, /Project governance/u);
+  assert.ok(firstContext.length <= 3500);
+  const compact = spawnSync('node', [join(root, '.codex/hooks/lifecycle.mjs'), 'codex', 'PreCompact'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root }),
+    encoding: 'utf8',
+  });
+  assert.equal(compact.status, 0, compact.stderr);
+  const reinjected = inject();
+  assert.equal(reinjected.status, 0, reinjected.stderr);
+  const reinjectedContext = JSON.parse(reinjected.stdout).hookSpecificOutput.additionalContext;
+  assert.match(reinjectedContext, /Project governance/u);
+  assert.ok(reinjectedContext.length <= 3500);
+});
+
 test('CTXRoute injects UI contract guidance for conventional product UI paths', () => {
   const session = `ui-contract-${process.pid}-${Date.now()}`;
-  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
     cwd: root,
     input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: 'src/Button.tsx' } }),
     encoding: 'utf8',
@@ -366,7 +442,7 @@ test('CTXRoute injects UI contract guidance for conventional product UI paths', 
 
 test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => {
   const session = `sensor-adapters-${process.pid}-${Date.now()}`;
-  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
     cwd: root,
     input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: '.githooks/sensor-engine.mjs' } }),
     encoding: 'utf8',
@@ -427,6 +503,8 @@ function initializedWorkspace() {
   config.directories.source = ['src/'];
   config.codeExtensions = ['.js'];
   config.quality.mutation.decision = 'not-applicable';
+  config.architecture.documents = ['docs/architecture/src/blueprint.architecture.json'];
+  config.architecture.internalDocuments = [];
   writeFileSync(configPath, JSON.stringify(config));
   mkdirSync(join(cwd, 'src'));
   return cwd;

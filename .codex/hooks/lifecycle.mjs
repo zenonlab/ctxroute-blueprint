@@ -15,6 +15,7 @@ export const lifecycleEvents = [
 ];
 
 const MAX_CONTEXT_LENGTH = 4096;
+const CTXROUTE_BUDGET = '3500';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot) {
@@ -25,9 +26,9 @@ export function handlerPlan(harness, event, root = projectRoot) {
   if (!ctxroute) return [];
 
   return {
-    SessionStart: [ctxroute('session-inject.js', '--budget', '0')],
-    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', '0')],
-    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs'), local('archify-preview.mjs')],
+    SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('crg-context.mjs')],
+    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', CTXROUTE_BUDGET)],
+    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-crg.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs'), local('archify-preview.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],
@@ -107,7 +108,7 @@ function applicableHandlers(plan, event, input) {
   let toolName;
   try { toolName = JSON.parse(input || '{}')?.tool_name; }
   catch { return plan; }
-  if (!toolName || /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell|Read|read_file|readFile)$/iu.test(String(toolName))) return plan;
+  if (!toolName || /^(?:apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell|Read|read_file|readFile)$/iu.test(String(toolName))) return plan;
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 

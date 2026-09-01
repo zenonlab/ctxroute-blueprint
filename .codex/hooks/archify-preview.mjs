@@ -1,34 +1,40 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, openSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import http from 'node:http';
+import { get as requestLoopback } from 'node:http';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
+import { selectArchifyDiagrams } from '../../scripts/archify-registry.mjs';
 
 const root = resolve(process.cwd());
-const input = await readInput();
-if (input && isRelevantMutation(input)) {
-  const preview = await ensurePreview();
-  if (preview) {
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: `Archify preview disponible : ${preview.url}`,
-      },
-    }));
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const input = await readInput();
+  if (input && isRelevantMutation(input)) {
+    const preview = await ensurePreview(input);
+    if (preview) {
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: `Archify preview disponible : ${preview.url}`,
+        },
+      }));
+    }
   }
 }
 
-async function ensurePreview() {
+async function ensurePreview(input) {
   const stateDirectory = resolve(process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
-  const statePath = join(stateDirectory, 'archify-preview.json');
-  const source = architectureSource();
+  const diagram = selectPreviewDiagram(input, selectArchifyDiagrams('all', root));
+  if (!diagram) return null;
+  const source = diagram.source;
+  const statePath = join(stateDirectory, `archify-preview-${diagram.id}.json`);
   mkdirSync(stateDirectory, { recursive: true });
   const existing = readJson(statePath);
   if (existing?.source === source && existing?.pid && existing?.url && processAlive(existing.pid) && await isHealthy(existing.url)) return existing;
 
-  const logPath = join(stateDirectory, 'archify-preview.log');
+  const logPath = join(stateDirectory, `archify-preview-${diagram.id}.log`);
   const log = openSync(logPath, 'a');
-  const child = spawn(process.execPath, ['.githooks/archify', 'preview'], {
+  const child = spawn(process.execPath, ['.githooks/archify', 'preview', diagram.id], {
     cwd: root,
     detached: true,
     stdio: ['ignore', log, log],
@@ -50,6 +56,14 @@ async function ensurePreview() {
   return null;
 }
 
+export function selectPreviewDiagram(input, diagrams) {
+  if (!Array.isArray(diagrams) || diagrams.length === 0) return null;
+  const mutation = JSON.stringify(input?.tool_input ?? {});
+  const matching = diagrams.filter(diagram => mutation.includes(diagram.source) || mutation.includes(diagram.id));
+  if (matching.length === 1) return matching[0];
+  return diagrams.length === 1 ? diagrams[0] : null;
+}
+
 function isRelevantMutation(value) {
   const tool = String(value.tool_name ?? '');
   if (/^(?:apply_patch|Edit|Write)$/iu.test(tool)) return true;
@@ -60,17 +74,18 @@ function isRelevantMutation(value) {
 
 function previewUrl(logPath) {
   const text = readFileSync(logPath, 'utf8');
-  return text.match(/\bpreview\s+(https?:\/\/[^\s\r\n]+)/iu)?.[1] ?? null;
+  return normalizePreviewUrl(text.match(/\bpreview\s+(https?:\/\/[^\s\r\n]+)/iu)?.[1]);
 }
 
-function architectureSource() {
-  const fallback = 'docs/architecture/src/blueprint.architecture.json';
+export function normalizePreviewUrl(value) {
+  if (!value) return null;
   try {
-    const config = JSON.parse(readFileSync(join(root, '.project', 'project-config.json'), 'utf8'));
-    const configured = config?.architecture?.project ?? config?.architecture?.documents?.[0];
-    return typeof configured === 'string' && configured && existsSync(resolve(root, configured)) ? configured : fallback;
+    const url = new URL(value);
+    const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+    if (url.protocol !== 'http:' || !loopbackHosts.has(url.hostname) || url.username || url.password) return null;
+    return url.href;
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -80,7 +95,7 @@ function processAlive(pid) {
 
 function isHealthy(url) {
   return new Promise(resolveHealth => {
-    const request = http.get(url, response => {
+    const request = requestLoopback(url, response => {
       response.resume();
       resolveHealth(response.statusCode === 200);
     });
@@ -94,5 +109,5 @@ function readJson(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
 }
 
-function wait(milliseconds) { return new Promise(resolveWait => setTimeout(resolveWait, milliseconds)); }
+function wait(milliseconds) { return new Promise(resolveWait => { setTimeout(resolveWait, milliseconds); }); }
 async function readInput() { let value = ''; for await (const chunk of process.stdin) value += chunk; try { return JSON.parse(value || '{}'); } catch { return null; } }
