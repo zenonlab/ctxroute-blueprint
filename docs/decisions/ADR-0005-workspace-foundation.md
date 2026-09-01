@@ -13,7 +13,7 @@ revised: true
 
 ## Context
 
-The blueprint coordinates three repositories but must remain reproducible,
+The blueprint exposes three integration boundaries but must remain reproducible,
 cross-platform, and compatible with its template lifecycle.
 
 ## Decision
@@ -34,5 +34,5 @@ friction. A single flat package hides repository boundaries.
 The root lockfile is authoritative. Workspace additions require architecture
 evidence and CI coverage. The blueprint can host future package code without
 selecting a product frontend or backend. The initial inventory exposes private
-boundaries for CTXRoute, Archify, and code-review-graph; upstream tools remain
+boundaries for CTXRoute, Archify, and official code-review-graph; upstream tools remain
 external and are not vendored into the blueprint.

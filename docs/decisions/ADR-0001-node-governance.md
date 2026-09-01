@@ -19,19 +19,20 @@ imposing a technology stack on derived products.
 
 ## Decision
 
-Use Node.js and npm only for template infrastructure: CTXRoute, governance hooks,
-governance tests, and Mermaid. Keep product stack decisions separate in
+Use Node.js and npm for template orchestration: CTXRoute, governance hooks,
+governance tests, Sensor, and Archify. Official CRG is a separate frozen Python
+3.10+ project managed by uv 0.11.2. Keep product stack decisions separate in
 `.project/project-config.json`.
 
 Expose `npm run setup` as the single cross-platform bootstrap command. It uses
-the lockfile, installs Mermaid's browser explicitly, enables repository-local
-Git hooks, and runs the full validation suite.
+both lockfiles, installs the exact CRG environment, builds the initial graph,
+enables repository-local Git hooks, and runs the full validation suite.
 
 During `template` status, PreToolUse allows the blueprint's read-only and
 validation commands, including workspace, governance, progress-read,
-progress-validate, and Sensor checklist checks. Progress approval, MCP startup,
-CRG updates, and the CRG watcher remain blocked because they mutate state or
-start a long-lived process.
+progress-validate, Sensor checklist checks, and CRG commands whose writes are
+confined to ignored `.code-review-graph/`. Progress approval and unrelated
+long-lived or direct mutation commands remain blocked.
 
 The template-to-initialized transition is owned by `npm run initialize`. It
 requires completed decisions, brief, quality strategy, and passing validation;

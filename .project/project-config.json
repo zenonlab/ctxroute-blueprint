@@ -48,7 +48,7 @@
   "directories": {
     "source": ["packages/", "scripts/"],
     "tests": ["tests/"],
-    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/"]
+    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/", ".code-review-graph/", "packages/code-review-graph/.venv/"]
   },
   "codeExtensions": [".js", ".mjs", ".json"],
   "architecture": {

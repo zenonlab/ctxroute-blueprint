@@ -23,9 +23,15 @@ grammar packages are distributed under their respective MIT licenses.
 
 Source: https://github.com/tree-sitter
 
-## Context budgeting and ignore matching
+## code-review-graph
 
-`gpt-tokenizer` 4.0.0 and `ignore` 7.0.5 are distributed under the MIT License.
+`code-review-graph` 2.3.8 is copyright its contributors and is distributed
+under the MIT License.
 
-Sources: https://github.com/niieani/gpt-tokenizer and
-https://github.com/kaelzhang/node-ignore
+Source: https://github.com/tirth8205/code-review-graph
+
+## Ignore matching
+
+`ignore` 7.0.8 is distributed under the MIT License.
+
+Source: https://github.com/kaelzhang/node-ignore

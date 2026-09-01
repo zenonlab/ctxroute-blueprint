@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 
 const checkOnly = process.argv.includes('--check');
 const npmCli = process.env.npm_execpath;
+const initialGitStatus = capture('git', ['status', '--porcelain']);
 
 requireVersion('Node.js', process.versions.node, [22, 13, 0]);
 if (!npmCli) fail('Run setup through npm: npm run setup');
@@ -10,7 +11,8 @@ if (!npmCli) fail('Run setup through npm: npm run setup');
 const npmVersion = capture(process.execPath, [npmCli, '--version']);
 requireVersion('npm', npmVersion, [10, 0, 0]);
 const gitVersion = capture('git', ['--version']);
-const pythonVersion = capture('python3', ['--version']).replace(/^Python\s+/u, '');
+const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+const pythonVersion = capture(pythonCommand, ['--version']).replace(/^Python\s+/u, '');
 requireVersion('Python', pythonVersion, [3, 10, 0]);
 const uvVersion = capture('uv', ['--version']).match(/\d+\.\d+\.\d+/u)?.[0] ?? '';
 if (uvVersion !== '0.11.2') fail(`uv 0.11.2 is required; found ${uvVersion || 'unknown'}.`);
@@ -31,6 +33,8 @@ run('Build the initial code-review-graph graph', process.execPath, [npmCli, 'run
 run('Enable repository Git hooks', 'git', ['config', 'core.hooksPath', '.githooks']);
 run('Verify Git hooks activation', 'git', ['config', '--get', 'core.hooksPath']);
 run('Validate the complete starter', process.execPath, [npmCli, 'run', 'validate']);
+const finalGitStatus = capture('git', ['status', '--porcelain']);
+if (finalGitStatus !== initialGitStatus) fail('Setup changed tracked files; inspect git status before continuing.');
 
 console.log('CTXRoute Blueprint setup is complete.');
 

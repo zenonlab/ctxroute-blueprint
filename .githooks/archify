@@ -21,6 +21,7 @@ if (command === 'restore') {
 else if (command === 'verify') { verify(); run(process.execPath, [cli, 'doctor']); }
 else if (command === 'validate') { verify(); run(process.execPath, [cli, 'validate', 'architecture', source, '--quality', 'showcase', '--json']); }
 else if (command === 'build') { verify(); run(process.execPath, [cli, 'deliver', 'architecture', source, output, '--quality', 'showcase', '--json']); }
+else if (command === 'visual-check') { verify(); run(process.execPath, [cli, 'visual-check', output, '--json']); }
 else if (command === 'preview') { verify(); run(process.execPath, [cli, 'preview', 'architecture', source, output, '--quality', 'showcase']); }
 else if (command === 'updates') { verify(); run(process.execPath, [join(skill, 'scripts', 'check-update.mjs')]); }
 else fail(`Unknown Archify command: ${command}`);

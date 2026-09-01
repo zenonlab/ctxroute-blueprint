@@ -1,0 +1,57 @@
+name: code-review-graph
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crg-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: CRG risk gate
+    runs-on: ubuntu-latest
+    env:
+      PIP_CONSTRAINT: ${{ github.workspace }}/.github/code-review-graph-constraints.txt
+    steps:
+      - name: Check out untrusted PR code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Analyze changes with pinned official CRG
+        id: review
+        uses: tirth8205/code-review-graph@2c6dae32643572ee528eb9b77dbcc17f58f3a8c9 # v2.3.8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment: "false"
+          fail-on-risk: high
+          python-version: "3.12"
+
+      - name: Stage bounded report metadata
+        if: always() && steps.review.outputs.comment-file != ''
+        shell: bash
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/crg-report
+          COMMENT_FILE: ${{ steps.review.outputs.comment-file }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          mkdir -p -- "${ARTIFACT_DIR}"
+          cp -- "${COMMENT_FILE}" "${ARTIFACT_DIR}/crg-comment.md"
+          printf '%s\n' "${PR_NUMBER}" > "${ARTIFACT_DIR}/pr-number.txt"
+          printf '%s\n' "${HEAD_SHA}" > "${ARTIFACT_DIR}/head-sha.txt"
+
+      - name: Upload report even when the risk gate fails
+        if: always() && steps.review.outputs.comment-file != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: crg-report
+          path: ${{ runner.temp }}/crg-report/
+          if-no-files-found: error
+          retention-days: 1

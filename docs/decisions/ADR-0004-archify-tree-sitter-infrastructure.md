@@ -35,6 +35,9 @@ vendor or modify the upstream skill.
 Store the blueprint architecture as Archify architecture JSON IR under
 `docs/architecture/src/`. Validate it with the `showcase` quality profile and
 generate self-contained HTML only under ignored `dist/`.
+After a Linux build, run Archify `visual-check` at all four supported desktop
+resolutions and publish its captures, contact sheet, and JSON receipt. Automated
+containment is required; `visualReview` remains pending until human inspection.
 
 Implement the Sensor as a short-lived Node.js CLI backed by the official
 tree-sitter JavaScript, TypeScript, and Python grammars. It emits stable JSON
@@ -55,5 +58,5 @@ Windows. `npm install` and `npm ci` require Git/network access to restore the
 pinned skill. Archify updates are explicit: review a release, change both pins,
 regenerate the lock, run doctor and all tests, then commit.
 
-CTXRoute is unchanged. CRG, watchers, memory, MCP/A2A, and agent loops remain
-outside this decision.
+Tree-sitter remains Sensor-only. Official CRG owns its independent code graph
+and context MCP as defined by ADR-0018; no AST context server is retained.

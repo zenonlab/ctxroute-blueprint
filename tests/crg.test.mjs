@@ -4,10 +4,13 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
 import { CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
 
 const nodeChild = source => () => spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('CRG invocation is frozen, project-local, and exactly pinned', () => {
   const invocation = crgInvocation(['--version'], '/workspace');
@@ -51,4 +54,14 @@ test('PostToolUse triggers only one successful normal write', () => {
   assert.equal(shouldUpdate({ tool_name: 'Read', tool_input: { file_path: 'src/a.js' }, tool_response: {} }), false);
   assert.equal(shouldUpdate({ tool_name: 'Edit', tool_input: { file_path: 'src/a.js' }, tool_response: { isError: true } }), false);
   assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'npm run crg:update' }, tool_response: {} }), false);
+});
+
+test('embeddings remain absent by default and cloud egress requires explicit consent', () => {
+  const project = readFileSync(join(repositoryRoot, 'packages/code-review-graph/pyproject.toml'), 'utf8');
+  const decision = readFileSync(join(repositoryRoot, 'docs/decisions/ADR-0018-official-code-review-graph.md'), 'utf8');
+  assert.match(project, /code-review-graph==2\.3\.8/u);
+  assert.doesNotMatch(project, /code-review-graph\[(?:embeddings|google-embeddings|all)\]/u);
+  assert.match(decision, /Local embeddings require an\nexplicit optional installation/u);
+  assert.match(decision, /CRG_ACCEPT_CLOUD_EMBEDDINGS=1/u);
+  assert.match(decision, /secrets and provider configuration are never\nversioned/u);
 });

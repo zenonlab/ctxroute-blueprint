@@ -11,7 +11,7 @@ const nodeGlobals = Object.fromEntries([
 
 export default [{
   files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-  ignores: ['.agents/**', '.claude/skills/**', '.ctxroute/**', 'coverage/**', 'dist/**', 'node_modules/**'],
+  ignores: ['.agents/**', '.claude/skills/**', '.code-review-graph/**', '.ctxroute/**', 'coverage/**', 'dist/**', 'node_modules/**', 'packages/code-review-graph/.venv/**'],
   languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: nodeGlobals },
   linterOptions: { reportUnusedDisableDirectives: 'error' },
   rules: {

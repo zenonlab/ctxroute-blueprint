@@ -31,7 +31,7 @@ Keep `npm run setup` as the single local bootstrap. Run it in Codespaces after
 creation and in the clean-install CI job; the cross-platform matrix runs the
 same deterministic validation gate after `npm ci`. CI uses Node 22, minimal
 permissions plus `security-events: write` only for SARIF, pinned action SHAs,
-and uploads only sanitized Archify/Sensor/benchmark/summary artifacts. The blueprint's CD means optional
+and uploads only sanitized Archify/Sensor/CRG-smoke/summary artifacts. The blueprint's CD means optional
 publication of documentation artifacts; it does not deploy an application.
 
 Use a separate derived-project workflow for product deployment, secrets,

@@ -4,7 +4,10 @@
 [![GitHub Template](https://img.shields.io/badge/GitHub-template-181717?logo=github)](https://github.com/zenonlab/ctxroute-blueprint/generate)
 [![Node.js 22.13+](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm 10+](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![uv 0.11.2](https://img.shields.io/badge/uv-0.11.2-DE5FE9)](https://github.com/astral-sh/uv)
 [![CTXRoute](https://img.shields.io/badge/context-CTXRoute-7c3aed)](https://github.com/zenonlab/ctxroute)
+[![code-review-graph v2.3.8](https://img.shields.io/badge/context-code--review--graph_v2.3.8-10b981)](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8)
 [![Archify v2.16.0](https://img.shields.io/badge/architecture-Archify_v2.16.0-06b6d4)](https://github.com/tt-a1i/archify/releases/tag/v2.16.0)
 [![tree-sitter Sensor](https://img.shields.io/badge/security-tree--sitter_Sensor-ef4444)](https://tree-sitter.github.io/tree-sitter/)
 [![Codex + Claude](https://img.shields.io/badge/agents-Codex_%2B_Claude-111827)](AGENTS.md)
@@ -18,14 +21,18 @@ database, deployment platform, or test framework.
 The generated product remains stack-neutral. The template tooling requires
 [Node.js 22.13+](https://nodejs.org/) and [npm 10+](https://www.npmjs.com/) to run
 [CTXRoute](https://github.com/zenonlab/ctxroute), governance hooks, tests, and
-[Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor.
+[Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor. Official
+[code-review-graph](https://github.com/tirth8205/code-review-graph) additionally
+requires Python 3.10+ and uv 0.11.2; Python 3.12 is the reference runtime.
 
-The blueprint combines five infrastructure layers:
+The blueprint combines six infrastructure layers:
 
 - **Agent governance:** one shared doctrine for Codex and Claude, enforced by
   project-local lifecycle and Git hooks.
 - **Context routing:** CTXRoute injects only the project guidance relevant to
   the current action.
+- **Code graph:** official code-review-graph v2.3.8 supplies MCP context,
+  incremental impact analysis, and fork-safe PR risk review.
 - **Architecture:** Archify validates versioned JSON IR and generates an
   interactive artifact outside Git.
 - **Static safety:** the [tree-sitter Sensor](https://tree-sitter.github.io/tree-sitter/) analyzes supported source files and
@@ -36,7 +43,7 @@ The blueprint combines five infrastructure layers:
 
 1. Select **Use this template** on GitHub.
 2. Clone the generated repository and enter its root directory.
-3. Install Git, Node.js 22.13+, and npm 10+.
+3. Install Git, Node.js 22.13+, npm 10+, Python 3.10+, and uv 0.11.2.
 4. Bootstrap the repository:
 
    ```sh
@@ -44,6 +51,7 @@ The blueprint combines five infrastructure layers:
    ```
 
    Setup runs `npm ci`, restores the pinned Archify skill, runs Archify Doctor,
+   synchronizes the frozen CRG environment, builds the ignored real graph,
    verifies CTXRoute and the agent configurations, enables the repository Git
    hooks, and executes the complete validation suite. It also warns when legacy
    global CTXRoute hooks would run alongside the project-local dispatchers.
@@ -104,22 +112,21 @@ The repository exposes two independent stdio servers:
 
 - `ctxroute-progress` runs `npm run progress:mcp` and exposes four checklist
   tools.
-- `ctxroute-context-ast` runs `npm run context:mcp` and exposes five read-only
-  AST context tools.
+- `code-review-graph` runs `npm run crg:mcp` and exposes the 30 official CRG
+  v2.3.8 tools against `.code-review-graph/graph.db`.
 
 Codex reads the tracked project configuration in [`.codex/config.toml`](.codex/config.toml),
 and Claude reads the tracked [`.mcp.json`](.mcp.json). These files never alter
 user-global configuration. A trusted client must approve project MCP servers;
 open a new local session or restart the client if it has already cached the
 project manifest. Use `/mcp` in the client to inspect the loaded servers and
-`npm run mcp:validate` or `npm run mcp:smoke` for mechanical verification.
+`npm run mcp:validate`, `npm run mcp:smoke`, or `npm run crg:smoke` for
+mechanical verification.
 
-Context searches default to the `product` scope. Blueprint searches require
-`scope: "blueprint"`; one request cannot mix both scopes. The server rejects
-absolute paths, traversal, ignored/generated paths and symlinks leaving the
-workspace. Every response identifies its scope, actual mode, grammar,
-`gpt-tokenizer@4.0.0` count, and truncation state without returning full source
-by default.
+CRG embeddings are off by default. Local embeddings require an explicit
+optional installation and command. Cloud providers require their documented
+environment variable plus `CRG_ACCEPT_CLOUD_EMBEDDINGS=1`; never commit a key
+or provider configuration.
 
 ## CTXRoute
 
@@ -141,9 +148,10 @@ workspace hooks, producing duplicate progress messages and extra process
 startup latency. The installer reports this condition but never edits the
 global configuration. Lifecycle handlers omit custom status messages, and
 `PostToolUse` runs only for tools that can change repository state.
-PostToolUse runs CTXRoute guards, the blocking Sensor, problem memory, audit,
-and Archify preview. It does not start either MCP server; Codex and Claude own
-the stdio transports.
+PostToolUse runs CTXRoute guards, the blocking Sensor, a bounded single-flight
+CRG update, problem memory, audit, and Archify preview. It does not start either
+MCP server; Codex and Claude own the stdio transports. CRG failures and its
+30-second timeout fail open with a visible bounded diagnostic.
 
 The project-local lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `PreCompact`, and `Stop`. CTXRoute state and recurring
@@ -166,8 +174,10 @@ npm run validate
 ```
 
 It includes lint, architecture and document contracts, workspace/governance
-coherence, the whole-blueprint Sensor baseline, performance budgets, and test
-coverage thresholds. For the full verification, including integration,
+coherence, the whole-blueprint Sensor baseline, and test coverage thresholds.
+`npm run crg:smoke` separately proves the pinned runtime, fixture build,
+incremental update, MCP startup, tool list, and a read call. For the full
+verification, including integration,
 dependency audit, and generated documentation:
 
 ```sh
@@ -198,10 +208,14 @@ It is validated at Archify's `showcase` quality level.
 ```sh
 npm run validate:architecture
 npm run build:docs
+npm run archify:visual-check
 npm run preview:docs
 ```
 
-`build:docs` generates `dist/architecture/blueprint.html`; `preview:docs`
+`build:docs` generates `dist/architecture/blueprint.architecture.html`;
+`archify:visual-check` checks containment at four desktop resolutions and
+writes screenshots, a contact sheet, and a JSON receipt beside it. Its
+automated `visualReview` remains `pending` until human review. `preview:docs`
 builds it and starts the local interactive preview. The generated HTML is not a
 source file and must not be edited manually.
 
@@ -218,8 +232,9 @@ silent update.
 
 ## Sensor
 
-The Sensor and Context MCP share one executable language registry with three
-explicit coverage levels:
+The Sensor owns one executable language registry with three explicit coverage
+levels. It is independent from CRG and remains the only blocking static safety
+boundary:
 
 - **AST:** JavaScript, TypeScript, JSX/TSX, Python, and Ruby.
 - **Embedded AST:** Ruby blocks extracted from ERB without changing offsets.
