@@ -9,7 +9,7 @@ proportionate level of verification.
 | Type | Project choice | Questions to answer | Evidence |
 | --- | --- | --- | --- |
 | Unit | required | Governance, Sensor, and progress rules | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
-| Static lint | required | JavaScript tooling and tests | `npm run lint` must pass with the pinned ESLint configuration |
+| Static lint | required | JavaScript tooling and tests | `npm run lint` and the vendored official anti-slop batch must pass |
 | Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
 | End-to-end | not applicable | The blueprint has no product UI or runtime | No product deployment |
 | Contract | required | Six lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
@@ -40,11 +40,12 @@ contract, or major quality constraints belong in an ADR.
 
 ## Sensor and CRG boundary
 
-The Sensor owns an executable registry and pinned Tree-sitter grammars for
-JavaScript, TypeScript/TSX, Python, and Ruby. ERB uses embedded
-Ruby extraction without changing source offsets. PHP and grammar-free formats
-remain explicitly lexical or embedded. Diagnostics report the actual mode,
-grammar, and any fallback reason.
+The Sensor catalogue classifies recognition separately from support. JavaScript,
+TypeScript/TSX, Python, Ruby/ERB, and JSON have verified syntax parsing. Other
+formats are `PARTIAL` or `MISSING` until their Node 22 parser and fixture matrix
+are verified. A fallback reports itself and never claims syntax-aware coverage.
+The vendored official JS/TS anti-slop rules keep `anti-slop/*` IDs; common
+blueprint heuristics use `sensor/quality/*`.
 
 Official CRG supplies code context and impact analysis through its own graph
 and MCP; it never replaces the blocking Sensor. Run `npm run ast:check` for

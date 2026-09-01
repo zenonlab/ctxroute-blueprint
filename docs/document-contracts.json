@@ -21,6 +21,15 @@
       "validator": "node .githooks/archify validate internal"
     },
     {
+      "id": "sensor-dataflow",
+      "kind": "sensor-dataflow-ir",
+      "audience": "internal",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/sensor.dataflow.json",
+      "narrative": "docs/decisions/ADR-0021-honest-multilanguage-sensor-packs.md",
+      "validator": "node .githooks/archify validate internal"
+    },
+    {
       "id": "project-brief",
       "kind": "brief",
       "format": "markdown",

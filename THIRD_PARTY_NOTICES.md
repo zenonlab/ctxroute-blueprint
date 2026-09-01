@@ -23,6 +23,15 @@ grammar packages are distributed under their respective MIT licenses.
 
 Source: https://github.com/tree-sitter
 
+## anti-slop
+
+The vendored anti-slop Oxlint plugin is copyright Dillon Mulroy and is
+distributed under the MIT License. Production sources and licence are pinned to
+commit `e8c4880471b23ab7f216fba7b27d173a6ef07d4c`; provenance and the complete
+licence text are stored under `tools/oxlint/anti-slop/`.
+
+Source: https://github.com/dmmulroy/anti-slop
+
 ## code-review-graph
 
 `code-review-graph` 2.3.8 is copyright its contributors and is distributed

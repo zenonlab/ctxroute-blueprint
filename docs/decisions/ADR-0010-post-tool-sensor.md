@@ -134,7 +134,9 @@ scanning exports unexpected blocking diagnostics only, while the JSON artifact
 retains the complete result and accepted evidence.
 
 High-confidence injection and execution risks are UNSAFE. UI layering and
-anti-slop findings are WARN by default. Unsupported or absent files produce
+blueprint quality findings under `sensor/quality/*` are WARN by default. The
+vendored official JS/TS findings retain `anti-slop/*` IDs and are ERROR.
+Unsupported or absent files produce
 explicit ERROR diagnostics and are never treated as safe. Adding an adapter or
 rule does not require changing the CTXRoute dispatcher.
 

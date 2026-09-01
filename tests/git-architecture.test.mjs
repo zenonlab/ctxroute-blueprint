@@ -71,6 +71,7 @@ function repository() {
   for (const key of Object.keys(config.decisions)) config.decisions[key] = key === 'language' ? 'Ruby' : 'none';
   config.directories.source = ['src/'];
   config.codeExtensions = ['.rb'];
+  config.quality.sensor.languages = ['ruby'];
   config.quality.mutation.decision = 'not-applicable';
   config.architecture.documents = ['docs/architecture/src/blueprint.architecture.json'];
   config.architecture.internalDocuments = [];

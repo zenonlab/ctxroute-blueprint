@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { catalogEntry, registryEntry } from './ast-registry.mjs';
 
 export const DEFAULT_CONFIG_PATH = '.project/project-config.json';
 
@@ -65,6 +66,21 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
   const mutation = config.quality?.mutation;
   if (mutation && (typeof mutation.preCommit !== 'boolean' || typeof mutation.prePush !== 'boolean')) failures.push('quality.mutation.preCommit and prePush must be booleans');
   if ((mutation?.preCommit || mutation?.prePush) && !config.commands?.mutation) failures.push('commands.mutation is required when a mutation hook is enabled');
+
+  const sensor = config.quality?.sensor;
+  if (sensor !== undefined) {
+    if (!sensor || Object.prototype.toString.call(sensor) !== '[object Object]') failures.push('quality.sensor must be an object');
+    else {
+      if (!Array.isArray(sensor.languages) || sensor.languages.length === 0 || sensor.languages.some(language => Object.prototype.toString.call(language) !== '[object String]' || !catalogEntry(language))) failures.push('quality.sensor.languages must contain known catalogue identifiers');
+      if (new Set(sensor.languages ?? []).size !== (sensor.languages ?? []).length) failures.push('quality.sensor.languages must not contain duplicates');
+      if (!['auto', 'enabled', 'disabled'].includes(sensor.antiSlopEffect)) failures.push('quality.sensor.antiSlopEffect must be auto, enabled, or disabled');
+      for (const extension of config.codeExtensions ?? []) {
+        const item = registryEntry(`fixture${extension}`);
+        const accepted = item?.id === 'tsx' ? ['tsx', 'typescript'] : item?.id === 'erb' ? ['erb', 'ruby'] : item ? [item.id] : [];
+        if (!item || !accepted.some(id => sensor.languages.includes(id))) failures.push(`codeExtensions ${extension} requires a declared Sensor language`);
+      }
+    }
+  }
 
   if (config.status === 'initialized') {
     for (const field of ['language', 'runtime', 'frontend', 'backend', 'storage', 'deployment', 'observability', 'security', 'performance']) {

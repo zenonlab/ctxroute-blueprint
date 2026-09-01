@@ -24,6 +24,7 @@ test('document contract inspection accepts the architecture source directly', ()
 
 test('document contract inspection accepts the internal traffic source directly', () => {
   assert.doesNotThrow(() => inspectDocumentSource({ format: 'archify-json-ir' }, 'docs/architecture/src/traffic.dataflow.json'));
+  assert.doesNotThrow(() => inspectDocumentSource({ format: 'archify-json-ir' }, 'docs/architecture/src/sensor.dataflow.json'));
 });
 
 test('document contract inspection honors an explicit exclusion directly', () => {

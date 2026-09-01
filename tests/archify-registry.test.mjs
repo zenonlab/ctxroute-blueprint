@@ -11,9 +11,9 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 
 test('Archify registry discovers every typed source in stable order', () => {
   const diagrams = listArchifyDiagrams(root);
-  assert.deepEqual(diagrams.map(diagram => diagram.id), ['blueprint.architecture', 'traffic.dataflow']);
-  assert.deepEqual(diagrams.map(diagram => diagram.type), ['architecture', 'dataflow']);
-  assert.deepEqual(diagrams.map(diagram => diagram.audience), ['internal', 'internal']);
+  assert.deepEqual(diagrams.map(diagram => diagram.id), ['blueprint.architecture', 'sensor.dataflow', 'traffic.dataflow']);
+  assert.deepEqual(diagrams.map(diagram => diagram.type), ['architecture', 'dataflow', 'dataflow']);
+  assert.deepEqual(diagrams.map(diagram => diagram.audience), ['internal', 'internal', 'internal']);
 });
 
 test('product diagrams reject blueprint control-plane names', () => {
@@ -22,7 +22,7 @@ test('product diagrams reject blueprint control-plane names', () => {
 });
 
 test('Archify selector keeps internal sources out of every product selection', () => {
-  assert.equal(selectArchifyDiagrams('internal', root).length, 2);
+  assert.equal(selectArchifyDiagrams('internal', root).length, 3);
   assert.equal(selectArchifyDiagrams('all', root).length, 0);
   assert.throws(() => selectArchifyDiagrams('traffic', root), /Unknown product Archify diagram/u);
   assert.throws(() => selectArchifyDiagrams('architecture', root), /Unknown product Archify diagram/u);

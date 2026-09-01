@@ -27,6 +27,7 @@ if (checkOnly) {
 }
 
 run('Install pinned dependencies (CTXRoute + Archify restore via postinstall)', process.execPath, [npmCli, 'ci']);
+run('Synchronize configured Sensor language packs', process.execPath, [npmCli, 'run', 'sensor:languages', '--', 'sync']);
 run('Synchronize code-review-graph from the frozen uv lock', 'uv', ['sync', '--project', 'packages/code-review-graph', '--frozen', '--python', '3.12']);
 run('Verify code-review-graph 2.3.8', process.execPath, [npmCli, 'run', 'crg:version']);
 run('Build the initial code-review-graph graph', process.execPath, [npmCli, 'run', 'crg:build']);

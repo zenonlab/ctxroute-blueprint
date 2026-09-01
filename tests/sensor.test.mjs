@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, optionalParserStatus, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
+import { adapterForPath, analyzePaths, analyzeSource, isSupportedSourcePath, SENSOR_ADAPTERS, SENSOR_COVERAGE, toSarif } from '../.githooks/sensor-engine.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sensor = join(root, '.githooks', 'sensor');
@@ -67,6 +67,19 @@ test('staged Sensor blocks unsafe diagnostics before commit', () => {
   const result = spawnSync(process.execPath, ['.githooks/validate-staged.mjs'], { cwd: root, env, encoding: 'utf8' });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /sensor\/shell-true/u);
+});
+test('staged Sensor batches official anti-slop rules against index blobs', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-staged-official-'));
+  const objects = join(directory, 'objects');
+  mkdirSync(objects);
+  const env = { ...process.env, GIT_INDEX_FILE: join(directory, 'index'), GIT_OBJECT_DIRECTORY: objects, GIT_ALTERNATE_OBJECT_DIRECTORIES: join(root, '.git/objects') };
+  const git = (args, input) => execFileSync('git', args, { cwd: root, env, input, stdio: 'pipe' });
+  git(['read-tree', 'HEAD']);
+  const blob = git(['hash-object', '-w', '--stdin'], 'function save(value: object) { return value; }\n').toString().trim();
+  git(['update-index', '--add', '--cacheinfo', `100644,${blob},.sensor-staged-fixture.ts`]);
+  const result = spawnSync(process.execPath, ['.githooks/validate-staged.mjs'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /anti-slop\/no-object-parameters/u);
 });
 test('syntax errors exit 2', () => { const result = run('py', 'def broken(:\n'); assert.equal(result.status, 2); assert.equal(result.body.verdict, 'ERROR'); });
 test('diagnostics are path ordered', () => { const directory = mkdtempSync(join(tmpdir(), 'sensor-order-')); const a = join(directory, 'a.js'); const b = join(directory, 'b.js'); writeFileSync(a, 'eval(a);'); writeFileSync(b, 'eval(b);'); const result = spawnSync(process.execPath, [sensor, b, a], { cwd: root, encoding: 'utf8' }); assert.deepEqual(JSON.parse(result.stdout).diagnostics.map(item => item.path), [a, b]); });
@@ -135,6 +148,16 @@ test('Sensor exposes bounded adapter coverage and never resolves an unscanned lo
   assert.equal(result.coverage.moduleScope, 'explicit-paths');
   assert.equal(result.coverage.wholeProgramAnalysis, false);
   assert.equal(result.coverage.rateLimitRuntimeProof, false);
+  assert.equal(result.schemaVersion, 2);
+  assert.deepEqual(result.coverage.files.map(item => ({ language: item.language, parser: item.parser, syntaxAware: item.syntaxAware })), [{ language: 'javascript', parser: 'loaded', syntaxAware: true }]);
+});
+test('official anti-slop rules run once for a JavaScript and TypeScript batch', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sensor-official-anti-slop-'));
+  writeFileSync(join(directory, 'unsafe.ts'), 'function save(value: object) { return value; }\n');
+  writeFileSync(join(directory, 'safe.js'), 'export const value = 1;\n');
+  const result = analyzePaths(['unsafe.ts', 'safe.js'], { root: directory, config: { schemaVersion: 1, dangerousCommands: [], sql: { sinks: ['query'] } } });
+  assert.equal(result.verdict, 'ERROR');
+  assert.equal(result.diagnostics.some(item => item.rule === 'anti-slop/no-object-parameters' && item.severity === 'ERROR' && item.mode === 'oxlint'), true);
 });
 test('SQL tracking follows Python builders and import aliases in one scan', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sensor-python-cross-file-'));
@@ -203,18 +226,18 @@ test('Vue and Svelte single-file components analyze embedded code without false 
   assert.equal(analyzeSource('Card.svelte', '<script>db.query(`SELECT * FROM users WHERE id = ${userId}`);</script><style>main { color: red }</style>').at(0).rule, 'sensor/sql-injection');
   assert.equal(analyzeSource('Card.vue', '<script lang="ts">eval(input);</script>').at(0).rule, 'sensor/dynamic-eval');
 });
-test('lexical adapters cover Rust, TOML, and common repository formats without comment/string false positives', () => {
-  assert.equal(analyzeSource('main.rs', 'fn main() { println!("ok"); }').length, 0);
-  assert.equal(analyzeSource('main.rs', '// eval(input)\nfn main() {}').length, 0);
+test('lexical fallbacks are explicit and avoid comment/string false positives', () => {
+  assert.equal(analyzeSource('main.rs', 'fn main() { println!("ok"); }').at(0).rule, 'sensor/parser-unavailable');
+  assert.equal(analyzeSource('main.rs', '// eval(input)\nfn main() {}').every(item => item.rule !== 'sensor/dynamic-eval'), true);
   assert.equal(analyzeSource('main.rs', 'fn main() { eval(input); }').at(0).rule, 'sensor/dynamic-eval');
-  assert.equal(analyzeSource('Cargo.toml', '# eval(input)\nname = "demo"').length, 0);
-  assert.equal(analyzeSource('config.toml', 'command = "eval(input)"').length, 0);
+  assert.equal(analyzeSource('Cargo.toml', '# eval(input)\nname = "demo"').every(item => item.rule !== 'sensor/dynamic-eval'), true);
+  assert.equal(analyzeSource('config.toml', 'command = "eval(input)"').every(item => item.rule !== 'sensor/dynamic-eval'), true);
   assert.equal(analyzeSource('config.yaml', 'command: eval(input)').at(0).rule, 'sensor/dynamic-eval');
-  assert.equal(analyzeSource('schema.graphql', 'type User { id: ID! }').length, 0);
-  assert.equal(analyzeSource('main.lua', '-- eval(input)\nprint("ok")').length, 0);
+  assert.equal(analyzeSource('schema.graphql', 'type User { id: ID! }').at(0).rule, 'sensor/parser-unavailable');
+  assert.equal(analyzeSource('main.lua', '-- eval(input)\nprint("ok")').every(item => item.rule !== 'sensor/dynamic-eval'), true);
   assert.equal(analyzeSource('main.lua', 'eval(input)').at(0).rule, 'sensor/dynamic-eval');
-  assert.equal(analyzeSource('Dockerfile', 'RUN echo "ok"').length, 0);
-  assert.equal(analyzeSource('.env', 'COMMAND="eval(input)"').length, 0);
+  assert.equal(analyzeSource('Dockerfile', 'RUN echo "ok"').at(0).rule, 'sensor/parser-unavailable');
+  assert.equal(analyzeSource('.env', 'COMMAND="eval(input)"').every(item => item.rule !== 'sensor/dynamic-eval'), true);
 });
 test('Rails Ruby and templates detect unsafe boundaries without flagging safe ORM usage', () => {
   assert.equal(analyzeSource('users.rb', "User.where(id: params[:id]); User.find_by(name: params[:name])").length, 0);
@@ -243,11 +266,10 @@ test('diagnostics identify their adapter and retain stable unique locations', ()
   assert.equal(diagnostics[0].adapter, 'template');
   assert.equal(new Set(diagnostics.map(item => `${item.line}:${item.column}:${item.rule}:${item.message}`)).size, diagnostics.length);
 });
-test('registry reports installed Ruby/ERB grammars and keeps PHP explicitly lexical', () => {
-  const status = optionalParserStatus();
-  assert.deepEqual(status.map(item => item.id), ['ruby-ast', 'erb-ast']);
-  assert.equal(status.every(item => item.available), true);
-  assert.equal(SENSOR_ADAPTERS.find(item => item.extensions.includes('.php')).mode, 'lexical');
+test('registry reports syntax-aware Ruby/ERB and missing PHP coverage honestly', () => {
+  assert.equal(SENSOR_ADAPTERS.find(item => item.id === 'ruby').support, 'stable');
+  assert.equal(SENSOR_ADAPTERS.find(item => item.id === 'erb').support, 'stable');
+  assert.equal(SENSOR_ADAPTERS.find(item => item.id === 'php').support, 'missing');
   assert.equal(analyzeSource('safe.rb', '# puts "eval(x)"\nUser.find_by(id: params[:id])').length, 0);
 });
 
@@ -282,7 +304,7 @@ test('Sensor deduplicates repeated paths within one action', () => {
 test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
   assert.equal(analyzeSource('template.js', 'const html = `<style>main { color: red }</style>`;').length, 0);
-  assert.equal(analyzeSource('debug.js', 'console.log(value);').at(0).rule, 'sensor/anti-slop/debug-output');
+  assert.equal(analyzeSource('debug.js', 'console.log(value);').at(0).rule, 'sensor/quality/debug-output');
 });
 test('unsupported and missing paths are explicit errors', () => {
   assert.equal(run('txt', 'plain text').body.verdict, 'ERROR');

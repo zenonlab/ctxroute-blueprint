@@ -39,6 +39,13 @@
     "mermaid": null
   },
   "quality": {
+    "sensor": {
+      "languages": [
+        "javascript",
+        "json"
+      ],
+      "antiSlopEffect": "auto"
+    },
     "mutation": {
       "decision": "not-applicable",
       "preCommit": false,
@@ -46,16 +53,33 @@
     }
   },
   "directories": {
-    "source": ["packages/", "scripts/"],
-    "tests": ["tests/"],
-    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/", ".code-review-graph/", "packages/code-review-graph/.venv/"]
+    "source": [
+      "packages/",
+      "scripts/"
+    ],
+    "tests": [
+      "tests/"
+    ],
+    "generated": [
+      "coverage/",
+      "dist/",
+      "build/",
+      ".ctxroute/state/",
+      ".code-review-graph/",
+      "packages/code-review-graph/.venv/"
+    ]
   },
-  "codeExtensions": [".js", ".mjs", ".json"],
+  "codeExtensions": [
+    ".js",
+    ".mjs",
+    ".json"
+  ],
   "architecture": {
     "documents": [],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",
-      "docs/architecture/src/traffic.dataflow.json"
+      "docs/architecture/src/traffic.dataflow.json",
+      "docs/architecture/src/sensor.dataflow.json"
     ]
   },
   "contracts": {
@@ -101,11 +125,13 @@
       "packages/",
       "scripts/",
       "tests/",
+      "tools/",
       ".devcontainer/"
     ],
     "rootFiles": [
       ".gitignore",
       "eslint.config.mjs",
+      "oxlint.config.ts",
       ".mcp.json",
       ".gitmessage",
       ".gitattributes",

@@ -244,26 +244,49 @@ ignored `dist/` and must never be committed.
 ### Sensor
 
 The Sensor is independent from CRG and is the only blocking static-safety
-boundary. Its executable registry declares three coverage levels:
+boundary. Its catalogue preserves every recognized extension while reporting
+four honest capability states: `PASS`, `PARTIAL`, `MISSING`, and `N/A`.
 
-- **AST:** JavaScript, TypeScript, JSX/TSX, Python, and Ruby.
-- **Embedded AST:** Ruby extracted from ERB without changing source offsets.
-- **Dedicated or lexical:** SQL, HTML, CSS, Vue, Svelte, Rust, Go, Java,
-  Kotlin, C/C++, C#, PHP, Swift, Dart, Shell, Elixir, Erlang, Haskell, Lua, R,
-  Scala, Solidity, and common configuration formats including TOML, YAML, JSON,
-  XML, Terraform, HCL, and Protocol Buffers.
+- `PASS` requires a parser loaded and exercised on Node 22.
+- `PARTIAL` identifies an extractor or bounded lexical check.
+- `MISSING` identifies an expected capability without a verified parser.
+- `N/A` means the capability does not apply to that language.
 
-Dedicated and lexical adapters provide bounded coverage; they do not claim
-type, package, dependency, or runtime analysis. Ruby uses an exact Tree-sitter
-dependency with a lexical fallback only when its grammar genuinely cannot load.
-PHP remains explicitly lexical. Every diagnostic records its actual adapter,
-mode, grammar, fallback, and reason.
+JavaScript/JSX, TypeScript/TSX, Python, Ruby/ERB, and JSON currently have
+verified syntax parsing. Other catalogue entries remain explicitly partial or
+missing. Recognition is never presented as parsing, and a lexical fallback can
+never report complete coverage.
 
 ```sh
 npm run sensor -- src/example.ts scripts/check.py
 npm run sensor -- --sarif src/example.ts
 npm run sensor:blueprint
-node .githooks/sensor --checklist --json
+npm run sensor:checklist -- --json
+npm run sensor:languages -- list
+npm run sensor:languages -- status --json
+npm run sensor:languages -- install javascript python
+npm run sensor:languages -- install --preset web
+npm run sensor:languages -- remove python
+npm run sensor:languages -- sync
+```
+
+Presets are `web`, `backend`, `systems`, `mobile`, `templates`, `data-config`,
+and `all`. Commands accept catalogue identifiers only. Installation pins exact
+versions in both npm manifests, validates the parser, and rolls back manifest
+changes on failure. A preset containing an unverified parser fails visibly;
+setup may synchronize packs, but hooks and scans never install dependencies.
+
+Project configuration declares requirements explicitly:
+
+```json
+{
+  "quality": {
+    "sensor": {
+      "languages": ["javascript", "typescript", "python"],
+      "antiSlopEffect": "auto"
+    }
+  }
+}
 ```
 
 | Verdict | Meaning | Exit code |
@@ -273,7 +296,8 @@ node .githooks/sensor --checklist --json
 | `UNSAFE` | Dangerous executable construct detected | `2` |
 | `ERROR` | Invalid input, unsupported language, read, or syntax error | `2` |
 
-Rules and thresholds live in
+Sensor JSON schema 2 adds per-file language, parser and capability coverage
+while retaining `verdict` and `diagnostics`. Rules and thresholds live in
 [`.project/sensor-rules.json`](.project/sensor-rules.json). Checks include
 dynamic evaluation, dangerous shell execution, SQL injection, secret-to-network
 flow, dynamic function construction, `shell: true`, XSS, SSRF, path traversal,
@@ -281,6 +305,14 @@ weak crypto, UI layering, syntax errors, and excessive AST complexity. `LIMIT`
 bounds SQL result rows; optional
 `requireRateLimit` is a separate request-rate heuristic and never proves runtime
 enforcement. SARIF 2.1.0 is available for code-scanning integrations.
+
+The 15 official JavaScript/TypeScript anti-slop rules are vendored from an
+immutable upstream commit and run once per batch as blocking `anti-slop/*`
+diagnostics. The optional Effect group is separate and activates in `auto` mode
+only when `effect` is a direct dependency. Multilanguage quality heuristics are
+blueprint rules under `sensor/quality/*`; they are not represented as official
+anti-slop rules. Local analysis remains bounded and does not prove types,
+package behavior, whole-program flows, or runtime enforcement.
 
 ### CI and repository protection
 

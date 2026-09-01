@@ -60,6 +60,18 @@ test('project configuration inspection rejects overlapping diagram audiences', (
   assert.match(validateProjectConfig(config, root, { supportedStatuses: ['template', 'initialized'] }).join(' '), /both product and internal/u);
 });
 
+test('project configuration inspection validates Sensor languages and extension ownership', () => {
+  const base = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  const unknown = structuredClone(base);
+  unknown.quality.sensor.languages = ['unknown-language'];
+  unknown.quality.sensor.antiSlopEffect = 'sometimes';
+  assert.match(validateProjectConfig(unknown, root, { supportedStatuses: ['template', 'initialized'] }).join(' '), /known catalogue identifiers/u);
+  assert.match(validateProjectConfig(unknown, root, { supportedStatuses: ['template', 'initialized'] }).join(' '), /auto, enabled, or disabled/u);
+  const mismatch = structuredClone(base);
+  mismatch.quality.sensor.languages = ['json'];
+  assert.match(validateProjectConfig(mismatch, root, { supportedStatuses: ['template', 'initialized'] }).join(' '), /codeExtensions .js requires/u);
+});
+
 test('architecture evidence recognizes explicitly declared sources', () => {
   const config = { architecture: { documents: ['docs/architecture/src/product.sequence.json'], internalDocuments: ['docs/architecture/src/control.dataflow.json'] } };
   assert.equal(isArchitectureEvidence('docs/architecture/src/product.sequence.json', config), true);

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Sensor Language Analysis Flow",
+    "subtitle": "Maintainer view: declared packs become explicit coverage evidence",
+    "output": "sensor.dataflow.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 620],
+    "views": [
+      { "id": "coverage", "label": "Coverage contract", "focus": ["config", "packs", "catalog", "parser", "ir", "rules", "outputs"], "note": "PASS requires a loaded parser; PARTIAL, MISSING, and N/A remain distinct." },
+      { "id": "reproducibility", "label": "Reproducibility", "focus": ["config", "packs", "catalog", "parser"], "note": "Only catalogue package names and exact versions may reach npm." },
+      { "id": "diagnostics", "label": "Diagnostics", "focus": ["parser", "ir", "rules", "outputs"], "note": "Syntax, quality, security, and UI evidence shares stable locations and rule IDs." }
+    ]
+  },
+  "stages": [
+    { "label": "Declaration" }, { "label": "Resolution" }, { "label": "Parsing" }, { "label": "Analysis" }, { "label": "Evidence" }
+  ],
+  "nodes": [
+    { "id": "config", "type": "database", "label": "Project config", "sublabel": "required languages", "stage": 0, "row": 0, "tag": "versioned" },
+    { "id": "packs", "type": "backend", "label": "Pack resolver", "sublabel": "exact dependencies", "stage": 1, "row": 0, "tag": "allowlist" },
+    { "id": "catalog", "type": "database", "label": "Language catalogue", "sublabel": "capabilities + status", "stage": 1, "row": 2, "tag": "113 + 9" },
+    { "id": "parser", "type": "backend", "label": "Parser / extractor", "sublabel": "syntax + offsets", "stage": 2, "row": 0, "tag": "Node 22" },
+    { "id": "ir", "type": "messagebus", "label": "Normalized evidence", "sublabel": "calls, imports, literals", "stage": 3, "row": 0, "tag": "bounded" },
+    { "id": "rules", "type": "security", "label": "Rule engine", "sublabel": "quality + security", "stage": 3, "row": 2, "tag": "stable IDs" },
+    { "id": "outputs", "type": "database", "label": "Evidence outputs", "sublabel": "JSON + SARIF + hooks", "stage": 4, "row": 0, "tag": "schema 2" }
+  ],
+  "flows": [
+    { "from": "config", "to": "packs", "label": "declares", "classification": "project policy", "variant": "emphasis", "route": "straight" },
+    { "from": "packs", "to": "catalog", "label": "resolves", "classification": "catalogue only", "variant": "security", "route": "straight", "labelDy": 24 },
+    { "from": "catalog", "to": "parser", "label": "selects", "classification": "grammar / extractor", "variant": "emphasis", "route": "vertical-channel" },
+    { "from": "parser", "to": "ir", "label": "normalizes", "classification": "located evidence", "variant": "default", "route": "straight" },
+    { "from": "ir", "to": "rules", "label": "evaluates", "classification": "capability contract", "variant": "security", "route": "straight", "labelDy": 24 },
+    { "from": "rules", "to": "outputs", "label": "emits", "classification": "PASS / PARTIAL / MISSING / N/A", "variant": "emphasis", "route": "vertical-channel", "labelDy": 53 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Honest coverage", "items": ["Recognition never implies parsing", "A required missing parser is an error", "Lexical fallback remains partial"] },
+    { "dot": "emerald", "title": "Reproducible packs", "items": ["Exact package versions", "Lockfile checked", "No install from hooks or scans"] },
+    { "dot": "rose", "title": "Stable evidence", "items": ["Official anti-slop IDs stay distinct", "Capabilities retain N/A versus MISSING", "JSON and SARIF share locations"] }
+  ]
+}

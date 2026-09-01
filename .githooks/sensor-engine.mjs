@@ -1,10 +1,13 @@
 import Parser from 'tree-sitter';
-import { adapterMetadata, extractEmbeddedSource, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
-import { readFileSync } from 'node:fs';
+import { adapterMetadata, catalogEntry, extractEmbeddedSource, grammarStatus, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
-export { AST_REGISTRY, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
+const sensorRoot = fileURLToPath(new URL('..', import.meta.url));
+export { AST_REGISTRY, grammarStatus, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
 const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
 const adapterByFilename = new Map(SENSOR_ADAPTERS.flatMap(adapter => (adapter.filenames ?? []).map(filename => [filename, adapter.id])));
 export const SENSOR_COVERAGE = Object.freeze({
@@ -49,20 +52,46 @@ export function toSarif(result) {
 
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
+  const files = [];
   const configurationErrors = validateConfig(config);
   if (configurationErrors.length) {
     diagnostics.push(...configurationErrors);
-    return sensorResult('ERROR', diagnostics);
+    return sensorResult('ERROR', diagnostics, files);
+  }
+  for (const id of config.languages ?? []) {
+    const language = catalogEntry(id);
+    const status = language && grammarStatus().find(item => item.id === language.id);
+    if (!language) diagnostics.push(diagnostic('.project/project-config.json', null, 'sensor/unknown-language', 'ERROR', `Unknown configured Sensor language: ${id}.`));
+    else if (!status?.syntaxAware) diagnostics.push(diagnostic('.project/project-config.json', null, 'sensor/parser-required', 'ERROR', `Parser required for ${language.id} is unavailable. Run: npm run sensor:languages -- install ${language.id}`));
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
   const uniquePaths = [...new Set(paths)];
   const scannedFiles = new Set(uniquePaths.map(path => resolve(root, path)));
   const sourceCache = new Map();
   const sharedState = { root, scannedFiles, sourceCache, sqlExports: collectDynamicExports(uniquePaths, root, sourceCache) };
-  for (const path of [...uniquePaths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
+  for (const path of [...uniquePaths].sort()) analyzePath(path, root, config, diagnostics, files, sharedState);
+  diagnostics.push(...runOfficialAntiSlop(uniquePaths, root));
   const stableDiagnostics = dedupeDiagnostics(diagnostics).sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = stableDiagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
-  return sensorResult(verdict, stableDiagnostics);
+  return sensorResult(verdict, stableDiagnostics, files);
+}
+
+function runOfficialAntiSlop(paths, root) {
+  const candidates = paths.filter(path => !path.replaceAll('\\', '/').includes('tools/oxlint/anti-slop/') && ['javascript', 'typescript', 'tsx'].includes(resolveRegistryEntry(path)?.id)).map(path => resolve(root, path)).filter(existsSync);
+  if (!candidates.length) return [];
+  const executable = resolve(sensorRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'oxlint.cmd' : 'oxlint');
+  const configPath = resolve(sensorRoot, 'oxlint.config.ts');
+  if (!existsSync(executable) || !existsSync(configPath)) return [diagnostic('', null, 'sensor/anti-slop-unavailable', 'ERROR', 'Official anti-slop dependencies are unavailable; run npm run sensor:languages -- sync.')];
+  const result = spawnSync(executable, ['--config', configPath, '--format', 'json', '--quiet', ...candidates], { cwd: sensorRoot, encoding: 'utf8' });
+  let report;
+  try { report = JSON.parse(result.stdout); }
+  catch { return [diagnostic('', null, 'sensor/anti-slop-failed', 'ERROR', `Official anti-slop failed: ${(result.stderr || result.stdout || `status ${result.status}`).trim()}`)]; }
+  return (report.diagnostics ?? []).filter(item => /^(?:anti-slop|anti-slop-effect)\(/u.test(item.code)).map(item => {
+    const label = item.labels?.[0]?.span ?? {};
+    const rule = item.code.replace(/^([^()]+)\(([^()]+)\)$/u, '$1/$2');
+    const displayedPath = paths.find(path => resolve(root, path) === resolve(root, item.filename)) ?? item.filename;
+    return { ...diagnostic(displayedPath, null, rule, 'ERROR', item.message), line: label.line ?? 1, column: label.column ?? 1, adapter: 'anti-slop', mode: 'oxlint', grammar: null, fallback: null, fallbackReason: null };
+  });
 }
 
 export function analyzeSource(path, source, { config = {}, state, grammarLoader } = {}) {
@@ -76,7 +105,8 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
     operation();
     for (let index = start; index < diagnostics.length; index += 1) Object.assign(diagnostics[index], metadata);
   };
-  if (resolved?.grammar) {
+  if (resolved?.parserKind === 'structured' && registryId === 'json') run(() => analyzeJson(path, source, diagnostics), { mode: 'structured', grammar: 'node:json', fallback: null, fallbackReason: null });
+  else if (resolved?.grammar) {
     if (registryId === 'erb') run(() => analyzeHtml(path, source.replace(/<%[\s\S]*?%>/gu, match => match.replace(/[^\n\r]/gu, ' ')), diagnostics), { mode: 'embedded', grammar: null, fallback: null, fallbackReason: null });
     const parserSource = extractEmbeddedSource(resolved, source);
     run(() => analyzeAst(path, source, parserSource, resolved, config, diagnostics, state), { mode: resolved.mode, grammar: resolved.package, fallback: null, fallbackReason: null });
@@ -86,9 +116,12 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
   } else if (registryId === 'sql') run(() => analyzeSql(path, source, diagnostics, config), lexicalMetadata());
   else if (registryId === 'html') run(() => analyzeHtml(path, source, diagnostics), { ...lexicalMetadata(), mode: 'embedded' });
   else if (registryId === 'css') run(() => analyzeCss(path, source, diagnostics), lexicalMetadata());
-  else if (registryId === 'single-file-component') run(() => analyzeSingleFileComponent(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'vue' || registryId === 'svelte') run(() => analyzeSingleFileComponent(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
   else if (registryId === 'template' || registryId === 'blade') run(() => analyzeTemplate(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
-  else if (registryId === 'lexical-source' || registryId === 'lexical-data') run(() => analyzeLexical(path, source, diagnostics), lexicalMetadata());
+  else if (resolved) {
+    run(() => analyzeLexical(path, source, diagnostics), { ...lexicalMetadata(), fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+    diagnostics.push({ ...diagnostic(path, null, 'sensor/parser-unavailable', 'WARN', `${resolved.id} has lexical-only partial coverage.`), ...lexicalMetadata(), fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+  }
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   const metadata = adapterMetadata(path, grammarLoader);
   return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: adapter ?? metadata.adapter, mode: item.mode ?? metadata.mode, grammar: Object.hasOwn(item, 'grammar') ? item.grammar : metadata.grammar, fallback: Object.hasOwn(item, 'fallback') ? item.fallback : metadata.fallback, fallbackReason: Object.hasOwn(item, 'fallbackReason') ? item.fallbackReason : metadata.fallbackReason }));
@@ -96,14 +129,23 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
 
 function lexicalMetadata() { return { mode: 'lexical', grammar: null, fallback: null, fallbackReason: null }; }
 
-function analyzePath(path, root, config, diagnostics, sharedState) {
+function analyzePath(path, root, config, diagnostics, files, sharedState) {
   try {
     const absolutePath = resolve(root, path);
     const source = sharedState.sourceCache.has(absolutePath) ? sharedState.sourceCache.get(absolutePath) : readFileSync(absolutePath, 'utf8');
     sharedState.sourceCache.set(absolutePath, source);
     diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, path, importedSqlFunctions: collectImportedNames(source) } }));
+    files.push(fileCoverage(path));
   }
-  catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
+  catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); files.push(fileCoverage(path)); }
+}
+
+function fileCoverage(path) {
+  const resolved = resolveRegistryEntry(path);
+  if (!resolved) return { path, language: null, parser: 'missing', syntaxAware: false, capabilities: { quality: 'MISSING', security: 'MISSING', ui: 'N/A', dataConfig: 'N/A' } };
+  const state = resolved.syntaxAware ? 'loaded' : resolved.fallback ? 'fallback' : 'missing';
+  const mapped = Object.fromEntries(Object.entries(resolved.capabilities).map(([name, status]) => [name, resolved.syntaxAware || status !== 'PASS' ? status : 'PARTIAL']));
+  return { path, language: resolved.id, parser: state, syntaxAware: resolved.syntaxAware, mode: resolved.actualMode, grammar: resolved.grammar && resolved.package ? `${resolved.package}@${resolved.version}` : resolved.parserKind === 'structured' ? 'node:json' : null, capabilities: mapped };
 }
 
 function analyzeAst(path, source, parserSource, entry, config, diagnostics, inheritedState) {
@@ -119,7 +161,7 @@ function analyzeAst(path, source, parserSource, entry, config, diagnostics, inhe
 
 function inspectAst(path, source, node, diagnostics, config, state, language) {
   const text = source.slice(node.startIndex, node.endIndex);
-  if (/comment$/u.test(node.type) && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
+  if (/comment$/u.test(node.type) && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/quality/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
   if (language === 'ruby' || language === 'erb') inspectRubyAst(path, source, node, diagnostics, config);
   if (node.type === 'variable_declarator' || node.type === 'assignment_expression' || node.type === 'assignment') {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
@@ -141,7 +183,7 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const callArgumentsText = node.childForFieldName('arguments')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
-    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Debug output should not ship in production code.'));
+    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Debug output should not ship in production code.'));
     if (isShell(name)) {
       const first = node.childForFieldName('arguments')?.namedChild(0); const command = literal(first, source).toLowerCase();
       if (command && (config.dangerousCommands ?? []).some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
@@ -164,8 +206,8 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
     if (isSqlSink(name, config) && config.sql?.requireRateLimit && looksLikeUntrustedSource(callableText, config) && !hasRateLimitGuard(callableText, config)) diagnostics.push(diagnostic(path, node, 'sensor/sql-missing-rate-limit', 'WARN', 'A request-scoped SQL operation has no configured rate-limit guard.'));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
-  if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
-  if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
+  if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/quality/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
+  if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/quality/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
   if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
   if (node.type === 'jsx_attribute' && /^dangerouslySetInnerHTML\b/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'Raw HTML is injected into a JSX element.'));
   if (node.type === 'property_identifier' && node.text === '__proto__') diagnostics.push(diagnostic(path, node, 'sensor/prototype-pollution', 'UNSAFE', 'Prototype mutation through __proto__ is forbidden.'));
@@ -202,7 +244,7 @@ function inspectRubyAst(path, source, node, diagnostics, config) {
   if ((method === 'raw' && requestControlled) || method === 'html_safe') diagnostics.push(diagnostic(path, node, 'sensor/rails-unsafe-render', 'WARN', 'Rails rendering bypasses automatic HTML escaping; sanitize the value.'));
   if (receiver?.text === 'params' && method === 'permit!') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'params.permit! bypasses an explicit strong-parameter allowlist.'));
   if (/^[A-Z]/u.test(receiver?.text ?? '') && /^(?:new|create|create!|update|update!|assign_attributes)$/u.test(method) && firstArgument?.text === 'params') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'Rails model assignment should use an explicit params permit list.'));
-  if (/^(?:puts|p|pp|print|warn|byebug|debugger)$/u.test(method) || name === 'binding.irb') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Ruby debug output or an interactive breakpoint should not ship in production code.'));
+  if (/^(?:puts|p|pp|print|warn|byebug|debugger)$/u.test(method) || name === 'binding.irb') diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Ruby debug output or an interactive breakpoint should not ship in production code.'));
 }
 
 function rubyDynamic(node) {
@@ -230,6 +272,14 @@ function analyzeSql(path, source, diagnostics, config = {}) {
   for (const match of code.matchAll(/\b(?:execute|query|prepare)\s*\([^\n;]*(?:\$\{|\+|\|\|)[^\n;]*\)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
   if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !hasSqlLimit(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
   if (config.sql?.requireMutationFilter && isUnfilteredMutation(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
+}
+
+function analyzeJson(path, source, diagnostics) {
+  try { JSON.parse(source); }
+  catch (error) {
+    const position = Number.parseInt(String(error.message).match(/position\s+(\d+)/u)?.[1] ?? '0', 10);
+    diagnostics.push(lineDiagnostic(path, source, Number.isInteger(position) ? position : 0, 'sensor/syntax-error', 'ERROR', 'JSON contains a syntax error.'));
+  }
 }
 function analyzeHtml(path, source, diagnostics) {
   const code = source.replace(/<!--[\s\S]*?-->/gu, match => match.replace(/[^\n]/gu, ' '));
@@ -327,7 +377,11 @@ function maskLexical(source, extension) {
   return maskedLines.replace(/'(?:\\.|[^'\n])*'|"(?:\\.|[^"\n])*"|`(?:\\.|[^`\n])*`/gu, match => match.replace(/[^\n]/gu, ' '));
 }
 function defaultConfig(root) {
-  try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
+  try {
+    const rules = JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8'));
+    const project = JSON.parse(readFileSync(resolve(root, '.project/project-config.json'), 'utf8'));
+    return { ...rules, languages: project.quality?.sensor?.languages ?? [] };
+  }
   catch (error) { return { __sensorConfigError: error.message }; }
 }
 function collectDynamicExports(paths, root, sourceCache = new Map()) {
@@ -339,7 +393,7 @@ function collectDynamicExports(paths, root, sourceCache = new Map()) {
       sourceCache.set(absolutePath, source);
       const extension = extname(path).toLowerCase();
       const resolved = resolveRegistryEntry(path);
-      if (resolved?.grammar && !['ruby', 'erb'].includes(resolved.language)) indexDynamicExports(source, resolved.grammar, resolved.language, path, root, exports);
+      if (resolved?.parserKind === 'native' && resolved.grammar && !['ruby', 'erb'].includes(resolved.language)) indexDynamicExports(source, resolved.grammar, resolved.language, path, root, exports);
       else if (extension === '.vue' || extension === '.svelte') {
         for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)) {
           const extensionPath = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? 'embedded.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? 'embedded.ts' : 'embedded.js';
@@ -445,6 +499,7 @@ function validateConfig(config) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) errors.push('configuration must be an object');
   else {
     if (config.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
+    if (config.languages !== undefined && (!Array.isArray(config.languages) || config.languages.some(value => typeof value !== 'string' || !value))) errors.push('languages must be an array of non-empty strings');
     if (config.analysis !== undefined && (!config.analysis || typeof config.analysis !== 'object' || Array.isArray(config.analysis))) errors.push('analysis must be an object');
     if (config.analysis?.moduleScope !== undefined && config.analysis.moduleScope !== 'explicit-paths') errors.push('analysis.moduleScope must equal explicit-paths');
     if (config.analysis?.packageResolution !== undefined && config.analysis.packageResolution !== 'disabled') errors.push('analysis.packageResolution must equal disabled');
@@ -463,7 +518,7 @@ function validateConfig(config) {
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
-function sensorResult(verdict, diagnostics) { return { schemaVersion: 1, verdict, coverage: SENSOR_COVERAGE, diagnostics }; }
+function sensorResult(verdict, diagnostics, files = []) { return { schemaVersion: 2, verdict, coverage: { ...SENSOR_COVERAGE, files }, diagnostics }; }
 function dedupeDiagnostics(diagnostics) {
   const seen = new Set();
   return diagnostics.filter(item => {
@@ -503,7 +558,7 @@ function isNetwork(name) { return /^(?:fetch|axios(?:\.[a-z]+)?|https?\.(?:reque
 function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? 0) + 1, column: (node?.startPosition.column ?? 0) + 1, rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
 function lineDiagnostic(path, source, index, rule, severity, message) { const before = source.slice(0, index); return { path, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
 function confidenceFor(rule) { return /sql-injection|dynamic-eval|dynamic-function|shell|secret|ssrf|path-traversal|xss|prototype-pollution/u.test(rule) ? 'HIGH' : 'MEDIUM'; }
-function categoryFor(rule) { if (/sql|secret|ssrf|path-traversal|xss|crypto|shell|eval|function|prototype/u.test(rule)) return 'security'; if (/ui|css/u.test(rule)) return 'architecture'; if (/anti-slop|complexity/u.test(rule)) return 'quality'; return 'safety'; }
+function categoryFor(rule) { if (/sql|secret|ssrf|path-traversal|xss|crypto|shell|eval|function|prototype/u.test(rule)) return 'security'; if (/ui|css/u.test(rule)) return 'architecture'; if (/anti-slop|quality|complexity/u.test(rule)) return 'quality'; return 'safety'; }
 function isLiteralNode(node) { return Boolean(node && ['string', 'template_string', 'string_content', 'integer', 'float'].includes(node.type)); }
 function isPathSink(name) { return /(?:^|\.)(?:readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|open|sendFile|download|unlink|rm|rmdir)$/u.test(name); }
 function isRedirect(name) { return /(?:^|\.)(?:redirect|redirectTo|sendRedirect)$/u.test(name); }
