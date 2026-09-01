@@ -22,7 +22,7 @@ test('project-local MCP manifests have exact server commands and disjoint tools'
   assert.equal(result.contextProvider, 'code-review-graph@2.3.8');
 });
 
-test('a real stdio client lists and calls all Progress MCP tools', { skip: process.platform === 'win32' }, async () => {
+test('a real stdio client lists and calls all Progress MCP tools', async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-stdio-'));
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'docs'));
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {

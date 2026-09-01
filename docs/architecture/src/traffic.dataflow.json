@@ -38,11 +38,11 @@
     { "from": "mcp", "to": "archify", "label": "verification target", "classification": "traffic check", "variant": "emphasis", "route": "vertical-channel" },
     { "from": "archify", "to": "artifacts", "label": "HTML receipt", "classification": "rendered evidence", "variant": "default", "route": "straight" },
     { "from": "agent", "to": "stop", "label": "stop", "classification": "completion attempt", "variant": "security", "route": "bottom-channel" },
-    { "from": "stop", "to": "archify", "label": "traffic target", "classification": "dataflow check", "variant": "emphasis", "route": "straight", "labelDy": 85 }
+    { "from": "stop", "to": "archify", "label": "product view hint", "classification": "diagram handoff", "variant": "emphasis", "route": "straight", "labelDy": 85 }
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Session start stays quiet when CRG is healthy", "PreToolUse injects only targeted documentation", "MCP schemas remain bounded and allowlisted"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop selects the traffic data-flow source explicitly", "Progress records the active mode and step evidence", "Archify validates both the architecture map and the traffic map"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop recommends a product-facing Archify view from the changed paths", "Progress records the active mode and step evidence", "Archify validates both internal maps without publishing them as product diagrams"] },
     { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
   ]
 }

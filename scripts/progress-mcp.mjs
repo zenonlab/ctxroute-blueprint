@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { pathToFileURL } from 'node:url';
 import * as z from 'zod/v4';
 import { readProgress, validatePlan, approvePlan, progressStatus, progressNext, updateProgressStep, setProgressMode } from './progress-core.mjs';
 
@@ -19,4 +20,4 @@ export function createProgressServer(root = process.cwd()) {
   return server;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { serveStdio(() => createProgressServer()); }
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) { serveStdio(() => createProgressServer()); }
