@@ -11,9 +11,11 @@ import { PROGRESS_TOOL_NAMES } from '../scripts/progress-mcp.mjs';
 import { validateMcpInstallation } from '../scripts/validate-mcp-installation.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-// Preserve Windows' executable lookup variables (notably PATHEXT), which the
-// SDK's intentionally restricted default environment does not inherit.
-const nodeCommand = process.execPath;
+// On Windows, launch through ComSpec so cross-spawn does not depend on its
+// executable-extension lookup (which differs across hosted runner images).
+const nodeCommand = process.platform === 'win32'
+  ? (process.env.ComSpec ?? 'cmd.exe')
+  : process.execPath;
 
 test('project-local MCP manifests have exact server commands and disjoint tools', () => {
   const result = validateMcpInstallation(root);
@@ -80,7 +82,10 @@ test('a real stdio client lists and calls all four Progress MCP tools', async ()
 
 async function withClient(script, cwd, operation) {
   const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
-  const transport = new StdioClientTransport({ command: nodeCommand, args: [script], cwd, stderr: 'pipe', env: process.platform === 'win32' ? process.env : undefined });
+  const args = process.platform === 'win32'
+    ? ['/d', '/s', '/c', `"${process.execPath}" "${script}"`]
+    : [script];
+  const transport = new StdioClientTransport({ command: nodeCommand, args, cwd, stderr: 'pipe', env: process.platform === 'win32' ? process.env : undefined });
   let stderr = '';
   transport.stderr?.on('data', chunk => { stderr += chunk; });
   try { await client.connect(transport); await operation(client); }
