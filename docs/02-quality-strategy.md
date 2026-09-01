@@ -36,3 +36,18 @@ owner, and an acceptance threshold.
 
 The project brief records the chosen strategy. Durable security, dependency,
 contract, or major quality constraints belong in an ADR.
+
+## AST Sensor and context boundary
+
+The Sensor and Context MCP share one executable registry and pinned Tree-sitter
+grammars for JavaScript, TypeScript/TSX, Python, and Ruby. ERB uses embedded
+Ruby extraction without changing source offsets. PHP and grammar-free formats
+remain explicitly lexical or embedded. Diagnostics report the actual mode,
+grammar, and any fallback reason.
+
+The separate Context MCP provides bounded symbols, summaries, definitions,
+syntax-aware references, and relevant context. It rejects path escapes,
+ignored/generated paths, and mixed product/blueprint scopes. Responses are
+counted with `gpt-tokenizer@4.0.0` and structurally truncated. Run
+`npm run ast:check`, `npm run mcp:smoke`, and `npm run context:benchmark` for
+the corresponding mechanical evidence.

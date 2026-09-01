@@ -3,6 +3,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import { readProgress, validatePlan, approvePlan, progressStatus } from './progress-core.mjs';
 
+export const PROGRESS_TOOL_NAMES = Object.freeze(['progress_read', 'progress_status', 'progress_validate_plan', 'progress_approve_plan']);
 const planSchema = z.object({ goalId: z.string(), title: z.string(), status: z.string().optional(), steps: z.array(z.object({ id: z.string(), title: z.string(), status: z.string().optional(), acceptance: z.array(z.string()), files: z.array(z.string()), commands: z.array(z.string()), evidence: z.array(z.string()).optional() })), validationEvidence: z.array(z.string()).optional(), evidence: z.array(z.string()).optional(), approved: z.boolean().optional() });
 const result = value => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
 export function createProgressServer(root = process.cwd()) {

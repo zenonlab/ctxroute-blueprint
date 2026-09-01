@@ -28,6 +28,12 @@
     "build:docs": "node .githooks/archify build",
     "preview:docs": "node .githooks/archify preview",
     "sensor": "node .githooks/sensor",
+    "ast:check": "node scripts/ast-check.mjs",
+    "ast:update": "node scripts/ast-update.mjs",
+    "context:mcp": "node scripts/context-mcp.mjs",
+    "context:benchmark": "node scripts/context-benchmark.mjs scripts/context-ast.mjs .githooks/sensor-engine.mjs",
+    "mcp:validate": "node scripts/validate-mcp-installation.mjs",
+    "mcp:smoke": "node --test tests/mcp-stdio.test.mjs",
     "check:updates": "node .githooks/archify updates",
     "workspace:check": "node scripts/check-workspaces.mjs",
     "crg:update": "node scripts/crg-runner.mjs",
@@ -45,16 +51,20 @@
     "check:coherence": "node scripts/check-coherence.mjs",
     "ci:summary": "node scripts/ci-summary.mjs",
     "validate:decisions": "node .githooks/validate-decisions.mjs",
-    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm test"
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run ast:check && npm run mcp:validate && npm test"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "ctxroute": "https://github.com/zenonlab/ctxroute/archive/76b45a57543c940c51e382a41adb749faa44bbc4.tar.gz",
+    "gpt-tokenizer": "4.0.0",
+    "ignore": "7.0.5",
     "skills": "1.5.23",
     "tree-sitter": "0.21.1",
     "tree-sitter-javascript": "0.23.1",
     "tree-sitter-python": "0.21.0",
+    "tree-sitter-ruby": "0.23.1",
     "tree-sitter-typescript": "0.23.2",
-    "@modelcontextprotocol/server": "2.0.0",
     "zod": "4.5.4"
   }
 }

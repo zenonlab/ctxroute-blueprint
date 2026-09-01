@@ -51,7 +51,21 @@ jobs:
         run: npm run validate:docs -- --all && npm run validate:ui
 
       - name: Validate Sensor coverage
-        run: npm run sensor -- --checklist --json --sarif > sensor.sarif
+        shell: bash
+        run: |
+          node .githooks/sensor --checklist --json > sensor-checklist.json
+          npm run sensor -- .githooks/sensor-engine.mjs > sensor.json
+          npm run sensor -- --sarif .githooks/sensor-engine.mjs > sensor.sarif
+
+      - name: Validate AST grammars and local MCP manifests
+        run: npm run ast:check && npm run mcp:validate
+
+      - name: Smoke-test both MCP stdio servers
+        run: npm run mcp:smoke
+
+      - name: Benchmark bounded context
+        shell: bash
+        run: npm run context:benchmark > context-benchmark.json
 
       - name: Validate governance and workspace
         run: npm run workspace:check && npm run governance:check && npm run check:coherence
@@ -80,6 +94,9 @@ jobs:
           path: |
             dist/
             sensor.sarif
+            sensor.json
+            sensor-checklist.json
+            context-benchmark.json
             ci-summary.md
           if-no-files-found: warn
 

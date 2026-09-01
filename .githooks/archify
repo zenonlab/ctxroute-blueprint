@@ -1,13 +1,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 
 const root = resolve(process.cwd());
 const skill = join(root, '.agents', 'skills', 'archify');
 const cli = join(skill, 'bin', 'archify.mjs');
-const source = join(root, 'docs', 'architecture', 'src', 'blueprint.architecture.json');
-const output = join(root, 'dist', 'architecture', 'blueprint.html');
+const source = architectureSource();
+const output = join(root, 'dist', 'architecture', `${basename(source, '.json')}.html`);
 const command = process.argv[2] ?? 'verify';
 if (command === 'restore') {
   const lockPath = join(root, 'skills-lock.json');
@@ -44,6 +44,18 @@ function verifyInstalled(pin, remote = false) {
     const hashes = result.stdout.trim().split(/\r?\n/u).map(line => line.split(/\s/u)[0]);
     if (!hashes.includes(pin.tagObject) || !hashes.includes(pin.commit)) fail('Archify remote tag object or peeled commit does not match the reviewed pin.');
   }
+}
+function architectureSource() {
+  const fallback = 'docs/architecture/src/blueprint.architecture.json';
+  let configured;
+  try {
+    const config = JSON.parse(readFileSync(join(root, '.project', 'project-config.json'), 'utf8'));
+    configured = config?.architecture?.project ?? config?.architecture?.documents?.[0];
+  } catch {
+    configured = null;
+  }
+  const relative = typeof configured === 'string' && configured && existsSync(join(root, configured)) ? configured : fallback;
+  return join(root, relative);
 }
 function json(path) { try { return JSON.parse(readFileSync(join(root, path), 'utf8')); } catch { fail(`${path} is missing or invalid.`); } }
 function run(file, args) { const result = spawnSync(file, args, { cwd: root, stdio: 'inherit' }); if (result.error) fail(result.error.message); if (result.status !== 0) process.exit(result.status ?? 1); }

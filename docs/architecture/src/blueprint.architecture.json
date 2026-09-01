@@ -6,9 +6,9 @@
     "quality_profile": "showcase",
     "viewBox": [1300, 1100],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop"], "note": "Project-local lifecycle dispatch keeps CTXRoute unchanged while governance boundaries constrain agent side effects." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop", "progressMcp", "contextMcp"], "note": "Lifecycle CTXRoute, blocking Sensor, Progress MCP, and Context MCP remain independent branches; clients own both stdio transports." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "113 extensions and 6 named files; no package, whole-program, or runtime rate-limit proof." },
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "113 extensions and 9 named files; no package, whole-program, or runtime rate-limit proof." },
       { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "ui-contract", "label": "UI contract", "focus": ["contributors", "uiContract", "ctxroute", "sensor"], "note": "Framework-neutral tokens and component roles guide derived products without selecting a frontend stack." }
     ]
@@ -26,9 +26,9 @@
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + risk rules + SARIF", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
-    { "id": "sensorAdapters", "type": "backend", "label": "Language adapters", "sublabel": "AST + lexical / 113 ext + named files", "pos": [520, 700], "size": [220, 66] },
+    { "id": "sensorAdapters", "type": "backend", "label": "Unified language registry", "sublabel": "AST / embedded / lexical modes", "pos": [520, 700], "size": [220, 66] },
     { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [40, 500], "size": [190, 66] },
-    { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Core + optional Ruby / PHP", "pos": [520, 520], "size": [180, 66] },
+    { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "JS / TS / Python / Ruby pinned", "pos": [520, 520], "size": [180, 66] },
     { "id": "diagnostics", "type": "database", "label": "Diagnostics", "sublabel": "JSON/SARIF + adapter + confidence", "pos": [790, 520], "size": [180, 66] },
     { "id": "workspace", "type": "backend", "label": "npm workspaces", "sublabel": "Three repository packages", "pos": [40, 220], "size": [170, 66] },
     { "id": "watcher", "type": "backend", "label": "File watcher", "sublabel": "Debounced single-flight", "pos": [270, 220], "size": [180, 66] },
@@ -42,7 +42,8 @@
     { "id": "progressCore", "type": "backend", "label": "Progress core", "sublabel": "Validate / approve / atomic write", "pos": [300, 800], "size": [200, 66] },
     { "id": "progressJson", "type": "database", "label": "Progress JSON", "sublabel": ".project/progress.json source", "pos": [560, 800], "size": [200, 66] },
     { "id": "progressView", "type": "frontend", "label": "Progress Markdown", "sublabel": "Generated short view", "pos": [820, 800], "size": [200, 66] },
-    { "id": "progressInterfaces", "type": "backend", "label": "CLI + MCP", "sublabel": "Shared read/validate/approve", "pos": [40, 800], "size": [200, 66] },
+    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "4 stdio checklist tools", "pos": [40, 800], "size": [200, 66] },
+    { "id": "contextMcp", "type": "backend", "label": "Context MCP", "sublabel": "5 scoped AST tools / token budget", "pos": [1040, 800], "size": [220, 66] },
     { "id": "initializer", "type": "security", "label": "Controlled initializer", "sublabel": "Checks decisions before status transition", "pos": [40, 900], "size": [220, 66] },
     { "id": "bootstrap", "type": "backend", "label": "Bootstrap setup", "sublabel": "Node 22 / npm 10 / idempotent", "pos": [40, 1000], "size": [180, 66] },
     { "id": "codespaces", "type": "cloud", "label": "GitHub Codespaces", "sublabel": "devcontainer post-create", "pos": [270, 980], "size": [190, 66] },
@@ -53,7 +54,7 @@
   "boundaries": [
     { "kind": "region", "label": "Versioned blueprint infrastructure", "wraps": ["lifecycle", "archifyAdapter", "jsonIr", "documentContracts", "uiContract", "sensor", "postToolUse", "sensorAdapters"] },
     { "kind": "region", "label": "Pinned upstream tools", "wraps": ["ctxroute", "archify", "grammars"] },
-    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressInterfaces"] },
+    { "kind": "region", "label": "Transition infrastructure", "wraps": ["workspace", "watcher", "crg", "sqlite", "governance", "controlLoop", "decisionMemory", "decisionValidator", "problemMemory", "progressCore", "progressJson", "progressView", "progressMcp", "contextMcp"] },
     { "kind": "region", "label": "Installation and CI boundary", "wraps": ["bootstrap", "initializer", "codespaces", "githubActions", "ciArtifacts", "docsPublish"] }
   ],
   "connections": [
@@ -76,7 +77,10 @@
     { "id": "governance-loop", "from": "governance", "to": "controlLoop", "label": "decision boundary", "variant": "security", "labelAt": [1010, 130] },
     { "id": "loop-ctxroute", "from": "controlLoop", "to": "ctxroute", "label": "scoped context" },
     { "id": "decision-validate", "from": "decisionMemory", "to": "decisionValidator", "label": "validate scope, revision, and overlap", "variant": "security", "labelAt": [1125, 400] },
-    { "id": "interfaces-core", "from": "progressInterfaces", "to": "progressCore", "label": "shared operations", "labelAt": [270, 880] },
+    { "id": "agents-progress-mcp", "from": "agents", "to": "progressMcp", "label": "client-owned stdio", "fromSide": "left", "toSide": "left", "via": [[25, 133], [5, 133], [5, 833], [25, 833]], "labelAt": [65, 780] },
+    { "id": "agents-context-mcp", "from": "agents", "to": "contextMcp", "label": "client-owned stdio", "fromSide": "right", "toSide": "top", "via": [[210, 133], [210, 15], [1280, 15], [1280, 780], [1150, 780]], "labelAt": [1200, 780] },
+    { "id": "progress-mcp-core", "from": "progressMcp", "to": "progressCore", "label": "shared operations", "labelAt": [270, 880] },
+    { "id": "context-mcp-registry", "from": "contextMcp", "to": "sensorAdapters", "label": "read-only AST queries", "fromSide": "right", "toSide": "right", "via": [[1280, 833], [1280, 650], [760, 650], [760, 733]], "labelAt": [1030, 645] },
     { "id": "core-json", "from": "progressCore", "to": "progressJson", "label": "atomic approved write", "variant": "security", "labelAt": [530, 880] },
     { "id": "core-view", "from": "progressCore", "to": "progressView", "label": "generate view", "fromSide": "bottom", "toSide": "bottom", "via": [[400, 900], [920, 900]], "labelAt": [660, 920] },
     { "id": "initialize-bootstrap", "from": "initializer", "to": "bootstrap", "fromSide": "bottom", "toSide": "top" }

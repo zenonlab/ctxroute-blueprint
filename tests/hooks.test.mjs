@@ -41,7 +41,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   const expected = {
     SessionStart: ['session-inject.js'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
+    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
@@ -364,7 +364,7 @@ test('CTXRoute injects UI contract guidance for conventional product UI paths', 
   assert.match(result.stdout, /UI design contract/u);
 });
 
-test('CTXRoute explains optional Sensor parsers at Sensor boundaries', () => {
+test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => {
   const session = `sensor-adapters-${process.pid}-${Date.now()}`;
   const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
     cwd: root,
@@ -372,8 +372,8 @@ test('CTXRoute explains optional Sensor parsers at Sensor boundaries', () => {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /optional derived-product capabilities/u);
-  assert.match(result.stdout, /lexical fallback/u);
+  assert.match(result.stdout, /exact `tree-sitter-ruby` dependency/u);
+  assert.match(result.stdout, /genuinely fails to load/u);
 });
 
 test('CTXRoute wrapper directs missing installations to npm install', () => {

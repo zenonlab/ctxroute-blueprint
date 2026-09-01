@@ -1,6 +1,9 @@
 import process from 'node:process';
-import { analyzePaths, toSarif } from './sensor-engine.mjs';
+import { readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { analyzePaths, isSupportedSourcePath, toSarif } from './sensor-engine.mjs';
 
+const IGNORED_DIRECTORIES = new Set(['.git', '.ctxroute', '.next', '.turbo', 'coverage', 'dist', 'log', 'node_modules', 'storage', 'tmp']);
 const sarif = process.argv.includes('--sarif');
 const paths = process.argv.slice(2).filter(path => path !== '--sarif');
 if (paths[0] === '--checklist') {
@@ -9,7 +12,29 @@ if (paths[0] === '--checklist') {
   process.stdout.write(`${process.argv.includes('--json') ? JSON.stringify(result) : formatChecklist(result)}\n`);
   process.exitCode = result.status === 'PASS' ? 0 : 1;
 } else {
-  const result = analyzePaths(paths);
+  const result = analyzePaths(expandDirectories(paths));
   process.stdout.write(`${JSON.stringify(sarif ? toSarif(result) : result)}\n`);
   process.exitCode = result.verdict === 'SAFE' ? 0 : result.verdict === 'WARN' ? 1 : 2;
+}
+
+function expandDirectories(inputs) {
+  const expanded = [];
+  for (const input of inputs) {
+    const absolute = resolve(process.cwd(), input);
+    let stat;
+    try { stat = statSync(absolute); } catch { expanded.push(input); continue; }
+    if (!stat.isDirectory()) { expanded.push(input); continue; }
+    walk(input, absolute);
+  }
+  return [...new Set(expanded)];
+
+  function walk(displayPath, absolutePath) {
+    for (const entry of readdirSync(absolutePath, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
+      const childDisplayPath = join(displayPath, entry.name);
+      const childAbsolutePath = join(absolutePath, entry.name);
+      if (entry.isDirectory()) walk(childDisplayPath, childAbsolutePath);
+      else if (entry.isFile() && isSupportedSourcePath(childDisplayPath)) expanded.push(childDisplayPath);
+    }
+  }
 }

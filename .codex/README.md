@@ -47,3 +47,9 @@ they inspect the index and capture files produced by commands or external tools.
 The registered lifecycle handlers intentionally omit custom status messages.
 Read-only tools skip the architecture subprocess, and PostToolUse is limited to
 mutation-capable tools to reduce lifecycle noise and process startup overhead.
+
+The lifecycle is independent from the two project-scoped MCP servers declared
+in `.codex/config.toml`: `ctxroute-progress` and `ctxroute-context-ast` are
+started by the Codex client over stdio. No PostToolUse handler starts or proxies
+an MCP transport. A trusted project and a refreshed Codex session may be needed
+before `/mcp` shows a newly added manifest.
