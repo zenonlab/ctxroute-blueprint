@@ -11,9 +11,10 @@ import { PROGRESS_TOOL_NAMES } from '../scripts/progress-mcp.mjs';
 import { validateMcpInstallation } from '../scripts/validate-mcp-installation.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-// Use the runner's PATH-resolved node command on Windows; this avoids
-// cross-spawn treating the absolute node.exe path as a shell command.
-const nodeCommand = process.platform === 'win32' ? 'node' : process.execPath;
+// Delegate to ComSpec on Windows so the runner handles node.exe consistently.
+const nodeCommand = process.platform === 'win32'
+  ? (process.env.ComSpec ?? 'cmd.exe')
+  : process.execPath;
 
 test('project-local MCP manifests have exact server commands and disjoint tools', () => {
   const result = validateMcpInstallation(root);
@@ -80,7 +81,9 @@ test('a real stdio client lists and calls all four Progress MCP tools', async ()
 
 async function withClient(script, cwd, operation) {
   const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
-  const args = [script];
+  const args = process.platform === 'win32'
+    ? ['/d', '/c', process.execPath, script]
+    : [script];
   const transport = new StdioClientTransport({ command: nodeCommand, args, cwd, stderr: 'pipe', env: process.platform === 'win32' ? process.env : undefined });
   let stderr = '';
   transport.stderr?.on('data', chunk => { stderr += chunk; });
