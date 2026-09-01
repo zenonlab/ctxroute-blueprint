@@ -54,8 +54,8 @@ jobs:
         shell: bash
         run: |
           node .githooks/sensor --checklist --json > sensor-checklist.json
-          npm run sensor -- .githooks/sensor-engine.mjs > sensor.json
-          npm run sensor -- --sarif .githooks/sensor-engine.mjs > sensor.sarif
+          npm run sensor -- .codex/hooks/path-extraction.mjs > sensor.json
+          npm run sensor -- --sarif .codex/hooks/path-extraction.mjs > sensor.sarif
 
       - name: Validate AST grammars and local MCP manifests
         run: npm run ast:check && npm run mcp:validate
