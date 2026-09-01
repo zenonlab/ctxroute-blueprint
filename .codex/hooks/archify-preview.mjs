@@ -34,7 +34,7 @@ async function ensurePreview(input) {
 
   const logPath = join(stateDirectory, `archify-preview-${diagram.id}.log`);
   const log = openSync(logPath, 'a');
-  const child = spawn(process.execPath, ['.githooks/archify', 'preview', diagram.id], {
+  const child = spawn(process.execPath, ['.githooks/archify', 'preview', diagram.id, '--no-open'], {
     cwd: root,
     detached: true,
     stdio: ['ignore', log, log],

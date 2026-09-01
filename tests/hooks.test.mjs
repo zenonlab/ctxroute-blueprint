@@ -274,6 +274,28 @@ function run(script, input, options = {}) {
   return spawnSync('node', [join(root, script)], { cwd: options.cwd ?? root, input: JSON.stringify(input), encoding: 'utf8' });
 }
 
+function stopProcessTree(pid) {
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    return;
+  }
+  try { process.kill(-pid, 'SIGTERM'); }
+  catch { try { process.kill(pid, 'SIGTERM'); } catch {} }
+}
+
+async function waitForPreviewStop(url) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const alive = await new Promise(resolveAlive => {
+      const request = requestLoopback(url, response => { response.resume(); resolveAlive(true); });
+      request.setTimeout(100, () => { request.destroy(); resolveAlive(false); });
+      request.on('error', () => resolveAlive(false));
+    });
+    if (!alive) return true;
+    await new Promise(resolveWait => { setTimeout(resolveWait, 50); });
+  }
+  return false;
+}
+
 test('PostToolUse audits a direct code path', () => {
   const result = run('.codex/hooks/post-tool-audit.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/main.ts' } });
   assert.equal(result.stdout, '');
@@ -315,12 +337,14 @@ test('Archify preview hook stays quiet when the template has no product diagram'
   const result = run('.codex/hooks/archify-preview.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' } });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
+  assert.match(readFileSync(join(root, '.codex/hooks/archify-preview.mjs'), 'utf8'), /'preview', diagram\.id, '--no-open'/u);
 });
 
 test('Archify preview hook serves a temporary product diagram over loopback', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'archify-preview-product-'));
   const stateDirectory = join(cwd, '.ctxroute', 'state');
   let previewPid;
+  let previewUrl;
   try {
     for (const directory of ['.githooks', '.project', '.agents/skills', 'docs/architecture/src', 'scripts']) mkdirSync(join(cwd, directory), { recursive: true });
     copyFileSync(join(root, '.githooks/archify'), join(cwd, '.githooks/archify'));
@@ -346,10 +370,10 @@ test('Archify preview hook serves a temporary product diagram over loopback', as
       assert.fail(`Archify preview produced no hook output. ${diagnostics}`);
     }
     const output = JSON.parse(result.stdout);
-    const url = output.hookSpecificOutput.additionalContext.match(/https?:\/\/\S+/u)?.[0];
-    assert.ok(url);
+    previewUrl = output.hookSpecificOutput.additionalContext.match(/https?:\/\/\S+/u)?.[0];
+    assert.ok(previewUrl);
     const status = await new Promise((resolveStatus, rejectStatus) => {
-      const request = requestLoopback(url, response => { response.resume(); resolveStatus(response.statusCode); });
+      const request = requestLoopback(previewUrl, response => { response.resume(); resolveStatus(response.statusCode); });
       request.on('error', rejectStatus);
     });
     assert.equal(status, 200);
@@ -357,9 +381,10 @@ test('Archify preview hook serves a temporary product diagram over loopback', as
     assert.ok(statePath);
     previewPid = JSON.parse(readFileSync(join(stateDirectory, statePath), 'utf8')).pid;
   } finally {
-    if (previewPid) try { process.kill(previewPid, 'SIGTERM'); } catch {}
+    if (previewPid) stopProcessTree(previewPid);
     rmSync(cwd, { recursive: true, force: true });
   }
+  assert.equal(await waitForPreviewStop(previewUrl), true);
 });
 
 test('an active Stop hook does not loop', () => {
