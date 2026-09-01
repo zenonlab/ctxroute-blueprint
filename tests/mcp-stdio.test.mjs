@@ -11,6 +11,9 @@ import { PROGRESS_TOOL_NAMES } from '../scripts/progress-mcp.mjs';
 import { validateMcpInstallation } from '../scripts/validate-mcp-installation.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+// Resolve through PATH on Windows; cross-spawn can report ENOENT for the
+// absolute setup-node executable path even though `node` is available.
+const nodeCommand = process.platform === 'win32' ? 'node' : process.execPath;
 
 test('project-local MCP manifests have exact server commands and disjoint tools', () => {
   const result = validateMcpInstallation(root);
@@ -77,7 +80,7 @@ test('a real stdio client lists and calls all four Progress MCP tools', async ()
 
 async function withClient(script, cwd, operation) {
   const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
-  const transport = new StdioClientTransport({ command: process.execPath, args: [script], cwd, stderr: 'pipe' });
+  const transport = new StdioClientTransport({ command: nodeCommand, args: [script], cwd, stderr: 'pipe' });
   let stderr = '';
   transport.stderr?.on('data', chunk => { stderr += chunk; });
   try { await client.connect(transport); await operation(client); }
