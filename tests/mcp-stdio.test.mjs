@@ -83,7 +83,7 @@ test('a real stdio client lists and calls all four Progress MCP tools', async ()
 async function withClient(script, cwd, operation) {
   const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
   const args = process.platform === 'win32'
-    ? ['/d', '/s', '/c', `"${process.execPath}" "${script}"`]
+    ? ['/d', '/s', '/c', `""${process.execPath}" "${script}""`]
     : [script];
   const transport = new StdioClientTransport({ command: nodeCommand, args, cwd, stderr: 'pipe', env: process.platform === 'win32' ? process.env : undefined });
   let stderr = '';
