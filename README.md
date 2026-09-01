@@ -36,7 +36,7 @@ deliberately and verify the result.
 | Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
 | Persistent execution | Progress MCP tracks approved goals, evidence, and collaborative or explicitly confirmed autonomous execution. |
-| Code intelligence | Official code-review-graph v2.3.8 provides bounded MCP context, impact analysis, and fork-safe PR risk review. |
+| Code intelligence | Official [Code Review Graph](https://github.com/tirth8205/code-review-graph/tree/main), pinned to [v2.3.8](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8), provides bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
 | Portable validation | Node.js 22 CI runs the same repository gate on Linux, macOS, and Windows. |
