@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
@@ -15,7 +15,7 @@ const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 test('CRG invocation is frozen, project-local, and exactly pinned', () => {
   const invocation = crgInvocation(['--version'], '/workspace');
   assert.equal(invocation.executable, 'uv');
-  assert.deepEqual(invocation.args.slice(0, 3), ['run', '--project', '/workspace/packages/code-review-graph']);
+  assert.deepEqual(invocation.args.slice(0, 3), ['run', '--project', resolve('/workspace', 'packages/code-review-graph')]);
   assert.ok(invocation.args.includes('--frozen'));
   assert.equal(CRG_VERSION, '2.3.8');
   const mcp = crgInvocation(['serve', '--repo', '/workspace'], '/workspace');

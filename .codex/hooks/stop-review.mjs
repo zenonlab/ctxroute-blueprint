@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import process from 'node:process';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
+import { markModeOffered, progressNext, readProgress } from '../../scripts/progress-core.mjs';
 
 const input = JSON.parse(await stdin());
 if (input.stop_hook_active) {
@@ -10,11 +11,6 @@ if (input.stop_hook_active) {
 }
 
 const changed = gitChangedFiles();
-if (!changed.length) {
-  process.stdout.write(JSON.stringify({ continue: true }));
-  process.exit(0);
-}
-
 const candidates = changed.filter(path => /(?:^|\/)(?:tmp|temp|coverage|dist|build)(?:\/|$)|(?:\.tmp|\.bak|\.old|~)$/iu.test(path));
 const syntaxFailures = checkSyntax(changed);
 const validationFailures = runValidations();
@@ -25,9 +21,37 @@ const lines = [
   candidates.length ? `Review cleanup candidates: ${candidates.join(', ')}` : '',
   configFailures.length ? `Configuration failures: ${configFailures.join(', ')}` : '',
 ].filter(Boolean);
-process.stdout.write(JSON.stringify(lines.length
-  ? { decision: 'block', reason: lines.join('\n').slice(0, 2000) }
-  : { continue: true }));
+if (lines.length) {
+  process.stdout.write(JSON.stringify({ decision: 'block', reason: lines.join('\n').slice(0, 2000) }));
+  process.exit(0);
+}
+
+const continuation = await progressContinuation();
+process.stdout.write(JSON.stringify(continuation ?? { continue: true }));
+
+async function progressContinuation() {
+  try {
+    const progress = await readProgress(process.cwd());
+    const goal = progress.goals.find(item => item.status !== 'DONE');
+    if (!goal) return null;
+    const next = progressNext(progress, goal.id);
+    if (next.complete) return null;
+    const labels = next.next.map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
+    if (next.mode === 'autonomous') {
+      if (next.next.every(step => step.status === 'BLOCKED')) return { continue: true, systemMessage: `Goal ${goal.id} is blocked externally. Handoff:\n${labels}` };
+      return { decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu’avec des preuves complètes.\n${labels}`.slice(0, 1200) };
+    }
+    if (next.next.length === 0) return null;
+    let message = `Handoff — prochaines étapes pour ${goal.id}:\n${labels}`;
+    if (!goal.modeOffered) {
+      await markModeOffered(goal.id, process.cwd());
+      message += '\nJe peux passer ce goal en mode automatique : j’enchaînerai toutes les étapes, chercherai moi-même les solutions et ne reviendrai qu’après vérification complète ou blocage externe réel.';
+    }
+    return { decision: 'block', reason: message.slice(0, 1200) };
+  } catch (error) {
+    return { systemMessage: `Progress handoff unavailable: ${String(error.message).slice(0, 240)}` };
+  }
+}
 
 function gitChangedFiles() {
   const files = new Set();

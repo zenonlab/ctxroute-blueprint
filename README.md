@@ -98,22 +98,28 @@ short validation evidence and explicit `approved: true`:
 
 ```sh
 npm run progress:read
+npm run progress:status
+npm run progress:next -- goal-id
+npm run progress:update -- update.json
+npm run progress:mode -- goal-id autonomous
 npm run progress:validate -- plan.json
 npm run progress:approve -- plan.json
 ```
 
 The same bounded engine is exposed through the stdio MCP server with
 `npm run progress:mcp`. It supports multiple goals, atomic idempotent writes,
-safe repository-relative paths, and no raw logs, secrets, or conversation text.
+step evidence, and exactly two modes: `collaborative` (default) and
+`autonomous`. Autonomous mode is enabled only after an explicit user request
+and confirmation; it directs the agent to complete and verify the whole goal.
 
 ## Local MCP servers
 
 The repository exposes two independent stdio servers:
 
-- `ctxroute-progress` runs `npm run progress:mcp` and exposes four checklist
-  tools.
-- `code-review-graph` runs `npm run crg:mcp` and exposes the 30 official CRG
-  v2.3.8 tools against `.code-review-graph/graph.db`.
+- `ctxroute-progress` runs `npm run progress:mcp` and exposes checklist,
+  step-update, next-step, and mode tools.
+- `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read/context
+  tools from official CRG v2.3.8 against `.code-review-graph/graph.db`.
 
 Codex reads the tracked project configuration in [`.codex/config.toml`](.codex/config.toml),
 and Claude reads the tracked [`.mcp.json`](.mcp.json). These files never alter

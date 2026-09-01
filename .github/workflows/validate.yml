@@ -62,7 +62,7 @@ jobs:
 
       - name: Smoke-test official CRG transport
         shell: bash
-        run: node scripts/crg-smoke.mjs > crg-smoke.json
+        run: node scripts/crg-smoke.mjs > "${RUNNER_TEMP}/crg-smoke.json"
 
       - name: Run complete repository gate
         run: npm run validate
@@ -111,7 +111,7 @@ jobs:
             sensor.sarif
             sensor.json
             sensor-checklist.json
-            crg-smoke.json
+            ${{ runner.temp }}/crg-smoke.json
             ci-summary.md
           if-no-files-found: warn
 
