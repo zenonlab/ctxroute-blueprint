@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { get as requestLoopback } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { progressContinuation } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
+import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -251,6 +253,23 @@ test('both lifecycle dialects inject a matching project rule', () => {
   }
 });
 
+test('both host dispatchers block an unsafe file through the real PostToolUse chain', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'lifecycle-post-tool-'));
+  const path = join(directory, 'query.js');
+  writeFileSync(path, "db.query('SELECT * FROM users WHERE id = ' + userId);\n");
+  for (const harness of ['codex', 'claude']) {
+    const result = spawnSync(process.execPath, [join(root, '.codex/hooks/lifecycle.mjs'), harness, 'PostToolUse'], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: path } }),
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.decision, 'block', harness);
+    assert.match(output.reason, /sensor\/sql-injection/u, harness);
+  }
+});
+
 function run(script, input, options = {}) {
   return spawnSync('node', [join(root, script)], { cwd: options.cwd ?? root, input: JSON.stringify(input), encoding: 'utf8' });
 }
@@ -296,6 +315,51 @@ test('Archify preview hook stays quiet when the template has no product diagram'
   const result = run('.codex/hooks/archify-preview.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' } });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
+});
+
+test('Archify preview hook serves a temporary product diagram over loopback', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'archify-preview-product-'));
+  const stateDirectory = join(cwd, '.ctxroute', 'state');
+  let previewPid;
+  try {
+    for (const directory of ['.githooks', '.project', '.agents/skills', 'docs/architecture/src', 'scripts']) mkdirSync(join(cwd, directory), { recursive: true });
+    copyFileSync(join(root, '.githooks/archify'), join(cwd, '.githooks/archify'));
+    copyFileSync(join(root, 'scripts/archify-registry.mjs'), join(cwd, 'scripts/archify-registry.mjs'));
+    copyFileSync(join(root, '.project/archify-pin.json'), join(cwd, '.project/archify-pin.json'));
+    copyFileSync(join(root, 'skills-lock.json'), join(cwd, 'skills-lock.json'));
+    copyFileSync(join(root, '.agents/skills/archify/examples/web-app.architecture.json'), join(cwd, 'docs/architecture/src/demo.architecture.json'));
+    symlinkSync(join(root, '.agents/skills/archify'), join(cwd, '.agents/skills/archify'), process.platform === 'win32' ? 'junction' : 'dir');
+    writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify({
+      architecture: { documents: ['docs/architecture/src/demo.architecture.json'], internalDocuments: [] },
+    }));
+
+    const result = spawnSync(process.execPath, [join(root, '.codex/hooks/archify-preview.mjs')], {
+      cwd,
+      env: { ...process.env, CTXROUTE_STATE_DIR: stateDirectory },
+      input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/src/demo.architecture.json' } }),
+      encoding: 'utf8',
+      timeout: 12_000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    if (!result.stdout) {
+      const diagnostics = readdirSync(stateDirectory).filter(path => path.endsWith('.log')).map(path => readFileSync(join(stateDirectory, path), 'utf8')).join('\n');
+      assert.fail(`Archify preview produced no hook output. ${diagnostics}`);
+    }
+    const output = JSON.parse(result.stdout);
+    const url = output.hookSpecificOutput.additionalContext.match(/https?:\/\/\S+/u)?.[0];
+    assert.ok(url);
+    const status = await new Promise((resolveStatus, rejectStatus) => {
+      const request = requestLoopback(url, response => { response.resume(); resolveStatus(response.statusCode); });
+      request.on('error', rejectStatus);
+    });
+    assert.equal(status, 200);
+    const statePath = readdirSync(stateDirectory).find(path => path.endsWith('.json'));
+    assert.ok(statePath);
+    previewPid = JSON.parse(readFileSync(join(stateDirectory, statePath), 'utf8')).pid;
+  } finally {
+    if (previewPid) try { process.kill(previewPid, 'SIGTERM'); } catch {}
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('an active Stop hook does not loop', () => {
@@ -538,10 +602,30 @@ test('setup prerequisite check is available before dependency installation', () 
 });
 
 test('setup keeps Sensor pack synchronization quiet unless it fails', () => {
-  const source = readFileSync(join(root, '.githooks/setup.mjs'), 'utf8');
-  assert.match(source, /sensor:languages[^\n]+sync[^\n]+\{ silent: true \}/u);
-  assert.match(source, /stdio: \['ignore', 'pipe', 'pipe'\]/u);
-  assert.match(source, /\[result\.stdout, result\.stderr\]/u);
+  const success = { logs: [], errors: [], exits: [] };
+  runStep('Sensor sync', process.execPath, ['sensor:languages', 'sync'], {
+    silent: true,
+    spawn: (_command, _args, options) => {
+      assert.deepEqual(options.stdio, ['ignore', 'pipe', 'pipe']);
+      return { status: 0, stdout: 'successful child output', stderr: '' };
+    },
+    log: value => success.logs.push(value),
+    error: value => success.errors.push(value),
+    terminate: code => success.exits.push(code),
+  });
+  assert.deepEqual(success, { logs: [], errors: [], exits: [] });
+
+  const failure = { logs: [], errors: [], exits: [] };
+  runStep('Sensor sync', process.execPath, ['sensor:languages', 'sync'], {
+    silent: true,
+    spawn: () => ({ status: 7, stdout: 'rollback complete', stderr: 'parser install failed' }),
+    log: value => failure.logs.push(value),
+    error: value => failure.errors.push(value),
+    terminate: code => failure.exits.push(code),
+  });
+  assert.deepEqual(failure.logs, []);
+  assert.deepEqual(failure.errors, ['rollback complete\nparser install failed', 'Sensor sync failed with status 7.']);
+  assert.deepEqual(failure.exits, [7]);
 });
 
 function starterWorkspace() {
