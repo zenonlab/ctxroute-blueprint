@@ -5,7 +5,7 @@ import { join, relative, resolve } from 'node:path';
 const root = resolve('tools/oxlint/anti-slop');
 const provenance = JSON.parse(readFileSync(join(root, 'PROVENANCE.json'), 'utf8'));
 const files = walk(root).filter(path => !path.endsWith('PROVENANCE.json') && !path.endsWith('LOCAL_CHANGES.md')).sort();
-const lines = files.map(path => `${digest(readFileSync(path))}  ${relative(process.cwd(), path)}\n`).join('');
+const lines = files.map(path => `${digest(readFileSync(path, 'utf8').replace(/\r\n/gu, '\n'))}  ${relative(process.cwd(), path).replaceAll('\\', '/')}\n`).join('');
 const actual = digest(lines);
 if (actual !== provenance.snapshotSha256) {
   console.error(`anti-slop snapshot drift: expected ${provenance.snapshotSha256}, found ${actual}`);

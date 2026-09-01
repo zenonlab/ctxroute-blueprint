@@ -6,6 +6,7 @@ scope:
   - .githooks/sensor-checklist.mjs
   - .project/project-config.json
   - tools/oxlint/anti-slop/
+  - scripts/check-anti-slop-snapshot.mjs
   - oxlint.config.ts
   - docs/architecture/src/sensor.dataflow.json
 review: on-change
@@ -74,6 +75,11 @@ Vendored anti-slop sources remain covered by their functional Sensor fixtures,
 but are excluded from the blueprint's aggregate Node coverage threshold. That
 threshold measures maintained integration code rather than imported upstream
 implementation details.
+
+Snapshot verification canonicalizes CRLF line endings and Windows path
+separators before hashing. The npm lockfile is generated with the supported npm
+10 reference used by CI so a clean setup remains idempotent across npm 10 and
+newer clients.
 
 ## Alternatives
 
