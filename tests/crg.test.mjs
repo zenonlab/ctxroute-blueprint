@@ -27,11 +27,11 @@ test('watcher coalesces events and enforces single-flight updates', async () => 
   const gate = new Promise(resolve => { release = resolve; });
   const controller = createCrgWatcher({ root: '/workspace', debounceMs: 1, watchImpl: (_root, _options, listener) => { callback = listener; return { close() {} }; }, runUpdate: ({ changedPaths }) => { events.push(changedPaths); return gate; } });
   callback('change', 'a.js'); callback('change', 'b.js');
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => { setTimeout(resolve, 10); });
   assert.deepEqual(controller.state(), { running: true, pending: false, changedPaths: [], stopped: false });
   callback('change', 'c.js');
   release();
-  await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => { setTimeout(resolve, 10); });
   assert.deepEqual(events, [['a.js', 'b.js'], ['c.js']]);
   controller.close();
 });

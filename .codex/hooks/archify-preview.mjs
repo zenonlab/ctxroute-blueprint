@@ -1,20 +1,23 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync, openSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import http from 'node:http';
+import { get as requestLoopback } from 'node:http';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const root = resolve(process.cwd());
-const input = await readInput();
-if (input && isRelevantMutation(input)) {
-  const preview = await ensurePreview();
-  if (preview) {
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: `Archify preview disponible : ${preview.url}`,
-      },
-    }));
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const input = await readInput();
+  if (input && isRelevantMutation(input)) {
+    const preview = await ensurePreview();
+    if (preview) {
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: `Archify preview disponible : ${preview.url}`,
+        },
+      }));
+    }
   }
 }
 
@@ -60,7 +63,19 @@ function isRelevantMutation(value) {
 
 function previewUrl(logPath) {
   const text = readFileSync(logPath, 'utf8');
-  return text.match(/\bpreview\s+(https?:\/\/[^\s\r\n]+)/iu)?.[1] ?? null;
+  return normalizePreviewUrl(text.match(/\bpreview\s+(https?:\/\/[^\s\r\n]+)/iu)?.[1]);
+}
+
+export function normalizePreviewUrl(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1']);
+    if (url.protocol !== 'http:' || !loopbackHosts.has(url.hostname) || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function architectureSource() {
@@ -80,7 +95,7 @@ function processAlive(pid) {
 
 function isHealthy(url) {
   return new Promise(resolveHealth => {
-    const request = http.get(url, response => {
+    const request = requestLoopback(url, response => {
       response.resume();
       resolveHealth(response.statusCode === 200);
     });
@@ -94,5 +109,5 @@ function readJson(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
 }
 
-function wait(milliseconds) { return new Promise(resolveWait => setTimeout(resolveWait, milliseconds)); }
+function wait(milliseconds) { return new Promise(resolveWait => { setTimeout(resolveWait, milliseconds); }); }
 async function readInput() { let value = ''; for await (const chunk of process.stdin) value += chunk; try { return JSON.parse(value || '{}'); } catch { return null; } }

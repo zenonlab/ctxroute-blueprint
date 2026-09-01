@@ -46,8 +46,9 @@ negations, and configured generated directories apply even to direct paths.
 Global searches have strict `product` and `blueprint` scopes and reject mixed
 requests. Every response uses a structural budget counted by the exact
 `gpt-tokenizer@4.0.0` package and never returns complete source by default.
-The benchmark reports observed counts, ratio, tokenizer, bytes and duration;
-it makes no fixed reduction promise.
+The benchmark reports observed counts, ratio, tokenizer, bytes and duration.
+Versioned thresholds prevent repository regressions without presenting the
+observed reduction as a universal promise.
 
 Codex loads both stdio servers from project-scoped `.codex/config.toml` and
 Claude loads them from project-scoped `.mcp.json`. Client configuration owns

@@ -32,6 +32,23 @@ test('high-value application risks and SARIF contract are reported', () => {
   assert.equal(sarif.version, '2.1.0');
   assert.equal(sarif.runs[0].results.length, 4);
 });
+test('blueprint Sensor baseline accepts only exact justified blocking diagnostics', async () => {
+  const { evaluateBaseline } = await import('../scripts/blueprint-sensor.mjs');
+  const diagnostic = { path: 'safe.js', rule: 'sensor/ssrf', severity: 'UNSAFE' };
+  const baseline = { schemaVersion: 1, exceptions: [{ path: 'safe.js', rule: 'sensor/ssrf', occurrences: 1, justification: 'Reviewed local-only network boundary.' }] };
+  assert.equal(evaluateBaseline([diagnostic], baseline).ok, true);
+  assert.equal(evaluateBaseline([{ ...diagnostic, rule: 'sensor/path-traversal' }], baseline).ok, false);
+  assert.equal(evaluateBaseline([], baseline).stale.length, 1);
+});
+test('whole-blueprint Sensor gate has no unexpected blocking diagnostic', () => {
+  const result = spawnSync(process.execPath, ['scripts/blueprint-sensor.mjs'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.gate, 'PASS');
+  assert.ok(report.scannedFiles >= 40);
+  assert.equal(report.baseline.unexpected.length, 0);
+  assert.equal(report.baseline.stale.length, 0);
+});
 test('SARIF CLI does not treat its flag as a source path', () => {
   const result = spawnSync(process.execPath, [sensor, '--sarif', 'safe.js'], { cwd: root, encoding: 'utf8' });
   const body = JSON.parse(result.stdout);

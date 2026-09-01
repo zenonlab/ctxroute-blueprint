@@ -3,7 +3,6 @@ scope:
   - package.json
   - package-lock.json
   - packages/**
-  - repos/**
 review: on-change
 revised: true
 ---
@@ -19,9 +18,10 @@ cross-platform, and compatible with its template lifecycle.
 
 ## Decision
 
-Use a private root npm project with `workspaces` covering `packages/*` and
-`repos/*`. Root commands remain the public entry points, and Node.js 22/npm 10
-remain the supported toolchain. Workspace package manifests are explicit and a
+Use a private root npm project with `workspaces` covering `packages/*`.
+Root commands remain the public entry points, and Node.js 22.13+/npm 10
+remain the supported toolchain. Workspace package manifests are private,
+carry the repository's Apache-2.0 license metadata, and a
 clean clone is validated by `npm ci` and the root validation command.
 
 ## Alternatives

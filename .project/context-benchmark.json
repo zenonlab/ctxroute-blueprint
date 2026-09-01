@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "minimumObservedRatio": 2,
+  "maximumSummaryTokens": 2000,
+  "maximumDurationMs": 5000
+}

@@ -231,6 +231,15 @@ test('PostToolUse audits documents and Archify sources', () => {
   assert.equal(result.stdout, '');
 });
 
+test('Archify preview health checks accept only unauthenticated loopback HTTP URLs', async () => {
+  const { normalizePreviewUrl } = await import('../.codex/hooks/archify-preview.mjs');
+  assert.equal(normalizePreviewUrl('http://127.0.0.1:4173/preview'), 'http://127.0.0.1:4173/preview');
+  assert.equal(normalizePreviewUrl('http://localhost:4173/preview'), 'http://localhost:4173/preview');
+  assert.equal(normalizePreviewUrl('https://127.0.0.1:4173/preview'), null);
+  assert.equal(normalizePreviewUrl('http://example.test/preview'), null);
+  assert.equal(normalizePreviewUrl('http://user:password@localhost:4173/preview'), null);
+});
+
 test('an active Stop hook does not loop', () => {
   const result = run('.codex/hooks/stop-review.mjs', { stop_hook_active: true });
   assert.match(result.stdout, /continue/u);

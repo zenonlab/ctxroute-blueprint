@@ -7,7 +7,7 @@
   },
   "decisions": {
     "language": "not applicable: blueprint tooling only",
-    "runtime": "Node.js 22+ for repository governance; derived product is undecided",
+    "runtime": "Node.js 22.13+ for repository governance; derived product is undecided",
     "frontend": "none: no product UI is selected",
     "backend": "none: no product service is selected",
     "storage": "none: product storage is undecided; local SQLite is tooling-only",
@@ -17,12 +17,12 @@
     "performance": "bounded setup and single-flight local tooling; product budgets undecided"
   },
   "commands": {
-    "test": "npm test",
+    "test": "npm run test:coverage",
     "initialize": "npm run initialize",
-    "lint": null,
+    "lint": "npm run lint",
     "typecheck": null,
     "mutation": null,
-    "integration": null,
+    "integration": "npm run integration",
     "build": "npm run build:docs",
     "workspaceCheck": "npm run workspace:check",
     "crgUpdate": "npm run crg:update",
@@ -35,6 +35,8 @@
     "contextMcp": "npm run context:mcp",
     "astCheck": "npm run ast:check",
     "contextBenchmark": "npm run context:benchmark",
+    "performance": "npm run context:benchmark:check",
+    "sensorBlueprint": "npm run sensor:blueprint",
     "mermaid": null
   },
   "quality": {
@@ -103,6 +105,7 @@
     ],
     "rootFiles": [
       ".gitignore",
+      "eslint.config.mjs",
       ".mcp.json",
       ".gitmessage",
       ".gitattributes",

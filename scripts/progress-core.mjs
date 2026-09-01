@@ -84,7 +84,7 @@ function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? pla
 function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: goal.title, status: goal.status, steps: goal.steps }; }
 function isId(value) { return typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
 function text(value) { return typeof value === 'string' && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
-function shortReference(value) { return typeof value === 'string' && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && !/[\u0000-\u001f]/u.test(value); }
+function shortReference(value) { return typeof value === 'string' && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && ![...value].some(character => character.codePointAt(0) <= 31); }
 function safePath(value) {
   if (!shortReference(value) || isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]+/u).includes('..')) return false;
   const normalized = value.replaceAll('\\', '/');

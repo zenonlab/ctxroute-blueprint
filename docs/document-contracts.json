@@ -46,6 +46,22 @@
       "requiredKeys": ["schemaVersion", "dangerousCommands", "sql"]
     },
     {
+      "id": "sensor-baseline",
+      "kind": "versioned-exception-config",
+      "format": "json",
+      "source": ".project/sensor-baseline.json",
+      "requiredKeys": ["schemaVersion", "exceptions"],
+      "validator": "npm run sensor:blueprint"
+    },
+    {
+      "id": "context-benchmark",
+      "kind": "performance-budget",
+      "format": "json",
+      "source": ".project/context-benchmark.json",
+      "requiredKeys": ["schemaVersion", "minimumObservedRatio", "maximumSummaryTokens", "maximumDurationMs"],
+      "validator": "npm run context:benchmark:check"
+    },
+    {
       "id": "ui-design-contract",
       "kind": "ui-contract",
       "format": "json",

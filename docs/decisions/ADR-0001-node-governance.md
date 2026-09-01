@@ -44,8 +44,9 @@ testability. Reimplementing Mermaid validation would add unjustified complexity.
 
 ## Consequences
 
-Node.js 22+ and npm 10+ are explicit template prerequisites because CTXRoute
-requires Node.js 22+. They do not determine the language, runtime, or
+Node.js 22.13+ and npm 10+ are explicit template prerequisites because CTXRoute
+requires Node.js 22+. The maintained Node 22 floor also supports the pinned
+ESLint major. These tooling constraints do not determine the language, runtime, or
 architecture of a derived product.
 
 Setup changes only repository-local state and dependency caches. It never edits

@@ -1,5 +1,5 @@
 import Parser from 'tree-sitter';
-import { adapterMetadata, AST_REGISTRY, extractEmbeddedSource, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
+import { adapterMetadata, extractEmbeddedSource, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
 import { readFileSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 
@@ -109,8 +109,8 @@ function analyzePath(path, root, config, diagnostics, sharedState) {
 function analyzeAst(path, source, parserSource, entry, config, diagnostics, inheritedState) {
   const tree = parseTree(entry.grammar, parserSource);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
-  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: new Map(), taintedVariables: new Set() };
-  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Map(); state.importedSqlFunctions ??= new Map();
+  let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: Object.create(null), taintedVariables: new Set() };
+  state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Map(); state.importedSqlFunctions ??= Object.create(null);
   state.taintedVariables ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state, entry.language); });
   const complexity = config.complexity ?? { maxNodes: 2000, maxDepth: 80 };
@@ -378,41 +378,41 @@ function parseTree(grammar, source) {
 }
 function isExported(node) { let parent = node.parent; while (parent) { if (parent.type === 'export_statement') return true; if (parent.type === 'program' || parent.type === 'module') return false; parent = parent.parent; } return false; }
 function collectImportedNames(source) {
-  const names = new Map();
+  const names = Object.create(null);
   for (const match of source.matchAll(/\bimport\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/gu)) {
     for (const item of (match[1] ?? match[2]).split(',')) {
       const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
-      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[2] });
+      if (parts[0]) names[parts.at(-1)] = { original: parts[0], module: match[2] };
     }
   }
-  for (const match of source.matchAll(/\bimport\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names.set(match[1], { namespace: true, module: match[2] });
-  for (const match of source.matchAll(/\bimport\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names.set(match[1], { original: 'default', module: match[2] });
+  for (const match of source.matchAll(/\bimport\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names[match[1]] = { namespace: true, module: match[2] };
+  for (const match of source.matchAll(/\bimport\s+([A-Za-z_$][\w$]*)\s+from\s*['"]([^'"]+)['"]/gu)) names[match[1]] = { original: 'default', module: match[2] };
   for (const match of source.matchAll(/\bfrom\s+([A-Za-z0-9_./-]+)\s+import\s+([^\n]+)/gu)) {
     for (const item of match[2].split(',')) {
       const parts = item.trim().split(/\s+as\s+/iu).map(value => value.trim());
-      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[1] });
+      if (parts[0]) names[parts.at(-1)] = { original: parts[0], module: match[1] };
     }
   }
   for (const match of source.matchAll(/\b(?:const|let|var)\s*\{([^}]+)\}\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/gu)) {
     for (const item of match[1].split(',')) {
       const parts = item.trim().split(/\s*:\s*/u).map(value => value.trim());
-      if (parts[0]) names.set(parts.at(-1), { original: parts[0], module: match[2] });
+      if (parts[0]) names[parts.at(-1)] = { original: parts[0], module: match[2] };
     }
   }
   for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)\.([A-Za-z_$][\w$]*)/gu)) {
-    names.set(match[1], { original: match[3], module: match[2] });
+    names[match[1]] = { original: match[3], module: match[2] };
   }
   for (const match of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/gu)) {
-    if (!names.has(match[1])) names.set(match[1], { namespace: true, module: match[2] });
+    if (!Object.hasOwn(names, match[1])) names[match[1]] = { namespace: true, module: match[2] };
   }
   return names;
 }
 function importedBinding(name, state) {
-  const direct = state.importedSqlFunctions.get(name);
+  const direct = state.importedSqlFunctions[name];
   if (direct) return direct;
   const [namespace, ...members] = name.split('.');
   const member = members.at(-1);
-  const binding = state.importedSqlFunctions.get(namespace);
+  const binding = state.importedSqlFunctions[namespace];
   return binding?.namespace && member ? { original: member, module: binding.module } : null;
 }
 function isResolvedSqlExport(binding, state) {

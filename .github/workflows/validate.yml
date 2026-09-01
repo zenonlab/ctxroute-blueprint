@@ -17,6 +17,9 @@ jobs:
   validate:
     name: Node 22 / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -38,41 +41,29 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci
 
-      - name: Validate project configuration
-        run: npm run validate:config
+      - name: Run complete repository gate
+        run: npm run validate
 
-      - name: Validate CTXRoute wiring
-        run: npm run validate:ctxroute
-
-      - name: Validate Archify architecture
-        run: npm run validate:architecture
-
-      - name: Validate documentation and UI contracts
-        run: npm run validate:docs -- --all && npm run validate:ui
-
-      - name: Validate Sensor coverage
+      - name: Materialize Sensor artifacts
         shell: bash
         run: |
           node .githooks/sensor --checklist --json > sensor-checklist.json
-          npm run sensor -- .codex/hooks/path-extraction.mjs > sensor.json
-          npm run sensor -- --sarif .codex/hooks/path-extraction.mjs > sensor.sarif
+          node scripts/blueprint-sensor.mjs > sensor.json
+          node scripts/blueprint-sensor.mjs --sarif > sensor.sarif
 
-      - name: Validate AST grammars and local MCP manifests
-        run: npm run ast:check && npm run mcp:validate
+      - name: Upload unexpected Sensor diagnostics to code scanning
+        if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          sarif_file: sensor.sarif
+          category: blueprint-sensor
 
-      - name: Smoke-test both MCP stdio servers
-        if: runner.os != 'Windows'
-        run: npm run mcp:smoke
+      - name: Verify integration boundary
+        run: npm run integration
 
-      - name: Benchmark bounded context
+      - name: Materialize bounded-context benchmark
         shell: bash
         run: npm run context:benchmark > context-benchmark.json
-
-      - name: Validate governance and workspace
-        run: npm run workspace:check && npm run governance:check && npm run check:coherence
-
-      - name: Run tests
-        run: npm test
 
       - name: Run dependency audit
         run: npm audit --audit-level=high
@@ -115,4 +106,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Verify clean install and idempotent checks
-        run: npm ci && npm run setup:check && npm run validate
+        shell: bash
+        run: |
+          npm run setup
+          test -z "$(git status --porcelain)"

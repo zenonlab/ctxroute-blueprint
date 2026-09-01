@@ -2,7 +2,7 @@
 
 [![Validate](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml/badge.svg)](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml)
 [![GitHub Template](https://img.shields.io/badge/GitHub-template-181717?logo=github)](https://github.com/zenonlab/ctxroute-blueprint/generate)
-[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js 22.13+](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm 10+](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 [![CTXRoute](https://img.shields.io/badge/context-CTXRoute-7c3aed)](https://github.com/zenonlab/ctxroute)
 [![Archify v2.16.0](https://img.shields.io/badge/architecture-Archify_v2.16.0-06b6d4)](https://github.com/tt-a1i/archify/releases/tag/v2.16.0)
@@ -16,7 +16,7 @@ for software projects. It does not impose a language, backend, frontend,
 database, deployment platform, or test framework.
 
 The generated product remains stack-neutral. The template tooling requires
-[Node.js 22+](https://nodejs.org/) and [npm 10+](https://www.npmjs.com/) to run
+[Node.js 22.13+](https://nodejs.org/) and [npm 10+](https://www.npmjs.com/) to run
 [CTXRoute](https://github.com/zenonlab/ctxroute), governance hooks, tests, and
 [Archify](https://github.com/tt-a1i/archify) and the tree-sitter Sensor.
 
@@ -36,7 +36,7 @@ The blueprint combines five infrastructure layers:
 
 1. Select **Use this template** on GitHub.
 2. Clone the generated repository and enter its root directory.
-3. Install Git, Node.js 22+, and npm 10+.
+3. Install Git, Node.js 22.13+, and npm 10+.
 4. Bootstrap the repository:
 
    ```sh
@@ -159,23 +159,35 @@ For prerequisite diagnostics without installing anything, run
 
 ## Validate
 
-Run the complete repository gate:
+Run the deterministic repository gate:
 
 ```sh
 npm run validate
 ```
 
-For a full local verification after initialization:
+It includes lint, architecture and document contracts, workspace/governance
+coherence, the whole-blueprint Sensor baseline, performance budgets, and test
+coverage thresholds. For the full verification, including integration,
+dependency audit, and generated documentation:
 
 ```sh
-npm run validate
-npm run build:docs
-npm run sensor -- <paths>
+npm run verify
+npm run sensor:blueprint
 git status --porcelain
 ```
 
 The final command must produce no output. Generated documentation belongs under
 the ignored `dist/` directory and must never be committed.
+
+## GitHub repository protections
+
+GitHub templates copy repository files and branches, not the complete security
+posture of the source repository. After creating a project, configure branch
+protection or an organization ruleset, require the CI jobs relevant to the
+derived project, and enable Dependabot alerts, secret scanning with push
+protection, code scanning, and a working private vulnerability-reporting
+channel. The tracked workflow uploads unexpected Sensor diagnostics as SARIF,
+but repository security features still require owner or organization policy.
 
 ## Architecture with Archify
 

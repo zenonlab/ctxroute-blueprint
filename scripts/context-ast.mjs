@@ -2,7 +2,7 @@ import Parser from 'tree-sitter';
 import ignore from 'ignore';
 import { encode } from 'gpt-tokenizer';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
-import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { extractEmbeddedSource, registryEntry, resolveRegistryEntry } from '../.githooks/ast-registry.mjs';
 
 export { maskErbRuby } from '../.githooks/ast-registry.mjs';

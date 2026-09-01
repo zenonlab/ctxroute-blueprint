@@ -8,13 +8,14 @@ proportionate level of verification.
 
 | Type | Project choice | Questions to answer | Evidence |
 | --- | --- | --- | --- |
-| Unit | required | Governance, Sensor, and progress rules | `npm test` must pass |
-| Integration | required | npm install, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup` and smoke fixtures |
+| Unit | required | Governance, Sensor, and progress rules | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
+| Static lint | required | JavaScript tooling and tests | `npm run lint` must pass with the pinned ESLint configuration |
+| Integration | required | npm install, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup` and `npm run integration` |
 | End-to-end | not applicable | The blueprint has no product UI or runtime | No product deployment |
 | Contract | required | Six lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
-| Property / fuzz | not applicable | No product input surface is selected | Reconsider in the derived project |
-| Performance | required | Setup and CI remain bounded; CRG watcher remains single-flight | Existing bounded-process tests |
-| Security | required | Minimal CI permissions, pinned actions, Sensor unsafe/error gates, no secret diagnostics | `npm audit --audit-level=high` and Sensor checklist |
+| Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
+| Performance | required | Context summaries stay bounded; CRG watcher remains single-flight | `npm run context:benchmark:check` enforces the versioned ratio, token, and duration budgets |
+| Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
 | Accessibility | not applicable | Generated Archify HTML is documentation infrastructure only | Validate artifact structure |
 | Migration / recovery | not applicable | No product data or deployment is owned by the blueprint | Derived project decision |
 
@@ -49,5 +50,7 @@ The separate Context MCP provides bounded symbols, summaries, definitions,
 syntax-aware references, and relevant context. It rejects path escapes,
 ignored/generated paths, and mixed product/blueprint scopes. Responses are
 counted with `gpt-tokenizer@4.0.0` and structurally truncated. Run
-`npm run ast:check`, `npm run mcp:smoke`, and `npm run context:benchmark` for
-the corresponding mechanical evidence.
+`npm run ast:check`, `npm run integration`, and `npm run
+context:benchmark:check` for the corresponding mechanical evidence. The
+thresholds in `.project/context-benchmark.json` are repository regression
+budgets rather than universal performance claims.

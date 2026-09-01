@@ -8,7 +8,7 @@
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "governance", "controlLoop", "progressMcp", "contextMcp"], "note": "Lifecycle CTXRoute, blocking Sensor, Progress MCP, and Context MCP remain independent branches; clients own both stdio transports." },
       { "id": "architecture-docs", "label": "Architecture docs", "focus": ["contributors", "archifyAdapter", "archify", "jsonIr", "documentContracts", "html"], "note": "Versioned JSON IR and document contracts produce ignored, deterministic HTML." },
-      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "113 extensions and 9 named files; no package, whole-program, or runtime rate-limit proof." },
+      { "id": "safety-scan", "label": "Safety scan", "focus": ["contributors", "sensor", "sensorAdapters", "sensorChecklist", "grammars", "diagnostics"], "note": "Blueprint sources use a justified baseline; 113 extensions and 9 named files remain bounded without whole-program or runtime proof." },
       { "id": "workspace-crg", "label": "Workspace and CRG", "focus": ["contributors", "workspace", "watcher", "crg", "sqlite"], "note": "Coalesced file events run one bounded CRG update against local SQLite/WAL state; AbortSignal stops active work." },
       { "id": "ui-contract", "label": "UI contract", "focus": ["contributors", "uiContract", "ctxroute", "sensor"], "note": "Framework-neutral tokens and component roles guide derived products without selecting a frontend stack." }
     ]
@@ -24,7 +24,7 @@
     { "id": "documentContracts", "type": "database", "label": "Document contracts", "sublabel": "Schema-first registry", "pos": [790, 700], "size": [190, 66] },
     { "id": "uiContract", "type": "database", "label": "UI design contract", "sublabel": "Framework-neutral tokens and roles", "pos": [1000, 700], "size": [210, 66] },
     { "id": "html", "type": "frontend", "label": "Interactive HTML", "sublabel": "Ignored dist/ artifact", "pos": [790, 310], "size": [180, 66] },
-    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + risk rules + SARIF", "pos": [270, 520], "size": [180, 66] },
+    { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "AST + baseline gate + SARIF", "pos": [270, 520], "size": [180, 66] },
     { "id": "postToolUse", "type": "backend", "label": "PostToolUse", "sublabel": "Modified-file verification", "pos": [40, 680], "size": [180, 66] },
     { "id": "sensorAdapters", "type": "backend", "label": "Unified language registry", "sublabel": "AST / embedded / lexical modes", "pos": [520, 700], "size": [220, 66] },
     { "id": "sensorChecklist", "type": "backend", "label": "Sensor checklist", "sublabel": "Read-only CLI coverage audit", "pos": [40, 500], "size": [190, 66] },
@@ -45,7 +45,7 @@
     { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "4 stdio checklist tools", "pos": [40, 800], "size": [200, 66] },
     { "id": "contextMcp", "type": "backend", "label": "Context MCP", "sublabel": "5 scoped AST tools / token budget", "pos": [1040, 800], "size": [220, 66] },
     { "id": "initializer", "type": "security", "label": "Controlled initializer", "sublabel": "Checks decisions before status transition", "pos": [40, 900], "size": [220, 66] },
-    { "id": "bootstrap", "type": "backend", "label": "Bootstrap setup", "sublabel": "Node 22 / npm 10 / idempotent", "pos": [40, 1000], "size": [180, 66] },
+    { "id": "bootstrap", "type": "backend", "label": "Quality gates", "sublabel": "Lint / test / verify", "pos": [40, 1000], "size": [180, 66] },
     { "id": "codespaces", "type": "cloud", "label": "GitHub Codespaces", "sublabel": "devcontainer post-create", "pos": [270, 980], "size": [190, 66] },
     { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "CI on push and pull request", "pos": [520, 980], "size": [190, 66] },
     { "id": "ciArtifacts", "type": "database", "label": "CI artifacts", "sublabel": "Archify / Sensor / summary", "pos": [760, 980], "size": [190, 66] },
@@ -64,7 +64,7 @@
     { "id": "adapter-skill", "from": "archifyAdapter", "to": "archify" },
     { "id": "ir-adapter", "from": "jsonIr", "to": "archifyAdapter", "label": "typed source" },
     { "id": "adapter-html", "from": "archifyAdapter", "to": "html", "label": "deliver self-contained artifact", "labelAt": [620, 395] },
-    { "id": "contributors-sensor", "from": "contributors", "to": "sensor", "label": "scan paths", "variant": "security" },
+    { "id": "contributors-sensor", "from": "contributors", "to": "sensor", "label": "scan paths / gate baseline", "variant": "security" },
     { "id": "dispatch-post-tool", "from": "lifecycle", "to": "postToolUse", "label": "after mutation", "variant": "emphasis", "fromSide": "left", "toSide": "left", "via": [[230, 133], [230, 200], [20, 200], [20, 713]], "labelAt": [120, 215] },
     { "id": "post-tool-sensor", "from": "postToolUse", "to": "sensor", "label": "reuse path extraction", "labelAt": [245, 600] },
     { "id": "sensor-adapters", "from": "sensor", "to": "sensorAdapters", "label": "select adapter", "labelAt": [485, 660] },
