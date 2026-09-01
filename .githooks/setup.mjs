@@ -27,7 +27,7 @@ if (checkOnly) {
 }
 
 run('Install pinned dependencies (CTXRoute + Archify restore via postinstall)', process.execPath, [npmCli, 'ci']);
-run('Synchronize configured Sensor language packs', process.execPath, [npmCli, 'run', 'sensor:languages', '--', 'sync']);
+run('Synchronize configured Sensor language packs', process.execPath, [npmCli, 'run', 'sensor:languages', '--', 'sync'], { silent: true });
 run('Synchronize code-review-graph from the frozen uv lock', 'uv', ['sync', '--project', 'packages/code-review-graph', '--frozen', '--python', '3.12']);
 run('Verify code-review-graph 2.3.8', process.execPath, [npmCli, 'run', 'crg:version']);
 run('Build the initial code-review-graph graph', process.execPath, [npmCli, 'run', 'crg:build']);
@@ -39,11 +39,20 @@ if (finalGitStatus !== initialGitStatus) fail('Setup changed tracked files; insp
 
 console.log('CTXRoute Blueprint setup is complete.');
 
-function run(label, command, args) {
-  console.log(`\n${label}...`);
-  const result = spawnSync(command, args, { cwd: process.cwd(), stdio: 'inherit' });
+function run(label, command, args, { silent = false } = {}) {
+  if (!silent) console.log(`\n${label}...`);
+  const result = silent
+    ? spawnSync(command, args, { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    : spawnSync(command, args, { cwd: process.cwd(), stdio: 'inherit' });
   if (result.error) fail(`${label} failed: ${result.error.message}`);
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.status !== 0) {
+    if (silent) {
+      const detail = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      if (detail) console.error(detail);
+      console.error(`${label} failed with status ${result.status ?? 'unknown'}.`);
+    }
+    process.exit(result.status ?? 1);
+  }
 }
 
 function capture(command, args) {

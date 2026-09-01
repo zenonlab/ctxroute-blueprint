@@ -537,6 +537,13 @@ test('setup prerequisite check is available before dependency installation', () 
   assert.match(result.stdout, /Setup prerequisites are available/u);
 });
 
+test('setup keeps Sensor pack synchronization quiet unless it fails', () => {
+  const source = readFileSync(join(root, '.githooks/setup.mjs'), 'utf8');
+  assert.match(source, /sensor:languages[^\n]+sync[^\n]+\{ silent: true \}/u);
+  assert.match(source, /stdio: \['ignore', 'pipe', 'pipe'\]/u);
+  assert.match(source, /\[result\.stdout, result\.stderr\]/u);
+});
+
 function starterWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'starter-validation-'));
   const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
