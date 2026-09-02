@@ -110,6 +110,115 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "progress-dashboard-refactor",
+      "title": "Refonte sobre du tableau CTXRoute Progress",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "editable-progress-core",
+          "title": "Étendre les mutations atomiques et les validations Progress",
+          "status": "DONE",
+          "acceptance": [
+            "Les titres et contenus sont modifiables sans changer les IDs",
+            "Ajout suppression réordre recalculent le statut et régénèrent la vue",
+            "Les révisions et toutes les bornes existantes restent appliquées"
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-core.test.mjs",
+            "npx eslint scripts/progress-core.mjs tests/progress-core.test.mjs"
+          ]
+        },
+        {
+          "id": "editable-progress-api",
+          "title": "Exposer les routes révisées du tableau local",
+          "status": "DONE",
+          "acceptance": [
+            "Les routes goal étape ajout suppression et ordre appellent progress-core",
+            "Jeton Host Origin corps bornés et conflits 409 restent couverts"
+          ],
+          "files": [
+            "scripts/progress-dashboard.mjs",
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "npx eslint scripts/progress-dashboard.mjs tests/progress-dashboard.test.mjs"
+          ]
+        },
+        {
+          "id": "accordion-progress-ui",
+          "title": "Construire les cartes accordéons autosauvegardées et accessibles",
+          "status": "DONE",
+          "acceptance": [
+            "Les ressources HTML CSS JavaScript sont séparées et sans prompt natif",
+            "Autosauvegarde historique statut ajout ordre suppression restauration et mode sont utilisables",
+            "Les vues mobile et bureau restent sans débordement ni erreur JavaScript"
+          ],
+          "files": [
+            "scripts/progress-dashboard-app.mjs",
+            "scripts/progress-dashboard.html",
+            "scripts/progress-dashboard.css",
+            "scripts/progress-dashboard-client.js",
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "Chrome headless 390x844 and 1440x1000"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "Chrome headless 390x844 and 1440x1000: scrollWidth equals viewport, 4 closed cards, no JavaScript errors",
+            "Chrome interaction smoke: DONE proof guard, focus, undo redo, slug"
+          ]
+        },
+        {
+          "id": "progress-refactor-docs",
+          "title": "Aligner le contrat UI les ADR et les diagrammes internes",
+          "status": "DONE",
+          "acceptance": [
+            "Les décisions décrivent une identité figée et une structure éditable explicitement",
+            "Le contrat et les diagrammes internes reflètent les nouvelles interactions",
+            "Les validations MCP Progress Archify validate et CRG passent"
+          ],
+          "files": [
+            "docs/ui-design-contract.md",
+            ".project/ui-design-contract.json",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            "docs/decisions/ADR-0019-progress-execution-modes.md",
+            "docs/decisions/ADR-0022-local-progress-dashboard.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/architecture/src/traffic.dataflow.json"
+          ],
+          "commands": [
+            "npm run mcp:smoke",
+            "node .githooks/archify validate internal",
+            "npm run validate",
+            "npm run crg:smoke"
+          ],
+          "evidence": [
+            "npm run mcp:smoke",
+            "node --test tests/progress-core.test.mjs tests/progress-dashboard.test.mjs tests/progress-mcp.test.mjs",
+            "npm run validate",
+            "node .githooks/archify validate internal",
+            "npm run crg:smoke"
+          ]
+        }
+      ]
     }
   ]
 }
