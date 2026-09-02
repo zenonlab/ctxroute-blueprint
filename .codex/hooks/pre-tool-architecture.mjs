@@ -266,7 +266,8 @@ function unquotedText(value) {
 }
 
 function isDirectMutationCommand(value) {
-  return /[>]|\b(?:rm|mv|cp|touch|mkdir|tee|truncate|dd|install)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b|\b(?:node|python|python3|ruby|perl)\s+-e\b/iu.test(value);
+  const command = value.replace(/(?:^|\s)2\s*>\s*\/dev\/null(?=\s|$)/gu, ' ');
+  return /[>]|\b(?:rm|mv|cp|touch|mkdir|tee|truncate|dd|install)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b|\b(?:node|python|python3|ruby|perl)\s+-e\b/iu.test(command);
 }
 
 function gitChangedFiles() {

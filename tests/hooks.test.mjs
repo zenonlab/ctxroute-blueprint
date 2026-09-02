@@ -477,12 +477,14 @@ test('Stop autonomous policy continues TODO and IN_PROGRESS work', async () => {
   }
 });
 
-test('Stop autonomous policy hands off an external block and stops a completed goal', async () => {
-  const blocked = progressWorkspace({ mode: 'autonomous', statuses: ['BLOCKED', 'BLOCKED'] });
-  const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
-  assert.equal(handoff.continue, true);
-  assert.match(handoff.systemMessage, /blocked externally/u);
-  assert.doesNotMatch(JSON.stringify(handoff), /"decision":"block"/u);
+test('Stop hands off an external block in either mode without a continuation loop', async () => {
+  for (const mode of ['collaborative', 'autonomous']) {
+    const blocked = progressWorkspace({ mode, statuses: ['BLOCKED', 'BLOCKED'] });
+    const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
+    assert.equal(handoff.continue, true, mode);
+    assert.match(handoff.systemMessage, /blocked externally/u, mode);
+    assert.doesNotMatch(JSON.stringify(handoff), /"decision":"block"|mode automatique/u, mode);
+  }
 
   const done = progressWorkspace({ mode: 'autonomous', statuses: ['DONE'], goalStatus: 'DONE' });
   assert.equal(await progressContinuation({}, { root: done, changed: [], diagrams: [] }), null);

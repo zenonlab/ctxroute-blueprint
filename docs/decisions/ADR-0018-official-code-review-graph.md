@@ -51,7 +51,9 @@ impact radius, graph query, review context, graph stats, and architecture
 overview. Build, refactor, embedding, wiki, and secondary exploration remain
 available through controlled CLI commands when needed. The MCP schema budget
 is kept below 8,000 characters for CRG and 14,000 characters combined with
-Progress.
+Progress. Codex waits a bounded three seconds for optional MCP startup while
+building its initial tool catalog. CRG stays optional so a failed graph service
+remains visible and fail-open instead of preventing the session from starting.
 The Sensor keeps its own pinned Tree-sitter registry solely for security
 checks. `apply_refactor_tool` is allowed only with `dry_run: true`; accepted
 changes use normal editors so architecture, Sensor, and audit hooks remain in
