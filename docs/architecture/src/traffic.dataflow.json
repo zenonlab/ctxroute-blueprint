@@ -42,7 +42,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Session start stays quiet when CRG is healthy", "PreToolUse injects only targeted documentation", "MCP schemas remain bounded and allowlisted"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop recommends a product-facing Archify view and presents the local Progress URL once per session", "Progress records the active mode and step evidence through one shared core", "Archify validates both internal maps without publishing them as product diagrams"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop recommends a product-facing Archify view and presents the local Progress URL once per session", "Progress validates revision-checked content and structure mutations through one shared core", "Archify validates both internal maps without publishing them as product diagrams"] },
     { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
   ]
 }

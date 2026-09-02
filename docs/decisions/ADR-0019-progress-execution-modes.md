@@ -25,8 +25,10 @@ for work already recorded as blocked.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
-The dashboard requires a user confirmation for either mode transition and
-passes `userConfirmed` through the shared core. On the first Stop for a Codex
+The dashboard presents both values in a compact select with an accessible
+hover/focus explanation. It requires a custom-dialog confirmation for either
+transition, restores the prior selection when cancelled, and passes
+`userConfirmed` through the shared core. On the first Stop for a Codex
 session with unfinished work, the hook publishes the authenticated local URL.
 A marker keyed by a hash of the official `session_id` suppresses repeats while
 allowing a replacement instance to be announced after the prior server dies.
