@@ -185,6 +185,22 @@ test('blocks direct shell writes after initialization', () => {
   assert.match(result.stdout, /traceable editing tool/u);
 });
 
+test('allows read-only stderr discard after initialization', () => {
+  const cwd = initializedWorkspace();
+  for (const cmd of ['rg -n service src 2>/dev/null', 'rg -n service src 2> /dev/null']) {
+    const result = run({ cmd }, { cwd, toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
+  }
+});
+
+test('keeps output and non-null stderr redirections blocked after initialization', () => {
+  const cwd = initializedWorkspace();
+  for (const cmd of ['rg -n service src > report.txt', 'rg -n service src 2> errors.log', 'rg -n service src 2>>/dev/null', 'rg -n service src 2>/dev/null > report.txt']) {
+    const result = run({ cmd }, { cwd, toolName: 'exec_command' });
+    assert.match(result.stdout, /traceable editing tool/u, cmd);
+  }
+});
+
 test('allows a contract with a real ADR', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Update File: package.json\n*** Add File: docs/decisions/ADR-0001-dependency.md' }, { cwd });

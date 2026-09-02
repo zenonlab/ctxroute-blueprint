@@ -39,6 +39,10 @@ inside the declared `documentation.roots` when its suffix appears in the
 bounded `documentation.extensions` allowlist. The default roots are `docs/`,
 `documentation/`, and `specs/`; executable documentation formats such as MDX
 are excluded. Shell writes remain blocked regardless of the file extension.
+After initialization, the direct shell mutation guard treats only stderr
+redirection to the null device (`2>/dev/null`, with optional spacing) as a safe
+discard. Output redirection, append redirection, and stderr redirection to any
+other path remain mutations and stay blocked.
 
 The template-to-initialized transition is owned by `npm run initialize`. It
 requires completed decisions, brief, quality strategy, and passing validation;
