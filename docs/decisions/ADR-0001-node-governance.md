@@ -34,9 +34,22 @@ progress-validate, Sensor checklist checks, and CRG commands whose writes are
 confined to ignored `.code-review-graph/`. Progress approval and unrelated
 long-lived or direct mutation commands remain blocked.
 
+Before initialization, traceable editing tools may also create documentation
+inside the declared `documentation.roots` when its suffix appears in the
+bounded `documentation.extensions` allowlist. The default roots are `docs/`,
+`documentation/`, and `specs/`; executable documentation formats such as MDX
+are excluded. Shell writes remain blocked regardless of the file extension.
+
 The template-to-initialized transition is owned by `npm run initialize`. It
 requires completed decisions, brief, quality strategy, and passing validation;
 direct edits to the status field are rejected by PreToolUse.
+Initialization recognizes unresolved square-bracket placeholders while allowing
+ordinary Markdown links. Repository tests derive lifecycle expectations from
+the current project configuration or isolated fixtures, so adding a product
+diagram or progress checklist cannot make the pre-transition validation
+impossible.
+The transition invokes the exact npm CLI supplied by `npm run` through the
+current Node executable, avoiding direct `.cmd` execution on Windows.
 
 ## Alternatives
 

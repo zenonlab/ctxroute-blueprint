@@ -37,6 +37,7 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
   requireObject(config.directories, 'directories', failures);
   requireObject(config.architecture, 'architecture', failures);
   requireObject(config.contracts, 'contracts', failures);
+  requireObject(config.documentation, 'documentation', failures);
   requireObject(config.starter, 'starter', failures);
 
   const pathCollections = [
@@ -45,6 +46,7 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
     ['directories.generated', config.directories?.generated],
     ['architecture.documents', config.architecture?.documents],
     ['architecture.internalDocuments', config.architecture?.internalDocuments],
+    ['documentation.roots', config.documentation?.roots],
     ['starter.infrastructureRoots', config.starter?.infrastructureRoots],
     ['starter.rootFiles', config.starter?.rootFiles],
   ];
@@ -58,6 +60,7 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
   if (!Array.isArray(config.codeExtensions)) failures.push('codeExtensions must be an array');
   else if (config.codeExtensions.some(extension => extension !== String(extension) || !/^\.[a-z0-9][a-z0-9.+-]*$/iu.test(extension))) failures.push('codeExtensions must contain extensions such as .ts or .rb');
   if (!Array.isArray(config.contracts?.patterns) || config.contracts.patterns.some(pattern => pattern !== String(pattern) || !pattern.trim())) failures.push('contracts.patterns must be an array of non-empty patterns');
+  if (!Array.isArray(config.documentation?.extensions) || config.documentation.extensions.length === 0 || config.documentation.extensions.some(extension => extension !== String(extension) || !/^\.[a-z0-9][a-z0-9.+-]*$/iu.test(extension))) failures.push('documentation.extensions must contain extensions such as .md or .rst');
 
   for (const [name, command] of Object.entries(config.commands ?? {})) {
     if (command !== null && (command !== String(command) || !command.trim())) failures.push(`commands.${name} must be a non-empty command or null`);
@@ -129,6 +132,11 @@ export function isTestPath(path, config) {
 
 export function isGeneratedPath(path, config) {
   return isWithin(path, config.directories?.generated);
+}
+
+export function isDocumentationPath(path, config) {
+  if (!isWithin(path, config.documentation?.roots)) return false;
+  return (config.documentation?.extensions ?? []).some(extension => path.toLowerCase().endsWith(extension.toLowerCase()));
 }
 
 export function isCodePath(path, config) {

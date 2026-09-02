@@ -6,6 +6,7 @@ import {
   isArchitectureEvidence,
   isCodePath,
   isContractPath,
+  isDocumentationPath,
   isGeneratedPath,
   isSourcePath,
   isStarterPath,
@@ -89,7 +90,7 @@ if (mutationTool && architecturalPaths.length && !decisionStatus.applicable.leng
 }
 
 if (config.status === 'template') {
-  const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
+  const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isDocumentationPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
   if (projectPaths.length) {
     block([
       'Write blocked: the project is still in template mode.',

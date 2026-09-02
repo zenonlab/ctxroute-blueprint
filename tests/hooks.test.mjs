@@ -40,15 +40,25 @@ test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () 
 });
 
 test('initialize refuses an incomplete template without changing status', () => {
-  const configPath = join(root, '.project/project-config.json');
+  const cwd = initializationWorkspace({ incomplete: true });
+  const configPath = join(cwd, '.project/project-config.json');
   const before = JSON.parse(readFileSync(configPath, 'utf8'));
   const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], {
-    cwd: root,
+    cwd,
     encoding: 'utf8',
+    env: { ...process.env, npm_execpath: join(cwd, 'npm-cli.mjs') },
   });
   assert.equal(result.status, 1);
   assert.match(`${result.stdout}\n${result.stderr}`, /Initialization blocked/u);
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, before.status);
+});
+
+test('initialize accepts completed documents containing Markdown links', () => {
+  const cwd = initializationWorkspace({ incomplete: false });
+  const configPath = join(cwd, '.project/project-config.json');
+  const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], { cwd, encoding: 'utf8', env: { ...process.env, npm_execpath: join(cwd, 'npm-cli.mjs') } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, 'initialized');
 });
 
 test('project configuration inspection accepts the declared internal/product split', () => {
@@ -375,7 +385,11 @@ test('Archify preview health checks accept only unauthenticated loopback HTTP UR
 });
 
 test('Archify preview hook stays quiet when the template has no product diagram', () => {
-  const result = run('.codex/hooks/archify-preview.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' } });
+  const cwd = mkdtempSync(join(tmpdir(), 'archify-preview-empty-'));
+  mkdirSync(join(cwd, '.project'), { recursive: true });
+  mkdirSync(join(cwd, 'docs/architecture/src'), { recursive: true });
+  writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify({ architecture: { documents: [], internalDocuments: [] } }));
+  const result = run('.codex/hooks/archify-preview.mjs', { tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' } }, { cwd });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
   assert.match(readFileSync(join(root, '.codex/hooks/archify-preview.mjs'), 'utf8'), /'preview', diagram\.id, '--no-open'/u);
@@ -551,6 +565,17 @@ test('configuration rejects a missing declared starter file', () => {
   assert.match(result.stderr, /Missing starter root file: MISSING-STARTER\.md/u);
 });
 
+test('configuration requires bounded documentation roots and extensions', () => {
+  const cwd = starterWorkspace();
+  const configPath = join(cwd, '.project/project-config.json');
+  const config = JSON.parse(readFileSync(configPath, 'utf8'));
+  config.documentation.extensions = ['md'];
+  writeFileSync(configPath, JSON.stringify(config));
+  const result = spawnSync(process.execPath, [join(root, '.githooks/validate-project-config.mjs')], { cwd, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /documentation\.extensions/u);
+});
+
 test('documentation rejects a broken local link', () => {
   const cwd = starterWorkspace();
   writeFileSync(join(cwd, 'docs/broken.md'), '[Document](missing.md)\n');
@@ -722,6 +747,20 @@ function starterWorkspace() {
   writeFileSync(join(cwd, '.project/project-config.json'), JSON.stringify(config));
   writeFileSync(join(cwd, 'docs/architecture/src/blueprint.architecture.json'), '{}\n');
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs', 'build:docs': 'node build' } }));
+  return cwd;
+}
+
+function initializationWorkspace({ incomplete }) {
+  const cwd = mkdtempSync(join(tmpdir(), 'initialize-'));
+  mkdirSync(join(cwd, '.project'), { recursive: true });
+  mkdirSync(join(cwd, 'docs'), { recursive: true });
+  const config = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8'));
+  config.status = 'template';
+  writeFileSync(join(cwd, '.project/project-config.json'), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileSync(join(cwd, 'docs/00-project-brief.md'), incomplete ? '# Project brief\n\n[project name]\n' : '# Project brief\n\n[Reference](https://example.test)\n');
+  writeFileSync(join(cwd, 'docs/01-technology-decisions.md'), '# Technology decisions\n\nComplete.\n');
+  writeFileSync(join(cwd, 'docs/02-quality-strategy.md'), '# Quality strategy\n\nComplete.\n');
+  writeFileSync(join(cwd, 'npm-cli.mjs'), 'process.exit(process.argv.slice(2).join(" ") === "run validate" ? 0 : 1);\n');
   return cwd;
 }
 

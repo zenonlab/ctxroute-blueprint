@@ -114,6 +114,22 @@
       "**/*.gql"
     ]
   },
+  "documentation": {
+    "roots": [
+      "docs/",
+      "documentation/",
+      "specs/"
+    ],
+    "extensions": [
+      ".md",
+      ".markdown",
+      ".rst",
+      ".adoc",
+      ".asciidoc",
+      ".txt",
+      ".mmd"
+    ]
+  },
   "starter": {
     "infrastructureRoots": [
       ".codex/",
