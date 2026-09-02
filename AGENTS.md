@@ -26,6 +26,15 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Give one next action.
 - Briefly state the current status.
 
+## Progress
+
+- Before significant mutating work, read the checklist with `progress_status`.
+- Create and validate a bounded plan with `progress_validate_plan` before changing files.
+- Materialize a plan with `progress_approve_plan` only after explicit user approval.
+- Update each active step with `progress_update_step`; `DONE` requires short validation evidence.
+- Use the matching `npm run progress:*` command only when the project MCP is unavailable.
+- Start or restart the agent from the repository root so project-local MCP servers are loaded.
+
 ## Development
 
 - Read existing files before writing.

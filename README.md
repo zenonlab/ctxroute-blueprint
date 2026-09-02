@@ -131,9 +131,12 @@ The repository exposes two independent stdio servers:
 
 Codex reads [`.codex/config.toml`](.codex/config.toml); Claude reads
 [`.mcp.json`](.mcp.json). These project manifests never alter user-global
-configuration. A trusted client must approve project MCP servers. Restart the
-client if it has cached an older manifest, and use `/mcp` to inspect the loaded
-servers.
+configuration. Start Codex from the repository root (`codex -C /path/to/project`)
+so it discovers the local manifest; opening it from a parent directory and
+changing directories later does not load project MCP servers. A trusted client
+must approve project MCP servers. Restart the client after manifest changes,
+then use `/mcp` or `codex mcp list` from the repository root to confirm that
+`ctxroute-progress` is enabled.
 
 ```sh
 npm run mcp:validate
