@@ -48,6 +48,8 @@ ordinary Markdown links. Repository tests derive lifecycle expectations from
 the current project configuration or isolated fixtures, so adding a product
 diagram or progress checklist cannot make the pre-transition validation
 impossible.
+The transition invokes the exact npm CLI supplied by `npm run` through the
+current Node executable, avoiding direct `.cmd` execution on Windows.
 
 ## Alternatives
 

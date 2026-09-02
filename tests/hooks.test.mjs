@@ -46,6 +46,7 @@ test('initialize refuses an incomplete template without changing status', () => 
   const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], {
     cwd,
     encoding: 'utf8',
+    env: { ...process.env, npm_execpath: join(cwd, 'npm-cli.mjs') },
   });
   assert.equal(result.status, 1);
   assert.match(`${result.stdout}\n${result.stderr}`, /Initialization blocked/u);
@@ -55,7 +56,7 @@ test('initialize refuses an incomplete template without changing status', () => 
 test('initialize accepts completed documents containing Markdown links', () => {
   const cwd = initializationWorkspace({ incomplete: false });
   const configPath = join(cwd, '.project/project-config.json');
-  const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], { cwd, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], { cwd, encoding: 'utf8', env: { ...process.env, npm_execpath: join(cwd, 'npm-cli.mjs') } });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, 'initialized');
 });
@@ -759,7 +760,7 @@ function initializationWorkspace({ incomplete }) {
   writeFileSync(join(cwd, 'docs/00-project-brief.md'), incomplete ? '# Project brief\n\n[project name]\n' : '# Project brief\n\n[Reference](https://example.test)\n');
   writeFileSync(join(cwd, 'docs/01-technology-decisions.md'), '# Technology decisions\n\nComplete.\n');
   writeFileSync(join(cwd, 'docs/02-quality-strategy.md'), '# Quality strategy\n\nComplete.\n');
-  writeFileSync(join(cwd, 'package.json'), `${JSON.stringify({ private: true, scripts: { validate: 'node -e "process.exit(0)"' } }, null, 2)}\n`);
+  writeFileSync(join(cwd, 'npm-cli.mjs'), 'process.exit(process.argv.slice(2).join(" ") === "run validate" ? 0 : 1);\n');
   return cwd;
 }
 
