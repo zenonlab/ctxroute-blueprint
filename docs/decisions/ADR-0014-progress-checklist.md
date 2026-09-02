@@ -6,6 +6,9 @@ scope:
   - .project/progress.json
   - docs/progress.md
   - .claude/hooks/docs/progress-guidance.md
+  - AGENTS.md
+  - scripts/validate-mcp-installation.mjs
+  - tests/mcp-stdio.test.mjs
   - package.json
   - package-lock.json
 review: on-change
@@ -30,8 +33,15 @@ the same core and `DONE` requires short evidence. The CLI, MCP, and Stop hook
 call the same functions. Evidence is a short reference, never raw logs or
 conversation text. SQLite remains problem-memory storage only.
 
+`AGENTS.md` states the Progress lifecycle directly so it does not depend on a
+matching tool call for discovery. CTXRoute reinforces that lifecycle on all
+significant repository roots using its path-substring matching semantics. The
+CLI remains a fallback when the client did not load the project-scoped MCP.
+
 ## Consequences
 
 Validation is read-only and approval is a separate operation. The contract
 supports up to 20 goals, 30 steps per goal, and 10 evidence references per
 step, with a 64 KiB JSON limit. No hook edits the checklist automatically.
+Agents must start from the repository root and restart after MCP manifest
+changes because the client owns project-scoped server discovery and transport.

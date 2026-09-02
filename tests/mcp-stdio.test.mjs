@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,16 @@ test('project-local MCP manifests have exact server commands and disjoint tools'
   assert.equal(result.ok, true, result.errors.join('\n'));
   assert.deepEqual(result.servers, ['ctxroute-progress', 'code-review-graph']);
   assert.equal(result.contextProvider, 'code-review-graph@2.3.8');
+});
+
+test('Codex MCP validation rejects a server outside the repository root', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-config-'));
+  mkdirSync(join(fixture, '.codex'));
+  writeFileSync(join(fixture, '.mcp.json'), readFileSync(join(root, '.mcp.json')));
+  writeFileSync(join(fixture, '.codex/config.toml'), readFileSync(join(root, '.codex/config.toml'), 'utf8').replace('cwd = "."', 'cwd = ".."'));
+  const result = validateMcpInstallation(fixture);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /repository root/u);
 });
 
 test('a real stdio client lists and calls all Progress MCP tools', async () => {
@@ -45,12 +55,25 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
   });
 });
 
+test('the Codex npm command launches the real Progress MCP transport', { skip: process.platform === 'win32' }, async () => {
+  await withTransport({ command: 'npm', args: ['run', 'progress:mcp'], cwd: root }, async client => {
+    const listed = await client.listTools();
+    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
+    const status = await client.callTool({ name: 'progress_status', arguments: {} });
+    assert.notEqual(status.isError, true);
+  });
+});
+
 async function withClient(script, cwd, operation) {
-  const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
   const args = process.platform === 'win32'
     ? ['/d', '/c', process.execPath, script]
     : [script];
-  const transport = new StdioClientTransport({ command: nodeCommand, args, cwd, stderr: 'pipe', env: process.platform === 'win32' ? process.env : undefined });
+  return withTransport({ command: nodeCommand, args, cwd, env: process.platform === 'win32' ? process.env : undefined }, operation);
+}
+
+async function withTransport({ command, args, cwd, env }, operation) {
+  const client = new Client({ name: 'ctxroute-test-client', version: '1.0.0' });
+  const transport = new StdioClientTransport({ command, args, cwd, stderr: 'pipe', env });
   let stderr = '';
   transport.stderr?.on('data', chunk => { stderr += chunk; });
   try { await client.connect(transport); await operation(client); }

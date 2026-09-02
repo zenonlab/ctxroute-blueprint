@@ -19,6 +19,10 @@ export function validateMcpInstallation(root = process.cwd()) {
     if (claude[legacy] || codex.includes(`mcp_servers.${legacy}`)) errors.push(`Legacy MCP server ${legacy} must be removed.`);
   }
   if (Object.keys(claude).sort().join(',') !== Object.keys(expected).sort().join(',')) errors.push('Claude must declare exactly ctxroute-progress and code-review-graph.');
+  const codexServers = [];
+  for (const serverSection of codex.matchAll(/^\[mcp_servers\.([^\]]+)\]$/gmu)) codexServers.push(serverSection[1]);
+  codexServers.sort();
+  if (codexServers.join(',') !== Object.keys(expected).sort().join(',')) errors.push('Codex must declare exactly ctxroute-progress and code-review-graph.');
 
   for (const [name, script] of Object.entries(expected)) {
     const item = claude[name];
@@ -31,6 +35,7 @@ export function validateMcpInstallation(root = process.cwd()) {
     const section = codex.match(new RegExp(`\\[mcp_servers\\.${escaped}\\]([\\s\\S]*?)(?=\\n\\[|$)`, 'u'))?.[1] ?? '';
     if (!section) errors.push(`Codex MCP manifest is missing ${name}.`);
     else if (!/command\s*=\s*"npm"/u.test(section) || !new RegExp(`args\\s*=\\s*\\["run",\\s*"${script}"\\]`, 'u').test(section)) errors.push(`Codex ${name} must run npm run ${script}.`);
+    else if (!/^cwd\s*=\s*"\."\s*$/mu.test(section)) errors.push(`Codex ${name} must run from the repository root with cwd = ".".`);
   }
   if (!PROGRESS_TOOL_NAMES.every(name => name.startsWith('progress_'))) errors.push('Progress MCP responsibilities are mixed.');
   return { ok: errors.length === 0, servers: Object.keys(expected), progressTools: [...PROGRESS_TOOL_NAMES].sort(), contextProvider: 'code-review-graph@2.3.8', errors };

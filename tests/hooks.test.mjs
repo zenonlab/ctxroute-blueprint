@@ -636,6 +636,19 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.doesNotMatch(repeated.stdout, /Project governance/u);
 });
 
+test('CTXRoute injects Progress guidance across significant repository roots', () => {
+  for (const filePath of ['tests/example.test.mjs', '.githooks/example.mjs', 'docs/example.md', 'src/example.ts']) {
+    const session = `progress-guidance-${filePath}-${process.pid}-${Date.now()}`;
+    const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
+      cwd: root,
+      input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }),
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Agent progress checklist/u, filePath);
+  }
+});
+
 test('CTXRoute reinjects bounded context after PreCompact', () => {
   const session = `compact-${process.pid}-${Date.now()}`;
   const input = JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: '*** Update File: package.json' } });
