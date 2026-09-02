@@ -12,9 +12,9 @@ const root = () => mkdtempSync(join(tmpdir(), 'progress-'));
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('empty checklist is read-only and has stable shape', async () => { const directory = root(); assert.deepEqual(await readProgress(directory), emptyProgress()); assert.equal(existsSync(join(directory, '.project/progress.json')), false); });
-test('published template starts without maintainer progress or tracked plan artifacts', async () => {
+test('tracked progress is valid and its generated view stays synchronized', async () => {
   const progress = await readProgress(repositoryRoot);
-  assert.deepEqual(progress, emptyProgress());
+  assert.deepEqual(validateProgress(progress), []);
   assert.equal(readFileSync(join(repositoryRoot, 'docs/progress.md'), 'utf8'), renderProgress(progress));
   assert.deepEqual(readdirSync(join(repositoryRoot, '.project')).filter(name => name.endsWith('-plan.json')), []);
 });
