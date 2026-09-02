@@ -46,9 +46,11 @@ export async function progressContinuation(hookInput, options = {}) {
     const next = progressNext(progress, goal.id);
     if (next.complete) return null;
     const labels = next.next.map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
+    if (isExternallyBlocked(goal)) {
+      return { continue: true, systemMessage: `Goal ${goal.id} is blocked externally. Handoff:\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
+    }
     if (next.mode === 'autonomous') {
-      if (isExternallyBlocked(goal)) return { continue: true, systemMessage: `Goal ${goal.id} is blocked externally. Handoff:\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
-      return { decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu’avec des preuves complètes.\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
+      return { decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu'avec des preuves complètes.\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
     }
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);

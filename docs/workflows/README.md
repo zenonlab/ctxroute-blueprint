@@ -8,7 +8,9 @@ After approval, the agent may offer autonomous execution once; only explicit
 user confirmation activates it. In collaborative mode Stop returns a compact
 handoff with up to three next steps. In autonomous mode Stop requests
 continuation until every step is `DONE`, or hands off a documented external
-blocker. `stop_hook_active` prevents recursive continuation loops.
+blocker. In either mode, a goal whose unfinished steps are all `BLOCKED`
+produces a non-blocking handoff and never triggers another Stop loop or an
+autonomous-mode offer. `stop_hook_active` prevents recursive continuation loops.
 
 ## File change to CRG update
 
