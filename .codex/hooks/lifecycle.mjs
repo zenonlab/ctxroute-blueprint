@@ -103,16 +103,16 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
   return mergeOutputs(event, outputs, notices);
 }
 
-function applicableHandlers(plan, event, input) {
+export function applicableHandlers(plan, event, input) {
   if (event !== 'PreToolUse') return plan;
   let toolName;
   try { toolName = JSON.parse(input || '{}')?.tool_name; }
   catch { return plan; }
-  if (!toolName || /^(?:apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell|Read|read_file|readFile)$/iu.test(String(toolName))) return plan;
+  if (!toolName || /^(?:apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 
-function executeHandler(handler, input, root) {
+export function executeHandler(handler, input, root) {
   const result = spawnSync(process.execPath, [handler.path, ...handler.args], {
     cwd: root,
     env: ctxrouteEnvironment(root),
@@ -120,7 +120,7 @@ function executeHandler(handler, input, root) {
     encoding: 'utf8',
     timeout: 30_000,
   });
-  const stderr = String(result.stderr ?? '').trim();
+  const stderr = actionableStderr(result.stderr);
   if (result.error || (result.status !== 0 && result.status !== null)) {
     return { error: result.error?.message ?? `exit ${result.status}`, stderr, outputs: [] };
   }
@@ -132,6 +132,12 @@ function executeHandler(handler, input, root) {
   } catch {
     return { error: `invalid JSON output: ${stdout.slice(0, 160)}`, stderr, outputs: [] };
   }
+}
+
+export function actionableStderr(value) {
+  return String(value ?? '')
+    .replace(/^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n(?:\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n?)?/gmu, '')
+    .trim();
 }
 
 function ctxrouteEnvironment(root) {
