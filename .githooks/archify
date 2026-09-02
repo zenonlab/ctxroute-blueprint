@@ -18,7 +18,7 @@ if (command === 'restore') {
   run(process.execPath, [cli, 'doctor']);
 }
 else if (command === 'verify') { verify(); run(process.execPath, [cli, 'doctor']); }
-else if (['validate', 'build', 'visual-check', 'preview'].includes(command)) { verify(); executeDiagrams(command, process.argv[3] ?? 'all'); }
+else if (['validate', 'build', 'visual-check', 'preview'].includes(command)) { verify(); executeDiagrams(command, process.argv[3] ?? 'all', process.argv.slice(4)); }
 else if (command === 'updates') { verify(); run(process.execPath, [join(skill, 'scripts', 'check-update.mjs')]); }
 else fail(`Unknown Archify command: ${command}`);
 
@@ -42,8 +42,10 @@ function verifyInstalled(pin, remote = false) {
     if (!hashes.includes(pin.tagObject) || !hashes.includes(pin.commit)) fail('Archify remote tag object or peeled commit does not match the reviewed pin.');
   }
 }
-function executeDiagrams(action, selector) {
+function executeDiagrams(action, selector, options = []) {
   if (selector === 'internal' && action !== 'validate') fail('Internal blueprint diagrams are validation-only and cannot be built, previewed, or visually published.');
+  if (options.length && action !== 'preview') fail(`${action} does not accept preview options.`);
+  if (options.some(option => option !== '--no-open')) fail(`Unknown preview option: ${options.find(option => option !== '--no-open')}`);
   let diagrams;
   try { diagrams = selectArchifyDiagrams(selector, root); }
   catch (error) { fail(error.message); }
@@ -63,7 +65,7 @@ function executeDiagrams(action, selector) {
     if (action === 'validate') run(process.execPath, [cli, 'validate', diagram.type, source, '--quality', 'showcase', '--json']);
     if (action === 'build') run(process.execPath, [cli, 'deliver', diagram.type, source, output, '--quality', 'showcase', '--json']);
     if (action === 'visual-check') run(process.execPath, [cli, 'visual-check', output, '--json']);
-    if (action === 'preview') run(process.execPath, [cli, 'preview', diagram.type, source, output, '--quality', 'showcase']);
+    if (action === 'preview') run(process.execPath, [cli, 'preview', diagram.type, source, output, '--quality', 'showcase', ...options]);
   }
 }
 function json(path) { try { return JSON.parse(readFileSync(join(root, path), 'utf8')); } catch { fail(`${path} is missing or invalid.`); } }

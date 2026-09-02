@@ -16,7 +16,7 @@ test('published template starts without maintainer progress or tracked plan arti
   const progress = await readProgress(repositoryRoot);
   assert.deepEqual(progress, emptyProgress());
   assert.equal(readFileSync(join(repositoryRoot, 'docs/progress.md'), 'utf8'), renderProgress(progress));
-  assert.deepEqual(readdirSync(join(repositoryRoot, '.project')).filter(name => /-plan\.json$/u.test(name)), []);
+  assert.deepEqual(readdirSync(join(repositoryRoot, '.project')).filter(name => name.endsWith('-plan.json')), []);
 });
 test('validate-plan is read-only and rejects missing acceptance, files, commands, evidence', async () => { const directory = root(); const result = validatePlan({ goalId: 'goal-9', title: 'Bad', steps: [{ id: 'step-1', title: 'Bad' }] }, await readProgress(directory)); assert.equal(result.ok, false); assert.equal(existsSync(join(directory, '.project/progress.json')), false); assert.ok(result.errors.length >= 4); });
 test('approval writes JSON and generated Markdown atomically and is idempotent', async () => { const directory = root(); const first = await approvePlan({ ...plan(), approved: true }, directory); const json = readFileSync(join(directory, '.project/progress.json'), 'utf8'); const markdown = readFileSync(join(directory, 'docs/progress.md'), 'utf8'); assert.deepEqual(JSON.parse(json), first); assert.match(markdown, /Checklist — ACTIVE/u); const second = await approvePlan({ ...plan(), approved: true }, directory); assert.deepEqual(second, first); });

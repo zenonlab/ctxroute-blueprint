@@ -27,33 +27,33 @@ export function normalizeStructuralMessage(value) {
 
 export function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === 'object') {
+  if (value && value === Object(value)) {
     return Object.fromEntries(Object.entries(value)
       .filter(([key]) => !/^(?:time|timestamp|session|request|run|duration|pid)(?:_|$)/iu.test(key))
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, item]) => [key, canonicalize(item)]));
   }
-  return typeof value === 'string' ? normalizeText(value) : value;
+  return value === String(value) ? normalizeText(value) : value;
 }
 
 function redactEvidence(value, depth = 0) {
   if (depth > 4) return '<depth-limit>';
   if (Array.isArray(value)) return value.slice(0, 20).map(item => redactEvidence(item, depth + 1));
-  if (value && typeof value === 'object') {
+  if (value && value === Object(value)) {
     return Object.fromEntries(Object.entries(value)
       .filter(([key]) => !/(?:password|secret|token|authorization|cookie|api[_-]?key|private[_-]?key)/iu.test(key))
       .slice(0, 40)
       .map(([key, item]) => [key, redactEvidence(item, depth + 1)]));
   }
-  return typeof value === 'string' ? value.slice(0, 2000) : value;
+  return value === String(value) ? value.slice(0, 2000) : value;
 }
 
 export function extractObservation(input, event) {
   let value = input;
-  if (typeof input === 'string') {
+  if (input === String(input)) {
     try { value = JSON.parse(input); } catch { value = { raw: input }; }
   }
-  if (!value || typeof value !== 'object') return null;
+  if (!value || value !== Object(value)) return null;
 
   const explicit = value.problem ?? value.problem_detected;
   const result = value.tool_result ?? value.tool_response ?? value.result ?? value.error ?? value.failure;
@@ -64,7 +64,7 @@ export function extractObservation(input, event) {
   const userReported = event === 'UserPromptSubmit' && (explicit || value.problemDetected === true);
   if (!failed && !userReported) return null;
 
-  const details = typeof explicit === 'object' ? explicit : {};
+  const details = explicit === Object(explicit) ? explicit : {};
   const message = details.message ?? value.error_message ?? value.error ?? value.failure ?? result?.error
     ?? value.message ?? value.prompt ?? value.raw ?? 'unspecified problem';
   const tool = value.tool_name ?? value.tool ?? details.tool ?? 'user';
@@ -109,7 +109,7 @@ export function buildSignatures(observation) {
 }
 
 function fieldText(value) {
-  if (value && typeof value === 'object') {
+  if (value && value === Object(value)) {
     try { return JSON.stringify(value).slice(0, MAX_FIELD_LENGTH); } catch { return '[unserializable]'; }
   }
   return String(value ?? '').slice(0, MAX_FIELD_LENGTH);
@@ -156,7 +156,7 @@ export class ProblemStore {
   }
 
   resolve(problemId, resolution, now = new Date().toISOString()) {
-    if (!resolution || typeof resolution !== 'object' || !resolution.type || !resolution.summary) {
+    if (!resolution || resolution !== Object(resolution) || !resolution.type || !resolution.summary) {
       throw new TypeError('A resolution requires type and summary');
     }
     const result = this.database.prepare(`UPDATE problems SET resolution_json = ?, protection_status = ?, last_seen = ? WHERE id = ?`)
@@ -227,7 +227,7 @@ export function validateInstructionPaths(paths) {
     throw new TypeError('Instruction paths must contain at least one repository-relative file');
   }
   return paths.map(path => {
-    if (typeof path !== 'string') throw new TypeError('Instruction paths must be strings');
+    if (path !== String(path)) throw new TypeError('Instruction paths must be strings');
     const normalized = path.trim().replace(/\\/gu, '/');
     if (!normalized || normalized === '.' || normalized.endsWith('/') || normalized.includes('*')
       || normalized.startsWith('/') || normalized.startsWith('//') || /^[A-Za-z]:\//u.test(normalized)
@@ -243,7 +243,7 @@ export function validateInstructionTools(tools) {
     throw new TypeError('Instruction tools must contain at least one exact CTXRoute tool');
   }
   return tools.map(tool => {
-    if (typeof tool !== 'string' || !tool.trim() || tool.trim() === '*' || /[\r\n]/u.test(tool)) {
+    if (tool !== String(tool) || !tool.trim() || tool.trim() === '*' || /[\r\n]/u.test(tool)) {
       throw new TypeError('Instruction tools must be non-empty exact tool names');
     }
     return tool.trim();

@@ -1,27 +1,30 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { optionalParserStatus, SENSOR_ADAPTERS, SENSOR_COVERAGE } from './sensor-engine.mjs';
+import { grammarStatus, SENSOR_COVERAGE } from './sensor-engine.mjs';
+import { CATALOG_VERSION } from './ast-registry.mjs';
 
 export function runChecklist(root = process.cwd()) {
-  const hasExtension = extension => SENSOR_ADAPTERS.some(adapter => adapter.extensions.includes(extension));
-  const optionalParsers = optionalParserStatus().map(parser => ({ id: parser.id, package: parser.package, mode: parser.mode, available: parser.available, fallback: parser.fallback, fallbackReason: parser.fallbackReason }));
-  const adapters = SENSOR_ADAPTERS.map(adapter => ({ id: adapter.id, language: adapter.language, mode: adapter.mode, grammar: adapter.package, variant: adapter.variant, extractor: adapter.extractor, fallbackAllowed: adapter.fallbackAllowed, ...(adapter.filenames.length ? { filenames: [...adapter.filenames] } : {}), extensions: [...adapter.extensions], status: 'PASS' }));
+  const statuses = grammarStatus();
+  const adapters = statuses.map(item => ({ ...item, extensions: [...item.extensions], filenames: [...item.filenames] }));
+  const extensionCount = new Set(adapters.flatMap(item => item.extensions)).size;
+  const filenameCount = new Set(adapters.flatMap(item => item.filenames)).size;
+  const project = readJson(resolve(root, '.project/project-config.json'));
+  const configured = project?.quality?.sensor?.languages ?? [];
+  const configuredStatuses = configured.map(id => adapters.find(item => item.id === id)).filter(Boolean);
   const checks = [
-    check('adapter-registry', SENSOR_ADAPTERS.length > 0, `${SENSOR_ADAPTERS.length} adapters`),
-    check('rust', hasExtension('.rs'), 'Rust'),
-    check('ruby-rails', hasExtension('.rb') && hasExtension('.erb') && hasExtension('.haml') && hasExtension('.slim'), 'Ruby / Rails templates'),
-    check('template-families', hasExtension('.heex') && SENSOR_ADAPTERS.some(adapter => adapter.id === 'template'), 'Phoenix / Blade / common templates'),
-    check('ruby-grammars', optionalParsers.every(parser => parser.available), optionalParsers.map(parser => `${parser.id}: ${parser.available ? parser.mode : `${parser.fallback}; ${parser.fallbackReason}`}`).join(', ')),
-    check('toml', hasExtension('.toml'), 'TOML'),
-    check('common-config', ['.json', '.yaml', '.yml', '.xml'].every(hasExtension), 'JSON/YAML/XML'),
+    check('catalog-classification', extensionCount === 115 && filenameCount === 9, `${extensionCount} extensions / ${filenameCount} filenames`),
+    check('no-false-pass', adapters.every(item => item.status !== 'PASS' || item.syntaxAware), `${adapters.filter(item => item.status === 'PASS').length} syntax-aware PASS / ${adapters.filter(item => item.status === 'PARTIAL').length} PARTIAL / ${adapters.filter(item => item.status === 'MISSING').length} MISSING`),
+    check('configured-languages', configured.length > 0 && configuredStatuses.length === configured.length, configured.join(', ')),
+    check('configured-parsers', configuredStatuses.every(item => item.syntaxAware), configuredStatuses.map(item => `${item.id}: ${item.status}`).join(', ')),
     check('bounded-module-scope', SENSOR_COVERAGE.moduleScope === 'explicit-paths' && SENSOR_COVERAGE.packageResolution === 'disabled' && !SENSOR_COVERAGE.wholeProgramAnalysis, SENSOR_COVERAGE.moduleScope),
     check('runtime-rate-limit', SENSOR_COVERAGE.rateLimitRuntimeProof === false, 'heuristic only'),
     check('rules', existsSync(resolve(root, '.project/sensor-rules.json')), '.project/sensor-rules.json'),
     check('architecture', existsSync(resolve(root, 'docs/architecture/src/blueprint.architecture.json')), 'Archify source'),
-    check('tests', existsSync(resolve(root, 'tests/sensor.test.mjs')) && existsSync(resolve(root, 'tests/post-tool-sensor.test.mjs')), 'unit + hook integration'),
+    check('tests', existsSync(resolve(root, 'tests/sensor.test.mjs')) && existsSync(resolve(root, 'tests/sensor-languages.test.mjs')), 'engine + language packs'),
   ];
-  return { schemaVersion: 1, status: checks.every(item => item.status === 'PASS') ? 'PASS' : 'FAIL', adapters, optionalParsers, checks };
+  return { schemaVersion: 2, catalogVersion: CATALOG_VERSION, status: checks.every(item => item.status === 'PASS') ? 'PASS' : 'FAIL', adapters, configured, checks };
 }
 
 export function formatChecklist(result) { return ['Sensor checklist', ...result.checks.map(item => `[${item.status}] ${item.name}: ${item.detail}`), `Result: ${result.status}`].join('\n'); }
-function check(name, passed, detail) { return { name, status: passed ? 'PASS' : 'FAIL', detail }; }
+function check(name, passed, detail) { return { name, status: passed ? 'PASS' : 'MISSING', detail }; }
+function readJson(path) { try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; } }

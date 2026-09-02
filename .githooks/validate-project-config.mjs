@@ -10,7 +10,7 @@ const packageJson = readJson('package.json', indexMode) ?? { scripts: {} };
 
 if (config) {
   for (const [name, command] of Object.entries(config.commands ?? {})) {
-    if (typeof command !== 'string' || !command.trim()) continue;
+    if (command !== String(command) || !command.trim()) continue;
     const npmScript = command.trim().match(/^npm(?:\s+run)?\s+([^\s]+)/u)?.[1];
     if (npmScript) {
       if (!packageJson.scripts?.[npmScript]) failures.push(`commands.${name}: npm script "${npmScript}" does not exist`);

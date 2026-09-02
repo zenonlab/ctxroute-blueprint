@@ -7,13 +7,13 @@ import { AST_REGISTRY, grammarStatus } from '../.githooks/ast-registry.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('one registry declares language, grammar, extractor, availability, and fallback policy', () => {
+test('one registry declares language, parser, capability, and fallback policy', () => {
   for (const item of AST_REGISTRY) {
-    for (const key of ['language', 'extensions', 'filenames', 'package', 'variant', 'mode', 'extractor', 'available', 'fallbackAllowed', 'fallbackReason']) assert.equal(key in item, true, `${item.id}.${key}`);
+    for (const key of ['language', 'extensions', 'filenames', 'package', 'version', 'variant', 'mode', 'extractor', 'parserKind', 'support', 'capabilities', 'fallbackAllowed', 'fallbackReason']) assert.equal(key in item, true, `${item.id}.${key}`);
   }
   const status = grammarStatus();
-  for (const language of ['javascript', 'typescript', 'tsx', 'python', 'ruby', 'erb']) assert.equal(status.find(item => item.language === language)?.available, true, language);
-  assert.equal(status.find(item => item.extensions.includes('.php')).mode, 'lexical');
+  for (const language of ['javascript', 'typescript', 'tsx', 'python', 'ruby', 'erb', 'json']) assert.equal(status.find(item => item.id === language)?.status, 'PASS', language);
+  assert.equal(status.find(item => item.extensions.includes('.php')).status, 'MISSING');
 });
 
 test('the AST runtime pipeline cannot import or call LLM and network clients', () => {

@@ -136,13 +136,13 @@ function extractPaths(value) {
   return [...paths].map(path => normalizePath(path)).filter(Boolean);
 
   function visit(current, key) {
-    if (typeof current === 'string') {
+    if (current === String(current)) {
       if (/^(?:file_?path|path|filename)$/iu.test(key) && !current.includes('\n')) paths.add(current);
       for (const match of current.matchAll(/\*\*\*\s+(?:Add|Update|Delete)\s+File:\s*([^\n]+)/giu)) paths.add(match[1].trim().replace(/^['"]|['"]$/gu, ''));
       return;
     }
     if (Array.isArray(current)) return current.forEach(item => visit(item, key));
-    if (current && typeof current === 'object') {
+    if (current && current === Object(current)) {
       for (const [childKey, child] of Object.entries(current)) visit(child, childKey);
     }
   }
@@ -154,9 +154,9 @@ function addedContent(value) {
   return strings.join('\n');
 
   function visit(current) {
-    if (typeof current === 'string') return strings.push(current);
+    if (current === String(current)) return strings.push(current);
     if (Array.isArray(current)) return current.forEach(visit);
-    if (current && typeof current === 'object') Object.values(current).forEach(visit);
+    if (current && current === Object(current)) Object.values(current).forEach(visit);
   }
 }
 
@@ -165,8 +165,8 @@ function hasStructuralSignal(content) {
 }
 
 function commandText(value) {
-  if (typeof value === 'string') return value;
-  return typeof value?.cmd === 'string' ? value.cmd : typeof value?.command === 'string' ? value.command : '';
+  if (value === String(value)) return value;
+  return value?.cmd === String(value?.cmd) ? value.cmd : value?.command === String(value?.command) ? value.command : '';
 }
 
 function isShellTool(name) {

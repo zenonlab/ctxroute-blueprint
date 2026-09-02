@@ -32,20 +32,19 @@ common Phoenix, Blade, Jinja, Twig, Tera, Handlebars, Liquid, EJS, Pug, Razor,
 and JSP templates. Additional languages require an explicit registry entry and
 tests.
 
-The repository exposes `node .githooks/sensor --checklist` as a read-only CLI. It reports
+The repository exposes `npm run sensor:checklist` as a read-only CLI. It reports
 the registry, bounded analysis contract, required configuration, architecture,
 and test evidence in human-readable or `--json` form. It does not modify files,
 permissions, hooks, or global configuration.
 
 ## Consequences
 
-PostToolUse recognizes the same registry extensions as the CLI. Ruby and ERB
-use the required Tree-sitter Ruby grammar; a clearly labelled lexical fallback
-is permitted only if that grammar is genuinely unavailable. PHP remains
-lexical. Lexical support only masks comments and strings before a small
-high-confidence check; it does not claim a grammar, type analysis, SQL
-dataflow, or runtime behavior proof. Unsupported extensions still produce
-explicit `ERROR` when passed directly to the Sensor.
+PostToolUse recognizes the same catalogue as the CLI. `PASS` is now computed
+from an actually loaded parser; lexical and extractor coverage is `PARTIAL`,
+and unverified entries are `MISSING`. Ruby and ERB use the required Tree-sitter
+Ruby grammar. PHP is recognized but remains `MISSING`, with lexical fallback
+available only for an ad hoc file. Fallback checks do not claim a grammar,
+type analysis, SQL dataflow, or runtime behavior proof.
 
 Official code-review-graph maintains its own parser and graph for context. It
 does not share this registry and cannot replace or bypass the Sensor gate.

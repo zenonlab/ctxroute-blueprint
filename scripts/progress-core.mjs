@@ -29,7 +29,7 @@ function inspectProgressChecklist(value) {
     if (!isId(goal?.id) || goalIds.has(goal.id)) errors.push('goal ids must be unique safe identifiers'); goalIds.add(goal?.id);
     if (!text(goal?.title)) errors.push(`goal ${goal?.id ?? '(missing)'} needs a title`);
     if (goal?.executionMode !== undefined && !EXECUTION_MODES.includes(goal.executionMode)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid executionMode`);
-    if (goal?.modeOffered !== undefined && typeof goal.modeOffered !== 'boolean') errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid modeOffered`);
+    if (goal?.modeOffered !== undefined && (goal.modeOffered !== true && goal.modeOffered !== false)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid modeOffered`);
     if (!Array.isArray(goal?.steps) || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs at most ${LIMITS.steps} steps`); continue; }
     const stepIds = new Set();
     for (const step of goal.steps) {
@@ -50,7 +50,7 @@ export const validateProgress = inspectProgressChecklist;
 
 export function validatePlan(plan, current = emptyProgress()) {
   const errors = [];
-  if (!plan || typeof plan !== 'object') return { ok: false, errors: ['plan must be an object'] };
+  if (!plan || plan !== Object(plan)) return { ok: false, errors: ['plan must be an object'] };
   const goalId = plan.goalId ?? plan.id;
   if (!isId(goalId)) errors.push('plan requires a safe goalId');
   if (!text(plan.title)) errors.push('plan requires a title');
@@ -130,9 +130,9 @@ export function renderProgress(value) {
 }
 function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode: 'collaborative', modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
 function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: goal.title, status: goal.status, executionMode: goal.executionMode ?? 'collaborative', modeOffered: goal.modeOffered ?? false, steps: goal.steps }; }
-function isId(value) { return typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
-function text(value) { return typeof value === 'string' && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
-function shortReference(value) { return typeof value === 'string' && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && ![...value].some(character => character.codePointAt(0) <= 31); }
+function isId(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
+function text(value) { return value === String(value) && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
+function shortReference(value) { return value === String(value) && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && ![...value].some(character => character.codePointAt(0) <= 31); }
 function safePath(value) {
   if (!shortReference(value) || isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]+/u).includes('..')) return false;
   const normalized = value.replaceAll('\\', '/');

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { catalogEntry, registryEntry } from './ast-registry.mjs';
 
 export const DEFAULT_CONFIG_PATH = '.project/project-config.json';
 
@@ -55,20 +56,35 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
   }
   if (config.status === 'template') validateStarterStructure(config, cwd, failures);
   if (!Array.isArray(config.codeExtensions)) failures.push('codeExtensions must be an array');
-  else if (config.codeExtensions.some(extension => typeof extension !== 'string' || !/^\.[a-z0-9][a-z0-9.+-]*$/iu.test(extension))) failures.push('codeExtensions must contain extensions such as .ts or .rb');
-  if (!Array.isArray(config.contracts?.patterns) || config.contracts.patterns.some(pattern => typeof pattern !== 'string' || !pattern.trim())) failures.push('contracts.patterns must be an array of non-empty patterns');
+  else if (config.codeExtensions.some(extension => extension !== String(extension) || !/^\.[a-z0-9][a-z0-9.+-]*$/iu.test(extension))) failures.push('codeExtensions must contain extensions such as .ts or .rb');
+  if (!Array.isArray(config.contracts?.patterns) || config.contracts.patterns.some(pattern => pattern !== String(pattern) || !pattern.trim())) failures.push('contracts.patterns must be an array of non-empty patterns');
 
   for (const [name, command] of Object.entries(config.commands ?? {})) {
-    if (command !== null && (typeof command !== 'string' || !command.trim())) failures.push(`commands.${name} must be a non-empty command or null`);
+    if (command !== null && (command !== String(command) || !command.trim())) failures.push(`commands.${name} must be a non-empty command or null`);
   }
 
   const mutation = config.quality?.mutation;
-  if (mutation && (typeof mutation.preCommit !== 'boolean' || typeof mutation.prePush !== 'boolean')) failures.push('quality.mutation.preCommit and prePush must be booleans');
+  if (mutation && ((mutation.preCommit !== true && mutation.preCommit !== false) || (mutation.prePush !== true && mutation.prePush !== false))) failures.push('quality.mutation.preCommit and prePush must be booleans');
   if ((mutation?.preCommit || mutation?.prePush) && !config.commands?.mutation) failures.push('commands.mutation is required when a mutation hook is enabled');
+
+  const sensor = config.quality?.sensor;
+  if (sensor !== undefined) {
+    if (!sensor || Object.prototype.toString.call(sensor) !== '[object Object]') failures.push('quality.sensor must be an object');
+    else {
+      if (!Array.isArray(sensor.languages) || sensor.languages.length === 0 || sensor.languages.some(language => Object.prototype.toString.call(language) !== '[object String]' || !catalogEntry(language))) failures.push('quality.sensor.languages must contain known catalogue identifiers');
+      if (new Set(sensor.languages ?? []).size !== (sensor.languages ?? []).length) failures.push('quality.sensor.languages must not contain duplicates');
+      if (!['auto', 'enabled', 'disabled'].includes(sensor.antiSlopEffect)) failures.push('quality.sensor.antiSlopEffect must be auto, enabled, or disabled');
+      for (const extension of config.codeExtensions ?? []) {
+        const item = registryEntry(`fixture${extension}`);
+        const accepted = item?.id === 'tsx' ? ['tsx', 'typescript'] : item?.id === 'erb' ? ['erb', 'ruby'] : item ? [item.id] : [];
+        if (!item || !accepted.some(id => sensor.languages.includes(id))) failures.push(`codeExtensions ${extension} requires a declared Sensor language`);
+      }
+    }
+  }
 
   if (config.status === 'initialized') {
     for (const field of ['language', 'runtime', 'frontend', 'backend', 'storage', 'deployment', 'observability', 'security', 'performance']) {
-      if (typeof config.decisions?.[field] !== 'string' || !config.decisions[field].trim()) failures.push(`decisions.${field} must be set after initialization`);
+      if (config.decisions?.[field] !== String(config.decisions?.[field]) || !config.decisions[field].trim()) failures.push(`decisions.${field} must be set after initialization`);
     }
     if (!Array.isArray(config.directories?.source) || config.directories.source.length === 0) failures.push('directories.source must be set after initialization');
     if (!Array.isArray(config.codeExtensions) || config.codeExtensions.length === 0) failures.push('codeExtensions must be set after initialization');
@@ -85,7 +101,7 @@ export function inspectProjectConfig(config, cwd = process.cwd(), policy = { sup
 export const validateProjectConfig = inspectProjectConfig;
 
 export function normalizePath(path, cwd = process.cwd()) {
-  if (typeof path !== 'string') return '';
+  if (path !== String(path)) return '';
   const normalized = path.trim().replace(/\\/gu, '/').replace(/^\.\//u, '');
   if (!normalized) return '';
   if (isAbsolute(normalized)) return relative(cwd, normalized).replace(/\\/gu, '/');
@@ -149,7 +165,7 @@ export function isIgnoredPath(path, cwd = process.cwd()) {
 }
 
 function requireObject(value, name, failures) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) failures.push(`${name} must be an object`);
+  if (!value || value !== Object(value) || Array.isArray(value)) failures.push(`${name} must be an object`);
 }
 
 function validatePaths(name, values, failures) {
@@ -176,7 +192,7 @@ function validateStarterStructure(config, cwd, failures) {
 }
 
 function isValidProjectPath(value) {
-  return typeof value === 'string' && Boolean(value.trim()) && !isAbsolute(value) && !value.replace(/\\/gu, '/').split('/').includes('..');
+  return value === String(value) && Boolean(value.trim()) && !isAbsolute(value) && !value.replace(/\\/gu, '/').split('/').includes('..');
 }
 
 function pathKind(path) {

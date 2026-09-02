@@ -1,10 +1,15 @@
 import Parser from 'tree-sitter';
-import { adapterMetadata, extractEmbeddedSource, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
-import { readFileSync } from 'node:fs';
+import { adapterMetadata, catalogEntry, extractEmbeddedSource, grammarStatus, resolveRegistryEntry, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, extname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { normalizeTree } from './sensor-ir.mjs';
 
 const rank = { SAFE: 0, WARN: 1, UNSAFE: 2, ERROR: 3 };
-export { AST_REGISTRY, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
+const sensorRoot = fileURLToPath(new URL('..', import.meta.url));
+export { AST_REGISTRY, grammarStatus, SENSOR_ADAPTERS, SENSOR_OPTIONAL_PARSERS } from './ast-registry.mjs';
 const adapterByExtension = new Map(SENSOR_ADAPTERS.flatMap(adapter => adapter.extensions.map(extension => [extension, adapter.id])));
 const adapterByFilename = new Map(SENSOR_ADAPTERS.flatMap(adapter => (adapter.filenames ?? []).map(filename => [filename, adapter.id])));
 export const SENSOR_COVERAGE = Object.freeze({
@@ -49,20 +54,98 @@ export function toSarif(result) {
 
 export function analyzePaths(paths, { root = process.cwd(), config = defaultConfig(root) } = {}) {
   const diagnostics = [];
+  const files = [];
   const configurationErrors = validateConfig(config);
   if (configurationErrors.length) {
     diagnostics.push(...configurationErrors);
-    return sensorResult('ERROR', diagnostics);
+    return sensorResult('ERROR', diagnostics, files);
+  }
+  for (const id of config.languages ?? []) {
+    const language = catalogEntry(id);
+    const status = language && grammarStatus().find(item => item.id === language.id);
+    if (!language) diagnostics.push(diagnostic('.project/project-config.json', null, 'sensor/unknown-language', 'ERROR', `Unknown configured Sensor language: ${id}.`));
+    else if (!status?.syntaxAware) {
+      const installable = Boolean(language.package && language.support === 'stable' && language.qualification?.parserLoaded);
+      const action = installable ? ` Run: npm run sensor:languages -- install ${language.id}` : '';
+      diagnostics.push(diagnostic('.project/project-config.json', null, 'sensor/parser-required', 'ERROR', `Parser required for ${language.id} is unavailable.${action || ` ${language.fallbackReason}`}`));
+    }
   }
   if (!paths.length) diagnostics.push(diagnostic('', null, 'sensor/no-input', 'ERROR', 'At least one source path is required.'));
   const uniquePaths = [...new Set(paths)];
   const scannedFiles = new Set(uniquePaths.map(path => resolve(root, path)));
   const sourceCache = new Map();
   const sharedState = { root, scannedFiles, sourceCache, sqlExports: collectDynamicExports(uniquePaths, root, sourceCache) };
-  for (const path of [...uniquePaths].sort()) analyzePath(path, root, config, diagnostics, sharedState);
+  for (const path of [...uniquePaths].sort()) analyzePath(path, root, config, diagnostics, files, sharedState);
+  diagnostics.push(...runOfficialAntiSlop(uniquePaths, root));
   const stableDiagnostics = dedupeDiagnostics(diagnostics).sort((a, b) => String(a.path).localeCompare(String(b.path)) || a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
   const verdict = stableDiagnostics.reduce((current, item) => rank[item.severity] > rank[current] ? item.severity : current, 'SAFE');
-  return sensorResult(verdict, stableDiagnostics);
+  return sensorResult(verdict, stableDiagnostics, files);
+}
+
+function runOfficialAntiSlop(paths, root) {
+  const direct = paths.filter(path => !path.replaceAll('\\', '/').includes('tools/oxlint/anti-slop/') && ['javascript', 'typescript', 'tsx'].includes(resolveRegistryEntry(path)?.id)).map(path => ({ candidate: resolve(root, path), path, source: null, offset: 0 })).filter(item => existsSync(item.candidate));
+  const workspace = mkdtempSync(resolve(tmpdir(), 'sensor-anti-slop-'));
+  const embedded = [];
+  try {
+    for (const path of paths.filter(item => ['vue', 'svelte', 'astro', 'html', 'template', 'blade', 'notebook'].includes(resolveRegistryEntry(item)?.id))) {
+      const source = readFileSync(resolve(root, path), 'utf8');
+      for (const [index, unit] of extractAntiSlopUnits(path, source).entries()) {
+        const candidate = resolve(workspace, `${embedded.length}-${index}${unit.extension}`);
+        writeFileSync(candidate, unit.code);
+        embedded.push({ candidate, path, source, offset: unit.offset });
+      }
+    }
+    const units = [...direct, ...embedded];
+    if (!units.length) return [];
+    return runAntiSlopUnits(units);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+}
+
+function runAntiSlopUnits(units) {
+  const executable = resolve(sensorRoot, 'node_modules', 'oxlint', 'bin', 'oxlint');
+  const configPath = resolve(sensorRoot, 'oxlint.config.ts');
+  if (!existsSync(executable) || !existsSync(configPath)) return [diagnostic('', null, 'sensor/anti-slop-unavailable', 'ERROR', 'Official anti-slop dependencies are unavailable; run npm run sensor:languages -- sync.')];
+  const result = spawnSync(process.execPath, [executable, '--config', configPath, '--format', 'json', '--quiet', ...units.map(item => item.candidate)], { cwd: sensorRoot, encoding: 'utf8' });
+  let report;
+  try { report = JSON.parse(result.stdout); }
+  catch { return [diagnostic('', null, 'sensor/anti-slop-failed', 'ERROR', `Official anti-slop failed: ${(result.stderr || result.stdout || `status ${result.status}`).trim()}`)]; }
+  const byCandidate = new Map(units.map(item => [resolve(item.candidate), item]));
+  return (report.diagnostics ?? []).filter(item => /^(?:anti-slop|anti-slop-effect)\(/u.test(item.code)).map(item => {
+    const label = item.labels?.[0]?.span ?? {};
+    const rule = item.code.replace(/^([^()]+)\(([^()]+)\)$/u, '$1/$2');
+    const unit = byCandidate.get(resolve(item.filename));
+    const displayedPath = unit?.path ?? item.filename;
+    const mapped = unit?.source ? lineDiagnostic(displayedPath, unit.source, unit.offset + sourceOffsetForPosition(readFileSync(unit.candidate, 'utf8'), label.line ?? 1, label.column ?? 1), rule, 'ERROR', item.message) : { ...diagnostic(displayedPath, null, rule, 'ERROR', item.message), line: label.line ?? 1, column: label.column ?? 1 };
+    return { ...mapped, adapter: 'anti-slop', mode: 'oxlint', grammar: null, fallback: null, fallbackReason: null };
+  });
+}
+
+function extractAntiSlopUnits(path, source) {
+  const units = [];
+  const registryId = resolveRegistryEntry(path)?.id;
+  if (registryId === 'astro') {
+    const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---/u.exec(source);
+    if (frontmatter) units.push({ code: frontmatter[1], extension: '.ts', offset: frontmatter.index + frontmatter[0].indexOf(frontmatter[1]) });
+  }
+  for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)) units.push({ code: match[2], extension: /\blang\s*=\s*["'](?:ts|typescript|tsx)["']/iu.test(match[1]) ? '.ts' : '.js', offset: match.index + match[0].indexOf(match[2]) });
+  if (registryId === 'notebook') {
+    try {
+      const notebook = JSON.parse(source);
+      const language = String(notebook.metadata?.kernelspec?.language ?? notebook.metadata?.language_info?.name ?? '').toLowerCase();
+      if (/^(?:javascript|typescript|node)$/u.test(language)) {
+        let cursor = 0;
+        for (const cell of notebook.cells ?? []) if (cell?.cell_type === 'code') {
+          const fragments = Array.isArray(cell.source) ? cell.source : [String(cell.source ?? '')];
+          const token = JSON.stringify(fragments[0] ?? '').slice(1, -1);
+          const found = token ? source.indexOf(token, cursor) : cursor;
+          const offset = found < 0 ? cursor : found;
+          cursor = offset + token.length;
+          units.push({ code: fragments.join(''), extension: language === 'typescript' ? '.ts' : '.js', offset });
+        }
+      }
+    } catch { /* structured analysis emits the authoritative JSON error */ }
+  }
+  return units;
 }
 
 export function analyzeSource(path, source, { config = {}, state, grammarLoader } = {}) {
@@ -76,7 +159,8 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
     operation();
     for (let index = start; index < diagnostics.length; index += 1) Object.assign(diagnostics[index], metadata);
   };
-  if (resolved?.grammar) {
+  if (resolved?.parserKind === 'structured' && registryId === 'json') run(() => analyzeJson(path, source, diagnostics), { mode: 'structured', grammar: 'node:json', fallback: null, fallbackReason: null });
+  else if (resolved?.grammar) {
     if (registryId === 'erb') run(() => analyzeHtml(path, source.replace(/<%[\s\S]*?%>/gu, match => match.replace(/[^\n\r]/gu, ' ')), diagnostics), { mode: 'embedded', grammar: null, fallback: null, fallbackReason: null });
     const parserSource = extractEmbeddedSource(resolved, source);
     run(() => analyzeAst(path, source, parserSource, resolved, config, diagnostics, state), { mode: resolved.mode, grammar: resolved.package, fallback: null, fallbackReason: null });
@@ -86,9 +170,13 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
   } else if (registryId === 'sql') run(() => analyzeSql(path, source, diagnostics, config), lexicalMetadata());
   else if (registryId === 'html') run(() => analyzeHtml(path, source, diagnostics), { ...lexicalMetadata(), mode: 'embedded' });
   else if (registryId === 'css') run(() => analyzeCss(path, source, diagnostics), lexicalMetadata());
-  else if (registryId === 'single-file-component') run(() => analyzeSingleFileComponent(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'vue' || registryId === 'svelte' || registryId === 'astro') run(() => analyzeSingleFileComponent(path, source, diagnostics, config, registryId), { ...lexicalMetadata(), mode: 'embedded' });
+  else if (registryId === 'notebook') run(() => analyzeNotebook(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
   else if (registryId === 'template' || registryId === 'blade') run(() => analyzeTemplate(path, source, diagnostics, config), { ...lexicalMetadata(), mode: 'embedded' });
-  else if (registryId === 'lexical-source' || registryId === 'lexical-data') run(() => analyzeLexical(path, source, diagnostics), lexicalMetadata());
+  else if (resolved) {
+    run(() => analyzeLexical(path, source, diagnostics), { ...lexicalMetadata(), fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+    diagnostics.push({ ...diagnostic(path, null, 'sensor/parser-unavailable', 'WARN', `${resolved.id} has lexical-only partial coverage.`), ...lexicalMetadata(), fallback: 'lexical', fallbackReason: resolved.fallbackReason });
+  }
   else diagnostics.push(diagnostic(path, null, 'sensor/unsupported-language', 'ERROR', `Unsupported source extension: ${extension || '(none)'}.`));
   const metadata = adapterMetadata(path, grammarLoader);
   return dedupeDiagnostics(diagnostics).map(item => ({ ...item, adapter: adapter ?? metadata.adapter, mode: item.mode ?? metadata.mode, grammar: Object.hasOwn(item, 'grammar') ? item.grammar : metadata.grammar, fallback: Object.hasOwn(item, 'fallback') ? item.fallback : metadata.fallback, fallbackReason: Object.hasOwn(item, 'fallbackReason') ? item.fallbackReason : metadata.fallbackReason }));
@@ -96,20 +184,30 @@ export function analyzeSource(path, source, { config = {}, state, grammarLoader 
 
 function lexicalMetadata() { return { mode: 'lexical', grammar: null, fallback: null, fallbackReason: null }; }
 
-function analyzePath(path, root, config, diagnostics, sharedState) {
+function analyzePath(path, root, config, diagnostics, files, sharedState) {
   try {
     const absolutePath = resolve(root, path);
     const source = sharedState.sourceCache.has(absolutePath) ? sharedState.sourceCache.get(absolutePath) : readFileSync(absolutePath, 'utf8');
     sharedState.sourceCache.set(absolutePath, source);
     diagnostics.push(...analyzeSource(path, source, { config, state: { ...sharedState, path, importedSqlFunctions: collectImportedNames(source) } }));
+    files.push(fileCoverage(path));
   }
-  catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); }
+  catch (error) { diagnostics.push(diagnostic(path, null, 'sensor/read-error', 'ERROR', error.message)); files.push(fileCoverage(path)); }
+}
+
+function fileCoverage(path) {
+  const resolved = resolveRegistryEntry(path);
+  if (!resolved) return { path, language: null, parser: 'missing', syntaxAware: false, capabilities: { quality: 'MISSING', security: 'MISSING', ui: 'N/A', dataConfig: 'N/A' } };
+  const state = resolved.syntaxAware ? 'loaded' : resolved.fallback ? 'fallback' : 'missing';
+  const mapped = Object.fromEntries(Object.entries(resolved.capabilities).map(([name, status]) => [name, resolved.syntaxAware || status !== 'PASS' ? status : 'PARTIAL']));
+  return { path, language: resolved.id, parser: state, syntaxAware: resolved.syntaxAware, mode: resolved.actualMode, grammar: resolved.grammar && resolved.package ? `${resolved.package}@${resolved.version}` : resolved.parserKind === 'structured' ? 'node:json' : null, parserVersion: resolved.version, origin: resolved.qualification?.provenance ?? null, evidence: resolved.qualification, capabilities: mapped };
 }
 
 function analyzeAst(path, source, parserSource, entry, config, diagnostics, inheritedState) {
   const tree = parseTree(entry.grammar, parserSource);
   if (tree.rootNode.hasError) diagnostics.push(diagnostic(path, firstError(tree.rootNode), 'sensor/syntax-error', 'ERROR', 'Source contains a syntax error.'));
   let count = 0; let maxDepth = 0; const state = inheritedState ?? { sqlVariables: new Set(), sqlFunctions: new Set(), sqlExports: new Map(), importedSqlFunctions: Object.create(null), taintedVariables: new Set() };
+  state.ir = normalizeTree(tree.rootNode, source);
   state.sqlVariables ??= new Set(); state.sqlFunctions ??= new Set(); state.sqlExports ??= new Map(); state.importedSqlFunctions ??= Object.create(null);
   state.taintedVariables ??= new Set();
   walk(tree.rootNode, 0, (node, depth) => { count += 1; maxDepth = Math.max(maxDepth, depth); inspectAst(path, source, node, diagnostics, config, state, entry.language); });
@@ -119,7 +217,7 @@ function analyzeAst(path, source, parserSource, entry, config, diagnostics, inhe
 
 function inspectAst(path, source, node, diagnostics, config, state, language) {
   const text = source.slice(node.startIndex, node.endIndex);
-  if (/comment$/u.test(node.type) && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
+  if (node.type.endsWith('comment') && /\b(?:TODO|FIXME|HACK)\b/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/quality/todo', 'WARN', 'Production code contains an unfinished TODO/FIXME/HACK marker.'));
   if (language === 'ruby' || language === 'erb') inspectRubyAst(path, source, node, diagnostics, config);
   if (node.type === 'variable_declarator' || node.type === 'assignment_expression' || node.type === 'assignment') {
     const left = node.childForFieldName('name')?.text ?? node.childForFieldName('left')?.text ?? '';
@@ -141,7 +239,7 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const callArgumentsText = node.childForFieldName('arguments')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
-    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Debug output should not ship in production code.'));
+    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Debug output should not ship in production code.'));
     if (isShell(name)) {
       const first = node.childForFieldName('arguments')?.namedChild(0); const command = literal(first, source).toLowerCase();
       if (command && (config.dangerousCommands ?? []).some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
@@ -164,8 +262,8 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
     if (isSqlSink(name, config) && config.sql?.requireRateLimit && looksLikeUntrustedSource(callableText, config) && !hasRateLimitGuard(callableText, config)) diagnostics.push(diagnostic(path, node, 'sensor/sql-missing-rate-limit', 'WARN', 'A request-scoped SQL operation has no configured rate-limit guard.'));
   }
   if (node.type === 'new_expression' && node.childForFieldName('constructor')?.text === 'Function') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-function', 'UNSAFE', 'Dynamic Function construction is forbidden.'));
-  if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
-  if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
+  if (node.type === 'debugger_statement') diagnostics.push(diagnostic(path, node, 'sensor/quality/debugger', 'WARN', 'Debugger statements should not ship in production code.'));
+  if (node.type === 'catch_clause' && !node.namedChildren.some(child => child.type !== 'identifier')) diagnostics.push(diagnostic(path, node, 'sensor/quality/empty-catch', 'WARN', 'Empty catch blocks hide failures and should be handled explicitly.'));
   if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
   if (node.type === 'jsx_attribute' && /^dangerouslySetInnerHTML\b/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'Raw HTML is injected into a JSX element.'));
   if (node.type === 'property_identifier' && node.text === '__proto__') diagnostics.push(diagnostic(path, node, 'sensor/prototype-pollution', 'UNSAFE', 'Prototype mutation through __proto__ is forbidden.'));
@@ -197,12 +295,14 @@ function inspectRubyAst(path, source, node, diagnostics, config) {
   }
   if (fileSinks.test(name) && requestControlled) diagnostics.push(diagnostic(path, node, 'sensor/path-traversal', 'UNSAFE', 'Rails file output uses request-controlled data; validate an allowlisted path.'));
   if (redirectSinks.has(method) && requestControlled) diagnostics.push(diagnostic(path, node, 'sensor/open-redirect', 'WARN', 'Rails redirect destination is request-controlled; validate it against an allowlist.'));
+  if (/^(?:Net::HTTP|URI|OpenURI|Faraday|HTTParty|RestClient)/u.test(receiver?.text ?? '') && /^(?:get|post|request|open|new)$/u.test(method) && (requestControlled || !rubyTrustedNetworkDestination(firstArgument))) diagnostics.push(diagnostic(path, node, 'sensor/ssrf', 'UNSAFE', 'Ruby network destination is dynamic or request-controlled; validate it against an allowlist.'));
+  if (/^(?:Digest::)?(?:MD5|SHA1)$/iu.test(receiver?.text ?? '') || /\b(?:OpenSSL::Cipher\.new\(['"](?:des|rc4)|Digest::(?:MD5|SHA1))/iu.test(node.text)) diagnostics.push(diagnostic(path, node, 'sensor/weak-crypto', 'WARN', 'A weak or legacy Ruby cryptographic primitive is used.'));
   const inlinePair = argumentsNode?.namedChildren.find(child => child.type === 'pair' && /^(?:inline|html):/u.test(child.text));
   if (method === 'render' && inlinePair && rubyRequestControlled(inlinePair)) diagnostics.push(diagnostic(path, node, 'sensor/rails-unsafe-render', 'WARN', 'Rails inline rendering uses request-controlled data.'));
   if ((method === 'raw' && requestControlled) || method === 'html_safe') diagnostics.push(diagnostic(path, node, 'sensor/rails-unsafe-render', 'WARN', 'Rails rendering bypasses automatic HTML escaping; sanitize the value.'));
   if (receiver?.text === 'params' && method === 'permit!') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'params.permit! bypasses an explicit strong-parameter allowlist.'));
   if (/^[A-Z]/u.test(receiver?.text ?? '') && /^(?:new|create|create!|update|update!|assign_attributes)$/u.test(method) && firstArgument?.text === 'params') diagnostics.push(diagnostic(path, node, 'sensor/rails-unpermitted-params', 'WARN', 'Rails model assignment should use an explicit params permit list.'));
-  if (/^(?:puts|p|pp|print|warn|byebug|debugger)$/u.test(method) || name === 'binding.irb') diagnostics.push(diagnostic(path, node, 'sensor/anti-slop/debug-output', 'WARN', 'Ruby debug output or an interactive breakpoint should not ship in production code.'));
+  if (/^(?:puts|p|pp|print|warn|byebug|debugger)$/u.test(method) || name === 'binding.irb') diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Ruby debug output or an interactive breakpoint should not ship in production code.'));
 }
 
 function rubyDynamic(node) {
@@ -218,10 +318,16 @@ function rubyRequestControlled(node) {
   return node.namedChildren.some(rubyRequestControlled);
 }
 function rubyLiteral(node) { return Boolean(node && /^(?:string|string_array|symbol|simple_symbol)$/u.test(node.type) && !rubyDynamic(node)); }
+function rubyTrustedNetworkDestination(node) {
+  if (rubyLiteral(node)) return true;
+  if (node?.type !== 'call') return false;
+  const method = node.childForFieldName('method')?.text ?? node.namedChildren[0]?.text ?? '';
+  return /^(?:URI|parse)$/u.test(method) && rubyLiteral(node.childForFieldName('arguments')?.namedChildren[0]);
+}
 function unquote(value) { return value.replace(/^['"]|['"]$/gu, ''); }
 function isRawErbNode(source, node) {
   const open = source.lastIndexOf('<%', node.startIndex);
-  return open >= 0 && /^<%==/u.test(source.slice(open, open + 4)) && source.indexOf('%>', open) >= node.endIndex;
+  return open >= 0 && source.slice(open, open + 4).startsWith('<%==') && source.indexOf('%>', open) >= node.endIndex;
 }
 
 function analyzeSql(path, source, diagnostics, config = {}) {
@@ -230,6 +336,14 @@ function analyzeSql(path, source, diagnostics, config = {}) {
   for (const match of code.matchAll(/\b(?:execute|query|prepare)\s*\([^\n;]*(?:\$\{|\+|\|\|)[^\n;]*\)/giu)) diagnostics.push(lineDiagnostic(path, source, match.index, 'sensor/sql-injection', 'UNSAFE', 'SQL query is dynamically constructed and may contain untrusted string data.'));
   if (config.sql?.requireLimit && /\b(?:select|update|delete)\b/iu.test(code) && !hasSqlLimit(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unbounded-query', 'WARN', `SQL query has no LIMIT clause; bound result size to ${config.sql.maxRows ?? 1000} rows.`));
   if (config.sql?.requireMutationFilter && isUnfilteredMutation(code)) diagnostics.push(lineDiagnostic(path, source, 0, 'sensor/sql-unfiltered-mutation', 'UNSAFE', 'UPDATE or DELETE query has no WHERE filter; require an explicit mutation predicate.'));
+}
+
+function analyzeJson(path, source, diagnostics) {
+  try { JSON.parse(source); }
+  catch (error) {
+    const position = Number.parseInt(String(error.message).match(/position\s+(\d+)/u)?.[1] ?? '0', 10);
+    diagnostics.push(lineDiagnostic(path, source, Number.isInteger(position) ? position : 0, 'sensor/syntax-error', 'ERROR', 'JSON contains a syntax error.'));
+  }
 }
 function analyzeHtml(path, source, diagnostics) {
   const code = source.replace(/<!--[\s\S]*?-->/gu, match => match.replace(/[^\n]/gu, ' '));
@@ -300,7 +414,11 @@ function isPhpCodePosition(source, index) {
   return !quote && !blockComment;
 }
 function maskRubyComments(source) { return source.replace(/#(?!\{)[^\n]*/gu, match => match.replace(/[^\n]/gu, ' ')); }
-function analyzeSingleFileComponent(path, source, diagnostics, config) {
+function analyzeSingleFileComponent(path, source, diagnostics, config, format = 'component') {
+  if (format === 'astro') {
+    const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---/u.exec(source);
+    if (frontmatter) appendEmbeddedDiagnostics(path, source, frontmatter.index + frontmatter[0].indexOf(frontmatter[1]), analyzeSource(`${path}.ts`, frontmatter[1], { config }), diagnostics);
+  }
   const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu;
   const stylePattern = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/giu;
   for (const match of source.matchAll(scriptPattern)) {
@@ -313,9 +431,36 @@ function analyzeSingleFileComponent(path, source, diagnostics, config) {
   }
 }
 function appendEmbeddedDiagnostics(path, source, offset, embedded, diagnostics) {
-  const lineOffset = source.slice(0, offset).split('\n').length - 1;
-  for (const item of embedded) diagnostics.push({ ...item, path, line: item.line + lineOffset });
+  for (const item of embedded) {
+    const localLines = sourceOffsetForPosition(source.slice(offset), item.line, item.column);
+    const mapped = lineDiagnostic(path, source, offset + localLines, item.rule, item.severity, item.message);
+    diagnostics.push({ ...item, ...mapped, path });
+  }
 }
+function sourceOffsetForPosition(source, line, column) {
+  let offset = 0;
+  for (let current = 1; current < line; current += 1) { const next = source.indexOf('\n', offset); if (next < 0) return source.length; offset = next + 1; }
+  return Math.min(source.length, offset + Math.max(0, column - 1));
+}
+function analyzeNotebook(path, source, diagnostics, config) {
+  let notebook;
+  try { notebook = JSON.parse(source); }
+  catch (error) { diagnostics.push(lineDiagnostic(path, source, jsonErrorOffset(error), 'sensor/syntax-error', 'ERROR', 'Notebook JSON contains a syntax error.')); return; }
+  const language = String(notebook.metadata?.kernelspec?.language ?? notebook.metadata?.language_info?.name ?? 'python').toLowerCase();
+  const extension = /^(?:javascript|typescript|node)$/u.test(language) ? (language === 'typescript' ? '.ts' : '.js') : '.py';
+  let cursor = 0;
+  for (const cell of notebook.cells ?? []) {
+    if (cell?.cell_type !== 'code') continue;
+    const fragments = Array.isArray(cell.source) ? cell.source : [String(cell.source ?? '')];
+    const code = fragments.join('');
+    const token = JSON.stringify(fragments[0] ?? '').slice(1, -1);
+    const encodedOffset = token ? source.indexOf(token, cursor) : cursor;
+    const cellOffset = encodedOffset < 0 ? cursor : encodedOffset;
+    cursor = Math.max(cursor, cellOffset + token.length);
+    appendEmbeddedDiagnostics(path, source, cellOffset, analyzeSource(`${path}${extension}`, code, { config }), diagnostics);
+  }
+}
+function jsonErrorOffset(error) { const match = /position\s+(\d+)/iu.exec(error.message); return match ? Number(match[1]) : 0; }
 function maskSql(source) { return source.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskCss(source) { return source.replace(/\/\*[\s\S]*?\*\/|'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/gu, match => match.replace(/[^\n]/gu, ' ')); }
 function maskLexical(source, extension) {
@@ -327,7 +472,11 @@ function maskLexical(source, extension) {
   return maskedLines.replace(/'(?:\\.|[^'\n])*'|"(?:\\.|[^"\n])*"|`(?:\\.|[^`\n])*`/gu, match => match.replace(/[^\n]/gu, ' '));
 }
 function defaultConfig(root) {
-  try { return JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8')); }
+  try {
+    const rules = JSON.parse(readFileSync(resolve(root, '.project/sensor-rules.json'), 'utf8'));
+    const project = JSON.parse(readFileSync(resolve(root, '.project/project-config.json'), 'utf8'));
+    return { ...rules, languages: project.quality?.sensor?.languages ?? [] };
+  }
   catch (error) { return { __sensorConfigError: error.message }; }
 }
 function collectDynamicExports(paths, root, sourceCache = new Map()) {
@@ -339,7 +488,7 @@ function collectDynamicExports(paths, root, sourceCache = new Map()) {
       sourceCache.set(absolutePath, source);
       const extension = extname(path).toLowerCase();
       const resolved = resolveRegistryEntry(path);
-      if (resolved?.grammar && !['ruby', 'erb'].includes(resolved.language)) indexDynamicExports(source, resolved.grammar, resolved.language, path, root, exports);
+      if (resolved?.parserKind === 'native' && resolved.grammar && !['ruby', 'erb'].includes(resolved.language)) indexDynamicExports(source, resolved.grammar, resolved.language, path, root, exports);
       else if (extension === '.vue' || extension === '.svelte') {
         for (const match of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)) {
           const extensionPath = /\blang\s*=\s*["'](?:tsx|jsx)["']/iu.test(match[1]) ? 'embedded.tsx' : /\blang\s*=\s*["'](?:ts|typescript)["']/iu.test(match[1]) ? 'embedded.ts' : 'embedded.js';
@@ -442,28 +591,29 @@ function fileExists(path) {
 function validateConfig(config) {
   if (config?.__sensorConfigError) return [diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', `Sensor rules could not be loaded: ${config.__sensorConfigError}`)];
   const errors = [];
-  if (!config || typeof config !== 'object' || Array.isArray(config)) errors.push('configuration must be an object');
+  if (!config || config !== Object(config) || Array.isArray(config)) errors.push('configuration must be an object');
   else {
     if (config.schemaVersion !== 1) errors.push('schemaVersion must equal 1');
-    if (config.analysis !== undefined && (!config.analysis || typeof config.analysis !== 'object' || Array.isArray(config.analysis))) errors.push('analysis must be an object');
+    if (config.languages !== undefined && (!Array.isArray(config.languages) || config.languages.some(value => value !== String(value) || !value))) errors.push('languages must be an array of non-empty strings');
+    if (config.analysis !== undefined && (!config.analysis || config.analysis !== Object(config.analysis) || Array.isArray(config.analysis))) errors.push('analysis must be an object');
     if (config.analysis?.moduleScope !== undefined && config.analysis.moduleScope !== 'explicit-paths') errors.push('analysis.moduleScope must equal explicit-paths');
     if (config.analysis?.packageResolution !== undefined && config.analysis.packageResolution !== 'disabled') errors.push('analysis.packageResolution must equal disabled');
-    if (!Array.isArray(config.dangerousCommands) || config.dangerousCommands.some(value => typeof value !== 'string')) errors.push('dangerousCommands must be an array of strings');
+    if (!Array.isArray(config.dangerousCommands) || config.dangerousCommands.some(value => value !== String(value))) errors.push('dangerousCommands must be an array of strings');
     if (config.complexity && (!Number.isInteger(config.complexity.maxNodes) || !Number.isInteger(config.complexity.maxDepth) || config.complexity.maxNodes < 1 || config.complexity.maxDepth < 1)) errors.push('complexity.maxNodes and complexity.maxDepth must be positive integers');
     if (config.sql) {
-      if (!Array.isArray(config.sql.sinks) || config.sql.sinks.some(value => typeof value !== 'string' || !value)) errors.push('sql.sinks must be a non-empty array of strings');
-      if (config.sql.requireLimit !== undefined && typeof config.sql.requireLimit !== 'boolean') errors.push('sql.requireLimit must be boolean');
-      if (config.sql.requireMutationFilter !== undefined && typeof config.sql.requireMutationFilter !== 'boolean') errors.push('sql.requireMutationFilter must be boolean');
-      if (config.sql.requireRateLimit !== undefined && typeof config.sql.requireRateLimit !== 'boolean') errors.push('sql.requireRateLimit must be boolean');
+      if (!Array.isArray(config.sql.sinks) || config.sql.sinks.some(value => value !== String(value) || !value)) errors.push('sql.sinks must be a non-empty array of strings');
+      if (config.sql.requireLimit !== undefined && (config.sql.requireLimit !== true && config.sql.requireLimit !== false)) errors.push('sql.requireLimit must be boolean');
+      if (config.sql.requireMutationFilter !== undefined && (config.sql.requireMutationFilter !== true && config.sql.requireMutationFilter !== false)) errors.push('sql.requireMutationFilter must be boolean');
+      if (config.sql.requireRateLimit !== undefined && (config.sql.requireRateLimit !== true && config.sql.requireRateLimit !== false)) errors.push('sql.requireRateLimit must be boolean');
       if (config.sql.maxRows !== undefined && (!Number.isInteger(config.sql.maxRows) || config.sql.maxRows < 1)) errors.push('sql.maxRows must be a positive integer');
-      if (config.sql.taintSources !== undefined && (!Array.isArray(config.sql.taintSources) || config.sql.taintSources.some(value => typeof value !== 'string' || !value))) errors.push('sql.taintSources must be an array of non-empty strings');
-      if (config.sql.rateLimitGuards !== undefined && (!Array.isArray(config.sql.rateLimitGuards) || config.sql.rateLimitGuards.some(value => typeof value !== 'string' || !value))) errors.push('sql.rateLimitGuards must be an array of non-empty strings');
-      if (config.sql.safeBuilders !== undefined && (!Array.isArray(config.sql.safeBuilders) || config.sql.safeBuilders.some(value => typeof value !== 'string' || !value))) errors.push('sql.safeBuilders must be an array of non-empty strings');
+      if (config.sql.taintSources !== undefined && (!Array.isArray(config.sql.taintSources) || config.sql.taintSources.some(value => value !== String(value) || !value))) errors.push('sql.taintSources must be an array of non-empty strings');
+      if (config.sql.rateLimitGuards !== undefined && (!Array.isArray(config.sql.rateLimitGuards) || config.sql.rateLimitGuards.some(value => value !== String(value) || !value))) errors.push('sql.rateLimitGuards must be an array of non-empty strings');
+      if (config.sql.safeBuilders !== undefined && (!Array.isArray(config.sql.safeBuilders) || config.sql.safeBuilders.some(value => value !== String(value) || !value))) errors.push('sql.safeBuilders must be an array of non-empty strings');
     }
   }
   return errors.map(message => diagnostic('.project/sensor-rules.json', null, 'sensor/configuration', 'ERROR', message));
 }
-function sensorResult(verdict, diagnostics) { return { schemaVersion: 1, verdict, coverage: SENSOR_COVERAGE, diagnostics }; }
+function sensorResult(verdict, diagnostics, files = []) { return { schemaVersion: 2, verdict, coverage: { ...SENSOR_COVERAGE, files }, diagnostics }; }
 function dedupeDiagnostics(diagnostics) {
   const seen = new Set();
   return diagnostics.filter(item => {
@@ -503,7 +653,7 @@ function isNetwork(name) { return /^(?:fetch|axios(?:\.[a-z]+)?|https?\.(?:reque
 function diagnostic(path, node, rule, severity, message) { return { path, line: (node?.startPosition.row ?? 0) + 1, column: (node?.startPosition.column ?? 0) + 1, rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
 function lineDiagnostic(path, source, index, rule, severity, message) { const before = source.slice(0, index); return { path, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, severity, confidence: confidenceFor(rule), category: categoryFor(rule), message }; }
 function confidenceFor(rule) { return /sql-injection|dynamic-eval|dynamic-function|shell|secret|ssrf|path-traversal|xss|prototype-pollution/u.test(rule) ? 'HIGH' : 'MEDIUM'; }
-function categoryFor(rule) { if (/sql|secret|ssrf|path-traversal|xss|crypto|shell|eval|function|prototype/u.test(rule)) return 'security'; if (/ui|css/u.test(rule)) return 'architecture'; if (/anti-slop|complexity/u.test(rule)) return 'quality'; return 'safety'; }
+function categoryFor(rule) { if (/sql|secret|ssrf|path-traversal|xss|crypto|shell|eval|function|prototype/u.test(rule)) return 'security'; if (/ui|css/u.test(rule)) return 'architecture'; if (/anti-slop|quality|complexity/u.test(rule)) return 'quality'; return 'safety'; }
 function isLiteralNode(node) { return Boolean(node && ['string', 'template_string', 'string_content', 'integer', 'float'].includes(node.type)); }
 function isPathSink(name) { return /(?:^|\.)(?:readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|open|sendFile|download|unlink|rm|rmdir)$/u.test(name); }
 function isRedirect(name) { return /(?:^|\.)(?:redirect|redirectTo|sendRedirect)$/u.test(name); }

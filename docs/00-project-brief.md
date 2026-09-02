@@ -36,7 +36,9 @@ repository.
 
 The blueprint supplies repository governance, CTXRoute context routing,
 official code-review-graph v2.3.8, Archify documentation validation, and a
-separate Sensor for static diagnostics. Tooling requires Git, Node.js 22.13+,
+separate Sensor for static diagnostics. Sensor language packs are exact,
+project-local dependencies; setup synchronizes declared packs, while hooks and
+analysis never install from the network. Tooling requires Git, Node.js 22.13+,
 npm 10+, Python 3.10+, and uv 0.11.2; Python 3.12 is the reference CRG runtime.
 These are template constraints, not product architecture choices. A derived
 project may adapt them only through the approved initialization and cleanup

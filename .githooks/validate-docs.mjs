@@ -30,7 +30,7 @@ export function validateDocumentContracts() {
   }
   const ids = new Set();
   for (const document of manifest.documents) {
-    if (!document || typeof document !== 'object' || !document.id || ids.has(document.id)) {
+    if (!document || document !== Object(document) || !document.id || ids.has(document.id)) {
       failures.push('docs/document-contracts.json: every document contract needs a unique id');
       continue;
     }
