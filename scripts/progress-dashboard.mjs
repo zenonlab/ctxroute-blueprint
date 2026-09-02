@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { approvePlan, progressRevision, readProgress, setProgressMode, updateProgressStep, validatePlan } from './progress-core.mjs';
+import { addProgressStep, approvePlan, deleteProgressStep, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
 import { DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS } from './progress-dashboard-app.mjs';
 
 export const DASHBOARD_BODY_LIMIT = 32 * 1024;
@@ -33,8 +33,15 @@ export async function startProgressDashboard({ root = process.cwd(), token = ran
         return sendJson(response, 200, { validation: validatePlan(body.plan, current), revision: progressRevision(current) });
       }
       if (request.method === 'POST' && url.pathname === '/api/plans/approve') return sendProgress(response, await approvePlan(body.plan, root, { expectedRevision: body.revision }));
+      const goal = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})$/u);
+      if (request.method === 'PATCH' && goal) return sendProgress(response, await updateProgressGoal(goal[1], { title: body.title }, root, { expectedRevision: body.revision }));
+      const order = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps\/order$/u);
+      if (request.method === 'PUT' && order) return sendProgress(response, await reorderProgressSteps(order[1], body.stepIds, root, { expectedRevision: body.revision }));
+      const steps = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps$/u);
+      if (request.method === 'POST' && steps) return sendProgress(response, await addProgressStep(steps[1], body.step, root, { expectedRevision: body.revision }));
       const step = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps\/([a-z][a-z0-9-]{0,63})$/u);
-      if (request.method === 'PATCH' && step) return sendProgress(response, await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, evidence: body.evidence }, root, { expectedRevision: body.revision }));
+      if (request.method === 'PATCH' && step) return sendProgress(response, await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, title: body.title, acceptance: body.acceptance, files: body.files, commands: body.commands, evidence: body.evidence }, root, { expectedRevision: body.revision }));
+      if (request.method === 'DELETE' && step) return sendProgress(response, await deleteProgressStep(step[1], step[2], root, { expectedRevision: body.revision }));
       const mode = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/mode$/u);
       if (request.method === 'PATCH' && mode) return sendProgress(response, await setProgressMode(mode[1], body.mode, body.userConfirmed, root, { expectedRevision: body.revision }));
       return sendJson(response, 404, { error: 'Introuvable' });

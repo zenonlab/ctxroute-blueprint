@@ -68,19 +68,56 @@ test('API validates and approves plans through progress-core', async t => {
   assert.equal(value.progress.goals[0].steps[0].title, 'Verify');
 });
 
-test('API updates only mutable step and mode fields and rejects stale revisions', async t => {
+test('API updates editable goal and step fields and rejects stale revisions', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   const first = await (await requestLocal(`${app.base}/api/progress`, { headers: app.headers })).json();
-  const step = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, status: 'DONE', evidence: ['node --test tests/progress-dashboard.test.mjs'] }) });
+  const goal = await requestLocal(`${app.base}/api/goals/goal-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, title: 'Ship clearly' }) });
+  assert.equal(goal.status, 200);
+  const renamed = await goal.json();
+  const step = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: renamed.revision, title: 'Verify all', acceptance: ['Tests and lint pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['node --test tests/progress-dashboard.test.mjs'], status: 'DONE', evidence: ['node --test tests/progress-dashboard.test.mjs'] }) });
   assert.equal(step.status, 200);
   const changed = await step.json();
-  assert.equal(changed.progress.goals[0].steps[0].title, 'Verify');
-  assert.deepEqual(changed.progress.goals[0].steps[0].acceptance, ['Tests pass']);
+  assert.equal(changed.progress.goals[0].title, 'Ship clearly');
+  assert.equal(changed.progress.goals[0].steps[0].title, 'Verify all');
+  assert.deepEqual(changed.progress.goals[0].steps[0].acceptance, ['Tests and lint pass']);
   const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'autonomous', userConfirmed: true }) });
   assert.equal(stale.status, 409);
   const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, mode: 'autonomous', userConfirmed: true }) });
   assert.equal(mode.status, 200);
   assert.equal((await mode.json()).progress.goals[0].executionMode, 'autonomous');
+});
+
+test('API adds, exactly reorders, deletes, and protects the last step', async t => {
+  const app = await fixture(); t.after(() => app.server.close());
+  const first = await (await requestLocal(`${app.base}/api/progress`, { headers: app.headers })).json();
+  const addition = await requestLocal(`${app.base}/api/goals/goal-one/steps`, { method: 'POST', headers: app.headers, body: JSON.stringify({ revision: first.revision, step: { id: 'step-two', title: 'Document', acceptance: ['Docs align'], files: ['docs/progress.md'], commands: ['npm run validate'] } }) });
+  assert.equal(addition.status, 200);
+  const added = await addition.json();
+  const order = await requestLocal(`${app.base}/api/goals/goal-one/steps/order`, { method: 'PUT', headers: app.headers, body: JSON.stringify({ revision: added.revision, stepIds: ['step-two', 'step-one'] }) });
+  assert.equal(order.status, 200);
+  const ordered = await order.json();
+  assert.deepEqual(ordered.progress.goals[0].steps.map(step => step.id), ['step-two', 'step-one']);
+  const deletion = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'DELETE', headers: app.headers, body: JSON.stringify({ revision: ordered.revision }) });
+  assert.equal(deletion.status, 200);
+  const deleted = await deletion.json();
+  const last = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-two`, { method: 'DELETE', headers: app.headers, body: JSON.stringify({ revision: deleted.revision }) });
+  assert.equal(last.status, 400);
+  assert.match((await last.json()).error, /last step/u);
+});
+
+test('new mutation routes retain token, origin, body, and revision protections', async t => {
+  const app = await fixture(); t.after(() => app.server.close());
+  const first = await (await requestLocal(`${app.base}/api/progress`, { headers: app.headers })).json();
+  const withoutToken = await requestLocal(`${app.base}/api/goals/goal-one`, { method: 'PATCH', headers: { Origin: new URL(app.base).origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: first.revision, title: 'No' }) });
+  assert.equal(withoutToken.status, 401);
+  const foreign = await requestLocal(`${app.base}/api/goals/goal-one`, { method: 'PATCH', headers: { ...app.headers, Origin: 'https://example.test' }, body: JSON.stringify({ revision: first.revision, title: 'No' }) });
+  assert.equal(foreign.status, 403);
+  const oversized = await requestLocal(`${app.base}/api/goals/goal-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, title: 'x'.repeat(DASHBOARD_BODY_LIMIT) }) });
+  assert.equal(oversized.status, 413);
+  const changed = await requestLocal(`${app.base}/api/goals/goal-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, title: 'Changed' }) });
+  assert.equal(changed.status, 200);
+  const stale = await requestLocal(`${app.base}/api/goals/goal-one/steps`, { method: 'POST', headers: app.headers, body: JSON.stringify({ revision: first.revision, step: { id: 'stale', title: 'Stale', acceptance: ['ok'], files: [], commands: [] } }) });
+  assert.equal(stale.status, 409);
 });
 
 test('API bounds JSON bodies and idle expiry closes the local server', async () => {
