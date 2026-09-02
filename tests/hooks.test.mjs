@@ -759,7 +759,7 @@ function initializationWorkspace({ incomplete }) {
   writeFileSync(join(cwd, 'docs/00-project-brief.md'), incomplete ? '# Project brief\n\n[project name]\n' : '# Project brief\n\n[Reference](https://example.test)\n');
   writeFileSync(join(cwd, 'docs/01-technology-decisions.md'), '# Technology decisions\n\nComplete.\n');
   writeFileSync(join(cwd, 'docs/02-quality-strategy.md'), '# Quality strategy\n\nComplete.\n');
-  writeFileSync(join(cwd, 'package.json'), `${JSON.stringify({ private: true, scripts: { validate: 'node -e ""' } }, null, 2)}\n`);
+  writeFileSync(join(cwd, 'package.json'), `${JSON.stringify({ private: true, scripts: { validate: 'node -e "process.exit(0)"' } }, null, 2)}\n`);
   return cwd;
 }
 
