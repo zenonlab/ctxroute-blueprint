@@ -1,7 +1,6 @@
 ---
 match: [".githooks/sensor", ".githooks/sensor-engine.mjs", ".githooks/sensor-checklist.mjs", ".project/sensor-rules.json", "package.json", "Gemfile", "composer.json"]
-mode: smart
-threshold: 3
+mode: once
 ---
 # Sensor adapters and grammar modes
 

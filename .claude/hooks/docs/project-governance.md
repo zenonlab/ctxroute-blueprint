@@ -1,7 +1,6 @@
 ---
 match: ["package.json", ".project/", "src/", "app/", "lib/"]
-mode: smart
-threshold: 4
+mode: once
 ---
 # Project governance
 

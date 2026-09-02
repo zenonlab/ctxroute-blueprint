@@ -64,3 +64,8 @@ The first occurrence is not lost, equivalent events can be correlated without
 fragile text matching, and decisions remain reviewable. Semantic matching is
 disabled initially to avoid false merges until a separately reviewed matcher is
 available.
+
+On Node.js releases that still label `node:sqlite` experimental, the lifecycle
+dispatcher removes that exact stability warning before producing agent-facing
+output. Other standard-error diagnostics remain visible and fail-open behavior
+is unchanged.

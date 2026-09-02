@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-08-24
-- Last reviewed: 2026-08-26
+- Last reviewed: 2026-09-02
 
 ## Context
 
@@ -52,6 +52,12 @@ mutation-capable tools, and skip the architecture subprocess on read-only
 CTXRoute commands during `postinstall`: global and project hooks are additive,
 so keeping both causes duplicate progress output and avoidable process startup.
 The diagnostic is read-only and never rewrites user configuration.
+
+Use `mode: once` as the project default and on every tracked guidance document.
+A matching rule is delivered at most once per session, then becomes eligible
+again only after the existing `PreCompact` reset. Blocking governance still
+runs on every applicable mutation; the cadence change only removes repeated
+informational context during reading and implementation loops.
 
 ## Alternatives
 

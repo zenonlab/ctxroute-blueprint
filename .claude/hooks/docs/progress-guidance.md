@@ -1,5 +1,6 @@
 ---
 match: ["scripts/**", "packages/**", ".project/progress.json", "docs/progress.md", "package.json"]
+mode: once
 ---
 
 # Agent progress checklist

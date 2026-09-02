@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/zenonlab/ctxroute/76b45a57543c940c51e382a41adb749faa44bbc4/ctxroute-config.schema.json",
   "enabled": true,
   "showNotification": true,
-  "mode": "smart",
+  "mode": "once",
   "defaultThreshold": 4,
   "defaultDriftUnit": "turn",
   "frames": 1,

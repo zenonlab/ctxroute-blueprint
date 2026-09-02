@@ -6,7 +6,7 @@ import { get as requestLoopback } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dispatch, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
+import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { progressContinuation } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
@@ -113,6 +113,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   assert.equal(handlerPlan('claude', 'PostToolUse', root)[0].name, 'doc-write-guard.js');
   const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
+  assert.deepEqual(codexInjection.args, ['--budget', '0']);
   assert.notEqual(codexInjection.path, join(root, '.codex', 'hooks', 'ctxroute.mjs'));
 });
 
@@ -137,11 +138,26 @@ test('the lifecycle dispatcher skips architecture policy for read-only tools', (
   dispatch({
     harness: 'codex',
     event: 'PreToolUse',
-    input: JSON.stringify({ tool_name: 'view_image', tool_input: { path: 'reference.png' } }),
+    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'src/main.ts' } }),
     root,
     execute(handler) { called.push(handler.name); return { outputs: [] }; },
   });
   assert.deepEqual(called, ['codex-doc-inject.js']);
+});
+
+test('applicable lifecycle handlers reserve architecture policy for mutations', () => {
+  const plan = [
+    { name: 'pre-tool-architecture.mjs' },
+    { name: 'codex-doc-inject.js' },
+  ];
+  assert.deepEqual(
+    applicableHandlers(plan, 'PreToolUse', JSON.stringify({ tool_name: 'Read' })).map(handler => handler.name),
+    ['codex-doc-inject.js'],
+  );
+  assert.deepEqual(
+    applicableHandlers(plan, 'PreToolUse', JSON.stringify({ tool_name: 'Edit' })).map(handler => handler.name),
+    ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
+  );
 });
 
 test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () => {
@@ -149,7 +165,7 @@ test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () 
   const result = dispatch({
     harness: 'codex',
     event: 'PreToolUse',
-    input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'scripts/crg-runner.mjs' } }),
+    input: JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'scripts/crg-runner.mjs' } }),
     root,
     execute(handler) {
       called.push(handler.name);
@@ -193,6 +209,31 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
   });
   assert.equal(calls, 3);
   assert.match(result.systemMessage, /turn-count\.js failed open: simulated failure/u);
+});
+
+test('the lifecycle dispatcher hides only the Node 22 SQLite stability warning', () => {
+  const warning = '(node:14537) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)';
+  assert.equal(actionableStderr(warning), '');
+  assert.equal(actionableStderr(`${warning}\nreal diagnostic`), 'real diagnostic');
+});
+
+test('the lifecycle handler executor suppresses the SQLite warning but preserves diagnostics', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'lifecycle-handler-'));
+  const hook = join(cwd, 'fixture.mjs');
+  writeFileSync(hook, [
+    "process.stderr.write('(node:14537) ExperimentalWarning: SQLite is an experimental feature and might change at any time\\n');",
+    "process.stderr.write('(Use `node --trace-warnings ...` to show where the warning was created)\\n');",
+    "process.stderr.write('real diagnostic\\n');",
+    "process.stdout.write(JSON.stringify({ continue: true }));",
+  ].join('\n'));
+  try {
+    assert.deepEqual(executeHandler({ path: hook, args: [] }, '{}', cwd), {
+      stderr: 'real diagnostic',
+      outputs: [{ continue: true }],
+    });
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('merged lifecycle output preserves messages and context', () => {
@@ -552,13 +593,22 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.equal(validation.status, 0, validation.stderr);
 
   const session = `test-${process.pid}-${Date.now()}`;
-  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
     cwd: root,
     input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: '*** Update File: package.json' } }),
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Project governance/u);
+  assert.doesNotMatch(result.stdout, /SEALED INJECTION|###END:/u);
+
+  const repeated = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Read', tool_input: { file_path: 'package.json' } }),
+    encoding: 'utf8',
+  });
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.doesNotMatch(repeated.stdout, /Project governance/u);
 });
 
 test('CTXRoute reinjects bounded context after PreCompact', () => {

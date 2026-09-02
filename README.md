@@ -158,6 +158,10 @@ The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 context. Targeted documentation is injected before relevant tool calls, and
 only the minimum required context is restored after compaction.
 
+Tracked guidance uses `mode: once`: a matching document is injected once per
+session and may be delivered again after `PreCompact`, without repeating every
+few turns while an agent is only exploring the project.
+
 `PostToolUse` runs write guards, the blocking Sensor, a bounded single-flight
 CRG update, problem memory, documentation audit, and Archify preview support.
 It does not start MCP servers; the clients own their stdio transports. CRG

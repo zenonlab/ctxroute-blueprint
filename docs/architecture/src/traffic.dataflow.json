@@ -25,7 +25,7 @@
   "nodes": [
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 1, "row": 0, "tag": "consumer" },
-    { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "bounded context", "stage": 2, "row": 0, "tag": "3500 chars" },
+    { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "once-per-session guidance", "stage": 2, "row": 0, "tag": "dispatcher cap" },
     { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "MCP calls", "stage": 2, "row": 2, "tag": "allowlist" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
     { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "handoff", "stage": 3, "row": 2, "tag": "final guard" },
