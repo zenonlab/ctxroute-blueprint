@@ -43,6 +43,20 @@ test('allows a new test file', () => {
   assert.equal(result.stdout, '');
 });
 
+test('allows safe documentation extensions in declared documentation roots during discovery', () => {
+  for (const path of ['documentation/guide.md', 'specs/contract.rst', 'specs/flow.mmd']) {
+    const result = run({ command: `*** Add File: ${path}` });
+    assert.equal(result.stdout, '', path);
+  }
+});
+
+test('does not treat executable or misplaced files as discovery documentation', () => {
+  for (const path of ['documentation/component.mdx', 'specs/generator.js', 'src/guide.md']) {
+    const result = run({ command: `*** Add File: ${path}` });
+    assert.match(result.stdout, /template mode/u, path);
+  }
+});
+
 test('blocks a new module during discovery even with a diagram', () => {
   const result = run({ command: '*** Add File: src/new-module.ts\n*** Update File: docs/architecture/containers.md' });
   assert.match(result.stdout, /template mode/u);

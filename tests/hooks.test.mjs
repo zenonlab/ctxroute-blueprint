@@ -551,6 +551,17 @@ test('configuration rejects a missing declared starter file', () => {
   assert.match(result.stderr, /Missing starter root file: MISSING-STARTER\.md/u);
 });
 
+test('configuration requires bounded documentation roots and extensions', () => {
+  const cwd = starterWorkspace();
+  const configPath = join(cwd, '.project/project-config.json');
+  const config = JSON.parse(readFileSync(configPath, 'utf8'));
+  config.documentation.extensions = ['md'];
+  writeFileSync(configPath, JSON.stringify(config));
+  const result = spawnSync(process.execPath, [join(root, '.githooks/validate-project-config.mjs')], { cwd, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /documentation\.extensions/u);
+});
+
 test('documentation rejects a broken local link', () => {
   const cwd = starterWorkspace();
   writeFileSync(join(cwd, 'docs/broken.md'), '[Document](missing.md)\n');
