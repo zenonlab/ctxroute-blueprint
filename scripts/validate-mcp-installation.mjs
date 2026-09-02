@@ -19,7 +19,9 @@ export function validateMcpInstallation(root = process.cwd()) {
     if (claude[legacy] || codex.includes(`mcp_servers.${legacy}`)) errors.push(`Legacy MCP server ${legacy} must be removed.`);
   }
   if (Object.keys(claude).sort().join(',') !== Object.keys(expected).sort().join(',')) errors.push('Claude must declare exactly ctxroute-progress and code-review-graph.');
-  const codexServers = [...codex.matchAll(/^\[mcp_servers\.([^\]]+)\]$/gmu)].map(match => match[1]).sort();
+  const codexServers = [];
+  for (const serverSection of codex.matchAll(/^\[mcp_servers\.([^\]]+)\]$/gmu)) codexServers.push(serverSection[1]);
+  codexServers.sort();
   if (codexServers.join(',') !== Object.keys(expected).sort().join(',')) errors.push('Codex must declare exactly ctxroute-progress and code-review-graph.');
 
   for (const [name, script] of Object.entries(expected)) {
