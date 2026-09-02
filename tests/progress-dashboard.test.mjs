@@ -30,11 +30,19 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(page.headers.get('content-security-policy'), /default-src 'none'/u);
   assert.equal(page.headers.get('cache-control'), 'no-store');
   const html = await page.text();
-  assert.match(html, /Afficher les objectifs terminés/u);
+  assert.match(html, /Goals terminés/u);
   assert.match(html, /aria-live="polite"/u);
   assert.match(html, /aria-labelledby="plan-title"/u);
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
-  assert.match(await (await requestLocal(`${app.base}/app.js`)).text(), /confirm\(/u);
+  const javascript = await (await requestLocal(`${app.base}/app.js`)).text();
+  assert.match(javascript, /setTimeout\(\(\) => saveCard\(card\), 500\)/u);
+  assert.match(javascript, /reloadPreservingDrafts/u);
+  assert.match(javascript, /dataTransfer\.effectAllowed/u);
+  assert.match(javascript, /target\.after\(dragged\)/u);
+  assert.doesNotMatch(javascript, /\b(?:prompt|confirm)\(/u);
+  assert.match(html, /id="confirm-dialog"/u);
+  assert.match(html, /class="switch"/u);
+  assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
   assert.equal((await requestLocal(`${app.base}/remote.js`)).status, 404);
 });
 
