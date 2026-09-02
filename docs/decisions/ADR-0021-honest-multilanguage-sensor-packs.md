@@ -79,7 +79,8 @@ implementation details.
 Snapshot verification canonicalizes CRLF line endings and Windows path
 separators before hashing. The npm lockfile is generated with the supported npm
 10 reference used by CI so a clean setup remains idempotent across npm 10 and
-newer clients.
+newer clients. Oxlint runs through its JavaScript entry point and the current
+Node executable instead of a platform-specific shell shim.
 
 ## Alternatives
 

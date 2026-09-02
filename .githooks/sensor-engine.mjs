@@ -102,10 +102,10 @@ function runOfficialAntiSlop(paths, root) {
 }
 
 function runAntiSlopUnits(units) {
-  const executable = resolve(sensorRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'oxlint.cmd' : 'oxlint');
+  const executable = resolve(sensorRoot, 'node_modules', 'oxlint', 'bin', 'oxlint');
   const configPath = resolve(sensorRoot, 'oxlint.config.ts');
   if (!existsSync(executable) || !existsSync(configPath)) return [diagnostic('', null, 'sensor/anti-slop-unavailable', 'ERROR', 'Official anti-slop dependencies are unavailable; run npm run sensor:languages -- sync.')];
-  const result = spawnSync(executable, ['--config', configPath, '--format', 'json', '--quiet', ...units.map(item => item.candidate)], { cwd: sensorRoot, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [executable, '--config', configPath, '--format', 'json', '--quiet', ...units.map(item => item.candidate)], { cwd: sensorRoot, encoding: 'utf8' });
   let report;
   try { report = JSON.parse(result.stdout); }
   catch { return [diagnostic('', null, 'sensor/anti-slop-failed', 'ERROR', `Official anti-slop failed: ${(result.stderr || result.stdout || `status ${result.status}`).trim()}`)]; }
