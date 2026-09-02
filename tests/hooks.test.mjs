@@ -559,6 +559,14 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Project governance/u);
+
+  const repeated = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Read', tool_input: { file_path: 'package.json' } }),
+    encoding: 'utf8',
+  });
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.doesNotMatch(repeated.stdout, /Project governance/u);
 });
 
 test('CTXRoute reinjects bounded context after PreCompact', () => {

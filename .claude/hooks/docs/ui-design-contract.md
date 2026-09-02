@@ -1,7 +1,6 @@
 ---
 match: ["src/", "app/", "components/", "ui/", "pages/"]
-mode: smart
-threshold: 4
+mode: once
 ---
 # UI design contract
 

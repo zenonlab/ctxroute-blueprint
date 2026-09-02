@@ -15,7 +15,7 @@ export const lifecycleEvents = [
 ];
 
 const MAX_CONTEXT_LENGTH = 4096;
-const CTXROUTE_BUDGET = '3500';
+const CTXROUTE_BUDGET = '0';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot) {
