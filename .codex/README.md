@@ -55,7 +55,9 @@ The lifecycle is independent from the two project-scoped MCP servers declared
 in `.codex/config.toml`: `ctxroute-progress` and `code-review-graph` are
 started by the Codex client over stdio. No PostToolUse handler starts or proxies
 an MCP transport. A trusted project and a refreshed Codex session may be needed
-before `/mcp` shows a newly added manifest.
+before `/mcp` shows a newly added manifest. Codex waits up to three seconds for
+optional servers while assembling the initial catalog so CRG's Python process
+can expose its tools without becoming a required, session-blocking dependency.
 
 CRG's `apply_refactor_tool` is permitted only for `dry_run: true`. Normal edit
 tools own accepted mutations so architecture, Sensor, and audit enforcement

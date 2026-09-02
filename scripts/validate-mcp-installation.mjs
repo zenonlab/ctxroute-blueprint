@@ -15,6 +15,12 @@ export function validateMcpInstallation(root = process.cwd()) {
   try { codex = readFileSync(resolve(root, '.codex/config.toml'), 'utf8'); }
   catch (error) { errors.push(`Codex MCP manifest is invalid: ${error.message}`); }
 
+  const firstCodexSection = codex.search(/^\[/mu);
+  const codexRoot = firstCodexSection < 0 ? codex : codex.slice(0, firstCodexSection);
+  if (!/^mcp_optional_startup_grace_ms\s*=\s*3000\s*$/mu.test(codexRoot)) {
+    errors.push('Codex must wait 3000 ms for optional MCP servers when building the initial tool catalog.');
+  }
+
   for (const legacy of ['ctxroute-context-ast']) {
     if (claude[legacy] || codex.includes(`mcp_servers.${legacy}`)) errors.push(`Legacy MCP server ${legacy} must be removed.`);
   }

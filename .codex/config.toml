@@ -1,3 +1,5 @@
+mcp_optional_startup_grace_ms = 3000
+
 [mcp_servers.ctxroute-progress]
 command = "npm"
 args = ["run", "progress:mcp"]

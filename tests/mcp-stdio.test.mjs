@@ -32,6 +32,18 @@ test('Codex MCP validation rejects a server outside the repository root', () => 
   assert.match(result.errors.join('\n'), /repository root/u);
 });
 
+test('Codex MCP validation enforces the bounded optional startup grace', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-grace-'));
+  mkdirSync(join(fixture, '.codex'));
+  writeFileSync(join(fixture, '.mcp.json'), readFileSync(join(root, '.mcp.json')));
+  const config = readFileSync(join(root, '.codex/config.toml'), 'utf8')
+    .replace('mcp_optional_startup_grace_ms = 3000', 'mcp_optional_startup_grace_ms = 1000');
+  writeFileSync(join(fixture, '.codex/config.toml'), config);
+  const result = validateMcpInstallation(fixture);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /3000 ms/u);
+});
+
 test('a real stdio client lists and calls all Progress MCP tools', async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-stdio-'));
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'docs'));

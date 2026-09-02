@@ -136,7 +136,9 @@ so it discovers the local manifest; opening it from a parent directory and
 changing directories later does not load project MCP servers. A trusted client
 must approve project MCP servers. Restart the client after manifest changes,
 then use `/mcp` or `codex mcp list` from the repository root to confirm that
-`ctxroute-progress` is enabled.
+both servers are enabled. Codex gives optional project MCP servers a bounded
+three-second grace while building its initial tool catalog, which accommodates
+CRG's frozen Python startup without turning a CRG failure into a session failure.
 
 ```sh
 npm run mcp:validate
