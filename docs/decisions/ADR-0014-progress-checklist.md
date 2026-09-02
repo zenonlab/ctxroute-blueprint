@@ -3,6 +3,9 @@ scope:
   - scripts/progress-core.mjs
   - scripts/progress-cli.mjs
   - scripts/progress-mcp.mjs
+  - scripts/progress-dashboard.mjs
+  - scripts/progress-dashboard-app.mjs
+  - scripts/progress-dashboard-manager.mjs
   - .project/progress.json
   - docs/progress.md
   - .claude/hooks/docs/progress-guidance.md
@@ -37,6 +40,8 @@ conversation text. SQLite remains problem-memory storage only.
 matching tool call for discovery. CTXRoute reinforces that lifecycle on all
 significant repository roots using its path-substring matching semantics. The
 CLI remains a fallback when the client did not load the project-scoped MCP.
+The local dashboard is another adapter over this core: it never edits approved
+goal or step structure, and every web mutation carries an optimistic revision.
 
 ## Consequences
 
@@ -45,3 +50,5 @@ supports up to 20 goals, 30 steps per goal, and 10 evidence references per
 step, with a 64 KiB JSON limit. No hook edits the checklist automatically.
 Agents must start from the repository root and restart after MCP manifest
 changes because the client owns project-scoped server discovery and transport.
+The dashboard exposes completed goals without deleting them and rejects stale
+browser state instead of silently overwriting a newer checklist.

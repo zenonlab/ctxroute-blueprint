@@ -1,4 +1,115 @@
 {
   "schemaVersion": 1,
-  "goals": []
+  "goals": [
+    {
+      "schemaVersion": 1,
+      "id": "progress-dashboard",
+      "title": "Tableau web local pour CTXRoute Progress",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "dashboard-core",
+          "title": "Construire le serveur local sécurisé, l’API révisée et l’interface accessible",
+          "status": "DONE",
+          "acceptance": [
+            "Le serveur sans dépendance écoute via localhost sur un port éphémère et expire après inactivité",
+            "Les API utilisent progress-core, un jeton hors logs, des contrôles Host et Origin et des corps bornés",
+            "L’interface gère plans, étapes, preuves et modes avec confirmations et filtre des goals terminés"
+          ],
+          "files": [
+            "scripts/progress-dashboard.mjs",
+            "scripts/progress-dashboard-app.mjs",
+            "scripts/progress-core.mjs",
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "npx eslint scripts/progress-dashboard*.mjs tests/progress-dashboard.test.mjs"
+          ]
+        },
+        {
+          "id": "dashboard-mcp",
+          "title": "Exposer progress_open_dashboard et gérer l’instance éphémère",
+          "status": "DONE",
+          "acceptance": [
+            "Le MCP démarre ou réutilise une instance détachée sans lancer de navigateur",
+            "L’outil retourne url reused et instanceId et respecte les budgets de schéma"
+          ],
+          "files": [
+            "scripts/progress-dashboard-manager.mjs",
+            "scripts/progress-mcp.mjs",
+            "scripts/validate-mcp-installation.mjs",
+            "tests/progress-mcp.test.mjs",
+            "tests/mcp-stdio.test.mjs"
+          ],
+          "commands": [
+            "npm run mcp:smoke",
+            "node --test tests/progress-mcp.test.mjs"
+          ],
+          "evidence": [
+            "npm run mcp:smoke",
+            "node --test tests/progress-mcp.test.mjs"
+          ]
+        },
+        {
+          "id": "dashboard-stop",
+          "title": "Injecter le lien une fois par session depuis Stop",
+          "status": "DONE",
+          "acceptance": [
+            "Le hook utilise le hash du session_id et reste silencieux sans goal actif",
+            "Une instance remplacée peut être réinjectée et les pannes restent fail-open",
+            "stop_hook_active ne crée aucune boucle"
+          ],
+          "files": [
+            ".codex/hooks/stop-review.mjs",
+            "tests/hooks.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/hooks.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/hooks.test.mjs",
+            "node --test tests/progress-dashboard.test.mjs"
+          ]
+        },
+        {
+          "id": "dashboard-docs",
+          "title": "Documenter et valider le control plane Progress",
+          "status": "DONE",
+          "acceptance": [
+            "Les ADR, workflows, contrat UI et diagrammes internes décrivent le tableau sans l’exposer comme produit",
+            "Les validations Archify internes, validate et CRG passent"
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            "docs/decisions/ADR-0019-progress-execution-modes.md",
+            "docs/decisions/ADR-0022-local-progress-dashboard.md",
+            "docs/workflows/README.md",
+            ".project/ui-design-contract.json",
+            "docs/ui-design-contract.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/architecture/src/traffic.dataflow.json"
+          ],
+          "commands": [
+            "node .githooks/archify validate internal",
+            "npm run validate",
+            "npm run crg:smoke"
+          ],
+          "evidence": [
+            "node .githooks/archify validate internal",
+            "npm run validate",
+            "npm run crg:smoke",
+            "Chrome headless 1440x1000"
+          ]
+        }
+      ]
+    }
+  ]
 }

@@ -15,5 +15,12 @@
     { "id": "dialog", "role": "interrupt with focused content", "anatomy": ["title", "description", "content", "actions", "dismiss"], "variants": ["default", "alert"], "states": ["closed", "open", "focus", "busy"], "slots": ["title", "description", "content", "actions"], "accessibility": ["label", "focus-management", "escape", "inert-background"], "tokenPolicy": "tokens-only" }
   ],
   "rules": { "reuseBeforeCreate": true, "noArbitraryValues": true, "noInlineStyle": true, "noLayerFusion": true, "requiredEvidence": ["component-usage", "token-usage", "accessibility-review"], "allowedCustomComponents": "documented-with-rationale" },
-  "adapters": { "framework": "selected-by-derived-product", "required": false, "contractOnly": true }
+  "adapters": { "framework": "selected-by-derived-product", "required": false, "contractOnly": true },
+  "toolingEvidence": {
+    "progressDashboard": {
+      "components": ["action", "field", "surface", "dialog"],
+      "tokens": ["color.surface", "color.text", "color.primary", "color.danger", "space.1", "space.2", "space.3", "space.4", "space.6", "space.8", "type.body", "type.label", "type.heading", "radius.sm", "radius.md", "radius.lg", "motion.standard", "motion.reduced"],
+      "accessibility": ["native controls and landmarks", "persistent focus-visible treatment", "labelled fields and dialog", "polite live status", "responsive single-column fallback", "confirmation before approval and mode changes"]
+    }
+  }
 }

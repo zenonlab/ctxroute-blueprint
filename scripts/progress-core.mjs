@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, open } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
@@ -9,6 +10,7 @@ export const EXECUTION_MODES = Object.freeze(['collaborative', 'autonomous']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
+export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export async function readProgress(root = process.cwd()) {
   try {
@@ -71,9 +73,9 @@ export function validatePlan(plan, current = emptyProgress()) {
   return { ok: errors.length === 0, errors, normalized: normalizePlan(plan) };
 }
 
-export async function approvePlan(plan, root = process.cwd()) {
+export async function approvePlan(plan, root = process.cwd(), options = {}) {
   if (plan?.approved !== true) throw new Error('explicit approval is required: approved must be true');
-  const current = await readProgress(root); const result = validatePlan(plan, current);
+  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const result = validatePlan(plan, current);
   if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
   const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
   const json = `${JSON.stringify(next, null, 2)}\n`; if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
@@ -89,7 +91,7 @@ export function progressNext(value, goalId) {
   return { goalId: goal.id, mode: goal.executionMode ?? 'collaborative', complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ({ stepId: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) };
 }
 
-export async function setProgressMode(goalId, mode, userConfirmed, root = process.cwd()) {
+export async function setProgressMode(goalId, mode, userConfirmed, root = process.cwd(), options = {}) {
   if (!EXECUTION_MODES.includes(mode)) throw new Error(`mode must be one of: ${EXECUTION_MODES.join(', ')}`);
   if (mode === 'autonomous' && userConfirmed !== true) throw new Error('autonomous mode requires explicit userConfirmed: true');
   return updateProgress(root, current => {
@@ -97,10 +99,10 @@ export async function setProgressMode(goalId, mode, userConfirmed, root = proces
     if (index < 0) throw new Error(`Unknown goal: ${goalId}`);
     const goals = [...current.goals]; goals[index] = { ...goals[index], executionMode: mode, modeOffered: true };
     return { ...current, goals };
-  });
+  }, options);
 }
 
-export async function updateProgressStep({ goalId, stepId, status, evidence = [] }, root = process.cwd()) {
+export async function updateProgressStep({ goalId, stepId, status, evidence = [] }, root = process.cwd(), options = {}) {
   if (!STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
   if (!Array.isArray(evidence) || evidence.length > LIMITS.evidence || evidence.some(item => !shortReference(item))) throw new Error('evidence must contain short safe references');
   return updateProgress(root, current => {
@@ -114,7 +116,7 @@ export async function updateProgressStep({ goalId, stepId, status, evidence = []
     const goalStatus = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.length > 0 && remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE';
     const goals = [...current.goals]; goals[goalIndex] = { ...goal, status: goalStatus, steps };
     return { ...current, goals };
-  });
+  }, options);
 }
 
 export async function markModeOffered(goalId, root = process.cwd()) {
@@ -140,8 +142,17 @@ function safePath(value) {
 }
 async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
 
-async function updateProgress(root, transform) {
-  const current = await readProgress(root); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
+async function updateProgress(root, transform, options = {}) {
+  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
   if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
   await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
+}
+
+function assertExpectedRevision(current, expectedRevision) {
+  if (expectedRevision === undefined) return;
+  if (expectedRevision !== progressRevision(current)) {
+    const error = new Error('Progress changed since it was loaded');
+    error.code = 'PROGRESS_REVISION_CONFLICT';
+    throw error;
+  }
 }

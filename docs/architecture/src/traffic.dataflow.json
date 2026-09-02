@@ -11,7 +11,7 @@
     "viewBox": [1068, 780],
     "views": [
       { "id": "context-route", "label": "Context routing", "focus": ["request", "agent", "ctxroute", "mcp"], "note": "Follow a request into bounded context and tool calls." },
-      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "stop", "mcp", "archify"], "note": "Follow implementation traffic through MCP and diagram checks." },
+      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "stop", "mcp", "archify"], "note": "Follow implementation traffic through MCP, the authenticated local Progress adapter, and diagram checks." },
       { "id": "review-evidence", "label": "Review evidence", "focus": ["archify", "stop", "artifacts"], "note": "Follow the checked diagram into local evidence." }
     ]
   },
@@ -42,7 +42,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Session start stays quiet when CRG is healthy", "PreToolUse injects only targeted documentation", "MCP schemas remain bounded and allowlisted"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop recommends a product-facing Archify view from the changed paths", "Progress records the active mode and step evidence", "Archify validates both internal maps without publishing them as product diagrams"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop recommends a product-facing Archify view and presents the local Progress URL once per session", "Progress records the active mode and step evidence through one shared core", "Archify validates both internal maps without publishing them as product diagrams"] },
     { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
   ]
 }

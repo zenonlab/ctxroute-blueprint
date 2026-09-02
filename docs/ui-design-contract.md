@@ -30,3 +30,13 @@ The contract requires evidence for component usage, token usage, and an
 accessibility review. A product-specific adapter may enforce those fields in a
 framework-aware way later; this blueprint validator intentionally does not
 pretend to parse every frontend ecosystem.
+
+## Blueprint tooling adapter
+
+The local Progress dashboard reuses the action, field, surface, and dialog
+roles without changing the product framework policy. Its machine-readable
+`toolingEvidence.progressDashboard` entry records the token and accessibility
+mapping. Native buttons, checkbox, details, dialog, form, headings, and live
+status preserve keyboard and assistive-technology behavior; responsive CSS
+collapses the content grid to one column. Plan approval and execution-mode
+changes use an explicit confirmation step.

@@ -6,6 +6,7 @@ import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { listArchifyDiagrams } from '../../scripts/archify-registry.mjs';
 import { markModeOffered, progressNext, readProgress } from '../../scripts/progress-core.mjs';
 import { hasAutonomousOffer, hasNextStepHandoff, isExternallyBlocked } from '../../scripts/progress-handoff.mjs';
+import { dashboardSessionNotice } from '../../scripts/progress-dashboard-manager.mjs';
 
 async function main() {
   const input = JSON.parse(await stdin());
@@ -45,30 +46,44 @@ export async function progressContinuation(hookInput, options = {}) {
     if (!goal) return null;
     const next = progressNext(progress, goal.id);
     if (next.complete) return null;
+    const dashboard = await progressDashboardMessage(hookInput, root, options.dashboardNotice);
     const labels = next.next.map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
     if (isExternallyBlocked(goal)) {
-      return { continue: true, systemMessage: `Goal ${goal.id} is blocked externally. Handoff:\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
+      return { continue: true, systemMessage: joinDashboard(`Goal ${goal.id} is blocked externally. Handoff:\n${labels}\n${archifyInstruction(changed, diagrams)}`, dashboard) };
     }
     if (next.mode === 'autonomous') {
-      return { decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu'avec des preuves complètes.\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) };
+      return withDashboard({ decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu'avec des preuves complètes.\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) }, dashboard);
     }
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);
     const offerPresent = hasAutonomousOffer(hookInput.last_assistant_message);
     if (handoffPresent && (goal.modeOffered || offerPresent)) {
       if (!goal.modeOffered && offerPresent) await markModeOffered(goal.id, root);
-      return null;
+      return dashboard ? { continue: true, systemMessage: dashboard } : null;
     }
     let message = `Handoff — prochaines étapes pour ${goal.id}:\n${labels}`;
     message += `\nArchify à produire ou mettre à jour pour cette étape : ${archifyInstruction(changed, diagrams)}`;
     if (!goal.modeOffered) {
       message += '\nJe peux passer ce goal en mode automatique : j’enchaînerai toutes les étapes, chercherai moi-même les solutions et ne reviendrai qu’après vérification complète ou blocage externe réel.';
     }
-    return { decision: 'block', reason: message.slice(0, 1200) };
+    return withDashboard({ decision: 'block', reason: message.slice(0, 1200) }, dashboard);
   } catch (error) {
     return { systemMessage: `Progress handoff unavailable: ${String(error.message).slice(0, 240)}` };
   }
 }
+
+async function progressDashboardMessage(hookInput, root, notice = dashboardSessionNotice) {
+  if (!hookInput.session_id) return '';
+  try {
+    const dashboard = await notice(hookInput.session_id, root);
+    return dashboard ? `Tableau Progress local : ${dashboard.url}` : '';
+  } catch (error) {
+    return `Progress dashboard unavailable: ${String(error.message).slice(0, 240)}`;
+  }
+}
+
+function joinDashboard(message, dashboard) { return [message, dashboard].filter(Boolean).join('\n').slice(0, 1200); }
+function withDashboard(output, dashboard) { if (dashboard) output.systemMessage = dashboard; return output; }
 
 export async function recordPresentedOffer(hookInput, root = process.cwd()) {
   if (!hasAutonomousOffer(hookInput.last_assistant_message)) return;
