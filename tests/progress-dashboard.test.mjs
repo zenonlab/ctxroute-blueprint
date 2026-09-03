@@ -29,6 +29,10 @@ test('client request injects authentication and returns decoded JSON', async () 
   };
   try {
     assert.equal((await request('/api/progress')).revision, 'r1');
+    await request('/api/progress');
+    await request('/api/progress');
+    await request('/api/progress');
+    await request('/api/progress');
     assert.equal(received.path, '/api/progress');
     assert.equal(received.options.headers['Content-Type'], 'application/json');
   } finally {
