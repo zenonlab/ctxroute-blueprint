@@ -18,3 +18,9 @@
 
 - [x] **Corriger les défauts UX visibles et compacter les goals terminés** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, Chrome visual review mobile and desktop)_
 - [x] **Vérifier les états UX sur mobile et bureau** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, npx eslint and oxlint dashboard client tests, Chrome 390x844 and 1440x1000: no overflow or JavaScript errors)_
+
+## Rendre CTXRoute Progress durable et authentifié — DONE
+
+- [x] **Conserver le jeton lors des rechargements** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — 11/11 passing, Same-tab reload test restores the token from sessionStorage)_
+- [x] **Supprimer l expiration par défaut du serveur** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — explicit expiry and durable default pass, Detached instance health 200 and authenticated API 200)_
+- [x] **Aligner le contrat et les diagrammes internes** — DONE _(evidence: node .githooks/archify validate internal — 3/3 internal diagrams pass, npm run validate — 266 tests pass, 1 skipped, 0 failures)_

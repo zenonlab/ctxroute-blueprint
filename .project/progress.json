@@ -7,7 +7,7 @@
       "title": "Tableau web local pour CTXRoute Progress",
       "status": "DONE",
       "executionMode": "collaborative",
-      "modeOffered": false,
+      "modeOffered": true,
       "steps": [
         {
           "id": "dashboard-core",
@@ -269,6 +269,80 @@
             "node --test tests/progress-dashboard.test.mjs",
             "npx eslint and oxlint dashboard client tests",
             "Chrome 390x844 and 1440x1000: no overflow or JavaScript errors"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "fix-progress-dashboard-uptime",
+      "title": "Rendre CTXRoute Progress durable et authentifié",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "persist-dashboard-auth",
+          "title": "Conserver le jeton lors des rechargements",
+          "status": "DONE",
+          "acceptance": [
+            "Un rechargement du même onglet reste authentifié",
+            "Un accès sans jeton échoue toujours en 401"
+          ],
+          "files": [
+            "scripts/progress-dashboard-client.js",
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs — 11/11 passing",
+            "Same-tab reload test restores the token from sessionStorage"
+          ]
+        },
+        {
+          "id": "keep-dashboard-live",
+          "title": "Supprimer l expiration par défaut du serveur",
+          "status": "DONE",
+          "acceptance": [
+            "Le serveur détaché reste actif sans expiration par défaut",
+            "Une expiration explicite reste disponible et testée"
+          ],
+          "files": [
+            "scripts/progress-dashboard.mjs",
+            "scripts/progress-dashboard-manager.mjs",
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs — explicit expiry and durable default pass",
+            "Detached instance health 200 and authenticated API 200"
+          ]
+        },
+        {
+          "id": "document-dashboard-lifecycle",
+          "title": "Aligner le contrat et les diagrammes internes",
+          "status": "DONE",
+          "acceptance": [
+            "La documentation décrit la persistance du jeton et la durée de vie du serveur",
+            "Les sources Archify internes sont validées"
+          ],
+          "files": [
+            "docs/decisions/ADR-0022-local-progress-dashboard.md",
+            "docs/workflows/README.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/architecture/src/traffic.dataflow.json"
+          ],
+          "commands": [
+            "node .githooks/archify validate internal",
+            "npm run validate"
+          ],
+          "evidence": [
+            "node .githooks/archify validate internal — 3/3 internal diagrams pass",
+            "npm run validate — 266 tests pass, 1 skipped, 0 failures"
           ]
         }
       ]

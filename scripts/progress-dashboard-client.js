@@ -1,7 +1,19 @@
-/* global CSS, FormData, document, fetch, history, location */
+/* global CSS, FormData, document, fetch */
+const TOKEN_STORAGE_KEY = 'progress-dashboard-token';
+export function initializeDashboardToken(browser = globalThis) {
+  if (!browser.document) return '';
+  let fragment = '';
+  let stored = '';
+  try { fragment = decodeURIComponent(browser.location.hash.slice(1)); } catch {}
+  try { stored = browser.sessionStorage.getItem(TOKEN_STORAGE_KEY) || ''; } catch {}
+  if (fragment) {
+    try { browser.sessionStorage.setItem(TOKEN_STORAGE_KEY, fragment); } catch {}
+    browser.history.replaceState(null, '', browser.location.pathname);
+  }
+  return fragment || stored;
+}
 const inBrowser = typeof document !== 'undefined';
-const token = inBrowser ? decodeURIComponent(location.hash.slice(1)) : '';
-if (inBrowser) history.replaceState(null, '', location.pathname);
+const token = initializeDashboardToken();
 let revision = '';
 let progress = { goals: [] };
 const histories = new Map();

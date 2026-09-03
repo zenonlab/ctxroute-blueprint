@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
-import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
+import { DASHBOARD_BODY_LIMIT, DEFAULT_IDLE_MS, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { request } from '../scripts/progress-dashboard-client.js';
+import { initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
 const test_request_two = () => request('/api/progress');
@@ -50,6 +50,21 @@ test('client request injects authentication and returns decoded JSON', async () 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('client retains fragment authentication across same-tab reloads', () => {
+  const storage = new Map();
+  const replacements = [];
+  const browser = {
+    document: {},
+    location: { hash: '#fresh-token', pathname: '/' },
+    history: { replaceState: (...args) => replacements.push(args) },
+    sessionStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+  };
+  assert.equal(initializeDashboardToken(browser), 'fresh-token');
+  assert.deepEqual(replacements, [[null, '', '/']]);
+  browser.location.hash = '';
+  assert.equal(initializeDashboardToken(browser), 'fresh-token');
 });
 
 test('dashboard serves only local static resources with restrictive headers', async t => {
@@ -176,6 +191,17 @@ test('API bounds JSON bodies and idle expiry closes the local server', async () 
   const closed = new Promise(resolve => { resolveIdle = resolve; });
   await startProgressDashboard({ root, idleMs: 20, onIdle: server => server.close(resolveIdle) });
   await closed;
+});
+
+test('dashboard has no idle expiry by default', async t => {
+  assert.equal(DEFAULT_IDLE_MS, null);
+  const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-durable-'));
+  let expired = false;
+  const app = await startProgressDashboard({ root, onIdle: () => { expired = true; } });
+  t.after(() => app.server.close());
+  await new Promise(resolve => { setTimeout(resolve, 40); });
+  assert.equal(expired, false);
+  assert.equal(app.server.listening, true);
 });
 
 test('detached dashboard instances are reused and replaced after death', async () => {

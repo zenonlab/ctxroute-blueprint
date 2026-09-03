@@ -42,11 +42,12 @@ to one numeric IP family; accepted Host and Origin values remain limited to
 localhost and the standard IPv4/IPv6 loopback forms.
 
 The URL carries a random token in its fragment so HTTP requests and access logs
-cannot receive it. Client JavaScript removes the fragment and sends the token
-in a request header. Every API request checks that token and local request
+cannot receive it. Client JavaScript copies the token into tab-scoped
+`sessionStorage`, removes the fragment, and sends the token in a request header.
+Reloading that tab therefore remains authenticated without persisting the token
+across browser sessions. Every API request checks that token and local request
 metadata; JSON bodies are bounded, responses are not cached, and a restrictive
-CSP permits only bundled resources. The server writes no request logs and
-stops after inactivity.
+CSP permits only bundled resources. The server writes no request logs.
 
 All reads, validation, approval, edits, structural step changes, and mode
 changes call `progress-core`. Responses include a hash revision and stale
@@ -63,8 +64,10 @@ focus-managed confirmation followed by a temporary restore toast. Revision
 conflicts reload durable state while reapplying matching unsaved drafts.
 
 `progress_open_dashboard` starts or reuses a detached instance and never opens
-the system browser. Ignored state under `.ctxroute/state/` records the instance,
-PID, URL, token, and hashed session markers. Stop uses Codex's official
+the system browser. The default instance has no idle expiration so an issued
+dashboard link stays available for the project session; callers may still set
+an explicit idle timeout. Ignored state under `.ctxroute/state/` records the
+instance, PID, URL, token, and hashed session markers. Stop uses Codex's official
 `session_id`, stays silent without unfinished work, and reports dashboard
 failure without altering continuation policy. `stop_hook_active` returns before
 any dashboard work to prevent recursive Stop behavior.

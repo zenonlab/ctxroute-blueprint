@@ -12,12 +12,15 @@ blocker. In either mode, a goal whose unfinished steps are all `BLOCKED`
 produces a non-blocking handoff and never triggers another Stop loop or an
 autonomous-mode offer. `stop_hook_active` prevents recursive continuation loops.
 
-`progress_open_dashboard` starts or reuses a local dashboard without launching
-a browser. The first Stop in a Codex session that still has an unfinished goal
-adds the authenticated URL to `systemMessage`; later Stops reuse a marker keyed
-by a hash of `session_id`. A newly created replacement instance is announced
-again, while completed-only checklists do not start a server. Dashboard errors
-remain visible and fail open without changing the continuation decision.
+`progress_open_dashboard` starts or reuses a durable local dashboard without
+launching a browser. The default server has no idle expiration. Its fragment
+token moves into tab-scoped `sessionStorage`, so reloading the same tab remains
+authenticated after the fragment is removed. The first Stop in a Codex session
+that still has an unfinished goal adds the authenticated URL to `systemMessage`;
+later Stops reuse a marker keyed by a hash of `session_id`. A newly created
+replacement instance is announced again, while completed-only checklists do not
+start a server. Dashboard errors remain visible and fail open without changing
+the continuation decision.
 
 The browser loads all goals from `.project/progress.json` through
 `progress-core`, with completed goals hidden by default. Plan approval and mode

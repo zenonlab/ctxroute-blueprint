@@ -7,12 +7,17 @@ import { addProgressStep, approvePlan, deleteProgressStep, progressRevision, rea
 import { DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS } from './progress-dashboard-app.mjs';
 
 export const DASHBOARD_BODY_LIMIT = 32 * 1024;
-const DEFAULT_IDLE_MS = 30 * 60 * 1000;
+export const DEFAULT_IDLE_MS = null;
 const SECURITY_HEADERS = { 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' };
 
 export async function startProgressDashboard({ root = process.cwd(), token = randomBytes(32).toString('base64url'), instanceId = randomUUID(), idleMs = DEFAULT_IDLE_MS, statePath, onIdle } = {}) {
   let port = 0; let timer;
-  const touch = () => { clearTimeout(timer); timer = setTimeout(() => onIdle ? onIdle(server) : server.close(), idleMs); timer.unref?.(); };
+  const touch = () => {
+    clearTimeout(timer);
+    if (!Number.isFinite(idleMs) || idleMs <= 0) return;
+    timer = setTimeout(() => onIdle ? onIdle(server) : server.close(), idleMs);
+    timer.unref?.();
+  };
   const server = createServer(async (request, response) => {
     touch();
     try {
@@ -80,5 +85,6 @@ async function atomicState(path, value) { await mkdir(dirname(path), { recursive
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const root = process.argv[2] ? resolve(process.argv[2]) : process.cwd();
-  await startProgressDashboard({ root, token: process.env.PROGRESS_DASHBOARD_TOKEN, instanceId: process.env.PROGRESS_DASHBOARD_INSTANCE_ID, idleMs: Number(process.env.PROGRESS_DASHBOARD_IDLE_MS) || DEFAULT_IDLE_MS, statePath: process.env.PROGRESS_DASHBOARD_STATE_PATH });
+  const configuredIdleMs = process.env.PROGRESS_DASHBOARD_IDLE_MS;
+  await startProgressDashboard({ root, token: process.env.PROGRESS_DASHBOARD_TOKEN, instanceId: process.env.PROGRESS_DASHBOARD_INSTANCE_ID, idleMs: configuredIdleMs === undefined ? DEFAULT_IDLE_MS : Number(configuredIdleMs), statePath: process.env.PROGRESS_DASHBOARD_STATE_PATH });
 }
