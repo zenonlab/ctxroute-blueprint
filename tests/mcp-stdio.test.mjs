@@ -68,7 +68,9 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     assert.notEqual(approved.isError, true);
     const claim = JSON.parse((await client.callTool({ name: 'progress_claim_ticket', arguments: { goalId: plan.goalId, agentId: 'stdio-agent' } })).content[0].text);
     assert.equal(claim.ticket.assignee, 'stdio-agent');
-    assert.notEqual((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual' } })).isError, true);
+    const mode = JSON.parse((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual' } })).content[0].text);
+    assert.deepEqual(mode.goal, { id: plan.goalId, status: 'ACTIVE', executionMode: 'manual' });
+    assert.equal(mode.progress, undefined);
     const update = JSON.parse((await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', agentId: 'stdio-agent', status: 'DONE', evidence: ['npm test'] } })).content[0].text);
     assert.deepEqual(update, { ok: true, goalStatus: 'DONE', ticket: { stepId: 'step-1', status: 'DONE', assignee: 'stdio-agent', evidence: ['npm test'] } });
     const next = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });

@@ -44,6 +44,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Reuse existing functions, components, and patterns.
 - Define success criteria before coding.
 - Make the smallest viable change.
+- For a localized edit, send a narrow patch containing only changed fields or diff hunks; never resend or rewrite an entire file, document, ticket, or Progress state when a delta is sufficient.
 - Touch only necessary files.
 - Avoid speculative abstractions and refactors.
 - Verify every modification.

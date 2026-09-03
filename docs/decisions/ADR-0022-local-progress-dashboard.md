@@ -58,7 +58,8 @@ paths, bounds, unique identifiers, one step minimum, and the `DONE` proof rule.
 
 The dependency-free client is split into local HTML, CSS, and JavaScript
 resources. Step cards are collapsed by default and provide an immediate status
-select, debounced text autosave, page-local undo/redo history, numbered list
+select, field-delta debounced autosave with compact mutation acknowledgements,
+page-local undo/redo history, numbered list
 editors, mouse and keyboard ordering, inline errors, and deletion through a
 focus-managed confirmation followed by a temporary restore toast. Revision
 conflicts reload durable state while reapplying matching unsaved drafts.

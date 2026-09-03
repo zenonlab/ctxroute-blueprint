@@ -7,7 +7,7 @@ import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, DEFAULT_IDLE_MS, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
+import { buildStepPatch, initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
 const test_request_two = () => request('/api/progress');
@@ -67,6 +67,12 @@ test('client retains fragment authentication across same-tab reloads', () => {
   assert.equal(initializeDashboardToken(browser), 'fresh-token');
 });
 
+test('client builds autosave payloads from changed fields only', () => {
+  const value = { title: 'Small edit', acceptance: 'one\ntwo', files: 'large.js', commands: 'npm test', evidence: 'proof' };
+  assert.deepEqual(buildStepPatch('r1', value, ['title']), { revision: 'r1', title: 'Small edit' });
+  assert.deepEqual(buildStepPatch('r1', value, ['acceptance']), { revision: 'r1', acceptance: ['one', 'two'] });
+});
+
 test('dashboard serves only local static resources with restrictive headers', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   assert.ok(['::1', '127.0.0.1'].includes(app.server.address().address));
@@ -81,8 +87,8 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
   const javascript = await (await requestLocal(`${app.base}/app.js`)).text();
   assert.match(javascript, /setTimeout\(\(\) => saveCard\(card\), 500\)/u);
-  assert.match(javascript, /retainView\(await request/u);
-  assert.match(javascript, /setSaveState\(card, 'Saved'\)/u);
+  assert.match(javascript, /buildStepPatch/u);
+  assert.match(javascript, /pending\?\.size \? 'Modified' : 'Saved'/u);
   assert.match(javascript, /reloadPreservingDrafts/u);
   assert.match(javascript, /dataTransfer\.effectAllowed/u);
   assert.match(javascript, /target\.after\(dragged\)/u);
@@ -138,14 +144,18 @@ test('API updates editable goal and step fields and rejects stale revisions', as
   const step = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: renamed.revision, title: 'Verify all', acceptance: ['Tests and lint pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['node --test tests/progress-dashboard.test.mjs'], status: 'DONE', evidence: ['node --test tests/progress-dashboard.test.mjs'] }) });
   assert.equal(step.status, 200);
   const changed = await step.json();
-  assert.equal(changed.progress.goals[0].title, 'Ship clearly');
-  assert.equal(changed.progress.goals[0].steps[0].title, 'Verify all');
-  assert.deepEqual(changed.progress.goals[0].steps[0].acceptance, ['Tests and lint pass']);
+  assert.equal(changed.progress, undefined);
+  assert.equal(changed.goalStatus, 'DONE');
+  assert.equal(changed.step.title, 'Verify all');
+  assert.deepEqual(changed.step.acceptance, ['Tests and lint pass']);
+  const delta = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, title: 'Tiny edit' }) });
+  const tiny = await delta.json();
+  assert.deepEqual(tiny.step, { id: 'step-one', title: 'Tiny edit' });
   const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual' }) });
   assert.equal(stale.status, 409);
-  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, mode: 'manual' }) });
+  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual' }) });
   assert.equal(mode.status, 200);
-  assert.equal((await mode.json()).progress.goals[0].executionMode, 'manual');
+  assert.deepEqual((await mode.json()).goal, { id: 'goal-one', status: 'DONE', executionMode: 'manual' });
 });
 
 test('API adds, exactly reorders, deletes, and protects the last step', async t => {
