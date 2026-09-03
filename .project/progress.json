@@ -6,7 +6,7 @@
       "id": "progress-dashboard",
       "title": "Tableau web local pour CTXRoute Progress",
       "status": "DONE",
-      "executionMode": "collaborative",
+      "executionMode": "manual",
       "modeOffered": true,
       "steps": [
         {
@@ -116,7 +116,7 @@
       "id": "progress-dashboard-refactor",
       "title": "Refonte sobre du tableau CTXRoute Progress",
       "status": "DONE",
-      "executionMode": "collaborative",
+      "executionMode": "manual",
       "modeOffered": false,
       "steps": [
         {
@@ -225,7 +225,7 @@
       "id": "progress-dashboard-ux-polish",
       "title": "Polir l’expérience du tableau Progress",
       "status": "DONE",
-      "executionMode": "collaborative",
+      "executionMode": "manual",
       "modeOffered": false,
       "steps": [
         {
@@ -278,7 +278,7 @@
       "id": "fix-progress-dashboard-uptime",
       "title": "Rendre CTXRoute Progress durable et authentifié",
       "status": "DONE",
-      "executionMode": "collaborative",
+      "executionMode": "manual",
       "modeOffered": false,
       "steps": [
         {
@@ -343,6 +343,60 @@
           "evidence": [
             "node .githooks/archify validate internal — 3/3 internal diagrams pass",
             "npm run validate — 266 tests pass, 1 skipped, 0 failures"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "progress-auto-manual-routing",
+      "title": "Rendre Progress automatique par défaut et manuel seulement aux vrais points de décision",
+      "status": "DONE",
+      "executionMode": "automatic",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "route-progress-interaction",
+          "title": "Remplacer le blocage systématique par un routage automatic/manual ciblé",
+          "status": "DONE",
+          "acceptance": [
+            "Les nouveaux goals Progress démarrent en automatic",
+            "Manual est réservé aux validations visuelles et décisions importantes de changement ou design",
+            "Stop ne demande Archify que pour un changement architectural réellement détecté",
+            "Les anciens états collaborative/autonomous restent lisibles"
+          ],
+          "files": [
+            "AGENTS.md",
+            "README.md",
+            "scripts/progress-core.mjs",
+            "scripts/progress-mcp.mjs",
+            "scripts/progress-cli.mjs",
+            "scripts/progress-dashboard-client.js",
+            "scripts/progress-dashboard.html",
+            ".codex/hooks/stop-review.mjs",
+            ".claude/hooks/docs/progress-guidance.md",
+            ".project/ui-design-contract.json",
+            "docs/00-project-brief.md",
+            "docs/ui-design-contract.md",
+            "docs/workflows/README.md",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            "docs/decisions/ADR-0019-progress-execution-modes.md",
+            "docs/decisions/ADR-0022-local-progress-dashboard.md",
+            "docs/architecture/src/traffic.dataflow.json",
+            "tests/progress-core.test.mjs",
+            "tests/hooks.test.mjs",
+            "tests/progress-dashboard.test.mjs",
+            "tests/mcp-stdio.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs tests/hooks.test.mjs",
+            "npm run lint",
+            "npm run validate"
+          ],
+          "evidence": [
+            "node --test tests/progress-core.test.mjs tests/hooks.test.mjs tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs — 113 pass, 1 skip",
+            "node .githooks/archify validate internal — 3 diagrams pass",
+            "npm run validate — 267 pass, 1 skip"
           ]
         }
       ]

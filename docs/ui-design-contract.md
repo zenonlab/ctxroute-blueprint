@@ -41,6 +41,6 @@ forms, headings, and live status preserve keyboard and assistive-technology
 behavior. Step cards start collapsed; their handles support pointer drag and
 Alt + arrow movement, and list fields pair textareas with scroll-synchronized
 line-number gutters. Responsive CSS collapses fields to one column and keeps
-controls at least 44 px high. Plan approval, deletion, and execution-mode
-changes use focus-managed dialogs; inline errors and save states are announced
-without a native prompt.
+controls at least 44 px high. Deletion uses a focus-managed dialog; validated
+plan creation and execution-mode changes save directly. Inline errors and save
+states are announced without a native prompt.

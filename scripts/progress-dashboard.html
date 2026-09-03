@@ -23,8 +23,8 @@
     <form method="dialog"><h2 id="confirm-title">Confirm</h2><p id="confirm-description"></p><div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary" value="confirm">Confirm</button></div></form>
   </dialog>
   <dialog id="plan-dialog" aria-labelledby="plan-title">
-    <h2 id="plan-title">Create a plan</h2><p class="muted">The JSON will be validated before explicit approval.</p>
-    <form id="plan-form"><label>Plan JSON<textarea name="plan" required spellcheck="false"></textarea></label><p class="field-error" data-plan-error></p><div class="dialog-actions"><button id="cancel-plan" type="button">Cancel</button><button class="primary" type="submit">Validate</button></div></form>
+    <h2 id="plan-title">Create a plan</h2><p class="muted">The JSON is validated before the plan is created.</p>
+    <form id="plan-form"><label>Plan JSON<textarea name="plan" required spellcheck="false"></textarea></label><p class="field-error" data-plan-error></p><div class="dialog-actions"><button id="cancel-plan" type="button">Cancel</button><button class="primary" type="submit">Create</button></div></form>
   </dialog>
   <aside id="toast" class="toast" role="status" aria-live="polite" hidden><span></span><button type="button">Undo</button></aside>
 <script src="/app.js" type="module"></script>

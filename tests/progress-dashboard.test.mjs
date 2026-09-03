@@ -141,11 +141,11 @@ test('API updates editable goal and step fields and rejects stale revisions', as
   assert.equal(changed.progress.goals[0].title, 'Ship clearly');
   assert.equal(changed.progress.goals[0].steps[0].title, 'Verify all');
   assert.deepEqual(changed.progress.goals[0].steps[0].acceptance, ['Tests and lint pass']);
-  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'autonomous', userConfirmed: true }) });
+  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual' }) });
   assert.equal(stale.status, 409);
-  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, mode: 'autonomous', userConfirmed: true }) });
+  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, mode: 'manual' }) });
   assert.equal(mode.status, 200);
-  assert.equal((await mode.json()).progress.goals[0].executionMode, 'autonomous');
+  assert.equal((await mode.json()).progress.goals[0].executionMode, 'manual');
 });
 
 test('API adds, exactly reorders, deletes, and protects the last step', async t => {

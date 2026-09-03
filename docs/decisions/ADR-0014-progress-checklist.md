@@ -22,16 +22,17 @@ revised: true
 
 ## Context
 
-Agents need a small durable representation of an approved plan that can be
+Agents need a small durable representation of a validated plan that can be
 read by CLI, MCP, hooks, and CTXRoute without turning Plan mode into a writer.
 
 ## Decision
 
 Use `.project/progress.json` as the sole source of truth and generate the short
 `docs/progress.md` view from it. A shared Node.js `progress-core` validates
-bounded plans and writes both files atomically only after explicit approval.
-It persists `executionMode` and `modeOffered` per goal, with `collaborative` as
-the migration/default mode. Approval freezes goal and step identifiers, not the
+bounded plans and writes both files atomically after an authorized request.
+The `approved: true` field is a write flag rather than a second conversational
+approval when the plan faithfully restates that request. It persists
+`executionMode` per goal, with `automatic` as the default. Materialization freezes goal and step identifiers, not the
 displayed content or step structure. Goal titles, step titles, criteria, files,
 commands, evidence, additions, deletions, and exact ordering are mutable only
 through visible, validated, revision-checked user actions backed by the shared
@@ -50,7 +51,7 @@ the final step of a goal cannot be deleted.
 
 ## Consequences
 
-Validation is read-only and approval is a separate operation. The contract
+Validation is read-only and materialization is a separate operation. The contract
 supports up to 20 goals, 30 steps per goal, and 10 evidence references per
 step, with a 64 KiB JSON limit. No hook edits the checklist automatically.
 Agents must start from the repository root and restart after MCP manifest

@@ -35,7 +35,7 @@ deliberately and verify the result.
 | --- | --- |
 | Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
-| Persistent execution | Progress MCP tracks approved goals, evidence, and collaborative or explicitly confirmed autonomous execution. |
+| Persistent execution | Progress MCP tracks goals and evidence with automatic execution and targeted manual pauses. |
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
@@ -99,14 +99,15 @@ after discovery.
 Approved plans are stored in [`.project/progress.json`](.project/progress.json).
 The generated [short view](docs/progress.md) is informational and must not be
 edited directly. Validation is read-only; materialization requires short
-validation evidence and explicit `approved: true`.
+validation evidence. `approved: true` is the write flag; a matching explicit
+user request is sufficient unless the plan introduces a consequential choice.
 
 ```sh
 npm run progress:read
 npm run progress:status
 npm run progress:next -- goal-id
 npm run progress:update -- update.json
-npm run progress:mode -- goal-id autonomous
+npm run progress:mode -- goal-id automatic
 npm run progress:validate -- plan.json
 npm run progress:approve -- plan.json
 ```
@@ -114,9 +115,12 @@ npm run progress:approve -- plan.json
 Progress supports multiple goals, atomic idempotent writes, bounded step
 evidence, and exactly two execution modes:
 
-- `collaborative` is the default and keeps meaningful decisions with the user.
-- `autonomous` is enabled only after an explicit user request and directs the
-  agent to complete and verify the whole approved goal before returning.
+- `automatic` is the default for requested implementation and verification.
+- `manual` is a targeted pause for a visual review or an important product,
+  change, or design decision that the user has not already made.
+
+Legacy `autonomous` and `collaborative` values remain readable and normalize to
+`automatic` and `manual` respectively.
 
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
 

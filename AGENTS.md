@@ -30,7 +30,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 - Before significant mutating work, read the checklist with `progress_status`.
 - Create and validate a bounded plan with `progress_validate_plan` before changing files.
-- Materialize a plan with `progress_approve_plan` only after explicit user approval.
+- Materialize a validated plan automatically when it is a faithful breakdown of an explicit user request. Ask first only when the plan introduces a consequential product, architecture, or design choice that the user has not already made.
 - Update each active step with `progress_update_step`; `DONE` requires short validation evidence.
 - Use the matching `npm run progress:*` command only when the project MCP is unavailable.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
@@ -39,7 +39,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 - Read existing files before writing.
 - Read the relevant documents and diagrams before changing code.
-- For structural changes, read the Archify architecture source and relevant ADRs.
+- For changes that materially alter a boundary, contract, dependency, or system flow, read the Archify architecture source and relevant ADRs. A routine feature or internal implementation change does not require Archify by itself.
 - Reuse existing functions, components, and patterns.
 - Define success criteria before coding.
 - Make the smallest viable change.
@@ -62,7 +62,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 - Update documentation when architecture, contracts, flows, state, or dependencies change.
 - After a code change, explicitly determine whether a document or diagram must change.
-- Before adding a module, contract, or dependency, update the Archify architecture source.
+- Before changing an architectural boundary, public contract, dependency, or cross-component flow, update the relevant Archify architecture source. Do not update a diagram solely because a requested feature adds ordinary implementation code.
 - Store diagrams as versioned text.
 - Use typed Archify JSON IR for executable, readable architecture diagrams.
 - Record important decisions in `docs/decisions/`.

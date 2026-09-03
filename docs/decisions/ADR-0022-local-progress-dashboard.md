@@ -49,9 +49,9 @@ across browser sessions. Every API request checks that token and local request
 metadata; JSON bodies are bounded, responses are not cached, and a restrictive
 CSP permits only bundled resources. The server writes no request logs.
 
-All reads, validation, approval, edits, structural step changes, and mode
+All reads, validation, plan creation, edits, structural step changes, and mode
 changes call `progress-core`. Responses include a hash revision and stale
-mutations fail with HTTP 409. Approval freezes identifiers, while titles,
+mutations fail with HTTP 409. Plan creation freezes identifiers, while titles,
 criteria, files, commands, evidence, status, and step structure remain editable
 through explicit UI operations. Atomic validation preserves safe relative
 paths, bounds, unique identifiers, one step minimum, and the `DONE` proof rule.

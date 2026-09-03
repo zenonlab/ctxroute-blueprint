@@ -88,7 +88,7 @@ questions, trade-offs, and research anchors used to make these decisions.
 - `[architecture, tests, and cross-platform CI evidence]`
 
 For the blueprint control plane, the Progress dashboard succeeds when its real
-HTTP and MCP tests cover local access controls, plan validation and approval,
-immutable approved structure, mutable status/evidence/mode, revision conflicts,
+HTTP and MCP tests cover local access controls, plan validation and creation,
+immutable plan identity, mutable status/evidence/mode, revision conflicts,
 idle expiry, instance reuse and Stop session deduplication. The complete
 repository validation, internal Archify validation, and CRG gate must pass.

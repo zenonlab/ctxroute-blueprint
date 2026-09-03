@@ -2,15 +2,19 @@
 
 ## Progress and Stop
 
-The Progress MCP is the durable source for approved goals, mutable step status,
-evidence, and the active per-goal mode. Goals are collaborative by default.
-After approval, the agent may offer autonomous execution once; only explicit
-user confirmation activates it. In collaborative mode Stop returns a compact
-handoff with up to three next steps. In autonomous mode Stop requests
-continuation until every step is `DONE`, or hands off a documented external
-blocker. In either mode, a goal whose unfinished steps are all `BLOCKED`
-produces a non-blocking handoff and never triggers another Stop loop or an
-autonomous-mode offer. `stop_hook_active` prevents recursive continuation loops.
+The Progress MCP is the durable source for goals, mutable step status, evidence,
+and the active per-goal mode. Goals are `automatic` by default, so Stop requests
+continuation until every step is `DONE` or a real external blocker is recorded.
+`manual` is a targeted pause only for a visual review or a consequential
+product/change/design decision not already made by the user. Routine feature
+implementation, tests, and documentation remain automatic. In either mode, a
+goal whose unfinished steps are all `BLOCKED` produces a non-blocking handoff.
+`stop_hook_active` prevents recursive continuation loops.
+
+Stop mentions Archify only when an Archify source is already part of the
+change. A diagram is needed only when a material boundary, public contract,
+dependency, or cross-component flow changes; ordinary feature code does not
+trigger one by filename heuristic.
 
 `progress_open_dashboard` starts or reuses a durable local dashboard without
 launching a browser. The default server has no idle expiration. Its fragment
@@ -23,8 +27,8 @@ start a server. Dashboard errors remain visible and fail open without changing
 the continuation decision.
 
 The browser loads all goals from `.project/progress.json` through
-`progress-core`, with completed goals hidden by default. Plan approval and mode
-changes require confirmation. Step status and short evidence remain mutable;
+`progress-core`, with completed goals hidden by default. Plan creation validates
+before writing, and mode changes save directly. Step status and short evidence remain mutable;
 approved titles, criteria, files, and commands do not. Every response includes
 an optimistic revision, and HTTP 409 requires the browser to reload before
 retrying.

@@ -66,7 +66,7 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     assert.notEqual(validated.isError, true);
     const approved = await client.callTool({ name: 'progress_approve_plan', arguments: { ...plan, approved: true } });
     assert.notEqual(approved.isError, true);
-    assert.notEqual((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'autonomous', userConfirmed: true } })).isError, true);
+    assert.notEqual((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual' } })).isError, true);
     assert.notEqual((await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', status: 'DONE', evidence: ['npm test'] } })).isError, true);
     const next = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
     assert.match(next.content[0].text, /"complete": true/u);

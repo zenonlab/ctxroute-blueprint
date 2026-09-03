@@ -24,3 +24,7 @@
 - [x] **Conserver le jeton lors des rechargements** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — 11/11 passing, Same-tab reload test restores the token from sessionStorage)_
 - [x] **Supprimer l expiration par défaut du serveur** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — explicit expiry and durable default pass, Detached instance health 200 and authenticated API 200)_
 - [x] **Aligner le contrat et les diagrammes internes** — DONE _(evidence: node .githooks/archify validate internal — 3/3 internal diagrams pass, npm run validate — 266 tests pass, 1 skipped, 0 failures)_
+
+## Rendre Progress automatique par défaut et manuel seulement aux vrais points de décision — DONE
+
+- [x] **Remplacer le blocage systématique par un routage automatic/manual ciblé** — DONE _(evidence: node --test tests/progress-core.test.mjs tests/hooks.test.mjs tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs — 113 pass, 1 skip, node .githooks/archify validate internal — 3 diagrams pass, npm run validate — 267 pass, 1 skip)_

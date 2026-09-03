@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
-import { progressContinuation } from '../.codex/hooks/stop-review.mjs';
+import { archifyInstruction, progressContinuation } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
@@ -449,21 +449,22 @@ test('an active Stop hook does not loop', () => {
   assert.match(result.stdout, /continue/u);
 });
 
-test('Stop collaborative policy offers autonomous mode once and accepts a complete handoff', async () => {
-  const cwd = progressWorkspace({ statuses: ['TODO'] });
+test('Stop mentions Archify only when a diagram source actually changed', () => {
+  assert.equal(archifyInstruction(['scripts/new-feature.mjs'], []), '');
+  assert.equal(archifyInstruction(['scripts/progress-core.mjs'], []), '');
+  assert.match(archifyInstruction(['docs/architecture/src/traffic.dataflow.json'], [{ id: 'traffic', type: 'dataflow', source: 'docs/architecture/src/traffic.dataflow.json' }]), /dataflow \(traffic\)/u);
+});
+
+test('Stop manual policy pauses only for a decision or visual review and accepts a handoff', async () => {
+  const cwd = progressWorkspace({ mode: 'manual', statuses: ['TODO'] });
   const first = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
   assert.equal(first.decision, 'block');
-  assert.match(first.reason, /prochaines étapes/u);
-  assert.match(first.reason, /mode automatique/u);
+  assert.match(first.reason, /Pause manuelle/u);
+  assert.doesNotMatch(first.reason, /Archify/u);
   assert.ok(first.reason.length <= 1200);
 
-  const accepted = await progressContinuation({ last_assistant_message: 'Prochaine étape: step-1. Je peux utiliser le mode automatique.' }, { root: cwd, changed: [], diagrams: [] });
+  const accepted = await progressContinuation({ last_assistant_message: 'Décision requise pour step-1.' }, { root: cwd, changed: [], diagrams: [] });
   assert.equal(accepted, null);
-  const stored = JSON.parse(readFileSync(join(cwd, '.project/progress.json'), 'utf8'));
-  assert.equal(stored.goals[0].modeOffered, true);
-
-  const repeated = await progressContinuation({ last_assistant_message: 'Prochaine étape: step-1.' }, { root: cwd, changed: [], diagrams: [] });
-  assert.equal(repeated, null);
 });
 
 test('Stop adds the dashboard once for an active session and keeps progression policy', async () => {
@@ -493,19 +494,20 @@ test('Stop does not start a dashboard without active goals and dashboard failure
   assert.match(result.systemMessage, /unavailable: simulated failure/u);
 });
 
-test('Stop autonomous policy continues TODO and IN_PROGRESS work', async () => {
+test('Stop automatic policy continues TODO and IN_PROGRESS work', async () => {
   for (const status of ['TODO', 'IN_PROGRESS']) {
-    const cwd = progressWorkspace({ mode: 'autonomous', statuses: [status] });
+    const cwd = progressWorkspace({ mode: 'automatic', statuses: [status] });
     const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
     assert.equal(result.decision, 'block', status);
-    assert.match(result.reason, /Continue ce goal en mode automatique/u);
+    assert.match(result.reason, /Continue ce goal automatiquement/u);
+    assert.doesNotMatch(result.reason, /Archify/u);
     assert.match(result.reason, new RegExp(`\\[${status}\\]`, 'u'));
     assert.ok(result.reason.length <= 1200);
   }
 });
 
 test('Stop hands off an external block in either mode without a continuation loop', async () => {
-  for (const mode of ['collaborative', 'autonomous']) {
+  for (const mode of ['manual', 'automatic']) {
     const blocked = progressWorkspace({ mode, statuses: ['BLOCKED', 'BLOCKED'] });
     const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
     assert.equal(handoff.continue, true, mode);
@@ -513,12 +515,12 @@ test('Stop hands off an external block in either mode without a continuation loo
     assert.doesNotMatch(JSON.stringify(handoff), /"decision":"block"|mode automatique/u, mode);
   }
 
-  const done = progressWorkspace({ mode: 'autonomous', statuses: ['DONE'], goalStatus: 'DONE' });
+  const done = progressWorkspace({ mode: 'automatic', statuses: ['DONE'], goalStatus: 'DONE' });
   assert.equal(await progressContinuation({}, { root: done, changed: [], diagrams: [] }), null);
 });
 
 test('Stop continuation remains bounded to three current steps after compaction', async () => {
-  const cwd = progressWorkspace({ mode: 'autonomous', statuses: ['IN_PROGRESS', 'BLOCKED', 'TODO', 'TODO'] });
+  const cwd = progressWorkspace({ mode: 'automatic', statuses: ['IN_PROGRESS', 'BLOCKED', 'TODO', 'TODO'] });
   const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
   assert.match(result.reason, /step-1/u);
   assert.match(result.reason, /step-2/u);
@@ -822,7 +824,7 @@ function initializedWorkspace() {
   return cwd;
 }
 
-function progressWorkspace({ mode = 'collaborative', statuses, goalStatus = statuses.every(status => status === 'DONE') ? 'DONE' : statuses.every(status => status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE' }) {
+function progressWorkspace({ mode = 'automatic', statuses, goalStatus = statuses.every(status => status === 'DONE') ? 'DONE' : statuses.every(status => status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE' }) {
   const cwd = mkdtempSync(join(tmpdir(), 'stop-progress-'));
   mkdirSync(join(cwd, '.project'), { recursive: true });
   mkdirSync(join(cwd, 'docs'), { recursive: true });
