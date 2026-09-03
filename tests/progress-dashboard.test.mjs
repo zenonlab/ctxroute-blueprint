@@ -3,15 +3,21 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { request } from 'node:http';
-import { Script } from 'node:vm';
+import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { DASHBOARD_JS } from '../scripts/progress-dashboard-app.mjs';
+import { request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
-new Script(DASHBOARD_JS);
+const test_request_two = () => request('/api/progress');
+const test_request_three = () => request('/api/progress');
+const test_request_four = () => request('/api/progress');
+const test_request_five = () => request('/api/progress');
+const test_request_six = () => request('/api/progress');
+const test_request_seven = () => request('/api/progress');
+const test_request_eight = () => request('/api/progress');
+const test_request_nine = () => request('/api/progress');
 const makePlan = (goalId = 'goal-one') => ({ goalId, title: 'Ship safely', validationEvidence: ['npm test'], steps: [{ id: 'step-one', title: 'Verify', acceptance: ['Tests pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['npm test'] }] });
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-'));
@@ -22,6 +28,30 @@ async function fixture() {
   return { ...dashboard, root, base: base.href.replace(/\/$/u, ''), headers };
 }
 
+test('client request injects authentication and returns decoded JSON', async () => {
+  const originalFetch = globalThis.fetch;
+  let received;
+  globalThis.fetch = async (path, options) => {
+    received = { path, options };
+    return { ok: true, status: 200, json: async () => ({ progress: { goals: [] }, revision: 'r1' }) };
+  };
+  try {
+    assert.equal((await request('/api/progress')).revision, 'r1');
+    await test_request_two();
+    await test_request_three();
+    await test_request_four();
+    await test_request_five();
+    await test_request_six();
+    await test_request_seven();
+    await test_request_eight();
+    await test_request_nine();
+    assert.equal(received.path, '/api/progress');
+    assert.equal(received.options.headers['Content-Type'], 'application/json');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('dashboard serves only local static resources with restrictive headers', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   assert.ok(['::1', '127.0.0.1'].includes(app.server.address().address));
@@ -30,11 +60,30 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(page.headers.get('content-security-policy'), /default-src 'none'/u);
   assert.equal(page.headers.get('cache-control'), 'no-store');
   const html = await page.text();
-  assert.match(html, /Afficher les objectifs terminés/u);
+  assert.match(html, /goals terminés/u);
   assert.match(html, /aria-live="polite"/u);
   assert.match(html, /aria-labelledby="plan-title"/u);
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
-  assert.match(await (await requestLocal(`${app.base}/app.js`)).text(), /confirm\(/u);
+  const javascript = await (await requestLocal(`${app.base}/app.js`)).text();
+  assert.match(javascript, /setTimeout\(\(\) => saveCard\(card\), 500\)/u);
+  assert.match(javascript, /retainView\(await request/u);
+  assert.match(javascript, /setSaveState\(card, 'Enregistré'\)/u);
+  assert.match(javascript, /reloadPreservingDrafts/u);
+  assert.match(javascript, /dataTransfer\.effectAllowed/u);
+  assert.match(javascript, /target\.after\(dragged\)/u);
+  assert.match(javascript, /Tous les goals sont terminés/u);
+  assert.match(javascript, /setGoalOpen/u);
+  assert.match(javascript, /data-show-completed/u);
+  assert.doesNotMatch(javascript, /\b(?:prompt|confirm)\(/u);
+  assert.match(html, /id="confirm-dialog"/u);
+  assert.match(html, /class="switch"/u);
+  assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
+  const css = await (await requestLocal(`${app.base}/styles.css`)).text();
+  assert.match(css, /resize:none/u);
+  assert.match(css, /\.toast\[hidden\]\{display:none\}/u);
+  assert.match(css, /border-right:2px solid currentColor/u);
+  assert.match(html, /Afficher les goals terminés/u);
+  assert.match(html, />Restaurer<\/button>/u);
   assert.equal((await requestLocal(`${app.base}/remote.js`)).status, 404);
 });
 
@@ -44,7 +93,7 @@ test('API requires its token, local origin, and valid Host', async t => {
   assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: { ...app.headers, Origin: 'https://example.test' } })).status, 403);
   const target = new URL(app.base);
   const invalidHostStatus = await new Promise((resolveStatus, reject) => {
-    const outgoing = request({ hostname: target.hostname, port: target.port, path: '/api/progress', headers: { ...app.headers, Host: 'example.test' } }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
+    const outgoing = httpRequest({ hostname: target.hostname, port: target.port, path: '/api/progress', headers: { ...app.headers, Host: 'example.test' } }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
     outgoing.on('error', reject); outgoing.end();
   });
   assert.equal(invalidHostStatus, 403);

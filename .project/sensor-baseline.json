@@ -1,4 +1,17 @@
 {
   "schemaVersion": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "path": "scripts/progress-dashboard-client.js",
+      "rule": "sensor/ssrf",
+      "occurrences": 1,
+      "justification": "Reviewed same-origin dashboard helper: every caller supplies an internal /api/ path and the server still enforces localhost Host, Origin, and token checks."
+    },
+    {
+      "path": "scripts/progress-dashboard-client.js",
+      "rule": "sensor/sql-injection",
+      "occurrences": 1,
+      "justification": "False positive on a debounced same-origin HTTP PATCH; the dashboard has no SQL client or database query sink."
+    }
+  ]
 }
