@@ -1,14 +1,16 @@
 import { mkdir, readFile, rename, open } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
-export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, evidence: 10, text: 500, next: 3 };
+export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['collaborative', 'autonomous']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
+export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export async function readProgress(root = process.cwd()) {
   try {
@@ -30,16 +32,17 @@ function inspectProgressChecklist(value) {
     if (!text(goal?.title)) errors.push(`goal ${goal?.id ?? '(missing)'} needs a title`);
     if (goal?.executionMode !== undefined && !EXECUTION_MODES.includes(goal.executionMode)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid executionMode`);
     if (goal?.modeOffered !== undefined && (goal.modeOffered !== true && goal.modeOffered !== false)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid modeOffered`);
-    if (!Array.isArray(goal?.steps) || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs at most ${LIMITS.steps} steps`); continue; }
+    if (!Array.isArray(goal?.steps) || goal.steps.length < 1 || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs 1-${LIMITS.steps} steps`); continue; }
     const stepIds = new Set();
     for (const step of goal.steps) {
       if (!isId(step?.id) || stepIds.has(step.id)) errors.push(`goal ${goal.id} has duplicate or invalid step id`); stepIds.add(step?.id);
       if (!text(step?.title) || !STATUSES.has(step?.status)) errors.push(`step ${step?.id ?? '(missing)'} has invalid title or status`);
       for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands, evidence: step?.evidence })) {
-        if (!Array.isArray(list) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} needs ${name}`);
+        if (!Array.isArray(list) || list.length > (name === 'evidence' ? LIMITS.evidence : LIMITS.references) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} needs bounded ${name}`);
         for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`step ${step?.id ?? '(missing)'} contains an invalid ${name} reference`);
       }
       if ((step?.evidence?.length ?? 0) > LIMITS.evidence) errors.push(`step ${step.id} has too many evidence references`);
+      if (step?.status === 'DONE' && step?.evidence?.length === 0) errors.push(`step ${step.id} requires evidence when DONE`);
     }
   }
   return errors;
@@ -71,9 +74,9 @@ export function validatePlan(plan, current = emptyProgress()) {
   return { ok: errors.length === 0, errors, normalized: normalizePlan(plan) };
 }
 
-export async function approvePlan(plan, root = process.cwd()) {
+export async function approvePlan(plan, root = process.cwd(), options = {}) {
   if (plan?.approved !== true) throw new Error('explicit approval is required: approved must be true');
-  const current = await readProgress(root); const result = validatePlan(plan, current);
+  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const result = validatePlan(plan, current);
   if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
   const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
   const json = `${JSON.stringify(next, null, 2)}\n`; if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
@@ -89,7 +92,7 @@ export function progressNext(value, goalId) {
   return { goalId: goal.id, mode: goal.executionMode ?? 'collaborative', complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ({ stepId: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) };
 }
 
-export async function setProgressMode(goalId, mode, userConfirmed, root = process.cwd()) {
+export async function setProgressMode(goalId, mode, userConfirmed, root = process.cwd(), options = {}) {
   if (!EXECUTION_MODES.includes(mode)) throw new Error(`mode must be one of: ${EXECUTION_MODES.join(', ')}`);
   if (mode === 'autonomous' && userConfirmed !== true) throw new Error('autonomous mode requires explicit userConfirmed: true');
   return updateProgress(root, current => {
@@ -97,24 +100,67 @@ export async function setProgressMode(goalId, mode, userConfirmed, root = proces
     if (index < 0) throw new Error(`Unknown goal: ${goalId}`);
     const goals = [...current.goals]; goals[index] = { ...goals[index], executionMode: mode, modeOffered: true };
     return { ...current, goals };
-  });
+  }, options);
 }
 
-export async function updateProgressStep({ goalId, stepId, status, evidence = [] }, root = process.cwd()) {
-  if (!STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
-  if (!Array.isArray(evidence) || evidence.length > LIMITS.evidence || evidence.some(item => !shortReference(item))) throw new Error('evidence must contain short safe references');
+export async function updateProgressGoal(goalId, { title }, root = process.cwd(), options = {}) {
   return updateProgress(root, current => {
-    const goalIndex = current.goals.findIndex(goal => goal.id === goalId);
-    if (goalIndex < 0) throw new Error(`Unknown goal: ${goalId}`);
+    const goalIndex = findGoalIndex(current, goalId);
+    const goals = [...current.goals]; goals[goalIndex] = { ...goals[goalIndex], title };
+    return { ...current, goals };
+  }, options);
+}
+
+export async function updateProgressStep({ goalId, stepId, status, title, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
+  if (status !== undefined && !STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
+  return updateProgress(root, current => {
+    const goalIndex = findGoalIndex(current, goalId);
     const goal = current.goals[goalIndex]; const stepIndex = goal.steps.findIndex(step => step.id === stepId);
     if (stepIndex < 0) throw new Error(`Unknown step: ${stepId}`);
-    if (status === 'DONE' && evidence.length === 0 && goal.steps[stepIndex].evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
-    const steps = [...goal.steps]; steps[stepIndex] = { ...steps[stepIndex], status, evidence: evidence.length ? [...new Set(evidence)] : steps[stepIndex].evidence };
-    const remaining = steps.filter(step => step.status !== 'DONE');
-    const goalStatus = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.length > 0 && remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE';
-    const goals = [...current.goals]; goals[goalIndex] = { ...goal, status: goalStatus, steps };
+    const existing = goal.steps[stepIndex];
+    const changed = { ...existing };
+    if (status !== undefined) changed.status = status;
+    if (title !== undefined) changed.title = title;
+    if (acceptance !== undefined) changed.acceptance = copyList(acceptance);
+    if (files !== undefined) changed.files = copyList(files);
+    if (commands !== undefined) changed.commands = copyList(commands);
+    if (evidence !== undefined) changed.evidence = copyList(evidence);
+    if (changed.status === 'DONE' && changed.evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
+    const steps = [...goal.steps]; steps[stepIndex] = changed;
+    const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, steps);
     return { ...current, goals };
-  });
+  }, options);
+}
+
+export async function addProgressStep(goalId, step, root = process.cwd(), options = {}) {
+  return updateProgress(root, current => {
+    const goalIndex = findGoalIndex(current, goalId); const goal = current.goals[goalIndex];
+    if (goal.steps.some(item => item.id === step?.id)) throw new Error(`Duplicate step id: ${step.id}`);
+    const added = { id: step?.id, title: step?.title, status: step?.status ?? 'TODO', acceptance: copyList(step?.acceptance), files: copyList(step?.files), commands: copyList(step?.commands), evidence: copyList(step?.evidence ?? []) };
+    if (added.status === 'DONE' && added.evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
+    const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, [...goal.steps, added]);
+    return { ...current, goals };
+  }, options);
+}
+
+export async function deleteProgressStep(goalId, stepId, root = process.cwd(), options = {}) {
+  return updateProgress(root, current => {
+    const goalIndex = findGoalIndex(current, goalId); const goal = current.goals[goalIndex];
+    if (!goal.steps.some(step => step.id === stepId)) throw new Error(`Unknown step: ${stepId}`);
+    if (goal.steps.length === 1) throw new Error('Cannot delete the last step');
+    const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, goal.steps.filter(step => step.id !== stepId));
+    return { ...current, goals };
+  }, options);
+}
+
+export async function reorderProgressSteps(goalId, stepIds, root = process.cwd(), options = {}) {
+  return updateProgress(root, current => {
+    const goalIndex = findGoalIndex(current, goalId); const goal = current.goals[goalIndex];
+    if (!Array.isArray(stepIds) || stepIds.length !== goal.steps.length || new Set(stepIds).size !== stepIds.length || stepIds.some(id => !goal.steps.some(step => step.id === id))) throw new Error('stepIds must contain every step id exactly once');
+    const byId = new Map(goal.steps.map(step => [step.id, step])); const steps = stepIds.map(id => byId.get(id));
+    const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, steps);
+    return { ...current, goals };
+  }, options);
 }
 
 export async function markModeOffered(goalId, root = process.cwd()) {
@@ -140,8 +186,22 @@ function safePath(value) {
 }
 async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
 
-async function updateProgress(root, transform) {
-  const current = await readProgress(root); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
+async function updateProgress(root, transform, options = {}) {
+  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
+  const errors = inspectProgressChecklist(next); if (errors.length) throw new Error(errors.join('; '));
   if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
   await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
+}
+
+function findGoalIndex(current, goalId) { const index = current.goals.findIndex(goal => goal.id === goalId); if (index < 0) throw new Error(`Unknown goal: ${goalId}`); return index; }
+function copyList(value) { return Array.isArray(value) ? [...value] : value; }
+function withDerivedStatus(goal, steps) { const remaining = steps.filter(step => step.status !== 'DONE'); const status = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE'; return { ...goal, status, steps }; }
+
+function assertExpectedRevision(current, expectedRevision) {
+  if (expectedRevision === undefined) return;
+  if (expectedRevision !== progressRevision(current)) {
+    const error = new Error('Progress changed since it was loaded');
+    error.code = 'PROGRESS_REVISION_CONFLICT';
+    throw error;
+  }
 }
