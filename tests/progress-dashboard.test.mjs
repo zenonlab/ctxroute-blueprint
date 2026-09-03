@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { request } from 'node:http';
+import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { request as dashboardRequest } from '../scripts/progress-dashboard-client.js';
+import { request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
 const makePlan = (goalId = 'goal-one') => ({ goalId, title: 'Ship safely', validationEvidence: ['npm test'], steps: [{ id: 'step-one', title: 'Verify', acceptance: ['Tests pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['npm test'] }] });
@@ -28,7 +28,7 @@ test('client request injects authentication and returns decoded JSON', async () 
     return { ok: true, status: 200, json: async () => ({ progress: { goals: [] }, revision: 'r1' }) };
   };
   try {
-    assert.equal((await dashboardRequest('/api/progress')).revision, 'r1');
+    assert.equal((await request('/api/progress')).revision, 'r1');
     assert.equal(received.path, '/api/progress');
     assert.equal(received.options.headers['Content-Type'], 'application/json');
   } finally {
@@ -77,7 +77,7 @@ test('API requires its token, local origin, and valid Host', async t => {
   assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: { ...app.headers, Origin: 'https://example.test' } })).status, 403);
   const target = new URL(app.base);
   const invalidHostStatus = await new Promise((resolveStatus, reject) => {
-    const outgoing = request({ hostname: target.hostname, port: target.port, path: '/api/progress', headers: { ...app.headers, Host: 'example.test' } }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
+    const outgoing = httpRequest({ hostname: target.hostname, port: target.port, path: '/api/progress', headers: { ...app.headers, Host: 'example.test' } }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
     outgoing.on('error', reject); outgoing.end();
   });
   assert.equal(invalidHostStatus, 403);
