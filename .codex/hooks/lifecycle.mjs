@@ -12,15 +12,20 @@ export const lifecycleEvents = [
   'UserPromptSubmit',
   'PreCompact',
   'Stop',
+  'SubagentStart',
+  'SubagentStop',
+  'SessionEnd',
 ];
 
 const MAX_CONTEXT_LENGTH = 4096;
+const MAX_SUBAGENT_CONTEXT_LENGTH = 64 * 1024;
 const CTXROUTE_BUDGET = '0';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot) {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
   const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
+  const progressSubagent = event => ({ name: 'progress-subagent.mjs', path: join(root, '.codex', 'hooks', 'progress-subagent.mjs'), args: [harness, event] });
   const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
   const ctxroute = harness === 'codex' || harness === 'claude' ? direct : null;
   if (!ctxroute) return [];
@@ -32,6 +37,9 @@ export function handlerPlan(harness, event, root = projectRoot) {
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],
+    SubagentStart: [progressSubagent('SubagentStart')],
+    SubagentStop: [progressSubagent('SubagentStop')],
+    SessionEnd: [progressSubagent('SessionEnd')],
   }[event] ?? [];
 }
 
@@ -59,7 +67,7 @@ export function mergeOutputs(event, outputs, notices = []) {
     }
   }
 
-  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), MAX_CONTEXT_LENGTH);
+  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), event === 'SubagentStart' ? MAX_SUBAGENT_CONTEXT_LENGTH : MAX_CONTEXT_LENGTH);
   if (Object.keys(hookSpecificOutput).length) {
     hookSpecificOutput.hookEventName ??= event;
     merged.hookSpecificOutput = hookSpecificOutput;

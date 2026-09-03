@@ -16,7 +16,7 @@ export async function openProgressDashboard(root = process.cwd(), options = {}) 
   const token = randomBytes(32).toString('base64url');
   const instanceId = randomUUID();
   const environment = { ...process.env, PROGRESS_DASHBOARD_TOKEN: token, PROGRESS_DASHBOARD_INSTANCE_ID: instanceId, PROGRESS_DASHBOARD_STATE_PATH: statePath };
-  if (options.idleMs) environment.PROGRESS_DASHBOARD_IDLE_MS = String(options.idleMs);
+  if (options.idleMs !== undefined) environment.PROGRESS_DASHBOARD_IDLE_MS = String(options.idleMs);
   const child = spawn(process.execPath, [join(moduleRoot, 'scripts', 'progress-dashboard.mjs'), resolve(root)], {
     cwd: root,
     detached: true,

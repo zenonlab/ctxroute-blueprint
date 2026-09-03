@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
-import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
+import { DASHBOARD_BODY_LIMIT, DEFAULT_IDLE_MS, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { request } from '../scripts/progress-dashboard-client.js';
+import { buildStepPatch, initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
 const test_request_two = () => request('/api/progress');
@@ -52,6 +52,27 @@ test('client request injects authentication and returns decoded JSON', async () 
   }
 });
 
+test('client retains fragment authentication across same-tab reloads', () => {
+  const storage = new Map();
+  const replacements = [];
+  const browser = {
+    document: {},
+    location: { hash: '#fresh-token', pathname: '/' },
+    history: { replaceState: (...args) => replacements.push(args) },
+    sessionStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+  };
+  assert.equal(initializeDashboardToken(browser), 'fresh-token');
+  assert.deepEqual(replacements, [[null, '', '/']]);
+  browser.location.hash = '';
+  assert.equal(initializeDashboardToken(browser), 'fresh-token');
+});
+
+test('client builds autosave payloads from changed fields only', () => {
+  const value = { title: 'Small edit', acceptance: 'one\ntwo', files: 'large.js', commands: 'npm test', evidence: 'proof' };
+  assert.deepEqual(buildStepPatch('r1', value, ['title']), { revision: 'r1', title: 'Small edit' });
+  assert.deepEqual(buildStepPatch('r1', value, ['acceptance']), { revision: 'r1', acceptance: ['one', 'two'] });
+});
+
 test('dashboard serves only local static resources with restrictive headers', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   assert.ok(['::1', '127.0.0.1'].includes(app.server.address().address));
@@ -66,8 +87,8 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
   const javascript = await (await requestLocal(`${app.base}/app.js`)).text();
   assert.match(javascript, /setTimeout\(\(\) => saveCard\(card\), 500\)/u);
-  assert.match(javascript, /retainView\(await request/u);
-  assert.match(javascript, /setSaveState\(card, 'Saved'\)/u);
+  assert.match(javascript, /buildStepPatch/u);
+  assert.match(javascript, /pending\?\.size \? 'Modified' : 'Saved'/u);
   assert.match(javascript, /reloadPreservingDrafts/u);
   assert.match(javascript, /dataTransfer\.effectAllowed/u);
   assert.match(javascript, /target\.after\(dragged\)/u);
@@ -76,6 +97,11 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(javascript, /data-show-completed/u);
   assert.doesNotMatch(javascript, /\b(?:prompt|confirm)\(/u);
   assert.match(html, /id="confirm-dialog"/u);
+  assert.match(html, /id="mode-dialog"/u);
+  assert.match(html, /value="visual-review"/u);
+  assert.match(html, /value="important-decision"/u);
+  assert.match(javascript, /chooseManualReason/u);
+  assert.doesNotMatch(javascript, /userConfirmed/u);
   assert.match(html, /class="switch"/u);
   assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
   const css = await (await requestLocal(`${app.base}/styles.css`)).text();
@@ -123,14 +149,20 @@ test('API updates editable goal and step fields and rejects stale revisions', as
   const step = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: renamed.revision, title: 'Verify all', acceptance: ['Tests and lint pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['node --test tests/progress-dashboard.test.mjs'], status: 'DONE', evidence: ['node --test tests/progress-dashboard.test.mjs'] }) });
   assert.equal(step.status, 200);
   const changed = await step.json();
-  assert.equal(changed.progress.goals[0].title, 'Ship clearly');
-  assert.equal(changed.progress.goals[0].steps[0].title, 'Verify all');
-  assert.deepEqual(changed.progress.goals[0].steps[0].acceptance, ['Tests and lint pass']);
-  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'autonomous', userConfirmed: true }) });
+  assert.equal(changed.progress, undefined);
+  assert.equal(changed.goalStatus, 'DONE');
+  assert.equal(changed.step.title, 'Verify all');
+  assert.deepEqual(changed.step.acceptance, ['Tests and lint pass']);
+  const delta = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, title: 'Tiny edit' }) });
+  const tiny = await delta.json();
+  assert.deepEqual(tiny.step, { id: 'step-one', title: 'Tiny edit' });
+  const unconfirmed = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual' }) });
+  assert.equal(unconfirmed.status, 400);
+  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual', manualReason: 'important-decision' }) });
   assert.equal(stale.status, 409);
-  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, mode: 'autonomous', userConfirmed: true }) });
+  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual', manualReason: 'important-decision' }) });
   assert.equal(mode.status, 200);
-  assert.equal((await mode.json()).progress.goals[0].executionMode, 'autonomous');
+  assert.deepEqual((await mode.json()).goal, { id: 'goal-one', status: 'DONE', executionMode: 'manual', manualReason: 'important-decision' });
 });
 
 test('API adds, exactly reorders, deletes, and protects the last step', async t => {
@@ -176,6 +208,17 @@ test('API bounds JSON bodies and idle expiry closes the local server', async () 
   const closed = new Promise(resolve => { resolveIdle = resolve; });
   await startProgressDashboard({ root, idleMs: 20, onIdle: server => server.close(resolveIdle) });
   await closed;
+});
+
+test('dashboard has no idle expiry by default', async t => {
+  assert.equal(DEFAULT_IDLE_MS, null);
+  const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-durable-'));
+  let expired = false;
+  const app = await startProgressDashboard({ root, onIdle: () => { expired = true; } });
+  t.after(() => app.server.close());
+  await new Promise(resolve => { setTimeout(resolve, 40); });
+  assert.equal(expired, false);
+  assert.equal(app.server.listening, true);
 });
 
 test('detached dashboard instances are reused and replaced after death', async () => {

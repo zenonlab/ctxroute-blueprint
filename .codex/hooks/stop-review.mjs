@@ -4,14 +4,13 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { listArchifyDiagrams } from '../../scripts/archify-registry.mjs';
-import { markModeOffered, progressNext, readProgress } from '../../scripts/progress-core.mjs';
-import { hasAutonomousOffer, hasNextStepHandoff, isExternallyBlocked } from '../../scripts/progress-handoff.mjs';
+import { progressNext, readProgress } from '../../scripts/progress-core.mjs';
+import { hasNextStepHandoff, isExternallyBlocked } from '../../scripts/progress-handoff.mjs';
 import { dashboardSessionNotice } from '../../scripts/progress-dashboard-manager.mjs';
 
 async function main() {
   const input = JSON.parse(await stdin());
   if (input.stop_hook_active) {
-    await recordPresentedOffer(input);
     process.stdout.write(JSON.stringify({ continue: true }));
     return;
   }
@@ -48,24 +47,19 @@ export async function progressContinuation(hookInput, options = {}) {
     if (next.complete) return null;
     const dashboard = await progressDashboardMessage(hookInput, root, options.dashboardNotice);
     const labels = next.next.map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
+    const archify = archifyInstruction(changed, diagrams);
     if (isExternallyBlocked(goal)) {
-      return { continue: true, systemMessage: joinDashboard(`Goal ${goal.id} is blocked externally. Handoff:\n${labels}\n${archifyInstruction(changed, diagrams)}`, dashboard) };
+      return { continue: true, systemMessage: joinDashboard([`Goal ${goal.id} is blocked externally. Handoff:\n${labels}`, archify].filter(Boolean).join('\n'), dashboard) };
     }
-    if (next.mode === 'autonomous') {
-      return withDashboard({ decision: 'block', reason: `Continue ce goal en mode automatique. Cherche toi-même la solution, exécute les étapes restantes, vérifie tous les critères et ne termine qu'avec des preuves complètes.\n${labels}\n${archifyInstruction(changed, diagrams)}`.slice(0, 1200) }, dashboard);
+    if (next.mode === 'automatic') {
+      const message = [`Progress asynchrone — tickets disponibles ou en cours pour ${goal.id}:\n${labels}`, archify, dashboard].filter(Boolean).join('\n').slice(0, 1200);
+      return message ? { continue: true, systemMessage: message } : null;
     }
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);
-    const offerPresent = hasAutonomousOffer(hookInput.last_assistant_message);
-    if (handoffPresent && (goal.modeOffered || offerPresent)) {
-      if (!goal.modeOffered && offerPresent) await markModeOffered(goal.id, root);
-      return dashboard ? { continue: true, systemMessage: dashboard } : null;
-    }
-    let message = `Handoff — prochaines étapes pour ${goal.id}:\n${labels}`;
-    message += `\nArchify à produire ou mettre à jour pour cette étape : ${archifyInstruction(changed, diagrams)}`;
-    if (!goal.modeOffered) {
-      message += '\nJe peux passer ce goal en mode automatique : j’enchaînerai toutes les étapes, chercherai moi-même les solutions et ne reviendrai qu’après vérification complète ou blocage externe réel.';
-    }
+    if (handoffPresent) return dashboard ? { continue: true, systemMessage: dashboard } : null;
+    let message = `Pause manuelle — décision importante ou validation visuelle requise pour ${goal.id}:\n${labels}`;
+    if (archify) message += `\n${archify}`;
     return withDashboard({ decision: 'block', reason: message.slice(0, 1200) }, dashboard);
   } catch (error) {
     return { systemMessage: `Progress handoff unavailable: ${String(error.message).slice(0, 240)}` };
@@ -85,21 +79,12 @@ async function progressDashboardMessage(hookInput, root, notice = dashboardSessi
 function joinDashboard(message, dashboard) { return [message, dashboard].filter(Boolean).join('\n').slice(0, 1200); }
 function withDashboard(output, dashboard) { if (dashboard) output.systemMessage = dashboard; return output; }
 
-export async function recordPresentedOffer(hookInput, root = process.cwd()) {
-  if (!hasAutonomousOffer(hookInput.last_assistant_message)) return;
-  try {
-    const progress = await readProgress(root);
-    const goal = progress.goals.find(item => item.status !== 'DONE');
-    if (goal && !goal.modeOffered) await markModeOffered(goal.id, root);
-  } catch {}
-}
-
 export function archifyInstruction(changed, diagrams = listArchifyDiagrams(process.cwd()).filter(diagram => diagram.audience === 'product')) {
   const source = changed.find(path => path.startsWith('docs/architecture/src/') && path.endsWith('.json'));
   const selected = source ? diagrams.find(diagram => diagram.source === source) : null;
   if (selected) return `${selected.type} (${selected.id}) — vérifier avec npm run archify:validate -- ${selected.id}`;
-  const hint = changed.some(path => /(?:mcp|ctxroute|progress|traffic|dataflow|lineage)/iu.test(path)) ? 'dataflow' : changed.some(path => /(?:api|request|response|sequence|trace|call)/iu.test(path)) ? 'sequence' : changed.some(path => /(?:state|status|retry|wait|lifecycle)/iu.test(path)) ? 'lifecycle' : changed.some(path => /(?:hook|workflow|ci|runbook)/iu.test(path)) ? 'workflow' : 'architecture';
-  return `${hint} — choisir la vue Archify qui décrit le résultat, l’ajouter sous docs/architecture/src/, puis lancer npm run archify:validate -- ${hint}`;
+  if (source) return `source Archify ${source} — vérifier le registre et lancer npm run archify:validate`;
+  return '';
 }
 
 function gitChangedFiles(root = process.cwd()) {

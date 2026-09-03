@@ -35,7 +35,7 @@ deliberately and verify the result.
 | --- | --- |
 | Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
-| Persistent execution | Progress MCP tracks approved goals, evidence, and collaborative or explicitly confirmed autonomous execution. |
+| Persistent execution | Progress MCP tracks goals and evidence with automatic execution and targeted manual pauses. |
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
@@ -53,7 +53,7 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
+3. In Codex, open `/hooks` and approve the nine workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
@@ -96,36 +96,59 @@ after discovery.
 
 ### Progress checklist
 
-Approved plans are stored in [`.project/progress.json`](.project/progress.json).
+Tracked plans are stored in [`.project/progress.json`](.project/progress.json).
 The generated [short view](docs/progress.md) is informational and must not be
 edited directly. Validation is read-only; materialization requires short
-validation evidence and explicit `approved: true`.
+validation evidence. `approved: true` is the write flag; a matching explicit
+user request is sufficient unless the plan introduces a consequential choice.
 
 ```sh
 npm run progress:read
 npm run progress:status
 npm run progress:next -- goal-id
+npm run progress:claim -- agent-id goal-id
 npm run progress:update -- update.json
-npm run progress:mode -- goal-id autonomous
+npm run progress:mode -- goal-id automatic
+npm run progress:mode -- goal-id manual visual-review
 npm run progress:validate -- plan.json
 npm run progress:approve -- plan.json
 ```
 
 Progress supports multiple goals, atomic idempotent writes, bounded step
-evidence, and exactly two execution modes:
+evidence, compact CLI/MCP acknowledgements, and exactly two execution modes:
 
-- `collaborative` is the default and keeps meaningful decisions with the user.
-- `autonomous` is enabled only after an explicit user request and directs the
-  agent to complete and verify the whole approved goal before returning.
+- `automatic` is the default for requested implementation and verification.
+- `manual` is a targeted pause for a visual review or an important product,
+  change, or design decision that the user has not already made.
+
+Legacy `autonomous` and `collaborative` values remain readable and normalize to
+`automatic` and `manual` respectively.
+
+Progress is optional for small or single-agent changes. For substantial
+parallel work, agents atomically claim distinct tickets, work independently,
+then report the final status and evidence once. A short, jittered, bounded lock
+wait prevents concurrent writes from overwriting another agent while absorbing
+local claim bursts, and mutation tools return compact replies.
+Automatic goals are advisory at Stop and never force a continuation loop.
+For subagents, `SubagentStart` atomically claims the next `automatic` ticket and
+injects its criteria, files, commands, and required final `PROGRESS_RESULT`
+footer. `SubagentStop` settles only that opaque session/agent claim; malformed
+results return it to `TODO`, and `SessionEnd` releases only that session's
+remaining `IN_PROGRESS` claims. Main agents continue to use the explicit MCP
+flow. The eight MCP tools and voluntary full resource are unchanged.
 
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
+Codex and Claude Code discover it from their project manifests. Any other local
+MCP client with stdio support can connect by launching `npm run progress:mcp`
+from the repository root; remote-only clients require an explicit transport
+adapter and do not discover this local server automatically.
 
 ### Local MCP servers
 
 The repository exposes two independent stdio servers:
 
 - `ctxroute-progress` runs `npm run progress:mcp` and exposes checklist,
-  step-update, next-step, and execution-mode tools.
+  atomic ticket claim, compact result reporting, next-step, and mode tools.
 - `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read and
   context tools from official CRG v2.3.8 against the ignored local graph.
 
@@ -159,7 +182,8 @@ guidance to agent actions through one project-local dispatcher. Rules live in
 Claude-compatible tooling.
 
 The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
-`UserPromptSubmit`, `PreCompact`, and `Stop`. Healthy CRG startup adds no
+`UserPromptSubmit`, `PreCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and
+`SessionEnd`. Healthy CRG startup adds no
 context. Targeted documentation is injected before relevant tool calls, and
 only the minimum required context is restored after compaction.
 
@@ -171,6 +195,7 @@ few turns while an agent is only exploring the project.
 CRG update, problem memory, documentation audit, and Archify preview support.
 It does not start MCP servers; the clients own their stdio transports. CRG
 failures and its 30-second timeout fail open with a short visible diagnostic.
+No `PostToolUse` handler changes Progress status.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process

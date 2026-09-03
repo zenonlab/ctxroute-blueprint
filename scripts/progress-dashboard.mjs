@@ -3,16 +3,22 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { addProgressStep, approvePlan, deleteProgressStep, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
+import { addProgressStep, approvePlan, deleteProgressStep, ensureProgressView, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
 import { DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS } from './progress-dashboard-app.mjs';
 
 export const DASHBOARD_BODY_LIMIT = 32 * 1024;
-const DEFAULT_IDLE_MS = 30 * 60 * 1000;
+export const DEFAULT_IDLE_MS = null;
 const SECURITY_HEADERS = { 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' };
 
 export async function startProgressDashboard({ root = process.cwd(), token = randomBytes(32).toString('base64url'), instanceId = randomUUID(), idleMs = DEFAULT_IDLE_MS, statePath, onIdle } = {}) {
+  await ensureProgressView(root);
   let port = 0; let timer;
-  const touch = () => { clearTimeout(timer); timer = setTimeout(() => onIdle ? onIdle(server) : server.close(), idleMs); timer.unref?.(); };
+  const touch = () => {
+    clearTimeout(timer);
+    if (!Number.isFinite(idleMs) || idleMs <= 0) return;
+    timer = setTimeout(() => onIdle ? onIdle(server) : server.close(), idleMs);
+    timer.unref?.();
+  };
   const server = createServer(async (request, response) => {
     touch();
     try {
@@ -34,16 +40,19 @@ export async function startProgressDashboard({ root = process.cwd(), token = ran
       }
       if (request.method === 'POST' && url.pathname === '/api/plans/approve') return sendProgress(response, await approvePlan(body.plan, root, { expectedRevision: body.revision }));
       const goal = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})$/u);
-      if (request.method === 'PATCH' && goal) return sendProgress(response, await updateProgressGoal(goal[1], { title: body.title }, root, { expectedRevision: body.revision }));
+      if (request.method === 'PATCH' && goal) return sendGoalDelta(response, await updateProgressGoal(goal[1], { title: body.title }, root, { expectedRevision: body.revision }), goal[1], ['title']);
       const order = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps\/order$/u);
       if (request.method === 'PUT' && order) return sendProgress(response, await reorderProgressSteps(order[1], body.stepIds, root, { expectedRevision: body.revision }));
       const steps = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps$/u);
       if (request.method === 'POST' && steps) return sendProgress(response, await addProgressStep(steps[1], body.step, root, { expectedRevision: body.revision }));
       const step = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps\/([a-z][a-z0-9-]{0,63})$/u);
-      if (request.method === 'PATCH' && step) return sendProgress(response, await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, title: body.title, acceptance: body.acceptance, files: body.files, commands: body.commands, evidence: body.evidence }, root, { expectedRevision: body.revision }));
+      if (request.method === 'PATCH' && step) {
+        const progress = await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, title: body.title, acceptance: body.acceptance, files: body.files, commands: body.commands, evidence: body.evidence }, root, { expectedRevision: body.revision });
+        return sendStepDelta(response, progress, step[1], step[2], body);
+      }
       if (request.method === 'DELETE' && step) return sendProgress(response, await deleteProgressStep(step[1], step[2], root, { expectedRevision: body.revision }));
       const mode = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/mode$/u);
-      if (request.method === 'PATCH' && mode) return sendProgress(response, await setProgressMode(mode[1], body.mode, body.userConfirmed, root, { expectedRevision: body.revision }));
+      if (request.method === 'PATCH' && mode) return sendGoalDelta(response, await setProgressMode(mode[1], body.mode, body.manualReason, root, { expectedRevision: body.revision }), mode[1], ['executionMode', 'manualReason']);
       return sendJson(response, 404, { error: 'Introuvable' });
     } catch (error) {
       if (error.code === 'PROGRESS_REVISION_CONFLICT') return sendJson(response, 409, { error: error.message });
@@ -74,11 +83,24 @@ async function readJson(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 function sendProgress(response, progress) { return sendJson(response, 200, { progress, revision: progressRevision(progress) }); }
+function sendGoalDelta(response, progress, goalId, fields) {
+  const goal = progress.goals.find(item => item.id === goalId);
+  const included = ['id', 'status', ...fields].filter(field => field !== 'manualReason' || goal.executionMode === 'manual');
+  return sendJson(response, 200, { revision: progressRevision(progress), goal: Object.fromEntries(included.map(field => [field, goal[field]])) });
+}
+function sendStepDelta(response, progress, goalId, stepId, requested) {
+  const goal = progress.goals.find(item => item.id === goalId);
+  const step = goal.steps.find(item => item.id === stepId);
+  const changed = { id: step.id };
+  for (const field of ['status', 'title', 'acceptance', 'files', 'commands', 'evidence']) if (Object.hasOwn(requested, field)) changed[field] = step[field];
+  return sendJson(response, 200, { revision: progressRevision(progress), goalStatus: goal.status, step: changed });
+}
 function sendJson(response, status, value) { return send(response, status, `${JSON.stringify(value)}\n`, 'application/json; charset=utf-8'); }
 function send(response, status, body, type) { response.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type }); response.end(body); }
 async function atomicState(path, value) { await mkdir(dirname(path), { recursive: true }); const temporary = `${path}.${process.pid}.tmp`; const handle = await open(temporary, 'w', 0o600); try { await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`); } finally { await handle.close(); } await rename(temporary, path); }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const root = process.argv[2] ? resolve(process.argv[2]) : process.cwd();
-  await startProgressDashboard({ root, token: process.env.PROGRESS_DASHBOARD_TOKEN, instanceId: process.env.PROGRESS_DASHBOARD_INSTANCE_ID, idleMs: Number(process.env.PROGRESS_DASHBOARD_IDLE_MS) || DEFAULT_IDLE_MS, statePath: process.env.PROGRESS_DASHBOARD_STATE_PATH });
+  const configuredIdleMs = process.env.PROGRESS_DASHBOARD_IDLE_MS;
+  await startProgressDashboard({ root, token: process.env.PROGRESS_DASHBOARD_TOKEN, instanceId: process.env.PROGRESS_DASHBOARD_INSTANCE_ID, idleMs: configuredIdleMs === undefined ? DEFAULT_IDLE_MS : Number(configuredIdleMs), statePath: process.env.PROGRESS_DASHBOARD_STATE_PATH });
 }

@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { PROGRESS_TOOL_NAMES } from '../scripts/progress-mcp.mjs';
+import { approvePlan, readProgress, renderProgress } from '../scripts/progress-core.mjs';
 import { validateMcpInstallation } from '../scripts/validate-mcp-installation.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -50,11 +51,14 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
+    assert.equal(listed.tools.some(tool => tool.name === 'progress_read'), false);
     assert.ok(JSON.stringify(listed.tools).length < 6000, 'Progress MCP schemas must remain below 6,000 characters');
-    for (const name of ['progress_read', 'progress_status']) {
-      const response = await client.callTool({ name, arguments: {} });
-      assert.notEqual(response.isError, true, name);
-    }
+    const statusResponse = await client.callTool({ name: 'progress_status', arguments: {} });
+    assert.notEqual(statusResponse.isError, true);
+    const resources = await client.listResources();
+    assert.deepEqual(resources.resources.map(resource => resource.uri), ['ctxroute://progress/full']);
+    const full = await client.readResource({ uri: 'ctxroute://progress/full' });
+    assert.deepEqual(JSON.parse(full.contents[0].text), { schemaVersion: 1, goals: [] });
     const opened = JSON.parse((await client.callTool({ name: 'progress_open_dashboard', arguments: {} })).content[0].text);
     assert.match(opened.url, /^http:\/\/localhost:\d+\/#/u);
     assert.equal(opened.reused, false);
@@ -64,14 +68,59 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     const plan = { goalId: 'stdio-goal', title: 'Stdio proof', validationEvidence: ['npm test'], steps: [{ id: 'step-1', title: 'Verify transport', acceptance: ['All tools respond'], files: ['tests/mcp-stdio.test.mjs'], commands: ['npm test'] }] };
     const validated = await client.callTool({ name: 'progress_validate_plan', arguments: plan });
     assert.notEqual(validated.isError, true);
+    assert.deepEqual(JSON.parse(validated.content[0].text), { ok: true, errors: [] });
     const approved = await client.callTool({ name: 'progress_approve_plan', arguments: { ...plan, approved: true } });
     assert.notEqual(approved.isError, true);
-    assert.notEqual((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'autonomous', userConfirmed: true } })).isError, true);
-    assert.notEqual((await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', status: 'DONE', evidence: ['npm test'] } })).isError, true);
+    assert.equal(JSON.parse(approved.content[0].text).progress, undefined);
+    const premature = await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', agentId: 'stdio-agent', status: 'DONE', evidence: ['npm test'] } });
+    assert.equal(premature.isError, true);
+    const claim = JSON.parse((await client.callTool({ name: 'progress_claim_ticket', arguments: { goalId: plan.goalId, agentId: 'stdio-agent' } })).content[0].text);
+    assert.equal(claim.ticket.assignee, 'stdio-agent');
+    const unclassifiedManual = await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual' } });
+    assert.equal(unclassifiedManual.isError, true);
+    const mode = JSON.parse((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual', reason: 'visual-review' } })).content[0].text);
+    assert.deepEqual(mode.goal, { id: plan.goalId, status: 'ACTIVE', executionMode: 'manual', steps: 1, manualReason: 'visual-review' });
+    assert.equal(mode.progress, undefined);
+    const updateResponse = await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', agentId: 'stdio-agent', status: 'DONE', evidence: ['npm test'] } });
+    const update = JSON.parse(updateResponse.content[0].text);
+    assert.equal(update.goal.status, 'DONE');
+    assert.deepEqual(update.ticket, { stepId: 'step-1', status: 'DONE', assignee: 'stdio-agent', evidence: ['npm test'] });
     const next = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
-    assert.match(next.content[0].text, /"complete": true/u);
+    assert.match(next.content[0].text, /"complete":true/u);
+    assert.ok(validated.content[0].text.length < 100 && approved.content[0].text.length < 300 && updateResponse.content[0].text.length < 400);
     const state = JSON.parse(readFileSync(join(fixture, '.ctxroute/state/progress-dashboard.json'), 'utf8'));
     try { process.kill(state.pid, 'SIGTERM'); } catch {}
+  });
+});
+
+test('every MCP operation waits for startup view repair', async () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-ready-'));
+  const plan = { goalId: 'ready-goal', title: 'Startup repair', validationEvidence: ['tests/mcp-stdio.test.mjs'], steps: [{ id: 'step-1', title: 'Wait for repair', acceptance: ['View repaired first'], files: ['docs/progress.md'], commands: ['npm test'] }] };
+  await approvePlan({ ...plan, approved: true }, fixture);
+  writeFileSync(join(fixture, 'docs/progress.md'), '# stale\n');
+  const lock = join(fixture, '.ctxroute/state/progress.lock');
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, token: 'live-startup-owner' }));
+  await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
+    const release = setTimeout(() => { if (existsSync(lock)) unlinkSync(lock); }, 150);
+    const started = Date.now();
+    try {
+      const response = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
+      assert.notEqual(response.isError, true);
+      assert.ok(Date.now() - started >= 100, 'progress_next must wait for startup repair');
+    } finally { clearTimeout(release); if (existsSync(lock)) unlinkSync(lock); }
+  });
+  assert.equal(readFileSync(join(fixture, 'docs/progress.md'), 'utf8'), renderProgress(await readProgress(fixture)));
+});
+
+test('startup repair failures remain controlled MCP errors', async () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-invalid-'));
+  mkdirSync(join(fixture, '.project'));
+  writeFileSync(join(fixture, '.project/progress.json'), '{invalid');
+  await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
+    const failed = await client.callTool({ name: 'progress_status', arguments: {} });
+    assert.equal(failed.isError, true);
+    const listed = await client.listTools();
+    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
   });
 });
 

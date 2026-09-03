@@ -42,29 +42,37 @@ to one numeric IP family; accepted Host and Origin values remain limited to
 localhost and the standard IPv4/IPv6 loopback forms.
 
 The URL carries a random token in its fragment so HTTP requests and access logs
-cannot receive it. Client JavaScript removes the fragment and sends the token
-in a request header. Every API request checks that token and local request
+cannot receive it. Client JavaScript copies the token into tab-scoped
+`sessionStorage`, removes the fragment, and sends the token in a request header.
+Reloading that tab therefore remains authenticated without persisting the token
+across browser sessions. Every API request checks that token and local request
 metadata; JSON bodies are bounded, responses are not cached, and a restrictive
-CSP permits only bundled resources. The server writes no request logs and
-stops after inactivity.
+CSP permits only bundled resources. The server writes no request logs.
 
-All reads, validation, approval, edits, structural step changes, and mode
+All reads, validation, plan creation, edits, structural step changes, and mode
 changes call `progress-core`. Responses include a hash revision and stale
-mutations fail with HTTP 409. Approval freezes identifiers, while titles,
+mutations fail with HTTP 409. Plan creation freezes identifiers, while titles,
 criteria, files, commands, evidence, status, and step structure remain editable
 through explicit UI operations. Atomic validation preserves safe relative
 paths, bounds, unique identifiers, one step minimum, and the `DONE` proof rule.
+Dashboard startup also repairs a missing or stale generated Markdown view from
+the JSON source before serving requests.
 
 The dependency-free client is split into local HTML, CSS, and JavaScript
 resources. Step cards are collapsed by default and provide an immediate status
-select, debounced text autosave, page-local undo/redo history, numbered list
+select, field-delta debounced autosave with compact mutation acknowledgements,
+page-local undo/redo history, numbered list
 editors, mouse and keyboard ordering, inline errors, and deletion through a
 focus-managed confirmation followed by a temporary restore toast. Revision
 conflicts reload durable state while reapplying matching unsaved drafts.
+Selecting manual mode opens a small accessible reason dialog; only
+`visual-review` and `important-decision` are accepted and persisted.
 
 `progress_open_dashboard` starts or reuses a detached instance and never opens
-the system browser. Ignored state under `.ctxroute/state/` records the instance,
-PID, URL, token, and hashed session markers. Stop uses Codex's official
+the system browser. The default instance has no idle expiration so an issued
+dashboard link stays available for the project session; callers may still set
+an explicit idle timeout. Ignored state under `.ctxroute/state/` records the
+instance, PID, URL, token, and hashed session markers. Stop uses Codex's official
 `session_id`, stays silent without unfinished work, and reports dashboard
 failure without altering continuation policy. `stop_hook_active` returns before
 any dashboard work to prevent recursive Stop behavior.

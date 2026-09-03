@@ -28,6 +28,7 @@
     "crgUpdate": "npm run crg:update",
     "governanceCheck": "npm run governance:check",
     "progressRead": "npm run progress:read",
+    "progressClaim": "npm run progress:claim",
     "progressValidate": "npm run progress:validate",
     "progressApprove": "npm run progress:approve",
     "progressMcp": "npm run progress:mcp",

@@ -20,7 +20,7 @@
     "progressDashboard": {
       "components": ["action", "field", "surface", "dialog"],
       "tokens": ["color.surface", "color.text", "color.primary", "color.danger", "space.1", "space.2", "space.3", "space.4", "space.6", "space.8", "type.body", "type.label", "type.heading", "radius.sm", "radius.md", "radius.lg", "motion.standard", "motion.reduced"],
-      "accessibility": ["native controls and landmarks", "persistent focus-visible treatment", "labelled fields and focus-managed dialogs", "polite live status and inline errors", "collapsed accordion cards", "pointer and Alt-arrow ordering", "responsive single-column fallback with 44px touch controls", "confirmation before approval deletion and mode changes"]
+      "accessibility": ["native controls and landmarks", "persistent focus-visible treatment", "labelled fields and focus-managed deletion and manual-reason dialogs", "polite live status and inline errors", "collapsed accordion cards", "pointer and Alt-arrow ordering", "responsive single-column fallback with 44px touch controls", "validated direct plan creation and classified mode changes"]
     }
   }
 }

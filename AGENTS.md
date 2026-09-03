@@ -28,10 +28,12 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 ## Progress
 
-- Before significant mutating work, read the checklist with `progress_status`.
-- Create and validate a bounded plan with `progress_validate_plan` before changing files.
-- Materialize a plan with `progress_approve_plan` only after explicit user approval.
-- Update each active step with `progress_update_step`; `DONE` requires short validation evidence.
+- Progress is asynchronous coordination, never a prerequisite or global lock for implementation.
+- Skip Progress for small, reversible, or single-agent changes. For substantial parallel work, create tickets once, then let each agent atomically claim one with `progress_claim_ticket`.
+- Split independent tickets so agents can work concurrently. An agent writes Progress only when claiming a ticket and once after implementation and verification; do not mirror intermediate activity.
+- For subagents only, `SubagentStart` may claim an `automatic` ticket, `SubagentStop` may settle that owned ticket from a valid `PROGRESS_RESULT` footer, and `SessionEnd` may release the session's remaining claims. No `PostToolUse` hook changes Progress.
+- Report `DONE` or `BLOCKED` with short evidence after the work. If Progress is busy or unavailable, continue safe in-scope work and reconcile the ticket afterward.
+- Use `manual` only with reason `visual-review` or `important-decision` for an important undecided product/change/design choice. All other tickets remain `automatic` and never block Stop.
 - Use the matching `npm run progress:*` command only when the project MCP is unavailable.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
@@ -39,15 +41,16 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 - Read existing files before writing.
 - Read the relevant documents and diagrams before changing code.
-- For structural changes, read the Archify architecture source and relevant ADRs.
+- For changes that materially alter a boundary, contract, dependency, or system flow, read the Archify architecture source and relevant ADRs. A routine feature or internal implementation change does not require Archify by itself.
 - Reuse existing functions, components, and patterns.
 - Define success criteria before coding.
 - Make the smallest viable change.
+- For a localized edit, send a narrow patch containing only changed fields or diff hunks; never resend or rewrite an entire file, document, ticket, or Progress state when a delta is sufficient.
 - Touch only necessary files.
 - Avoid speculative abstractions and refactors.
 - Verify every modification.
 - Review the diff after each write.
-- Complete one step before starting the next.
+- Each agent completes one claimed ticket before taking another; independent agents may work in parallel.
 
 ## Audit
 
@@ -62,7 +65,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 - Update documentation when architecture, contracts, flows, state, or dependencies change.
 - After a code change, explicitly determine whether a document or diagram must change.
-- Before adding a module, contract, or dependency, update the Archify architecture source.
+- Before changing an architectural boundary, public contract, dependency, or cross-component flow, update the relevant Archify architecture source. Do not update a diagram solely because a requested feature adds ordinary implementation code.
 - Store diagrams as versioned text.
 - Use typed Archify JSON IR for executable, readable architecture diagrams.
 - Record important decisions in `docs/decisions/`.

@@ -60,7 +60,7 @@ function inspectHarness(root, relativePath, harness, failures) {
   const config = readJson(join(root, relativePath), failures, relativePath);
   const actualEvents = Object.keys(config?.hooks ?? {});
   if (actualEvents.length !== lifecycleEvents.length || lifecycleEvents.some(event => !actualEvents.includes(event))) {
-    failures.push(`${relativePath} must define exactly the six supported lifecycle events.`);
+    failures.push(`${relativePath} must define exactly the nine supported lifecycle events.`);
   }
   for (const event of lifecycleEvents) {
     const entries = (config?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []);
@@ -85,8 +85,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.error([...new Set(failures)].join('\n'));
     process.exit(1);
   }
-  console.log('CTXRoute and six lifecycle hooks are installed and verified.');
-  console.log('Codex local step: open /hooks and approve the six workspace definitions.');
+  console.log('CTXRoute and nine lifecycle hooks are installed and verified.');
+  console.log('Codex local step: open /hooks and approve the nine workspace definitions.');
   const globalHooks = inspectGlobalCtxrouteHooks();
   if (globalHooks.length) {
     console.warn(`Warning: ${globalHooks.length} global CTXRoute hook(s) were found in Codex config. Local project hooks are valid, but the global definitions will run in addition and may cause duplicate output. Disable the legacy global definitions manually after approving this workspace.`);

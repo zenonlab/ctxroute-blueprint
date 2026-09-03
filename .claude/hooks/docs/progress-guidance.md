@@ -5,25 +5,23 @@ mode: once
 
 # Agent progress checklist
 
-CTXRoute `match` entries are path substrings, not glob expressions. The
-frontmatter therefore names repository roots directly so this guidance reaches
-significant product, test, hook, documentation, and configuration changes.
-
-Read `.project/progress.json` before a significant change and verify that the
-change belongs to an existing goal. If it is not covered, add a short step to
-a structured plan. Produce the plan before modifying files, then call
-`progress_validate_plan` (or `npm run progress:validate`) first. Only after
-explicit approval may the agent call `progress_approve_plan` (or
-`npm run progress:approve`); `approved: true` is mandatory.
+Progress is optional asynchronous coordination, not a prerequisite for edits.
+Skip it for small or single-agent work. For substantial parallel work, create
+independent tickets once; each agent atomically claims one, works without
+intermediate Progress writes, then reports `DONE` or `BLOCKED` with evidence.
+If the MCP is busy or unavailable, continue safe work and reconcile afterward.
+Use the compact `progress_status` → `progress_next`/`progress_claim_ticket` →
+`progress_update_step` flow. Read the complete checklist only through the
+voluntary `ctxroute://progress/full` resource or the human diagnostic CLI.
 
 Never edit `.project/progress.json` or `docs/progress.md` directly. Never mark
 an item done without a short evidence reference. Do not create hooks,
 permissions, global rules, or `AGENTS.md` automatically. SQLite remains only
-for recurring-problem memory. PostToolUse may report missing checklist coverage
-but must not write the checklist.
-Progress usage: treat the approved checklist as the source of truth. The mode
-is `collaborative` unless the user explicitly asks to activate `autonomous`
-and confirms it. In collaborative mode, update each step and show up to three
-next steps. In autonomous mode, seek solutions yourself, execute all approved
-steps, verify every acceptance criterion, attach short evidence, and finish
-only when the goal is `DONE` or a real external blocker is documented.
+for recurring-problem memory. Only `SubagentStart`, `SubagentStop` (using its
+injected `PROGRESS_RESULT` footer), and `SessionEnd` mutate Progress automatically;
+main agents use MCP, and `PostToolUse` never writes the checklist.
+New goals use `automatic`, which never blocks Stop. Use `manual` only with
+reason `visual-review` or `important-decision` for the matching undecided choice.
+Persist that reason as `manualReason`; switching back to automatic clears it.
+Require Archify only for a material boundary, public contract, dependency, or
+cross-component flow change—not merely because feature code was added.

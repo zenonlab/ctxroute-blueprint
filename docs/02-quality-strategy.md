@@ -17,7 +17,7 @@ proportionate level of verification.
 | Performance | required | CRG updates remain single-flight, time-bounded, and output-bounded | runner unit tests plus `npm run crg:smoke` |
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
 | Accessibility | required for local tooling | Progress remains keyboard-operable, labelled, responsive, status-announced, and confirmation-gated; generated Archify HTML remains documentation infrastructure | Dashboard HTML contract tests plus 9/9 Archify showcase checks and `npm run archify:visual-check` |
-| Migration / recovery | not applicable | No product data or deployment is owned by the blueprint | Derived project decision |
+| Migration / recovery | required for local tooling | Can Progress repair a stale derived view and reclaim dead owners without disturbing live locks? | Progress core crash-window and multi-process tests |
 
 ## Template baseline
 

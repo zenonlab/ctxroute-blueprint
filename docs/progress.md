@@ -1,5 +1,7 @@
 # Progress checklist
 
+<!-- progress-revision: f8168e0602748fcb83f499c44809581169d0c006080bfc0388f1ff20df76f8c7 -->
+
 ## Tableau web local pour CTXRoute Progress — DONE
 
 - [x] **Construire le serveur local sécurisé, l’API révisée et l’interface accessible** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, npx eslint scripts/progress-dashboard*.mjs tests/progress-dashboard.test.mjs)_
@@ -18,3 +20,17 @@
 
 - [x] **Corriger les défauts UX visibles et compacter les goals terminés** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, Chrome visual review mobile and desktop)_
 - [x] **Vérifier les états UX sur mobile et bureau** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, npx eslint and oxlint dashboard client tests, Chrome 390x844 and 1440x1000: no overflow or JavaScript errors)_
+
+## Rendre CTXRoute Progress durable et authentifié — DONE
+
+- [x] **Conserver le jeton lors des rechargements** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — 11/11 passing, Same-tab reload test restores the token from sessionStorage)_
+- [x] **Supprimer l expiration par défaut du serveur** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs — explicit expiry and durable default pass, Detached instance health 200 and authenticated API 200)_
+- [x] **Aligner le contrat et les diagrammes internes** — DONE _(evidence: node .githooks/archify validate internal — 3/3 internal diagrams pass, npm run validate — 266 tests pass, 1 skipped, 0 failures)_
+
+## Rendre Progress automatique par défaut et manuel seulement aux vrais points de décision — DONE
+
+- [x] **Remplacer le blocage systématique par un routage automatic/manual ciblé** — DONE _(evidence: node --test tests/progress-core.test.mjs tests/hooks.test.mjs tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs — 113 pass, 1 skip, node .githooks/archify validate internal — 3 diagrams pass, npm run validate — 267 pass, 1 skip)_
+
+## Rendre Progress asynchrone et léger pour les équipes d’agents — DONE
+
+- [x] **Ajouter la prise atomique de tickets et différer les mises à jour** — DONE _(evidence: Parallel claim test: 4 agents received 4 distinct tickets, Targeted suite: 105 pass, 1 skip, npm run validate: 269 pass, 1 skip)_
