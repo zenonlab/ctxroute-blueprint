@@ -14,7 +14,10 @@ export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decisio
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
 const LOCK_STALE_MS = 30_000;
-const LOCK_WAIT_MS = 1_000;
+// Windows can briefly retain an exclusive file handle after unlink/rename. Give
+// a full 30-process claim burst enough time to drain without extending the
+// normal POSIX contention window or the five-second lifecycle-hook timeout.
+const LOCK_WAIT_MS = process.platform === 'win32' ? 3_000 : 1_000;
 const LOCK_RETRY_MIN_MS = 2;
 const LOCK_RETRY_MAX_MS = 25;
 
@@ -316,7 +319,7 @@ async function withProgressLock(root, operation) {
   while (!handle) {
     try { handle = await createLock(path, owner); break; }
     catch (error) {
-      if (error.code !== 'EEXIST') throw error;
+      if (!isLockContention(error)) throw error;
       if (!recoveryChecked) { recoveryChecked = true; handle = await recoverStaleLock(path, owner); }
       if (handle) break;
       const remaining = deadline - performance.now();
@@ -338,6 +341,10 @@ async function createLock(path, owner) {
   catch (error) { await handle.close(); await unlink(path).catch(() => {}); throw error; }
 }
 
+function isLockContention(error) {
+  return error.code === 'EEXIST' || (process.platform === 'win32' && error.code === 'EPERM');
+}
+
 async function recoverStaleLock(path, owner) {
   try { if (Date.now() - (await stat(path)).mtimeMs <= LOCK_STALE_MS) return undefined; }
   catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
@@ -349,21 +356,21 @@ async function recoverStaleLock(path, owner) {
     try { current = JSON.parse(source); } catch {}
     if (!shortReference(current.token) || Date.now() - details.mtimeMs <= LOCK_STALE_MS || processIsLive(current.pid)) return undefined;
     await releaseOwnedLock(path, current);
-    try { return await createLock(path, owner); } catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
+    try { return await createLock(path, owner); } catch (error) { if (isLockContention(error)) return undefined; throw error; }
   } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
   finally { await recovery.close(); await releaseOwnedLock(recoveryPath, recoveryOwner); }
 }
 
 async function acquireRecoveryLock(path, owner) {
   try { return await createLock(path, owner); }
-  catch (error) { if (error.code !== 'EEXIST') throw error; }
+  catch (error) { if (!isLockContention(error)) throw error; }
   let current; let details;
   try { current = JSON.parse(await readFile(path, 'utf8')); details = await stat(path); }
   catch (error) { if (error.code === 'ENOENT') return undefined; return undefined; }
   if (!shortReference(current.token) || Date.now() - details.mtimeMs <= LOCK_STALE_MS || processIsLive(current.pid)) return undefined;
   await releaseOwnedLock(path, current);
   try { return await createLock(path, owner); }
-  catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
+  catch (error) { if (isLockContention(error)) return undefined; throw error; }
 }
 
 async function releaseOwnedLock(path, owner) {
