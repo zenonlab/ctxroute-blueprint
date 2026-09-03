@@ -109,12 +109,13 @@ npm run progress:next -- goal-id
 npm run progress:claim -- agent-id goal-id
 npm run progress:update -- update.json
 npm run progress:mode -- goal-id automatic
+npm run progress:mode -- goal-id manual visual-review
 npm run progress:validate -- plan.json
 npm run progress:approve -- plan.json
 ```
 
 Progress supports multiple goals, atomic idempotent writes, bounded step
-evidence, and exactly two execution modes:
+evidence, compact CLI/MCP acknowledgements, and exactly two execution modes:
 
 - `automatic` is the default for requested implementation and verification.
 - `manual` is a targeted pause for a visual review or an important product,
@@ -130,6 +131,10 @@ writes from overwriting another agent, and mutation tools return compact replies
 Automatic goals are advisory at Stop and never force a continuation loop.
 
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
+Codex and Claude Code discover it from their project manifests. Any other local
+MCP client with stdio support can connect by launching `npm run progress:mcp`
+from the repository root; remote-only clients require an explicit transport
+adapter and do not discover this local server automatically.
 
 ### Local MCP servers
 

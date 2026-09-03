@@ -1,5 +1,5 @@
 import { mkdir, readFile, rename, open, stat, unlink } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
@@ -8,6 +8,7 @@ export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
 export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
+export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decision']);
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
 
@@ -89,13 +90,25 @@ export async function approvePlan(plan, root = process.cwd(), options = {}) {
   });
 }
 
-export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), modeOffered: goal.modeOffered ?? false, steps: goal.steps.map(step => ({ id: step.id, title: step.title, status: step.status, assignee: step.assignee, evidence: step.evidence.slice(0, 3) })) }));
+export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: statusCounts(goal.steps) }));
 export function progressNext(value, goalId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
   const priority = { IN_PROGRESS: 0, BLOCKED: 1, TODO: 2, DONE: 3 };
   const next = goal.steps.filter(step => step.status !== 'DONE').sort((a, b) => priority[a.status] - priority[b.status] || goal.steps.indexOf(a) - goal.steps.indexOf(b)).slice(0, LIMITS.next);
-  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticket(goal.id, step)) };
+  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticketSummary(step)) };
+}
+
+export function progressMutationResult(value, goalId, stepId) {
+  const goal = value.goals.find(item => item.id === goalId);
+  if (!goal) throw new Error(`Unknown goal: ${goalId}`);
+  const result = { ok: true, revision: progressRevision(value), goal: { id: goal.id, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: goal.steps.length } };
+  if (stepId !== undefined) {
+    const step = goal.steps.find(item => item.id === stepId);
+    if (!step) throw new Error(`Unknown step: ${stepId}`);
+    result.ticket = { stepId: step.id, status: step.status, assignee: step.assignee, evidence: step.evidence.slice(0, 3) };
+  }
+  return result;
 }
 
 export async function claimProgressTicket(agentId, goalId, root = process.cwd()) {
@@ -120,9 +133,10 @@ export async function claimProgressTicket(agentId, goalId, root = process.cwd())
   return { claimed: Boolean(claimed), ticket: claimed };
 }
 
-export async function setProgressMode(goalId, mode, _userConfirmed, root = process.cwd(), options = {}) {
+export async function setProgressMode(goalId, mode, confirmation, root = process.cwd(), options = {}) {
   if (![...EXECUTION_MODES, ...LEGACY_EXECUTION_MODES].includes(mode)) throw new Error(`mode must be one of: ${EXECUTION_MODES.join(', ')}`);
   const normalizedMode = normalizeExecutionMode(mode);
+  if (normalizedMode === 'manual' && confirmation !== true && !MANUAL_REASONS.includes(confirmation)) throw new Error('manual mode requires a visual-review or important-decision confirmation');
   return updateProgress(root, current => {
     const index = current.goals.findIndex(goal => goal.id === goalId);
     if (index < 0) throw new Error(`Unknown goal: ${goalId}`);
@@ -146,7 +160,7 @@ export async function updateProgressStep({ goalId, stepId, agentId, status, titl
     const goal = current.goals[goalIndex]; const stepIndex = goal.steps.findIndex(step => step.id === stepId);
     if (stepIndex < 0) throw new Error(`Unknown step: ${stepId}`);
     const existing = goal.steps[stepIndex];
-    if (agentId !== undefined && existing.assignee !== undefined && existing.assignee !== agentId) throw new Error(`Ticket ${stepId} is assigned to ${existing.assignee}`);
+    if (agentId !== undefined && existing.assignee !== agentId) throw new Error(existing.assignee === undefined ? `Ticket ${stepId} must be claimed before agent reporting` : `Ticket ${stepId} is assigned to ${existing.assignee}`);
     const changed = { ...existing };
     if (status !== undefined) changed.status = status;
     if (agentId !== undefined && status === 'IN_PROGRESS') changed.assignee = agentId;
@@ -235,24 +249,55 @@ async function writeProgress(root, next) {
 
 async function withProgressLock(root, operation) {
   const path = resolve(root, PROGRESS_LOCK_PATH); await mkdir(dirname(path), { recursive: true });
+  const owner = { pid: process.pid, token: randomUUID() };
   let handle;
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    try { handle = await open(path, 'wx', 0o600); break; }
+    try { handle = await createLock(path, owner); break; }
     catch (error) {
       if (error.code !== 'EEXIST') throw error;
-      try { if (Date.now() - (await stat(path)).mtimeMs > 30_000) await unlink(path); } catch (inspectionError) { if (inspectionError.code !== 'ENOENT') throw inspectionError; }
+      handle = await recoverStaleLock(path, owner);
+      if (handle) break;
       if (attempt < 19) await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
     }
   }
   if (!handle) { const error = new Error('Progress update is busy; retry later'); error.code = 'PROGRESS_BUSY'; throw error; }
   try { return await operation(); }
-  finally { await handle.close(); await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+  finally { await handle.close(); await releaseOwnedLock(path, owner); }
 }
+
+async function createLock(path, owner) {
+  const handle = await open(path, 'wx', 0o600);
+  try { await handle.writeFile(JSON.stringify(owner)); return handle; }
+  catch (error) { await handle.close(); await unlink(path).catch(() => {}); throw error; }
+}
+
+async function recoverStaleLock(path, owner) {
+  const recoveryPath = `${path}.recovery`; let recovery;
+  try { recovery = await open(recoveryPath, 'wx', 0o600); }
+  catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
+  try {
+    const source = await readFile(path, 'utf8'); const details = await stat(path); let current = {};
+    try { current = JSON.parse(source); } catch {}
+    if (Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
+    await unlink(path);
+    try { return await createLock(path, owner); } catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
+  } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+  finally { await recovery.close(); await unlink(recoveryPath).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+}
+
+async function releaseOwnedLock(path, owner) {
+  try { const current = JSON.parse(await readFile(path, 'utf8')); if (current.token === owner.token) await unlink(path); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
+
+function processIsLive(pid) { if (!Number.isSafeInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; } }
 
 function findGoalIndex(current, goalId) { const index = current.goals.findIndex(goal => goal.id === goalId); if (index < 0) throw new Error(`Unknown goal: ${goalId}`); return index; }
 function copyList(value) { return Array.isArray(value) ? [...value] : value; }
 function withDerivedStatus(goal, steps) { const remaining = steps.filter(step => step.status !== 'DONE'); const status = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE'; return { ...goal, status, steps }; }
 function ticket(goalId, step) { return { goalId, stepId: step.id, title: step.title, status: step.status, assignee: step.assignee, acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence.slice(0, 3) }; }
+function ticketSummary(step) { return { stepId: step.id, title: step.title, status: step.status, assignee: step.assignee }; }
+function statusCounts(steps) { return { total: steps.length, todo: steps.filter(step => step.status === 'TODO').length, inProgress: steps.filter(step => step.status === 'IN_PROGRESS').length, blocked: steps.filter(step => step.status === 'BLOCKED').length, done: steps.filter(step => step.status === 'DONE').length }; }
 
 function assertExpectedRevision(current, expectedRevision) {
   if (expectedRevision === undefined) return;

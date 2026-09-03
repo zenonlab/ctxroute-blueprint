@@ -151,9 +151,11 @@ test('API updates editable goal and step fields and rejects stale revisions', as
   const delta = await requestLocal(`${app.base}/api/goals/goal-one/steps/step-one`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: changed.revision, title: 'Tiny edit' }) });
   const tiny = await delta.json();
   assert.deepEqual(tiny.step, { id: 'step-one', title: 'Tiny edit' });
-  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual' }) });
+  const unconfirmed = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual' }) });
+  assert.equal(unconfirmed.status, 400);
+  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual', userConfirmed: true }) });
   assert.equal(stale.status, 409);
-  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual' }) });
+  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual', userConfirmed: true }) });
   assert.equal(mode.status, 200);
   assert.deepEqual((await mode.json()).goal, { id: 'goal-one', status: 'DONE', executionMode: 'manual' });
 });

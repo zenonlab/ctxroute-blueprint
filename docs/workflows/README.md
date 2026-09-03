@@ -5,8 +5,8 @@
 The Progress MCP is the durable source for goals, mutable step status, evidence,
 and the active per-goal mode. Goals are `automatic` by default, so Stop reports
 remaining tickets without preventing the agent from ending its turn.
-`manual` is a targeted pause only for a visual review or a consequential
-product/change/design decision not already made by the user. Routine feature
+`manual` is a targeted pause classified as `visual-review` or
+`important-decision` for a consequential choice not already made by the user. Routine feature
 implementation, tests, and documentation remain automatic. In either mode, a
 goal whose unfinished steps are all `BLOCKED` produces a non-blocking handoff.
 `stop_hook_active` prevents recursive continuation loops.

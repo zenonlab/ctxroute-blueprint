@@ -29,6 +29,8 @@ for work already recorded as blocked.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
+MCP callers must classify a manual transition as `visual-review` or
+`important-decision`; the shared core rejects an unconfirmed manual transition.
 The dashboard presents both values in a compact select with an accessible
 hover/focus explanation and saves transitions directly. The shared core reads
 legacy `autonomous` as `automatic` and `collaborative` as `manual`. On the first Stop for a Codex

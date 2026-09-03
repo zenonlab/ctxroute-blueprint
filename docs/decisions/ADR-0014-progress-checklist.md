@@ -51,11 +51,14 @@ the final step of a goal cannot be deleted.
 
 Progress is optional for small or single-agent work. During substantial
 parallel work, each step acts as a ticket: `progress_claim_ticket` atomically
-assigns one `TODO` step to an agent and moves it to `IN_PROGRESS`. The agent
+assigns one `TODO` step to an agent and moves it to `IN_PROGRESS`. Agent result
+reporting rejects unclaimed tickets. The agent
 does not mirror intermediate activity and reports only its final result. Every
-mutation shares a bounded filesystem lock, preventing concurrent lost updates
-without making the MCP a long-running coordinator. Mutation responses stay
-compact, and a busy or unavailable Progress service does not block safe work.
+mutation shares a bounded, owner-identified filesystem lock; stale recovery is
+serialized before a replacement owner is installed. MCP and fallback CLI
+mutation responses contain only acknowledgements, while status and next-step
+reads omit full ticket bodies.
+A busy or unavailable Progress service does not block safe work.
 
 ## Consequences
 

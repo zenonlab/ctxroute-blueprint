@@ -20,7 +20,7 @@ an item done without a short evidence reference. Do not create hooks,
 permissions, global rules, or `AGENTS.md` automatically. SQLite remains only
 for recurring-problem memory. PostToolUse may report missing checklist coverage
 but must not write the checklist.
-New goals use `automatic`, which never blocks Stop. Use `manual` only for visual
-review or an important undecided product/change/design choice.
+New goals use `automatic`, which never blocks Stop. Use `manual` only with
+reason `visual-review` or `important-decision` for the matching undecided choice.
 Require Archify only for a material boundary, public contract, dependency, or
 cross-component flow change—not merely because feature code was added.
