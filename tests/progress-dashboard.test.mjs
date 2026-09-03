@@ -132,23 +132,26 @@ test('API bounds JSON bodies and idle expiry closes the local server', async () 
   await closed;
 });
 
-test('detached dashboard instances are reused and replaced after death', async t => {
+test('detached dashboard instances are reused and replaced after death', async () => {
   const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-manager-'));
   const first = await openProgressDashboard(root, { idleMs: 5_000 });
   let pid = JSON.parse(readFileSync(join(root, '.ctxroute/state/progress-dashboard.json'), 'utf8')).pid;
-  t.after(() => { try { process.kill(pid, 'SIGTERM'); } catch {} });
-  assert.equal(first.reused, false);
-  const second = await openProgressDashboard(root, { idleMs: 5_000 });
-  assert.equal(second.reused, true);
-  assert.equal(second.instanceId, first.instanceId);
-  assert.ok(await dashboardSessionNotice('session-one', root, { idleMs: 5_000 }));
-  assert.equal(await dashboardSessionNotice('session-one', root, { idleMs: 5_000 }), null);
-  assert.ok(await dashboardSessionNotice('session-two', root, { idleMs: 5_000 }));
-  process.kill(pid, 'SIGTERM');
-  await new Promise(resolve => { setTimeout(resolve, 80); });
-  const third = await openProgressDashboard(root, { idleMs: 5_000 });
-  pid = JSON.parse(readFileSync(join(root, '.ctxroute/state/progress-dashboard.json'), 'utf8')).pid;
-  assert.equal(third.reused, false);
-  assert.notEqual(third.instanceId, first.instanceId);
-  assert.equal((await dashboardSessionNotice('session-one', root, { idleMs: 5_000 })).instanceId, third.instanceId);
+  try {
+    assert.equal(first.reused, false);
+    const second = await openProgressDashboard(root, { idleMs: 5_000 });
+    assert.equal(second.reused, true);
+    assert.equal(second.instanceId, first.instanceId);
+    assert.ok(await dashboardSessionNotice('session-one', root, { idleMs: 5_000 }));
+    assert.equal(await dashboardSessionNotice('session-one', root, { idleMs: 5_000 }), null);
+    assert.ok(await dashboardSessionNotice('session-two', root, { idleMs: 5_000 }));
+    process.kill(pid, 'SIGTERM');
+    await new Promise(resolve => { setTimeout(resolve, 80); });
+    const third = await openProgressDashboard(root, { idleMs: 5_000 });
+    pid = JSON.parse(readFileSync(join(root, '.ctxroute/state/progress-dashboard.json'), 'utf8')).pid;
+    assert.equal(third.reused, false);
+    assert.notEqual(third.instanceId, first.instanceId);
+    assert.equal((await dashboardSessionNotice('session-one', root, { idleMs: 5_000 })).instanceId, third.instanceId);
+  } finally {
+    try { process.kill(pid, 'SIGTERM'); } catch {}
+  }
 });
