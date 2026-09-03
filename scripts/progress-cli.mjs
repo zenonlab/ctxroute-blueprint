@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { MANUAL_REASONS, ensureProgressView, readProgress, validatePlan, approvePlan, progressStatus, progressNext, progressMutationResult, claimProgressTicket, updateProgressStep, setProgressMode } from './progress-core.mjs';
+import { MANUAL_REASONS, ensureProgressView, validatePlan, approvePlan, progressStatus, progressNext, progressMutationResult, claimProgressTicket, updateProgressStep, setProgressMode } from './progress-core.mjs';
 const [command, file, arg, reason] = process.argv.slice(2);
 try {
-  await ensureProgressView();
-  const current = await readProgress();
+  const current = await ensureProgressView();
   if (command === 'read') console.log(JSON.stringify(current));
   else if (command === 'status') console.log(JSON.stringify(progressStatus(current)));
   else if (command === 'next') { const goalId = file ?? current.goals.find(goal => goal.status !== 'DONE')?.id; if (!goalId) throw new Error('usage: next <goal-id>'); console.log(JSON.stringify(progressNext(current, goalId))); }

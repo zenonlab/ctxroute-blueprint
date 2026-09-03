@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, open, stat, unlink } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
@@ -12,6 +13,10 @@ export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
 export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decision']);
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
+const LOCK_STALE_MS = 30_000;
+const LOCK_WAIT_MS = 1_000;
+const LOCK_RETRY_MIN_MS = 2;
+const LOCK_RETRY_MAX_MS = 25;
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
 export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -113,7 +118,7 @@ export function progressNext(value, goalId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
   const priority = { IN_PROGRESS: 0, BLOCKED: 1, TODO: 2, DONE: 3 };
-  const next = goal.steps.filter(step => step.status !== 'DONE').sort((a, b) => priority[a.status] - priority[b.status] || goal.steps.indexOf(a) - goal.steps.indexOf(b)).slice(0, LIMITS.next);
+  const next = goal.steps.filter(step => step.status !== 'DONE').sort((a, b) => priority[a.status] - priority[b.status]).slice(0, LIMITS.next);
   return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticketSummary(step)) };
 }
 
@@ -274,14 +279,20 @@ async function writeProgress(root, next) {
 async function withProgressLock(root, operation) {
   const path = resolve(root, PROGRESS_LOCK_PATH); await mkdir(dirname(path), { recursive: true });
   const owner = { pid: process.pid, token: randomUUID() };
-  let handle;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  const deadline = performance.now() + LOCK_WAIT_MS;
+  let handle; let attempt = 0; let recoveryChecked = false;
+  while (!handle) {
     try { handle = await createLock(path, owner); break; }
     catch (error) {
       if (error.code !== 'EEXIST') throw error;
-      handle = await recoverStaleLock(path, owner);
+      if (!recoveryChecked) { recoveryChecked = true; handle = await recoverStaleLock(path, owner); }
       if (handle) break;
-      if (attempt < 19) await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) break;
+      attempt += 1;
+      const ceiling = Math.min(LOCK_RETRY_MAX_MS, LOCK_RETRY_MIN_MS * (2 ** Math.min(attempt, 4)));
+      const jittered = LOCK_RETRY_MIN_MS + Math.floor(Math.random() * (ceiling - LOCK_RETRY_MIN_MS + 1));
+      await new Promise(resolveWait => { setTimeout(resolveWait, Math.min(remaining, jittered)); });
     }
   }
   if (!handle) { const error = new Error('Progress update is busy; retry later'); error.code = 'PROGRESS_BUSY'; throw error; }
@@ -296,13 +307,15 @@ async function createLock(path, owner) {
 }
 
 async function recoverStaleLock(path, owner) {
+  try { if (Date.now() - (await stat(path)).mtimeMs <= LOCK_STALE_MS) return undefined; }
+  catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
   const recoveryPath = `${path}.recovery`; const recoveryOwner = { pid: process.pid, token: randomUUID() };
   const recovery = await acquireRecoveryLock(recoveryPath, recoveryOwner);
   if (!recovery) return undefined;
   try {
     const source = await readFile(path, 'utf8'); const details = await stat(path); let current = {};
     try { current = JSON.parse(source); } catch {}
-    if (!shortReference(current.token) || Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
+    if (!shortReference(current.token) || Date.now() - details.mtimeMs <= LOCK_STALE_MS || processIsLive(current.pid)) return undefined;
     await releaseOwnedLock(path, current);
     try { return await createLock(path, owner); } catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
   } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
@@ -315,7 +328,7 @@ async function acquireRecoveryLock(path, owner) {
   let current; let details;
   try { current = JSON.parse(await readFile(path, 'utf8')); details = await stat(path); }
   catch (error) { if (error.code === 'ENOENT') return undefined; return undefined; }
-  if (!shortReference(current.token) || Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
+  if (!shortReference(current.token) || Date.now() - details.mtimeMs <= LOCK_STALE_MS || processIsLive(current.pid)) return undefined;
   await releaseOwnedLock(path, current);
   try { return await createLock(path, owner); }
   catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }

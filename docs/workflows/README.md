@@ -15,8 +15,10 @@ For multi-agent work, each independent step is a ticket. An agent calls
 `progress_status`, then `progress_next` or `progress_claim_ticket`, and performs the work without intermediate tracking
 writes, and calls `progress_update_step` once with its final status and evidence.
 Claims and all other mutations use the same short filesystem lock, so parallel
-agents cannot overwrite one another. A busy MCP fails quickly; work may continue
-and the agent reconciles its ticket afterward. Mutation replies are compact.
+agents cannot overwrite one another. Contenders retry with bounded jitter to
+absorb local bursts without forming a retry convoy. A busy MCP still fails
+after about one second; work may continue and the agent reconciles its ticket
+afterward. Mutation replies are compact.
 The full checklist is available only through the voluntary JSON resource
 `ctxroute://progress/full`; it is not an automatically selectable tool.
 `npm run progress:read` remains the human diagnostic path.

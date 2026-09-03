@@ -25,4 +25,4 @@ export function createProgressServer(root = process.cwd()) {
   return server;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) { await ensureProgressView(); serveStdio(() => createProgressServer()); }
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) serveStdio(() => createProgressServer());

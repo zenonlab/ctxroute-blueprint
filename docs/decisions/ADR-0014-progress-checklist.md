@@ -57,8 +57,9 @@ parallel work, each step acts as a ticket: `progress_claim_ticket` atomically
 assigns one `TODO` step to an agent and moves it to `IN_PROGRESS`. Agent result
 reporting rejects unclaimed tickets. The agent
 does not mirror intermediate activity and reports only its final result. Every
-mutation shares a bounded, owner-identified filesystem lock; stale recovery is
-serialized before a replacement owner is installed. The recovery marker also
+mutation shares a bounded, owner-identified filesystem lock. Contenders use a
+short jittered backoff, while stale recovery is checked once and serialized
+before a replacement owner is installed. The recovery marker also
 stores `{pid, token}`: recent or live owners are preserved, while stale markers
 owned by dead processes are reclaimed with token verification. MCP and fallback
 CLI mutation responses contain only acknowledgements, while status and

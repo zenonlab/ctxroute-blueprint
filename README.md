@@ -126,8 +126,9 @@ Legacy `autonomous` and `collaborative` values remain readable and normalize to
 
 Progress is optional for small or single-agent changes. For substantial
 parallel work, agents atomically claim distinct tickets, work independently,
-then report the final status and evidence once. A short lock prevents concurrent
-writes from overwriting another agent, and mutation tools return compact replies.
+then report the final status and evidence once. A short, jittered, bounded lock
+wait prevents concurrent writes from overwriting another agent while absorbing
+local claim bursts, and mutation tools return compact replies.
 Automatic goals are advisory at Stop and never force a continuation loop.
 
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
