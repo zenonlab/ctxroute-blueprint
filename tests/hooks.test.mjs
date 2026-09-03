@@ -466,6 +466,33 @@ test('Stop collaborative policy offers autonomous mode once and accepts a comple
   assert.equal(repeated, null);
 });
 
+test('Stop adds the dashboard once for an active session and keeps progression policy', async () => {
+  const cwd = progressWorkspace({ statuses: ['TODO'] });
+  let calls = 0;
+  const dashboardNotice = async sessionId => {
+    calls += 1;
+    assert.equal(sessionId, 'session-one');
+    return calls === 1 ? { url: 'http://localhost:4321/#private', instanceId: 'instance-one' } : null;
+  };
+  const first = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
+  assert.equal(first.decision, 'block');
+  assert.match(first.systemMessage, /http:\/\/localhost:4321\/#private/u);
+  const repeated = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
+  assert.equal(repeated.decision, 'block');
+  assert.equal('systemMessage' in repeated, false);
+});
+
+test('Stop does not start a dashboard without active goals and dashboard failures stay fail-open', async () => {
+  const done = progressWorkspace({ statuses: ['DONE'], goalStatus: 'DONE' });
+  let called = false;
+  assert.equal(await progressContinuation({ session_id: 'finished' }, { root: done, changed: [], diagrams: [], dashboardNotice: async () => { called = true; } }), null);
+  assert.equal(called, false);
+  const active = progressWorkspace({ statuses: ['TODO'] });
+  const result = await progressContinuation({ session_id: 'active' }, { root: active, changed: [], diagrams: [], dashboardNotice: async () => { throw new Error('simulated failure'); } });
+  assert.equal(result.decision, 'block');
+  assert.match(result.systemMessage, /unavailable: simulated failure/u);
+});
+
 test('Stop autonomous policy continues TODO and IN_PROGRESS work', async () => {
   for (const status of ['TODO', 'IN_PROGRESS']) {
     const cwd = progressWorkspace({ mode: 'autonomous', statuses: [status] });

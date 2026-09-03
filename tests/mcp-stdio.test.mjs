@@ -55,6 +55,12 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
       const response = await client.callTool({ name, arguments: {} });
       assert.notEqual(response.isError, true, name);
     }
+    const opened = JSON.parse((await client.callTool({ name: 'progress_open_dashboard', arguments: {} })).content[0].text);
+    assert.match(opened.url, /^http:\/\/localhost:\d+\/#/u);
+    assert.equal(opened.reused, false);
+    const reused = JSON.parse((await client.callTool({ name: 'progress_open_dashboard', arguments: {} })).content[0].text);
+    assert.equal(reused.reused, true);
+    assert.equal(reused.instanceId, opened.instanceId);
     const plan = { goalId: 'stdio-goal', title: 'Stdio proof', validationEvidence: ['npm test'], steps: [{ id: 'step-1', title: 'Verify transport', acceptance: ['All tools respond'], files: ['tests/mcp-stdio.test.mjs'], commands: ['npm test'] }] };
     const validated = await client.callTool({ name: 'progress_validate_plan', arguments: plan });
     assert.notEqual(validated.isError, true);
@@ -64,6 +70,8 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     assert.notEqual((await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', status: 'DONE', evidence: ['npm test'] } })).isError, true);
     const next = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
     assert.match(next.content[0].text, /"complete": true/u);
+    const state = JSON.parse(readFileSync(join(fixture, '.ctxroute/state/progress-dashboard.json'), 'utf8'));
+    try { process.kill(state.pid, 'SIGTERM'); } catch {}
   });
 });
 
