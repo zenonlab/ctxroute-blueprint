@@ -30,7 +30,7 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(page.headers.get('content-security-policy'), /default-src 'none'/u);
   assert.equal(page.headers.get('cache-control'), 'no-store');
   const html = await page.text();
-  assert.match(html, /Goals terminés/u);
+  assert.match(html, /goals terminés/u);
   assert.match(html, /aria-live="polite"/u);
   assert.match(html, /aria-labelledby="plan-title"/u);
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
@@ -41,11 +41,19 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(javascript, /reloadPreservingDrafts/u);
   assert.match(javascript, /dataTransfer\.effectAllowed/u);
   assert.match(javascript, /target\.after\(dragged\)/u);
+  assert.match(javascript, /Tous les goals sont terminés/u);
+  assert.match(javascript, /setGoalOpen/u);
+  assert.match(javascript, /data-show-completed/u);
   assert.doesNotMatch(javascript, /\b(?:prompt|confirm)\(/u);
   assert.match(html, /id="confirm-dialog"/u);
   assert.match(html, /class="switch"/u);
   assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
-  assert.match(await (await requestLocal(`${app.base}/styles.css`)).text(), /resize:none/u);
+  const css = await (await requestLocal(`${app.base}/styles.css`)).text();
+  assert.match(css, /resize:none/u);
+  assert.match(css, /\.toast\[hidden\]\{display:none\}/u);
+  assert.match(css, /border-right:2px solid currentColor/u);
+  assert.match(html, /Afficher les goals terminés/u);
+  assert.match(html, />Restaurer<\/button>/u);
   assert.equal((await requestLocal(`${app.base}/remote.js`)).status, 404);
 });
 
