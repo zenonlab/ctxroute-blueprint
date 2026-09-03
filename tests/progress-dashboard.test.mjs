@@ -36,6 +36,8 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.doesNotMatch(html, new RegExp(app.token, 'u'));
   const javascript = await (await requestLocal(`${app.base}/app.js`)).text();
   assert.match(javascript, /setTimeout\(\(\) => saveCard\(card\), 500\)/u);
+  assert.match(javascript, /retainView\(await request/u);
+  assert.match(javascript, /setSaveState\(card, 'Enregistré'\)/u);
   assert.match(javascript, /reloadPreservingDrafts/u);
   assert.match(javascript, /dataTransfer\.effectAllowed/u);
   assert.match(javascript, /target\.after\(dragged\)/u);
@@ -43,6 +45,7 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(html, /id="confirm-dialog"/u);
   assert.match(html, /class="switch"/u);
   assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
+  assert.match(await (await requestLocal(`${app.base}/styles.css`)).text(), /resize:none/u);
   assert.equal((await requestLocal(`${app.base}/remote.js`)).status, 404);
 });
 
