@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { addProgressStep, approvePlan, deleteProgressStep, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
+import { addProgressStep, approvePlan, deleteProgressStep, ensureProgressView, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
 import { DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS } from './progress-dashboard-app.mjs';
 
 export const DASHBOARD_BODY_LIMIT = 32 * 1024;
@@ -11,6 +11,7 @@ export const DEFAULT_IDLE_MS = null;
 const SECURITY_HEADERS = { 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' };
 
 export async function startProgressDashboard({ root = process.cwd(), token = randomBytes(32).toString('base64url'), instanceId = randomUUID(), idleMs = DEFAULT_IDLE_MS, statePath, onIdle } = {}) {
+  await ensureProgressView(root);
   let port = 0; let timer;
   const touch = () => {
     clearTimeout(timer);
@@ -51,7 +52,7 @@ export async function startProgressDashboard({ root = process.cwd(), token = ran
       }
       if (request.method === 'DELETE' && step) return sendProgress(response, await deleteProgressStep(step[1], step[2], root, { expectedRevision: body.revision }));
       const mode = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/mode$/u);
-      if (request.method === 'PATCH' && mode) return sendGoalDelta(response, await setProgressMode(mode[1], body.mode, body.userConfirmed, root, { expectedRevision: body.revision }), mode[1], ['executionMode']);
+      if (request.method === 'PATCH' && mode) return sendGoalDelta(response, await setProgressMode(mode[1], body.mode, body.manualReason, root, { expectedRevision: body.revision }), mode[1], ['executionMode', 'manualReason']);
       return sendJson(response, 404, { error: 'Introuvable' });
     } catch (error) {
       if (error.code === 'PROGRESS_REVISION_CONFLICT') return sendJson(response, 409, { error: error.message });
@@ -84,7 +85,8 @@ async function readJson(request) {
 function sendProgress(response, progress) { return sendJson(response, 200, { progress, revision: progressRevision(progress) }); }
 function sendGoalDelta(response, progress, goalId, fields) {
   const goal = progress.goals.find(item => item.id === goalId);
-  return sendJson(response, 200, { revision: progressRevision(progress), goal: Object.fromEntries(['id', 'status', ...fields].map(field => [field, goal[field]])) });
+  const included = ['id', 'status', ...fields].filter(field => field !== 'manualReason' || goal.executionMode === 'manual');
+  return sendJson(response, 200, { revision: progressRevision(progress), goal: Object.fromEntries(included.map(field => [field, goal[field]])) });
 }
 function sendStepDelta(response, progress, goalId, stepId, requested) {
   const goal = progress.goals.find(item => item.id === goalId);

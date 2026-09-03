@@ -14,6 +14,9 @@ Skip it for small or single-agent work. For substantial parallel work, create
 independent tickets once; each agent atomically claims one, works without
 intermediate Progress writes, then reports `DONE` or `BLOCKED` with evidence.
 If the MCP is busy or unavailable, continue safe work and reconcile afterward.
+Use the compact `progress_status` → `progress_next`/`progress_claim_ticket` →
+`progress_update_step` flow. Read the complete checklist only through the
+voluntary `ctxroute://progress/full` resource or the human diagnostic CLI.
 
 Never edit `.project/progress.json` or `docs/progress.md` directly. Never mark
 an item done without a short evidence reference. Do not create hooks,
@@ -22,5 +25,6 @@ for recurring-problem memory. PostToolUse may report missing checklist coverage
 but must not write the checklist.
 New goals use `automatic`, which never blocks Stop. Use `manual` only with
 reason `visual-review` or `important-decision` for the matching undecided choice.
+Persist that reason as `manualReason`; switching back to automatic clears it.
 Require Archify only for a material boundary, public contract, dependency, or
 cross-component flow change—not merely because feature code was added.

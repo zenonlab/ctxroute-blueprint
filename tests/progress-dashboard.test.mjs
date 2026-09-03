@@ -97,6 +97,11 @@ test('dashboard serves only local static resources with restrictive headers', as
   assert.match(javascript, /data-show-completed/u);
   assert.doesNotMatch(javascript, /\b(?:prompt|confirm)\(/u);
   assert.match(html, /id="confirm-dialog"/u);
+  assert.match(html, /id="mode-dialog"/u);
+  assert.match(html, /value="visual-review"/u);
+  assert.match(html, /value="important-decision"/u);
+  assert.match(javascript, /chooseManualReason/u);
+  assert.doesNotMatch(javascript, /userConfirmed/u);
   assert.match(html, /class="switch"/u);
   assert.doesNotMatch(html, /<style|<script(?:\s|>)(?![^>]*src=)/u);
   const css = await (await requestLocal(`${app.base}/styles.css`)).text();
@@ -153,11 +158,11 @@ test('API updates editable goal and step fields and rejects stale revisions', as
   assert.deepEqual(tiny.step, { id: 'step-one', title: 'Tiny edit' });
   const unconfirmed = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual' }) });
   assert.equal(unconfirmed.status, 400);
-  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual', userConfirmed: true }) });
+  const stale = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: first.revision, mode: 'manual', manualReason: 'important-decision' }) });
   assert.equal(stale.status, 409);
-  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual', userConfirmed: true }) });
+  const mode = await requestLocal(`${app.base}/api/goals/goal-one/mode`, { method: 'PATCH', headers: app.headers, body: JSON.stringify({ revision: tiny.revision, mode: 'manual', manualReason: 'important-decision' }) });
   assert.equal(mode.status, 200);
-  assert.deepEqual((await mode.json()).goal, { id: 'goal-one', status: 'DONE', executionMode: 'manual' });
+  assert.deepEqual((await mode.json()).goal, { id: 'goal-one', status: 'DONE', executionMode: 'manual', manualReason: 'important-decision' });
 });
 
 test('API adds, exactly reorders, deletes, and protects the last step', async t => {

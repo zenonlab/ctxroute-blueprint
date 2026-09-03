@@ -42,5 +42,6 @@ behavior. Step cards start collapsed; their handles support pointer drag and
 Alt + arrow movement, and list fields pair textareas with scroll-synchronized
 line-number gutters. Responsive CSS collapses fields to one column and keeps
 controls at least 44 px high. Deletion uses a focus-managed dialog; validated
-plan creation and execution-mode changes save directly. Inline errors and save
+plan creation saves directly, while manual mode requires a focused reason
+dialog before saving. Inline errors and save
 states are announced without a native prompt.

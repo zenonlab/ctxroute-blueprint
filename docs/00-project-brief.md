@@ -64,6 +64,9 @@ only bundled resources under a restrictive CSP, and expires after inactivity.
 Optimistic revisions reject stale mutations with HTTP 409. There is no remote
 deployment, account, telemetry, cloud synchronization, or availability target;
 recovery is a safe local restart through the Progress MCP.
+Startup also self-repairs the generated Markdown view from the JSON revision;
+stale lock and recovery-marker owners are reclaimed only when their process is
+dead, with bounded retries and token-checked release.
 
 ## Decisions
 
@@ -90,5 +93,6 @@ questions, trade-offs, and research anchors used to make these decisions.
 For the blueprint control plane, the Progress dashboard succeeds when its real
 HTTP and MCP tests cover local access controls, plan validation and creation,
 immutable plan identity, mutable status/evidence/mode, revision conflicts,
-idle expiry, instance reuse and Stop session deduplication. The complete
+classified manual reasons, generated-view crash recovery, lock recovery, idle
+expiry, instance reuse and Stop session deduplication. The complete
 repository validation, internal Archify validation, and CRG gate must pass.

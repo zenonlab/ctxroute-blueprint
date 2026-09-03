@@ -3,7 +3,10 @@ scope:
   - scripts/progress-core.mjs
   - scripts/progress-mcp.mjs
   - scripts/progress-dashboard.mjs
+  - scripts/progress-dashboard.html
+  - scripts/progress-dashboard-client.js
   - scripts/progress-dashboard-manager.mjs
+  - .project/progress.json
   - .codex/hooks/stop-review.mjs
   - .claude/hooks/docs/progress-guidance.md
 review: on-change
@@ -30,9 +33,12 @@ for work already recorded as blocked.
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
 MCP callers must classify a manual transition as `visual-review` or
-`important-decision`; the shared core rejects an unconfirmed manual transition.
-The dashboard presents both values in a compact select with an accessible
-hover/focus explanation and saves transitions directly. The shared core reads
+`important-decision`; the shared core persists that value as `manualReason`
+and rejects a new manual transition or plan without it. Returning to automatic
+clears the reason. Completed legacy manual goals retain `manualReason: null`
+because their history cannot be reconstructed. The dashboard presents both
+modes in a compact select with an accessible hover/focus explanation, then asks
+for one of the two reasons before activating manual mode. The shared core reads
 legacy `autonomous` as `automatic` and `collaborative` as `manual`. On the first Stop for a Codex
 session with unfinished work, the hook publishes the authenticated local URL.
 A marker keyed by a hash of the official `session_id` suppresses repeats while

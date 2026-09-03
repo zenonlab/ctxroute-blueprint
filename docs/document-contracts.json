@@ -86,6 +86,8 @@
       "format": "json",
       "source": ".project/progress.json",
       "narrative": "docs/progress.md",
+      "derivedRevision": "sha256-normalized-json",
+      "mcpResource": "ctxroute://progress/full",
       "requiredKeys": ["schemaVersion", "goals"],
       "validator": "npm run progress:validate"
     }

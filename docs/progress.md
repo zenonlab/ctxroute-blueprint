@@ -1,5 +1,7 @@
 # Progress checklist
 
+<!-- progress-revision: f8168e0602748fcb83f499c44809581169d0c006080bfc0388f1ff20df76f8c7 -->
+
 ## Tableau web local pour CTXRoute Progress — DONE
 
 - [x] **Construire le serveur local sécurisé, l’API révisée et l’interface accessible** — DONE _(evidence: node --test tests/progress-dashboard.test.mjs, npx eslint scripts/progress-dashboard*.mjs tests/progress-dashboard.test.mjs)_

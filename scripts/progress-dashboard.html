@@ -22,6 +22,9 @@
   <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
     <form method="dialog"><h2 id="confirm-title">Confirm</h2><p id="confirm-description"></p><div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary" value="confirm">Confirm</button></div></form>
   </dialog>
+  <dialog id="mode-dialog" aria-labelledby="mode-title">
+    <form method="dialog"><h2 id="mode-title">Why switch to manual?</h2><p class="muted">Manual mode is reserved for a pause that needs human input.</p><label><input type="radio" name="manualReason" value="visual-review" required> Visual review</label><label><input type="radio" name="manualReason" value="important-decision" required> Important decision</label><div class="dialog-actions"><button value="cancel" formnovalidate>Cancel</button><button class="primary" value="confirm">Switch to manual</button></div></form>
+  </dialog>
   <dialog id="plan-dialog" aria-labelledby="plan-title">
     <h2 id="plan-title">Create a plan</h2><p class="muted">The JSON is validated before the plan is created.</p>
     <form id="plan-form"><label>Plan JSON<textarea name="plan" required spellcheck="false"></textarea></label><p class="field-error" data-plan-error></p><div class="dialog-actions"><button id="cancel-plan" type="button">Cancel</button><button class="primary" type="submit">Create</button></div></form>

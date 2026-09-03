@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { MANUAL_REASONS, readProgress, validatePlan, approvePlan, progressStatus, progressNext, progressMutationResult, claimProgressTicket, updateProgressStep, setProgressMode } from './progress-core.mjs';
+import { MANUAL_REASONS, ensureProgressView, readProgress, validatePlan, approvePlan, progressStatus, progressNext, progressMutationResult, claimProgressTicket, updateProgressStep, setProgressMode } from './progress-core.mjs';
 const [command, file, arg, reason] = process.argv.slice(2);
 try {
+  await ensureProgressView();
   const current = await readProgress();
   if (command === 'read') console.log(JSON.stringify(current));
   else if (command === 'status') console.log(JSON.stringify(progressStatus(current)));

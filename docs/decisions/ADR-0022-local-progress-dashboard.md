@@ -55,6 +55,8 @@ mutations fail with HTTP 409. Plan creation freezes identifiers, while titles,
 criteria, files, commands, evidence, status, and step structure remain editable
 through explicit UI operations. Atomic validation preserves safe relative
 paths, bounds, unique identifiers, one step minimum, and the `DONE` proof rule.
+Dashboard startup also repairs a missing or stale generated Markdown view from
+the JSON source before serving requests.
 
 The dependency-free client is split into local HTML, CSS, and JavaScript
 resources. Step cards are collapsed by default and provide an immediate status
@@ -63,6 +65,8 @@ page-local undo/redo history, numbered list
 editors, mouse and keyboard ordering, inline errors, and deletion through a
 focus-managed confirmation followed by a temporary restore toast. Revision
 conflicts reload durable state while reapplying matching unsaved drafts.
+Selecting manual mode opens a small accessible reason dialog; only
+`visual-review` and `important-decision` are accepted and persisted.
 
 `progress_open_dashboard` starts or reuses a detached instance and never opens
 the system browser. The default instance has no idle expiration so an issued

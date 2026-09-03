@@ -839,7 +839,7 @@ function progressWorkspace({ mode = 'automatic', statuses, goalStatus = statuses
     commands: ['npm test'],
     evidence: status === 'DONE' ? ['tests/hooks.test.mjs'] : [],
   }));
-  writeFileSync(join(cwd, '.project/progress.json'), `${JSON.stringify({ schemaVersion: 1, goals: [{ id: 'goal-stop', title: 'Stop policy', status: goalStatus, executionMode: mode, modeOffered: false, steps }] }, null, 2)}\n`);
+  writeFileSync(join(cwd, '.project/progress.json'), `${JSON.stringify({ schemaVersion: 1, goals: [{ id: 'goal-stop', title: 'Stop policy', status: goalStatus, executionMode: mode, manualReason: mode === 'manual' ? 'important-decision' : null, modeOffered: false, steps }] }, null, 2)}\n`);
   return cwd;
 }
 

@@ -5,6 +5,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
 export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
+export const PROGRESS_RESOURCE_URI = 'ctxroute://progress/full';
 export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
@@ -15,13 +16,24 @@ const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
 export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
+export async function ensureProgressView(root = process.cwd()) {
+  const current = await readProgress(root);
+  const expected = progressRevision(current);
+  if (await viewHasRevision(root, expected)) return current;
+  return withProgressLock(root, async () => {
+    const latest = await readProgress(root);
+    if (!await viewHasRevision(root, progressRevision(latest))) await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(latest));
+    return latest;
+  });
+}
+
 export async function readProgress(root = process.cwd()) {
   try {
     const source = await readFile(resolve(root, PROGRESS_PATH), 'utf8');
     if (Buffer.byteLength(source) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
     const value = JSON.parse(source); const errors = inspectProgressChecklist(value);
     if (errors.length) throw new Error(errors.join('; '));
-    return { ...value, goals: value.goals.map(goal => ({ ...goal, executionMode: normalizeExecutionMode(goal.executionMode), modeOffered: goal.modeOffered ?? false })) };
+    return { ...value, goals: value.goals.map(normalizeStoredGoal) };
   } catch (error) { if (error.code === 'ENOENT') return emptyProgress(); throw new Error(`Cannot read progress checklist: ${error.message}`); }
 }
 
@@ -34,6 +46,10 @@ function inspectProgressChecklist(value) {
     if (!isId(goal?.id) || goalIds.has(goal.id)) errors.push('goal ids must be unique safe identifiers'); goalIds.add(goal?.id);
     if (!text(goal?.title)) errors.push(`goal ${goal?.id ?? '(missing)'} needs a title`);
     if (goal?.executionMode !== undefined && ![...EXECUTION_MODES, ...LEGACY_EXECUTION_MODES].includes(goal.executionMode)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid executionMode`);
+    const mode = normalizeExecutionMode(goal?.executionMode);
+    if (goal?.manualReason !== undefined && goal.manualReason !== null && !MANUAL_REASONS.includes(goal.manualReason)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid manualReason`);
+    if (mode === 'manual' && goal?.status !== 'DONE' && !MANUAL_REASONS.includes(goal?.manualReason)) errors.push(`active manual goal ${goal?.id ?? '(missing)'} requires manualReason`);
+    if (mode === 'automatic' && goal?.manualReason !== undefined && goal.manualReason !== null) errors.push(`automatic goal ${goal?.id ?? '(missing)'} cannot have manualReason`);
     if (goal?.modeOffered !== undefined && (goal.modeOffered !== true && goal.modeOffered !== false)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid modeOffered`);
     if (!Array.isArray(goal?.steps) || goal.steps.length < 1 || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs 1-${LIMITS.steps} steps`); continue; }
     const stepIds = new Set();
@@ -62,6 +78,8 @@ export function validatePlan(plan, current = emptyProgress()) {
   if (!isId(goalId)) errors.push('plan requires a safe goalId');
   if (!text(plan.title)) errors.push('plan requires a title');
   if (plan.executionMode !== undefined && !EXECUTION_MODES.includes(plan.executionMode)) errors.push(`plan executionMode must be one of: ${EXECUTION_MODES.join(', ')}`);
+  if (plan.executionMode === 'manual' && !MANUAL_REASONS.includes(plan.manualReason)) errors.push(`manual plan requires manualReason: ${MANUAL_REASONS.join(' or ')}`);
+  if (plan.executionMode !== 'manual' && plan.manualReason !== undefined && plan.manualReason !== null) errors.push('manualReason is only valid for manual plans');
   if (!Array.isArray(plan.steps) || !plan.steps.length || plan.steps.length > LIMITS.steps) errors.push(`plan requires 1-${LIMITS.steps} steps`);
   const ids = new Set();
   for (const step of plan.steps ?? []) {
@@ -90,7 +108,7 @@ export async function approvePlan(plan, root = process.cwd(), options = {}) {
   });
 }
 
-export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: statusCounts(goal.steps) }));
+export const progressStatus = value => value.goals.map(goal => withManualReason({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: statusCounts(goal.steps) }, goal));
 export function progressNext(value, goalId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
@@ -102,7 +120,7 @@ export function progressNext(value, goalId) {
 export function progressMutationResult(value, goalId, stepId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
-  const result = { ok: true, revision: progressRevision(value), goal: { id: goal.id, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: goal.steps.length } };
+  const result = { ok: true, revision: progressRevision(value), goal: withManualReason({ id: goal.id, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: goal.steps.length }, goal) };
   if (stepId !== undefined) {
     const step = goal.steps.find(item => item.id === stepId);
     if (!step) throw new Error(`Unknown step: ${stepId}`);
@@ -133,14 +151,14 @@ export async function claimProgressTicket(agentId, goalId, root = process.cwd())
   return { claimed: Boolean(claimed), ticket: claimed };
 }
 
-export async function setProgressMode(goalId, mode, confirmation, root = process.cwd(), options = {}) {
+export async function setProgressMode(goalId, mode, manualReason, root = process.cwd(), options = {}) {
   if (![...EXECUTION_MODES, ...LEGACY_EXECUTION_MODES].includes(mode)) throw new Error(`mode must be one of: ${EXECUTION_MODES.join(', ')}`);
   const normalizedMode = normalizeExecutionMode(mode);
-  if (normalizedMode === 'manual' && confirmation !== true && !MANUAL_REASONS.includes(confirmation)) throw new Error('manual mode requires a visual-review or important-decision confirmation');
+  if (normalizedMode === 'manual' && !MANUAL_REASONS.includes(manualReason)) throw new Error('manual mode requires reason visual-review or important-decision');
   return updateProgress(root, current => {
     const index = current.goals.findIndex(goal => goal.id === goalId);
     if (index < 0) throw new Error(`Unknown goal: ${goalId}`);
-    const goals = [...current.goals]; goals[index] = { ...goals[index], executionMode: normalizedMode, modeOffered: true };
+    const goals = [...current.goals]; goals[index] = { ...goals[index], executionMode: normalizedMode, manualReason: normalizedMode === 'manual' ? manualReason : null, modeOffered: true };
     return { ...current, goals };
   }, options);
 }
@@ -215,12 +233,13 @@ export async function markModeOffered(goalId, root = process.cwd()) {
   });
 }
 export function renderProgress(value) {
-  const lines = ['# Progress checklist', ''];
+  const lines = ['# Progress checklist', '', `<!-- progress-revision: ${progressRevision(value)} -->`, ''];
   for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) { const displayStatus = step.status === 'TODO' ? 'PENDING' : step.status; lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${displayStatus}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); } lines.push(''); }
   if (!value.goals.length) lines.push('_No goals approved yet._', ''); return lines.join('\n');
 }
-function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode: normalizeExecutionMode(plan.executionMode), modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
-function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), modeOffered: goal.modeOffered ?? false, steps: goal.steps }; }
+function normalizePlan(plan) { const executionMode = normalizeExecutionMode(plan.executionMode); return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode, manualReason: executionMode === 'manual' ? plan.manualReason : null, modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
+function normalizeGoal(goal) { const normalized = normalizeStoredGoal(goal); return { schemaVersion: 1, id: normalized.id, title: normalized.title, status: normalized.status, executionMode: normalized.executionMode, manualReason: normalized.manualReason, modeOffered: normalized.modeOffered, steps: normalized.steps }; }
+function normalizeStoredGoal(goal) { const executionMode = normalizeExecutionMode(goal.executionMode); return { ...goal, executionMode, manualReason: executionMode === 'manual' ? (goal.manualReason ?? null) : null, modeOffered: goal.modeOffered ?? false }; }
 function normalizeExecutionMode(mode) { return mode === 'manual' || mode === 'collaborative' ? 'manual' : 'automatic'; }
 function isId(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
 function text(value) { return value === String(value) && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
@@ -231,6 +250,11 @@ function safePath(value) {
   return relative('.', value).replaceAll('\\', '/') === normalized;
 }
 async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
+
+async function viewHasRevision(root, revision) {
+  try { return (await readFile(resolve(root, PROGRESS_VIEW_PATH), 'utf8')).includes(`<!-- progress-revision: ${revision} -->`); }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+}
 
 async function updateProgress(root, transform, options = {}) {
   return withProgressLock(root, async () => {
@@ -272,20 +296,33 @@ async function createLock(path, owner) {
 }
 
 async function recoverStaleLock(path, owner) {
-  const recoveryPath = `${path}.recovery`; let recovery;
-  try { recovery = await open(recoveryPath, 'wx', 0o600); }
-  catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
+  const recoveryPath = `${path}.recovery`; const recoveryOwner = { pid: process.pid, token: randomUUID() };
+  const recovery = await acquireRecoveryLock(recoveryPath, recoveryOwner);
+  if (!recovery) return undefined;
   try {
     const source = await readFile(path, 'utf8'); const details = await stat(path); let current = {};
     try { current = JSON.parse(source); } catch {}
-    if (Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
-    await unlink(path);
+    if (!shortReference(current.token) || Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
+    await releaseOwnedLock(path, current);
     try { return await createLock(path, owner); } catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
   } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
-  finally { await recovery.close(); await unlink(recoveryPath).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+  finally { await recovery.close(); await releaseOwnedLock(recoveryPath, recoveryOwner); }
+}
+
+async function acquireRecoveryLock(path, owner) {
+  try { return await createLock(path, owner); }
+  catch (error) { if (error.code !== 'EEXIST') throw error; }
+  let current; let details;
+  try { current = JSON.parse(await readFile(path, 'utf8')); details = await stat(path); }
+  catch (error) { if (error.code === 'ENOENT') return undefined; return undefined; }
+  if (!shortReference(current.token) || Date.now() - details.mtimeMs <= 30_000 || processIsLive(current.pid)) return undefined;
+  await releaseOwnedLock(path, current);
+  try { return await createLock(path, owner); }
+  catch (error) { if (error.code === 'EEXIST') return undefined; throw error; }
 }
 
 async function releaseOwnedLock(path, owner) {
+  if (!shortReference(owner.token)) return;
   try { const current = JSON.parse(await readFile(path, 'utf8')); if (current.token === owner.token) await unlink(path); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
@@ -298,6 +335,7 @@ function withDerivedStatus(goal, steps) { const remaining = steps.filter(step =>
 function ticket(goalId, step) { return { goalId, stepId: step.id, title: step.title, status: step.status, assignee: step.assignee, acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence.slice(0, 3) }; }
 function ticketSummary(step) { return { stepId: step.id, title: step.title, status: step.status, assignee: step.assignee }; }
 function statusCounts(steps) { return { total: steps.length, todo: steps.filter(step => step.status === 'TODO').length, inProgress: steps.filter(step => step.status === 'IN_PROGRESS').length, blocked: steps.filter(step => step.status === 'BLOCKED').length, done: steps.filter(step => step.status === 'DONE').length }; }
+function withManualReason(result, goal) { if (normalizeExecutionMode(goal.executionMode) === 'manual') result.manualReason = goal.manualReason ?? null; return result; }
 
 function assertExpectedRevision(current, expectedRevision) {
   if (expectedRevision === undefined) return;

@@ -7,6 +7,7 @@
       "title": "Tableau web local pour CTXRoute Progress",
       "status": "DONE",
       "executionMode": "manual",
+      "manualReason": null,
       "modeOffered": true,
       "steps": [
         {
@@ -117,6 +118,7 @@
       "title": "Refonte sobre du tableau CTXRoute Progress",
       "status": "DONE",
       "executionMode": "manual",
+      "manualReason": null,
       "modeOffered": false,
       "steps": [
         {
@@ -226,6 +228,7 @@
       "title": "Polir l’expérience du tableau Progress",
       "status": "DONE",
       "executionMode": "manual",
+      "manualReason": null,
       "modeOffered": false,
       "steps": [
         {
@@ -279,6 +282,7 @@
       "title": "Rendre CTXRoute Progress durable et authentifié",
       "status": "DONE",
       "executionMode": "manual",
+      "manualReason": null,
       "modeOffered": false,
       "steps": [
         {
@@ -353,6 +357,7 @@
       "title": "Rendre Progress automatique par défaut et manuel seulement aux vrais points de décision",
       "status": "DONE",
       "executionMode": "automatic",
+      "manualReason": null,
       "modeOffered": true,
       "steps": [
         {
@@ -407,6 +412,7 @@
       "title": "Rendre Progress asynchrone et léger pour les équipes d’agents",
       "status": "DONE",
       "executionMode": "automatic",
+      "manualReason": null,
       "modeOffered": false,
       "steps": [
         {

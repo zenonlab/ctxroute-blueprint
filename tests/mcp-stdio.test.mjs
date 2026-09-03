@@ -50,11 +50,14 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
+    assert.equal(listed.tools.some(tool => tool.name === 'progress_read'), false);
     assert.ok(JSON.stringify(listed.tools).length < 6000, 'Progress MCP schemas must remain below 6,000 characters');
-    for (const name of ['progress_read', 'progress_status']) {
-      const response = await client.callTool({ name, arguments: {} });
-      assert.notEqual(response.isError, true, name);
-    }
+    const statusResponse = await client.callTool({ name: 'progress_status', arguments: {} });
+    assert.notEqual(statusResponse.isError, true);
+    const resources = await client.listResources();
+    assert.deepEqual(resources.resources.map(resource => resource.uri), ['ctxroute://progress/full']);
+    const full = await client.readResource({ uri: 'ctxroute://progress/full' });
+    assert.deepEqual(JSON.parse(full.contents[0].text), { schemaVersion: 1, goals: [] });
     const opened = JSON.parse((await client.callTool({ name: 'progress_open_dashboard', arguments: {} })).content[0].text);
     assert.match(opened.url, /^http:\/\/localhost:\d+\/#/u);
     assert.equal(opened.reused, false);
@@ -75,7 +78,7 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     const unclassifiedManual = await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual' } });
     assert.equal(unclassifiedManual.isError, true);
     const mode = JSON.parse((await client.callTool({ name: 'progress_set_mode', arguments: { goalId: plan.goalId, mode: 'manual', reason: 'visual-review' } })).content[0].text);
-    assert.deepEqual(mode.goal, { id: plan.goalId, status: 'ACTIVE', executionMode: 'manual', steps: 1 });
+    assert.deepEqual(mode.goal, { id: plan.goalId, status: 'ACTIVE', executionMode: 'manual', steps: 1, manualReason: 'visual-review' });
     assert.equal(mode.progress, undefined);
     const updateResponse = await client.callTool({ name: 'progress_update_step', arguments: { goalId: plan.goalId, stepId: 'step-1', agentId: 'stdio-agent', status: 'DONE', evidence: ['npm test'] } });
     const update = JSON.parse(updateResponse.content[0].text);

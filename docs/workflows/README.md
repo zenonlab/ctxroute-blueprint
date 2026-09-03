@@ -12,11 +12,14 @@ goal whose unfinished steps are all `BLOCKED` produces a non-blocking handoff.
 `stop_hook_active` prevents recursive continuation loops.
 
 For multi-agent work, each independent step is a ticket. An agent calls
-`progress_claim_ticket` once, performs the work without intermediate tracking
+`progress_status`, then `progress_next` or `progress_claim_ticket`, and performs the work without intermediate tracking
 writes, and calls `progress_update_step` once with its final status and evidence.
 Claims and all other mutations use the same short filesystem lock, so parallel
 agents cannot overwrite one another. A busy MCP fails quickly; work may continue
 and the agent reconciles its ticket afterward. Mutation replies are compact.
+The full checklist is available only through the voluntary JSON resource
+`ctxroute://progress/full`; it is not an automatically selectable tool.
+`npm run progress:read` remains the human diagnostic path.
 
 Stop mentions Archify only when an Archify source is already part of the
 change. A diagram is needed only when a material boundary, public contract,
@@ -35,10 +38,17 @@ the continuation decision.
 
 The browser loads all goals from `.project/progress.json` through
 `progress-core`, with completed goals hidden by default. Plan creation validates
-before writing, and mode changes save directly. Step status and short evidence remain mutable;
+before writing. Switching to manual opens a reason dialog and persists either
+`visual-review` or `important-decision`; automatic mode clears that reason.
+Step status and short evidence remain mutable;
 approved titles, criteria, files, and commands do not. Every response includes
 an optimistic revision, and HTTP 409 requires the browser to reload before
 retrying.
+
+`docs/progress.md` is a derived view carrying the JSON revision. CLI, MCP, and
+dashboard startup repair it atomically when it is missing or stale. Both the
+main lock and its recovery marker identify their owner by PID and token so a
+dead stale owner can be reclaimed without disturbing a live or recent one.
 
 ## File change to CRG update
 
