@@ -10,6 +10,10 @@ import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progre
 import { request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
+const test_request_two = () => request('/api/progress');
+const test_request_three = () => request('/api/progress');
+const test_request_four = () => request('/api/progress');
+const test_request_five = () => request('/api/progress');
 const makePlan = (goalId = 'goal-one') => ({ goalId, title: 'Ship safely', validationEvidence: ['npm test'], steps: [{ id: 'step-one', title: 'Verify', acceptance: ['Tests pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['npm test'] }] });
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-'));
@@ -29,10 +33,10 @@ test('client request injects authentication and returns decoded JSON', async () 
   };
   try {
     assert.equal((await request('/api/progress')).revision, 'r1');
-    await request('/api/progress');
-    await request('/api/progress');
-    await request('/api/progress');
-    await request('/api/progress');
+    await test_request_two();
+    await test_request_three();
+    await test_request_four();
+    await test_request_five();
     assert.equal(received.path, '/api/progress');
     assert.equal(received.options.headers['Content-Type'], 'application/json');
   } finally {
