@@ -476,11 +476,12 @@ test('Stop adds the dashboard once for an active session and keeps progression p
     return calls === 1 ? { url: 'http://localhost:4321/#private', instanceId: 'instance-one' } : null;
   };
   const first = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
-  assert.equal(first.decision, 'block');
+  assert.equal(first.continue, true);
   assert.match(first.systemMessage, /http:\/\/localhost:4321\/#private/u);
   const repeated = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
-  assert.equal(repeated.decision, 'block');
-  assert.equal('systemMessage' in repeated, false);
+  assert.equal(repeated.continue, true);
+  assert.match(repeated.systemMessage, /Progress asynchrone/u);
+  assert.doesNotMatch(repeated.systemMessage, /localhost/u);
 });
 
 test('Stop does not start a dashboard without active goals and dashboard failures stay fail-open', async () => {
@@ -490,19 +491,20 @@ test('Stop does not start a dashboard without active goals and dashboard failure
   assert.equal(called, false);
   const active = progressWorkspace({ statuses: ['TODO'] });
   const result = await progressContinuation({ session_id: 'active' }, { root: active, changed: [], diagrams: [], dashboardNotice: async () => { throw new Error('simulated failure'); } });
-  assert.equal(result.decision, 'block');
+  assert.equal(result.continue, true);
   assert.match(result.systemMessage, /unavailable: simulated failure/u);
 });
 
-test('Stop automatic policy continues TODO and IN_PROGRESS work', async () => {
+test('Stop automatic policy stays advisory for TODO and IN_PROGRESS work', async () => {
   for (const status of ['TODO', 'IN_PROGRESS']) {
     const cwd = progressWorkspace({ mode: 'automatic', statuses: [status] });
     const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
-    assert.equal(result.decision, 'block', status);
-    assert.match(result.reason, /Continue ce goal automatiquement/u);
-    assert.doesNotMatch(result.reason, /Archify/u);
-    assert.match(result.reason, new RegExp(`\\[${status}\\]`, 'u'));
-    assert.ok(result.reason.length <= 1200);
+    assert.equal(result.continue, true, status);
+    assert.equal('decision' in result, false);
+    assert.match(result.systemMessage, /Progress asynchrone/u);
+    assert.doesNotMatch(result.systemMessage, /Archify/u);
+    assert.match(result.systemMessage, new RegExp(`\\[${status}\\]`, 'u'));
+    assert.ok(result.systemMessage.length <= 1200);
   }
 });
 
@@ -522,11 +524,11 @@ test('Stop hands off an external block in either mode without a continuation loo
 test('Stop continuation remains bounded to three current steps after compaction', async () => {
   const cwd = progressWorkspace({ mode: 'automatic', statuses: ['IN_PROGRESS', 'BLOCKED', 'TODO', 'TODO'] });
   const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
-  assert.match(result.reason, /step-1/u);
-  assert.match(result.reason, /step-2/u);
-  assert.match(result.reason, /step-3/u);
-  assert.doesNotMatch(result.reason, /step-4/u);
-  assert.ok(result.reason.length <= 1200);
+  assert.match(result.systemMessage, /step-1/u);
+  assert.match(result.systemMessage, /step-2/u);
+  assert.match(result.systemMessage, /step-3/u);
+  assert.doesNotMatch(result.systemMessage, /step-4/u);
+  assert.ok(result.systemMessage.length <= 1200);
 });
 
 test('Stop requires confirmation only for deletion, not verified commits', () => {

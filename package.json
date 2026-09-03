@@ -55,6 +55,7 @@
     "progress:read": "node scripts/progress-cli.mjs read",
     "progress:status": "node scripts/progress-cli.mjs status",
     "progress:next": "node scripts/progress-cli.mjs next",
+    "progress:claim": "node scripts/progress-cli.mjs claim",
     "progress:update": "node scripts/progress-cli.mjs update",
     "progress:mode": "node scripts/progress-cli.mjs mode",
     "progress:validate": "node scripts/progress-cli.mjs validate-plan",

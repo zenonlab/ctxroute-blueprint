@@ -26,9 +26,9 @@
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 1, "row": 0, "tag": "consumer" },
     { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "once-per-session guidance", "stage": 2, "row": 0, "tag": "dispatcher cap" },
-    { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "MCP calls", "stage": 2, "row": 2, "tag": "allowlist" },
+    { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "atomic claim + report", "stage": 2, "row": 2, "tag": "async tickets" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
-    { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "automatic / manual", "stage": 3, "row": 2, "tag": "targeted guard" },
+    { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "async advisory / manual", "stage": 3, "row": 2, "tag": "targeted guard" },
     { "id": "artifacts", "type": "database", "label": "Local evidence", "sublabel": "HTML + receipt", "stage": 4, "row": 0, "tag": "bounded output" }
   ],
   "flows": [
@@ -42,7 +42,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Session start stays quiet when CRG is healthy", "PreToolUse injects only targeted documentation", "MCP schemas remain bounded and allowlisted"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["Stop continues requested work automatically and pauses only for visual review or a consequential undecided choice", "Tab-scoped authentication survives reloads while Progress validates revision-checked mutations", "Archify is mentioned only when a diagram source actually changed"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Agents atomically claim independent tickets and report only once after work", "Automatic Stop remains advisory while manual is reserved for visual review or a consequential undecided choice", "Archify is mentioned only when a diagram source actually changed"] },
     { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
   ]
 }

@@ -20,6 +20,9 @@ for solutions, verifies acceptance criteria, and records evidence before
 returning control; a genuine external blocker is the only incomplete handoff.
 Routine feature implementation, tests, documentation, and decisions already
 present in the request never justify a manual pause.
+Automatic Stop output is advisory and never returns a blocking decision;
+parallel agents may own unfinished tickets independently. Manual mode remains
+the only progression pause.
 When every unfinished step is `BLOCKED`, Stop emits that incomplete handoff
 without blocking termination in either mode. It does not offer autonomous mode
 for work already recorded as blocked.

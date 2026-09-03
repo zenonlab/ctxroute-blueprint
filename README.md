@@ -96,7 +96,7 @@ after discovery.
 
 ### Progress checklist
 
-Approved plans are stored in [`.project/progress.json`](.project/progress.json).
+Tracked plans are stored in [`.project/progress.json`](.project/progress.json).
 The generated [short view](docs/progress.md) is informational and must not be
 edited directly. Validation is read-only; materialization requires short
 validation evidence. `approved: true` is the write flag; a matching explicit
@@ -106,6 +106,7 @@ user request is sufficient unless the plan introduces a consequential choice.
 npm run progress:read
 npm run progress:status
 npm run progress:next -- goal-id
+npm run progress:claim -- agent-id goal-id
 npm run progress:update -- update.json
 npm run progress:mode -- goal-id automatic
 npm run progress:validate -- plan.json
@@ -122,6 +123,12 @@ evidence, and exactly two execution modes:
 Legacy `autonomous` and `collaborative` values remain readable and normalize to
 `automatic` and `manual` respectively.
 
+Progress is optional for small or single-agent changes. For substantial
+parallel work, agents atomically claim distinct tickets, work independently,
+then report the final status and evidence once. A short lock prevents concurrent
+writes from overwriting another agent, and mutation tools return compact replies.
+Automatic goals are advisory at Stop and never force a continuation loop.
+
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
 
 ### Local MCP servers
@@ -129,7 +136,7 @@ The CLI and the `ctxroute-progress` MCP server use the same progress core.
 The repository exposes two independent stdio servers:
 
 - `ctxroute-progress` runs `npm run progress:mcp` and exposes checklist,
-  step-update, next-step, and execution-mode tools.
+  atomic ticket claim, compact result reporting, next-step, and mode tools.
 - `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read and
   context tools from official CRG v2.3.8 against the ignored local graph.
 

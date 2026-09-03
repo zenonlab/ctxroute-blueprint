@@ -18,7 +18,7 @@ review: on-change
 revised: true
 ---
 
-# ADR-0014 — Explicit agent progress checklist
+# ADR-0014 — Asynchronous agent ticket coordination
 
 ## Context
 
@@ -48,6 +48,14 @@ CLI remains a fallback when the client did not load the project-scoped MCP.
 The local dashboard is another adapter over this core and every web mutation
 carries an optimistic revision. Existing identifiers are never rewritten and
 the final step of a goal cannot be deleted.
+
+Progress is optional for small or single-agent work. During substantial
+parallel work, each step acts as a ticket: `progress_claim_ticket` atomically
+assigns one `TODO` step to an agent and moves it to `IN_PROGRESS`. The agent
+does not mirror intermediate activity and reports only its final result. Every
+mutation shares a bounded filesystem lock, preventing concurrent lost updates
+without making the MCP a long-running coordinator. Mutation responses stay
+compact, and a busy or unavailable Progress service does not block safe work.
 
 ## Consequences
 

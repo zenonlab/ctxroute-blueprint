@@ -28,10 +28,11 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 ## Progress
 
-- Before significant mutating work, read the checklist with `progress_status`.
-- Create and validate a bounded plan with `progress_validate_plan` before changing files.
-- Materialize a validated plan automatically when it is a faithful breakdown of an explicit user request. Ask first only when the plan introduces a consequential product, architecture, or design choice that the user has not already made.
-- Update each active step with `progress_update_step`; `DONE` requires short validation evidence.
+- Progress is asynchronous coordination, never a prerequisite or global lock for implementation.
+- Skip Progress for small, reversible, or single-agent changes. For substantial parallel work, create tickets once, then let each agent atomically claim one with `progress_claim_ticket`.
+- Split independent tickets so agents can work concurrently. An agent writes Progress only when claiming a ticket and once after implementation and verification; do not mirror intermediate activity.
+- Report `DONE` or `BLOCKED` with short evidence after the work. If Progress is busy or unavailable, continue safe in-scope work and reconcile the ticket afterward.
+- Use `manual` only for visual review or an important undecided product/change/design choice. All other tickets remain `automatic` and never block Stop.
 - Use the matching `npm run progress:*` command only when the project MCP is unavailable.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
@@ -47,7 +48,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Avoid speculative abstractions and refactors.
 - Verify every modification.
 - Review the diff after each write.
-- Complete one step before starting the next.
+- Each agent completes one claimed ticket before taking another; independent agents may work in parallel.
 
 ## Audit
 

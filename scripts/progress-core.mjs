@@ -1,9 +1,10 @@
-import { mkdir, readFile, rename, open } from 'node:fs/promises';
+import { mkdir, readFile, rename, open, stat, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
+export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
 export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
@@ -38,6 +39,7 @@ function inspectProgressChecklist(value) {
     for (const step of goal.steps) {
       if (!isId(step?.id) || stepIds.has(step.id)) errors.push(`goal ${goal.id} has duplicate or invalid step id`); stepIds.add(step?.id);
       if (!text(step?.title) || !STATUSES.has(step?.status)) errors.push(`step ${step?.id ?? '(missing)'} has invalid title or status`);
+      if (step?.assignee !== undefined && !shortReference(step.assignee)) errors.push(`step ${step?.id ?? '(missing)'} has an invalid assignee`);
       for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands, evidence: step?.evidence })) {
         if (!Array.isArray(list) || list.length > (name === 'evidence' ? LIMITS.evidence : LIMITS.references) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} needs bounded ${name}`);
         for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`step ${step?.id ?? '(missing)'} contains an invalid ${name} reference`);
@@ -78,20 +80,44 @@ export function validatePlan(plan, current = emptyProgress()) {
 
 export async function approvePlan(plan, root = process.cwd(), options = {}) {
   if (plan?.approved !== true) throw new Error('approved: true write flag is required to materialize a plan');
-  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const result = validatePlan(plan, current);
-  if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
-  const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
-  const json = `${JSON.stringify(next, null, 2)}\n`; if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
-  await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
+  return withProgressLock(root, async () => {
+    const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const result = validatePlan(plan, current);
+    if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
+    const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
+    if (next !== current) await writeProgress(root, next);
+    return next;
+  });
 }
 
-export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), modeOffered: goal.modeOffered ?? false, steps: goal.steps.map(step => ({ id: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) }));
+export const progressStatus = value => value.goals.map(goal => ({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), modeOffered: goal.modeOffered ?? false, steps: goal.steps.map(step => ({ id: step.id, title: step.title, status: step.status, assignee: step.assignee, evidence: step.evidence.slice(0, 3) })) }));
 export function progressNext(value, goalId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
   const priority = { IN_PROGRESS: 0, BLOCKED: 1, TODO: 2, DONE: 3 };
   const next = goal.steps.filter(step => step.status !== 'DONE').sort((a, b) => priority[a.status] - priority[b.status] || goal.steps.indexOf(a) - goal.steps.indexOf(b)).slice(0, LIMITS.next);
-  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ({ stepId: step.id, title: step.title, status: step.status, evidence: step.evidence.slice(0, 3) })) };
+  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticket(goal.id, step)) };
+}
+
+export async function claimProgressTicket(agentId, goalId, root = process.cwd()) {
+  if (!shortReference(agentId)) throw new Error('agentId must be a short non-secret identifier');
+  let claimed;
+  await updateProgress(root, current => {
+    const goals = goalId ? [current.goals.find(goal => goal.id === goalId)] : current.goals.filter(goal => goal.status === 'ACTIVE');
+    if (goals.some(goal => !goal)) throw new Error(`Unknown goal: ${goalId}`);
+    for (const goal of goals) {
+      const owned = goal.steps.find(step => step.status === 'IN_PROGRESS' && step.assignee === agentId);
+      if (owned) { claimed = ticket(goal.id, owned); return current; }
+    }
+    for (const goal of goals) {
+      const index = goal.steps.findIndex(step => step.status === 'TODO');
+      if (index < 0) continue;
+      const steps = [...goal.steps]; steps[index] = { ...steps[index], status: 'IN_PROGRESS', assignee: agentId };
+      claimed = ticket(goal.id, steps[index]);
+      return { ...current, goals: current.goals.map(item => item.id === goal.id ? withDerivedStatus(goal, steps) : item) };
+    }
+    return current;
+  });
+  return { claimed: Boolean(claimed), ticket: claimed };
 }
 
 export async function setProgressMode(goalId, mode, _userConfirmed, root = process.cwd(), options = {}) {
@@ -113,15 +139,18 @@ export async function updateProgressGoal(goalId, { title }, root = process.cwd()
   }, options);
 }
 
-export async function updateProgressStep({ goalId, stepId, status, title, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
+export async function updateProgressStep({ goalId, stepId, agentId, status, title, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
   if (status !== undefined && !STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
   return updateProgress(root, current => {
     const goalIndex = findGoalIndex(current, goalId);
     const goal = current.goals[goalIndex]; const stepIndex = goal.steps.findIndex(step => step.id === stepId);
     if (stepIndex < 0) throw new Error(`Unknown step: ${stepId}`);
     const existing = goal.steps[stepIndex];
+    if (agentId !== undefined && existing.assignee !== undefined && existing.assignee !== agentId) throw new Error(`Ticket ${stepId} is assigned to ${existing.assignee}`);
     const changed = { ...existing };
     if (status !== undefined) changed.status = status;
+    if (agentId !== undefined && status === 'IN_PROGRESS') changed.assignee = agentId;
+    if (status === 'TODO') delete changed.assignee;
     if (title !== undefined) changed.title = title;
     if (acceptance !== undefined) changed.acceptance = copyList(acceptance);
     if (files !== undefined) changed.files = copyList(files);
@@ -190,15 +219,40 @@ function safePath(value) {
 async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
 
 async function updateProgress(root, transform, options = {}) {
-  const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
-  const errors = inspectProgressChecklist(next); if (errors.length) throw new Error(errors.join('; '));
+  return withProgressLock(root, async () => {
+    const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current);
+    if (next !== current) await writeProgress(root, next);
+    return next;
+  });
+}
+
+async function writeProgress(root, next) {
+  const json = `${JSON.stringify(next, null, 2)}\n`; const errors = inspectProgressChecklist(next);
+  if (errors.length) throw new Error(errors.join('; '));
   if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 64 KiB');
-  await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
+  await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next));
+}
+
+async function withProgressLock(root, operation) {
+  const path = resolve(root, PROGRESS_LOCK_PATH); await mkdir(dirname(path), { recursive: true });
+  let handle;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try { handle = await open(path, 'wx', 0o600); break; }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      try { if (Date.now() - (await stat(path)).mtimeMs > 30_000) await unlink(path); } catch (inspectionError) { if (inspectionError.code !== 'ENOENT') throw inspectionError; }
+      if (attempt < 19) await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
+    }
+  }
+  if (!handle) { const error = new Error('Progress update is busy; retry later'); error.code = 'PROGRESS_BUSY'; throw error; }
+  try { return await operation(); }
+  finally { await handle.close(); await unlink(path).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 
 function findGoalIndex(current, goalId) { const index = current.goals.findIndex(goal => goal.id === goalId); if (index < 0) throw new Error(`Unknown goal: ${goalId}`); return index; }
 function copyList(value) { return Array.isArray(value) ? [...value] : value; }
 function withDerivedStatus(goal, steps) { const remaining = steps.filter(step => step.status !== 'DONE'); const status = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE'; return { ...goal, status, steps }; }
+function ticket(goalId, step) { return { goalId, stepId: step.id, title: step.title, status: step.status, assignee: step.assignee, acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence.slice(0, 3) }; }
 
 function assertExpectedRevision(current, expectedRevision) {
   if (expectedRevision === undefined) return;

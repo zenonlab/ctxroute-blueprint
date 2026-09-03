@@ -3,13 +3,20 @@
 ## Progress and Stop
 
 The Progress MCP is the durable source for goals, mutable step status, evidence,
-and the active per-goal mode. Goals are `automatic` by default, so Stop requests
-continuation until every step is `DONE` or a real external blocker is recorded.
+and the active per-goal mode. Goals are `automatic` by default, so Stop reports
+remaining tickets without preventing the agent from ending its turn.
 `manual` is a targeted pause only for a visual review or a consequential
 product/change/design decision not already made by the user. Routine feature
 implementation, tests, and documentation remain automatic. In either mode, a
 goal whose unfinished steps are all `BLOCKED` produces a non-blocking handoff.
 `stop_hook_active` prevents recursive continuation loops.
+
+For multi-agent work, each independent step is a ticket. An agent calls
+`progress_claim_ticket` once, performs the work without intermediate tracking
+writes, and calls `progress_update_step` once with its final status and evidence.
+Claims and all other mutations use the same short filesystem lock, so parallel
+agents cannot overwrite one another. A busy MCP fails quickly; work may continue
+and the agent reconciles its ticket afterward. Mutation replies are compact.
 
 Stop mentions Archify only when an Archify source is already part of the
 change. A diagram is needed only when a material boundary, public contract,

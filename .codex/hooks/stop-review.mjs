@@ -52,7 +52,8 @@ export async function progressContinuation(hookInput, options = {}) {
       return { continue: true, systemMessage: joinDashboard([`Goal ${goal.id} is blocked externally. Handoff:\n${labels}`, archify].filter(Boolean).join('\n'), dashboard) };
     }
     if (next.mode === 'automatic') {
-      return withDashboard({ decision: 'block', reason: [`Continue ce goal automatiquement. Exécute les étapes restantes, résous les problèmes dans le périmètre demandé et ne t'arrête qu'après vérification complète ou blocage externe réel.\n${labels}`, archify].filter(Boolean).join('\n').slice(0, 1200) }, dashboard);
+      const message = [`Progress asynchrone — tickets disponibles ou en cours pour ${goal.id}:\n${labels}`, archify, dashboard].filter(Boolean).join('\n').slice(0, 1200);
+      return message ? { continue: true, systemMessage: message } : null;
     }
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);

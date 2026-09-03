@@ -28,3 +28,7 @@
 ## Rendre Progress automatique par défaut et manuel seulement aux vrais points de décision — DONE
 
 - [x] **Remplacer le blocage systématique par un routage automatic/manual ciblé** — DONE _(evidence: node --test tests/progress-core.test.mjs tests/hooks.test.mjs tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs — 113 pass, 1 skip, node .githooks/archify validate internal — 3 diagrams pass, npm run validate — 267 pass, 1 skip)_
+
+## Rendre Progress asynchrone et léger pour les équipes d’agents — DONE
+
+- [x] **Ajouter la prise atomique de tickets et différer les mises à jour** — DONE _(evidence: Parallel claim test: 4 agents received 4 distinct tickets, Targeted suite: 105 pass, 1 skip, npm run validate: 269 pass, 1 skip)_
