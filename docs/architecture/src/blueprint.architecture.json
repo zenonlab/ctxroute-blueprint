@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1280, 520],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress exposes eight bounded tools plus an opt-in full resource and a self-repaired view; Stop hands off; clients own stdio." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Subagent lifecycle claims automatic tickets; main agents retain explicit MCP control." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -28,12 +28,12 @@
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
   ],
   "connections": [
-    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "six lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
+    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "nine lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
     { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "dispatch context and policy", "labelAt": [500, 124] },
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-progress", "from": "agents", "to": "progressMcp", "label": "status → claim → update", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [165, 170] },
-    { "id": "progress-stop", "from": "progressMcp", "to": "lifecycle", "label": "mode / next / evidence", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [250, 304] },
+    { "id": "progress-stop", "from": "progressMcp", "to": "lifecycle", "label": "explicit MCP + automatic subagents", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [250, 304] },
     { "id": "progress-dashboard", "from": "progressMcp", "to": "progressDashboard", "label": "start / reuse + revised mutations", "fromSide": "bottom", "toSide": "top", "labelAt": [130, 350] },
     { "id": "dashboard-state", "from": "progressDashboard", "to": "dashboardState", "label": "PID + token metadata", "labelAt": [250, 494] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },

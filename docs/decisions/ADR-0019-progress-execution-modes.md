@@ -26,12 +26,23 @@ present in the request never justify a manual pause.
 Automatic Stop output is advisory and never returns a blocking decision;
 parallel agents may own unfinished tickets independently. Manual mode remains
 the only progression pause.
+`SubagentStart` automatically claims only `automatic` goals and injects the
+complete ticket plus a required final `PROGRESS_RESULT` JSON footer.
+`SubagentStop` accepts only `DONE` or `BLOCKED` with non-empty bounded evidence
+on the last non-empty line outside Markdown fences. Invalid output atomically
+releases that agent's claim to `TODO`; `SessionEnd` releases remaining
+`IN_PROGRESS` claims matching only its opaque session prefix. These hooks fail
+open with bounded diagnostics when Progress is busy or unavailable.
 When every unfinished step is `BLOCKED`, Stop emits that incomplete handoff
 without blocking termination in either mode. It does not offer autonomous mode
 for work already recorded as blocked.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
+Codex and Claude provide the parent `session_id`, subagent `agent_id`, and
+`last_assistant_message` needed by this contract in their official hook
+schemas: [Codex hooks](https://developers.openai.com/codex/hooks/) and
+[Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks).
 MCP callers must classify a manual transition as `visual-review` or
 `important-decision`; the shared core persists that value as `manualReason`
 and rejects a new manual transition or plan without it. Returning to automatic

@@ -43,6 +43,11 @@ flowchart TD
     Prompt[UserPromptSubmit] --> Count[Turn counter]
     Count --> Canary[Canary]
     Compact[PreCompact] --> Reset[CTXRoute reset]
+    Spawn[SubagentStart] --> Claim[Claim automatic Progress ticket]
+    Claim --> Worker[Subagent work]
+    Worker --> Result[SubagentStop structured footer]
+    Result --> Settle[DONE or BLOCKED]
+    SessionEnd --> Release[Release session IN_PROGRESS claims]
 ```
 
 PreToolUse provides immediate feedback. Git hooks remain authoritative because
@@ -50,6 +55,8 @@ they inspect the index and capture files produced by commands or external tools.
 The registered lifecycle handlers intentionally omit custom status messages.
 Read-only tools skip the architecture subprocess, and PostToolUse is limited to
 mutation-capable tools to reduce lifecycle noise and process startup overhead.
+Only the three subagent/session lifecycle hooks mutate Progress automatically;
+main-agent coordination remains explicit over MCP.
 
 The lifecycle is independent from the two project-scoped MCP servers declared
 in `.codex/config.toml`: `ctxroute-progress` and `code-review-graph` are

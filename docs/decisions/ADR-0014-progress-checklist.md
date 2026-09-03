@@ -9,6 +9,7 @@ scope:
   - .project/progress.json
   - docs/progress.md
   - .claude/hooks/docs/progress-guidance.md
+  - .codex/hooks/progress-subagent.mjs
   - AGENTS.md
   - scripts/validate-mcp-installation.mjs
   - tests/mcp-stdio.test.mjs
@@ -69,12 +70,18 @@ The complete JSON checklist is absent from `tools/list` and exposed as the
 opt-in MCP resource `ctxroute://progress/full`. `npm run progress:read` remains
 available for human diagnostics.
 A busy or unavailable Progress service does not block safe work.
+For subagents, the same core exposes internal-only automatic claim and
+session-prefix release mutations. They are not MCP tools. Harness hooks persist
+only `harness:sha256(session_id):sha256(agent_id)` identities, so concurrent
+sessions and agents cannot share ownership accidentally and raw harness IDs do
+not enter Progress.
 
 ## Consequences
 
 Validation is read-only and materialization is a separate operation. The contract
 supports up to 20 goals, 30 steps per goal, and 10 evidence references per
-step, with a 64 KiB JSON limit. No hook edits the checklist automatically.
+step, with a 64 KiB JSON limit. Only `SubagentStart`, `SubagentStop`, and
+`SessionEnd` edit the checklist automatically; `PostToolUse` never does.
 Agents must start from the repository root and restart after MCP manifest
 changes because the client owns project-scoped server discovery and transport.
 The stdio contract stays portable across MCP clients and does not depend on

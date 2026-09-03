@@ -9,13 +9,15 @@ import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { archifyInstruction, progressContinuation } from '../.codex/hooks/stop-review.mjs';
+import { handleProgressLifecycle, parseProgressResult, sessionOwnerPrefix, subagentOwner } from '../.codex/hooks/progress-subagent.mjs';
+import { approvePlan, readProgress } from '../scripts/progress-core.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('Codex and Claude expose exactly one handler for the same six lifecycle events', () => {
+test('Codex and Claude expose exactly one handler for the same nine lifecycle events', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
@@ -25,7 +27,7 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, event === 'SubagentStart' ? 65_536 : 1200, `${file} ${event} context limit`);
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
@@ -106,6 +108,9 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
+    SubagentStart: ['progress-subagent.mjs'],
+    SubagentStop: ['progress-subagent.mjs'],
+    SessionEnd: ['progress-subagent.mjs'],
   };
   for (const event of lifecycleEvents) {
     assert.deepEqual(handlerPlan('codex', event, root).map(handler => handler.name), expected[event]);
@@ -125,6 +130,121 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
   assert.deepEqual(codexInjection.args, ['--budget', '0']);
   assert.notEqual(codexInjection.path, join(root, '.codex', 'hooks', 'ctxroute.mjs'));
+});
+
+test('subagent ownership is opaque and separates sessions and agents', () => {
+  assert.notEqual(subagentOwner('codex', 'session-a', 'agent-1'), subagentOwner('codex', 'session-b', 'agent-1'));
+  assert.notEqual(subagentOwner('codex', 'session-a', 'agent-1'), subagentOwner('codex', 'session-a', 'agent-2'));
+  assert.equal(subagentOwner('codex', 'session-a', 'agent-1').startsWith(sessionOwnerPrefix('codex', 'session-a')), true);
+  assert.doesNotMatch(subagentOwner('codex', 'raw-session', 'raw-agent'), /raw-(?:session|agent)/u);
+});
+
+test('progress result parsing requires a strict final footer and bounded evidence', () => {
+  assert.deepEqual(parseProgressResult('work complete\nPROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}'), { status: 'DONE', evidence: ['npm test'] });
+  assert.deepEqual(parseProgressResult('PROGRESS_RESULT: {"status":"BLOCKED","evidence":["missing fixture"]}\n\n'), { status: 'BLOCKED', evidence: ['missing fixture'] });
+  for (const message of [
+    'finish',
+    'PROGRESS_RESULT: {bad}',
+    'PROGRESS_RESULT: {"status":"DONE","evidence":[]}',
+    '```\nPROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}\n```',
+    '```text\nPROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}',
+    'PROGRESS_RESULT: {"status":"TODO","evidence":["npm test"]}',
+    'PROGRESS_RESULT: {"status":"DONE","evidence":["npm test"],"extra":true}',
+  ]) assert.equal(parseProgressResult(message), undefined, message);
+});
+
+test('subagent lifecycle claims distinct automatic tickets and replays idempotently', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(3), approved: true }, directory);
+  const firstInput = JSON.stringify({ session_id: 'session-a', agent_id: 'agent-1' });
+  const first = await handleProgressLifecycle('codex', 'SubagentStart', firstInput, directory);
+  const repeated = await handleProgressLifecycle('codex', 'SubagentStart', firstInput, directory);
+  const second = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-2' }), directory);
+  const otherSession = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-b', agent_id: 'agent-1' }), directory);
+  assert.equal(first.hookSpecificOutput.additionalContext, repeated.hookSpecificOutput.additionalContext);
+  assert.match(first.hookSpecificOutput.additionalContext, /Acceptance:[\s\S]*Files:[\s\S]*Commands:[\s\S]*PROGRESS_RESULT/u);
+  const steps = (await readProgress(directory)).goals[0].steps;
+  assert.equal(new Set(steps.map(step => step.assignee)).size, 3);
+  assert.notEqual(second.hookSpecificOutput.additionalContext, otherSession.hookSpecificOutput.additionalContext);
+});
+
+test('subagent lifecycle skips manual goals and settles only the owned ticket', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1, { goalId: 'manual', executionMode: 'manual', manualReason: 'important-decision' }), approved: true }, directory);
+  await approvePlan({ ...progressPlan(2), approved: true }, directory);
+  const first = { session_id: 'session-a', agent_id: 'agent-1' };
+  const second = { session_id: 'session-b', agent_id: 'agent-1' };
+  await handleProgressLifecycle('claude', 'SubagentStart', JSON.stringify(first), directory);
+  await handleProgressLifecycle('claude', 'SubagentStart', JSON.stringify(second), directory);
+  await handleProgressLifecycle('claude', 'SubagentStop', JSON.stringify({ ...first, last_assistant_message: 'done\nPROGRESS_RESULT: {"status":"DONE","evidence":["node --test"]}' }), directory);
+  let progress = await readProgress(directory);
+  assert.equal(progress.goals.find(goal => goal.id === 'manual').steps[0].status, 'TODO');
+  assert.equal(progress.goals.find(goal => goal.id === 'goal-9').steps.filter(step => step.status === 'DONE').length, 1);
+  assert.equal(progress.goals.find(goal => goal.id === 'goal-9').steps.filter(step => step.status === 'IN_PROGRESS').length, 1);
+  await handleProgressLifecycle('claude', 'SubagentStop', JSON.stringify({ ...second, last_assistant_message: 'PROGRESS_RESULT: {"status":"BLOCKED","evidence":["external dependency"]}' }), directory);
+  progress = await readProgress(directory);
+  assert.equal(progress.goals.find(goal => goal.id === 'goal-9').status, 'BLOCKED');
+  assert.deepEqual(progress.goals.find(goal => goal.id === 'goal-9').steps.map(step => step.status), ['DONE', 'BLOCKED']);
+});
+
+test('a valid DONE footer completes a goal and repeated SubagentStop is a no-op', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1), approved: true }, directory);
+  const owner = { session_id: 'session-a', agent_id: 'agent-1' };
+  await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(owner), directory);
+  const stop = JSON.stringify({ ...owner, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}' });
+  await handleProgressLifecycle('codex', 'SubagentStop', stop, directory);
+  const completed = await readProgress(directory);
+  await handleProgressLifecycle('codex', 'SubagentStop', stop, directory);
+  assert.equal(completed.goals[0].status, 'DONE');
+  assert.deepEqual(await readProgress(directory), completed);
+});
+
+test('the real subagent hook process claims and settles a fixture ticket', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1), approved: true }, directory);
+  const script = join(root, '.codex/hooks/progress-subagent.mjs');
+  const identity = { session_id: 'real-session', agent_id: 'real-agent' };
+  const started = spawnSync(process.execPath, [script, 'codex', 'SubagentStart'], { cwd: directory, input: JSON.stringify(identity), encoding: 'utf8' });
+  assert.equal(started.status, 0, started.stderr);
+  assert.match(JSON.parse(started.stdout).hookSpecificOutput.additionalContext, /Ticket: step-1/u);
+  const stopped = spawnSync(process.execPath, [script, 'codex', 'SubagentStop'], { cwd: directory, input: JSON.stringify({ ...identity, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["real process"]}' }), encoding: 'utf8' });
+  assert.equal(stopped.status, 0, stopped.stderr);
+  assert.equal((await readProgress(directory)).goals[0].status, 'DONE');
+});
+
+test('subagent Progress failures stay fail-open with a short diagnostic', async () => {
+  const directory = progressHookWorkspace();
+  mkdirSync(join(directory, '.project'), { recursive: true });
+  writeFileSync(join(directory, '.project/progress.json'), '{invalid');
+  const result = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-a' }), directory);
+  assert.match(result.systemMessage, /^Progress SubagentStart failed open:/u);
+  assert.ok(result.systemMessage.length < 300);
+});
+
+test('invalid subagent results release only that claim and session cleanup is scoped and idempotent', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(3), approved: true }, directory);
+  const ownerA = { session_id: 'session-a', agent_id: 'agent-1' };
+  const ownerB = { session_id: 'session-a', agent_id: 'agent-2' };
+  const ownerC = { session_id: 'session-b', agent_id: 'agent-1' };
+  for (const owner of [ownerA, ownerB, ownerC]) await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(owner), directory);
+  await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...ownerA, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["api_key: secret"]}' }), directory);
+  let progress = await readProgress(directory);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'TODO').length, 1);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'IN_PROGRESS').length, 2);
+  await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(ownerA), directory);
+  await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...ownerA, last_assistant_message: `PROGRESS_RESULT: {"status":"DONE","evidence":["${'x'.repeat(501)}"]}` }), directory);
+  await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(ownerA), directory);
+  await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...ownerA, last_assistant_message: 'footer missing' }), directory);
+  progress = await readProgress(directory);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'TODO').length, 1);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'IN_PROGRESS').length, 2);
+  await handleProgressLifecycle('codex', 'SessionEnd', JSON.stringify({ session_id: 'session-a' }), directory);
+  await handleProgressLifecycle('codex', 'SessionEnd', JSON.stringify({ session_id: 'session-a' }), directory);
+  progress = await readProgress(directory);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'TODO').length, 2);
+  assert.equal(progress.goals[0].steps.filter(step => step.status === 'IN_PROGRESS').length, 1);
 });
 
 test('the lifecycle dispatcher executes sequentially and merges non-blocking context', () => {
@@ -263,7 +383,7 @@ test('postinstall verifies the complete local installation', () => {
   assert.deepEqual(inspectInstallation(root), []);
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /open \/hooks and approve the six workspace definitions/u);
+  assert.match(result.stdout, /open \/hooks and approve the nine workspace definitions/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {
@@ -824,6 +944,18 @@ function initializedWorkspace() {
   writeFileSync(configPath, JSON.stringify(config));
   mkdirSync(join(cwd, 'src'));
   return cwd;
+}
+
+function progressHookWorkspace() { return mkdtempSync(join(tmpdir(), 'progress-hook-')); }
+
+function progressPlan(count, overrides = {}) {
+  return {
+    goalId: 'goal-9',
+    title: 'Automatic work',
+    validationEvidence: ['node --test'],
+    steps: Array.from({ length: count }, (_, index) => ({ id: `step-${index + 1}`, title: `Ticket ${index + 1}`, acceptance: ['verified'], files: ['src/app.js'], commands: ['node --test'] })),
+    ...overrides,
+  };
 }
 
 function progressWorkspace({ mode = 'automatic', statuses, goalStatus = statuses.every(status => status === 'DONE') ? 'DONE' : statuses.every(status => status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE' }) {

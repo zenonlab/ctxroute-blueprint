@@ -19,6 +19,16 @@ agents cannot overwrite one another. Contenders retry with bounded jitter to
 absorb local bursts without forming a retry convoy. A busy MCP still fails
 after about one second; work may continue and the agent reconciles its ticket
 afterward. Mutation replies are compact.
+
+Subagents use an automatic specialization of this flow. `SubagentStart` hashes
+the harness, parent session, and agent identities, then claims the first `TODO`
+ticket from an `automatic` goal and injects its full contract. `SubagentStop`
+requires a final, unfenced `PROGRESS_RESULT` JSON line with `DONE` or `BLOCKED`
+and bounded non-empty evidence. A missing, malformed, oversized, secret-bearing,
+or empty-evidence result returns only that owned ticket to `TODO`. `SessionEnd`
+releases only `IN_PROGRESS` claims carrying its session prefix. Replays are
+idempotent, and all mutations use the existing lock. Main-agent sessions do not
+claim automatically; their explicit MCP flow remains the portable fallback.
 The full checklist is available only through the voluntary JSON resource
 `ctxroute://progress/full`; it is not an automatically selectable tool.
 `npm run progress:read` remains the human diagnostic path.

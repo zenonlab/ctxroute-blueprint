@@ -53,7 +53,7 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
+3. In Codex, open `/hooks` and approve the nine workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
@@ -130,6 +130,12 @@ then report the final status and evidence once. A short, jittered, bounded lock
 wait prevents concurrent writes from overwriting another agent while absorbing
 local claim bursts, and mutation tools return compact replies.
 Automatic goals are advisory at Stop and never force a continuation loop.
+For subagents, `SubagentStart` atomically claims the next `automatic` ticket and
+injects its criteria, files, commands, and required final `PROGRESS_RESULT`
+footer. `SubagentStop` settles only that opaque session/agent claim; malformed
+results return it to `TODO`, and `SessionEnd` releases only that session's
+remaining `IN_PROGRESS` claims. Main agents continue to use the explicit MCP
+flow. The eight MCP tools and voluntary full resource are unchanged.
 
 The CLI and the `ctxroute-progress` MCP server use the same progress core.
 Codex and Claude Code discover it from their project manifests. Any other local
@@ -176,7 +182,8 @@ guidance to agent actions through one project-local dispatcher. Rules live in
 Claude-compatible tooling.
 
 The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
-`UserPromptSubmit`, `PreCompact`, and `Stop`. Healthy CRG startup adds no
+`UserPromptSubmit`, `PreCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and
+`SessionEnd`. Healthy CRG startup adds no
 context. Targeted documentation is injected before relevant tool calls, and
 only the minimum required context is restored after compaction.
 
@@ -188,6 +195,7 @@ few turns while an agent is only exploring the project.
 CRG update, problem memory, documentation audit, and Archify preview support.
 It does not start MCP servers; the clients own their stdio transports. CRG
 failures and its 30-second timeout fail open with a short visible diagnostic.
+No `PostToolUse` handler changes Progress status.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process

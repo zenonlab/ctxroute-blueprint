@@ -135,6 +135,14 @@ export function progressMutationResult(value, goalId, stepId) {
 }
 
 export async function claimProgressTicket(agentId, goalId, root = process.cwd()) {
+  return claimMatchingProgressTicket(agentId, goalId, root, () => true);
+}
+
+export async function claimAutomaticProgressTicket(agentId, root = process.cwd()) {
+  return claimMatchingProgressTicket(agentId, undefined, root, goal => normalizeExecutionMode(goal.executionMode) === 'automatic');
+}
+
+async function claimMatchingProgressTicket(agentId, goalId, root, eligible) {
   if (!shortReference(agentId)) throw new Error('agentId must be a short non-secret identifier');
   let claimed;
   await updateProgress(root, current => {
@@ -145,6 +153,7 @@ export async function claimProgressTicket(agentId, goalId, root = process.cwd())
       if (owned) { claimed = ticket(goal.id, owned); return current; }
     }
     for (const goal of goals) {
+      if (!eligible(goal)) continue;
       const index = goal.steps.findIndex(step => step.status === 'TODO');
       if (index < 0) continue;
       const steps = [...goal.steps]; steps[index] = { ...steps[index], status: 'IN_PROGRESS', assignee: agentId };
@@ -154,6 +163,29 @@ export async function claimProgressTicket(agentId, goalId, root = process.cwd())
     return current;
   });
   return { claimed: Boolean(claimed), ticket: claimed };
+}
+
+export async function releaseProgressClaims(assigneePrefix, root = process.cwd()) {
+  if (!shortReference(assigneePrefix)) throw new Error('assigneePrefix must be a short non-secret identifier');
+  let released = 0;
+  const progress = await updateProgress(root, current => {
+    let changed = false;
+    const goals = current.goals.map(goal => {
+      let goalChanged = false;
+      const steps = goal.steps.map(step => {
+        if (step.status !== 'IN_PROGRESS' || !step.assignee?.startsWith(assigneePrefix)) return step;
+        const releasedStep = { ...step, status: 'TODO' };
+        delete releasedStep.assignee;
+        released += 1;
+        goalChanged = true;
+        changed = true;
+        return releasedStep;
+      });
+      return goalChanged ? withDerivedStatus(goal, steps) : goal;
+    });
+    return changed ? { ...current, goals } : current;
+  });
+  return { released, progress };
 }
 
 export async function setProgressMode(goalId, mode, manualReason, root = process.cwd(), options = {}) {

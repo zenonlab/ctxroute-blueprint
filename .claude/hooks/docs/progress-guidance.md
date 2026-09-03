@@ -5,10 +5,6 @@ mode: once
 
 # Agent progress checklist
 
-CTXRoute `match` entries are path substrings, not glob expressions. The
-frontmatter therefore names repository roots directly so this guidance reaches
-significant product, test, hook, documentation, and configuration changes.
-
 Progress is optional asynchronous coordination, not a prerequisite for edits.
 Skip it for small or single-agent work. For substantial parallel work, create
 independent tickets once; each agent atomically claims one, works without
@@ -21,8 +17,9 @@ voluntary `ctxroute://progress/full` resource or the human diagnostic CLI.
 Never edit `.project/progress.json` or `docs/progress.md` directly. Never mark
 an item done without a short evidence reference. Do not create hooks,
 permissions, global rules, or `AGENTS.md` automatically. SQLite remains only
-for recurring-problem memory. PostToolUse may report missing checklist coverage
-but must not write the checklist.
+for recurring-problem memory. Only `SubagentStart`, `SubagentStop` (using its
+injected `PROGRESS_RESULT` footer), and `SessionEnd` mutate Progress automatically;
+main agents use MCP, and `PostToolUse` never writes the checklist.
 New goals use `automatic`, which never blocks Stop. Use `manual` only with
 reason `visual-review` or `important-decision` for the matching undecided choice.
 Persist that reason as `manualReason`; switching back to automatic clears it.
