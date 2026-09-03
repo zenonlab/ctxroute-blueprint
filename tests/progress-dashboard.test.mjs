@@ -4,14 +4,12 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
-import { Script } from 'node:vm';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { DASHBOARD_JS } from '../scripts/progress-dashboard-app.mjs';
+import { request as dashboardRequest } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
-new Script(DASHBOARD_JS);
 const makePlan = (goalId = 'goal-one') => ({ goalId, title: 'Ship safely', validationEvidence: ['npm test'], steps: [{ id: 'step-one', title: 'Verify', acceptance: ['Tests pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['npm test'] }] });
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-'));
@@ -21,6 +19,22 @@ async function fixture() {
   const headers = { 'X-Progress-Token': dashboard.token, Origin: base.origin, 'Content-Type': 'application/json' };
   return { ...dashboard, root, base: base.href.replace(/\/$/u, ''), headers };
 }
+
+test('client request injects authentication and returns decoded JSON', async () => {
+  const originalFetch = globalThis.fetch;
+  let received;
+  globalThis.fetch = async (path, options) => {
+    received = { path, options };
+    return { ok: true, status: 200, json: async () => ({ progress: { goals: [] }, revision: 'r1' }) };
+  };
+  try {
+    assert.equal((await dashboardRequest('/api/progress')).revision, 'r1');
+    assert.equal(received.path, '/api/progress');
+    assert.equal(received.options.headers['Content-Type'], 'application/json');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('dashboard serves only local static resources with restrictive headers', async t => {
   const app = await fixture(); t.after(() => app.server.close());

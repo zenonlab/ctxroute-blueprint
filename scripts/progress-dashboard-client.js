@@ -1,6 +1,7 @@
 /* global CSS, FormData, document, fetch, history, location */
-const token = decodeURIComponent(location.hash.slice(1));
-history.replaceState(null, '', location.pathname);
+const inBrowser = typeof document !== 'undefined';
+const token = inBrowser ? decodeURIComponent(location.hash.slice(1)) : '';
+if (inBrowser) history.replaceState(null, '', location.pathname);
 let revision = '';
 let progress = { goals: [] };
 const histories = new Map();
@@ -73,6 +74,7 @@ async function restoreDeleted() { if (!deleted) return; const item = deleted; de
 async function persistOrder(goalId, ids) { try { applyServer(await request(`/api/goals/${encodeURIComponent(goalId)}/steps/order`, { method: 'PUT', body: JSON.stringify({ revision, stepIds: ids }) })); notice('Ordre enregistré'); } catch (error) { notice(error.message, true); } }
 function moveCard(card, delta) { const container = card.parentElement; const cards = $$('[data-step-card]', container); const target = cards[cards.indexOf(card) + delta]; if (!target) return; if (delta < 0) container.insertBefore(card, target); else container.insertBefore(target, card); persistOrder(card.dataset.goal, $$('[data-step-card]', container).map(item => item.dataset.step)); card.querySelector('.drag-handle').focus(); }
 
+if (inBrowser) {
 $('#show-done').addEventListener('change', render);
 $('#refresh').addEventListener('click', load);
 $('#goals').addEventListener('click', event => { const card = event.target.closest('[data-step-card]'); const goal = event.target.closest('[data-goal-card]'); if (event.target.closest('[data-show-completed]')) { $('#show-done').checked = true; render(); } else if (event.target.closest('.goal-toggle') && goal) setGoalOpen(goal, $('[data-goal-content]', goal).hidden); else if (event.target.closest('.toggle') && card) setOpen(card, $('.step-details', card).hidden); else if (event.target.closest('[data-undo]') && card) moveHistory(card, -1); else if (event.target.closest('[data-redo]') && card) moveHistory(card, 1); else if (event.target.closest('[data-delete]') && card) deleteStep(card); });
@@ -92,3 +94,6 @@ $('#new-plan').addEventListener('click', () => $('#plan-dialog').showModal());
 $('#cancel-plan').addEventListener('click', () => $('#plan-dialog').close());
 $('#plan-form').addEventListener('submit', async event => { event.preventDefault(); const errorNode = $('[data-plan-error]'); errorNode.textContent = ''; try { const plan = JSON.parse(new FormData(event.target).get('plan')); const checked = await request('/api/plans/validate', { method: 'POST', body: JSON.stringify({ revision, plan }) }); if (!checked.validation.ok) throw new Error(checked.validation.errors.join(' · ')); if (!await confirmAction('Approuver ce plan ?', 'Son identité sera figée, mais son contenu et sa structure resteront modifiables depuis des actions visibles et révisées.', 'Approuver')) return; applyServer(await request('/api/plans/approve', { method: 'POST', body: JSON.stringify({ revision, plan: { ...plan, approved: true } }) })); $('#plan-dialog').close(); event.target.reset(); notice('Plan approuvé'); } catch (error) { errorNode.textContent = error.message; } });
 load();
+}
+
+export { request };
