@@ -14,6 +14,10 @@ const test_request_two = () => request('/api/progress');
 const test_request_three = () => request('/api/progress');
 const test_request_four = () => request('/api/progress');
 const test_request_five = () => request('/api/progress');
+const test_request_six = () => request('/api/progress');
+const test_request_seven = () => request('/api/progress');
+const test_request_eight = () => request('/api/progress');
+const test_request_nine = () => request('/api/progress');
 const makePlan = (goalId = 'goal-one') => ({ goalId, title: 'Ship safely', validationEvidence: ['npm test'], steps: [{ id: 'step-one', title: 'Verify', acceptance: ['Tests pass'], files: ['tests/progress-dashboard.test.mjs'], commands: ['npm test'] }] });
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-'));
@@ -37,6 +41,10 @@ test('client request injects authentication and returns decoded JSON', async () 
     await test_request_three();
     await test_request_four();
     await test_request_five();
+    await test_request_six();
+    await test_request_seven();
+    await test_request_eight();
+    await test_request_nine();
     assert.equal(received.path, '/api/progress');
     assert.equal(received.options.headers['Content-Type'], 'application/json');
   } finally {
