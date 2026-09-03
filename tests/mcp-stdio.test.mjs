@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { PROGRESS_TOOL_NAMES } from '../scripts/progress-mcp.mjs';
+import { approvePlan, readProgress, renderProgress } from '../scripts/progress-core.mjs';
 import { validateMcpInstallation } from '../scripts/validate-mcp-installation.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -89,6 +90,37 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     assert.ok(validated.content[0].text.length < 100 && approved.content[0].text.length < 300 && updateResponse.content[0].text.length < 400);
     const state = JSON.parse(readFileSync(join(fixture, '.ctxroute/state/progress-dashboard.json'), 'utf8'));
     try { process.kill(state.pid, 'SIGTERM'); } catch {}
+  });
+});
+
+test('every MCP operation waits for startup view repair', async () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-ready-'));
+  const plan = { goalId: 'ready-goal', title: 'Startup repair', validationEvidence: ['tests/mcp-stdio.test.mjs'], steps: [{ id: 'step-1', title: 'Wait for repair', acceptance: ['View repaired first'], files: ['docs/progress.md'], commands: ['npm test'] }] };
+  await approvePlan({ ...plan, approved: true }, fixture);
+  writeFileSync(join(fixture, 'docs/progress.md'), '# stale\n');
+  const lock = join(fixture, '.ctxroute/state/progress.lock');
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, token: 'live-startup-owner' }));
+  await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
+    const release = setTimeout(() => { if (existsSync(lock)) unlinkSync(lock); }, 150);
+    const started = Date.now();
+    try {
+      const response = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
+      assert.notEqual(response.isError, true);
+      assert.ok(Date.now() - started >= 100, 'progress_next must wait for startup repair');
+    } finally { clearTimeout(release); if (existsSync(lock)) unlinkSync(lock); }
+  });
+  assert.equal(readFileSync(join(fixture, 'docs/progress.md'), 'utf8'), renderProgress(await readProgress(fixture)));
+});
+
+test('startup repair failures remain controlled MCP errors', async () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-invalid-'));
+  mkdirSync(join(fixture, '.project'));
+  writeFileSync(join(fixture, '.project/progress.json'), '{invalid');
+  await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
+    const failed = await client.callTool({ name: 'progress_status', arguments: {} });
+    assert.equal(failed.isError, true);
+    const listed = await client.listTools();
+    assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...PROGRESS_TOOL_NAMES].sort());
   });
 });
 
