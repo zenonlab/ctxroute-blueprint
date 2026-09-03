@@ -219,6 +219,59 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "progress-dashboard-ux-polish",
+      "title": "Polir l’expérience du tableau Progress",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "polish-dashboard-ux",
+          "title": "Corriger les défauts UX visibles et compacter les goals terminés",
+          "status": "DONE",
+          "acceptance": [
+            "Le toast est réellement masqué et son action est explicite",
+            "Les états vide filtre chevrons titres et sauvegarde sont compréhensibles",
+            "Les goals terminés restent compacts et utilisables sur mobile"
+          ],
+          "files": [
+            "scripts/progress-dashboard.html",
+            "scripts/progress-dashboard.css",
+            "scripts/progress-dashboard-client.js"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "Chrome visual review mobile and desktop"
+          ]
+        },
+        {
+          "id": "verify-dashboard-ux",
+          "title": "Vérifier les états UX sur mobile et bureau",
+          "status": "DONE",
+          "acceptance": [
+            "Les tests ciblés et linters passent",
+            "Les vues 390 et 1440 ne débordent pas et ne remontent aucune erreur JavaScript"
+          ],
+          "files": [
+            "tests/progress-dashboard.test.mjs"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "Chrome headless 390x844 and 1440x1000"
+          ],
+          "evidence": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "npx eslint and oxlint dashboard client tests",
+            "Chrome 390x844 and 1440x1000: no overflow or JavaScript errors"
+          ]
+        }
+      ]
     }
   ]
 }
