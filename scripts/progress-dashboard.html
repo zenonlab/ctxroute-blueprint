@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -8,25 +8,25 @@
 </head>
 <body>
   <header class="page-header">
-    <div><p class="eyebrow">CTXRoute</p><h1>Progress</h1><p class="muted">Objectifs, étapes et preuves depuis la source de référence.</p></div>
+    <div><p class="eyebrow">CTXRoute</p><h1>Progress</h1><p class="muted">Goals, steps, and evidence from the source of truth.</p></div>
     <div class="toolbar">
-      <label class="switch"><input id="show-done" type="checkbox"><span aria-hidden="true"></span><b id="show-done-label">Afficher les goals terminés</b></label>
-      <button id="refresh" type="button">Actualiser</button>
-      <button id="new-plan" class="primary" type="button">Nouveau plan</button>
+      <label class="switch"><input id="show-done" type="checkbox"><span aria-hidden="true"></span><b id="show-done-label">Show completed goals</b></label>
+      <button id="refresh" type="button">Refresh</button>
+      <button id="new-plan" class="primary" type="button">New plan</button>
     </div>
   </header>
   <main>
     <p id="notice" role="status" aria-live="polite"></p>
-    <section id="goals" aria-label="Objectifs"></section>
+    <section id="goals" aria-label="Goals"></section>
   </main>
   <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
-    <form method="dialog"><h2 id="confirm-title">Confirmer</h2><p id="confirm-description"></p><div class="dialog-actions"><button value="cancel">Annuler</button><button class="primary" value="confirm">Confirmer</button></div></form>
+    <form method="dialog"><h2 id="confirm-title">Confirm</h2><p id="confirm-description"></p><div class="dialog-actions"><button value="cancel">Cancel</button><button class="primary" value="confirm">Confirm</button></div></form>
   </dialog>
   <dialog id="plan-dialog" aria-labelledby="plan-title">
-    <h2 id="plan-title">Créer un plan</h2><p class="muted">Le JSON sera validé avant son approbation explicite.</p>
-    <form id="plan-form"><label>Plan JSON<textarea name="plan" required spellcheck="false"></textarea></label><p class="field-error" data-plan-error></p><div class="dialog-actions"><button id="cancel-plan" type="button">Annuler</button><button class="primary" type="submit">Valider</button></div></form>
+    <h2 id="plan-title">Create a plan</h2><p class="muted">The JSON will be validated before explicit approval.</p>
+    <form id="plan-form"><label>Plan JSON<textarea name="plan" required spellcheck="false"></textarea></label><p class="field-error" data-plan-error></p><div class="dialog-actions"><button id="cancel-plan" type="button">Cancel</button><button class="primary" type="submit">Validate</button></div></form>
   </dialog>
-  <aside id="toast" class="toast" role="status" aria-live="polite" hidden><span></span><button type="button">Restaurer</button></aside>
+  <aside id="toast" class="toast" role="status" aria-live="polite" hidden><span></span><button type="button">Undo</button></aside>
 <script src="/app.js" type="module"></script>
 </body>
 </html>
