@@ -42,17 +42,14 @@ test('API requires its token, local origin, and valid Host', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: { Origin: new URL(app.base).origin } })).status, 401);
   assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: { ...app.headers, Origin: 'https://example.test' } })).status, 403);
-  assert.equal(await requestStatus(app.base, { ...app.headers, Host: 'example.test' }), 403);
-  assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: app.headers })).status, 200);
-});
-
-function requestStatus(base, headers) {
-  const target = new URL(base);
-  return new Promise((resolveStatus, reject) => {
-    const outgoing = request({ hostname: target.hostname, port: target.port, path: '/api/progress', headers }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
+  const target = new URL(app.base);
+  const invalidHostStatus = await new Promise((resolveStatus, reject) => {
+    const outgoing = request({ hostname: target.hostname, port: target.port, path: '/api/progress', headers: { ...app.headers, Host: 'example.test' } }, response => { response.resume(); response.on('end', () => resolveStatus(response.statusCode)); });
     outgoing.on('error', reject); outgoing.end();
   });
-}
+  assert.equal(invalidHostStatus, 403);
+  assert.equal((await requestLocal(`${app.base}/api/progress`, { headers: app.headers })).status, 200);
+});
 
 test('API validates and approves plans through progress-core', async t => {
   const app = await fixture(); t.after(() => app.server.close());
