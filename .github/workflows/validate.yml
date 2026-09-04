@@ -49,6 +49,7 @@ jobs:
           enable-cache: false
 
       - name: Check installation prerequisites
+        if: runner.os == 'Linux'
         run: npm run setup:check
 
       - name: Install pinned dependencies
