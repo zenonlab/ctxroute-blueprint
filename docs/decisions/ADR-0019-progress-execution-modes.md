@@ -29,6 +29,8 @@ every completion attempt. Manual mode remains the only progression pause.
 `SubagentStart` automatically claims only claimable milestones from `automatic`
 goals when the agent type is explicitly `progress-worker`, then injects the
 milestone plus a required final `PROGRESS_RESULT` JSON footer.
+Both harnesses ship a project-local definition for that exact agent type; hook
+configuration alone does not create a launchable subagent.
 `SubagentStop` accepts only `DONE` or `BLOCKED` with non-empty bounded evidence
 on the last non-empty line outside Markdown fences. Invalid output atomically
 releases that agent's claim to `TODO`; `SessionEnd` releases remaining

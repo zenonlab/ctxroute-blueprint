@@ -160,7 +160,7 @@ function ctxrouteEnvironment(root) {
     CTXROUTE_FILEDOCS_DIR: join(root, '.claude', 'hooks', 'docs'),
     CTXROUTE_FLEET_HOOKS_DIR: join(root, '.claude', 'hooks'),
     CTXROUTE_SESSIONDOCS_DIR: join(root, 'docs', 'session'),
-    CTXROUTE_STATE_DIR: join(root, '.ctxroute', 'state'),
+    CTXROUTE_STATE_DIR: process.env.CTXROUTE_STATE_DIR || join(root, '.ctxroute', 'state'),
   };
 }
 

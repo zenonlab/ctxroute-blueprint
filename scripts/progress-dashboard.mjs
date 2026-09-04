@@ -47,7 +47,7 @@ export async function startProgressDashboard({ root = process.cwd(), token = ran
       if (request.method === 'POST' && steps) return sendProgress(response, await addProgressStep(steps[1], body.step, root, { expectedRevision: body.revision }));
       const step = url.pathname.match(/^\/api\/goals\/([a-z][a-z0-9-]{0,63})\/steps\/([a-z][a-z0-9-]{0,63})$/u);
       if (request.method === 'PATCH' && step) {
-        const progress = await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, title: body.title, acceptance: body.acceptance, files: body.files, commands: body.commands, evidence: body.evidence }, root, { expectedRevision: body.revision });
+        const progress = await updateProgressStep({ goalId: step[1], stepId: step[2], status: body.status, title: body.title, claimable: body.claimable, acceptance: body.acceptance, files: body.files, commands: body.commands, evidence: body.evidence }, root, { expectedRevision: body.revision });
         return sendStepDelta(response, progress, step[1], step[2], body);
       }
       if (request.method === 'DELETE' && step) return sendProgress(response, await deleteProgressStep(step[1], step[2], root, { expectedRevision: body.revision }));
@@ -92,7 +92,7 @@ function sendStepDelta(response, progress, goalId, stepId, requested) {
   const goal = progress.goals.find(item => item.id === goalId);
   const step = goal.steps.find(item => item.id === stepId);
   const changed = { id: step.id };
-  for (const field of ['status', 'title', 'acceptance', 'files', 'commands', 'evidence']) if (Object.hasOwn(requested, field)) changed[field] = step[field];
+  for (const field of ['status', 'title', 'claimable', 'acceptance', 'files', 'commands', 'evidence']) if (Object.hasOwn(requested, field)) changed[field] = step[field];
   return sendJson(response, 200, { revision: progressRevision(progress), goalStatus: goal.status, step: changed });
 }
 function sendJson(response, status, value) { return send(response, status, `${JSON.stringify(value)}\n`, 'application/json; charset=utf-8'); }

@@ -202,6 +202,19 @@ CTXRoute hooks would run in addition to them, duplicating context and process
 startup. Local state and recurring problem memory live in ignored `.ctxroute/`;
 removing that directory clears local history and it is recreated on demand.
 
+Projects already created from the blueprint are intentionally not rewritten in
+the background. From a trusted current blueprint checkout, preview the bounded
+control-plane update and inspect the file list before applying it:
+
+```sh
+npm run blueprint:sync -- --target ../derived-project
+npm run blueprint:sync -- --target ../derived-project --apply
+```
+
+The target must be a clean Git repository. Updated files are backed up under
+its ignored `.ctxroute/blueprint-backups/`; product source, project decisions,
+Progress data, and product documentation are outside the synchronizer allowlist.
+
 Codex Cloud may run `npm install` before the agent starts, but hook activation
 still depends on workspace trust and cannot be bypassed by installation.
 

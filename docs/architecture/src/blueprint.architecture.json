@@ -18,13 +18,13 @@
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
     { "id": "progressMcp", "type": "backend", "label": "Progress memory", "sublabel": "Optional MCP + CLI", "pos": [30, 230], "size": [170, 60] },
-    { "id": "progressDashboard", "type": "frontend", "label": "Progress dashboard", "sublabel": "Explicit start + tab auth", "pos": [30, 410], "size": [190, 60] },
+    { "id": "progressDashboard", "type": "frontend", "label": "Progress dashboard", "sublabel": "Explicit start / close + tab auth", "pos": [30, 410], "size": [190, 60] },
     { "id": "dashboardState", "type": "database", "label": "Dashboard state", "sublabel": "Ignored PID + session markers", "pos": [280, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Post-edit repair signal", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },
     { "id": "graph", "type": "database", "label": "CRG graph.db", "sublabel": "Ignored local graph", "pos": [790, 230], "size": [190, 60] },
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [1060, 230], "size": [170, 60] },
-    { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Matrix + fork-safe review", "pos": [1060, 410], "size": [190, 60] },
+    { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Linux gate + platform smoke", "pos": [1060, 410], "size": [190, 60] },
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
   ],
   "connections": [
@@ -40,7 +40,7 @@
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "async structured edits only", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },
-    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned PR risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
+    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned critical-risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
     { "id": "ci-archify", "from": "githubActions", "to": "archify", "label": "build + visual-check", "fromSide": "right", "toSide": "right", "via": [[1260, 440], [1260, 80]], "labelAt": [1195, 320] },
     { "id": "ci-artifacts", "from": "githubActions", "to": "ciArtifacts", "label": "publish bounded evidence", "labelAt": [1020, 484] }
   ]

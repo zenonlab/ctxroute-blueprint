@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readFile, mkdir, open, rename } from 'node:fs/promises';
+import { readFile, mkdir, open, rename, unlink } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,6 +44,25 @@ export async function dashboardSessionNotice(sessionId, root = process.cwd(), op
   return dashboard;
 }
 
+export async function closeProgressDashboard(root = process.cwd(), options = {}) {
+  const statePath = resolve(root, options.statePath ?? DASHBOARD_STATE_PATH);
+  const state = await readState(statePath);
+  if (!state || state.root !== resolve(root)) return { closed: false };
+  if (!await isLive(state)) {
+    if (processIsLive(state.pid)) return { closed: false, reason: 'unverified' };
+    await unlink(statePath).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    return { closed: false };
+  }
+  try { process.kill(state.pid, 'SIGTERM'); }
+  catch (error) { if (error.code !== 'ESRCH') throw error; }
+  const deadline = Date.now() + (options.shutdownTimeoutMs ?? 1_000);
+  while (Date.now() < deadline && processIsLive(state.pid)) await delay(25);
+  if (processIsLive(state.pid)) throw new Error('Progress dashboard did not stop');
+  const current = await readState(statePath);
+  if (current?.instanceId === state.instanceId) await unlink(statePath).catch(error => { if (error.code !== 'ENOENT') throw error; });
+  return { closed: true, instanceId: state.instanceId };
+}
+
 async function isLive(state) {
   if (!Number.isSafeInteger(state.pid) || state.pid <= 0 || !state.url || !state.instanceId) return false;
   try { process.kill(state.pid, 0); } catch { return false; }
@@ -56,6 +75,7 @@ async function isLive(state) {
     return response.ok && value.instanceId === state.instanceId;
   } catch { return false; }
 }
+function processIsLive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
 async function readState(path) { try { return JSON.parse(await readFile(path, 'utf8')); } catch { return null; } }
 async function atomicJson(path, value) { await mkdir(dirname(path), { recursive: true }); const temporary = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temporary, 'wx', 0o600); try { await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`); } finally { await handle.close(); } await rename(temporary, path); }
 function publicResult(state, reused) { return { url: state.url, reused, instanceId: state.instanceId }; }

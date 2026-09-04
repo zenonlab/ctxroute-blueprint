@@ -14,14 +14,16 @@ test('validation matrix pins Python and uv and captures Archify visual evidence'
   assert.match(workflow, /uv sync --project packages\/code-review-graph --frozen --python 3\.12/u);
   assert.match(workflow, /npm run archify:visual-check/u);
   assert.match(workflow, /crg-smoke\.json/u);
+  const auditJob = workflow.match(/  dependency-audit:[\s\S]*?(?=\n  smoke-install:)/u)?.[0] ?? '';
+  assert.doesNotMatch(auditJob, /npm ci/u);
 });
 
-test('untrusted CRG review is read-only, pinned, constrained, and keeps the high gate', () => {
+test('untrusted CRG review is read-only, pinned, constrained, and blocks only critical risk', () => {
   const workflow = read('.github/workflows/code-review-graph.yml');
   assert.match(workflow, /permissions:\n  contents: read/u);
   assert.match(workflow, /tirth8205\/code-review-graph@2c6dae32643572ee528eb9b77dbcc17f58f3a8c9/u);
   assert.match(workflow, /PIP_CONSTRAINT:/u);
-  assert.match(workflow, /fail-on-risk: high/u);
+  assert.match(workflow, /fail-on-risk: critical/u);
   assert.match(workflow, /if: always\(\).*comment-file/u);
   assert.doesNotMatch(workflow, /pull-requests: write/u);
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);

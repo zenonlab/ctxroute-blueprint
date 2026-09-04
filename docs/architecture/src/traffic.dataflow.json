@@ -43,6 +43,6 @@
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Nine lifecycle events share synchronous and maintenance lanes", "Main agents use ordered memory only when useful", "Only progress workers claim parallel milestones and return a final footer"] },
     { "dot": "emerald", "title": "Traffic verification", "items": ["Session-scoped hashes isolate concurrent worker claims", "SubagentStop settles only its owned milestone and SessionEnd releases only its session", "Automatic Stop stays silent while manual is reserved for consequential review"] },
-    { "dot": "rose", "title": "Review boundary", "items": ["Post-edit findings point at the existing change instead of rejecting it", "CRG and Archify maintenance runs asynchronously", "GitHub receives the risk-gate result for human review"] }
+    { "dot": "rose", "title": "Review boundary", "items": ["Post-edit checks run only after structured edits", "CRG and Archify maintenance runs asynchronously", "High CRG risk requests review while only critical risk fails the gate"] }
   ]
 }

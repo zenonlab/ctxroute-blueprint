@@ -21,6 +21,7 @@ const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = process.platform === 'win32' ? 3_000 : 1_000;
 const LOCK_RETRY_MIN_MS = 2;
 const LOCK_RETRY_MAX_MS = 25;
+const ATOMIC_RENAME_WAIT_MS = process.platform === 'win32' ? 1_000 : 0;
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
 export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -214,8 +215,9 @@ export async function updateProgressGoal(goalId, { title }, root = process.cwd()
   }, options);
 }
 
-export async function updateProgressStep({ goalId, stepId, agentId, status, title, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
+export async function updateProgressStep({ goalId, stepId, agentId, status, title, claimable, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
   if (status !== undefined && !STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
+  if (claimable !== undefined && ![true, false].includes(claimable)) throw new Error('claimable must be a boolean');
   return updateProgress(root, current => {
     const goalIndex = findGoalIndex(current, goalId);
     const goal = current.goals[goalIndex]; const stepIndex = goal.steps.findIndex(step => step.id === stepId);
@@ -227,6 +229,7 @@ export async function updateProgressStep({ goalId, stepId, agentId, status, titl
     if (agentId !== undefined && status === 'IN_PROGRESS') changed.assignee = agentId;
     if (status === 'TODO') delete changed.assignee;
     if (title !== undefined) changed.title = title;
+    if (claimable !== undefined) changed.claimable = claimable;
     if (acceptance !== undefined) changed.acceptance = copyList(acceptance);
     if (files !== undefined) changed.files = copyList(files);
     if (commands !== undefined) changed.commands = copyList(commands);
@@ -242,7 +245,7 @@ export async function addProgressStep(goalId, step, root = process.cwd(), option
   return updateProgress(root, current => {
     const goalIndex = findGoalIndex(current, goalId); const goal = current.goals[goalIndex];
     if (goal.steps.some(item => item.id === step?.id)) throw new Error(`Duplicate step id: ${step.id}`);
-    const added = { id: step?.id, title: step?.title, status: step?.status ?? 'TODO', acceptance: copyList(step?.acceptance), files: copyList(step?.files), commands: copyList(step?.commands), evidence: copyList(step?.evidence ?? []) };
+    const added = { id: step?.id, title: step?.title, status: step?.status ?? 'TODO', claimable: step?.claimable ?? false, acceptance: copyList(step?.acceptance), files: copyList(step?.files), commands: copyList(step?.commands), evidence: copyList(step?.evidence ?? []) };
     if (added.status === 'DONE' && added.evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
     const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, [...goal.steps, added]);
     return { ...current, goals };
@@ -292,7 +295,32 @@ function safePath(value) {
   const normalized = value.replaceAll('\\', '/');
   return relative('.', value).replaceAll('\\', '/') === normalized;
 }
-async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
+async function atomicWrite(path, content) {
+  await mkdir(dirname(path), { recursive: true });
+  const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  const handle = await open(temp, 'wx', 0o600);
+  try { await handle.writeFile(content, 'utf8'); await handle.sync(); }
+  finally { await handle.close(); }
+  try { await renameWithRetry(temp, path); }
+  catch (error) { await unlink(temp).catch(() => {}); throw error; }
+}
+
+export async function renameWithRetry(from, to, options = {}) {
+  const operation = options.operation ?? rename;
+  const wait = options.wait ?? (milliseconds => new Promise(resolveWait => { setTimeout(resolveWait, milliseconds); }));
+  const deadline = performance.now() + (options.waitMs ?? ATOMIC_RENAME_WAIT_MS);
+  let attempt = 0;
+  while (true) {
+    try { return await operation(from, to); }
+    catch (error) {
+      const remaining = deadline - performance.now();
+      if (!['EACCES', 'EPERM'].includes(error.code) || remaining <= 0) throw error;
+      attempt += 1;
+      const delay = Math.min(remaining, LOCK_RETRY_MIN_MS * (2 ** Math.min(attempt, 6)));
+      await wait(delay);
+    }
+  }
+}
 
 async function viewHasRevision(root, revision) {
   try { return (await readFile(resolve(root, PROGRESS_VIEW_PATH), 'utf8')).includes(`<!-- progress-revision: ${revision} -->`); }

@@ -71,6 +71,8 @@ Selecting manual mode opens a small accessible reason dialog; only
 `progress_open_dashboard` starts or reuses a detached instance and never opens
 the system browser. The default instance has no idle expiration so an explicitly
 requested dashboard link stays available; callers may still set an idle timeout.
+The local `progress:close` command terminates only the instance whose health and
+instance identifier match the current repository state, then removes that state.
 Ignored state under `.ctxroute/state/` records the instance, PID, URL, and token.
 Stop never starts or advertises a dashboard, so ordinary agent sessions create
 no dashboard process or session markers.
