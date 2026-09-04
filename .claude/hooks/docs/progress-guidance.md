@@ -7,7 +7,8 @@ mode: once
 
 Progress is optional ordered memory, never a prerequisite or permission gate.
 Skip it for small or single-agent work. For substantial work, keep 2–6 outcome
-milestones; never mirror files, commands, commits, or routine edits. Only truly
+milestones when practical; larger plans are accepted unchanged with a warning.
+Never auto-split a plan or mirror files, commands, commits, or routine edits. Only truly
 independent parallel work is claimable by a `progress-worker`.
 
 MCP and `progress:*` CLI are equivalent; continue safely if either is unavailable.

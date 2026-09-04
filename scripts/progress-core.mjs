@@ -9,7 +9,7 @@ export const PROGRESS_VIEW_PATH = 'docs/progress.md';
 export const PROGRESS_ARCHIVE_PATH = '.project/progress-archive.json';
 export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
 export const PROGRESS_RESOURCE_URI = 'ctxroute://progress/full';
-export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
+export const LIMITS = { bytes: 64 * 1024, references: 30, evidence: 10, text: 500, next: 3, recommendedSteps: 6 };
 const ARCHIVE_BYTES = 2 * 1024 * 1024;
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
@@ -17,8 +17,8 @@ export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decisio
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
 const SECRET = /(?:\b(?:api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]|\bbearer\s+[a-z0-9._~+/-]{8,}|\bgh[oprsu]_[a-z0-9]{12,}|\bsk-[a-z0-9_-]{12,})/iu;
 const LOCK_STALE_MS = 30_000;
-// Give a full 30-process claim burst enough time to drain on loaded runners and
-// Windows while remaining below the five-second lifecycle-hook timeout.
+// Give a representative concurrent claim burst enough time to drain on loaded
+// runners and Windows while remaining below the lifecycle-hook timeout.
 const LOCK_WAIT_MS = 3_000;
 const LOCK_RETRY_MIN_MS = 2;
 const LOCK_RETRY_MAX_MS = 25;
@@ -51,7 +51,7 @@ export async function readProgress(root = process.cwd()) {
 function inspectProgressChecklist(value) {
   const errors = [];
   if (!value || value.schemaVersion !== 1 || !Array.isArray(value.goals)) return ['schemaVersion 1 and goals array are required'];
-  if (value.goals.length > LIMITS.goals) errors.push(`maximum ${LIMITS.goals} goals exceeded`);
+  if (serializedBytes(value) > LIMITS.bytes) errors.push('progress file exceeds 64 KiB');
   const goalIds = new Set();
   for (const goal of value.goals) {
     if (!isId(goal?.id) || goalIds.has(goal.id)) errors.push('goal ids must be unique safe identifiers'); goalIds.add(goal?.id);
@@ -62,7 +62,7 @@ function inspectProgressChecklist(value) {
     if (mode === 'manual' && goal?.status !== 'DONE' && !MANUAL_REASONS.includes(goal?.manualReason)) errors.push(`active manual goal ${goal?.id ?? '(missing)'} requires manualReason`);
     if (mode === 'automatic' && goal?.manualReason !== undefined && goal.manualReason !== null) errors.push(`automatic goal ${goal?.id ?? '(missing)'} cannot have manualReason`);
     if (goal?.modeOffered !== undefined && (goal.modeOffered !== true && goal.modeOffered !== false)) errors.push(`goal ${goal?.id ?? '(missing)'} has an invalid modeOffered`);
-    if (!Array.isArray(goal?.steps) || goal.steps.length < 1 || goal.steps.length > LIMITS.steps) { errors.push(`goal ${goal?.id ?? '(missing)'} needs 1-${LIMITS.steps} steps`); continue; }
+    if (!Array.isArray(goal?.steps) || goal.steps.length < 1) { errors.push(`goal ${goal?.id ?? '(missing)'} needs at least one step`); continue; }
     const stepIds = new Set();
     for (const step of goal.steps) {
       if (!isId(step?.id) || stepIds.has(step.id)) errors.push(`goal ${goal.id} has duplicate or invalid step id`); stepIds.add(step?.id);
@@ -86,29 +86,36 @@ export const isSafeProgressReference = shortReference;
 
 export function validatePlan(plan, current = emptyProgress()) {
   const errors = [];
-  if (!plan || plan !== Object(plan)) return { ok: false, errors: ['plan must be an object'] };
+  const warnings = [];
+  if (!plan || plan !== Object(plan)) return { ok: false, errors: ['plan must be an object'], warnings };
   const goalId = plan.goalId ?? plan.id;
   if (!isId(goalId)) errors.push('plan requires a safe goalId');
   if (!text(plan.title)) errors.push('plan requires a title');
   if (plan.executionMode !== undefined && !EXECUTION_MODES.includes(plan.executionMode)) errors.push(`plan executionMode must be one of: ${EXECUTION_MODES.join(', ')}`);
   if (plan.executionMode === 'manual' && !MANUAL_REASONS.includes(plan.manualReason)) errors.push(`manual plan requires manualReason: ${MANUAL_REASONS.join(' or ')}`);
   if (plan.executionMode !== 'manual' && plan.manualReason !== undefined && plan.manualReason !== null) errors.push('manualReason is only valid for manual plans');
-  if (!Array.isArray(plan.steps) || !plan.steps.length || plan.steps.length > LIMITS.steps) errors.push(`plan requires 1-${LIMITS.steps} steps`);
+  if (!Array.isArray(plan.steps) || !plan.steps.length) errors.push('plan requires at least one step');
+  if (Array.isArray(plan.steps) && plan.steps.length > LIMITS.recommendedSteps) warnings.push(`plan has ${plan.steps.length} milestones; 2-${LIMITS.recommendedSteps} outcome-sized milestones is recommended, but the plan remains unchanged`);
   const ids = new Set();
   for (const step of plan.steps ?? []) {
     if (!isId(step?.id) || ids.has(step.id)) errors.push('plan step ids must be unique safe identifiers'); ids.add(step?.id);
     if (!text(step?.title)) errors.push('each step requires a title');
     for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files ?? [], commands: step?.commands ?? [] })) {
-      if (!Array.isArray(list) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} requires bounded ${name}`);
+      if (!Array.isArray(list) || list.length > LIMITS.references || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} requires bounded ${name}`);
       for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`unsafe or invalid ${name} reference`);
     }
     if (step?.claimable !== undefined && ![true, false].includes(step.claimable)) errors.push(`step ${step?.id ?? '(missing)'} has an invalid claimable flag`);
   }
   const evidence = plan.validationEvidence ?? plan.evidence;
-  if (!Array.isArray(evidence) || !evidence.length || evidence.some(item => !shortReference(item))) errors.push('plan requires short validation evidence references');
+  if (!Array.isArray(evidence) || !evidence.length || evidence.length > LIMITS.evidence || evidence.some(item => !shortReference(item))) errors.push('plan requires bounded validation evidence references');
+  const normalized = Array.isArray(plan.steps) ? normalizePlan(plan) : undefined;
   const existing = current.goals?.find(goal => goal.id === goalId);
-  if (existing && !isDeepStrictEqual(normalizePlan(plan), normalizeGoal(existing))) errors.push(`goal already exists with different content: ${goalId}`);
-  return { ok: errors.length === 0, errors, normalized: normalizePlan(plan) };
+  if (existing && normalized && !isDeepStrictEqual(normalized, normalizeGoal(existing))) errors.push(`goal already exists with different content: ${goalId}`);
+  if (normalized) {
+    const goals = existing ? current.goals.map(goal => goal.id === goalId ? normalized : goal) : [...(current.goals ?? []), normalized];
+    if (serializedBytes({ schemaVersion: 1, goals }) > LIMITS.bytes) errors.push('progress file would exceed 64 KiB');
+  }
+  return { ok: errors.length === 0, errors, warnings, normalized };
 }
 
 export async function approvePlan(plan, root = process.cwd(), options = {}) {
@@ -342,6 +349,7 @@ function normalizeExecutionMode(mode) { return mode === 'manual' || mode === 'co
 function isId(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
 function text(value) { return value === String(value) && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }
 function shortReference(value) { return value === String(value) && value.length > 0 && value.length <= LIMITS.text && !SECRET.test(value) && ![...value].some(character => character.codePointAt(0) <= 31); }
+function serializedBytes(value) { try { return Buffer.byteLength(`${JSON.stringify(value, null, 2)}\n`); } catch { return Number.POSITIVE_INFINITY; } }
 function safePath(value) {
   if (!shortReference(value) || isAbsolute(value) || value.startsWith('~') || value.split(/[\\/]+/u).includes('..')) return false;
   const normalized = value.replaceAll('\\', '/');

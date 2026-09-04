@@ -26,6 +26,12 @@ three-second `SessionEnd` limit, and a busy stop never performs a second wait.
 Work may continue after a busy failure and the agent reconciles its ticket
 afterward. Mutation replies are compact.
 
+Two to six milestones is advice, not a schema limit. Progress accepts longer
+ordered plans unchanged while the complete checklist remains below 64 KiB.
+Validation returns a non-blocking warning, and compact consumers expose only
+the first three actionable or blocked milestones. Progress never auto-splits or
+rewrites the user's plan.
+
 Subagents use this specialization only when started with the explicit
 `progress-worker` agent type. `SubagentStart` hashes the harness, parent session,
 and agent identities, then claims the first claimable `TODO` milestone from an

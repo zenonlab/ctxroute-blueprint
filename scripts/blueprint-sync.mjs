@@ -10,7 +10,8 @@ export const CONTROL_FILES = Object.freeze([
   '.project/blueprint-version.json',
   'scripts/progress-core.mjs', 'scripts/progress-cli.mjs', 'scripts/progress-mcp.mjs',
   'scripts/progress-dashboard.mjs', 'scripts/progress-dashboard-manager.mjs',
-  'scripts/progress-dashboard-app.mjs',
+  'scripts/progress-dashboard-app.mjs', 'scripts/progress-dashboard.html',
+  'scripts/progress-dashboard.css', 'scripts/progress-dashboard-client.js',
   'scripts/blueprint-sync.mjs', 'scripts/blueprint-version.mjs',
 ]);
 export const CONTROL_DIRECTORIES = Object.freeze([

@@ -71,7 +71,11 @@ test('a real stdio client lists and calls all Progress MCP tools', async t => {
     const plan = { goalId: 'stdio-goal', title: 'Stdio proof', validationEvidence: ['npm test'], steps: [{ id: 'step-1', title: 'Verify transport', acceptance: ['All tools respond'], files: ['tests/mcp-stdio.test.mjs'], commands: ['npm test'] }] };
     const validated = await client.callTool({ name: 'progress_validate_plan', arguments: plan });
     assert.notEqual(validated.isError, true);
-    assert.deepEqual(JSON.parse(validated.content[0].text), { ok: true, errors: [] });
+    assert.deepEqual(JSON.parse(validated.content[0].text), { ok: true, errors: [], warnings: [] });
+    const longPlan = { ...plan, goalId: 'stdio-long', steps: Array.from({ length: 7 }, (_, index) => ({ ...plan.steps[0], id: `step-${index + 1}` })) };
+    const longValidation = JSON.parse((await client.callTool({ name: 'progress_validate_plan', arguments: longPlan })).content[0].text);
+    assert.equal(longValidation.ok, true);
+    assert.match(longValidation.warnings[0], /plan remains unchanged/u);
     const approved = await client.callTool({ name: 'progress_approve_plan', arguments: { ...plan, approved: true } });
     assert.notEqual(approved.isError, true);
     assert.equal(JSON.parse(approved.content[0].text).progress, undefined);
