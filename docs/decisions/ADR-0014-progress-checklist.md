@@ -7,6 +7,7 @@ scope:
   - scripts/progress-dashboard-app.mjs
   - scripts/progress-dashboard-manager.mjs
   - .project/progress.json
+  - .project/progress-archive.json
   - docs/progress.md
   - .claude/hooks/docs/progress-guidance.md
   - .codex/hooks/progress-subagent.mjs
@@ -104,4 +105,7 @@ overwriting either version.
 Completed goals can instead be moved explicitly with
 `npm run progress:archive` into `.project/progress-archive.json`. The archive
 is written before the active checklist, so an interrupted move can be replayed
-without duplicate records. Hooks never archive automatically.
+without duplicate records. Hooks never archive automatically. The distributable
+template keeps both active Progress and its archive schema-valid and empty;
+blueprint-maintenance history remains available through Git and pull requests
+instead of being copied into every newly derived repository.

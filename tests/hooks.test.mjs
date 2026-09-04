@@ -561,6 +561,8 @@ test('both lifecycle dialects inject a matching project rule', () => {
     });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Project governance/u, harness);
+    assert.match(result.stdout, /architecture\.documents/u, harness);
+    assert.doesNotMatch(result.stdout, /docs\/architecture\/src\/blueprint\.architecture\.json/u, harness);
   }
 });
 
@@ -965,7 +967,7 @@ test('CTXRoute injects UI contract guidance for conventional product UI paths', 
   assert.match(result.stdout, /UI design contract/u);
 });
 
-test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => {
+test('CTXRoute keeps core Sensor guidance stack-neutral', () => {
   const session = `sensor-adapters-${process.pid}-${Date.now()}`;
   const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
     cwd: root,
@@ -973,8 +975,38 @@ test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => 
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /exact `tree-sitter-ruby` dependency/u);
-  assert.match(result.stdout, /genuinely fails to load/u);
+  assert.match(result.stdout, /Sensor adapter registry/u);
+  assert.doesNotMatch(result.stdout, /tree-sitter-ruby|PHP Sensor adapter/u);
+});
+
+test('CTXRoute routes Sensor details only to their product language', () => {
+  const cases = [
+    ['src/model.rb', /Ruby Sensor adapter/u, /exact `tree-sitter-ruby` dependency/u, /PHP Sensor adapter/u],
+    ['src/Controller.php', /PHP Sensor adapter/u, /explicitly lexical/u, /Ruby Sensor adapter/u],
+  ];
+  for (const [filePath, title, detail, unrelated] of cases) {
+    const session = `sensor-language-${filePath}-${process.pid}-${Date.now()}`;
+    const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
+      cwd: root,
+      input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: filePath } }),
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, title);
+    assert.match(result.stdout, detail);
+    assert.doesNotMatch(result.stdout, unrelated);
+  }
+});
+
+test('package metadata does not inject unrelated Sensor ecosystems', () => {
+  const session = `package-context-${process.pid}-${Date.now()}`;
+  const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: 'package.json' } }),
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /Ruby Sensor adapter|PHP Sensor adapter|Sensor adapter registry/u);
 });
 
 test('CTXRoute wrapper directs missing installations to npm install', () => {

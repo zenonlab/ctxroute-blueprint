@@ -57,6 +57,11 @@ Use `mode: once` as the project default and on every tracked guidance document.
 ADR mirrors are inactive routing indexes rather than copies of full decision
 bodies. The architecture guard names only applicable ADR files and directs the
 agent to read them when a mutation materially changes a boundary or contract.
+Project-governance guidance resolves product architecture from
+`.project/project-config.json`; it never treats the blueprint's internal
+architecture as product evidence. Ecosystem-specific Sensor guidance is split
+by path substring, so JavaScript package work does not receive Ruby or PHP
+adapter details and each derived stack receives only relevant context.
 CTXRoute receives a 1,800-character producer budget below the dispatcher's
 4,096-character cap. Normal guidance is delivered in one compact frame rather
 than a multi-call remainder queue. A matching rule completes delivery once per session, then becomes

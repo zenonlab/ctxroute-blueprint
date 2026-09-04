@@ -4,7 +4,9 @@ mode: once
 ---
 # Project governance
 
-Before changing project structure, read `AGENTS.md`, the versioned Archify
-source at `docs/architecture/src/blueprint.architecture.json`, and relevant
-ADRs. Update the architecture evidence before adding a new module, dependency,
-or contract.
+Before changing project structure, read `AGENTS.md`, relevant ADRs, and only
+the product Archify sources listed in `.project/project-config.json` under
+`architecture.documents`. Entries in `architecture.internalDocuments` describe
+blueprint infrastructure and never count as product evidence. Add or update a
+product source only for a material boundary, dependency, contract, or
+cross-component flow.
