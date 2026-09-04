@@ -50,8 +50,8 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - For a localized edit, send a narrow patch containing only changed fields or diff hunks; never resend or rewrite an entire file, document, ticket, or Progress state when a delta is sufficient.
 - Touch only necessary files.
 - Avoid speculative abstractions and refactors.
-- Verify every modification.
-- Review the diff after each write.
+- Verify each coherent change in proportion to its risk; use targeted checks while iterating and the release gate only before push or handoff.
+- Review the accumulated diff at coherent boundaries, not after every small write.
 - Complete one coherent claimed work package before taking another; ordinary work need not be claimed or mirrored in Progress.
 
 ## Audit

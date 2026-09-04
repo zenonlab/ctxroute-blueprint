@@ -12,9 +12,9 @@ proportionate level of verification.
 | Static lint | required | JavaScript tooling and tests | `npm run lint` and the vendored official anti-slop batch must pass |
 | Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
 | End-to-end | required for local tooling | The Progress dashboard crosses browser-style HTTP, MCP, detached-process, and filesystem boundaries | `node --test tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs tests/hooks.test.mjs` |
-| Contract | required | Ten lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
+| Contract | required | Nine lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
 | Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
-| Performance | required | CRG updates remain single-flight, time-bounded, and output-bounded | runner unit tests plus `npm run crg:smoke` |
+| Performance | required | Lifecycle context and latency stay bounded; CRG bursts coalesce and updates remain time/output-bounded | `npm run hooks:performance`, runner unit tests, and `npm run crg:smoke` |
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
 | Accessibility | required for local tooling | Progress remains keyboard-operable, labelled, responsive, status-announced, and confirmation-gated; generated Archify HTML remains documentation infrastructure | Dashboard HTML contract tests plus 9/9 Archify showcase checks and `npm run archify:visual-check` |
 | Migration / recovery | required for local tooling | Can Progress repair a stale derived view and reclaim dead owners without disturbing live locks? | Progress core crash-window and multi-process tests |

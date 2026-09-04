@@ -124,8 +124,11 @@ if (paths.some(path => isSourcePath(path, config))) {
 }
 
 function formatDecisionStatus(status) {
-  if (status.status !== 'partial') return '';
-  return `\n\nDecision status: partial. ${status.message}`;
+  if (!status.applicable.length) return '';
+  const files = status.applicable.slice(0, 8).map(path => path.split('/').pop()).join(', ');
+  const remainder = status.applicable.length > 8 ? ` (+${status.applicable.length - 8})` : '';
+  const qualifier = status.status === 'partial' ? ` ${status.message}` : '';
+  return `\n\nApplicable ADRs: ${files}${remainder}. Read only those material to a boundary, contract, dependency, or cross-component flow.${qualifier}`;
 }
 
 function extractPaths(value) {

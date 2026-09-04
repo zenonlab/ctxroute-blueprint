@@ -29,7 +29,7 @@
   ],
   "connections": [
     { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "nine lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
-    { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "dispatch context and policy", "labelAt": [500, 124] },
+    { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "compact mutation context", "labelAt": [500, 124] },
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-progress", "from": "agents", "to": "progressMcp", "label": "optional memory", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [165, 170] },
@@ -37,7 +37,7 @@
     { "id": "progress-dashboard", "from": "progressMcp", "to": "progressDashboard", "label": "start / reuse + revised mutations", "fromSide": "bottom", "toSide": "top", "labelAt": [130, 350] },
     { "id": "dashboard-state", "from": "progressDashboard", "to": "dashboardState", "label": "PID + token metadata", "labelAt": [250, 494] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
-    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "async structured edits only", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
+    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "debounced structured edits", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },
     { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned critical-risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },

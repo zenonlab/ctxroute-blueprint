@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const hook = join(root, '.codex/hooks/post-tool-sensor.mjs');
-function run(input) { return spawnSync(process.execPath, [hook], { cwd: root, input: JSON.stringify(input), encoding: 'utf8' }); }
+const state = mkdtempSync(join(tmpdir(), 'post-tool-sensor-state-'));
+process.on('exit', () => rmSync(state, { recursive: true, force: true }));
+function run(input) { return spawnSync(process.execPath, [hook], { cwd: root, env: { ...process.env, CTXROUTE_STATE_DIR: state }, input: JSON.stringify(input), encoding: 'utf8' }); }
 
 test('PostToolUse ignores non-source paths and does not mutate policy', () => {
   const before = JSON.stringify({ hooks: 'dispatcher', policy: 'external' });
@@ -49,6 +51,19 @@ test('PostToolUse forwards diagnostics from a Svelte component', () => {
   const output = JSON.parse(result.stdout);
   assert.match(output.hookSpecificOutput.additionalContext, /sensor\/sql-injection/u);
   assert.equal('decision' in output, false);
+});
+
+test('PostToolUse emits WARN once per session and keeps it compact', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'post-tool-sensor-warn-'));
+  const path = join(directory, 'debug.js');
+  writeFileSync(path, 'console.log(value);\n');
+  const input = { session_id: 'warn-session', tool_name: 'Edit', tool_input: { file_path: path } };
+  const first = run(input);
+  const second = run(input);
+  const context = JSON.parse(first.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /Sensor WARN/u);
+  assert.ok(context.length <= 300);
+  assert.equal(second.stdout, '');
 });
 
 test('PostToolUse does not treat an intentional delete as a read failure', () => {

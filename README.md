@@ -193,8 +193,9 @@ Tracked guidance uses `mode: once`: a matching document is injected once per
 session and may be delivered again after `PreCompact`, without repeating every
 few turns while an agent is only exploring the project.
 
-`PostToolUse` runs write guards, the blocking Sensor, a bounded single-flight
-CRG update, problem memory, documentation audit, and Archify preview support.
+`PostToolUse` runs write guards and the blocking Sensor. Its asynchronous
+maintenance lane coalesces an edit burst, then runs one bounded CRG update,
+problem-memory pass, documentation audit, and Archify preview pass.
 It does not start MCP servers; the clients own their stdio transports. CRG
 failures and its 30-second timeout fail open with a short visible diagnostic.
 No `PostToolUse` handler changes Progress status.
@@ -210,12 +211,15 @@ control-plane update and inspect the file list before applying it:
 
 ```sh
 npm run blueprint:sync -- --target ../derived-project
+npm run blueprint:check -- --target ../derived-project
 npm run blueprint:sync -- --target ../derived-project --apply
 ```
 
 The target must be a clean Git repository. Updated files are backed up under
 its ignored `.ctxroute/blueprint-backups/`; product source, project decisions,
 Progress data, and product documentation are outside the synchronizer allowlist.
+The versioned `.project/blueprint-version.json` and `blueprint:check` make drift
+visible in automation; synchronization is still an explicit operator action.
 
 Codex Cloud may run `npm install` before the agent starts, but hook activation
 still depends on workspace trust and cannot be bypassed by installation.
@@ -273,14 +277,14 @@ the full verification suite, then confirm a clean Git state. Use
 
 Run the deterministic repository gate during development:
 
-```sh
-npm run validate
-```
-
-It covers configuration, decisions, architecture and document contracts,
-CTXRoute, lint, workspace coherence, the Sensor baseline, and test coverage.
-For final verification, including CRG and Progress MCP smoke tests, integration,
-dependency audit, and generated documentation, run:
+Use the cheapest gate that matches the risk: targeted `node --test` or a
+specific `validate:*` command while iterating; `npm run validate` at the end of
+a coherent chantier; and `npm run verify` once before push or handoff.
+`validate` includes the isolated hook latency/context budget, configuration,
+decisions, architecture and document contracts, CTXRoute, lint, workspace
+coherence, the Sensor baseline, and coverage. The release gate additionally
+checks CRG and Progress MCP transports, integration, dependencies, and generated
+documentation:
 
 ```sh
 npm run verify

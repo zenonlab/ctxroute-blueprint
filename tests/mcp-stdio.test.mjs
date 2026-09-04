@@ -38,11 +38,11 @@ test('Codex MCP validation enforces the bounded optional startup grace', () => {
   mkdirSync(join(fixture, '.codex'));
   writeFileSync(join(fixture, '.mcp.json'), readFileSync(join(root, '.mcp.json')));
   const config = readFileSync(join(root, '.codex/config.toml'), 'utf8')
-    .replace('mcp_optional_startup_grace_ms = 3000', 'mcp_optional_startup_grace_ms = 1000');
+    .replace('mcp_optional_startup_grace_ms = 1000', 'mcp_optional_startup_grace_ms = 3000');
   writeFileSync(join(fixture, '.codex/config.toml'), config);
   const result = validateMcpInstallation(fixture);
   assert.equal(result.ok, false);
-  assert.match(result.errors.join('\n'), /3000 ms/u);
+  assert.match(result.errors.join('\n'), /1000 ms/u);
 });
 
 test('a real stdio client lists and calls all Progress MCP tools', async t => {

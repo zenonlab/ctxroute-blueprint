@@ -19,9 +19,9 @@ export const lifecycleEvents = [
 
 const MAX_CONTEXT_LENGTH = 4096;
 const MAX_SUBAGENT_CONTEXT_LENGTH = 8 * 1024;
-// Keep CTXRoute below this dispatcher's final character cap so its own
-// remainder queue, rather than a lossy last-mile slice, owns pagination.
-const CTXROUTE_BUDGET = '3200';
+// Keep CTXRoute well below this dispatcher's final cap so normal guidance fits
+// in one frame alongside bounded architecture context.
+const CTXROUTE_BUDGET = '1800';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
@@ -110,6 +110,7 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
     }
     if (result.stderr) notices.push(`Lifecycle ${event} handler ${handler.name}: ${result.stderr}`);
     for (const output of result.outputs ?? []) {
+      if (lane === 'maintenance' && output?.maintenanceSuperseded === true) return null;
       if (isBlocking(output)) return output;
       outputs.push(output);
     }

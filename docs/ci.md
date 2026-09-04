@@ -27,10 +27,11 @@ cloud, secret ou environnement de production n'est imposé. Un projet dérivé
 doit ajouter son propre workflow de déploiement, ses secrets, ses contrôles et
 sa stratégie de rollback.
 
-Après un clone local, exécuter `npm run setup`, puis `npm run verify` avant une
-livraison. Le smoke job CI et Codespaces exécutent le bootstrap réel. Dans
+Pendant une modification, utiliser le test ou validateur ciblé. Exécuter
+`npm run validate` une fois par chantier cohérent, puis `npm run verify` avant
+une livraison. Le smoke job CI et Codespaces exécutent le bootstrap réel. Dans
 Codex, l'approbation des
-six définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
+neuf définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
 les réglages globaux Codex ou Claude.
 
 Deux workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié

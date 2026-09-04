@@ -40,9 +40,12 @@ for a new diagnostic, malformed exception, excess occurrence, or stale
 exception. Informational `WARN` diagnostics remain visible without blocking.
 SARIF contains only unexpected blocking diagnostics.
 
-Replace the retired internal context benchmark with an official CRG smoke test
-that proves the exact version, fixture build, incremental update, MCP startup,
-tool listing, and one read call. `npm run integration` smoke-tests the Progress
+Add `npm run hooks:performance`, an isolated representative lifecycle benchmark
+with generous latency ceilings and strict context-size ceilings. It exercises a
+session start, prompt, read-only and mutating pre-tool events, post-tool output,
+and stop without writing repository state. Keep the official CRG smoke test to
+prove the exact version, fixture build, incremental update, MCP startup, tool
+listing, and one read call. `npm run integration` smoke-tests the Progress
 MCP stdio transport on supported local
 platforms and validates manifests on Windows, where the GitHub runner transport
 is not reliable. `npm run verify` adds the network dependency audit and the

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
+import { isLatestMaintenanceRequest, shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
 import { CRG_MCP_TOOLS, CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
 
 const nodeChild = source => () => spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -58,6 +58,15 @@ test('PostToolUse triggers only one successful normal write', () => {
   assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'npm run crg:update' }, tool_response: {} }), false);
   assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'rg TODO .' }, tool_response: {} }), false);
   assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'npm test' }, tool_response: {} }), false);
+});
+
+test('PostToolUse maintenance coalesces an edit burst to its latest request', async () => {
+  const stateDirectory = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
+  const first = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'first' });
+  await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
+  const second = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'second' });
+  assert.equal(await first, false);
+  assert.equal(await second, true);
 });
 
 test('embeddings remain absent by default and cloud egress requires explicit consent', () => {

@@ -51,8 +51,10 @@ SARIF 2.1.0 with `--sarif` for code-scanning integrations. This is an export
 format only; it does not change verdicts or make a product's CI provider a
 blueprint dependency.
 
-CTXRoute remains the context-injection and guidance layer. Sensor diagnostics
-are returned in the agent context, while SQLite problem memory may retain
+CTXRoute remains the context-injection and guidance layer. `UNSAFE` and `ERROR`
+Sensor results return a bounded repair diagnostic in agent context. `WARN`
+returns one compact path/rule summary per session and changed file; repeated
+identical warnings stay silent. SQLite problem memory may retain
 recurrences independently. No hook edits AGENTS.md, permissions, or global
 CTXRoute configuration. UNSAFE and ERROR results block subsequent validation
 or commit controls; WARN results remain informational.
