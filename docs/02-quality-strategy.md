@@ -12,7 +12,7 @@ proportionate level of verification.
 | Static lint | required | JavaScript tooling and tests | `npm run lint` and the vendored official anti-slop batch must pass |
 | Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
 | End-to-end | required for local tooling | The Progress dashboard crosses browser-style HTTP, MCP, detached-process, and filesystem boundaries | `node --test tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs tests/hooks.test.mjs` |
-| Contract | required | Six lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
+| Contract | required | Ten lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
 | Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
 | Performance | required | CRG updates remain single-flight, time-bounded, and output-bounded | runner unit tests plus `npm run crg:smoke` |
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |

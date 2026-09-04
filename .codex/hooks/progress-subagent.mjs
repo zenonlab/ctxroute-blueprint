@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { LIMITS, claimAutomaticProgressTicket, readProgress, releaseProgressClaims, updateProgressStep } from '../../scripts/progress-core.mjs';
+import { LIMITS, claimAutomaticProgressTicket, isSafeProgressReference, readProgress, releaseProgressClaims, updateProgressStep } from '../../scripts/progress-core.mjs';
 
 const FOOTER_PREFIX = 'PROGRESS_RESULT: ';
 
@@ -25,6 +25,7 @@ export function parseProgressResult(message) {
   if (Object.keys(value).sort().join(',') !== 'evidence,status') return undefined;
   if (!['DONE', 'BLOCKED'].includes(value.status)) return undefined;
   if (!Array.isArray(value.evidence) || value.evidence.length < 1 || value.evidence.length > LIMITS.evidence) return undefined;
+  if (value.evidence.some(item => !isSafeProgressReference(item))) return undefined;
   return { status: value.status, evidence: value.evidence };
 }
 
@@ -33,7 +34,7 @@ export async function handleProgressLifecycle(harness, event, input, root = proc
   try { payload = JSON.parse(input || '{}'); }
   catch { return diagnostic(event, 'invalid hook input'); }
   if (!validIdentity(payload.session_id) || (event !== 'SessionEnd' && !validIdentity(payload.agent_id))) return diagnostic(event, 'missing session or agent identity');
-  if (event === 'SubagentStart' && !isProgressWorker(payload.agent_type)) return null;
+  if ((event === 'SubagentStart' || event === 'SubagentStop') && !isProgressWorker(payload.agent_type)) return null;
 
   try {
     if (event === 'SubagentStart') return await startSubagent(harness, payload, root);

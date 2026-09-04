@@ -16,8 +16,8 @@ entry points directly instead of starting a nested wrapper process.
 
 ```text
 flowchart TD
-    Session[SessionStart] --> SessionContext[CTXRoute session context]
-    Session --> CRGStatus[CRG status or initial build]
+    Session[SessionStart] --> SessionContext[Bounded CTXRoute and active Progress context]
+    Session --> CRGStatus[Existing CRG status only]
     Request[Requested action] --> PreTool[PreToolUse dispatcher]
     PreTool --> Governance[Governance policy]
     Governance -->|allow| Route[CTXRoute context injection]
@@ -43,6 +43,7 @@ flowchart TD
     Prompt[UserPromptSubmit] --> Count[Turn counter]
     Count --> Canary[Canary]
     Compact[PreCompact] --> Reset[CTXRoute reset]
+    Reset --> Resume[PostCompact active Progress reminder]
     Spawn[SubagentStart] --> Claim[Claim automatic Progress ticket]
     Claim --> Worker[Subagent work]
     Worker --> Result[SubagentStop structured footer]
@@ -56,7 +57,8 @@ The registered lifecycle handlers intentionally omit custom status messages.
 Read-only tools skip the architecture subprocess, and PostToolUse is limited to
 mutation-capable tools to reduce lifecycle noise and process startup overhead.
 Only the three subagent/session lifecycle hooks mutate Progress automatically;
-main-agent coordination remains explicit over MCP.
+the main agent receives only a small advisory reminder and uses MCP or CLI when
+details or a mutation are actually useful.
 
 The lifecycle is independent from the two project-scoped MCP servers declared
 in `.codex/config.toml`: `ctxroute-progress` and `code-review-graph` are

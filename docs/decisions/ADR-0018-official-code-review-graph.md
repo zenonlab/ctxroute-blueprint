@@ -38,8 +38,10 @@ local invocation uses `uv run --project packages/code-review-graph --frozen`.
 The official graph at `.code-review-graph/graph.db` and the project virtual
 environment are ignored.
 
-CTXRoute remains the sole lifecycle dispatcher. SessionStart checks or builds
-the graph, stays silent when healthy, and emits only a bounded fail-open
+CTXRoute remains the sole lifecycle dispatcher. SessionStart checks an existing
+graph without building missing state; the first structured edit or explicit
+command performs that initial build. The lifecycle stays silent when healthy
+and emits only a bounded fail-open
 diagnostic on failure. Successful structured file edits start an asynchronous
 `update --skip-flows` behind a cross-process single-flight lock, a 30-second
 timeout, bounded output, and fail-open diagnostics. Shell reads, status commands,

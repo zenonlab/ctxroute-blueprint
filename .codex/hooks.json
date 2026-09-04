@@ -1,5 +1,5 @@
 {
-  "description": "Nine portable lifecycle dispatchers for CTXRoute, Progress, and architecture-first governance.",
+  "description": "Ten portable lifecycle dispatchers for CTXRoute, Progress, and architecture-first governance.",
   "hooks": {
     "SessionStart": [
       {
@@ -82,6 +82,18 @@
         ]
       }
     ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PostCompact",
+            "timeout": 5,
+            "additionalContextLimit": 1200
+          }
+        ]
+      }
+    ],
     "SubagentStart": [
       {
         "matcher": "^progress[-_]worker$",
@@ -114,7 +126,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex SessionEnd",
-            "timeout": 3,
+            "timeout": 5,
             "additionalContextLimit": 1200
           }
         ]

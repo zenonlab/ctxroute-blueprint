@@ -11,6 +11,7 @@ export const lifecycleEvents = [
   'PostToolUse',
   'UserPromptSubmit',
   'PreCompact',
+  'PostCompact',
   'Stop',
   'SubagentStart',
   'SubagentStop',
@@ -19,11 +20,13 @@ export const lifecycleEvents = [
 
 const MAX_CONTEXT_LENGTH = 4096;
 const MAX_SUBAGENT_CONTEXT_LENGTH = 64 * 1024;
-const CTXROUTE_BUDGET = '0';
+// Keep CTXRoute below this dispatcher's final character cap so its own
+// remainder queue, rather than a lossy last-mile slice, owns pagination.
+const CTXROUTE_BUDGET = '3200';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
-  const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
+  const local = (name, ...args) => ({ name, path: join(root, '.codex', 'hooks', name), args });
   const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
   const progressSubagent = event => ({ name: 'progress-subagent.mjs', path: join(root, '.codex', 'hooks', 'progress-subagent.mjs'), args: [harness, event] });
   const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
@@ -35,11 +38,12 @@ export function handlerPlan(harness, event, root = projectRoot, lane = 'synchron
   }
 
   return {
-    SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('crg-context.mjs')],
+    SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('progress-context.mjs', 'SessionStart'), local('crg-context.mjs')],
     PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', CTXROUTE_BUDGET)],
     PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
+    PostCompact: [local('progress-context.mjs', 'PostCompact')],
     Stop: [local('stop-review.mjs')],
     SubagentStart: [progressSubagent('SubagentStart')],
     SubagentStop: [progressSubagent('SubagentStop')],

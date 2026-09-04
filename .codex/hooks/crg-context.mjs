@@ -1,13 +1,13 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { runCrgCommand, runCrgUpdate } from '../../scripts/crg-runner.mjs';
+import { runCrgCommand } from '../../scripts/crg-runner.mjs';
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const result = existsSync(resolve(root, '.code-review-graph/graph.db'))
     ? await runCrgCommand({ root, args: ['status', '--repo', root] }).catch(error => ({ code: 1, stderr: error.message }))
-    : await runCrgUpdate({ root }).catch(error => ({ code: 1, stderr: error.message }));
+    : { code: 0, skipped: true, reason: 'graph build deferred to first edit or explicit command' };
   process.stdout.write(JSON.stringify(sessionStartOutput(result)));
 }
 

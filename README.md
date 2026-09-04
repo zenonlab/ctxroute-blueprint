@@ -53,7 +53,7 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the nine workspace definitions. Claude
+3. In Codex, open `/hooks` and approve the ten workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.

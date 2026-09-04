@@ -6,14 +6,16 @@ import { isDeepStrictEqual } from 'node:util';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
+export const PROGRESS_ARCHIVE_PATH = '.project/progress-archive.json';
 export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
 export const PROGRESS_RESOURCE_URI = 'ctxroute://progress/full';
 export const LIMITS = { bytes: 64 * 1024, goals: 20, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
+const ARCHIVE_BYTES = 2 * 1024 * 1024;
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
 export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decision']);
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
-const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
+const SECRET = /(?:\b(?:api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]|\bbearer\s+[a-z0-9._~+/-]{8,}|\bgh[oprsu]_[a-z0-9]{12,}|\bsk-[a-z0-9_-]{12,})/iu;
 const LOCK_STALE_MS = 30_000;
 // Windows can briefly retain an exclusive file handle after unlink/rename. Give
 // a full 30-process claim burst enough time to drain without extending the
@@ -81,6 +83,7 @@ function inspectProgressChecklist(value) {
 
 // Kept as the public API name used by the CLI, MCP server, and consumers.
 export const validateProgress = inspectProgressChecklist;
+export const isSafeProgressReference = shortReference;
 
 export function validatePlan(plan, current = emptyProgress()) {
   const errors = [];
@@ -114,10 +117,59 @@ export async function approvePlan(plan, root = process.cwd(), options = {}) {
   return withProgressLock(root, async () => {
     const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const result = validatePlan(plan, current);
     if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
+    const archived = (await readProgressArchive(root)).goals.some(entry => entry.goal.id === result.normalized.id);
+    if (archived) throw new Error(`goal id is already archived: ${result.normalized.id}`);
     const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
     if (next !== current) await writeProgress(root, next);
     return next;
   });
+}
+
+export async function archiveCompletedProgressGoals(root = process.cwd(), options = {}) {
+  return withProgressLock(root, async () => {
+    const current = await readProgress(root);
+    assertExpectedRevision(current, options.expectedRevision);
+    const completed = current.goals.filter(goal => goal.status === 'DONE');
+    if (!completed.length) return { archived: 0, remaining: current.goals.length, progress: current };
+
+    const archive = await readProgressArchive(root);
+    const known = new Map(archive.goals.map(entry => [entry.goal.id, entry.goal]));
+    for (const goal of completed) {
+      const archivedGoal = known.get(goal.id);
+      if (archivedGoal && !isDeepStrictEqual(normalizeGoal(archivedGoal), normalizeGoal(goal))) throw new Error(`archived goal conflicts with active goal: ${goal.id}`);
+    }
+    const archivedAt = new Date().toISOString();
+    const additions = completed.filter(goal => !known.has(goal.id)).map(goal => ({ archivedAt, goal }));
+    const nextArchive = { schemaVersion: 1, goals: [...archive.goals, ...additions] };
+    const archiveJson = `${JSON.stringify(nextArchive, null, 2)}\n`;
+    if (Buffer.byteLength(archiveJson) > ARCHIVE_BYTES) throw new Error('progress archive exceeds 2 MiB');
+
+    // Archive first: if the process stops between writes, replay sees the goal
+    // in both places, avoids a duplicate, and completes the move safely.
+    await atomicWrite(resolve(root, PROGRESS_ARCHIVE_PATH), archiveJson);
+    const next = { ...current, goals: current.goals.filter(goal => goal.status !== 'DONE') };
+    await writeProgress(root, next);
+    return { archived: completed.length, remaining: next.goals.length, progress: next };
+  });
+}
+
+export async function readProgressArchive(root = process.cwd()) {
+  try {
+    const source = await readFile(resolve(root, PROGRESS_ARCHIVE_PATH), 'utf8');
+    if (Buffer.byteLength(source) > ARCHIVE_BYTES) throw new Error('progress archive exceeds 2 MiB');
+    const value = JSON.parse(source);
+    if (!value || value.schemaVersion !== 1 || !Array.isArray(value.goals)) throw new Error('schemaVersion 1 and goals array are required');
+    const ids = new Set();
+    for (const entry of value.goals) {
+      if (!entry || Number.isNaN(Date.parse(entry.archivedAt)) || inspectProgressChecklist({ schemaVersion: 1, goals: [entry.goal] }).length) throw new Error('archive contains an invalid goal');
+      if (ids.has(entry.goal.id)) throw new Error(`archive contains duplicate goal: ${entry.goal.id}`);
+      ids.add(entry.goal.id);
+    }
+    return value;
+  } catch (error) {
+    if (error.code === 'ENOENT') return { schemaVersion: 1, goals: [] };
+    throw new Error(`Cannot read progress archive: ${error.message}`);
+  }
 }
 
 export const progressStatus = value => value.goals.map(goal => withManualReason({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: statusCounts(goal.steps) }, goal));
@@ -235,6 +287,7 @@ export async function updateProgressStep({ goalId, stepId, agentId, status, titl
     if (commands !== undefined) changed.commands = copyList(commands);
     if (evidence !== undefined) changed.evidence = copyList(evidence);
     if (changed.status === 'DONE' && changed.evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
+    if (agentId !== undefined && ['DONE', 'BLOCKED'].includes(changed.status) && changed.evidence.length === 0) throw new Error('agent final reporting requires at least one evidence reference');
     const steps = [...goal.steps]; steps[stepIndex] = changed;
     const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, steps);
     return { ...current, goals };
