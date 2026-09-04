@@ -48,6 +48,8 @@ The full checklist is available only through the voluntary JSON resource
 `npm run progress:read` remains the human diagnostic path.
 `npm run progress:archive` explicitly moves completed goals into the replay-safe
 `.project/progress-archive.json`; no hook archives or deletes goals.
+The distributable template keeps that archive empty so a newly derived project
+does not inherit blueprint-maintenance history.
 
 Stop mentions Archify only when an Archify source is already part of the
 change. A diagram is needed only when a material boundary, public contract,
@@ -112,5 +114,10 @@ context; only a bounded diagnostic is emitted when a real status check fails.
 PreToolUse permits generated graph maintenance and
 `apply_refactor_tool` only with `dry_run: true`; real changes continue through
 normal editing tools and all CTXRoute/Sensor controls.
+
+CTXRoute project guidance reads product diagrams only from
+`architecture.documents`. Internal blueprint diagrams never satisfy product
+architecture evidence. Sensor adapter details are separate per ecosystem, so a
+package or source change does not receive unrelated language guidance.
 
 The architecture JSON IR is the executable diagram source for this flow.
