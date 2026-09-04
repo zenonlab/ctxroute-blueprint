@@ -145,8 +145,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install lockfile without lifecycle scripts
-        run: npm ci --ignore-scripts
       - name: Audit high-severity production and development dependencies
         run: npm run audit:dependencies
 

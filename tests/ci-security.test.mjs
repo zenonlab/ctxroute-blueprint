@@ -14,6 +14,8 @@ test('validation matrix pins Python and uv and captures Archify visual evidence'
   assert.match(workflow, /uv sync --project packages\/code-review-graph --frozen --python 3\.12/u);
   assert.match(workflow, /npm run archify:visual-check/u);
   assert.match(workflow, /crg-smoke\.json/u);
+  const auditJob = workflow.match(/  dependency-audit:[\s\S]*?(?=\n  smoke-install:)/u)?.[0] ?? '';
+  assert.doesNotMatch(auditJob, /npm ci/u);
 });
 
 test('untrusted CRG review is read-only, pinned, constrained, and blocks only critical risk', () => {
