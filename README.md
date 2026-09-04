@@ -215,11 +215,14 @@ npm run blueprint:check -- --target ../derived-project
 npm run blueprint:sync -- --target ../derived-project --apply
 ```
 
-The target must be a clean Git repository. Updated files are backed up under
-its ignored `.ctxroute/blueprint-backups/`; product source, project decisions,
-Progress data, and product documentation are outside the synchronizer allowlist.
-The versioned `.project/blueprint-version.json` and `blueprint:check` make drift
-visible in automation; synchronization is still an explicit operator action.
+The target must be a clean Git repository. Only Git-tracked source files from
+the control-plane allowlist are considered, so ignored caches and generated ADR
+memory cannot leak between checkouts. Updated files are backed up under its
+ignored `.ctxroute/blueprint-backups/`; product source, project decisions,
+Progress data, and product documentation remain outside the allowlist. The
+versioned `.project/blueprint-version.json`, its control digest, and
+`blueprint:check` make drift visible in automation; synchronization is still an
+explicit operator action.
 
 Codex Cloud may run `npm install` before the agent starts, but hook activation
 still depends on workspace trust and cannot be bypassed by installation.

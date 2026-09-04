@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const config = JSON.parse(readFileSync('.project/project-config.json', 'utf8'));
 const workflow = readFileSync('.github/workflows/validate.yml', 'utf8');
-const required = ['setup:check', 'workspace:check', 'governance:check', 'progress:read', 'progress:validate', 'progress:close', 'blueprint:sync', 'audit:dependencies', 'sensor', 'sensor:blueprint', 'initialize', 'lint', 'test:coverage', 'crg:smoke', 'integration', 'verify'];
+const required = ['setup:check', 'workspace:check', 'governance:check', 'progress:read', 'progress:validate', 'progress:close', 'blueprint:sync', 'blueprint:version:check', 'audit:dependencies', 'sensor', 'sensor:blueprint', 'initialize', 'lint', 'test:coverage', 'crg:smoke', 'integration', 'verify'];
 const missing = required.filter(name => !pkg.scripts[name]);
 const requiredCommands = [config.commands.test, config.commands.lint, config.commands.integration, config.commands.performance, config.commands.sensorBlueprint];
 for (const command of requiredCommands) if (!command) missing.push('project-command:null');

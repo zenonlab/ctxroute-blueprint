@@ -87,13 +87,24 @@ function gitChangedFiles(root = process.cwd()) {
   return [...files].sort();
 }
 
-function checkSyntax(paths) {
+const MAX_STOP_SYNTAX_PROCESSES = 4;
+
+export function checkSyntax(paths) {
   const failures = [];
-  for (const path of paths.filter(existsSync)) {
+  const existing = paths.filter(existsSync);
+  for (const path of existing.filter(path => /\.json$/iu.test(path))) {
     try {
-      if (/\.(?:js|mjs|cjs)$/iu.test(path)) execFileSync('node', ['--check', path], { stdio: 'pipe' });
-      else if (/\.json$/iu.test(path)) JSON.parse(readFileSync(path, 'utf8'));
-      else if (process.platform !== 'win32' && (/\.sh$|^\.githooks\/(?:pre-commit|pre-push|commit-msg)$/u.test(path))) execFileSync('sh', ['-n', path], { stdio: 'pipe' });
+      JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      failures.push(path);
+    }
+  }
+  const subprocessCandidates = existing.filter(path => /\.(?:js|mjs|cjs)$/iu.test(path)
+    || (process.platform !== 'win32' && (/\.sh$|^\.githooks\/(?:pre-commit|pre-push|commit-msg)$/u.test(path))));
+  for (const path of subprocessCandidates.slice(0, MAX_STOP_SYNTAX_PROCESSES)) {
+    try {
+      if (/\.(?:js|mjs|cjs)$/iu.test(path)) execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
+      else execFileSync('sh', ['-n', path], { stdio: 'pipe' });
     } catch {
       failures.push(path);
     }
