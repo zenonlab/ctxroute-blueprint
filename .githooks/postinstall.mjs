@@ -61,23 +61,40 @@ function inspectHarness(root, relativePath, harness, failures) {
   const config = readJson(join(root, relativePath), failures, relativePath);
   const actualEvents = Object.keys(config?.hooks ?? {});
   if (actualEvents.length !== lifecycleEvents.length || lifecycleEvents.some(event => !actualEvents.includes(event))) {
-    failures.push(`${relativePath} must define exactly the ten supported lifecycle events.`);
+    failures.push(`${relativePath} must define exactly the nine supported lifecycle events.`);
   }
   for (const event of lifecycleEvents) {
     const entries = (config?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []);
-    const expected = `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`;
+    const expected = expectedHookCommand(harness, event);
     const expectedEntries = event === 'PostToolUse' ? 2 : 1;
     if (entries.length !== expectedEntries || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} must contain the expected local lifecycle handlers.`);
-    if (event === 'PostToolUse' && (entries[1]?.command !== `${expected} maintenance` || entries[1]?.async !== true)) failures.push(`${relativePath} PostToolUse maintenance must run asynchronously.`);
+    if (event === 'PostToolUse' && (entries[1]?.command !== expectedHookCommand(harness, event, 'maintenance') || entries[1]?.async !== true)) failures.push(`${relativePath} PostToolUse maintenance must run asynchronously.`);
     for (const entry of entries) {
       if (!Number.isFinite(entry?.timeout) || entry.timeout <= 0) failures.push(`${relativePath} ${event} must declare explicit positive timeouts.`);
       if ('statusMessage' in entry) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
+      if (harness === 'codex' && entry.commandWindows !== expectedWindowsHookCommand(event, entry.async ? 'maintenance' : '')) failures.push(`${relativePath} ${event} must resolve its Windows command from the Git root.`);
+      const supportsContext = ['SessionStart', 'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'SubagentStart'].includes(event);
+      if (harness === 'codex' && supportsContext && (!Number.isInteger(entry.additionalContextLimit) || entry.additionalContextLimit < 1 || entry.additionalContextLimit > 2500)) failures.push(`${relativePath} ${event} must declare a bounded supported context limit.`);
+      if (harness === 'codex' && !supportsContext && 'additionalContextLimit' in entry) failures.push(`${relativePath} ${event} cannot declare additionalContextLimit.`);
     }
+    if (harness === 'codex' && event === 'SessionEnd' && entries[0]?.timeout > 3) failures.push(`${relativePath} SessionEnd timeout cannot exceed Codex's three-second limit.`);
     if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write') {
       failures.push(`${relativePath} PostToolUse must target only structured editing tools.`);
     }
     if ((event === 'SubagentStart' || event === 'SubagentStop') && config?.hooks?.[event]?.[0]?.matcher !== '^progress[-_]worker$') failures.push(`${relativePath} ${event} must target only progress-worker.`);
   }
+}
+
+function expectedHookCommand(harness, event, lane = '') {
+  const suffix = lane ? ` ${lane}` : '';
+  return harness === 'codex'
+    ? `node "$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs" codex ${event}${suffix}`
+    : `node "\${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs" claude ${event}${suffix}`;
+}
+
+function expectedWindowsHookCommand(event, lane = '') {
+  const suffix = lane ? ` ${lane}` : '';
+  return `powershell.exe -NoProfile -Command "$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex ${event}${suffix}"`;
 }
 
 function inspectProgressWorkers(root, failures) {
@@ -103,8 +120,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.error([...new Set(failures)].join('\n'));
     process.exit(1);
   }
-  console.log('CTXRoute and ten lifecycle hooks are installed and verified.');
-  console.log('Codex local step: open /hooks and approve the ten workspace definitions.');
+  console.log('CTXRoute and nine lifecycle hooks are installed and verified.');
+  console.log('Codex local step: open /hooks and approve the nine workspace definitions.');
   const globalHooks = inspectGlobalCtxrouteHooks();
   if (globalHooks.length) {
     console.warn(`Warning: ${globalHooks.length} global CTXRoute hook(s) were found in Codex config. Local project hooks are valid, but the global definitions will run in addition and may cause duplicate output. Disable the legacy global definitions manually after approving this workspace.`);

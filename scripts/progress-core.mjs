@@ -223,7 +223,7 @@ async function claimMatchingProgressTicket(agentId, goalId, root, eligible, step
   return { claimed: Boolean(claimed), ticket: claimed };
 }
 
-export async function releaseProgressClaims(assigneePrefix, root = process.cwd()) {
+export async function releaseProgressClaims(assigneePrefix, root = process.cwd(), options = {}) {
   if (!shortReference(assigneePrefix)) throw new Error('assigneePrefix must be a short non-secret identifier');
   let released = 0;
   const progress = await updateProgress(root, current => {
@@ -242,7 +242,7 @@ export async function releaseProgressClaims(assigneePrefix, root = process.cwd()
       return goalChanged ? withDerivedStatus(goal, steps) : goal;
     });
     return changed ? { ...current, goals } : current;
-  });
+  }, options);
   return { released, progress };
 }
 
@@ -384,7 +384,7 @@ async function updateProgress(root, transform, options = {}) {
     const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current);
     if (next !== current) await writeProgress(root, next);
     return next;
-  });
+  }, options);
 }
 
 async function writeProgress(root, next) {
@@ -394,10 +394,10 @@ async function writeProgress(root, next) {
   await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next));
 }
 
-async function withProgressLock(root, operation) {
+async function withProgressLock(root, operation, options = {}) {
   const path = resolve(root, PROGRESS_LOCK_PATH); await mkdir(dirname(path), { recursive: true });
   const owner = { pid: process.pid, token: randomUUID() };
-  const deadline = performance.now() + LOCK_WAIT_MS;
+  const deadline = performance.now() + (options.lockWaitMs ?? LOCK_WAIT_MS);
   let handle; let attempt = 0; let recoveryChecked = false;
   while (!handle) {
     try { handle = await createLock(path, owner); break; }

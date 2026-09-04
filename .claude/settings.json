@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude SessionStart",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude SessionStart",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude PreToolUse",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude PreToolUse",
             "timeout": 45
           }
         ]
@@ -29,12 +29,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude PostToolUse",
             "timeout": 45
           },
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse maintenance",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude PostToolUse maintenance",
             "timeout": 45,
             "async": true
           }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude UserPromptSubmit",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude UserPromptSubmit",
             "timeout": 30
           }
         ]
@@ -57,19 +57,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude PreCompact",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude PreCompact",
             "timeout": 15
-          }
-        ]
-      }
-    ],
-    "PostCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude PostCompact",
-            "timeout": 5
           }
         ]
       }
@@ -79,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude Stop",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude Stop",
             "timeout": 30
           }
         ]
@@ -91,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude SubagentStart",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude SubagentStart",
             "timeout": 5
           }
         ]
@@ -103,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude SubagentStop",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude SubagentStop",
             "timeout": 5
           }
         ]
@@ -114,8 +103,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ./.codex/hooks/lifecycle.mjs claude SessionEnd",
-            "timeout": 5
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs\" claude SessionEnd",
+            "timeout": 3
           }
         ]
       }

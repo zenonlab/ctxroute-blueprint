@@ -21,9 +21,10 @@ preserves plan order and returns blocked context separately.
 Claims and all other mutations use the same short filesystem lock, so parallel
 agents cannot overwrite one another. Contenders retry with bounded jitter for
 up to three seconds to absorb a full local process burst without forming a
-retry convoy, still below the lifecycle-hook timeout. Work may continue after a
-busy failure and the agent reconciles its ticket afterward. Mutation replies
-are compact.
+retry convoy. Session cleanup uses a two-second lock budget within Codex's
+three-second `SessionEnd` limit, and a busy stop never performs a second wait.
+Work may continue after a busy failure and the agent reconciles its ticket
+afterward. Mutation replies are compact.
 
 Subagents use this specialization only when started with the explicit
 `progress-worker` agent type. `SubagentStart` hashes the harness, parent session,
@@ -39,9 +40,9 @@ claim automatically; MCP is their rich optional interface and the matching
 `npm run progress:*` command is an equivalent emergency/local fallback.
 For two or more genuinely independent claimable milestones, the main agent
 starts `progress-worker` subagents without another conversational approval.
-Sequential or small work remains direct. `SessionStart` and `PostCompact`
-provide a bounded active-goal reminder so resumption does not require a routine
-MCP read.
+Sequential or small work remains direct. `SessionStart`, including its
+`source=compact` invocation, provides a bounded active-goal reminder so
+resumption does not require a routine MCP read.
 The full checklist is available only through the voluntary JSON resource
 `ctxroute://progress/full`; it is not an automatically selectable tool.
 `npm run progress:read` remains the human diagnostic path.

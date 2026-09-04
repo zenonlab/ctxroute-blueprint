@@ -53,7 +53,7 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the ten workspace definitions. Claude
+3. In Codex, open `/hooks` and approve the nine workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
@@ -132,7 +132,7 @@ local claim bursts, and mutation tools return compact replies.
 Automatic goals are advisory at Stop and never force a continuation loop.
 For subagents, `SubagentStart` atomically claims the next `automatic` ticket and
 injects its criteria, files, commands, and required final `PROGRESS_RESULT`
-footer. `SubagentStop` settles only that opaque session/agent claim; malformed
+footer in at most 8 KiB of context. `SubagentStop` settles only that opaque session/agent claim; malformed
 results return it to `TODO`, and `SessionEnd` releases only that session's
 remaining `IN_PROGRESS` claims. Main agents continue to use the explicit MCP
 flow. The eight MCP tools and voluntary full resource are unchanged.
@@ -186,6 +186,8 @@ The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `SessionEnd`. Healthy CRG startup adds no
 context. Targeted documentation is injected before relevant tool calls, and
 only the minimum required context is restored after compaction.
+The existing `SessionStart(source=compact)` path restores that context; no
+redundant `PostCompact` process is needed.
 
 Tracked guidance uses `mode: once`: a matching document is injected once per
 session and may be delivered again after `PreCompact`, without repeating every

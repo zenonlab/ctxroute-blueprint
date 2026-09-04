@@ -43,7 +43,7 @@ flowchart TD
     Prompt[UserPromptSubmit] --> Count[Turn counter]
     Count --> Canary[Canary]
     Compact[PreCompact] --> Reset[CTXRoute reset]
-    Reset --> Resume[PostCompact active Progress reminder]
+    Reset --> Resume[SessionStart compact reminder]
     Spawn[SubagentStart] --> Claim[Claim automatic Progress ticket]
     Claim --> Worker[Subagent work]
     Worker --> Result[SubagentStop structured footer]
