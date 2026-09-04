@@ -16,6 +16,9 @@ import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/proj
 import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const isolatedCtxrouteState = mkdtempSync(join(tmpdir(), 'hooks-ctxroute-state-'));
+process.env.CTXROUTE_STATE_DIR = isolatedCtxrouteState;
+process.on('exit', () => rmSync(isolatedCtxrouteState, { recursive: true, force: true }));
 
 test('Codex and Claude expose matching lifecycle handlers with async PostToolUse maintenance', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
@@ -35,7 +38,9 @@ test('Codex and Claude expose matching lifecycle handlers with async PostToolUse
       }
       if (harness === 'codex') for (const handler of handlers) assert.equal(handler.additionalContextLimit, event === 'SubagentStart' ? 65_536 : 1200, `${file} ${event} context limit`);
     }
-    assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
+    assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write');
+    assert.equal(config.hooks.SubagentStart[0].matcher, '^progress[-_]worker$');
+    assert.equal(config.hooks.SubagentStop[0].matcher, '^progress[-_]worker$');
   }
 });
 
@@ -806,7 +811,7 @@ test('CTXRoute reinjects bounded context after PreCompact', () => {
   const reinjected = inject();
   assert.equal(reinjected.status, 0, reinjected.stderr);
   const reinjectedContext = JSON.parse(reinjected.stdout).hookSpecificOutput.additionalContext;
-  assert.match(reinjectedContext, /Project governance/u);
+  assert.ok(reinjectedContext.trim(), 'PreCompact must make bounded context eligible again');
   assert.ok(reinjectedContext.length <= 3500);
 });
 

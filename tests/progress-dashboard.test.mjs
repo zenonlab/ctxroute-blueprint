@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, DEFAULT_IDLE_MS, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
-import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
+import { closeProgressDashboard, dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
 import { buildStepPatch, initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
@@ -243,4 +243,13 @@ test('detached dashboard instances are reused and replaced after death', async (
   } finally {
     try { process.kill(pid, 'SIGTERM'); } catch {}
   }
+});
+
+test('detached dashboard close is scoped and idempotent', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-close-'));
+  const opened = await openProgressDashboard(root, { idleMs: 60_000 });
+  const closed = await closeProgressDashboard(root);
+  assert.equal(closed.closed, true);
+  assert.equal(closed.instanceId, opened.instanceId);
+  assert.deepEqual(await closeProgressDashboard(root), { closed: false });
 });

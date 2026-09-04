@@ -16,6 +16,7 @@ function run(tool_input, options = {}) {
     encoding: 'utf8',
   });
 }
+const executeArchitectureHook = (...args) => run(...args);
 
 function templateWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'architecture-template-'));
@@ -73,8 +74,13 @@ test('does not block a new infrastructure hook', () => {
 });
 
 test('blocks a new dependency without architecture documentation', () => {
-  const result = run({ file_path: 'package.json' }, { cwd: initializedWorkspace() });
+  const result = executeArchitectureHook({ patch: '*** Update File: package.json\n+  "dependencies": { "new-package": "1.0.0" }' }, { cwd: initializedWorkspace() });
   assert.match(result.stdout, /Write blocked/u);
+});
+
+test('allows a routine package script change without demanding an ADR', () => {
+  const result = executeArchitectureHook({ patch: '*** Update File: package.json\n+  "scripts": { "check": "node --test" }' }, { cwd: initializedWorkspace() });
+  assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
 test('reads patches supplied through a patch property', () => {

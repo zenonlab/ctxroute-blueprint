@@ -214,8 +214,9 @@ export async function updateProgressGoal(goalId, { title }, root = process.cwd()
   }, options);
 }
 
-export async function updateProgressStep({ goalId, stepId, agentId, status, title, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
+export async function updateProgressStep({ goalId, stepId, agentId, status, title, claimable, acceptance, files, commands, evidence }, root = process.cwd(), options = {}) {
   if (status !== undefined && !STATUSES.has(status)) throw new Error(`status must be one of: ${[...STATUSES].join(', ')}`);
+  if (claimable !== undefined && ![true, false].includes(claimable)) throw new Error('claimable must be a boolean');
   return updateProgress(root, current => {
     const goalIndex = findGoalIndex(current, goalId);
     const goal = current.goals[goalIndex]; const stepIndex = goal.steps.findIndex(step => step.id === stepId);
@@ -227,6 +228,7 @@ export async function updateProgressStep({ goalId, stepId, agentId, status, titl
     if (agentId !== undefined && status === 'IN_PROGRESS') changed.assignee = agentId;
     if (status === 'TODO') delete changed.assignee;
     if (title !== undefined) changed.title = title;
+    if (claimable !== undefined) changed.claimable = claimable;
     if (acceptance !== undefined) changed.acceptance = copyList(acceptance);
     if (files !== undefined) changed.files = copyList(files);
     if (commands !== undefined) changed.commands = copyList(commands);
@@ -242,7 +244,7 @@ export async function addProgressStep(goalId, step, root = process.cwd(), option
   return updateProgress(root, current => {
     const goalIndex = findGoalIndex(current, goalId); const goal = current.goals[goalIndex];
     if (goal.steps.some(item => item.id === step?.id)) throw new Error(`Duplicate step id: ${step.id}`);
-    const added = { id: step?.id, title: step?.title, status: step?.status ?? 'TODO', acceptance: copyList(step?.acceptance), files: copyList(step?.files), commands: copyList(step?.commands), evidence: copyList(step?.evidence ?? []) };
+    const added = { id: step?.id, title: step?.title, status: step?.status ?? 'TODO', claimable: step?.claimable ?? false, acceptance: copyList(step?.acceptance), files: copyList(step?.files), commands: copyList(step?.commands), evidence: copyList(step?.evidence ?? []) };
     if (added.status === 'DONE' && added.evidence.length === 0) throw new Error('DONE requires at least one evidence reference');
     const goals = [...current.goals]; goals[goalIndex] = withDerivedStatus(goal, [...goal.steps, added]);
     return { ...current, goals };

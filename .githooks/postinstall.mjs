@@ -27,6 +27,7 @@ export function inspectInstallation(root = process.cwd()) {
 
   inspectHarness(root, '.codex/hooks.json', 'codex', failures);
   inspectHarness(root, '.claude/settings.json', 'claude', failures);
+  inspectProgressWorkers(root, failures);
 
   try {
     if (readFileSync(join(root, 'CLAUDE.md'), 'utf8').trim() !== '@AGENTS.md') failures.push('CLAUDE.md must contain only the native @AGENTS.md import.');
@@ -72,10 +73,23 @@ function inspectHarness(root, relativePath, harness, failures) {
       if (!Number.isFinite(entry?.timeout) || entry.timeout <= 0) failures.push(`${relativePath} ${event} must declare explicit positive timeouts.`);
       if ('statusMessage' in entry) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
     }
-    if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write|exec_command|Bash|Shell') {
-      failures.push(`${relativePath} PostToolUse must target only mutation-capable tools.`);
+    if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write') {
+      failures.push(`${relativePath} PostToolUse must target only structured editing tools.`);
     }
+    if ((event === 'SubagentStart' || event === 'SubagentStop') && config?.hooks?.[event]?.[0]?.matcher !== '^progress[-_]worker$') failures.push(`${relativePath} ${event} must target only progress-worker.`);
   }
+}
+
+function inspectProgressWorkers(root, failures) {
+  let codex = '';
+  let claude = '';
+  try { codex = readFileSync(join(root, '.codex/agents/progress-worker.toml'), 'utf8'); }
+  catch { failures.push('Codex progress-worker definition is missing.'); }
+  try { claude = readFileSync(join(root, '.claude/agents/progress-worker.md'), 'utf8'); }
+  catch { failures.push('Claude progress-worker definition is missing.'); }
+  for (const field of ['name', 'description', 'developer_instructions']) if (!new RegExp(`^${field}\\s*=`, 'mu').test(codex)) failures.push(`Codex progress-worker must define ${field}.`);
+  if (!/^name:\s*progress-worker\s*$/mu.test(claude) || !/^description:\s*\S+/mu.test(claude)) failures.push('Claude progress-worker must define name and description frontmatter.');
+  for (const source of [codex, claude]) if (!source.includes('PROGRESS_RESULT')) failures.push('Every progress-worker must document its final PROGRESS_RESULT footer.');
 }
 
 function readJson(path, failures, label) {

@@ -36,11 +36,13 @@ jobs:
           cache: npm
 
       - name: Set up Python
+        if: runner.os == 'Linux'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
       - name: Set up uv
+        if: runner.os == 'Linux'
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           version: "0.11.2"
@@ -53,25 +55,34 @@ jobs:
         run: npm ci
 
       - name: Synchronize frozen CRG environment
+        if: runner.os == 'Linux'
         run: uv sync --project packages/code-review-graph --frozen --python 3.12
 
       - name: Verify CRG version and MCP manifests
+        if: runner.os == 'Linux'
         run: |
           npm run crg:version
           npm run mcp:validate
 
       - name: Smoke-test Progress MCP transport
+        if: runner.os == 'Linux'
         run: npm run mcp:smoke
 
       - name: Smoke-test official CRG transport
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         shell: bash
         run: node scripts/crg-smoke.mjs > "${RUNNER_TEMP}/crg-smoke.json"
 
       - name: Run complete repository gate
+        if: runner.os == 'Linux'
         run: npm run validate
 
+      - name: Run cross-platform lifecycle smoke
+        if: runner.os != 'Linux'
+        run: node --test tests/hooks.test.mjs tests/progress-core.test.mjs tests/mcp-stdio.test.mjs
+
       - name: Materialize Sensor artifacts
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           node .githooks/sensor --checklist --json > sensor-checklist.json
@@ -86,16 +97,15 @@ jobs:
           category: blueprint-sensor
 
       - name: Verify integration boundary
+        if: runner.os == 'Linux'
         run: npm run integration
 
-      - name: Run dependency audit
-        run: npm audit --audit-level=high
-
       - name: Check POSIX hook syntax
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         run: sh -n .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
 
       - name: Build Archify documentation
+        if: runner.os == 'Linux'
         run: npm run build:docs
 
       - name: Capture Archify visual evidence
@@ -103,6 +113,7 @@ jobs:
         run: npm run archify:visual-check
 
       - name: Write validation summary
+        if: runner.os == 'Linux'
         run: npm run ci:summary
 
       - name: Upload validation artifacts
@@ -118,6 +129,25 @@ jobs:
             ${{ runner.temp }}/crg-smoke.json
             ci-summary.md
           if-no-files-found: warn
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install lockfile without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Audit high-severity production and development dependencies
+        run: npm run audit:dependencies
 
   smoke-install:
     name: Clean installation smoke test

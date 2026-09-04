@@ -32,7 +32,7 @@ const environment = {
   CTXROUTE_FILEDOCS_DIR: join(projectRoot, '.claude', 'hooks', 'docs'),
   CTXROUTE_FLEET_HOOKS_DIR: join(projectRoot, '.claude', 'hooks'),
   CTXROUTE_SESSIONDOCS_DIR: join(projectRoot, 'docs', 'session'),
-  CTXROUTE_STATE_DIR: join(projectRoot, '.ctxroute', 'state'),
+  CTXROUTE_STATE_DIR: process.env.CTXROUTE_STATE_DIR || join(projectRoot, '.ctxroute', 'state'),
 };
 
 const result = spawnSync(process.execPath, [hookPath, ...process.argv.slice(3)], {

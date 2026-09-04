@@ -28,7 +28,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
+        "matcher": "apply_patch|Edit|Write",
         "hooks": [
           {
             "type": "command",
@@ -52,7 +52,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex Stop",
-            "timeout": 120,
+            "timeout": 30,
             "additionalContextLimit": 1200
           }
         ]
@@ -97,7 +97,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "*",
+        "matcher": "^progress[-_]worker$",
         "hooks": [
           {
             "type": "command",

@@ -45,8 +45,11 @@ test('Codex MCP validation enforces the bounded optional startup grace', () => {
   assert.match(result.errors.join('\n'), /3000 ms/u);
 });
 
-test('a real stdio client lists and calls all Progress MCP tools', async () => {
+test('a real stdio client lists and calls all Progress MCP tools', async t => {
   const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-stdio-'));
+  t.after(() => {
+    try { process.kill(JSON.parse(readFileSync(join(fixture, '.ctxroute/state/progress-dashboard.json'), 'utf8')).pid, 'SIGTERM'); } catch {}
+  });
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'docs'));
   await withClient(join(root, 'scripts/progress-mcp.mjs'), fixture, async client => {
     const listed = await client.listTools();
@@ -88,8 +91,6 @@ test('a real stdio client lists and calls all Progress MCP tools', async () => {
     const next = await client.callTool({ name: 'progress_next', arguments: { goalId: plan.goalId } });
     assert.match(next.content[0].text, /"complete":true/u);
     assert.ok(validated.content[0].text.length < 100 && approved.content[0].text.length < 300 && updateResponse.content[0].text.length < 400);
-    const state = JSON.parse(readFileSync(join(fixture, '.ctxroute/state/progress-dashboard.json'), 'utf8'));
-    try { process.kill(state.pid, 'SIGTERM'); } catch {}
   });
 });
 

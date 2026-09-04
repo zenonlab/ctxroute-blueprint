@@ -61,6 +61,9 @@
     "progress:validate": "node scripts/progress-cli.mjs validate-plan",
     "progress:approve": "node scripts/progress-cli.mjs approve-plan",
     "progress:mcp": "node scripts/progress-mcp.mjs",
+    "progress:close": "node scripts/progress-cli.mjs dashboard-close",
+    "blueprint:sync": "node scripts/blueprint-sync.mjs",
+    "audit:dependencies": "node scripts/dependency-audit.mjs",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",
@@ -71,7 +74,7 @@
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "integration": "node scripts/integration-check.mjs",
     "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run sensor:blueprint && npm run test:coverage",
-    "verify": "npm run validate && npm run crg:smoke && npm run integration && npm audit --audit-level=high && npm run build:docs"
+    "verify": "npm run validate && npm run crg:smoke && npm run integration && npm run build:docs && npm run audit:dependencies"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",

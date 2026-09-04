@@ -75,13 +75,18 @@ if (decisionStatus.conflicts.length && mutationTool && !paths.some(path => path.
 }
 const architectureEvidence = changePaths.some(path => isArchitectureEvidence(path, config));
 const adrEvidence = changePaths.some(isAdr);
-const contractPaths = paths.filter(path => isContractPath(path, config));
+const contractPaths = paths.filter(path => isContractPath(path, config) && requiresContractDecision(path, toolInput));
 
 if (mutationTool && contractPaths.length && !adrEvidence) {
   block([
     'Write blocked: a contract or dependency requires an ADR in the same change.',
     `Contracts: ${contractPaths.join(', ')}`,
   ]);
+}
+
+function requiresContractDecision(path, input) {
+  if (!/(?:^|\/)package\.json$/u.test(path)) return true;
+  return /["'](?:dependencies|devDependencies|optionalDependencies|peerDependencies|overrides|resolutions)["']\s*:/u.test(addedContent(input));
 }
 
 if (config.status === 'template') {

@@ -49,14 +49,15 @@ trigger one by filename heuristic.
 launching a browser. The default server has no idle expiration. Its fragment
 token moves into tab-scoped `sessionStorage`, so reloading the same tab remains
 authenticated after the fragment is removed. Stop never starts or advertises
-the dashboard.
+the dashboard. `npm run progress:close` stops the current repository's instance
+and is safe to replay.
 
 The browser loads all goals from `.project/progress.json` through
 `progress-core`, with completed goals hidden by default. Plan creation validates
 before writing. Switching to manual opens a reason dialog and persists either
 `visual-review` or `important-decision`; automatic mode clears that reason.
-Step status and short evidence remain mutable;
-approved titles, criteria, files, and commands do not. Every response includes
+Step status, claimability, short evidence, approved titles, criteria, files,
+and commands remain explicitly mutable. Every response includes
 an optimistic revision, and HTTP 409 requires the browser to reload before
 retrying.
 
