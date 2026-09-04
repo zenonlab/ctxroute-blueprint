@@ -33,6 +33,7 @@ export async function handleProgressLifecycle(harness, event, input, root = proc
   try { payload = JSON.parse(input || '{}'); }
   catch { return diagnostic(event, 'invalid hook input'); }
   if (!validIdentity(payload.session_id) || (event !== 'SessionEnd' && !validIdentity(payload.agent_id))) return diagnostic(event, 'missing session or agent identity');
+  if (event === 'SubagentStart' && !isProgressWorker(payload.agent_type)) return null;
 
   try {
     if (event === 'SubagentStart') return await startSubagent(harness, payload, root);
@@ -96,11 +97,15 @@ function ticketContext(ticket) {
     'Make the following footer your final non-empty line, outside any Markdown block:',
     'PROGRESS_RESULT: {"status":"DONE","evidence":["short verification reference"]}',
     'Use status BLOCKED only when the ticket cannot be completed, and include at least one short evidence reference.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function section(title, items) {
-  return `${title}:\n${items.map(item => `- ${item}`).join('\n')}`;
+  return items?.length ? `${title}:\n${items.map(item => `- ${item}`).join('\n')}` : '';
+}
+
+export function isProgressWorker(agentType) {
+  return /^(?:progress-worker|progress_worker)$/iu.test(String(agentType ?? ''));
 }
 
 function opaqueHash(value) {

@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { execFileSync } from 'node:child_process';
 import { isSourcePath, isTestPath, isGeneratedPath, isContractPath, loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { applicableAdrs, decisionDiagnostics, loadAdrs, normalizePath } from './decision-memory.mjs';
 import { extractPaths } from './path-extraction.mjs';
@@ -16,24 +17,22 @@ const applicable = applicableAdrs(paths);
 const decisionStatus = decisionDiagnostics(paths);
 const changedDecisionPaths = paths.filter(path => /^docs\/decisions\/ADR-(?!0000-).+\.md$/u.test(path));
 const changedDecisions = loadAdrs().filter(adr => changedDecisionPaths.includes(adr.file));
+const findings = [];
 for (const path of changedDecisionPaths) {
   const adr = changedDecisions.find(item => item.file === path);
-  if (adr && !adr.metadata.revised && !adr.metadata['superseded-by']) {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: `PostToolUse blocked: ${path} was modified without revised: true or superseded-by.` }));
-    process.exit(0);
-  }
+  if (adr && isTracked(path) && !adr.metadata.revised && !adr.metadata['superseded-by']) findings.push(`${path} was modified without revised: true or superseded-by.`);
 }
 if ((architecturalPaths.length || contractPaths.length) && !applicable.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
-  process.stdout.write(JSON.stringify({ decision: 'block', reason: `PostToolUse blocked: no applicable ADR for ${[...architecturalPaths, ...contractPaths].join(', ')}. Add or revise an ADR with a matching scope.` }));
-  process.exit(0);
+  findings.push(`No applicable ADR for ${[...architecturalPaths, ...contractPaths].join(', ')}. Add one only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
 }
 if (decisionStatus.conflicts.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
-  process.stdout.write(JSON.stringify({ decision: 'block', reason: `PostToolUse blocked: applicable ADRs explicitly conflict. Revise or replace the conflicting ADR before changing governed files.` }));
-  process.exit(0);
+  findings.push('Applicable ADRs explicitly conflict. Revise or replace them before committing the governed change.');
 }
 
-if (process.env.CODEX_POST_TOOL_AUDIT === '1') {
-  const lines = ['Audit required before continuing.'];
+if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
+  const lines = findings.length
+    ? ['PostToolUse findings. The change already exists: inspect and repair the current file; do not replay the patch.', ...findings]
+    : ['Audit required before continuing.'];
   if (codePaths.length) {
     lines.push(`Code : ${codePaths.join(', ')}`);
     lines.push('Read relevant documentation and diagrams before changing code.');
@@ -53,6 +52,11 @@ if (process.env.CODEX_POST_TOOL_AUDIT === '1') {
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: lines.join('\n') },
   }));
+}
+
+function isTracked(path) {
+  try { execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { stdio: 'ignore' }); return true; }
+  catch { return false; }
 }
 
 

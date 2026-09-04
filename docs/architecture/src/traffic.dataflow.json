@@ -11,7 +11,7 @@
     "viewBox": [1068, 780],
     "views": [
       { "id": "context-route", "label": "Context routing", "focus": ["request", "agent", "ctxroute", "mcp"], "note": "Follow a request into bounded context and tool calls." },
-      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "stop", "mcp", "archify"], "note": "Follow explicit main-agent calls and automatic subagent lifecycle mutations through the same atomic Progress core." },
+      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "stop", "mcp", "archify"], "note": "Follow optional MCP or CLI memory and explicit progress-worker lifecycle mutations through the same atomic core." },
       { "id": "review-evidence", "label": "Review evidence", "focus": ["archify", "stop", "artifacts"], "note": "Follow the checked diagram into local evidence." }
     ]
   },
@@ -26,23 +26,23 @@
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 1, "row": 0, "tag": "consumer" },
     { "id": "ctxroute", "type": "backend", "label": "Lifecycle", "sublabel": "CTXRoute + nine events", "stage": 2, "row": 0, "tag": "dispatcher cap" },
-    { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "8 tools + full resource", "stage": 2, "row": 2, "tag": "async tickets" },
+    { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "ordered memory", "stage": 2, "row": 2, "tag": "opt-in coordination" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
-    { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "async advisory / manual", "stage": 3, "row": 2, "tag": "targeted guard" },
+    { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "silent automatic / manual", "stage": 3, "row": 2, "tag": "targeted guard" },
     { "id": "artifacts", "type": "database", "label": "Local evidence", "sublabel": "HTML + receipt", "stage": 4, "row": 0, "tag": "bounded output" }
   ],
   "flows": [
     { "from": "request", "to": "agent", "label": "intent", "classification": "user input", "variant": "emphasis", "route": "straight" },
     { "from": "agent", "to": "ctxroute", "label": "hook event", "classification": "lifecycle", "variant": "emphasis", "route": "straight" },
-    { "from": "ctxroute", "to": "mcp", "label": "explicit calls / automatic claims", "classification": "atomic Progress core", "variant": "default", "route": "straight", "labelDy": 35 },
+    { "from": "ctxroute", "to": "mcp", "label": "optional calls / worker claims", "classification": "atomic Progress core", "variant": "default", "route": "straight", "labelDy": 35 },
     { "from": "mcp", "to": "archify", "label": "verification target", "classification": "traffic check", "variant": "emphasis", "route": "vertical-channel" },
     { "from": "archify", "to": "artifacts", "label": "HTML receipt", "classification": "rendered evidence", "variant": "default", "route": "straight" },
     { "from": "agent", "to": "stop", "label": "stop", "classification": "completion attempt", "variant": "security", "route": "bottom-channel" },
     { "from": "stop", "to": "archify", "label": "changed source only", "classification": "diagram verification", "variant": "emphasis", "route": "straight", "labelDx": 12, "labelDy": 105 }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Routing contract", "items": ["Nine lifecycle events share one dispatcher", "Main agents use status, next or claim, then update", "Subagents claim automatic tickets and return a structured final footer"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["Session-scoped hashes isolate concurrent subagent claims", "SubagentStop settles only its owned ticket and SessionEnd releases only its session", "Automatic Stop remains advisory while manual is reserved for consequential review"] },
-    { "dot": "rose", "title": "Review boundary", "items": ["Sensor and CRG findings remain sanitized", "HTML and receipts are local evidence", "GitHub receives the risk-gate result for human review"] }
+    { "dot": "cyan", "title": "Routing contract", "items": ["Nine lifecycle events share synchronous and maintenance lanes", "Main agents use ordered memory only when useful", "Only progress workers claim parallel milestones and return a final footer"] },
+    { "dot": "emerald", "title": "Traffic verification", "items": ["Session-scoped hashes isolate concurrent worker claims", "SubagentStop settles only its owned milestone and SessionEnd releases only its session", "Automatic Stop stays silent while manual is reserved for consequential review"] },
+    { "dot": "rose", "title": "Review boundary", "items": ["Post-edit findings point at the existing change instead of rejecting it", "CRG and Archify maintenance runs asynchronously", "GitHub receives the risk-gate result for human review"] }
   ]
 }

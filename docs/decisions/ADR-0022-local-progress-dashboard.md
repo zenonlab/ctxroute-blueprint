@@ -69,13 +69,11 @@ Selecting manual mode opens a small accessible reason dialog; only
 `visual-review` and `important-decision` are accepted and persisted.
 
 `progress_open_dashboard` starts or reuses a detached instance and never opens
-the system browser. The default instance has no idle expiration so an issued
-dashboard link stays available for the project session; callers may still set
-an explicit idle timeout. Ignored state under `.ctxroute/state/` records the
-instance, PID, URL, token, and hashed session markers. Stop uses Codex's official
-`session_id`, stays silent without unfinished work, and reports dashboard
-failure without altering continuation policy. `stop_hook_active` returns before
-any dashboard work to prevent recursive Stop behavior.
+the system browser. The default instance has no idle expiration so an explicitly
+requested dashboard link stays available; callers may still set an idle timeout.
+Ignored state under `.ctxroute/state/` records the instance, PID, URL, and token.
+Stop never starts or advertises a dashboard, so ordinary agent sessions create
+no dashboard process or session markers.
 
 ## Consequences
 

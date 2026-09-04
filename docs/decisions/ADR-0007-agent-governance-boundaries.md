@@ -40,6 +40,10 @@ step, while existing infrastructure remains reusable and unchanged. The
 policy is versioned as JSON and evaluated by a short-lived Node.js CLI; it does
 not grant access to memory or MCP/A2A providers by itself.
 
-Successful hook validations are silent. Lifecycle context is bounded; blocking
-Sensor diagnostics remain visible while full reports belong in CI or local
+Successful hook validations are silent. Lifecycle context is bounded; Sensor
+diagnostics remain visible while full reports belong in CI or local
 validation output.
+Deterministic safety gates run before a mutation. PostToolUse analysis reports
+against the already-modified file without rejecting or hiding the successful
+tool result, and maintenance-only CRG, problem-memory, and Archify work runs in
+an asynchronous lane.

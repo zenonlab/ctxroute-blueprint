@@ -28,13 +28,13 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 ## Progress
 
-- Progress is asynchronous coordination, never a prerequisite or global lock for implementation.
-- Skip Progress for small, reversible, or single-agent changes. For substantial parallel work, create tickets once, then let each agent atomically claim one with `progress_claim_ticket`.
-- Split independent tickets so agents can work concurrently. An agent writes Progress only when claiming a ticket and once after implementation and verification; do not mirror intermediate activity.
-- For subagents only, `SubagentStart` may claim an `automatic` ticket, `SubagentStop` may settle that owned ticket from a valid `PROGRESS_RESULT` footer, and `SessionEnd` may release the session's remaining claims. No `PostToolUse` hook changes Progress.
+- Progress is a compact, ordered memory of intent and outcomes, never a prerequisite, taskmaster, or global implementation lock.
+- Skip Progress for small, reversible, or single-agent changes. For a substantial chantier, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.
+- Preserve milestone order. Mark `claimable: true` only on genuinely independent work packages that can run in parallel; explicit agents may claim those packages once and report once after verification.
+- Only a subagent explicitly started as `progress-worker` may be auto-assigned a claimable `automatic` milestone. `SubagentStop` may settle its owned milestone from a valid `PROGRESS_RESULT` footer, and `SessionEnd` may release remaining session claims. No `PostToolUse` hook changes Progress.
 - Report `DONE` or `BLOCKED` with short evidence after the work. If Progress is busy or unavailable, continue safe in-scope work and reconcile the ticket afterward.
 - Use `manual` only with reason `visual-review` or `important-decision` for an important undecided product/change/design choice. All other tickets remain `automatic` and never block Stop.
-- Use the matching `npm run progress:*` command only when the project MCP is unavailable.
+- MCP is the optional rich interface for inspecting or editing the memory. Use the matching `npm run progress:*` command as an equivalent local fallback when MCP is unavailable or urgency favors the CLI.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
 ## Development
@@ -50,7 +50,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Avoid speculative abstractions and refactors.
 - Verify every modification.
 - Review the diff after each write.
-- Each agent completes one claimed ticket before taking another; independent agents may work in parallel.
+- Complete one coherent claimed work package before taking another; ordinary work need not be claimed or mirrored in Progress.
 
 ## Audit
 
@@ -72,7 +72,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 ## Git
 
-- One verified functional step per commit.
+- One coherent verified outcome per commit; do not create micro-commits merely to mirror Progress milestones.
 - Branches: `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/`, `perf/`.
 - Commits: `type(scope): short description`.
 - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.

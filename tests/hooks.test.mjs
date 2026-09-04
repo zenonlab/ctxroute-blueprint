@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { archifyInstruction, progressContinuation } from '../.codex/hooks/stop-review.mjs';
-import { handleProgressLifecycle, parseProgressResult, sessionOwnerPrefix, subagentOwner } from '../.codex/hooks/progress-subagent.mjs';
+import { handleProgressLifecycle, isProgressWorker, parseProgressResult, sessionOwnerPrefix, subagentOwner } from '../.codex/hooks/progress-subagent.mjs';
 import { approvePlan, readProgress } from '../scripts/progress-core.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
@@ -17,17 +17,23 @@ import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('Codex and Claude expose exactly one handler for the same nine lifecycle events', () => {
+test('Codex and Claude expose matching lifecycle handlers with async PostToolUse maintenance', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
     for (const event of lifecycleEvents) {
       const handlers = config.hooks[event].flatMap(block => block.hooks ?? []);
-      assert.equal(handlers.length, 1, `${file} ${event}`);
+      assert.equal(handlers.length, event === 'PostToolUse' ? 2 : 1, `${file} ${event}`);
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
-      assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
-      assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, event === 'SubagentStart' ? 65_536 : 1200, `${file} ${event} context limit`);
+      for (const handler of handlers) {
+        assert.ok(handler.timeout > 0, `${file} ${event} timeout`);
+        assert.equal('statusMessage' in handler, false, `${file} ${event} should remain quiet`);
+      }
+      if (event === 'PostToolUse') {
+        assert.equal(handlers[1].command, `node ./.codex/hooks/lifecycle.mjs ${harness} PostToolUse maintenance`);
+        assert.equal(handlers[1].async, true);
+      }
+      if (harness === 'codex') for (const handler of handlers) assert.equal(handler.additionalContextLimit, event === 'SubagentStart' ? 65_536 : 1200, `${file} ${event} context limit`);
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
@@ -104,7 +110,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   const expected = {
     SessionStart: ['session-inject.js', 'crg-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
-    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-crg.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs', 'archify-preview.mjs'],
+    PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
     Stop: ['stop-review.mjs'],
@@ -126,6 +132,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   }
   assert.equal(handlerPlan('claude', 'PreToolUse', root)[1].name, 'doc-inject.js');
   assert.equal(handlerPlan('claude', 'PostToolUse', root)[0].name, 'doc-write-guard.js');
+  assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs', 'problem-memory.mjs', 'archify-preview.mjs']);
   const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
   assert.deepEqual(codexInjection.args, ['--budget', '0']);
@@ -137,6 +144,15 @@ test('subagent ownership is opaque and separates sessions and agents', () => {
   assert.notEqual(subagentOwner('codex', 'session-a', 'agent-1'), subagentOwner('codex', 'session-a', 'agent-2'));
   assert.equal(subagentOwner('codex', 'session-a', 'agent-1').startsWith(sessionOwnerPrefix('codex', 'session-a')), true);
   assert.doesNotMatch(subagentOwner('codex', 'raw-session', 'raw-agent'), /raw-(?:session|agent)/u);
+});
+
+test('automatic Progress assignment is explicit to progress workers', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1), approved: true }, directory);
+  assert.equal(isProgressWorker('Explore'), false);
+  assert.equal(isProgressWorker('progress-worker'), true);
+  assert.equal(await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-1', agent_type: 'Explore' }), directory), null);
+  assert.equal((await readProgress(directory)).goals[0].steps[0].status, 'TODO');
 });
 
 test('progress result parsing requires a strict final footer and bounded evidence', () => {
@@ -156,11 +172,11 @@ test('progress result parsing requires a strict final footer and bounded evidenc
 test('subagent lifecycle claims distinct automatic tickets and replays idempotently', async () => {
   const directory = progressHookWorkspace();
   await approvePlan({ ...progressPlan(3), approved: true }, directory);
-  const firstInput = JSON.stringify({ session_id: 'session-a', agent_id: 'agent-1' });
+  const firstInput = JSON.stringify({ session_id: 'session-a', agent_id: 'agent-1', agent_type: 'progress-worker' });
   const first = await handleProgressLifecycle('codex', 'SubagentStart', firstInput, directory);
   const repeated = await handleProgressLifecycle('codex', 'SubagentStart', firstInput, directory);
-  const second = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-2' }), directory);
-  const otherSession = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-b', agent_id: 'agent-1' }), directory);
+  const second = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-2', agent_type: 'progress-worker' }), directory);
+  const otherSession = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-b', agent_id: 'agent-1', agent_type: 'progress-worker' }), directory);
   assert.equal(first.hookSpecificOutput.additionalContext, repeated.hookSpecificOutput.additionalContext);
   assert.match(first.hookSpecificOutput.additionalContext, /Acceptance:[\s\S]*Files:[\s\S]*Commands:[\s\S]*PROGRESS_RESULT/u);
   const steps = (await readProgress(directory)).goals[0].steps;
@@ -172,8 +188,8 @@ test('subagent lifecycle skips manual goals and settles only the owned ticket', 
   const directory = progressHookWorkspace();
   await approvePlan({ ...progressPlan(1, { goalId: 'manual', executionMode: 'manual', manualReason: 'important-decision' }), approved: true }, directory);
   await approvePlan({ ...progressPlan(2), approved: true }, directory);
-  const first = { session_id: 'session-a', agent_id: 'agent-1' };
-  const second = { session_id: 'session-b', agent_id: 'agent-1' };
+  const first = { session_id: 'session-a', agent_id: 'agent-1', agent_type: 'progress-worker' };
+  const second = { session_id: 'session-b', agent_id: 'agent-1', agent_type: 'progress-worker' };
   await handleProgressLifecycle('claude', 'SubagentStart', JSON.stringify(first), directory);
   await handleProgressLifecycle('claude', 'SubagentStart', JSON.stringify(second), directory);
   await handleProgressLifecycle('claude', 'SubagentStop', JSON.stringify({ ...first, last_assistant_message: 'done\nPROGRESS_RESULT: {"status":"DONE","evidence":["node --test"]}' }), directory);
@@ -190,7 +206,7 @@ test('subagent lifecycle skips manual goals and settles only the owned ticket', 
 test('a valid DONE footer completes a goal and repeated SubagentStop is a no-op', async () => {
   const directory = progressHookWorkspace();
   await approvePlan({ ...progressPlan(1), approved: true }, directory);
-  const owner = { session_id: 'session-a', agent_id: 'agent-1' };
+  const owner = { session_id: 'session-a', agent_id: 'agent-1', agent_type: 'progress-worker' };
   await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(owner), directory);
   const stop = JSON.stringify({ ...owner, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}' });
   await handleProgressLifecycle('codex', 'SubagentStop', stop, directory);
@@ -204,7 +220,7 @@ test('the real subagent hook process claims and settles a fixture ticket', async
   const directory = progressHookWorkspace();
   await approvePlan({ ...progressPlan(1), approved: true }, directory);
   const script = join(root, '.codex/hooks/progress-subagent.mjs');
-  const identity = { session_id: 'real-session', agent_id: 'real-agent' };
+  const identity = { session_id: 'real-session', agent_id: 'real-agent', agent_type: 'progress-worker' };
   const started = spawnSync(process.execPath, [script, 'codex', 'SubagentStart'], { cwd: directory, input: JSON.stringify(identity), encoding: 'utf8' });
   assert.equal(started.status, 0, started.stderr);
   assert.match(JSON.parse(started.stdout).hookSpecificOutput.additionalContext, /Ticket: step-1/u);
@@ -217,7 +233,7 @@ test('subagent Progress failures stay fail-open with a short diagnostic', async 
   const directory = progressHookWorkspace();
   mkdirSync(join(directory, '.project'), { recursive: true });
   writeFileSync(join(directory, '.project/progress.json'), '{invalid');
-  const result = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-a' }), directory);
+  const result = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session-a', agent_id: 'agent-a', agent_type: 'progress-worker' }), directory);
   assert.match(result.systemMessage, /^Progress SubagentStart failed open:/u);
   assert.ok(result.systemMessage.length < 300);
 });
@@ -225,9 +241,9 @@ test('subagent Progress failures stay fail-open with a short diagnostic', async 
 test('invalid subagent results release only that claim and session cleanup is scoped and idempotent', async () => {
   const directory = progressHookWorkspace();
   await approvePlan({ ...progressPlan(3), approved: true }, directory);
-  const ownerA = { session_id: 'session-a', agent_id: 'agent-1' };
-  const ownerB = { session_id: 'session-a', agent_id: 'agent-2' };
-  const ownerC = { session_id: 'session-b', agent_id: 'agent-1' };
+  const ownerA = { session_id: 'session-a', agent_id: 'agent-1', agent_type: 'progress-worker' };
+  const ownerB = { session_id: 'session-a', agent_id: 'agent-2', agent_type: 'progress-worker' };
+  const ownerC = { session_id: 'session-b', agent_id: 'agent-1', agent_type: 'progress-worker' };
   for (const owner of [ownerA, ownerB, ownerC]) await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(owner), directory);
   await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...ownerA, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["api_key: secret"]}' }), directory);
   let progress = await readProgress(directory);
@@ -424,7 +440,7 @@ test('both lifecycle dialects inject a matching project rule', () => {
   }
 });
 
-test('both host dispatchers block an unsafe file through the real PostToolUse chain', () => {
+test('both host dispatchers report an unsafe file without hiding the completed write', () => {
   const directory = mkdtempSync(join(tmpdir(), 'lifecycle-post-tool-'));
   const path = join(directory, 'query.js');
   writeFileSync(path, "db.query('SELECT * FROM users WHERE id = ' + userId);\n");
@@ -436,8 +452,9 @@ test('both host dispatchers block an unsafe file through the real PostToolUse ch
     });
     assert.equal(result.status, 0, result.stderr);
     const output = JSON.parse(result.stdout);
-    assert.equal(output.decision, 'block', harness);
-    assert.match(output.reason, /sensor\/sql-injection/u, harness);
+    assert.equal('decision' in output, false, harness);
+    assert.match(output.hookSpecificOutput.additionalContext, /sensor\/sql-injection/u, harness);
+    assert.match(output.hookSpecificOutput.additionalContext, /already exists/u, harness);
   }
 });
 
@@ -587,44 +604,10 @@ test('Stop manual policy pauses only for a decision or visual review and accepts
   assert.equal(accepted, null);
 });
 
-test('Stop adds the dashboard once for an active session and keeps progression policy', async () => {
-  const cwd = progressWorkspace({ statuses: ['TODO'] });
-  let calls = 0;
-  const dashboardNotice = async sessionId => {
-    calls += 1;
-    assert.equal(sessionId, 'session-one');
-    return calls === 1 ? { url: 'http://localhost:4321/#private', instanceId: 'instance-one' } : null;
-  };
-  const first = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
-  assert.equal(first.continue, true);
-  assert.match(first.systemMessage, /http:\/\/localhost:4321\/#private/u);
-  const repeated = await progressContinuation({ session_id: 'session-one' }, { root: cwd, changed: [], diagrams: [], dashboardNotice });
-  assert.equal(repeated.continue, true);
-  assert.match(repeated.systemMessage, /Progress asynchrone/u);
-  assert.doesNotMatch(repeated.systemMessage, /localhost/u);
-});
-
-test('Stop does not start a dashboard without active goals and dashboard failures stay fail-open', async () => {
-  const done = progressWorkspace({ statuses: ['DONE'], goalStatus: 'DONE' });
-  let called = false;
-  assert.equal(await progressContinuation({ session_id: 'finished' }, { root: done, changed: [], diagrams: [], dashboardNotice: async () => { called = true; } }), null);
-  assert.equal(called, false);
-  const active = progressWorkspace({ statuses: ['TODO'] });
-  const result = await progressContinuation({ session_id: 'active' }, { root: active, changed: [], diagrams: [], dashboardNotice: async () => { throw new Error('simulated failure'); } });
-  assert.equal(result.continue, true);
-  assert.match(result.systemMessage, /unavailable: simulated failure/u);
-});
-
-test('Stop automatic policy stays advisory for TODO and IN_PROGRESS work', async () => {
+test('Stop stays silent for automatic memory milestones', async () => {
   for (const status of ['TODO', 'IN_PROGRESS']) {
     const cwd = progressWorkspace({ mode: 'automatic', statuses: [status] });
-    const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
-    assert.equal(result.continue, true, status);
-    assert.equal('decision' in result, false);
-    assert.match(result.systemMessage, /Progress asynchrone/u);
-    assert.doesNotMatch(result.systemMessage, /Archify/u);
-    assert.match(result.systemMessage, new RegExp(`\\[${status}\\]`, 'u'));
-    assert.ok(result.systemMessage.length <= 1200);
+    assert.equal(await progressContinuation({}, { root: cwd, changed: [], diagrams: [] }), null, status);
   }
 });
 
@@ -645,26 +628,12 @@ test('Stop hands off only a qualified external block without a continuation loop
   assert.equal(await progressContinuation({}, { root: done, changed: [], diagrams: [] }), null);
 });
 
-test('Stop keeps unqualified blocked work advisory', async () => {
+test('Stop stays silent for unqualified blocked memory', async () => {
   const blocked = progressWorkspace({ mode: 'automatic', statuses: ['BLOCKED'] });
-  const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
-  assert.equal(handoff.continue, true);
-  assert.equal('decision' in handoff, false);
-  assert.match(handoff.systemMessage, /no external blocker is qualified/u);
-  assert.doesNotMatch(handoff.systemMessage, /blocked externally/u);
+  assert.equal(await progressContinuation({}, { root: blocked, changed: [], diagrams: [] }), null);
 });
 
-test('Stop continuation remains bounded to three current steps after compaction', async () => {
-  const cwd = progressWorkspace({ mode: 'automatic', statuses: ['IN_PROGRESS', 'BLOCKED', 'TODO', 'TODO'] });
-  const result = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
-  assert.match(result.systemMessage, /step-1/u);
-  assert.match(result.systemMessage, /step-2/u);
-  assert.match(result.systemMessage, /step-3/u);
-  assert.doesNotMatch(result.systemMessage, /step-4/u);
-  assert.ok(result.systemMessage.length <= 1200);
-});
-
-test('Stop requires confirmation only for deletion, not verified commits', () => {
+test('Stop does not run repository-wide validation on ordinary completion', () => {
   const cwd = starterWorkspace();
   git(cwd, ['init', '-q']);
   git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
@@ -673,10 +642,12 @@ test('Stop requires confirmation only for deletion, not verified commits', () =>
   git(cwd, ['commit', '-qm', 'chore: fixture']);
   writeFileSync(join(cwd, 'change.json'), '{}\n');
   const result = run('.codex/hooks/stop-review.mjs', {}, { cwd });
-  assert.match(result.stdout, /Validation failures/u);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.continue, true);
+  assert.equal(output.decision, undefined);
 });
 
-test('Stop recognizes valid JSON', () => {
+test('Stop keeps lightweight JSON checks advisory', () => {
   const cwd = starterWorkspace();
   git(cwd, ['init', '-q']);
   git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
@@ -685,7 +656,9 @@ test('Stop recognizes valid JSON', () => {
   git(cwd, ['commit', '-qm', 'chore: fixture']);
   writeFileSync(join(cwd, 'change.json'), '{}\n');
   const result = run('.codex/hooks/stop-review.mjs', {}, { cwd });
-  assert.match(result.stdout, /Validation failures/u);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.continue, true);
+  assert.equal(output.decision, undefined);
 });
 
 test('commit-msg accepts Conventional Commits', () => {
@@ -966,7 +939,7 @@ function progressPlan(count, overrides = {}) {
     goalId: 'goal-9',
     title: 'Automatic work',
     validationEvidence: ['node --test'],
-    steps: Array.from({ length: count }, (_, index) => ({ id: `step-${index + 1}`, title: `Ticket ${index + 1}`, acceptance: ['verified'], files: ['src/app.js'], commands: ['node --test'] })),
+    steps: Array.from({ length: count }, (_, index) => ({ id: `step-${index + 1}`, title: `Ticket ${index + 1}`, claimable: true, acceptance: ['verified'], files: ['src/app.js'], commands: ['node --test'] })),
     ...overrides,
   };
 }

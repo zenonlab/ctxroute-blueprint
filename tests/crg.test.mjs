@@ -56,6 +56,8 @@ test('PostToolUse triggers only one successful normal write', () => {
   assert.equal(shouldUpdate({ tool_name: 'Read', tool_input: { file_path: 'src/a.js' }, tool_response: {} }), false);
   assert.equal(shouldUpdate({ tool_name: 'Edit', tool_input: { file_path: 'src/a.js' }, tool_response: { isError: true } }), false);
   assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'npm run crg:update' }, tool_response: {} }), false);
+  assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'rg TODO .' }, tool_response: {} }), false);
+  assert.equal(shouldUpdate({ tool_name: 'exec_command', tool_input: { cmd: 'npm test' }, tool_response: {} }), false);
 });
 
 test('embeddings remain absent by default and cloud egress requires explicit consent', () => {

@@ -84,11 +84,6 @@ if (mutationTool && contractPaths.length && !adrEvidence) {
   ]);
 }
 
-const architecturalPaths = paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
-if (mutationTool && architecturalPaths.length && !decisionStatus.applicable.length && !adrEvidence) {
-  block(['Write blocked: architectural change has no applicable ADR.', `Files: ${architecturalPaths.join(', ')}`, 'Write or revise an ADR with a matching scope before changing these files.']);
-}
-
 if (config.status === 'template') {
   const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isDocumentationPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
   if (projectPaths.length) {
@@ -113,11 +108,8 @@ if (codeOutsideDeclaredRoots.length) {
 const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(path) && !isTestPath(path, config));
 const structuralChange = paths.some(path => isSourcePath(path, config)) && hasStructuralSignal(addedContent(toolInput));
 if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
-  block([
-    'Write blocked: structural change has no associated diagram.',
-    `Files: ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}`,
-    'Update the Archify source or a components/flows document in the same change.',
-  ]);
+  context(`Potential structural change in ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}. Update an ADR and Archify source only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
+  process.exit(0);
 }
 
 if (paths.some(path => isSourcePath(path, config))) {

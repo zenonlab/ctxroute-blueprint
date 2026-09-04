@@ -35,6 +35,13 @@
             "command": "node ./.codex/hooks/lifecycle.mjs codex PostToolUse",
             "timeout": 45,
             "additionalContextLimit": 1200
+          },
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PostToolUse maintenance",
+            "timeout": 45,
+            "async": true,
+            "additionalContextLimit": 1200
           }
         ]
       }
@@ -77,7 +84,7 @@
     ],
     "SubagentStart": [
       {
-        "matcher": "*",
+        "matcher": "^progress[-_]worker$",
         "hooks": [
           {
             "type": "command",

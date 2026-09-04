@@ -31,6 +31,12 @@
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse",
             "timeout": 45
+          },
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/lifecycle.mjs claude PostToolUse maintenance",
+            "timeout": 45,
+            "async": true
           }
         ]
       }
@@ -70,7 +76,7 @@
     ],
     "SubagentStart": [
       {
-        "matcher": "*",
+        "matcher": "^progress[-_]worker$",
         "hooks": [
           {
             "type": "command",

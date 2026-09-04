@@ -23,8 +23,9 @@ revised: true
 
 ## Context
 
-Agents need a small durable representation of a validated plan that can be
-read by CLI, MCP, hooks, and CTXRoute without turning Plan mode into a writer.
+Agents need a small durable memory of a validated plan that can be read by CLI,
+MCP, hooks, and CTXRoute without turning Plan mode into a writer or the memory
+into a task scheduler.
 
 ## Decision
 
@@ -37,7 +38,8 @@ both files atomically after an authorized request.
 The `approved: true` field is a write flag rather than a second conversational
 approval when the plan faithfully restates that request. It persists
 `executionMode` per goal, with `automatic` as the default. Materialization freezes goal and step identifiers, not the
-displayed content or step structure. Goal titles, step titles, criteria, files,
+displayed content or step structure. Milestones preserve their declared order;
+criteria remain required while file and command hints are optional. Goal titles, step titles, criteria, files,
 commands, evidence, additions, deletions, and exact ordering are mutable only
 through visible, validated, revision-checked user actions backed by the shared
 core. Every mutation derives goal status, regenerates the Markdown view, and
@@ -53,9 +55,12 @@ The local dashboard is another adapter over this core and every web mutation
 carries an optimistic revision. Existing identifiers are never rewritten and
 the final step of a goal cannot be deleted.
 
-Progress is optional for small or single-agent work. During substantial
-parallel work, each step acts as a ticket: `progress_claim_ticket` atomically
-assigns one `TODO` step to an agent and moves it to `IN_PROGRESS`. Agent result
+Progress is optional for small or single-agent work. A substantial plan should
+normally contain two to six outcome-sized milestones rather than mirroring
+files, commands, commits, or routine edits. Only a milestone explicitly marked
+`claimable: true` participates in automatic parallel dispatch. During
+substantial parallel work, `progress_claim_ticket` atomically assigns one
+`TODO` milestone to an agent and moves it to `IN_PROGRESS`. Agent result
 reporting rejects unclaimed tickets. The agent
 does not mirror intermediate activity and reports only its final result. Every
 mutation shares a bounded, owner-identified filesystem lock. Contenders use a
@@ -64,14 +69,17 @@ before a replacement owner is installed. The recovery marker also
 stores `{pid, token}`: recent or live owners are preserved, while stale markers
 owned by dead processes are reclaimed with token verification. MCP and fallback
 CLI mutation responses contain only acknowledgements, while status and
-next-step reads omit full ticket bodies. The normal flow is `progress_status`,
-then `progress_next` or `progress_claim_ticket`, then `progress_update_step`.
+next-step reads omit full ticket bodies. `progress_next` preserves declared
+milestone order and returns blocked context separately. MCP is the optional rich
+interface; matching local CLI commands provide the same core operations when
+MCP is unavailable.
 The complete JSON checklist is absent from `tools/list` and exposed as the
 opt-in MCP resource `ctxroute://progress/full`. `npm run progress:read` remains
 available for human diagnostics.
 A busy or unavailable Progress service does not block safe work.
-For subagents, the same core exposes internal-only automatic claim and
-session-prefix release mutations. They are not MCP tools. Harness hooks persist
+For subagents explicitly typed `progress-worker`, the same core exposes
+internal-only automatic claim and session-prefix release mutations. Other
+subagents do not touch Progress. These mutations are not MCP tools. Harness hooks persist
 only `harness:sha256(session_id):sha256(agent_id)` identities, so concurrent
 sessions and agents cannot share ownership accidentally and raw harness IDs do
 not enter Progress.
