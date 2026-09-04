@@ -34,6 +34,7 @@
     "progressMcp": "npm run progress:mcp",
     "progressClose": "npm run progress:close",
     "blueprintSync": "npm run blueprint:sync",
+    "blueprintVersionCheck": "npm run blueprint:version:check",
     "dependencyAudit": "npm run audit:dependencies",
     "astCheck": "npm run ast:check",
     "crgMcp": "npm run crg:mcp",

@@ -54,6 +54,12 @@ change. A diagram is needed only when a material boundary, public contract,
 dependency, or cross-component flow changes; ordinary feature code does not
 trigger one by filename heuristic.
 
+Stop checks JSON syntax in-process and caps subprocess syntax probes at a small
+constant. Full JavaScript and shell syntax coverage remains part of the normal
+validation gate, so a large dirty worktree cannot multiply completion latency.
+The lifecycle performance gate uses repeated median samples and includes real
+Sensor and dirty-Stop fixtures.
+
 When multiple runnable goals coexist, Stop requires an unambiguous goal or
 step-title reference before applying manual policy. Ambiguity stays silent so
 an old goal cannot interrupt unrelated work. A `visual-review` pause asks for a
@@ -66,6 +72,12 @@ token moves into tab-scoped `sessionStorage`, so reloading the same tab remains
 authenticated after the fragment is removed. Stop never starts or advertises
 the dashboard. `npm run progress:close` stops the current repository's instance
 and is safe to replay.
+
+`npm run blueprint:sync -- --target <repo>` previews only Git-tracked files in
+the explicit control-plane allowlist. Ignored caches, generated decision memory,
+Progress state, and product files never enter the preview. `npm run
+blueprint:version:check` verifies the allowlist digest and requires a marker
+version bump whenever that control plane changes.
 
 The browser loads all goals from `.project/progress.json` through
 `progress-core`, with completed goals hidden by default. Plan creation validates

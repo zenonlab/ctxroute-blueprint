@@ -43,6 +43,6 @@
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Nine lifecycle events inject compact context only on relevant boundaries", "Main agents use ordered memory only when useful", "Only progress workers claim parallel milestones and return a final footer"] },
     { "dot": "emerald", "title": "Traffic verification", "items": ["Session-scoped hashes isolate concurrent worker claims", "SubagentStop settles only its owned milestone and SessionEnd releases only its session", "Automatic Stop stays silent; ambiguous multi-goal manual review cannot capture unrelated work"] },
-    { "dot": "rose", "title": "Review boundary", "items": ["Post-edit checks run only after structured edits", "CRG and Archify maintenance coalesces asynchronously after an edit burst", "WARN context is deduplicated while unsafe diagnostics remain actionable"] }
+    { "dot": "rose", "title": "Review boundary", "items": ["Post-edit checks run only after structured edits", "Stop syntax probes and repeated latency samples are strictly bounded", "Tracked-only sync and a version digest keep derived control planes reproducible"] }
   ]
 }

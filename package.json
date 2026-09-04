@@ -65,6 +65,8 @@
     "progress:close": "node scripts/progress-cli.mjs dashboard-close",
     "blueprint:sync": "node scripts/blueprint-sync.mjs",
     "blueprint:check": "node scripts/blueprint-sync.mjs --check",
+    "blueprint:version:check": "node scripts/blueprint-version.mjs",
+    "blueprint:version:update": "node scripts/blueprint-version.mjs --write",
     "hooks:performance": "node scripts/hook-performance.mjs",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "validate:config": "node .githooks/validate-project-config.mjs",
@@ -76,7 +78,7 @@
     "ci:summary": "node scripts/ci-summary.mjs",
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "integration": "node scripts/integration-check.mjs",
-    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run hooks:performance && npm run sensor:blueprint && npm run test:coverage",
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run blueprint:version:check && npm run hooks:performance && npm run sensor:blueprint && npm run test:coverage",
     "verify": "npm run validate && npm run crg:smoke && npm run integration && npm run build:docs && npm run audit:dependencies"
   },
   "devDependencies": {

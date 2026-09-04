@@ -1,4 +1,5 @@
 {
   "schemaVersion": 1,
-  "version": "2026.09.04.2"
+  "version": "2026.09.04.3",
+  "controlHash": "sha256:38ab368b7c72cfb4d7bc9351f305ed47ed50a352c5e212df8d1e0d871b74243e"
 }

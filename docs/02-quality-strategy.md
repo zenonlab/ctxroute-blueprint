@@ -14,7 +14,7 @@ proportionate level of verification.
 | End-to-end | required for local tooling | The Progress dashboard crosses browser-style HTTP, MCP, detached-process, and filesystem boundaries | `node --test tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs tests/hooks.test.mjs` |
 | Contract | required | Nine lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
 | Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
-| Performance | required | Lifecycle context and latency stay bounded; CRG bursts coalesce and updates remain time/output-bounded | `npm run hooks:performance`, runner unit tests, and `npm run crg:smoke` |
+| Performance | required | Median lifecycle latency and context stay bounded under real Sensor and dirty-Stop fixtures; CRG bursts coalesce | `npm run hooks:performance`, runner unit tests, and `npm run crg:smoke` |
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
 | Accessibility | required for local tooling | Progress remains keyboard-operable, labelled, responsive, status-announced, and confirmation-gated; generated Archify HTML remains documentation infrastructure | Dashboard HTML contract tests plus 9/9 Archify showcase checks and `npm run archify:visual-check` |
 | Migration / recovery | required for local tooling | Can Progress repair a stale derived view and reclaim dead owners without disturbing live locks? | Progress core crash-window and multi-process tests |

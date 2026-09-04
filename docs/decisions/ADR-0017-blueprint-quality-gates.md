@@ -6,6 +6,8 @@ scope:
   - .project/sensor-baseline.json
   - scripts/blueprint-sensor.mjs
   - scripts/integration-check.mjs
+  - scripts/hook-performance.mjs
+  - scripts/blueprint-version.mjs
   - .github/workflows/validate.yml
   - docs/02-quality-strategy.md
   - docs/architecture/src/blueprint.architecture.json
@@ -41,15 +43,24 @@ exception. Informational `WARN` diagnostics remain visible without blocking.
 SARIF contains only unexpected blocking diagnostics.
 
 Add `npm run hooks:performance`, an isolated representative lifecycle benchmark
-with generous latency ceilings and strict context-size ceilings. It exercises a
-session start, prompt, read-only and mutating pre-tool events, post-tool output,
-and stop without writing repository state. Keep the official CRG smoke test to
+with generous latency ceilings and strict context-size ceilings. It reports the
+median of repeated samples, exercises session and prompt context, a mutating
+pre-tool event, real Sensor diagnostics, and Stop against a bounded
+dirty-worktree fixture. Stop may perform only a fixed number of subprocess
+syntax probes; exhaustive syntax validation belongs to the repository gate
+rather than the agent's completion path. Keep the official CRG smoke test to
 prove the exact version, fixture build, incremental update, MCP startup, tool
 listing, and one read call. `npm run integration` smoke-tests the Progress
 MCP stdio transport on supported local
 platforms and validates manifests on Windows, where the GitHub runner transport
 is not reliable. `npm run verify` adds the network dependency audit and the
 generated documentation build to the deterministic validation gate.
+
+The blueprint version marker also stores a deterministic digest of the tracked
+control-plane allowlist. Validation recomputes that digest and requires the
+version to change whenever a covered working-tree or committed change differs
+from its Git baseline. This turns missed distribution-version updates into a
+mechanical failure.
 
 Pin ESLint to the latest compatible major and declare its Node.js 22.13+ floor.
 The blueprint remains JavaScript-only, so static lint and runtime contract tests

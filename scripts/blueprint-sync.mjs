@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, copyFile, lstat, mkdir, readFile, readdir } from 'node:fs/promises';
+import { access, copyFile, lstat, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -11,6 +11,7 @@ export const CONTROL_FILES = Object.freeze([
   'scripts/progress-core.mjs', 'scripts/progress-cli.mjs', 'scripts/progress-mcp.mjs',
   'scripts/progress-dashboard.mjs', 'scripts/progress-dashboard-manager.mjs',
   'scripts/progress-dashboard-app.mjs',
+  'scripts/blueprint-sync.mjs', 'scripts/blueprint-version.mjs',
 ]);
 export const CONTROL_DIRECTORIES = Object.freeze([
   '.codex/agents', '.codex/hooks', '.claude/agents', '.claude/hooks/docs',
@@ -22,7 +23,7 @@ export async function synchronizeBlueprint({ source = scriptRoot, target, apply 
   if (!target || sourceRoot === targetRoot) throw new Error('Provide a derived repository with --target; source and target must differ.');
   assertGitRepository(targetRoot);
   if (apply && gitStatus(targetRoot)) throw new Error('Target repository is dirty; commit or stash its changes before applying a blueprint update.');
-  const files = [...CONTROL_FILES, ...await directoryFiles(sourceRoot, CONTROL_DIRECTORIES)];
+  const files = trackedControlFiles(sourceRoot);
   const changes = [];
   for (const file of [...new Set(files)].sort()) {
     const sourcePath = resolve(sourceRoot, file);
@@ -58,20 +59,14 @@ async function blueprintVersion(root) {
   catch { return null; }
 }
 
-async function directoryFiles(root, directories) {
-  const files = [];
-  for (const directory of directories) await walk(resolve(root, directory), directory, files);
-  return files;
-}
-async function walk(absolute, relativeDirectory, files) {
-  let entries;
-  try { entries = await readdir(absolute, { withFileTypes: true }); }
-  catch (error) { if (error.code === 'ENOENT') return; throw error; }
-  for (const entry of entries) {
-    const relativePath = `${relativeDirectory}/${entry.name}`;
-    if (entry.isDirectory()) await walk(resolve(absolute, entry.name), relativePath, files);
-    else if (entry.isFile()) files.push(relativePath);
-  }
+export function trackedControlFiles(root = scriptRoot) {
+  const output = execFileSync('git', ['ls-files', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
+    cwd: resolve(root), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  return output.split('\0')
+    .filter(Boolean)
+    .filter(file => !file.startsWith('.claude/hooks/docs/adr-memory/'))
+    .sort();
 }
 function assertGitRepository(root) {
   try { execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: root, stdio: 'ignore' }); }

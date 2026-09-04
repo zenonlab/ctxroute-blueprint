@@ -9,6 +9,7 @@ scope:
   - scripts/progress-dashboard-manager.mjs
   - scripts/progress-cli.mjs
   - scripts/blueprint-sync.mjs
+  - scripts/blueprint-version.mjs
 review: on-change
 revised: true
 ---
@@ -31,11 +32,15 @@ explicit, idempotent close operation. Tests must isolate CTXRoute state and must
 terminate every detached dashboard they create even when an assertion fails.
 
 Derived repositories can inspect, drift-check, or apply a conservative control-plane update
-from a trusted blueprint checkout. The synchronizer has an explicit allowlist,
-defaults to a dry run, refuses dirty targets, creates a recoverable backup, and
+from a trusted blueprint checkout. The synchronizer has an explicit allowlist
+intersected with Git-tracked source files, so ignored caches and generated ADR
+memory can never leak from one checkout into another. The synchronizer defaults
+to a dry run, refuses dirty targets, creates a recoverable backup, and
 never overwrites project decisions, Progress data, product documentation, or
 source code. A versioned marker travels with that allowlist so automation can
-fail visibly when a derived control plane is stale without rewriting it.
+fail visibly when a derived control plane is stale without rewriting it. The
+marker carries the allowlist digest, and the quality gate requires an explicit
+version change for every covered control-plane change.
 
 Cross-platform CI runs the complete repository gate on Linux and bounded
 platform smoke checks on macOS and Windows. Dependency audit runs once in a
