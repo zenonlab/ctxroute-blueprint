@@ -58,7 +58,10 @@ the final step of a goal cannot be deleted.
 
 Progress is optional for small or single-agent work. A substantial plan should
 normally contain two to six outcome-sized milestones rather than mirroring
-files, commands, commits, or routine edits. Only a milestone explicitly marked
+files, commands, commits, or routine edits. This is non-blocking guidance:
+larger plans remain intact and are never split, summarized, or rewritten by
+Progress. Validation returns the guidance as a warning while only the first
+three actionable milestones enter compact `next` and hook output. Only a milestone explicitly marked
 `claimable: true` participates in automatic parallel dispatch. During
 substantial parallel work, `progress_claim_ticket` atomically assigns one
 `TODO` milestone to an agent and moves it to `IN_PROGRESS`. Agent result
@@ -87,9 +90,11 @@ not enter Progress.
 
 ## Consequences
 
-Validation is read-only and materialization is a separate operation. The contract
-supports up to 20 goals, 30 steps per goal, and 10 evidence references per
-step, with a 64 KiB JSON limit. Only `SubagentStart`, `SubagentStop`, and
+Validation is read-only and materialization is a separate operation. The 64 KiB
+serialized checklist size is the sole aggregate hard bound; goal and milestone
+counts have no independent semantic ceiling. Per-field text, reference, and
+evidence bounds remain security constraints. Validation warnings travel through
+CLI, MCP, and dashboard without preventing approval. Only `SubagentStart`, `SubagentStop`, and
 `SessionEnd` edit the checklist automatically; `PostToolUse` never does.
 Lifecycle commands resolve the Git root even when the agent works from a nested
 directory. Agents still start from the repository root and restart after MCP

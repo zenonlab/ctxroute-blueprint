@@ -7,7 +7,7 @@ import { request as httpRequest } from 'node:http';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, DEFAULT_IDLE_MS, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
 import { closeProgressDashboard, dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
-import { buildStepPatch, initializeDashboardToken, request } from '../scripts/progress-dashboard-client.js';
+import { buildStepPatch, initializeDashboardToken, planCreationNotice, request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
 const test_request_two = () => request('/api/progress');
@@ -73,6 +73,10 @@ test('client builds autosave payloads from changed fields only', () => {
   assert.deepEqual(buildStepPatch('r1', value, ['acceptance']), { revision: 'r1', acceptance: ['one', 'two'] });
 });
 
+test('client surfaces non-blocking plan guidance', () => {
+  assert.equal(planCreationNotice(['Keep milestones outcome-sized']), 'Plan created · Keep milestones outcome-sized');
+});
+
 test('dashboard serves only local static resources with restrictive headers', async t => {
   const app = await fixture(); t.after(() => app.server.close());
   assert.ok(['::1', '127.0.0.1'].includes(app.server.address().address));
@@ -132,7 +136,14 @@ test('API validates and approves plans through progress-core', async t => {
   const plan = makePlan('goal-two');
   const validation = await requestLocal(`${app.base}/api/plans/validate`, { method: 'POST', headers: app.headers, body: JSON.stringify({ revision: first.revision, plan }) });
   assert.equal(validation.status, 200);
-  assert.equal((await validation.json()).validation.ok, true);
+  const validationBody = await validation.json();
+  assert.equal(validationBody.validation.ok, true);
+  assert.deepEqual(validationBody.validation.warnings, []);
+  const longPlan = { ...makePlan('goal-long'), steps: Array.from({ length: 7 }, (_, index) => ({ ...makePlan().steps[0], id: `step-${index + 1}` })) };
+  const longValidation = await requestLocal(`${app.base}/api/plans/validate`, { method: 'POST', headers: app.headers, body: JSON.stringify({ revision: first.revision, plan: longPlan }) });
+  const longValidationBody = await longValidation.json();
+  assert.equal(longValidationBody.validation.ok, true);
+  assert.match(longValidationBody.validation.warnings[0], /plan remains unchanged/u);
   const approval = await requestLocal(`${app.base}/api/plans/approve`, { method: 'POST', headers: app.headers, body: JSON.stringify({ revision: first.revision, plan: { ...plan, approved: true } }) });
   assert.equal(approval.status, 200);
   const value = await approval.json();
