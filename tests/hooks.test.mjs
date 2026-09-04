@@ -849,7 +849,7 @@ test('CTXRoute wrapper directs missing installations to npm install', () => {
   assert.match(result.stderr, /Run npm install/u);
 });
 
-test('setup prerequisite check is available before dependency installation', () => {
+test('setup prerequisite check is available before dependency installation', { skip: process.platform !== 'linux' }, () => {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const result = spawnSync(npm, ['run', 'setup:check'], {
     cwd: root,
