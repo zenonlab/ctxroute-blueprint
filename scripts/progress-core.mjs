@@ -21,6 +21,7 @@ const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = process.platform === 'win32' ? 3_000 : 1_000;
 const LOCK_RETRY_MIN_MS = 2;
 const LOCK_RETRY_MAX_MS = 25;
+const ATOMIC_RENAME_WAIT_MS = process.platform === 'win32' ? 1_000 : 0;
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
 export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -294,7 +295,32 @@ function safePath(value) {
   const normalized = value.replaceAll('\\', '/');
   return relative('.', value).replaceAll('\\', '/') === normalized;
 }
-async function atomicWrite(path, content) { await mkdir(dirname(path), { recursive: true }); const temp = `${path}.${process.pid}.${Date.now()}.tmp`; const handle = await open(temp, 'wx', 0o600); try { await handle.writeFile(content, 'utf8'); await handle.sync(); } finally { await handle.close(); } await rename(temp, path); }
+async function atomicWrite(path, content) {
+  await mkdir(dirname(path), { recursive: true });
+  const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  const handle = await open(temp, 'wx', 0o600);
+  try { await handle.writeFile(content, 'utf8'); await handle.sync(); }
+  finally { await handle.close(); }
+  try { await renameWithRetry(temp, path); }
+  catch (error) { await unlink(temp).catch(() => {}); throw error; }
+}
+
+export async function renameWithRetry(from, to, options = {}) {
+  const operation = options.operation ?? rename;
+  const wait = options.wait ?? (milliseconds => new Promise(resolveWait => { setTimeout(resolveWait, milliseconds); }));
+  const deadline = performance.now() + (options.waitMs ?? ATOMIC_RENAME_WAIT_MS);
+  let attempt = 0;
+  while (true) {
+    try { return await operation(from, to); }
+    catch (error) {
+      const remaining = deadline - performance.now();
+      if (!['EACCES', 'EPERM'].includes(error.code) || remaining <= 0) throw error;
+      attempt += 1;
+      const delay = Math.min(remaining, LOCK_RETRY_MIN_MS * (2 ** Math.min(attempt, 6)));
+      await wait(delay);
+    }
+  }
+}
 
 async function viewHasRevision(root, revision) {
   try { return (await readFile(resolve(root, PROGRESS_VIEW_PATH), 'utf8')).includes(`<!-- progress-revision: ${revision} -->`); }
