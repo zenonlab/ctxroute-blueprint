@@ -721,11 +721,31 @@ test('Stop manual policy pauses only for a decision or visual review and accepts
   const first = await progressContinuation({}, { root: cwd, changed: [], diagrams: [] });
   assert.equal(first.decision, 'block');
   assert.match(first.reason, /Pause manuelle/u);
+  assert.match(first.reason, /décision importante/u);
+  assert.doesNotMatch(first.reason, /\bgo\b/iu);
   assert.doesNotMatch(first.reason, /Archify/u);
   assert.ok(first.reason.length <= 1200);
 
   const accepted = await progressContinuation({ last_assistant_message: 'Décision requise pour step-1.' }, { root: cwd, changed: [], diagrams: [] });
   assert.equal(accepted, null);
+
+  const visual = progressWorkspace({ mode: 'manual', manualReason: 'visual-review', statuses: ['TODO'] });
+  const visualPause = await progressContinuation({}, { root: visual, changed: [], diagrams: [] });
+  assert.match(visualPause.reason, /validation visuelle ciblée/u);
+  assert.doesNotMatch(visualPause.reason, /\bgo\b/iu);
+});
+
+test('Stop does not attach an ambiguous old manual goal to unrelated work', async () => {
+  const cwd = progressWorkspace({ mode: 'manual', statuses: ['TODO'] });
+  const path = join(cwd, '.project/progress.json');
+  const progress = JSON.parse(readFileSync(path, 'utf8'));
+  progress.goals.push({
+    id: 'goal-current-work', title: 'Current implementation', status: 'ACTIVE', executionMode: 'automatic', manualReason: null, modeOffered: false,
+    steps: [{ id: 'step-1', title: 'Implement current surface', status: 'IN_PROGRESS', claimable: false, acceptance: ['verified'], files: [], commands: [], evidence: [] }],
+  });
+  writeFileSync(path, `${JSON.stringify(progress, null, 2)}\n`);
+  assert.equal(await progressContinuation({}, { root: cwd, changed: [], diagrams: [] }), null);
+  assert.equal(await progressContinuation({ last_assistant_message: 'Current implementation is complete.' }, { root: cwd, changed: [], diagrams: [] }), null);
 });
 
 test('Stop stays silent for automatic memory milestones', async () => {
@@ -1068,7 +1088,7 @@ function progressPlan(count, overrides = {}) {
   };
 }
 
-function progressWorkspace({ mode = 'automatic', statuses, goalStatus = statuses.every(status => status === 'DONE') ? 'DONE' : statuses.every(status => status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE' }) {
+function progressWorkspace({ mode = 'automatic', manualReason = 'important-decision', statuses, goalStatus = statuses.every(status => status === 'DONE') ? 'DONE' : statuses.every(status => status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE' }) {
   const cwd = mkdtempSync(join(tmpdir(), 'stop-progress-'));
   mkdirSync(join(cwd, '.project'), { recursive: true });
   mkdirSync(join(cwd, 'docs'), { recursive: true });
@@ -1081,7 +1101,7 @@ function progressWorkspace({ mode = 'automatic', statuses, goalStatus = statuses
     commands: ['npm test'],
     evidence: status === 'DONE' ? ['tests/hooks.test.mjs'] : [],
   }));
-  writeFileSync(join(cwd, '.project/progress.json'), `${JSON.stringify({ schemaVersion: 1, goals: [{ id: 'goal-stop', title: 'Stop policy', status: goalStatus, executionMode: mode, manualReason: mode === 'manual' ? 'important-decision' : null, modeOffered: false, steps }] }, null, 2)}\n`);
+  writeFileSync(join(cwd, '.project/progress.json'), `${JSON.stringify({ schemaVersion: 1, goals: [{ id: 'goal-stop', title: 'Stop policy', status: goalStatus, executionMode: mode, manualReason: mode === 'manual' ? manualReason : null, modeOffered: false, steps }] }, null, 2)}\n`);
   return cwd;
 }
 

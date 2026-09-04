@@ -100,4 +100,14 @@ test('goal selection prioritizes runnable work over stale blocked goals', () => 
   assert.equal(selectProgressGoal({ goals: [blocked, runnable] }).id, 'runnable');
 });
 
+test('goal selection stays silent when runnable goals are ambiguous', () => {
+  const oldManual = { id: 'goal-old-review', title: 'Old visual review', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Review old surface', status: 'TODO' }] };
+  const current = { id: 'goal-current-work', title: 'Current implementation', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Implement current surface', status: 'IN_PROGRESS' }] };
+  const progress = { goals: [oldManual, current] };
+  assert.equal(selectProgressGoal(progress), undefined);
+  assert.equal(selectProgressGoal(progress, 'Working on Current implementation.').id, 'goal-current-work');
+  assert.equal(selectProgressGoal(progress, 'Handoff for goal-old-review.').id, 'goal-old-review');
+  assert.equal(selectProgressGoal(progress, 'Next: step-1'), undefined);
+});
+
 function execute(command, args, cwd) { return new Promise((resolve, reject) => { execFile(command, args, { cwd }, (error, stdout) => error ? reject(error) : resolve(stdout)); }); }
