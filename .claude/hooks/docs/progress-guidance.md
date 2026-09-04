@@ -5,23 +5,18 @@ mode: once
 
 # Agent progress checklist
 
-Progress is optional asynchronous coordination, not a prerequisite for edits.
-Skip it for small or single-agent work. For substantial parallel work, create
-independent tickets once; each agent atomically claims one, works without
-intermediate Progress writes, then reports `DONE` or `BLOCKED` with evidence.
-If the MCP is busy or unavailable, continue safe work and reconcile afterward.
-Use the compact `progress_status` → `progress_next`/`progress_claim_ticket` →
-`progress_update_step` flow. Read the complete checklist only through the
-voluntary `ctxroute://progress/full` resource or the human diagnostic CLI.
+Progress is optional ordered memory, not a prerequisite or taskmaster. Skip it
+for small or single-agent work. Use 2–6 outcome milestones in declared order;
+do not mirror files, commands, commits, or routine edits. Only independent
+parallel work gets `claimable: true`. Claim and report once, after verification.
+If MCP is unavailable, continue safe work and use the matching `progress:*` CLI.
+Full JSON is voluntary via `ctxroute://progress/full` or the diagnostic CLI.
 
-Never edit `.project/progress.json` or `docs/progress.md` directly. Never mark
-an item done without a short evidence reference. Do not create hooks,
-permissions, global rules, or `AGENTS.md` automatically. SQLite remains only
-for recurring-problem memory. Only `SubagentStart`, `SubagentStop` (using its
-injected `PROGRESS_RESULT` footer), and `SessionEnd` mutate Progress automatically;
-main agents use MCP, and `PostToolUse` never writes the checklist.
-New goals use `automatic`, which never blocks Stop. Use `manual` only with
-reason `visual-review` or `important-decision` for the matching undecided choice.
-Persist that reason as `manualReason`; switching back to automatic clears it.
-Require Archify only for a material boundary, public contract, dependency, or
-cross-component flow change—not merely because feature code was added.
+Never edit generated Progress files directly or finish without short evidence.
+Only a `progress-worker` auto-claims on `SubagentStart`; its structured footer
+updates the ticket on `SubagentStop`, and `SessionEnd` releases its claims.
+Main agents may use MCP or CLI. `PostToolUse` never changes Progress; automatic
+Stop is silent. Manual mode is reserved for an undecided visual review or
+important decision. `BLOCKED` is external only with `external:` evidence for a
+real dependency—missing approval is not external. Require Archify only for a
+material boundary, public contract, dependency, or cross-component flow change.

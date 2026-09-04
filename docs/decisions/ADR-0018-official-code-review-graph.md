@@ -40,9 +40,10 @@ environment are ignored.
 
 CTXRoute remains the sole lifecycle dispatcher. SessionStart checks or builds
 the graph, stays silent when healthy, and emits only a bounded fail-open
-diagnostic on failure. Successful normal writes run
-one `update --skip-flows` behind a cross-process single-flight lock, a
-30-second timeout, bounded output, and fail-open diagnostics. No CRG daemon,
+diagnostic on failure. Successful structured file edits start an asynchronous
+`update --skip-flows` behind a cross-process single-flight lock, a 30-second
+timeout, bounded output, and fail-open diagnostics. Shell reads, status commands,
+and test runs never trigger graph maintenance. No CRG daemon,
 watcher, generated CRG hooks, or synthetic update database is used.
 
 The only project MCP servers are Progress and official code-review-graph. The

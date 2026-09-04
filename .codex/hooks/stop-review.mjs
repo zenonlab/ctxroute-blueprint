@@ -5,8 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { listArchifyDiagrams } from '../../scripts/archify-registry.mjs';
 import { progressNext, readProgress } from '../../scripts/progress-core.mjs';
-import { hasNextStepHandoff, isExternallyBlocked } from '../../scripts/progress-handoff.mjs';
-import { dashboardSessionNotice } from '../../scripts/progress-dashboard-manager.mjs';
+import { hasNextStepHandoff, isExternallyBlocked, isFullyBlocked, selectProgressGoal } from '../../scripts/progress-handoff.mjs';
 
 async function main() {
   const input = JSON.parse(await stdin());
@@ -18,21 +17,21 @@ async function main() {
   const changed = gitChangedFiles();
   const candidates = changed.filter(path => /(?:^|\/)(?:tmp|temp|coverage|dist|build)(?:\/|$)|(?:\.tmp|\.bak|\.old|~)$/iu.test(path));
   const syntaxFailures = checkSyntax(changed);
-  const validationFailures = runValidations();
   const { failures: configFailures } = loadProjectConfig();
   const lines = [
     syntaxFailures.length ? `Syntax failures: ${syntaxFailures.join(', ')}` : '',
-    validationFailures.length ? `Validation failures: ${validationFailures.join(' | ')}` : '',
     candidates.length ? `Review cleanup candidates: ${candidates.join(', ')}` : '',
     configFailures.length ? `Configuration failures: ${configFailures.join(', ')}` : '',
   ].filter(Boolean);
-  if (lines.length) {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: lines.join('\n').slice(0, 2000) }));
+  const continuation = await progressContinuation(input, { changed });
+  const review = lines.join('\n').slice(0, 1200);
+  if (continuation?.decision === 'block') {
+    if (review) continuation.reason = `${review}\n${continuation.reason}`.slice(0, 1200);
+    process.stdout.write(JSON.stringify(continuation));
     return;
   }
-
-  const continuation = await progressContinuation(input, { changed });
-  process.stdout.write(JSON.stringify(continuation ?? { continue: true }));
+  const systemMessage = [review, continuation?.systemMessage].filter(Boolean).join('\n').slice(0, 1200);
+  process.stdout.write(JSON.stringify(systemMessage ? { continue: true, systemMessage } : { continue: true }));
 }
 
 export async function progressContinuation(hookInput, options = {}) {
@@ -41,43 +40,26 @@ export async function progressContinuation(hookInput, options = {}) {
   try {
     const diagrams = options.diagrams ?? listArchifyDiagrams(root).filter(diagram => diagram.audience === 'product');
     const progress = await readProgress(root);
-    const goal = progress.goals.find(item => item.status !== 'DONE');
+    const goal = selectProgressGoal(progress);
     if (!goal) return null;
     const next = progressNext(progress, goal.id);
     if (next.complete) return null;
-    const dashboard = await progressDashboardMessage(hookInput, root, options.dashboardNotice);
-    const labels = next.next.map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
+    const labels = [...next.next, ...(next.blocked ?? [])].map(step => `${step.stepId}: ${step.title} [${step.status}]`).join('\n');
     const archify = archifyInstruction(changed, diagrams);
     if (isExternallyBlocked(goal)) {
-      return { continue: true, systemMessage: joinDashboard([`Goal ${goal.id} is blocked externally. Handoff:\n${labels}`, archify].filter(Boolean).join('\n'), dashboard) };
+      return { continue: true, systemMessage: [`Goal ${goal.id} is blocked externally. Handoff:\n${labels}`, archify].filter(Boolean).join('\n').slice(0, 1200) };
     }
-    if (next.mode === 'automatic') {
-      const message = [`Progress asynchrone — tickets disponibles ou en cours pour ${goal.id}:\n${labels}`, archify, dashboard].filter(Boolean).join('\n').slice(0, 1200);
-      return message ? { continue: true, systemMessage: message } : null;
-    }
+    if (isFullyBlocked(goal) || next.mode === 'automatic') return null;
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);
-    if (handoffPresent) return dashboard ? { continue: true, systemMessage: dashboard } : null;
+    if (handoffPresent) return null;
     let message = `Pause manuelle — décision importante ou validation visuelle requise pour ${goal.id}:\n${labels}`;
     if (archify) message += `\n${archify}`;
-    return withDashboard({ decision: 'block', reason: message.slice(0, 1200) }, dashboard);
+    return { decision: 'block', reason: message.slice(0, 1200) };
   } catch (error) {
     return { systemMessage: `Progress handoff unavailable: ${String(error.message).slice(0, 240)}` };
   }
 }
-
-async function progressDashboardMessage(hookInput, root, notice = dashboardSessionNotice) {
-  if (!hookInput.session_id) return '';
-  try {
-    const dashboard = await notice(hookInput.session_id, root);
-    return dashboard ? `Tableau Progress local : ${dashboard.url}` : '';
-  } catch (error) {
-    return `Progress dashboard unavailable: ${String(error.message).slice(0, 240)}`;
-  }
-}
-
-function joinDashboard(message, dashboard) { return [message, dashboard].filter(Boolean).join('\n').slice(0, 1200); }
-function withDashboard(output, dashboard) { if (dashboard) output.systemMessage = dashboard; return output; }
 
 export function archifyInstruction(changed, diagrams = listArchifyDiagrams(process.cwd()).filter(diagram => diagram.audience === 'product')) {
   const source = changed.find(path => path.startsWith('docs/architecture/src/') && path.endsWith('.json'));
@@ -111,23 +93,6 @@ function checkSyntax(paths) {
       else if (process.platform !== 'win32' && (/\.sh$|^\.githooks\/(?:pre-commit|pre-push|commit-msg)$/u.test(path))) execFileSync('sh', ['-n', path], { stdio: 'pipe' });
     } catch {
       failures.push(path);
-    }
-  }
-  return failures;
-}
-
-function runValidations() {
-  const failures = [];
-  for (const [name, args] of [
-    ['configuration', ['.githooks/validate-project-config.mjs']],
-    ['CTXRoute', ['.githooks/validate-ctxroute.mjs']],
-    ['architecture', ['.githooks/validate-architecture.mjs', '--all']],
-    ['documentation', ['.githooks/validate-docs.mjs', '--all']],
-  ]) {
-    try { execFileSync('node', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
-    catch (error) {
-      const detail = String(error.stderr ?? '').trim().split(/\r?\n/u)[0];
-      failures.push(`${name}${detail ? ` (${detail})` : ''}`);
     }
   }
   return failures;

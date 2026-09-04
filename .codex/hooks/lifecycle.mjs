@@ -22,7 +22,7 @@ const MAX_SUBAGENT_CONTEXT_LENGTH = 64 * 1024;
 const CTXROUTE_BUDGET = '0';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
-export function handlerPlan(harness, event, root = projectRoot) {
+export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
   const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
   const progressSubagent = event => ({ name: 'progress-subagent.mjs', path: join(root, '.codex', 'hooks', 'progress-subagent.mjs'), args: [harness, event] });
@@ -30,10 +30,14 @@ export function handlerPlan(harness, event, root = projectRoot) {
   const ctxroute = harness === 'codex' || harness === 'claude' ? direct : null;
   if (!ctxroute) return [];
 
+  if (event === 'PostToolUse' && lane === 'maintenance') {
+    return [local('post-tool-crg.mjs'), problemMemory('PostToolUse'), local('archify-preview.mjs')];
+  }
+
   return {
     SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('crg-context.mjs')],
     PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', CTXROUTE_BUDGET)],
-    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-crg.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs'), local('archify-preview.mjs')],
+    PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],
@@ -88,8 +92,8 @@ export function isBlocking(output) {
     || output?.continue === false;
 }
 
-export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler }) {
-  const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
+export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler, lane = 'synchronous' }) {
+  const plan = applicableHandlers(handlerPlan(harness, event, root, lane), event, input);
   if (!lifecycleEvents.includes(event) || !plan.length) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
@@ -168,6 +172,6 @@ async function stdin() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const result = dispatch({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
+  const result = dispatch({ harness: process.argv[2], event: process.argv[3], lane: process.argv[4], input: await stdin() });
   if (result) process.stdout.write(JSON.stringify(result));
 }

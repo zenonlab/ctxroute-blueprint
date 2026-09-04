@@ -65,9 +65,13 @@ function inspectHarness(root, relativePath, harness, failures) {
   for (const event of lifecycleEvents) {
     const entries = (config?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []);
     const expected = `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`;
-    if (entries.length !== 1 || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} must contain exactly one local lifecycle handler.`);
-    if (!Number.isFinite(entries[0]?.timeout) || entries[0].timeout <= 0) failures.push(`${relativePath} ${event} must declare an explicit positive timeout.`);
-    if ('statusMessage' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
+    const expectedEntries = event === 'PostToolUse' ? 2 : 1;
+    if (entries.length !== expectedEntries || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} must contain the expected local lifecycle handlers.`);
+    if (event === 'PostToolUse' && (entries[1]?.command !== `${expected} maintenance` || entries[1]?.async !== true)) failures.push(`${relativePath} PostToolUse maintenance must run asynchronously.`);
+    for (const entry of entries) {
+      if (!Number.isFinite(entry?.timeout) || entry.timeout <= 0) failures.push(`${relativePath} ${event} must declare explicit positive timeouts.`);
+      if ('statusMessage' in entry) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
+    }
     if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write|exec_command|Bash|Shell') {
       failures.push(`${relativePath} PostToolUse must target only mutation-capable tools.`);
     }

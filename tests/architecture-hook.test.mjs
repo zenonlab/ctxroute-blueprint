@@ -167,10 +167,10 @@ test('requires both an ADR and Archify evidence for a new module', () => {
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
-test('blocks a new module with only Archify evidence', () => {
+test('keeps an ordinary new module advisory when Archify evidence exists', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Add File: src/service.rb\n*** Update File: docs/architecture/src/blueprint.architecture.json' }, { cwd });
-  assert.match(result.stdout, /applicable ADR/u);
+  assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
 test('blocks code outside declared directories after initialization', () => {

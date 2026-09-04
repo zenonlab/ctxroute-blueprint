@@ -15,9 +15,7 @@ function successful(value) {
 
 function isWrite(value) {
   const name = String(value.tool_name ?? '');
-  const command = value.tool_input?.cmd === String(value.tool_input?.cmd) ? value.tool_input.cmd : value.tool_input?.command === String(value.tool_input?.command) ? value.tool_input.command : '';
-  if (/\bnpm\s+run\s+crg:(?:build|update|status|review|mcp|smoke)\b/u.test(command)) return false;
-  return /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(name);
+  return /^(?:apply_patch|Edit|Write)$/iu.test(name);
 }
 
 async function stdin() {

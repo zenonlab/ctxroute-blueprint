@@ -16,11 +16,10 @@ if (input) {
   if (supported.length) {
     const result = analyzePaths(supported);
     if (result.verdict !== 'SAFE') {
-      const blocking = result.verdict === 'UNSAFE' || result.verdict === 'ERROR';
       const details = result.diagnostics.slice(0, 5).map(item => `${item.path}:${item.line} ${item.rule}`).join(', ');
       const summary = JSON.stringify({ verdict: result.verdict, coverage: result.coverage, diagnostics: result.diagnostics.slice(0, 5) });
-      const output = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `Sensor ${result.verdict}: ${result.diagnostics.length} diagnostic(s)${details ? ` — ${details}` : ''}\n${summary.slice(0, 3500)}` } };
-      if (blocking) { output.decision = 'block'; output.reason = `PostToolUse Sensor ${result.verdict}: ${details}`; }
+      const repair = result.verdict === 'UNSAFE' || result.verdict === 'ERROR' ? ' The change already exists: inspect and repair the current file; do not replay the patch.' : '';
+      const output = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `Sensor ${result.verdict}: ${result.diagnostics.length} diagnostic(s)${details ? ` — ${details}` : ''}.${repair}\n${summary.slice(0, 3500)}` } };
       process.stdout.write(JSON.stringify(output));
     }
   }

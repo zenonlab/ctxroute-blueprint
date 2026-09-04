@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, open, stat, unlink } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { isDeepStrictEqual } from 'node:util';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
@@ -64,6 +65,7 @@ function inspectProgressChecklist(value) {
     for (const step of goal.steps) {
       if (!isId(step?.id) || stepIds.has(step.id)) errors.push(`goal ${goal.id} has duplicate or invalid step id`); stepIds.add(step?.id);
       if (!text(step?.title) || !STATUSES.has(step?.status)) errors.push(`step ${step?.id ?? '(missing)'} has invalid title or status`);
+      if (step?.claimable !== undefined && ![true, false].includes(step.claimable)) errors.push(`step ${step?.id ?? '(missing)'} has an invalid claimable flag`);
       if (step?.assignee !== undefined && !shortReference(step.assignee)) errors.push(`step ${step?.id ?? '(missing)'} has an invalid assignee`);
       for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands, evidence: step?.evidence })) {
         if (!Array.isArray(list) || list.length > (name === 'evidence' ? LIMITS.evidence : LIMITS.references) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} needs bounded ${name}`);
@@ -93,15 +95,16 @@ export function validatePlan(plan, current = emptyProgress()) {
   for (const step of plan.steps ?? []) {
     if (!isId(step?.id) || ids.has(step.id)) errors.push('plan step ids must be unique safe identifiers'); ids.add(step?.id);
     if (!text(step?.title)) errors.push('each step requires a title');
-    for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files, commands: step?.commands })) {
-      if (!Array.isArray(list) || !list.length) errors.push(`step ${step?.id ?? '(missing)'} requires ${name}`);
+    for (const [name, list] of Object.entries({ acceptance: step?.acceptance, files: step?.files ?? [], commands: step?.commands ?? [] })) {
+      if (!Array.isArray(list) || (name === 'acceptance' && !list.length)) errors.push(`step ${step?.id ?? '(missing)'} requires bounded ${name}`);
       for (const item of list ?? []) if (!shortReference(item) || (name === 'files' && !safePath(item))) errors.push(`unsafe or invalid ${name} reference`);
     }
+    if (step?.claimable !== undefined && ![true, false].includes(step.claimable)) errors.push(`step ${step?.id ?? '(missing)'} has an invalid claimable flag`);
   }
   const evidence = plan.validationEvidence ?? plan.evidence;
   if (!Array.isArray(evidence) || !evidence.length || evidence.some(item => !shortReference(item))) errors.push('plan requires short validation evidence references');
   const existing = current.goals?.find(goal => goal.id === goalId);
-  if (existing && JSON.stringify(normalizePlan(plan)) !== JSON.stringify(normalizeGoal(existing))) errors.push(`goal already exists with different content: ${goalId}`);
+  if (existing && !isDeepStrictEqual(normalizePlan(plan), normalizeGoal(existing))) errors.push(`goal already exists with different content: ${goalId}`);
   return { ok: errors.length === 0, errors, normalized: normalizePlan(plan) };
 }
 
@@ -120,9 +123,9 @@ export const progressStatus = value => value.goals.map(goal => withManualReason(
 export function progressNext(value, goalId) {
   const goal = value.goals.find(item => item.id === goalId);
   if (!goal) throw new Error(`Unknown goal: ${goalId}`);
-  const priority = { IN_PROGRESS: 0, BLOCKED: 1, TODO: 2, DONE: 3 };
-  const next = goal.steps.filter(step => step.status !== 'DONE').sort((a, b) => priority[a.status] - priority[b.status]).slice(0, LIMITS.next);
-  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticketSummary(step)) };
+  const next = goal.steps.filter(step => step.status === 'IN_PROGRESS' || step.status === 'TODO').slice(0, LIMITS.next);
+  const blocked = goal.steps.filter(step => step.status === 'BLOCKED').slice(0, LIMITS.next);
+  return { goalId: goal.id, mode: normalizeExecutionMode(goal.executionMode), complete: goal.steps.every(step => step.status === 'DONE'), next: next.map(step => ticketSummary(step)), blocked: blocked.map(step => ticketSummary(step)) };
 }
 
 export function progressMutationResult(value, goalId, stepId) {
@@ -142,10 +145,10 @@ export async function claimProgressTicket(agentId, goalId, root = process.cwd())
 }
 
 export async function claimAutomaticProgressTicket(agentId, root = process.cwd()) {
-  return claimMatchingProgressTicket(agentId, undefined, root, goal => normalizeExecutionMode(goal.executionMode) === 'automatic');
+  return claimMatchingProgressTicket(agentId, undefined, root, goal => normalizeExecutionMode(goal.executionMode) === 'automatic', step => step.claimable === true);
 }
 
-async function claimMatchingProgressTicket(agentId, goalId, root, eligible) {
+async function claimMatchingProgressTicket(agentId, goalId, root, eligible, stepEligible = () => true) {
   if (!shortReference(agentId)) throw new Error('agentId must be a short non-secret identifier');
   let claimed;
   await updateProgress(root, current => {
@@ -157,7 +160,7 @@ async function claimMatchingProgressTicket(agentId, goalId, root, eligible) {
     }
     for (const goal of goals) {
       if (!eligible(goal)) continue;
-      const index = goal.steps.findIndex(step => step.status === 'TODO');
+      const index = goal.steps.findIndex(step => step.status === 'TODO' && stepEligible(step));
       if (index < 0) continue;
       const steps = [...goal.steps]; steps[index] = { ...steps[index], status: 'IN_PROGRESS', assignee: agentId };
       claimed = ticket(goal.id, steps[index]);
@@ -277,8 +280,8 @@ export function renderProgress(value) {
   for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) { const displayStatus = step.status === 'TODO' ? 'PENDING' : step.status; lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${displayStatus}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); } lines.push(''); }
   if (!value.goals.length) lines.push('_No goals approved yet._', ''); return lines.join('\n');
 }
-function normalizePlan(plan) { const executionMode = normalizeExecutionMode(plan.executionMode); return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode, manualReason: executionMode === 'manual' ? plan.manualReason : null, modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
-function normalizeGoal(goal) { const normalized = normalizeStoredGoal(goal); return { schemaVersion: 1, id: normalized.id, title: normalized.title, status: normalized.status, executionMode: normalized.executionMode, manualReason: normalized.manualReason, modeOffered: normalized.modeOffered, steps: normalized.steps }; }
+function normalizePlan(plan) { const executionMode = normalizeExecutionMode(plan.executionMode); return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode, manualReason: executionMode === 'manual' ? plan.manualReason : null, modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', claimable: step.claimable ?? false, acceptance: step.acceptance, files: step.files ?? [], commands: step.commands ?? [], evidence: step.evidence ?? [] })) }; }
+function normalizeGoal(goal) { const normalized = normalizeStoredGoal(goal); return { schemaVersion: 1, id: normalized.id, title: normalized.title, status: normalized.status, executionMode: normalized.executionMode, manualReason: normalized.manualReason, modeOffered: normalized.modeOffered, steps: normalized.steps.map(step => ({ ...step, claimable: step.claimable ?? false })) }; }
 function normalizeStoredGoal(goal) { const executionMode = normalizeExecutionMode(goal.executionMode); return { ...goal, executionMode, manualReason: executionMode === 'manual' ? (goal.manualReason ?? null) : null, modeOffered: goal.modeOffered ?? false }; }
 function normalizeExecutionMode(mode) { return mode === 'manual' || mode === 'collaborative' ? 'manual' : 'automatic'; }
 function isId(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
@@ -384,8 +387,8 @@ function processIsLive(pid) { if (!Number.isSafeInteger(pid) || pid <= 0) return
 function findGoalIndex(current, goalId) { const index = current.goals.findIndex(goal => goal.id === goalId); if (index < 0) throw new Error(`Unknown goal: ${goalId}`); return index; }
 function copyList(value) { return Array.isArray(value) ? [...value] : value; }
 function withDerivedStatus(goal, steps) { const remaining = steps.filter(step => step.status !== 'DONE'); const status = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE'; return { ...goal, status, steps }; }
-function ticket(goalId, step) { return { goalId, stepId: step.id, title: step.title, status: step.status, assignee: step.assignee, acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence.slice(0, 3) }; }
-function ticketSummary(step) { return { stepId: step.id, title: step.title, status: step.status, assignee: step.assignee }; }
+function ticket(goalId, step) { return { goalId, stepId: step.id, title: step.title, status: step.status, claimable: step.claimable ?? false, assignee: step.assignee, acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence.slice(0, 3) }; }
+function ticketSummary(step) { return { stepId: step.id, title: step.title, status: step.status, claimable: step.claimable ?? false, assignee: step.assignee }; }
 function statusCounts(steps) { return { total: steps.length, todo: steps.filter(step => step.status === 'TODO').length, inProgress: steps.filter(step => step.status === 'IN_PROGRESS').length, blocked: steps.filter(step => step.status === 'BLOCKED').length, done: steps.filter(step => step.status === 'DONE').length }; }
 function withManualReason(result, goal) { if (normalizeExecutionMode(goal.executionMode) === 'manual') result.manualReason = goal.manualReason ?? null; return result; }
 

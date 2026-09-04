@@ -60,7 +60,8 @@ token state stays ignored under `.ctxroute/state/`.
 
 The server accepts only local Host and Origin values, requires a random bearer
 token for every API request, limits JSON bodies, emits no request log, serves
-only bundled resources under a restrictive CSP, and expires after inactivity.
+only bundled resources under a restrictive CSP, and starts only on an explicit
+dashboard request.
 Optimistic revisions reject stale mutations with HTTP 409. There is no remote
 deployment, account, telemetry, cloud synchronization, or availability target;
 recovery is a safe local restart through the Progress MCP.
