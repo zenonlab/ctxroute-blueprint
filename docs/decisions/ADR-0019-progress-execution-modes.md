@@ -47,6 +47,11 @@ for work already recorded as blocked.
 external only when every unfinished step has short evidence prefixed with
 `external:`. It selects runnable `TODO` or `IN_PROGRESS` work before older
 blocked goals, preventing a stale handoff from starving automatic execution.
+When several runnable goals coexist, Stop selects one only from an unambiguous
+goal/title reference in the final response; otherwise it stays silent instead
+of attaching an old manual pause to unrelated work. A manual pause names its
+persisted reason and asks for a targeted visual verdict or consequential
+decision, never a generic `go`.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.

@@ -40,7 +40,7 @@ export async function progressContinuation(hookInput, options = {}) {
   try {
     const diagrams = options.diagrams ?? listArchifyDiagrams(root).filter(diagram => diagram.audience === 'product');
     const progress = await readProgress(root);
-    const goal = selectProgressGoal(progress);
+    const goal = selectProgressGoal(progress, hookInput.last_assistant_message);
     if (!goal) return null;
     const next = progressNext(progress, goal.id);
     if (next.complete) return null;
@@ -53,7 +53,10 @@ export async function progressContinuation(hookInput, options = {}) {
     if (next.next.length === 0) return null;
     const handoffPresent = hasNextStepHandoff(hookInput.last_assistant_message, next.next);
     if (handoffPresent) return null;
-    let message = `Pause manuelle — décision importante ou validation visuelle requise pour ${goal.id}:\n${labels}`;
+    const request = goal.manualReason === 'visual-review'
+      ? 'validation visuelle ciblée requise; présentez l’artefact et le verdict attendu'
+      : 'décision importante requise; présentez les options, leurs compromis et la question non résolue';
+    let message = `Pause manuelle — ${request} pour ${goal.id}:\n${labels}`;
     if (archify) message += `\n${archify}`;
     return { decision: 'block', reason: message.slice(0, 1200) };
   } catch (error) {

@@ -54,6 +54,12 @@ change. A diagram is needed only when a material boundary, public contract,
 dependency, or cross-component flow changes; ordinary feature code does not
 trigger one by filename heuristic.
 
+When multiple runnable goals coexist, Stop requires an unambiguous goal or
+step-title reference before applying manual policy. Ambiguity stays silent so
+an old goal cannot interrupt unrelated work. A `visual-review` pause asks for a
+visual verdict; an `important-decision` pause asks for the unresolved choice.
+Neither is phrased as a generic request for `go`.
+
 `progress_open_dashboard` voluntarily starts or reuses a durable local dashboard without
 launching a browser. The default server has no idle expiration. Its fragment
 token moves into tab-scoped `sessionStorage`, so reloading the same tab remains
