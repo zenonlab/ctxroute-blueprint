@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { listArchifyDiagrams } from '../../scripts/archify-registry.mjs';
 import { progressNext, readProgress } from '../../scripts/progress-core.mjs';
-import { hasNextStepHandoff, isExternallyBlocked } from '../../scripts/progress-handoff.mjs';
+import { hasNextStepHandoff, isExternallyBlocked, isFullyBlocked, selectProgressGoal } from '../../scripts/progress-handoff.mjs';
 import { dashboardSessionNotice } from '../../scripts/progress-dashboard-manager.mjs';
 
 async function main() {
@@ -41,7 +41,7 @@ export async function progressContinuation(hookInput, options = {}) {
   try {
     const diagrams = options.diagrams ?? listArchifyDiagrams(root).filter(diagram => diagram.audience === 'product');
     const progress = await readProgress(root);
-    const goal = progress.goals.find(item => item.status !== 'DONE');
+    const goal = selectProgressGoal(progress);
     if (!goal) return null;
     const next = progressNext(progress, goal.id);
     if (next.complete) return null;
@@ -50,6 +50,9 @@ export async function progressContinuation(hookInput, options = {}) {
     const archify = archifyInstruction(changed, diagrams);
     if (isExternallyBlocked(goal)) {
       return { continue: true, systemMessage: joinDashboard([`Goal ${goal.id} is blocked externally. Handoff:\n${labels}`, archify].filter(Boolean).join('\n'), dashboard) };
+    }
+    if (isFullyBlocked(goal)) {
+      return { continue: true, systemMessage: joinDashboard(`Goal ${goal.id} has blocked tickets, but no external blocker is qualified. Handoff:\n${labels}`, dashboard) };
     }
     if (next.mode === 'automatic') {
       const message = [`Progress asynchrone — tickets disponibles ou en cours pour ${goal.id}:\n${labels}`, archify, dashboard].filter(Boolean).join('\n').slice(0, 1200);

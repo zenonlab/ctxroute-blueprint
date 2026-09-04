@@ -36,6 +36,10 @@ open with bounded diagnostics when Progress is busy or unavailable.
 When every unfinished step is `BLOCKED`, Stop emits that incomplete handoff
 without blocking termination in either mode. It does not offer autonomous mode
 for work already recorded as blocked.
+`BLOCKED` does not itself prove an external dependency. Stop labels a blocker
+external only when every unfinished step has short evidence prefixed with
+`external:`. It selects runnable `TODO` or `IN_PROGRESS` work before older
+blocked goals, preventing a stale handoff from starving automatic execution.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.

@@ -628,9 +628,13 @@ test('Stop automatic policy stays advisory for TODO and IN_PROGRESS work', async
   }
 });
 
-test('Stop hands off an external block in either mode without a continuation loop', async () => {
+test('Stop hands off only a qualified external block without a continuation loop', async () => {
   for (const mode of ['manual', 'automatic']) {
     const blocked = progressWorkspace({ mode, statuses: ['BLOCKED', 'BLOCKED'] });
+    const path = join(blocked, '.project/progress.json');
+    const progress = JSON.parse(readFileSync(path, 'utf8'));
+    for (const step of progress.goals[0].steps) step.evidence = ['external: dependency unavailable'];
+    writeFileSync(path, `${JSON.stringify(progress, null, 2)}\n`);
     const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
     assert.equal(handoff.continue, true, mode);
     assert.match(handoff.systemMessage, /blocked externally/u, mode);
@@ -639,6 +643,15 @@ test('Stop hands off an external block in either mode without a continuation loo
 
   const done = progressWorkspace({ mode: 'automatic', statuses: ['DONE'], goalStatus: 'DONE' });
   assert.equal(await progressContinuation({}, { root: done, changed: [], diagrams: [] }), null);
+});
+
+test('Stop keeps unqualified blocked work advisory', async () => {
+  const blocked = progressWorkspace({ mode: 'automatic', statuses: ['BLOCKED'] });
+  const handoff = await progressContinuation({}, { root: blocked, changed: [], diagrams: [] });
+  assert.equal(handoff.continue, true);
+  assert.equal('decision' in handoff, false);
+  assert.match(handoff.systemMessage, /no external blocker is qualified/u);
+  assert.doesNotMatch(handoff.systemMessage, /blocked externally/u);
 });
 
 test('Stop continuation remains bounded to three current steps after compaction', async () => {

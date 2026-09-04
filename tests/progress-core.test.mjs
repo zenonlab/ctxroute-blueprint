@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LIMITS, emptyProgress, ensureProgressView, readProgress, validateProgress, validatePlan, approvePlan, progressStatus, progressNext, claimProgressTicket, claimAutomaticProgressTicket, releaseProgressClaims, updateProgressGoal, updateProgressStep, addProgressStep, deleteProgressStep, reorderProgressSteps, setProgressMode, markModeOffered, progressRevision, renderProgress } from '../scripts/progress-core.mjs';
-import { hasAutonomousOffer, hasNextStepHandoff, isExternallyBlocked } from '../scripts/progress-handoff.mjs';
+import { hasAutonomousOffer, hasNextStepHandoff, isExternallyBlocked, isFullyBlocked, selectProgressGoal } from '../scripts/progress-handoff.mjs';
 
 const plan = (overrides = {}) => ({ goalId: 'goal-9', title: 'Checklist', validationEvidence: ['tests/progress-core.test.mjs'], steps: [{ id: 'step-1', title: 'Define contract', acceptance: ['Schema validated'], files: ['.project/progress.json'], commands: ['npm test'], evidence: [] }], ...overrides });
 const root = () => mkdtempSync(join(tmpdir(), 'progress-'));
@@ -68,7 +68,9 @@ test('collaborative handoff detection requires every bounded next step and recog
   assert.equal(hasAutonomousOffer('Je peux passer ce goal en mode automatique.'), true);
   assert.equal(hasAutonomousOffer('Voici les prochaines étapes.'), false);
   assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'BLOCKED' }, { status: 'TODO' }] }), false);
-  assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }, { status: 'BLOCKED' }] }), true);
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'DONE' }, { status: 'BLOCKED', evidence: ['external: vendor unavailable'] }] }), true);
+  assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED', evidence: ['waiting for approval'] }] }), false);
+  assert.equal(isFullyBlocked({ steps: [{ status: 'DONE' }, { status: 'BLOCKED', evidence: [] }] }), true);
 });
 test('autonomous offer detection accepts the English agent wording', () => {
   assert.equal(hasAutonomousOffer('I can switch this goal to autonomous mode.'), true);
@@ -87,6 +89,12 @@ test('external blocking requires at least one unfinished step', () => {
 });
 test('external blocking rejects a mixed blocked and active goal', () => {
   assert.equal(isExternallyBlocked({ steps: [{ status: 'BLOCKED' }, { status: 'IN_PROGRESS' }] }), false);
+});
+
+test('goal selection prioritizes runnable work over stale blocked goals', () => {
+  const blocked = { id: 'blocked', status: 'BLOCKED', steps: [{ status: 'BLOCKED', evidence: [] }] };
+  const runnable = { id: 'runnable', status: 'ACTIVE', steps: [{ status: 'TODO', evidence: [] }] };
+  assert.equal(selectProgressGoal({ goals: [blocked, runnable] }).id, 'runnable');
 });
 
 function execute(command, args, cwd) { return new Promise((resolve, reject) => { execFile(command, args, { cwd }, (error, stdout) => error ? reject(error) : resolve(stdout)); }); }
