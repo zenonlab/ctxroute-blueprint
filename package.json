@@ -54,6 +54,7 @@
     "governance:check": "node scripts/agent-governance.mjs context.scope",
     "progress:read": "node scripts/progress-cli.mjs read",
     "progress:status": "node scripts/progress-cli.mjs status",
+    "progress:archive": "node scripts/progress-cli.mjs archive-completed",
     "progress:next": "node scripts/progress-cli.mjs next",
     "progress:claim": "node scripts/progress-cli.mjs claim",
     "progress:update": "node scripts/progress-cli.mjs update",

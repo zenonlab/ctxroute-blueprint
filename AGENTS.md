@@ -31,10 +31,12 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Progress is a compact, ordered memory of intent and outcomes, never a prerequisite, taskmaster, or global implementation lock.
 - Skip Progress for small, reversible, or single-agent changes. For a substantial chantier, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.
 - Preserve milestone order. Mark `claimable: true` only on genuinely independent work packages that can run in parallel; explicit agents may claim those packages once and report once after verification.
+- For substantial work with at least two genuinely independent claimable milestones, start the matching `progress-worker` subagents without asking for another `go`. Otherwise stay single-agent and skip automatic claims. A plan records intent and order; it never creates a conversational permission gate or requires repeated approval.
 - Only a subagent explicitly started as `progress-worker` may be auto-assigned a claimable `automatic` milestone. `SubagentStop` may settle its owned milestone from a valid `PROGRESS_RESULT` footer, and `SessionEnd` may release remaining session claims. No `PostToolUse` hook changes Progress.
 - Report `DONE` or `BLOCKED` with short evidence after the work. If Progress is busy or unavailable, continue safe in-scope work and reconcile the ticket afterward.
 - Use `manual` only with reason `visual-review` or `important-decision` for an important undecided product/change/design choice. All other tickets remain `automatic` and never block Stop.
 - MCP is the optional rich interface for inspecting or editing the memory. Use the matching `npm run progress:*` command as an equivalent local fallback when MCP is unavailable or urgency favors the CLI.
+- Session and post-compaction hooks may inject only a bounded active-goal reminder. Continue from that reminder directly; query MCP or CLI only when the task actually needs details or a Progress mutation.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
 ## Development

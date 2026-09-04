@@ -25,7 +25,7 @@
   "nodes": [
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 1, "row": 0, "tag": "consumer" },
-    { "id": "ctxroute", "type": "backend", "label": "Lifecycle", "sublabel": "CTXRoute + nine events", "stage": 2, "row": 0, "tag": "dispatcher cap" },
+    { "id": "ctxroute", "type": "backend", "label": "Lifecycle", "sublabel": "CTXRoute + ten events", "stage": 2, "row": 0, "tag": "dispatcher cap" },
     { "id": "mcp", "type": "messagebus", "label": "Progress + CRG", "sublabel": "ordered memory", "stage": 2, "row": 2, "tag": "opt-in coordination" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
     { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "silent automatic / manual", "stage": 3, "row": 2, "tag": "targeted guard" },
@@ -41,7 +41,7 @@
     { "from": "stop", "to": "archify", "label": "changed source only", "classification": "diagram verification", "variant": "emphasis", "route": "straight", "labelDx": 12, "labelDy": 105 }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Routing contract", "items": ["Nine lifecycle events share synchronous and maintenance lanes", "Main agents use ordered memory only when useful", "Only progress workers claim parallel milestones and return a final footer"] },
+    { "dot": "cyan", "title": "Routing contract", "items": ["Ten lifecycle events include bounded resume context after compaction", "Main agents use ordered memory only when useful", "Only progress workers claim parallel milestones and return a final footer"] },
     { "dot": "emerald", "title": "Traffic verification", "items": ["Session-scoped hashes isolate concurrent worker claims", "SubagentStop settles only its owned milestone and SessionEnd releases only its session", "Automatic Stop stays silent while manual is reserved for consequential review"] },
     { "dot": "rose", "title": "Review boundary", "items": ["Post-edit checks run only after structured edits", "CRG and Archify maintenance runs asynchronously", "High CRG risk requests review while only critical risk fails the gate"] }
   ]

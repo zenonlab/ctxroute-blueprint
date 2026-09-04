@@ -19,10 +19,11 @@ parallel milestones carry `claimable: true`; an explicit agent can call
 `progress_update_step` once with its final status and evidence. `progress_next`
 preserves plan order and returns blocked context separately.
 Claims and all other mutations use the same short filesystem lock, so parallel
-agents cannot overwrite one another. Contenders retry with bounded jitter to
-absorb local bursts without forming a retry convoy. A busy MCP still fails
-after about one second; work may continue and the agent reconciles its ticket
-afterward. Mutation replies are compact.
+agents cannot overwrite one another. Contenders retry with bounded jitter for
+up to three seconds to absorb a full local process burst without forming a
+retry convoy, still below the lifecycle-hook timeout. Work may continue after a
+busy failure and the agent reconciles its ticket afterward. Mutation replies
+are compact.
 
 Subagents use this specialization only when started with the explicit
 `progress-worker` agent type. `SubagentStart` hashes the harness, parent session,
@@ -36,9 +37,16 @@ releases only `IN_PROGRESS` claims carrying its session prefix. Replays are
 idempotent, and all mutations use the existing lock. Main-agent sessions do not
 claim automatically; MCP is their rich optional interface and the matching
 `npm run progress:*` command is an equivalent emergency/local fallback.
+For two or more genuinely independent claimable milestones, the main agent
+starts `progress-worker` subagents without another conversational approval.
+Sequential or small work remains direct. `SessionStart` and `PostCompact`
+provide a bounded active-goal reminder so resumption does not require a routine
+MCP read.
 The full checklist is available only through the voluntary JSON resource
 `ctxroute://progress/full`; it is not an automatically selectable tool.
 `npm run progress:read` remains the human diagnostic path.
+`npm run progress:archive` explicitly moves completed goals into the replay-safe
+`.project/progress-archive.json`; no hook archives or deletes goals.
 
 Stop mentions Archify only when an Archify source is already part of the
 change. A diagram is needed only when a material boundary, public contract,
@@ -77,8 +85,10 @@ background; a 30-second timeout, bounded output, and fail-open diagnostics keep
 the agent's tool path responsive. Archify preview and problem memory share that
 non-blocking maintenance lane.
 
-SessionStart checks graph status or builds missing state. A healthy graph adds
-no context; only a bounded diagnostic is emitted when CRG fails open.
+SessionStart checks existing graph status but does not synchronously build
+missing state. The first structured edit or explicit `npm run crg:build` creates
+it instead, keeping startup responsive. A healthy or absent graph adds no
+context; only a bounded diagnostic is emitted when a real status check fails.
 PreToolUse permits generated graph maintenance and
 `apply_refactor_tool` only with `dry_run: true`; real changes continue through
 normal editing tools and all CTXRoute/Sensor controls.

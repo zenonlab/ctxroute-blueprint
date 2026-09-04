@@ -28,7 +28,7 @@
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
   ],
   "connections": [
-    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "nine lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
+    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "ten lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
     { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "dispatch context and policy", "labelAt": [500, 124] },
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },

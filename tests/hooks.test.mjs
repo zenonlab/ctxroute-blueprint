@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
+import { progressContext } from '../.codex/hooks/progress-context.mjs';
 import { archifyInstruction, progressContinuation } from '../.codex/hooks/stop-review.mjs';
 import { handleProgressLifecycle, isProgressWorker, parseProgressResult, sessionOwnerPrefix, subagentOwner } from '../.codex/hooks/progress-subagent.mjs';
 import { approvePlan, readProgress } from '../scripts/progress-core.mjs';
@@ -41,6 +42,8 @@ test('Codex and Claude expose matching lifecycle handlers with async PostToolUse
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write');
     assert.equal(config.hooks.SubagentStart[0].matcher, '^progress[-_]worker$');
     assert.equal(config.hooks.SubagentStop[0].matcher, '^progress[-_]worker$');
+    assert.equal(config.hooks.SubagentStop[0].hooks[0].timeout, 5);
+    assert.equal(config.hooks.SessionEnd[0].hooks[0].timeout, 5);
   }
 });
 
@@ -50,6 +53,17 @@ test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () 
   assert.deepEqual(Object.keys(failed), ['systemMessage']);
   assert.match(failed.systemMessage, /index unavailable/u);
   assert.ok(failed.systemMessage.length < 500);
+});
+
+test('resume context is silent without active work and bounded when work exists', async () => {
+  const empty = progressHookWorkspace();
+  assert.equal(await progressContext(empty, 'PostCompact'), null);
+  await approvePlan({ ...progressPlan(1), approved: true }, empty);
+  const result = await progressContext(empty, 'PostCompact');
+  assert.equal(result.hookSpecificOutput.hookEventName, 'PostCompact');
+  assert.match(result.hookSpecificOutput.additionalContext, /never a permission gate/u);
+  assert.match(result.hookSpecificOutput.additionalContext, /step-1/u);
+  assert.ok(result.hookSpecificOutput.additionalContext.length <= 600);
 });
 
 test('initialize refuses an incomplete template without changing status', () => {
@@ -113,11 +127,12 @@ test('architecture evidence rejects unrelated documentation', () => {
 
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
-    SessionStart: ['session-inject.js', 'crg-context.mjs'],
+    SessionStart: ['session-inject.js', 'progress-context.mjs', 'crg-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
     PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
+    PostCompact: ['progress-context.mjs'],
     Stop: ['stop-review.mjs'],
     SubagentStart: ['progress-subagent.mjs'],
     SubagentStop: ['progress-subagent.mjs'],
@@ -140,7 +155,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs', 'problem-memory.mjs', 'archify-preview.mjs']);
   const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
-  assert.deepEqual(codexInjection.args, ['--budget', '0']);
+  assert.deepEqual(codexInjection.args, ['--budget', '3200']);
   assert.notEqual(codexInjection.path, join(root, '.codex', 'hooks', 'ctxroute.mjs'));
 });
 
@@ -171,7 +186,19 @@ test('progress result parsing requires a strict final footer and bounded evidenc
     '```text\nPROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}',
     'PROGRESS_RESULT: {"status":"TODO","evidence":["npm test"]}',
     'PROGRESS_RESULT: {"status":"DONE","evidence":["npm test"],"extra":true}',
+    'PROGRESS_RESULT: {"status":"DONE","evidence":["Bearer abcdefghijklmnop"]}',
+    'PROGRESS_RESULT: {"status":"DONE","evidence":["ghp_abcdefghijklmnop"]}',
+    'PROGRESS_RESULT: {"status":"DONE","evidence":["sk-abcdefghijklmnop"]}',
   ]) assert.equal(parseProgressResult(message), undefined, message);
+});
+
+test('SubagentStop ignores a non-progress agent even if an owner-shaped claim exists', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1), approved: true }, directory);
+  const identity = { session_id: 'session-a', agent_id: 'agent-1', agent_type: 'progress-worker' };
+  await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(identity), directory);
+  await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...identity, agent_type: 'Explore', last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["npm test"]}' }), directory);
+  assert.equal((await readProgress(directory)).goals[0].steps[0].status, 'IN_PROGRESS');
 });
 
 test('subagent lifecycle claims distinct automatic tickets and replays idempotently', async () => {
@@ -328,6 +355,36 @@ test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () 
   assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
 });
 
+test('CTXRoute paginates before the dispatcher cap without losing deferred context', () => {
+  const state = mkdtempSync(join(tmpdir(), 'ctxroute-budget-'));
+  const input = JSON.stringify({
+    session_id: `budget-${process.pid}-${Date.now()}`,
+    cwd: root,
+    tool_name: 'apply_patch',
+    tool_input: { patch: '*** Begin Patch\n*** Update File: scripts/progress-core.mjs\n@@\n-before\n+after\n*** End Patch' },
+  });
+  try {
+    const invoke = () => spawnSync(process.execPath, [join(root, '.codex/hooks/lifecycle.mjs'), 'codex', 'PreToolUse'], {
+      cwd: root,
+      input,
+      encoding: 'utf8',
+      env: { ...process.env, CTXROUTE_STATE_DIR: state },
+    });
+    const first = invoke();
+    const second = invoke();
+    assert.equal(first.status, 0, first.stderr);
+    assert.equal(second.status, 0, second.stderr);
+    const firstContext = JSON.parse(first.stdout).hookSpecificOutput.additionalContext;
+    const secondContext = JSON.parse(second.stdout).hookSpecificOutput.additionalContext;
+    assert.match(firstContext, /DEFERRED/u);
+    assert.ok(firstContext.length <= 4_096);
+    assert.ok(secondContext.length <= 4_096);
+    assert.doesNotMatch(`${firstContext}\n${secondContext}`, /contexte tronqué/u);
+  } finally {
+    rmSync(state, { recursive: true, force: true });
+  }
+});
+
 test('the lifecycle dispatcher returns the first refusal unchanged', () => {
   const reason = 'Architecture decision required.';
   let calls = 0;
@@ -404,7 +461,7 @@ test('postinstall verifies the complete local installation', () => {
   assert.deepEqual(inspectInstallation(root), []);
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /open \/hooks and approve the nine workspace definitions/u);
+  assert.match(result.stdout, /open \/hooks and approve the ten workspace definitions/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {

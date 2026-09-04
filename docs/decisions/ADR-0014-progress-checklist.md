@@ -99,3 +99,7 @@ tools and constrain their selection with
 The dashboard exposes completed goals without deleting them. A stale mutation
 reloads server state while preserving matching local drafts instead of silently
 overwriting either version.
+Completed goals can instead be moved explicitly with
+`npm run progress:archive` into `.project/progress-archive.json`. The archive
+is written before the active checklist, so an interrupted move can be replayed
+without duplicate records. Hooks never archive automatically.

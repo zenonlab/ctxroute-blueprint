@@ -31,6 +31,10 @@ goals when the agent type is explicitly `progress-worker`, then injects the
 milestone plus a required final `PROGRESS_RESULT` JSON footer.
 Both harnesses ship a project-local definition for that exact agent type; hook
 configuration alone does not create a launchable subagent.
+For substantial work with at least two genuinely independent claimable
+milestones, the main agent launches those workers without requesting another
+`go`. Smaller or sequential work stays in the main agent and normally skips
+Progress.
 `SubagentStop` accepts only `DONE` or `BLOCKED` with non-empty bounded evidence
 on the last non-empty line outside Markdown fences. Invalid output atomically
 releases that agent's claim to `TODO`; `SessionEnd` releases remaining
@@ -46,6 +50,9 @@ blocked goals, preventing a stale handoff from starving automatic execution.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
+`SessionStart` and `PostCompact` inject only a bounded active-goal reminder and
+stay silent when no goal is active. The reminder is advisory and avoids a
+routine MCP status call after startup or compaction.
 Codex and Claude provide the parent `session_id`, subagent `agent_id`, and
 `last_assistant_message` needed by this contract in their official hook
 schemas: [Codex hooks](https://developers.openai.com/codex/hooks/) and
