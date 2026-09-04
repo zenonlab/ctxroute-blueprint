@@ -5,22 +5,14 @@ mode: once
 
 # Agent progress checklist
 
-Progress is optional ordered memory, not a prerequisite or taskmaster. Skip it
-for small or single-agent work. Use 2–6 outcome milestones in declared order;
-do not mirror files, commands, commits, or routine edits. Only independent
-parallel work gets `claimable: true`. Claim and report once, after verification.
-With 2+ genuinely independent claimable milestones, start `progress-worker`
-subagents without asking for another `go`; otherwise stay single-agent.
-If MCP is unavailable, continue safe work and use the matching `progress:*` CLI.
-Full JSON is voluntary via `ctxroute://progress/full` or the diagnostic CLI.
+Progress is optional ordered memory, never a prerequisite or permission gate.
+Skip it for small or single-agent work. For substantial work, keep 2–6 outcome
+milestones; never mirror files, commands, commits, or routine edits. Only truly
+independent parallel work is claimable by a `progress-worker`.
 
-Never edit generated Progress files directly or finish without short evidence.
-Only a `progress-worker` auto-claims on `SubagentStart`; its structured footer
-updates the ticket on `SubagentStop`, and `SessionEnd` releases its claims.
-Main agents may use MCP or CLI. `PostToolUse` never changes Progress; automatic
-Stop is silent. Manual mode is reserved for an undecided visual review or
-important decision. `BLOCKED` is external only with `external:` evidence for a
-real dependency—missing approval is not external. Require Archify only for a
-material boundary, public contract, dependency, or cross-component flow change.
-Session resume context is advisory: continue authorized work directly and read
-Progress only when details or a mutation are actually needed.
+MCP and `progress:*` CLI are equivalent; continue safely if either is unavailable.
+Only SubagentStart/SubagentStop/SessionEnd automate worker claims. PostToolUse
+never changes Progress. Manual means an undecided visual review or important
+decision—not another `go`. Resume context is advisory. Read full Progress only
+when details or a mutation are needed, and require Archify only for a material
+boundary, contract, dependency, or cross-component flow.

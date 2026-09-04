@@ -42,9 +42,10 @@ CTXRoute remains the sole lifecycle dispatcher. SessionStart checks an existing
 graph without building missing state; the first structured edit or explicit
 command performs that initial build. The lifecycle stays silent when healthy
 and emits only a bounded fail-open
-diagnostic on failure. Successful structured file edits start an asynchronous
-`update --skip-flows` behind a cross-process single-flight lock, a 30-second
-timeout, bounded output, and fail-open diagnostics. Shell reads, status commands,
+diagnostic on failure. Successful structured file edits request an asynchronous,
+quiet-period-coalesced `update --skip-flows` behind a cross-process single-flight
+lock, a 30-second timeout, bounded output, and fail-open diagnostics. A burst of
+edits produces one graph update after the last edit. Shell reads, status commands,
 and test runs never trigger graph maintenance. No CRG daemon,
 watcher, generated CRG hooks, or synthetic update database is used.
 
@@ -54,7 +55,7 @@ impact radius, graph query, review context, graph stats, and architecture
 overview. Build, refactor, embedding, wiki, and secondary exploration remain
 available through controlled CLI commands when needed. The MCP schema budget
 is kept below 8,000 characters for CRG and 14,000 characters combined with
-Progress. Codex waits a bounded three seconds for optional MCP startup while
+Progress. Codex waits the official bounded one-second default for optional MCP startup while
 building its initial tool catalog. CRG stays optional so a failed graph service
 remains visible and fail-open instead of preventing the session from starting.
 The Sensor keeps its own pinned Tree-sitter registry solely for security

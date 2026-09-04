@@ -52,6 +52,7 @@ test('Codex and Claude expose matching lifecycle handlers with portable commands
       }
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write');
+    assert.equal(config.hooks.PreToolUse[0].matcher, 'apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell');
     assert.equal(config.hooks.SubagentStart[0].matcher, '^progress[-_]worker$');
     assert.equal(config.hooks.SubagentStop[0].matcher, '^progress[-_]worker$');
     assert.equal(config.hooks.SubagentStop[0].hooks[0].timeout, 5);
@@ -180,7 +181,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs', 'problem-memory.mjs', 'archify-preview.mjs']);
   const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
-  assert.deepEqual(codexInjection.args, ['--budget', '3200']);
+  assert.deepEqual(codexInjection.args, ['--budget', '1800']);
   assert.notEqual(codexInjection.path, join(root, '.codex', 'hooks', 'ctxroute.mjs'));
 });
 
@@ -416,7 +417,7 @@ test('the lifecycle dispatcher delegates ADR context injection to CTXRoute', () 
   assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
 });
 
-test('CTXRoute paginates before the dispatcher cap without losing deferred context', () => {
+test('CTXRoute emits one compact frame without queued ADR bodies', () => {
   const state = mkdtempSync(join(tmpdir(), 'ctxroute-budget-'));
   const input = JSON.stringify({
     session_id: `budget-${process.pid}-${Date.now()}`,
@@ -436,10 +437,10 @@ test('CTXRoute paginates before the dispatcher cap without losing deferred conte
     assert.equal(first.status, 0, first.stderr);
     assert.equal(second.status, 0, second.stderr);
     const firstContext = JSON.parse(first.stdout).hookSpecificOutput.additionalContext;
-    const secondContext = JSON.parse(second.stdout).hookSpecificOutput.additionalContext;
-    assert.match(firstContext, /DEFERRED/u);
-    assert.ok(firstContext.length <= 4_096);
-    assert.ok(secondContext.length <= 4_096);
+    const secondContext = second.stdout ? JSON.parse(second.stdout).hookSpecificOutput?.additionalContext ?? '' : '';
+    assert.doesNotMatch(firstContext, /DEFERRED|# ADR-\d{4}/u);
+    assert.ok(firstContext.length <= 2_200);
+    assert.ok(secondContext.length <= 2_200);
     assert.doesNotMatch(`${firstContext}\n${secondContext}`, /contexte tronqué/u);
   } finally {
     rmSync(state, { recursive: true, force: true });

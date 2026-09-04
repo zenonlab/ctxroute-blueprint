@@ -38,7 +38,7 @@
     "astCheck": "npm run ast:check",
     "crgMcp": "npm run crg:mcp",
     "crgSmoke": "npm run crg:smoke",
-    "performance": "npm run crg:smoke",
+    "performance": "npm run hooks:performance",
     "sensorBlueprint": "npm run sensor:blueprint",
     "mermaid": null
   },

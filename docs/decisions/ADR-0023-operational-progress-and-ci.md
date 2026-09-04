@@ -10,6 +10,7 @@ scope:
   - scripts/progress-cli.mjs
   - scripts/blueprint-sync.mjs
 review: on-change
+revised: true
 ---
 # ADR-0023 — Operable Progress workers and resilient validation
 
@@ -29,11 +30,12 @@ The local dashboard remains voluntary and durable, but the CLI exposes an
 explicit, idempotent close operation. Tests must isolate CTXRoute state and must
 terminate every detached dashboard they create even when an assertion fails.
 
-Derived repositories can inspect or apply a conservative control-plane update
+Derived repositories can inspect, drift-check, or apply a conservative control-plane update
 from a trusted blueprint checkout. The synchronizer has an explicit allowlist,
 defaults to a dry run, refuses dirty targets, creates a recoverable backup, and
 never overwrites project decisions, Progress data, product documentation, or
-source code.
+source code. A versioned marker travels with that allowlist so automation can
+fail visibly when a derived control plane is stale without rewriting it.
 
 Cross-platform CI runs the complete repository gate on Linux and bounded
 platform smoke checks on macOS and Windows. Dependency audit runs once in a

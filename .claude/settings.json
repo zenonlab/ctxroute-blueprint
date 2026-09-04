@@ -13,7 +13,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "*",
+        "matcher": "apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell",
         "hooks": [
           {
             "type": "command",

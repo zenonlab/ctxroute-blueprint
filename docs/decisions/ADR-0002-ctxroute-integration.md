@@ -46,18 +46,20 @@ Claude doctrine import. It reports one manual Codex action: open `/hooks` and
 approve the nine workspace definitions. It never changes Codex trust settings,
 which are stored outside the repository.
 
-Do not configure custom lifecycle status messages. Restrict `PostToolUse` to
-mutation-capable tools, and skip the architecture subprocess on read-only
-`PreToolUse` events while retaining CTXRoute routing. Diagnose legacy global
+Do not configure custom lifecycle status messages. Restrict `PreToolUse` and
+`PostToolUse` to mutation-capable tools; ordinary reads do not start the
+dispatcher. Diagnose legacy global
 CTXRoute commands during `postinstall`: global and project hooks are additive,
 so keeping both causes duplicate progress output and avoidable process startup.
 The diagnostic is read-only and never rewrites user configuration.
 
 Use `mode: once` as the project default and on every tracked guidance document.
-CTXRoute receives a 3,200-character producer budget below the dispatcher's
-4,096-character cap. Content that does not fit is visibly queued for later
-matching calls, so the dispatcher never silently slices a block already marked
-as delivered. A matching rule completes delivery once per session, then becomes
+ADR mirrors are inactive routing indexes rather than copies of full decision
+bodies. The architecture guard names only applicable ADR files and directs the
+agent to read them when a mutation materially changes a boundary or contract.
+CTXRoute receives a 1,800-character producer budget below the dispatcher's
+4,096-character cap. Normal guidance is delivered in one compact frame rather
+than a multi-call remainder queue. A matching rule completes delivery once per session, then becomes
 eligible again only after the existing `PreCompact` reset. Blocking governance still
 runs on every applicable mutation; the cadence change only removes repeated
 informational context during reading and implementation loops.

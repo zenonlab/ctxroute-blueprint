@@ -78,8 +78,9 @@ dead stale owner can be reclaimed without disturbing a live or recent one.
 ## File change to CRG update
 
 CTXRoute's asynchronous PostToolUse maintenance lane calls CRG only after a
-successful structured file edit, never after a shell read or test command. The
-handler acquires an atomic lock and runs
+successful structured file edit, never after a shell read or test command. A
+shared quiet-period marker coalesces rapid edits; only the newest request
+continues to problem memory and Archify preview. The handler then acquires an atomic lock and runs
 `update --skip-flows`; if `graph.db` is absent it performs the initial build.
 Concurrent calls skip while one update is active. The hook runs in the
 background; a 30-second timeout, bounded output, and fail-open diagnostics keep

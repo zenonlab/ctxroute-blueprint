@@ -17,10 +17,11 @@ contrainte majeure doit être conservée dans `docs/decisions/`.
 
 ## Réutilisation automatique
 
-Avant une modification, `PreToolUse` extrait les fichiers ciblés, sélectionne
-les ADRs dont le périmètre correspond et injecte leur contenu au premier geste
-correspondant (`mode: once`).
-L’agent doit relire ces décisions avant d’agir.
+Avant une modification, `PreToolUse` extrait les fichiers ciblés et nomme dans
+un résumé borné les ADRs dont le périmètre correspond. L’agent relit uniquement
+les décisions utiles si la modification touche réellement une frontière, un
+contrat, une dépendance ou un flux inter-composants. Les corps complets ne sont
+jamais injectés automatiquement.
 
 Après une modification, `PostToolUse` vérifie qu’un changement architectural
 ou de contrat possède une décision valide. Les tests et fichiers générés sont
@@ -34,9 +35,8 @@ npm run validate:decisions
 npm test
 ```
 
-Le flux canonique est : changement → sélection ADR → injection contextuelle
-unique → validation. Après `PreCompact`, CTXRoute peut réinjecter la décision si
-le contexte a été vidé.
+Le flux canonique est : changement → sélection des noms ADR → lecture à la
+demande si matérielle → validation.
 
 Les protections issues de la mémoire des problèmes suivent le même principe :
 SQLite détecte et résout le problème, puis CTXRoute injecte une règle approuvée
@@ -44,10 +44,9 @@ scopée par fichier et outil. La règle contient uniquement le vocabulaire
 CTXRoute (`tool`, `scope`, `mode`) ; elle ne contient pas `problem-memory`,
 `events` ou `tools`, et ne modifie jamais automatiquement `AGENTS.md`.
 
-Les ADRs valides sont synchronisés vers des documents CTXRoute générés dans
+Les ADRs valides sont indexés par des documents CTXRoute inactifs dans
 `.claude/hooks/docs/adr-memory/`. Le hook local conserve la correspondance par
-scope et les blocages de gouvernance, mais ne transmet plus le corps des ADRs
-comme contexte ; l’injection est réalisée exclusivement par CTXRoute.
+scope et les blocages de gouvernance sans y copier le corps des ADRs.
 
 Un ADR invalide ou remplacé bloque une modification gouvernée. Plusieurs ADRs
 applicables produisent le statut `partial` et un diagnostic explicite ; la

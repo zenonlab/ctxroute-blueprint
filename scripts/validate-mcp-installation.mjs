@@ -17,8 +17,8 @@ export function validateMcpInstallation(root = process.cwd()) {
 
   const firstCodexSection = codex.search(/^\[/mu);
   const codexRoot = firstCodexSection < 0 ? codex : codex.slice(0, firstCodexSection);
-  if (!/^mcp_optional_startup_grace_ms\s*=\s*3000\s*$/mu.test(codexRoot)) {
-    errors.push('Codex must wait 3000 ms for optional MCP servers when building the initial tool catalog.');
+  if (!/^mcp_optional_startup_grace_ms\s*=\s*1000\s*$/mu.test(codexRoot)) {
+    errors.push('Codex must use the 1000 ms optional MCP startup grace when building the initial tool catalog.');
   }
 
   for (const legacy of ['ctxroute-context-ast']) {

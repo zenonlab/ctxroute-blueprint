@@ -24,8 +24,9 @@ Durable decisions were readable but not addressable by lifecycle hooks.
 
 Every ADR except the authoring template carries YAML front matter with a
 non-empty `scope`, optional `contracts`, and a `review` policy. Scope uses
-repository-relative exact paths and `*`/`**` globs. Applicable ADRs are
-injected in numeric filename order before a matching change. An ADR marked
+repository-relative exact paths and `*`/`**` globs. Applicable ADR filenames are
+reported in numeric order before a matching change; the agent reads the bodies
+only when the change materially affects their decision. An ADR marked
 `superseded-by` remains in the corpus and is not injected; a revised ADR uses
 `revised: true` and remains the source of truth.
 
@@ -35,9 +36,10 @@ requires repair or replacement. PostToolUse repeats the check and validates
 modified decisions. When multiple ADRs apply, the diagnostic reports
 `partial`; semantic contradiction is not inferred from prose. ADR authors may
 declare an auditable `conflicts-with` list; a matching explicit conflict is
-blocked until one ADR is revised or superseded. Valid ADR bodies are mirrored into ignored CTXRoute documents before
-injection; the local hook validates and synchronizes that corpus but does not
-inject decision text itself. Tests and generated files are exempt from the
+blocked until one ADR is revised or superseded. Ignored CTXRoute ADR documents
+are inactive indexes and never mirror or inject full decision bodies. The local
+hook validates and synchronizes that index and emits a bounded applicable-file
+summary. Tests and generated files are exempt from the
 architectural requirement.
 
 ## Alternatives

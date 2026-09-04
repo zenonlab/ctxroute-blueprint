@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CONTROL_FILES = Object.freeze([
   'AGENTS.md', 'CLAUDE.md', '.codex/hooks.json', '.claude/settings.json',
+  '.project/blueprint-version.json',
   'scripts/progress-core.mjs', 'scripts/progress-cli.mjs', 'scripts/progress-mcp.mjs',
   'scripts/progress-dashboard.mjs', 'scripts/progress-dashboard-manager.mjs',
   'scripts/progress-dashboard-app.mjs',
@@ -41,7 +42,20 @@ export async function synchronizeBlueprint({ source = scriptRoot, target, apply 
     await mkdir(dirname(targetPath), { recursive: true });
     await copyFile(sourcePath, targetPath, constants.COPYFILE_FICLONE);
   }
-  return { applied: apply, target: targetRoot, backup: apply && changes.some(change => change.action === 'update') ? `.ctxroute/blueprint-backups/${timestamp}` : null, changes };
+  return {
+    applied: apply,
+    current: changes.length === 0,
+    sourceVersion: await blueprintVersion(sourceRoot),
+    targetVersion: await blueprintVersion(targetRoot),
+    target: targetRoot,
+    backup: apply && changes.some(change => change.action === 'update') ? `.ctxroute/blueprint-backups/${timestamp}` : null,
+    changes,
+  };
+}
+
+async function blueprintVersion(root) {
+  try { return JSON.parse(await readFile(resolve(root, '.project/blueprint-version.json'), 'utf8')).version ?? null; }
+  catch { return null; }
 }
 
 async function directoryFiles(root, directories) {
@@ -78,8 +92,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const args = process.argv.slice(2);
   const targetIndex = args.indexOf('--target');
   try {
+    const check = args.includes('--check');
     const result = await synchronizeBlueprint({ target: targetIndex >= 0 ? args[targetIndex + 1] : undefined, apply: args.includes('--apply') });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    if (check && !result.current) process.exitCode = 1;
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
