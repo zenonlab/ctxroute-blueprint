@@ -17,10 +17,9 @@ export const MANUAL_REASONS = Object.freeze(['visual-review', 'important-decisio
 const LEGACY_EXECUTION_MODES = Object.freeze(['autonomous', 'collaborative']);
 const SECRET = /(?:\b(?:api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]|\bbearer\s+[a-z0-9._~+/-]{8,}|\bgh[oprsu]_[a-z0-9]{12,}|\bsk-[a-z0-9_-]{12,})/iu;
 const LOCK_STALE_MS = 30_000;
-// Windows can briefly retain an exclusive file handle after unlink/rename. Give
-// a full 30-process claim burst enough time to drain without extending the
-// normal POSIX contention window or the five-second lifecycle-hook timeout.
-const LOCK_WAIT_MS = process.platform === 'win32' ? 3_000 : 1_000;
+// Give a full 30-process claim burst enough time to drain on loaded runners and
+// Windows while remaining below the five-second lifecycle-hook timeout.
+const LOCK_WAIT_MS = 3_000;
 const LOCK_RETRY_MIN_MS = 2;
 const LOCK_RETRY_MAX_MS = 25;
 const ATOMIC_RENAME_WAIT_MS = process.platform === 'win32' ? 1_000 : 0;

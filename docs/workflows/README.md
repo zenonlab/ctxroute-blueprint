@@ -19,10 +19,11 @@ parallel milestones carry `claimable: true`; an explicit agent can call
 `progress_update_step` once with its final status and evidence. `progress_next`
 preserves plan order and returns blocked context separately.
 Claims and all other mutations use the same short filesystem lock, so parallel
-agents cannot overwrite one another. Contenders retry with bounded jitter to
-absorb local bursts without forming a retry convoy. A busy MCP still fails
-after about one second; work may continue and the agent reconciles its ticket
-afterward. Mutation replies are compact.
+agents cannot overwrite one another. Contenders retry with bounded jitter for
+up to three seconds to absorb a full local process burst without forming a
+retry convoy, still below the lifecycle-hook timeout. Work may continue after a
+busy failure and the agent reconciles its ticket afterward. Mutation replies
+are compact.
 
 Subagents use this specialization only when started with the explicit
 `progress-worker` agent type. `SubagentStart` hashes the harness, parent session,
