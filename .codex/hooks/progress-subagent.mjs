@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 import { LIMITS, claimAutomaticProgressTicket, isSafeProgressReference, readProgress, releaseProgressClaims, updateProgressStep } from '../../scripts/progress-core.mjs';
 
 const FOOTER_PREFIX = 'PROGRESS_RESULT: ';
+const MAX_TICKET_CONTEXT_LENGTH = 8 * 1024;
+const TRUNCATION_NOTICE = '[… ticket details truncated; inspect Progress only if the omitted detail is needed …]';
 
 export function sessionOwnerPrefix(harness, sessionId) {
   return `${harness}:${opaqueHash(sessionId)}:`;
@@ -40,7 +42,7 @@ export async function handleProgressLifecycle(harness, event, input, root = proc
     if (event === 'SubagentStart') return await startSubagent(harness, payload, root);
     if (event === 'SubagentStop') return await stopSubagent(harness, payload, root);
     if (event === 'SessionEnd') {
-      await releaseProgressClaims(sessionOwnerPrefix(harness, payload.session_id), root);
+      await releaseProgressClaims(sessionOwnerPrefix(harness, payload.session_id), root, { lockWaitMs: 2_000 });
       return null;
     }
     return diagnostic(event, 'unsupported event');
@@ -73,8 +75,8 @@ async function stopSubagent(harness, payload, root) {
   try {
     await updateProgressStep({ ...ticket, agentId: owner, ...result }, root);
   } catch (error) {
-    await releaseProgressClaims(owner, root);
     if (error.code === 'PROGRESS_BUSY') throw error;
+    await releaseProgressClaims(owner, root);
   }
   return null;
 }
@@ -88,17 +90,26 @@ function findOwnedTicket(progress, owner) {
 }
 
 function ticketContext(ticket) {
-  return [
+  const header = [
     'Progress assigned this automatic ticket to you.',
     `Goal: ${ticket.goalId}`,
     `Ticket: ${ticket.stepId} — ${ticket.title}`,
+  ].join('\n');
+  const details = [
     section('Acceptance', ticket.acceptance),
     section('Files', ticket.files),
     section('Commands', ticket.commands),
+  ].filter(Boolean).join('\n');
+  const footer = [
     'Make the following footer your final non-empty line, outside any Markdown block:',
     'PROGRESS_RESULT: {"status":"DONE","evidence":["short verification reference"]}',
     'Use status BLOCKED only when the ticket cannot be completed, and include at least one short evidence reference.',
-  ].filter(Boolean).join('\n');
+  ].join('\n');
+  const fixedLength = header.length + footer.length + TRUNCATION_NOTICE.length + 4;
+  const boundedDetails = details.length + fixedLength <= MAX_TICKET_CONTEXT_LENGTH
+    ? details
+    : `${details.slice(0, MAX_TICKET_CONTEXT_LENGTH - fixedLength)}\n${TRUNCATION_NOTICE}`;
+  return [header, boundedDetails, footer].filter(Boolean).join('\n');
 }
 
 function section(title, items) {

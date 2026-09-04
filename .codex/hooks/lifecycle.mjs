@@ -11,7 +11,6 @@ export const lifecycleEvents = [
   'PostToolUse',
   'UserPromptSubmit',
   'PreCompact',
-  'PostCompact',
   'Stop',
   'SubagentStart',
   'SubagentStop',
@@ -19,7 +18,7 @@ export const lifecycleEvents = [
 ];
 
 const MAX_CONTEXT_LENGTH = 4096;
-const MAX_SUBAGENT_CONTEXT_LENGTH = 64 * 1024;
+const MAX_SUBAGENT_CONTEXT_LENGTH = 8 * 1024;
 // Keep CTXRoute below this dispatcher's final character cap so its own
 // remainder queue, rather than a lossy last-mile slice, owns pagination.
 const CTXROUTE_BUDGET = '3200';
@@ -43,7 +42,6 @@ export function handlerPlan(harness, event, root = projectRoot, lane = 'synchron
     PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
-    PostCompact: [local('progress-context.mjs', 'PostCompact')],
     Stop: [local('stop-review.mjs')],
     SubagentStart: [progressSubagent('SubagentStart')],
     SubagentStop: [progressSubagent('SubagentStop')],

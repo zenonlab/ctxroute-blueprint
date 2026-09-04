@@ -90,8 +90,10 @@ Validation is read-only and materialization is a separate operation. The contrac
 supports up to 20 goals, 30 steps per goal, and 10 evidence references per
 step, with a 64 KiB JSON limit. Only `SubagentStart`, `SubagentStop`, and
 `SessionEnd` edit the checklist automatically; `PostToolUse` never does.
-Agents must start from the repository root and restart after MCP manifest
-changes because the client owns project-scoped server discovery and transport.
+Lifecycle commands resolve the Git root even when the agent works from a nested
+directory. Agents still start from the repository root and restart after MCP
+manifest changes because the client owns project-scoped server discovery and
+transport.
 The stdio contract stays portable across MCP clients and does not depend on
 client-specific tool-selection behavior. OpenAI clients can use standard MCP
 tools and constrain their selection with

@@ -26,9 +26,9 @@ Install CTXRoute from the official `zenonlab/ctxroute` HTTPS archive, pinned to
 a reviewed commit. Keep CTXRoute configuration and rule documents in the derived
 project under the canonical `.claude/hooks/docs/` path.
 
-Expose one project-local lifecycle dispatcher for each of the ten supported
+Expose one project-local lifecycle dispatcher for each of the nine supported
 events: `SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`,
-`PreCompact`, `PostCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and `SessionEnd`. The dispatcher invokes the existing governance hooks
+`PreCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and `SessionEnd`. The dispatcher invokes the existing governance hooks
 and CTXRoute shells sequentially, merges non-blocking output, and immediately
 returns a refusal without changing its reason. The dispatcher resolves both
 Codex and Claude entry points directly from the project-local CTXRoute package,
@@ -43,7 +43,7 @@ the turn counter before the canary on `UserPromptSubmit`.
 Add a lightweight `postinstall` check. It verifies the installed CTXRoute
 package, the required CTXRoute entry points, both hook configurations, and the
 Claude doctrine import. It reports one manual Codex action: open `/hooks` and
-approve the ten workspace definitions. It never changes Codex trust settings,
+approve the nine workspace definitions. It never changes Codex trust settings,
 which are stored outside the repository.
 
 Do not configure custom lifecycle status messages. Restrict `PostToolUse` to

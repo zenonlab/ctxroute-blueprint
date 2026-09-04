@@ -21,29 +21,55 @@ const isolatedCtxrouteState = mkdtempSync(join(tmpdir(), 'hooks-ctxroute-state-'
 process.env.CTXROUTE_STATE_DIR = isolatedCtxrouteState;
 process.on('exit', () => rmSync(isolatedCtxrouteState, { recursive: true, force: true }));
 
-test('Codex and Claude expose matching lifecycle handlers with async PostToolUse maintenance', () => {
+function expectedHookCommand(harness, event, lane = '') {
+  const suffix = lane ? ` ${lane}` : '';
+  return harness === 'codex'
+    ? `node "$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs" codex ${event}${suffix}`
+    : `node "\${CLAUDE_PROJECT_DIR}/.codex/hooks/lifecycle.mjs" claude ${event}${suffix}`;
+}
+
+test('Codex and Claude expose matching lifecycle handlers with portable commands and valid event budgets', () => {
+  const contextEvents = new Set(['SessionStart', 'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'SubagentStart']);
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
     for (const event of lifecycleEvents) {
       const handlers = config.hooks[event].flatMap(block => block.hooks ?? []);
       assert.equal(handlers.length, event === 'PostToolUse' ? 2 : 1, `${file} ${event}`);
-      assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
+      assert.equal(handlers[0].command, expectedHookCommand(harness, event));
       for (const handler of handlers) {
         assert.ok(handler.timeout > 0, `${file} ${event} timeout`);
         assert.equal('statusMessage' in handler, false, `${file} ${event} should remain quiet`);
       }
       if (event === 'PostToolUse') {
-        assert.equal(handlers[1].command, `node ./.codex/hooks/lifecycle.mjs ${harness} PostToolUse maintenance`);
+        assert.equal(handlers[1].command, expectedHookCommand(harness, 'PostToolUse', 'maintenance'));
         assert.equal(handlers[1].async, true);
       }
-      if (harness === 'codex') for (const handler of handlers) assert.equal(handler.additionalContextLimit, event === 'SubagentStart' ? 65_536 : 1200, `${file} ${event} context limit`);
+      if (harness === 'codex') for (const handler of handlers) {
+        if (contextEvents.has(event)) assert.equal(handler.additionalContextLimit, event === 'SubagentStart' ? 2500 : 1200, `${file} ${event} context limit`);
+        else assert.equal('additionalContextLimit' in handler, false, `${file} ${event} must not configure unsupported context`);
+        assert.match(handler.commandWindows, /git rev-parse --show-toplevel/u);
+      }
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write');
     assert.equal(config.hooks.SubagentStart[0].matcher, '^progress[-_]worker$');
     assert.equal(config.hooks.SubagentStop[0].matcher, '^progress[-_]worker$');
     assert.equal(config.hooks.SubagentStop[0].hooks[0].timeout, 5);
-    assert.equal(config.hooks.SessionEnd[0].hooks[0].timeout, 5);
+    assert.equal(config.hooks.SessionEnd[0].hooks[0].timeout, 3);
+  }
+});
+
+test('configured lifecycle commands resolve the repository from a nested working directory', { skip: process.platform === 'win32' }, () => {
+  for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
+    const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
+    const command = config.hooks.SessionEnd[0].hooks[0].command;
+    const result = spawnSync('/bin/sh', ['-lc', command], {
+      cwd: join(root, 'docs'),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      input: JSON.stringify({ session_id: `nested-${harness}`, hook_event_name: 'SessionEnd', cwd: join(root, 'docs') }),
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
   }
 });
 
@@ -57,10 +83,10 @@ test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () 
 
 test('resume context is silent without active work and bounded when work exists', async () => {
   const empty = progressHookWorkspace();
-  assert.equal(await progressContext(empty, 'PostCompact'), null);
+  assert.equal(await progressContext(empty, 'SessionStart'), null);
   await approvePlan({ ...progressPlan(1), approved: true }, empty);
-  const result = await progressContext(empty, 'PostCompact');
-  assert.equal(result.hookSpecificOutput.hookEventName, 'PostCompact');
+  const result = await progressContext(empty, 'SessionStart');
+  assert.equal(result.hookSpecificOutput.hookEventName, 'SessionStart');
   assert.match(result.hookSpecificOutput.additionalContext, /never a permission gate/u);
   assert.match(result.hookSpecificOutput.additionalContext, /step-1/u);
   assert.ok(result.hookSpecificOutput.additionalContext.length <= 600);
@@ -132,7 +158,6 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js'],
-    PostCompact: ['progress-context.mjs'],
     Stop: ['stop-review.mjs'],
     SubagentStart: ['progress-subagent.mjs'],
     SubagentStop: ['progress-subagent.mjs'],
@@ -214,6 +239,42 @@ test('subagent lifecycle claims distinct automatic tickets and replays idempoten
   const steps = (await readProgress(directory)).goals[0].steps;
   assert.equal(new Set(steps.map(step => step.assignee)).size, 3);
   assert.notEqual(second.hookSpecificOutput.additionalContext, otherSession.hookSpecificOutput.additionalContext);
+});
+
+test('subagent ticket context stays below both harness limits and preserves the footer', async () => {
+  const directory = progressHookWorkspace();
+  const reference = (prefix, index) => `${prefix}-${index}-${'x'.repeat(470)}`;
+  const step = {
+    id: 'step-1',
+    title: 'Maximum bounded ticket',
+    claimable: true,
+    acceptance: Array.from({ length: 30 }, (_, index) => reference('acceptance', index)),
+    files: Array.from({ length: 30 }, (_, index) => reference('file', index)),
+    commands: Array.from({ length: 30 }, (_, index) => reference('command', index)),
+  };
+  await approvePlan({ goalId: 'large-ticket', title: 'Bound context', executionMode: 'automatic', steps: [step], validationEvidence: ['audit'], approved: true }, directory);
+  const result = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session', agent_id: 'agent', agent_type: 'progress-worker' }), directory);
+  const context = result.hookSpecificOutput.additionalContext;
+  assert.ok(context.length <= 8 * 1024);
+  assert.match(context, /ticket details truncated/u);
+  assert.match(context.split(/\r?\n/u).findLast(line => line.trim()), /^Use status BLOCKED/u);
+  assert.match(context, /PROGRESS_RESULT:/u);
+});
+
+test('a busy SubagentStop fails open once without a second lock wait', async () => {
+  const directory = progressHookWorkspace();
+  await approvePlan({ ...progressPlan(1), approved: true }, directory);
+  const identity = { session_id: 'session', agent_id: 'agent', agent_type: 'progress-worker' };
+  await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify(identity), directory);
+  const lock = join(directory, '.ctxroute/state/progress.lock');
+  mkdirSync(join(directory, '.ctxroute/state'), { recursive: true });
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, token: 'live-test-lock' }));
+  const started = Date.now();
+  const result = await handleProgressLifecycle('codex', 'SubagentStop', JSON.stringify({ ...identity, last_assistant_message: 'PROGRESS_RESULT: {"status":"DONE","evidence":["test"]}' }), directory);
+  const elapsed = Date.now() - started;
+  rmSync(lock, { force: true });
+  assert.match(result.systemMessage, /busy/u);
+  assert.ok(elapsed >= 2_500 && elapsed < 4_500, `unexpected lock wait: ${elapsed}ms`);
 });
 
 test('subagent lifecycle skips manual goals and settles only the owned ticket', async () => {
@@ -461,7 +522,7 @@ test('postinstall verifies the complete local installation', () => {
   assert.deepEqual(inspectInstallation(root), []);
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /open \/hooks and approve the ten workspace definitions/u);
+  assert.match(result.stdout, /open \/hooks and approve the nine workspace definitions/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {
