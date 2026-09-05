@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import process from 'node:process';
+import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { listArchifyDiagrams } from '../../scripts/archify-registry.mjs';
@@ -16,10 +17,11 @@ async function main() {
 
   const changed = gitChangedFiles();
   const candidates = changed.filter(path => /(?:^|\/)(?:tmp|temp|coverage|dist|build)(?:\/|$)|(?:\.tmp|\.bak|\.old|~)$/iu.test(path));
-  const syntaxFailures = checkSyntax(changed);
+  const syntax = checkSyntax(changed);
   const { failures: configFailures } = loadProjectConfig();
   const lines = [
-    syntaxFailures.length ? `Syntax failures: ${syntaxFailures.join(', ')}` : '',
+    syntax.failures.length ? `Syntax failures: ${syntax.failures.join(', ')}` : '',
+    syntax.deferred.length ? `Syntax coverage: checked ${syntax.checked.length}; deferred ${syntax.deferred.length} after the bounded review budget (${syntax.deferred.join(', ')}).` : '',
     candidates.length ? `Review cleanup candidates: ${candidates.join(', ')}` : '',
     configFailures.length ? `Configuration failures: ${configFailures.join(', ')}` : '',
   ].filter(Boolean);
@@ -87,29 +89,37 @@ function gitChangedFiles(root = process.cwd()) {
   return [...files].sort();
 }
 
-const MAX_STOP_SYNTAX_PROCESSES = 4;
+const MAX_STOP_SYNTAX_BYTES = 512 * 1024;
+const MAX_STOP_SYNTAX_MS = 1_500;
 
-export function checkSyntax(paths) {
+export function checkSyntax(paths, options = {}) {
   const failures = [];
+  const checked = [];
+  const deferred = [];
+  const maximumBytes = options.maximumBytes ?? MAX_STOP_SYNTAX_BYTES;
+  const deadline = performance.now() + (options.maximumMs ?? MAX_STOP_SYNTAX_MS);
+  let consumedBytes = 0;
   const existing = paths.filter(existsSync);
-  for (const path of existing.filter(path => /\.json$/iu.test(path))) {
-    try {
-      JSON.parse(readFileSync(path, 'utf8'));
-    } catch {
-      failures.push(path);
-    }
-  }
-  const subprocessCandidates = existing.filter(path => /\.(?:js|mjs|cjs)$/iu.test(path)
+  const candidates = existing.filter(path => /\.json$/iu.test(path)
+    || /\.(?:js|mjs|cjs)$/iu.test(path)
     || (process.platform !== 'win32' && (/\.sh$|^\.githooks\/(?:pre-commit|pre-push|commit-msg)$/u.test(path))));
-  for (const path of subprocessCandidates.slice(0, MAX_STOP_SYNTAX_PROCESSES)) {
+  for (const path of candidates) {
+    const bytes = statSync(path).size;
+    if (performance.now() >= deadline || consumedBytes + bytes > maximumBytes) {
+      deferred.push(path);
+      continue;
+    }
+    consumedBytes += bytes;
+    checked.push(path);
     try {
-      if (/\.(?:js|mjs|cjs)$/iu.test(path)) execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
-      else execFileSync('sh', ['-n', path], { stdio: 'pipe' });
+      if (/\.json$/iu.test(path)) JSON.parse(readFileSync(path, 'utf8'));
+      else if (/\.(?:js|mjs|cjs)$/iu.test(path)) execFileSync(process.execPath, ['--check', path], { stdio: 'pipe', timeout: Math.max(50, deadline - performance.now()) });
+      else execFileSync('sh', ['-n', path], { stdio: 'pipe', timeout: Math.max(50, deadline - performance.now()) });
     } catch {
       failures.push(path);
     }
   }
-  return failures;
+  return { failures, checked, deferred, bytes: consumedBytes };
 }
 
 function stdin() {

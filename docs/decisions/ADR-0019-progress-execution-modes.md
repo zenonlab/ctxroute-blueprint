@@ -29,6 +29,10 @@ every completion attempt. Manual mode remains the only progression pause.
 `SubagentStart` automatically claims only claimable milestones from `automatic`
 goals when the agent type is explicitly `progress-worker`, then injects the
 milestone plus a required final `PROGRESS_RESULT` JSON footer.
+The portable context budget comes from the lifecycle contract and uses the
+smallest supported harness limit. Header and footer space is reserved before
+optional ticket details are truncated, so the result footer always survives
+host-side delivery.
 Both harnesses ship a project-local definition for that exact agent type; hook
 configuration alone does not create a launchable subagent.
 For substantial work with at least two genuinely independent claimable
@@ -55,7 +59,7 @@ decision, never a generic `go`.
 
 The mode changes progression policy only. It does not change Codex or Claude
 permissions, tool access, or technical safety controls.
-`SessionStart` injects only a bounded active-goal reminder and stays silent when
+`SessionStart` injects only the highest-priority runnable goal reminder and stays silent when
 no goal is active. Both harnesses invoke it again with `source=compact`, so a
 separate `PostCompact` context hook would be redundant and unsupported. The
 reminder is advisory and avoids a routine MCP status call after startup or

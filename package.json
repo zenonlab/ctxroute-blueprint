@@ -79,7 +79,7 @@
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "integration": "node scripts/integration-check.mjs",
     "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run blueprint:version:check && npm run hooks:performance && npm run sensor:blueprint && npm run test:coverage",
-    "verify": "npm run validate && npm run crg:smoke && npm run integration && npm run build:docs && npm run audit:dependencies"
+    "verify": "npm run validate && npm run crg:smoke && npm run integration && npm run build:docs && npm run audit:dependencies -- --required"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",

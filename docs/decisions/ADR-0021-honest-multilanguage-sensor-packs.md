@@ -57,6 +57,10 @@ provenance and a separate local-adaptation journal. Oxlint and
 batch as blocking `anti-slop/*` diagnostics. The optional Effect plugin is
 enabled only by direct `effect` dependency in `auto` mode, or by explicit
 policy. Blueprint-specific heuristics use `sensor/quality/*` identifiers.
+Expected command-line output from guarded tooling entrypoints is not classified
+as debug output. ESLint additionally enforces coarse function-size, nesting,
+and cyclomatic-complexity ceilings on maintained JavaScript to prevent further
+structural growth while focused refactors reduce existing hotspots.
 
 ## Consequences
 
@@ -66,10 +70,8 @@ catalogue entries remain visible as `PARTIAL` or `MISSING` until a compatible
 parser and fixture matrix are added. Presets containing an unavailable parser
 fail before mutation instead of pretending installation succeeded.
 
-The blueprint baseline has no exceptions. The 69 pre-existing
-`anti-slop/no-runtime-typeof` errors and the commit-message path false positive
-were removed. Stale entries and all unexpected blocking diagnostics fail the
-gate.
+The blueprint baseline contains only exact reviewed false positives. Stale
+entries and all unexpected blocking diagnostics fail the gate.
 
 Vendored anti-slop sources remain covered by their functional Sensor fixtures,
 but are excluded from the blueprint's aggregate Node coverage threshold. That

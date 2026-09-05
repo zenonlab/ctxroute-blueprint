@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { LIMITS, claimAutomaticProgressTicket, isSafeProgressReference, readProgress, releaseProgressClaims, updateProgressStep } from '../../scripts/progress-core.mjs';
+import { portableContextLimit } from './lifecycle-contract.mjs';
 
 const FOOTER_PREFIX = 'PROGRESS_RESULT: ';
-const MAX_TICKET_CONTEXT_LENGTH = 8 * 1024;
 const TRUNCATION_NOTICE = '[… ticket details truncated; inspect Progress only if the omitted detail is needed …]';
 
 export function sessionOwnerPrefix(harness, sessionId) {
@@ -58,7 +58,7 @@ async function startSubagent(harness, payload, root) {
   return {
     hookSpecificOutput: {
       hookEventName: 'SubagentStart',
-      additionalContext: ticketContext(claim.ticket),
+      additionalContext: ticketContext(claim.ticket, portableContextLimit('SubagentStart')),
     },
   };
 }
@@ -89,7 +89,7 @@ function findOwnedTicket(progress, owner) {
   return undefined;
 }
 
-function ticketContext(ticket) {
+function ticketContext(ticket, maximum) {
   const header = [
     'Progress assigned this automatic ticket to you.',
     `Goal: ${ticket.goalId}`,
@@ -106,9 +106,9 @@ function ticketContext(ticket) {
     'Use status BLOCKED only when the ticket cannot be completed, and include at least one short evidence reference.',
   ].join('\n');
   const fixedLength = header.length + footer.length + TRUNCATION_NOTICE.length + 4;
-  const boundedDetails = details.length + fixedLength <= MAX_TICKET_CONTEXT_LENGTH
+  const boundedDetails = details.length + fixedLength <= maximum
     ? details
-    : `${details.slice(0, MAX_TICKET_CONTEXT_LENGTH - fixedLength)}\n${TRUNCATION_NOTICE}`;
+    : `${details.slice(0, Math.max(0, maximum - fixedLength))}\n${TRUNCATION_NOTICE}`;
   return [header, boundedDetails, footer].filter(Boolean).join('\n');
 }
 

@@ -56,6 +56,9 @@ their texts is outside scope until a dedicated analyzer exists.
 
 Persist records as SQLite tables in the project-local state directory using WAL
 mode and parameterized statements. Bound and redact evidence before persistence.
+Apply a logical byte budget to the complete table and evict the least recently
+seen records transactionally when it is exceeded; record count alone is not a
+semantic limit.
 Fail open with a diagnostic if the store is unavailable.
 
 ## Consequences

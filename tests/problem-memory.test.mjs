@@ -59,6 +59,20 @@ test('the store records first occurrence and retains evidence for recurrences', 
   store.close();
 });
 
+test('problem memory prunes least-recently-seen rows by logical byte budget', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-bounded-'));
+  const store = new ProblemStore(directory, { maximumBytes: 1_500 });
+  let latest;
+  for (const [index, marker] of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta'].entries()) {
+    const observation = extractObservation({ success: false, tool_name: `tool-${marker}`, error: `unique-${marker}-${'x'.repeat(700)}` }, 'PostToolUse');
+    latest = store.record(observation, buildSignatures(observation), `2026-08-30T00:0${index}:00.000Z`, { structuralMatch: false });
+  }
+  assert.ok(store.database.prepare('SELECT COUNT(*) AS count FROM problems').get().count < 8);
+  assert.ok(store.get(latest.id));
+  assert.ok(store.logicalBytes() <= 1_500);
+  store.close();
+});
+
 test('handle emits a proposal only at the configured recurrence threshold', () => {
   const directory = mkdtempSync(join(tmpdir(), 'problem-memory-threshold-'));
   const config = { enabled: true, recordOn: ['PostToolUse'], recurrenceThreshold: 2, protectionMode: 'propose' };

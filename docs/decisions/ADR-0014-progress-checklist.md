@@ -108,9 +108,12 @@ The dashboard exposes completed goals without deleting them. A stale mutation
 reloads server state while preserving matching local drafts instead of silently
 overwriting either version.
 Completed goals can instead be moved explicitly with
-`npm run progress:archive` into `.project/progress-archive.json`. The archive
-is written before the active checklist, so an interrupted move can be replayed
-without duplicate records. Hooks never archive automatically. The distributable
-template keeps both active Progress and its archive schema-valid and empty;
+`npm run progress:archive`. The legacy `.project/progress-archive.json` remains
+readable while new immutable segments are written under
+`.project/progress-archive/` before the active checklist changes. Reads merge
+and validate every segment, so interrupted moves replay without duplicate
+records and archive growth never reaches one monolithic terminal ceiling.
+Hooks never archive automatically. The distributable template keeps active
+Progress and its legacy archive schema-valid and empty;
 blueprint-maintenance history remains available through Git and pull requests
 instead of being copied into every newly derived repository.

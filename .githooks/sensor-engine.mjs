@@ -239,7 +239,7 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
     const firstArgument = node.childForFieldName('arguments')?.namedChild(0);
     const callArgumentsText = node.childForFieldName('arguments')?.text ?? '';
     if (name === 'eval') diagnostics.push(diagnostic(path, node, 'sensor/dynamic-eval', 'UNSAFE', 'Dynamic eval execution is forbidden.'));
-    if (name === 'console.log' || name === 'console.debug') diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Debug output should not ship in production code.'));
+    if ((name === 'console.log' || name === 'console.debug') && !isExpectedCliOutput(path, source)) diagnostics.push(diagnostic(path, node, 'sensor/quality/debug-output', 'WARN', 'Debug output should not ship in production code.'));
     if (isShell(name)) {
       const first = node.childForFieldName('arguments')?.namedChild(0); const command = literal(first, source).toLowerCase();
       if (command && (config.dangerousCommands ?? []).some(value => command.includes(value))) diagnostics.push(diagnostic(path, node, 'sensor/dangerous-shell-command', 'UNSAFE', 'Dangerous shell command detected.'));
@@ -267,6 +267,12 @@ function inspectAst(path, source, node, diagnostics, config, state, language) {
   if (node.type === 'assignment_expression' && /(?:innerHTML|outerHTML)\s*=/u.test(text) && /<(?:style|script)\b|style\s*=/iu.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/ui-mixed-markup', 'WARN', 'HTML/CSS is embedded in a runtime string; keep UI structure and styles in their respective layers.'));
   if (node.type === 'jsx_attribute' && /^dangerouslySetInnerHTML\b/u.test(text)) diagnostics.push(diagnostic(path, node, 'sensor/xss', 'UNSAFE', 'Raw HTML is injected into a JSX element.'));
   if (node.type === 'property_identifier' && node.text === '__proto__') diagnostics.push(diagnostic(path, node, 'sensor/prototype-pollution', 'UNSAFE', 'Prototype mutation through __proto__ is forbidden.'));
+}
+
+function isExpectedCliOutput(path, source) {
+  const normalized = path.replaceAll('\\', '/');
+  return (/^(?:scripts|\.githooks)\//u.test(normalized)
+    && (/(?:process\.(?:argv|exitCode|exit)|import\.meta\.url)/u.test(source) || !/\bexport\s/u.test(source)));
 }
 
 function inspectRubyAst(path, source, node, diagnostics, config) {

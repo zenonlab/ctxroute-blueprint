@@ -5,15 +5,10 @@ mode: once
 
 # Agent progress checklist
 
-Progress is optional ordered memory, never a prerequisite or permission gate.
-Skip it for small or single-agent work. For substantial work, keep 2–6 outcome
-milestones when practical; larger plans are accepted unchanged with a warning.
-Never auto-split a plan or mirror files, commands, commits, or routine edits. Only truly
-independent parallel work is claimable by a `progress-worker`.
-
-MCP and `progress:*` CLI are equivalent; continue safely if either is unavailable.
-Only SubagentStart/SubagentStop/SessionEnd automate worker claims. PostToolUse
-never changes Progress. Manual means an undecided visual review or important
-decision—not another `go`. Resume context is advisory. Read full Progress only
-when details or a mutation are needed, and require Archify only for a material
-boundary, contract, dependency, or cross-component flow.
+Progress is optional ordered memory, never permission. For ordinary or single-agent
+work, continue directly without reading or updating it. Plans recommend 2–6
+outcome milestones but remain unchanged if larger. Use `progress-worker` only for
+genuinely independent work. MCP and CLI are equivalent optional interfaces.
+Hooks automate only worker start/stop/session end; PostToolUse never mutates.
+Manual means visual review or an important decision, never another `go`.
+Require Archify only for a material boundary, contract, dependency, or flow.

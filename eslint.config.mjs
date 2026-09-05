@@ -15,6 +15,9 @@ export default [{
   languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: nodeGlobals },
   linterOptions: { reportUnusedDisableDirectives: 'error' },
   rules: {
+    'complexity': ['error', 120],
+    'max-depth': ['error', 8],
+    'max-lines-per-function': ['error', { max: 200, skipBlankLines: true, skipComments: true }],
     'constructor-super': 'error',
     'for-direction': 'error',
     'getter-return': 'error',

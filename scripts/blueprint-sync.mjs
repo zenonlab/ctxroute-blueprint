@@ -1,18 +1,21 @@
 import { execFileSync } from 'node:child_process';
-import { constants } from 'node:fs';
+import { constants, existsSync, readFileSync } from 'node:fs';
 import { access, copyFile, lstat, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CONTROL_FILES = Object.freeze([
-  'AGENTS.md', 'CLAUDE.md', '.codex/hooks.json', '.claude/settings.json',
+  'AGENTS.md', 'CLAUDE.md', '.gitignore', '.codex/hooks.json', '.claude/settings.json',
+  '.github/workflows/validate.yml', 'eslint.config.mjs',
   '.project/blueprint-version.json',
   'scripts/progress-core.mjs', 'scripts/progress-cli.mjs', 'scripts/progress-mcp.mjs',
   'scripts/progress-dashboard.mjs', 'scripts/progress-dashboard-manager.mjs',
   'scripts/progress-dashboard-app.mjs', 'scripts/progress-dashboard.html',
   'scripts/progress-dashboard.css', 'scripts/progress-dashboard-client.js',
   'scripts/blueprint-sync.mjs', 'scripts/blueprint-version.mjs',
+  'scripts/blueprint-sensor.mjs', 'scripts/dependency-audit.mjs', 'scripts/hook-performance.mjs',
+  '.githooks/validate-ctxroute.mjs',
 ]);
 export const CONTROL_DIRECTORIES = Object.freeze([
   '.codex/agents', '.codex/hooks', '.claude/agents', '.claude/hooks/docs',
@@ -61,13 +64,27 @@ async function blueprintVersion(root) {
 }
 
 export function trackedControlFiles(root = scriptRoot) {
+  const repository = resolve(root);
   const output = execFileSync('git', ['ls-files', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
-    cwd: resolve(root), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   });
-  return output.split('\0')
+  const allTracked = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean));
+  const selected = new Set(output.split('\0')
     .filter(Boolean)
-    .filter(file => !file.startsWith('.claude/hooks/docs/adr-memory/'))
-    .sort();
+    .filter(file => !file.startsWith('.claude/hooks/docs/adr-memory/')));
+  const queue = [...selected];
+  for (const file of queue) {
+    if (!/\.(?:[cm]?js)$/iu.test(file) || !existsSync(resolve(repository, file))) continue;
+    const source = readFileSync(resolve(repository, file), 'utf8');
+    for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/gu)) {
+      const candidate = resolve(dirname(resolve(repository, file)), match[1]);
+      const relativePath = candidate.slice(repository.length + 1).replaceAll('\\', '/');
+      for (const dependency of [relativePath, `${relativePath}.mjs`, `${relativePath}.js`, `${relativePath}.cjs`, `${relativePath}.json`, `${relativePath}/index.mjs`, `${relativePath}/index.js`]) {
+        if (allTracked.has(dependency) && !selected.has(dependency)) { selected.add(dependency); queue.push(dependency); break; }
+      }
+    }
+  }
+  return [...selected].filter(file => existsSync(resolve(repository, file))).sort();
 }
 function assertGitRepository(root) {
   try { execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: root, stdio: 'ignore' }); }

@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { extractPaths } from './path-extraction.mjs';
+import { handlerContextBudget, hookContract } from './lifecycle-contract.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -17,11 +19,6 @@ export const lifecycleEvents = [
   'SessionEnd',
 ];
 
-const MAX_CONTEXT_LENGTH = 4096;
-const MAX_SUBAGENT_CONTEXT_LENGTH = 8 * 1024;
-// Keep CTXRoute well below this dispatcher's final cap so normal guidance fits
-// in one frame alongside bounded architecture context.
-const CTXROUTE_BUDGET = '1800';
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
@@ -31,25 +28,26 @@ export function handlerPlan(harness, event, root = projectRoot, lane = 'synchron
   const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
   const ctxroute = harness === 'codex' || harness === 'claude' ? direct : null;
   if (!ctxroute) return [];
+  const contextBudget = String(handlerContextBudget(event, root));
 
   if (event === 'PostToolUse' && lane === 'maintenance') {
     return [local('post-tool-crg.mjs'), problemMemory('PostToolUse'), local('archify-preview.mjs')];
   }
 
   return {
-    SessionStart: [ctxroute('session-inject.js', '--budget', CTXROUTE_BUDGET), local('progress-context.mjs', 'SessionStart'), local('crg-context.mjs')],
-    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', CTXROUTE_BUDGET)],
+    SessionStart: [ctxroute('session-inject.js', '--budget', contextBudget), local('progress-context.mjs', 'SessionStart')],
+    PreToolUse: [local('pre-tool-architecture.mjs'), ctxroute(harness === 'codex' ? 'codex-doc-inject.js' : 'doc-inject.js', '--budget', contextBudget)],
     PostToolUse: [ctxroute(harness === 'codex' ? 'codex-doc-write-guard.js' : 'doc-write-guard.js'), local('post-tool-sensor.mjs'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [ctxroute('turn-count.js'), ctxroute('canary-check.js'), problemMemory('UserPromptSubmit')],
     PreCompact: [ctxroute('ctxroute-reset.js')],
     Stop: [local('stop-review.mjs')],
     SubagentStart: [progressSubagent('SubagentStart')],
     SubagentStop: [progressSubagent('SubagentStop')],
-    SessionEnd: [progressSubagent('SessionEnd')],
+    SessionEnd: [progressSubagent('SessionEnd'), ctxroute('ctxroute-reset.js')],
   }[event] ?? [];
 }
 
-export function mergeOutputs(event, outputs, notices = []) {
+export function mergeOutputs(event, outputs, notices = [], contextLimit = 1200) {
   const merged = {};
   const hookSpecificOutput = {};
   const contexts = [];
@@ -65,7 +63,7 @@ export function mergeOutputs(event, outputs, notices = []) {
     if (output.hookSpecificOutput && output.hookSpecificOutput === Object(output.hookSpecificOutput)) {
       for (const [key, value] of Object.entries(output.hookSpecificOutput)) {
         if (key === 'additionalContext') {
-          if (value === String(value) && value.trim()) contexts.push(limit(value.trim(), MAX_CONTEXT_LENGTH));
+          if (value === String(value) && value.trim()) contexts.push(limit(value.trim(), contextLimit));
         } else {
           hookSpecificOutput[key] = value;
         }
@@ -73,7 +71,7 @@ export function mergeOutputs(event, outputs, notices = []) {
     }
   }
 
-  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), event === 'SubagentStart' ? MAX_SUBAGENT_CONTEXT_LENGTH : MAX_CONTEXT_LENGTH);
+  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), contextLimit);
   if (Object.keys(hookSpecificOutput).length) {
     hookSpecificOutput.hookEventName ??= event;
     merged.hookSpecificOutput = hookSpecificOutput;
@@ -95,15 +93,20 @@ export function isBlocking(output) {
 }
 
 export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler, lane = 'synchronous' }) {
-  const plan = applicableHandlers(handlerPlan(harness, event, root, lane), event, input);
-  if (!lifecycleEvents.includes(event) || !plan.length) {
+  const configuredPlan = handlerPlan(harness, event, root, lane);
+  const plan = applicableHandlers(configuredPlan, event, input);
+  if (!lifecycleEvents.includes(event) || !configuredPlan.length) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
+  if (!plan.length) return null;
 
   const outputs = [];
   const notices = [];
+  const contract = hookContract(harness, event, lane, root);
+  const deadline = Date.now() + contract.timeoutMs - 100;
   for (const handler of plan) {
-    const result = execute(handler, input, root);
+    const timeoutMs = Math.max(100, deadline - Date.now());
+    const result = execute(handler, input, root, { timeoutMs });
     if (result.error) {
       notices.push(`Lifecycle ${event} handler ${handler.name} failed open: ${result.error}`);
       continue;
@@ -115,25 +118,39 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
       outputs.push(output);
     }
   }
-  return mergeOutputs(event, outputs, notices);
+  return mergeOutputs(event, outputs, notices, contract.contextLimit);
 }
 
 export function applicableHandlers(plan, event, input) {
-  if (event !== 'PreToolUse') return plan;
-  let toolName;
-  try { toolName = JSON.parse(input || '{}')?.tool_name; }
+  let payload;
+  try { payload = JSON.parse(input || '{}'); }
   catch { return plan; }
+  const toolName = payload?.tool_name;
+  if (event === 'PostToolUse') {
+    const paths = extractPaths(payload?.tool_input ?? payload);
+    const failed = payload?.success === false || payload?.ok === false || payload?.is_error === true
+      || payload?.tool_response?.is_error === true || payload?.tool_response?.isError === true
+      || payload?.tool_result?.is_error === true || payload?.tool_result?.isError === true
+      || Boolean(payload?.tool_response?.error || payload?.tool_result?.error || payload?.error || payload?.failure || payload?.problem || payload?.problem_detected);
+    return plan.filter(handler => {
+      if (handler.name === 'problem-memory.mjs') return failed;
+      if (handler.name === 'archify-preview.mjs') return paths.some(path => path.replaceAll('\\', '/').startsWith('docs/architecture/src/'));
+      if (handler.name === 'post-tool-crg.mjs') return paths.some(path => /\.(?:[cm]?[jt]sx?|py|rb|rs|go|java|kt|php|swift|cs|vue|svelte)$/iu.test(path));
+      return true;
+    });
+  }
+  if (event !== 'PreToolUse') return plan;
   if (!toolName || /^(?:apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 
-export function executeHandler(handler, input, root) {
+export function executeHandler(handler, input, root, options = {}) {
   const result = spawnSync(process.execPath, [handler.path, ...handler.args], {
     cwd: root,
     env: ctxrouteEnvironment(root),
     input,
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: options.timeoutMs ?? 30_000,
   });
   const stderr = actionableStderr(result.stderr);
   if (result.error || (result.status !== 0 && result.status !== null)) {
