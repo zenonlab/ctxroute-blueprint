@@ -82,3 +82,10 @@ proxy the asset.
 Provider drivers are separate from product runtime code. The only mutation path
 is the approved operational gate: inspect current state, create a bounded plan,
 then apply that exact plan after user approval.
+
+`scripts/infra/provider-gate-core.mjs` owns this provider-neutral contract.
+`scripts/infra/cloudflare-driver.mjs` is the replaceable Wrangler translation,
+and `scripts/infra/tobirink-provider-gate.mjs` is the sole command composition
+root. Resource names come from `apps/worker/wrangler.jsonc`; none are duplicated
+in the gate. See [`docs/operations/cloudflare.md`](../operations/cloudflare.md)
+for the non-mutating and approved workflows.

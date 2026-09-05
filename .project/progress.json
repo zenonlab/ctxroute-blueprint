@@ -1892,6 +1892,80 @@
             "Worker route audit finds no direct D1, R2 or Images binding access; only composition.ts reads provider bindings.",
             "ESLint, Oxlint, Sensor SAFE, security 11/11, docs, decisions, diff-check and Tobirink Archify showcase 9/9 pass."
           ]
+        },
+        {
+          "id": "step-7",
+          "title": "Ajouter une gate inspect plan apply et un driver Cloudflare isolé",
+          "status": "DONE",
+          "acceptance": [
+            "Le cœur de gate ne connaît aucun SDK ni commande Cloudflare",
+            "Le driver Cloudflare est le seul propriétaire des commandes Wrangler",
+            "Inspect et plan ne mutent pas le provider",
+            "Apply refuse un plan absent, périmé, modifié, non approuvé ou hors allowlist",
+            "Aucun appel Cloudflare réel, déploiement, secret, coût, push ou suppression n'est effectué",
+            "Tests, lint, Sensor, documentation et architecture Tobirink passent"
+          ],
+          "files": [
+            "scripts/infra/provider-gate-core.mjs",
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/tobirink-provider-gate.mjs",
+            "scripts/infra/provider-gate-core.test.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "package.json",
+            "docs/decisions/ADR-0024-ports-adapters-and-provider-gates.md",
+            "docs/02-quality-strategy.md",
+            "docs/systems/README.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test scripts/infra/*.test.mjs",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- scripts/infra",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Gate 12/12: hashes déterministes, plans modifiés/périmés/non approuvés/hors allowlist refusés, drift distant et dry-run refusés avant mutation.",
+            "Driver isolé: seul cloudflare-driver.mjs connaît Wrangler; migrations D1 avant déploiement; audit global ne trouve aucun contournement.",
+            "npm run validate passe (269 tests, 1 skip); Worker 19/19, typecheck, ESLint, Oxlint, Sensor SAFE, docs et décisions passent.",
+            "Tobirink Archify passe 9/9 et le visual-check passe clair/sombre de 1440x900 à 2048x1320 sans overflow.",
+            "Aucun appel Cloudflare réel, déploiement, secret, coût, push ou suppression effectué."
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Rendre la couverture du driver visible par CRG",
+          "status": "DONE",
+          "acceptance": [
+            "Les tests du driver gardent les mêmes assertions et deviennent des fonctions de test nommées",
+            "CRG relie les appels au driver et son risque maximal passe sous 0.70",
+            "La suite infra et npm run validate passent sans appel Cloudflare réel"
+          ],
+          "files": [
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:infra",
+            "npm run crg:build",
+            "uv run --project packages/code-review-graph --frozen code-review-graph detect-changes --repo . --base origin/main",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run archify:visual-check -- tobirink.architecture",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "CRG officiel relie les tests nommés au driver et abaisse le risque maximal de 0.80 à 0.65, sous le seuil high 0.70.",
+            "Infra 16/16 et npm run validate passent: 269 tests, 1 skip, 0 échec, couverture lignes 90.86%.",
+            "Tobirink Archify showcase passe 9/9; visual-check clair/sombre 1440x900 à 2048x1320 sans overflow; aucun appel Cloudflare réel."
+          ]
         }
       ]
     },
