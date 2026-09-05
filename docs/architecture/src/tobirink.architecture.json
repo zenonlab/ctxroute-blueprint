@@ -25,7 +25,7 @@
         "id": "bookmark-boundary",
         "label": "Bookmark connector",
         "focus": ["appCore", "browserAdapter", "bookmarks"],
-        "note": "Bookmarks import by default and may receive an optional projection; they are never authoritative."
+        "note": "A bounded onInstalled import preserves browser folder paths and order in IndexedDB; bookmarks remain non-authoritative."
       },
       {
         "id": "catalogue-media",
@@ -71,7 +71,7 @@
     { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "schema-checked messages", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
     { "id": "workerCore", "from": "extensionWorker", "to": "appCore", "label": "validated commands", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[370, 502], [370, 430], [485, 430]], "labelAt": [385, 450] },
     { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "ports / lazy Dexie v3", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
-    { "id": "bookmarksImport", "from": "bookmarks", "to": "browserAdapter", "label": "import events", "fromSide": "bottom", "toSide": "bottom", "via": [[1025, 205], [745, 205]] },
+    { "id": "bookmarksImport", "from": "bookmarks", "to": "browserAdapter", "label": "onInstalled getTree", "fromSide": "bottom", "toSide": "bottom", "via": [[1025, 205], [745, 205]] },
     { "id": "bookmarkProjection", "from": "browserAdapter", "to": "bookmarks", "label": "optional projection", "variant": "dashed", "fromSide": "top", "toSide": "top", "via": [[745, 65], [1025, 65]] },
     { "id": "coreBrowser", "from": "appCore", "to": "browserAdapter", "label": "active page / cache commands", "fromSide": "right", "toSide": "bottom", "via": [[620, 362], [620, 230], [745, 230]], "labelAt": [645, 245] },
     { "id": "bootstrapCore", "from": "bootstrapStore", "to": "appCore", "label": "prefs / cache / recovery pointer", "variant": "dashed", "labelAt": [725, 345] },

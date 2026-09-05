@@ -1,5 +1,10 @@
-import { readPopupContext } from '@tobirink/application';
-import { WebExtensionPageContextAdapter, WebExtensionPopupContinuationCacheAdapter } from '@tobirink/adapters-browser';
+import { importFavoriteSources, readPopupContext } from '@tobirink/application';
+import {
+  normalizeBookmarks,
+  WebExtensionBookmarkImportAdapter,
+  WebExtensionPageContextAdapter,
+  WebExtensionPopupContinuationCacheAdapter,
+} from '@tobirink/adapters-browser';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
 
@@ -8,7 +13,13 @@ export default defineBackground({
   main() {
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
+    const bookmarks = new WebExtensionBookmarkImportAdapter(browser.bookmarks);
     const privateStorage = createExtensionLocalStorage();
+    browser.runtime.onInstalled.addListener(async () => {
+      await privateStorage.ensureReady();
+      const favorites = normalizeBookmarks(await bookmarks.importBookmarks());
+      await importFavoriteSources(favorites, privateStorage.storage, new Date().toISOString());
+    });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
       const parsed = extensionMessageSchema.safeParse(value);

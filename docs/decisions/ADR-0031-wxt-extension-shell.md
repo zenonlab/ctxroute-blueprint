@@ -58,6 +58,12 @@ a separate bounded `storage.local` adapter and never becomes authoritative. The
 extension workspace declares `@tobirink/adapters-indexeddb` directly because
 the composition root imports it; the dependency is not obtained transitively.
 
+The explicit `runtime.onInstalled` lifecycle event performs the initial local
+bookmark import. The browser adapter flattens `bookmarks.getTree()` into owned,
+serializable records; the application use case writes bounded batches into
+IndexedDB. No inventory scan runs merely because the worker wakes, and the
+installation import performs no provider or public-service request.
+
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its
 semantic shell and verifies the shared contrast, focus, reduced-motion and

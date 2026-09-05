@@ -10,10 +10,10 @@ describe('review-flow', () => {
     const enriched: string[] = [];
     const enrichment = { enrich: async (work: { id: string }) => { enriched.push(work.id); } };
     const favorites = normalizeBookmarks([
-      { bookmarkId: 'certain-1', title: 'Certain', url: 'https://example.test/certain' },
-      { bookmarkId: 'ambiguous-1', title: 'Ambiguous', url: 'https://example.test/ambiguous' },
-      { bookmarkId: 'offline-1', title: 'Offline', url: 'https://example.test/offline' },
-      { bookmarkId: 'ignored-1', title: 'Folder', url: 'chrome://bookmarks' },
+      { bookmarkId: 'certain-1', folderPath: ['Anime'], order: 0, title: 'Certain', url: 'https://example.test/certain' },
+      { bookmarkId: 'ambiguous-1', folderPath: ['Manga'], order: 1, title: 'Ambiguous', url: 'https://example.test/ambiguous' },
+      { bookmarkId: 'offline-1', folderPath: ['Manga'], order: 2, title: 'Offline', url: 'https://example.test/offline' },
+      { bookmarkId: 'ignored-1', folderPath: [], order: 3, title: 'Folder', url: 'chrome://bookmarks' },
     ]);
     const certainWork = createWork({ externalReferences: [], id: workId('work_certain1'), mediaKind: 'anime', preferredTitle: 'Certain' });
     const resolver = { resolve: async (favorite: { title: string }) => favorite.title === 'Certain' ? { kind: 'certain' as const, work: certainWork } : favorite.title === 'Ambiguous' ? { kind: 'ambiguous' as const } : { kind: 'unavailable' as const } };

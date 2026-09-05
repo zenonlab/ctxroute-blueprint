@@ -2,7 +2,7 @@ import { createReview, createWork, reviewId } from '@tobirink/domain';
 import type { Review, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 
-export interface ImportableFavorite { bookmarkId: string; state: 'eligible' | 'ignored'; title: string; url: string; }
+export interface ImportableFavorite { bookmarkId: string; folderPath: readonly string[]; order: number; state: 'eligible' | 'ignored'; title: string; url: string; }
 export type ResolutionOutcome = { kind: 'certain'; work: Work } | { kind: 'ambiguous' } | { kind: 'unavailable' };
 export interface ResolutionPort { resolve(favorite: ImportableFavorite): Promise<ResolutionOutcome>; }
 export interface EnrichmentPort { enrich(work: Work): Promise<void>; }

@@ -7,12 +7,14 @@ scope:
   - packages/contracts/**
   - packages/adapters-indexeddb/**
 review: on-change
+revised: true
 ---
 
 # ADR-0034 — Preserve imported favorite sources locally
 
 - Status: accepted
 - Date: 2026-09-05
+- Revised: 2026-09-06
 
 ## Context
 
@@ -36,6 +38,12 @@ sources. Dexie owns the versioned store and validates every record on reads and
 writes. Private export version 2 includes favorite sources; version 1 remains
 importable and materializes an empty source collection. Browser deletion never
 deletes a Work, progress record, or remembered source automatically.
+
+Initial and update installation events import eligible HTTP(S) bookmarks in
+bounded local transactions. Reimport updates the source placement and raw data,
+but preserves its original import time and any existing resolved Review. An
+interruption may leave completed batches visible; rerunning the idempotent
+import safely converges without deleting local records absent from bookmarks.
 
 ## Consequences
 

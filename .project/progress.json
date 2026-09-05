@@ -661,6 +661,65 @@
             "IndexedDB 2/2 + contrat Chromium; builds Chrome/Firefox ~584 kB; securite 12/12 et performance 3/3 passent sans scan, timer, reseau ni nouvelle permission.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR, lockfile coherent et Archify Tobirink 9/9 passent; navigateur integre indisponible, donc aucun smoke UI manuel revendique."
           ]
+        },
+        {
+          "id": "step-3",
+          "title": "Ecrire FavoriteSource et Review depuis l inventaire navigateur",
+          "status": "DONE",
+          "acceptance": [
+            "L adaptateur WebExtension conserve bookmarkId URL titre chemin de dossiers et ordre",
+            "Chaque favori HTTP(S) est importe localement avec FavoriteSource et Review dans une transaction",
+            "La reimportation est idempotente et preserve date initiale et Review resolue",
+            "onInstalled declenche seulement l import local sans reseau et le cache popup reste separe",
+            "Tests builds securite performance documentation et Archify passent"
+          ],
+          "files": [
+            "packages/application/src/ports/capability-ports.ts",
+            "packages/application/src/resolution/favorite-resolution.ts",
+            "packages/application/src/use-cases/import-favorite-sources.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "packages/application/src/index.ts",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-browser/src/bookmarks/web-extension-bookmark-adapter.ts",
+            "packages/adapters-browser/src/bookmarks/web-extension-bookmark-adapter.test.ts",
+            "packages/adapters-browser/src/bookmarks/normalize-bookmarks.ts",
+            "packages/adapters-browser/src/index.ts",
+            "packages/contracts/src/capability-fakes.ts",
+            "apps/extension/review-flow.test.ts",
+            "apps/extension/runtime/local-storage.ts",
+            "apps/extension/runtime/local-storage.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/decisions/ADR-0029-component-and-module-boundaries.md",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test --workspace @tobirink/adapters-browser",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:storage",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 18/18, adaptateur navigateur 2/2 et extension 60/60: import HTTP(S) transactionnel, chemins/ordre preserves et reimport idempotent.",
+            "IndexedDB 2/2 plus contrat Chromium; builds Chrome/Firefox ~586 kB, securite 12/12 et performance 3/3 passent sans reseau.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/34 ADR et Archify Tobirink 9/9 passent."
+          ]
         }
       ]
     },

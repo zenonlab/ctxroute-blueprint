@@ -81,6 +81,9 @@ describe('extension security boundary', () => {
     expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
     expect(background).toMatch(/createExtensionLocalStorage\(\)/);
     expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
+    expect(background).toMatch(/browser\.runtime\.onInstalled\.addListener/);
+    expect(background).toMatch(/normalizeBookmarks\(await bookmarks\.importBookmarks\(\)\)/);
+    expect(background).toMatch(/importFavoriteSources\(favorites, privateStorage\.storage/);
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
   });

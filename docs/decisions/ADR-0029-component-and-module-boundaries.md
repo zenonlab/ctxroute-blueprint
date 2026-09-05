@@ -21,7 +21,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-03
-- Revised: 2026-09-05
+- Revised: 2026-09-06
 
 ## Context
 
@@ -47,6 +47,8 @@ Keep product dependencies directed inward:
   network or provider details.
 - `packages/adapters-browser` validates bookmark URLs and owns WebExtension
   notification calls; application resolution receives only normalized records.
+  The package exposes its adapter contract tests through its own workspace test
+  script so root and focused gates execute the same maintained suite.
 - The IndexedDB adapter owns versioned Dexie migrations, local integrity
   checks, and browser-only migration fixtures. Root scripts expose these
   package checks without moving persistence behavior into the workspace root.

@@ -37,6 +37,13 @@ background-wide record scan. React surfaces receive serialized messages only;
 they never import Dexie or open IndexedDB directly. The popup continuation
 cache remains a separate, disposable `storage.local` record.
 
+On the explicit extension installation or update event, the browser adapter
+reads the bookmark tree and emits serializable records with their folder path
+and sibling order. The application imports HTTP(S) entries into IndexedDB in
+bounded batches, atomically pairing each `FavoriteSource` with its Review. A
+rerun preserves the initial import time and resolved decisions; missing browser
+bookmarks are not interpreted as local deletions.
+
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
 folder path, sibling order, import time and associated Review. Resolution stays

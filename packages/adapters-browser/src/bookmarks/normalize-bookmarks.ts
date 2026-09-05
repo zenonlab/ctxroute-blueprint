@@ -7,6 +7,13 @@ export function normalizeBookmarks(bookmarks: readonly BookmarkRecord[]): readon
       const url = new URL(bookmark.url);
       if (url.protocol === 'http:' || url.protocol === 'https:') state = 'eligible';
     } catch { state = 'ignored'; }
-    return Object.freeze({ bookmarkId: bookmark.bookmarkId, state, title: bookmark.title.trim() || bookmark.url, url: bookmark.url });
+    return Object.freeze({
+      bookmarkId: bookmark.bookmarkId,
+      folderPath: Object.freeze([...bookmark.folderPath]),
+      order: bookmark.order,
+      state,
+      title: bookmark.title.trim() || bookmark.url,
+      url: bookmark.url,
+    });
   });
 }
