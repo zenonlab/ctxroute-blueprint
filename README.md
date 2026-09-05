@@ -132,7 +132,8 @@ local claim bursts, and mutation tools return compact replies.
 Automatic goals are advisory at Stop and never force a continuation loop.
 For subagents, `SubagentStart` atomically claims the next `automatic` ticket and
 injects its criteria, files, commands, and required final `PROGRESS_RESULT`
-footer in at most 8 KiB of context. `SubagentStop` settles only that opaque session/agent claim; malformed
+footer inside the portable 2,500-character hook envelope. `SubagentStop`
+settles only that opaque session/agent claim; malformed
 results return it to `TODO`, and `SessionEnd` releases only that session's
 remaining `IN_PROGRESS` claims. Main agents continue to use the explicit MCP
 flow. The eight MCP tools and voluntary full resource are unchanged.

@@ -52,21 +52,20 @@ resumption does not require a routine MCP read.
 The full checklist is available only through the voluntary JSON resource
 `ctxroute://progress/full`; it is not an automatically selectable tool.
 `npm run progress:read` remains the human diagnostic path.
-`npm run progress:archive` explicitly moves completed goals into the replay-safe
-`.project/progress-archive.json`; no hook archives or deletes goals.
-The distributable template keeps that archive empty so a newly derived project
-does not inherit blueprint-maintenance history.
+`npm run progress:archive` explicitly moves completed goals into immutable,
+replay-safe segments under `.project/progress-archive/`. The legacy
+`.project/progress-archive.json` remains readable and empty in the distributable
+template; no hook archives or deletes goals.
 
 Stop mentions Archify only when an Archify source is already part of the
 change. A diagram is needed only when a material boundary, public contract,
 dependency, or cross-component flow changes; ordinary feature code does not
 trigger one by filename heuristic.
 
-Stop checks JSON syntax in-process and caps subprocess syntax probes at a small
-constant. Full JavaScript and shell syntax coverage remains part of the normal
-validation gate, so a large dirty worktree cannot multiply completion latency.
-The lifecycle performance gate uses repeated median samples and includes real
-Sensor and dirty-Stop fixtures.
+Stop checks syntax within byte and time budgets and reports checked and deferred
+paths. Full syntax coverage remains part of normal validation. The lifecycle
+performance gate covers all nine events, both harness plans, maintenance, and
+reports maximum observed latency and context.
 
 When multiple runnable goals coexist, Stop requires an unambiguous goal or
 step-title reference before applying manual policy. Ambiguity stays silent so

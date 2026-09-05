@@ -7,9 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
-import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { progressContext } from '../.codex/hooks/progress-context.mjs';
-import { archifyInstruction, progressContinuation } from '../.codex/hooks/stop-review.mjs';
+import { archifyInstruction, checkSyntax, progressContinuation } from '../.codex/hooks/stop-review.mjs';
 import { handleProgressLifecycle, isProgressWorker, parseProgressResult, sessionOwnerPrefix, subagentOwner } from '../.codex/hooks/progress-subagent.mjs';
 import { approvePlan, readProgress } from '../scripts/progress-core.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
@@ -72,14 +71,6 @@ test('configured lifecycle commands resolve the repository from a nested working
     });
     assert.equal(result.status, 0, result.stderr);
   }
-});
-
-test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () => {
-  assert.deepEqual(sessionStartOutput({ code: 0, timedOut: false }), { continue: true });
-  const failed = sessionStartOutput({ code: 1, timedOut: false, stderr: 'index unavailable' });
-  assert.deepEqual(Object.keys(failed), ['systemMessage']);
-  assert.match(failed.systemMessage, /index unavailable/u);
-  assert.ok(failed.systemMessage.length < 500);
 });
 
 test('resume context is silent without active work and bounded when work exists', async () => {
@@ -154,7 +145,7 @@ test('architecture evidence rejects unrelated documentation', () => {
 
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
-    SessionStart: ['session-inject.js', 'progress-context.mjs', 'crg-context.mjs'],
+    SessionStart: ['session-inject.js', 'progress-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
     PostToolUse: ['codex-doc-write-guard.js', 'post-tool-sensor.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['turn-count.js', 'canary-check.js', 'problem-memory.mjs'],
@@ -162,7 +153,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     Stop: ['stop-review.mjs'],
     SubagentStart: ['progress-subagent.mjs'],
     SubagentStop: ['progress-subagent.mjs'],
-    SessionEnd: ['progress-subagent.mjs'],
+    SessionEnd: ['progress-subagent.mjs', 'ctxroute-reset.js'],
   };
   for (const event of lifecycleEvents) {
     assert.deepEqual(handlerPlan('codex', event, root).map(handler => handler.name), expected[event]);
@@ -179,6 +170,9 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   assert.equal(handlerPlan('claude', 'PreToolUse', root)[1].name, 'doc-inject.js');
   assert.equal(handlerPlan('claude', 'PostToolUse', root)[0].name, 'doc-write-guard.js');
   assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs', 'problem-memory.mjs', 'archify-preview.mjs']);
+  assert.deepEqual(applicableHandlers(handlerPlan('codex', 'PostToolUse', root, 'maintenance'), 'PostToolUse', JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'README.md' }, tool_response: {} })), []);
+  assert.deepEqual(applicableHandlers(handlerPlan('codex', 'PostToolUse', root, 'maintenance'), 'PostToolUse', JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'src/app.ts' }, tool_response: {} })).map(handler => handler.name), ['post-tool-crg.mjs']);
+  assert.deepEqual(applicableHandlers(handlerPlan('codex', 'PostToolUse', root, 'maintenance'), 'PostToolUse', JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/src/system.architecture.json' }, tool_response: { is_error: true } })).map(handler => handler.name), ['problem-memory.mjs', 'archify-preview.mjs']);
   const codexInjection = handlerPlan('codex', 'PreToolUse', root)[1];
   assert.equal(codexInjection.path, join(root, 'node_modules', 'ctxroute', 'src', 'hooks', 'codex-doc-inject.js'));
   assert.deepEqual(codexInjection.args, ['--budget', '1800']);
@@ -256,7 +250,7 @@ test('subagent ticket context stays below both harness limits and preserves the 
   await approvePlan({ goalId: 'large-ticket', title: 'Bound context', executionMode: 'automatic', steps: [step], validationEvidence: ['audit'], approved: true }, directory);
   const result = await handleProgressLifecycle('codex', 'SubagentStart', JSON.stringify({ session_id: 'session', agent_id: 'agent', agent_type: 'progress-worker' }), directory);
   const context = result.hookSpecificOutput.additionalContext;
-  assert.ok(context.length <= 8 * 1024);
+  assert.ok(context.length <= 2500);
   assert.match(context, /ticket details truncated/u);
   assert.match(context.split(/\r?\n/u).findLast(line => line.trim()), /^Use status BLOCKED/u);
   assert.match(context, /PROGRESS_RESULT:/u);
@@ -645,6 +639,7 @@ test('Archify preview health checks accept only unauthenticated loopback HTTP UR
   const diagrams = [{ id: 'system.architecture', source: 'docs/architecture/src/system.architecture.json' }, { id: 'traffic.dataflow', source: 'docs/architecture/src/traffic.dataflow.json' }];
   assert.deepEqual(selectPreviewDiagram({ tool_input: { file_path: diagrams[1].source } }, diagrams), diagrams[1]);
   assert.equal(selectPreviewDiagram({ tool_input: { file_path: 'src/app.ts' } }, diagrams), null);
+  assert.equal(selectPreviewDiagram({ tool_input: { file_path: 'src/app.ts' } }, [diagrams[0]]), null);
 });
 
 test('Archify preview hook stays quiet when the template has no product diagram', () => {
@@ -807,6 +802,18 @@ test('Stop keeps lightweight JSON checks advisory', () => {
   assert.equal(output.decision, undefined);
 });
 
+test('Stop syntax review reports checked and deferred files under byte budgets', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'stop-syntax-budget-'));
+  const first = join(directory, 'first.json');
+  const second = join(directory, 'second.json');
+  writeFileSync(first, '{}');
+  writeFileSync(second, '{}');
+  const result = checkSyntax([first, second], { maximumBytes: 2, maximumMs: 5_000 });
+  assert.deepEqual(result.checked, [first]);
+  assert.deepEqual(result.deferred, [second]);
+  assert.deepEqual(result.failures, []);
+});
+
 test('commit-msg accepts Conventional Commits', () => {
   const directory = mkdtempSync(join(tmpdir(), 'hooks-test-'));
   mkdirSync(join(directory, '.git'));
@@ -899,8 +906,10 @@ test('disabled mutation remains skipped for trivial code', () => {
 });
 
 test('CTXRoute wiring validates and injects a matching project rule', () => {
+  const before = readdirSync(isolatedCtxrouteState).sort();
   const validation = spawnSync('node', [join(root, '.githooks/validate-ctxroute.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(validation.status, 0, validation.stderr);
+  assert.deepEqual(readdirSync(isolatedCtxrouteState).sort(), before);
 
   const session = `test-${process.pid}-${Date.now()}`;
   const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '0'], {
@@ -954,6 +963,21 @@ test('CTXRoute reinjects bounded context after PreCompact', () => {
   const reinjectedContext = JSON.parse(reinjected.stdout).hookSpecificOutput.additionalContext;
   assert.ok(reinjectedContext.trim(), 'PreCompact must make bounded context eligible again');
   assert.ok(reinjectedContext.length <= 3500);
+});
+
+test('SessionEnd releases CTXRoute state for only that session', () => {
+  const session = `ended-${process.pid}-${Date.now()}`;
+  const input = JSON.stringify({ session_id: session, cwd: root, tool_name: 'Edit', tool_input: { file_path: 'package.json' } });
+  const inject = () => spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], { cwd: root, input, encoding: 'utf8' });
+  assert.match(inject().stdout, /Project governance/u);
+  assert.doesNotMatch(inject().stdout, /Project governance/u);
+  const ended = spawnSync('node', [join(root, '.codex/hooks/lifecycle.mjs'), 'codex', 'SessionEnd'], {
+    cwd: root,
+    input: JSON.stringify({ session_id: session, cwd: root }),
+    encoding: 'utf8',
+  });
+  assert.equal(ended.status, 0, ended.stderr);
+  assert.match(inject().stdout, /Project governance/u);
 });
 
 test('CTXRoute injects UI contract guidance for conventional product UI paths', () => {

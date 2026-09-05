@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const MAX_FIELD_LENGTH = 4000;
+export const PROBLEM_MEMORY_BYTES = 4 * 1024 * 1024;
 
 export function normalizeText(value) {
   return String(value ?? '')
@@ -120,7 +121,8 @@ function digest(value) {
 }
 
 export class ProblemStore {
-  constructor(stateDirectory) {
+  constructor(stateDirectory, options = {}) {
+    this.maximumBytes = options.maximumBytes ?? PROBLEM_MEMORY_BYTES;
     mkdirSync(stateDirectory, { recursive: true });
     this.database = new DatabaseSync(join(stateDirectory, 'problem-memory.sqlite'));
     this.database.exec('PRAGMA journal_mode = WAL;');
@@ -146,12 +148,14 @@ export class ProblemStore {
     if (structural) {
       this.database.prepare(`UPDATE problems SET last_seen = ?, occurrences = occurrences + 1,
       evidence_json = ? WHERE id = ?`).run(now, appendEvidence(structural.evidence_json, observation.evidence), structural.id);
+      this.prune(structural.id);
       return { ...structural, occurrences: structural.occurrences + 1, match: exact ? 'exact' : 'structural', last_seen: now };
     }
     const result = this.database.prepare(`INSERT INTO problems
       (exact_signature, structural_signature, first_seen, last_seen, kind, evidence_json)
       VALUES (?, ?, ?, ?, ?, ?)`).run(signatures.exactSignature, signatures.structuralSignature,
       now, now, observation.kind, JSON.stringify([observation.evidence]));
+    this.prune(Number(result.lastInsertRowid));
     return { id: Number(result.lastInsertRowid), occurrences: 1, match: 'new', first_seen: now, last_seen: now };
   }
 
@@ -161,11 +165,43 @@ export class ProblemStore {
     }
     const result = this.database.prepare(`UPDATE problems SET resolution_json = ?, protection_status = ?, last_seen = ? WHERE id = ?`)
       .run(JSON.stringify(redactEvidence(resolution)), resolution.protectionStatus ?? 'resolved', now, problemId);
+    if (result.changes > 0) this.prune(problemId);
     return result.changes > 0;
   }
 
   get(problemId) {
     return this.database.prepare('SELECT * FROM problems WHERE id = ?').get(problemId);
+  }
+
+  logicalBytes() {
+    return Number(this.database.prepare(`SELECT COALESCE(SUM(
+      length(CAST(exact_signature AS BLOB)) + length(CAST(structural_signature AS BLOB))
+      + length(CAST(first_seen AS BLOB)) + length(CAST(last_seen AS BLOB))
+      + length(CAST(kind AS BLOB)) + length(CAST(evidence_json AS BLOB))
+      + length(CAST(COALESCE(resolution_json, '') AS BLOB)) + length(CAST(protection_status AS BLOB)) + 16
+    ), 0) AS bytes FROM problems`).get().bytes);
+  }
+
+  prune(preserveId) {
+    let bytes = this.logicalBytes();
+    if (bytes <= this.maximumBytes) return 0;
+    let removed = 0;
+    const oldest = this.database.prepare(`SELECT id,
+      length(CAST(exact_signature AS BLOB)) + length(CAST(structural_signature AS BLOB))
+      + length(CAST(first_seen AS BLOB)) + length(CAST(last_seen AS BLOB))
+      + length(CAST(kind AS BLOB)) + length(CAST(evidence_json AS BLOB))
+      + length(CAST(COALESCE(resolution_json, '') AS BLOB)) + length(CAST(protection_status AS BLOB)) + 16 AS bytes
+      FROM problems WHERE id != ? ORDER BY last_seen ASC, id ASC`).all(preserveId);
+    const remove = this.database.prepare('DELETE FROM problems WHERE id = ?');
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      for (const row of oldest) {
+        if (bytes <= this.maximumBytes) break;
+        remove.run(row.id); bytes -= Number(row.bytes); removed += 1;
+      }
+      this.database.exec('COMMIT');
+    } catch (error) { this.database.exec('ROLLBACK'); throw error; }
+    return removed;
   }
 
   close() { this.database.close(); }

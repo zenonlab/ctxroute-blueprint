@@ -6,7 +6,7 @@ const MAX_CONTEXT_LENGTH = 600;
 
 export async function progressContext(root = process.cwd(), event = 'SessionStart') {
   const progress = await readProgress(root);
-  const active = progress.goals.filter(goal => goal.status !== 'DONE').slice(0, 2);
+  const active = progress.goals.filter(goal => goal.status !== 'DONE' && goal.steps.some(step => step.status === 'TODO' || step.status === 'IN_PROGRESS')).slice(0, 1);
   if (!active.length) return null;
   const goals = active.map(goal => {
     const state = progressNext(progress, goal.id);

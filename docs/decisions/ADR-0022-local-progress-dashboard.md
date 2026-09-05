@@ -46,7 +46,7 @@ cannot receive it. Client JavaScript copies the token into tab-scoped
 `sessionStorage`, removes the fragment, and sends the token in a request header.
 Reloading that tab therefore remains authenticated without persisting the token
 across browser sessions. Every API request checks that token and local request
-metadata; JSON bodies are bounded, responses are not cached, and a restrictive
+metadata; JSON bodies use the shared Progress transport budget, responses are not cached, and a restrictive
 CSP permits only bundled resources. The server writes no request logs.
 
 All reads, validation, plan creation, edits, structural step changes, and mode

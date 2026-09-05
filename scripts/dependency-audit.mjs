@@ -37,6 +37,9 @@ export async function runDependencyAudit({ timeoutMs = DEFAULT_TIMEOUT_MS, npmCl
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const result = await runDependencyAudit();
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  if (result.infrastructureFailure) process.stderr.write(`::warning title=Dependency audit unavailable::${result.message}\n`);
+  if (result.infrastructureFailure) {
+    process.stderr.write(`::warning title=Dependency audit unavailable::${result.message}\n`);
+    if (process.argv.includes('--required')) process.exitCode = 1;
+  }
   else if (!result.ok) process.exitCode = 1;
 }

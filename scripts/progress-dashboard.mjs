@@ -3,10 +3,10 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { addProgressStep, approvePlan, deleteProgressStep, ensureProgressView, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
+import { LIMITS, addProgressStep, approvePlan, deleteProgressStep, ensureProgressView, progressRevision, readProgress, reorderProgressSteps, setProgressMode, updateProgressGoal, updateProgressStep, validatePlan } from './progress-core.mjs';
 import { DASHBOARD_CSS, DASHBOARD_HTML, DASHBOARD_JS } from './progress-dashboard-app.mjs';
 
-export const DASHBOARD_BODY_LIMIT = 32 * 1024;
+export const DASHBOARD_BODY_LIMIT = LIMITS.transportBytes;
 export const DEFAULT_IDLE_MS = null;
 const SECURITY_HEADERS = { 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' };
 

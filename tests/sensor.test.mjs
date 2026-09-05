@@ -327,6 +327,8 @@ test('anti-slop rules ignore comments and string contents', () => {
   assert.equal(analyzeSource('safe.js', '// console.log("debug")\nconst text = "TODO";').length, 0);
   assert.equal(analyzeSource('template.js', 'const html = `<style>main { color: red }</style>`;').length, 0);
   assert.equal(analyzeSource('debug.js', 'console.log(value);').at(0).rule, 'sensor/quality/debug-output');
+  assert.equal(analyzeSource('scripts/report.mjs', "if (import.meta.url) console.log('expected result');").some(item => item.rule === 'sensor/quality/debug-output'), false);
+  assert.equal(analyzeSource('scripts/library.mjs', 'export const value = 1; console.log(value);').at(0).rule, 'sensor/quality/debug-output');
 });
 test('unsupported and missing paths are explicit errors', () => {
   assert.equal(run('txt', 'plain text').body.verdict, 'ERROR');

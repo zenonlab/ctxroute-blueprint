@@ -61,7 +61,7 @@ export function selectPreviewDiagram(input, diagrams) {
   const mutation = JSON.stringify(input?.tool_input ?? {});
   const matching = diagrams.filter(diagram => mutation.includes(diagram.source) || mutation.includes(diagram.id));
   if (matching.length === 1) return matching[0];
-  return diagrams.length === 1 ? diagrams[0] : null;
+  return null;
 }
 
 function isRelevantMutation(value) {

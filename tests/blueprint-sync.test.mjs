@@ -5,7 +5,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { synchronizeBlueprint } from '../scripts/blueprint-sync.mjs';
+import { synchronizeBlueprint, trackedControlFiles } from '../scripts/blueprint-sync.mjs';
+
+test('blueprint sync includes transitive local dependencies of control files', () => {
+  const files = trackedControlFiles(source);
+  for (const dependency of ['scripts/progress-handoff.mjs', 'scripts/crg-runner.mjs', 'scripts/archify-registry.mjs', '.githooks/project-policy.mjs', '.githooks/ast-registry.mjs', '.githooks/sensor-engine.mjs', '.githooks/sensor-ir.mjs']) {
+    assert.ok(files.includes(dependency), dependency);
+  }
+});
 
 const source = fileURLToPath(new URL('..', import.meta.url));
 
@@ -20,7 +27,7 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   const preview = await synchronizeBlueprint({ source, target, timestamp: 'fixture' });
   assert.equal(preview.applied, false);
   assert.equal(preview.current, false);
-  assert.equal(preview.sourceVersion, '2026.09.05.1');
+  assert.equal(preview.sourceVersion, '2026.09.05.2');
   assert.equal(preview.targetVersion, null);
   assert.ok(preview.changes.some(change => change.file === 'AGENTS.md' && change.action === 'update'));
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), 'old doctrine\n');
@@ -29,11 +36,11 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   assert.equal(JSON.parse(check.stdout).current, false);
   const applied = await synchronizeBlueprint({ source, target, apply: true, timestamp: 'fixture' });
   assert.equal(applied.applied, true);
-  assert.equal(applied.targetVersion, '2026.09.05.1');
+  assert.equal(applied.targetVersion, '2026.09.05.2');
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), readFileSync(join(source, 'AGENTS.md'), 'utf8'));
   assert.equal(readFileSync(join(target, '.ctxroute/blueprint-backups/fixture/AGENTS.md'), 'utf8'), 'old doctrine\n');
   assert.ok(existsSync(join(target, '.codex/agents/progress-worker.toml')));
-  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.05.1');
+  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.05.2');
   await assert.rejects(() => synchronizeBlueprint({ source, target, apply: true }), /dirty/u);
 });
 
@@ -43,19 +50,22 @@ test('blueprint sync copies tracked allowlisted files only', async () => {
   git(fixtureSource, ['init']);
   git(target, ['init']);
   mkdirSync(join(fixtureSource, '.codex/hooks'), { recursive: true });
+  mkdirSync(join(fixtureSource, 'scripts'), { recursive: true });
   mkdirSync(join(fixtureSource, '.claude/hooks/docs/adr-memory'), { recursive: true });
   writeFileSync(join(fixtureSource, 'AGENTS.md'), 'tracked doctrine\n');
-  writeFileSync(join(fixtureSource, '.codex/hooks/tracked.mjs'), 'export {};\n');
+  writeFileSync(join(fixtureSource, '.codex/hooks/tracked.mjs'), "export { helper } from '../../scripts/helper.mjs';\n");
+  writeFileSync(join(fixtureSource, 'scripts/helper.mjs'), 'export const helper = true;\n');
   writeFileSync(join(fixtureSource, '.codex/hooks/local-cache.mjs'), 'ignored local cache\n');
   writeFileSync(join(fixtureSource, '.claude/hooks/docs/adr-memory/generated.md'), 'generated memory\n');
   writeFileSync(join(fixtureSource, '.gitignore'), '.codex/hooks/local-cache.mjs\n.claude/hooks/docs/adr-memory/\n');
-  git(fixtureSource, ['add', 'AGENTS.md', '.codex/hooks/tracked.mjs', '.gitignore']);
+  git(fixtureSource, ['add', 'AGENTS.md', '.codex/hooks/tracked.mjs', 'scripts/helper.mjs', '.gitignore']);
   git(fixtureSource, ['-c', 'user.email=test@example.test', '-c', 'user.name=Blueprint', 'commit', '-m', 'fixture']);
 
   const preview = await synchronizeBlueprint({ source: fixtureSource, target });
-  assert.deepEqual(preview.changes.map(change => change.file), ['.codex/hooks/tracked.mjs', 'AGENTS.md']);
+  assert.deepEqual(preview.changes.map(change => change.file), ['.codex/hooks/tracked.mjs', '.gitignore', 'AGENTS.md', 'scripts/helper.mjs']);
   await synchronizeBlueprint({ source: fixtureSource, target, apply: true });
   assert.ok(existsSync(join(target, '.codex/hooks/tracked.mjs')));
+  assert.ok(existsSync(join(target, 'scripts/helper.mjs')));
   assert.equal(existsSync(join(target, '.codex/hooks/local-cache.mjs')), false);
   assert.equal(existsSync(join(target, '.claude/hooks/docs/adr-memory/generated.md')), false);
 });

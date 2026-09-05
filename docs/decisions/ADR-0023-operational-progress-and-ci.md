@@ -33,7 +33,8 @@ terminate every detached dashboard they create even when an assertion fails.
 
 Derived repositories can inspect, drift-check, or apply a conservative control-plane update
 from a trusted blueprint checkout. The synchronizer has an explicit allowlist
-intersected with Git-tracked source files, so ignored caches and generated ADR
+intersected with Git-tracked source files and mechanically rejects an allowlist
+whose relative runtime imports are not closed. Ignored caches and generated ADR
 memory can never leak from one checkout into another. The synchronizer defaults
 to a dry run, refuses dirty targets, creates a recoverable backup, and
 never overwrites project decisions, Progress data, product documentation, or
@@ -46,9 +47,16 @@ Cross-platform CI runs the complete repository gate on Linux and bounded
 platform smoke checks on macOS and Windows. Dependency audit runs once in a
 dedicated Linux job through a bounded wrapper; only a decoded high or critical
 vulnerability result is a quality failure, while timeout, registry, or malformed
-response failure produces a visible non-blocking infrastructure warning. CRG
+response failure is visible locally and fails release verification. CRG
 high risk requests review but does not assert that
 correctness failed.
+
+Lifecycle dispatch derives aggregate deadlines and context ceilings from the
+checked harness configuration. Healthy SessionStart performs no CRG probe;
+CRG is checked only when explicitly used or after a relevant structured source
+edit. Problem memory and Archify preview handlers are skipped before process
+creation when the event cannot affect them. SessionEnd also asks CTXRoute to
+purge that session's scoped injection state.
 
 ## Consequences
 

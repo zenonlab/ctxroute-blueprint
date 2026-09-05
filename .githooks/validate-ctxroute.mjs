@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { inspectInstallation } from './postinstall.mjs';
 
@@ -35,19 +36,22 @@ const rulesDirectory = join('.claude', 'hooks', 'docs');
 if (!existsSync(rulesDirectory) || !readdirSync(rulesDirectory).some(name => name.endsWith('.md'))) failures.push('.claude/hooks/docs/ must contain at least one CTXRoute document');
 
 if (!failures.length) {
-  const environment = {
-    ...process.env,
-    CTXROUTE_CONFIG_PATH: join(root, 'ctxroute-config.json'),
-    CTXROUTE_DOCS_DIR: join(root, 'docs', 'mcp'),
-    CTXROUTE_FILEDOCS_DIR: join(root, '.claude', 'hooks', 'docs'),
-    CTXROUTE_FLEET_HOOKS_DIR: join(root, '.claude', 'hooks'),
-    CTXROUTE_SESSIONDOCS_DIR: join(root, 'docs', 'session'),
-    CTXROUTE_STATE_DIR: join(root, '.ctxroute', 'state'),
-  };
-  const doctor = spawnSync(process.execPath, ['node_modules/ctxroute/tools/doctor.js', '--quiet'], { cwd: root, env: environment, encoding: 'utf8' });
-  if (doctor.status !== 0) failures.push(`CTXRoute doctor failed: ${(doctor.stderr || doctor.stdout).trim()}`);
-  const corpus = spawnSync(process.execPath, ['node_modules/ctxroute/tools/lint-corpus.js', '--quiet'], { cwd: root, env: environment, encoding: 'utf8' });
-  if (corpus.status !== 0) failures.push(`CTXRoute corpus lint failed: ${(corpus.stderr || corpus.stdout).trim()}`);
+  const validationState = mkdtempSync(join(tmpdir(), 'ctxroute-validation-'));
+  try {
+    const environment = {
+      ...process.env,
+      CTXROUTE_CONFIG_PATH: join(root, 'ctxroute-config.json'),
+      CTXROUTE_DOCS_DIR: join(root, 'docs', 'mcp'),
+      CTXROUTE_FILEDOCS_DIR: join(root, '.claude', 'hooks', 'docs'),
+      CTXROUTE_FLEET_HOOKS_DIR: join(root, '.claude', 'hooks'),
+      CTXROUTE_SESSIONDOCS_DIR: join(root, 'docs', 'session'),
+      CTXROUTE_STATE_DIR: validationState,
+    };
+    const doctor = spawnSync(process.execPath, ['node_modules/ctxroute/tools/doctor.js', '--quiet'], { cwd: root, env: environment, encoding: 'utf8' });
+    if (doctor.status !== 0) failures.push(`CTXRoute doctor failed: ${(doctor.stderr || doctor.stdout).trim()}`);
+    const corpus = spawnSync(process.execPath, ['node_modules/ctxroute/tools/lint-corpus.js', '--quiet'], { cwd: root, env: environment, encoding: 'utf8' });
+    if (corpus.status !== 0) failures.push(`CTXRoute corpus lint failed: ${(corpus.stderr || corpus.stdout).trim()}`);
+  } finally { rmSync(validationState, { recursive: true, force: true }); }
 }
 
 if (failures.length) {

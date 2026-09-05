@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, open, stat, unlink } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, open, stat, unlink } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -7,9 +7,10 @@ import { isDeepStrictEqual } from 'node:util';
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
 export const PROGRESS_ARCHIVE_PATH = '.project/progress-archive.json';
+export const PROGRESS_ARCHIVE_DIRECTORY = '.project/progress-archive';
 export const PROGRESS_LOCK_PATH = '.ctxroute/state/progress.lock';
 export const PROGRESS_RESOURCE_URI = 'ctxroute://progress/full';
-export const LIMITS = { bytes: 64 * 1024, references: 30, evidence: 10, text: 500, next: 3, recommendedSteps: 6 };
+export const LIMITS = { bytes: 64 * 1024, transportBytes: 128 * 1024, references: 30, evidence: 10, text: 500, next: 3, recommendedSteps: 6 };
 const ARCHIVE_BYTES = 2 * 1024 * 1024;
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['automatic', 'manual']);
@@ -146,13 +147,14 @@ export async function archiveCompletedProgressGoals(root = process.cwd(), option
     }
     const archivedAt = new Date().toISOString();
     const additions = completed.filter(goal => !known.has(goal.id)).map(goal => ({ archivedAt, goal }));
-    const nextArchive = { schemaVersion: 1, goals: [...archive.goals, ...additions] };
-    const archiveJson = `${JSON.stringify(nextArchive, null, 2)}\n`;
-    if (Buffer.byteLength(archiveJson) > ARCHIVE_BYTES) throw new Error('progress archive exceeds 2 MiB');
-
     // Archive first: if the process stops between writes, replay sees the goal
     // in both places, avoids a duplicate, and completes the move safely.
-    await atomicWrite(resolve(root, PROGRESS_ARCHIVE_PATH), archiveJson);
+    if (additions.length) {
+      const segment = `${JSON.stringify({ schemaVersion: 1, goals: additions }, null, 2)}\n`;
+      if (Buffer.byteLength(segment) > LIMITS.bytes) throw new Error('progress archive segment exceeds 64 KiB');
+      const name = `${Date.now()}-${randomUUID()}.json`;
+      await atomicWrite(resolve(root, PROGRESS_ARCHIVE_DIRECTORY, name), segment);
+    }
     const next = { ...current, goals: current.goals.filter(goal => goal.status !== 'DONE') };
     await writeProgress(root, next);
     return { archived: completed.length, remaining: next.goals.length, progress: next };
@@ -160,22 +162,36 @@ export async function archiveCompletedProgressGoals(root = process.cwd(), option
 }
 
 export async function readProgressArchive(root = process.cwd()) {
+  const sources = [];
   try {
     const source = await readFile(resolve(root, PROGRESS_ARCHIVE_PATH), 'utf8');
     if (Buffer.byteLength(source) > ARCHIVE_BYTES) throw new Error('progress archive exceeds 2 MiB');
-    const value = JSON.parse(source);
-    if (!value || value.schemaVersion !== 1 || !Array.isArray(value.goals)) throw new Error('schemaVersion 1 and goals array are required');
-    const ids = new Set();
-    for (const entry of value.goals) {
-      if (!entry || Number.isNaN(Date.parse(entry.archivedAt)) || inspectProgressChecklist({ schemaVersion: 1, goals: [entry.goal] }).length) throw new Error('archive contains an invalid goal');
-      if (ids.has(entry.goal.id)) throw new Error(`archive contains duplicate goal: ${entry.goal.id}`);
-      ids.add(entry.goal.id);
-    }
-    return value;
+    sources.push({ name: PROGRESS_ARCHIVE_PATH, value: JSON.parse(source) });
   } catch (error) {
-    if (error.code === 'ENOENT') return { schemaVersion: 1, goals: [] };
-    throw new Error(`Cannot read progress archive: ${error.message}`);
+    if (error.code !== 'ENOENT') throw new Error(`Cannot read progress archive: ${error.message}`);
   }
+  try {
+    const directory = resolve(root, PROGRESS_ARCHIVE_DIRECTORY);
+    for (const name of (await readdir(directory)).filter(name => name.endsWith('.json')).sort()) {
+      const source = await readFile(resolve(directory, name), 'utf8');
+      if (Buffer.byteLength(source) > LIMITS.bytes) throw new Error(`${name} exceeds 64 KiB`);
+      sources.push({ name, value: JSON.parse(source) });
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new Error(`Cannot read progress archive: ${error.message}`);
+  }
+  const goals = [];
+  const known = new Map();
+  for (const source of sources) {
+    if (!source.value || source.value.schemaVersion !== 1 || !Array.isArray(source.value.goals)) throw new Error(`Cannot read progress archive: ${source.name} requires schemaVersion 1 and goals array`);
+    for (const entry of source.value.goals) {
+      if (!entry || Number.isNaN(Date.parse(entry.archivedAt)) || inspectProgressChecklist({ schemaVersion: 1, goals: [entry.goal] }).length) throw new Error(`Cannot read progress archive: ${source.name} contains an invalid goal`);
+      const previous = known.get(entry.goal.id);
+      if (previous && !isDeepStrictEqual(normalizeGoal(previous.goal), normalizeGoal(entry.goal))) throw new Error(`Cannot read progress archive: conflicting goal ${entry.goal.id}`);
+      if (!previous) { known.set(entry.goal.id, entry); goals.push(entry); }
+    }
+  }
+  return { schemaVersion: 1, goals };
 }
 
 export const progressStatus = value => value.goals.map(goal => withManualReason({ id: goal.id, title: goal.title, status: goal.status, executionMode: normalizeExecutionMode(goal.executionMode), steps: statusCounts(goal.steps) }, goal));

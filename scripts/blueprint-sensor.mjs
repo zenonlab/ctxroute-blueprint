@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { analyzePaths, isSupportedSourcePath, toSarif } from '../.githooks/sensor-engine.mjs';
@@ -32,7 +32,7 @@ export function evaluateBaseline(diagnostics, baseline) {
 export function trackedBlueprintSources() {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' })
     .split('\0')
-    .filter(path => path && SCOPES.some(scope => path.startsWith(scope)) && isSupportedSourcePath(path));
+    .filter(path => path && existsSync(path) && SCOPES.some(scope => path.startsWith(scope)) && isSupportedSourcePath(path));
 }
 
 function main() {
