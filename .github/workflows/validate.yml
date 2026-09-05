@@ -20,7 +20,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -78,13 +77,6 @@ jobs:
           node .githooks/sensor --checklist --json > sensor-checklist.json
           node scripts/blueprint-sensor.mjs > sensor.json
           node scripts/blueprint-sensor.mjs --sarif > sensor.sarif
-
-      - name: Upload unexpected Sensor diagnostics to code scanning
-        if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
-        with:
-          sarif_file: sensor.sarif
-          category: tobirink-sensor
 
       - name: Verify integration boundary
         run: npm run integration
@@ -149,5 +141,9 @@ jobs:
       - name: Verify clean install and idempotent checks
         shell: bash
         run: |
-          npm run setup
-          test -z "$(git status --porcelain)"
+          npm run setup:check
+          npm ci
+          uv sync --project packages/code-review-graph --frozen --python 3.12
+          npm run crg:version
+          npm run mcp:validate
+          test -z "$(git status --porcelain --untracked-files=no)"
