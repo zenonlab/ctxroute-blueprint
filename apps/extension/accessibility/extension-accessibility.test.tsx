@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { ExtensionSurface } from '../runtime/ExtensionSurface';
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+const extensionSurface = read('../runtime/ExtensionSurface.tsx');
+const reviewNavigationHook = read('../runtime/use-local-review-navigation.ts');
 
 const styles = {
   button: read('../../../packages/ui/src/components/button/Button.module.css'),
@@ -56,6 +58,14 @@ describe('extension accessibility contract', () => {
     expect(markup).toContain('aria-haspopup="dialog"');
     expect(markup).not.toContain('<dialog');
     expect(styles.memberNavigation).toMatch(/\.reviewPanel::before/);
+  });
+
+  it('feeds every member-page bell through one local serialized queue boundary', () => {
+    expect(extensionSurface.match(/useLocalReviewNavigation\(/g)).toHaveLength(3);
+    expect(extensionSurface).not.toMatch(/emptyNavigation/);
+    expect(reviewNavigationHook).toMatch(/readReviewQueueMessage\(\)/);
+    expect(reviewNavigationHook).toMatch(/if \(!active\) return/);
+    expect(reviewNavigationHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\./);
   });
 
   it('keeps the popup shell and compact tablist available while runtime context loads', () => {

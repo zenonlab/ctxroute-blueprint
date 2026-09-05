@@ -29,7 +29,7 @@ function isState(value: string): value is ReviewResolverState {
 function ReviewResolverDemo({ state }: { state: ReviewResolverState }) {
   const [result, setResult] = useState<ReviewDecision | null>(null);
   const [position, setPosition] = useState(1);
-  const currentItem = { ...item, position };
+  const currentItem = state === 'partial' ? { ...item, candidates: [], position } : { ...item, position };
   return (
     <section className={styles.preview}>
       <ReviewResolver
@@ -56,7 +56,7 @@ const reviewResolverPreview = definePreview({
   purpose: 'Résoudre un favori ambigu sans transformer la source en carte candidate.',
   variants: ['candidate-only'],
   states: [...reviewResolverStates],
-  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe'],
+  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file locale sans candidats en état partiel'],
   sources: [
     { label: 'API publique', path: 'features/review/review-resolver/index.ts' },
     { label: 'Contrat', path: 'features/review/review-resolver/review-resolver.contract.ts' },

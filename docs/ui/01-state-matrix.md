@@ -8,7 +8,7 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 | --- | --- | --- | --- | --- | --- | --- |
 | Menu d’extension | Cette œuvre affiche un état central; les reprises peuvent rester disponibles | analyse de l’onglet actif, agenda ou préférences annoncée dans le panneau actif | titre actif conservé sans enrichissement distant | cache de reprise et données locales restent consultables | nouvelle tentative limitée à Cette œuvre ou Sorties; Réglages complets reste accessible | état central explicite si `activeTab` ou le port de lecture manque; Réglages complets reste accessible |
 | Bibliothèque | état central illustré avec invitation à importer | état central illustré sans contrôles inactifs | filtres et œuvres locales visibles, métadonnées manquantes signalées | recherche, filtres et progression restent actifs | état central avec nouvelle tentative ciblée | état central expliquant la reprise de migration |
-| Panneau Review | bulle compacte avec Inbox et un seul libellé | état central pendant la lecture locale | état central signalant les métadonnées manquantes ; choix dans la cloche | état central confirmant la disponibilité locale ; choix dans la cloche | état central avec relecture ciblée | état central demandant de rouvrir la cloche après conflit |
+| Panneau Review | bulle compacte avec Inbox et un seul libellé | état central pendant la lecture locale | contexte local et navigation conservés ; aucune décision sans candidat | état central confirmant la disponibilité locale ; choix dans la cloche | état central avec relecture ciblée | état central demandant de rouvrir la cloche après conflit |
 | Agenda | aucune sortie connue pour la période | squelette de groupes temporels | dates estimées séparées des dates confirmées | dernier agenda local daté et consultable | actualiser la période concernée | permission de notification refusée pour un rappel |
 | Réglages complets | arbre racine visible, invitation à créer un premier dossier | calcul de l’aperçu annoncé sans masquer l’arbre | règles locales visibles, enrichissement distant absent | édition, aperçu local et restauration restent disponibles | recalculer uniquement l’aperçu | organisateur indisponible si le port local n’est pas raccordé |
 | Workbench local | aucun résultat pour le filtre ou aucun composant découvert | chargement du module de preview sélectionné | preview disponible, fichier source facultatif absent | identique : aucune dépendance réseau nécessaire | recharger la preview isolée | erreur de compilation localisée avec chemin du fichier |
@@ -48,6 +48,9 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   présente une correspondance à la fois et son propriétaire fournit la suivante.
 - Les flèches de pied parcourent la file sans écrire de décision ; elles sont
   désactivées aux bornes et pendant l'enregistrement d'un choix.
+- Une Review locale sans candidat affiche son contexte et sa position, mais ni
+  saisie manuelle ni action de décision tant qu'un port de résolution n'a pas
+  fourni des choix vérifiables.
 - Toute date d'agenda affiche son statut officiel, confirmé ou estimé au même
   endroit que la date.
 - Les sept jours de l’Agenda restent côte à côte sur mobile dans un rail

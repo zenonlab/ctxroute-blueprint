@@ -68,7 +68,7 @@
   "connections": [
     { "id": "readerUi", "from": "reader", "to": "extensionUi", "label": "interacts", "variant": "emphasis", "labelAt": [158, 408] },
     { "id": "uiCore", "from": "extensionUi", "to": "appCore", "label": "commands / queries", "variant": "emphasis", "labelAt": [360, 408] },
-    { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "schema-checked messages", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
+    { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "context + Review messages", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
     { "id": "workerCore", "from": "extensionWorker", "to": "appCore", "label": "validated commands", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[370, 502], [370, 430], [485, 430]], "labelAt": [385, 450] },
     { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "ports / lazy Dexie v3", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
     { "id": "bookmarksImport", "from": "bookmarks", "to": "browserAdapter", "label": "onInstalled getTree", "fromSide": "bottom", "toSide": "bottom", "via": [[1025, 205], [745, 205]] },

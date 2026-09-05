@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
-import type { MemberNavigationConfig } from '@tobirink/ui';
 import { emptyLibraryFilters } from '../../../packages/ui/src/features/library/library-filters';
 import type { LibraryFiltersValue } from '../../../packages/ui/src/features/library/library-filters';
 import { Agenda } from '../entrypoints/agenda';
@@ -11,6 +10,7 @@ import type { PopupWork } from '../entrypoints/popup';
 import { Review } from '../entrypoints/review';
 import type { NavigationTarget } from './messages';
 import { readPopupContextMessage, sendExtensionMessage } from './messages';
+import { useLocalReviewNavigation } from './use-local-review-navigation';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
 
@@ -20,35 +20,16 @@ function open(target: NavigationTarget) {
   void sendExtensionMessage({ target, type: 'navigation.open', version: 1 });
 }
 
-function emptyNavigation(activeId?: 'agenda' | 'home' | 'library'): MemberNavigationConfig {
-  return {
-    activeId,
-    onSearch: () => undefined,
-    review: {
-      count: 0,
-      resolver: {
-        canNext: false,
-        canPrevious: false,
-        onNext: () => undefined,
-        onPrevious: () => undefined,
-        onRefresh: () => undefined,
-        onRetry: () => undefined,
-        onSubmitDecision: () => undefined,
-        state: 'empty',
-      },
-    },
-  };
-}
-
 function LibrarySurface() {
   const [filters, setFilters] = useState<LibraryFiltersValue>(emptyLibraryFilters);
+  const navigation = useLocalReviewNavigation('library');
 
   return (
     <Library
       filterOptions={emptyFilterOptions}
       filters={filters}
       items={[]}
-      navigation={emptyNavigation('library')}
+      navigation={navigation}
       onChangeFilters={setFilters}
       onDownloadExtension={() => undefined}
       onLoadMore={() => undefined}
@@ -57,6 +38,20 @@ function LibrarySurface() {
       state="empty"
     />
   );
+}
+
+function ReviewSurface() {
+  const navigation = useLocalReviewNavigation();
+  const resolver = navigation.review.resolver;
+  const state = resolver.state === 'loading' || resolver.state === 'empty' || resolver.state === 'partial' || resolver.state === 'error'
+    ? resolver.state
+    : 'ready';
+  return <Review navigation={navigation} onRetry={resolver.onRetry} state={state} />;
+}
+
+function AgendaSurface() {
+  const navigation = useLocalReviewNavigation('agenda');
+  return <Agenda canNext={false} canPrevious={false} days={[]} navigation={navigation} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel="Cette semaine" state="empty" updatedAt="Jamais" />;
 }
 
 function OptionsSurface() {
@@ -130,17 +125,11 @@ export function ExtensionSurface({ name }: { name: ExtensionSurfaceName }) {
   }
 
   if (name === 'review') {
-    return (
-      <Review
-        navigation={emptyNavigation()}
-        onRetry={() => undefined}
-        state="empty"
-      />
-    );
+    return <ReviewSurface />;
   }
 
   if (name === 'agenda') {
-    return <Agenda canNext={false} canPrevious={false} days={[]} navigation={emptyNavigation('agenda')} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel="Cette semaine" state="empty" updatedAt="Jamais" />;
+    return <AgendaSurface />;
   }
 
   if (name === 'options') {

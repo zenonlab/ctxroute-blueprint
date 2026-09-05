@@ -59,6 +59,10 @@ par `Icon` et Lucide ; ils ne remplacent jamais la marque.
 La cloche reste visuellement identifiable au repos, immédiatement à droite de
 la recherche. Le pied du resolver affiche précédent, position courante et
 suivant ; avancer reporte temporairement l'élément sans enregistrer de décision.
+La file locale alimente ce compteur et cette navigation sur Bibliothèque,
+Agenda et la route Review. Si aucun candidat n'est encore disponible, le
+contexte du favori et les flèches restent visibles mais aucune saisie ni action
+de décision factice n'est proposée.
 Quand la file est vide, la bulle reprend l'empty state FavLib compact : une
 icône Inbox grise et le seul libellé « Aucune correspondance à vérifier », sans
 en-tête ni description internes supplémentaires.

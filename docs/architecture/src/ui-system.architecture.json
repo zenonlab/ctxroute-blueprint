@@ -18,7 +18,7 @@
         "id": "product-reuse",
         "label": "Réutilisation produit",
         "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "extension"],
-        "note": "Le popup et les pages composent les mêmes composants publics; modèles sérialisables et actions restent séparés à leur frontière."
+        "note": "Les pages injectent à la cloche une file Review sérialisable; le resolver masque les décisions tant que les candidats manquent."
       }
     ]
   },
@@ -47,7 +47,7 @@
     { "id": "previewUi", "from": "previewModules", "to": "uiPackage", "label": "importe l’API publique", "variant": "default", "fromSide": "top", "toSide": "bottom", "via": [[340, 232], [295, 232]] },
     { "id": "uiReviewResolver", "from": "uiPackage", "to": "reviewResolver", "label": "API publique", "variant": "default" },
     { "id": "resolverNavigation", "from": "reviewResolver", "to": "memberNavigation", "label": "bulle de la cloche", "variant": "emphasis", "labelAt": [685, 158] },
-    { "id": "navigationExtension", "from": "memberNavigation", "to": "extension", "label": "enveloppe les pages", "variant": "default" }
+    { "id": "navigationExtension", "from": "extension", "to": "memberNavigation", "label": "file locale + callbacks", "variant": "default" }
   ],
   "cards": [
     {
@@ -66,6 +66,7 @@
         "La bulle Review compose le resolver partagé sans modaliser la page",
         "L’empty Review compact garde seulement Inbox et un libellé",
         "Les flèches parcourent la file sans soumettre de décision",
+        "Sans candidat, le contexte local reste navigable mais aucune décision factice n’apparaît",
         "Seules les candidates utilisent la coque WorkCard",
         "Le popup réemploie WorkCard et Navigation compacte",
         "Cette œuvre est en 3:2; ses cinq reprises restent en 2:3",

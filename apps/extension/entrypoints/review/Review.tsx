@@ -20,7 +20,7 @@ const reviewCopy = {
     title: 'Aucune correspondance à vérifier',
   },
   partial: {
-    description: 'Les choix locaux restent accessibles depuis la cloche pendant l’enrichissement.',
+    description: 'Le contexte local reste accessible dans la cloche en attendant les candidats.',
     title: 'Certaines métadonnées manquent',
   },
   offline: {
