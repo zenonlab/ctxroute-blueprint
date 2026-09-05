@@ -1,5 +1,0 @@
--- Schema-only migration. A previous implementation repaired links while the
--- migration ran, which made deployment mutate personal favorites without an
--- operator decision. The idempotent repair now lives in the explicit
--- `repair-anime-season-links` command: preview is the default and apply needs
--- an explicit confirmation. Existing chain tables from 0039 are untouched.

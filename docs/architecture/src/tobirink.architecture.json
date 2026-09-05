@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tobirink — authoritative data and media architecture",
+    "subtitle": "WXT MV3 shell, IndexedDB authority, consented public signals, optimized catalogue and covers",
+    "output": "tobirink-architecture.html",
+    "quality_profile": "showcase",
+    "visual_preset": "signal-flow",
+    "viewBox": [1390, 820],
+    "views": [
+      {
+        "id": "local-authority",
+        "label": "Private local authority",
+        "focus": ["reader", "extensionUi", "extensionWorker", "appCore", "indexedDb", "bootstrapStore"],
+        "note": "IndexedDB alone owns the private library, progress, agenda, and durable tasks."
+      },
+      {
+        "id": "extension-security",
+        "label": "Extension security boundary",
+        "focus": ["extensionUi", "extensionWorker", "browserAdapter"],
+        "note": "WXT generates the least-privilege manifest; local-only CSP and validated messages guard the MV3 worker."
+      },
+      {
+        "id": "bookmark-boundary",
+        "label": "Bookmark connector",
+        "focus": ["appCore", "browserAdapter", "bookmarks"],
+        "note": "Bookmarks import by default and may receive an optional projection; they are never authoritative."
+      },
+      {
+        "id": "catalogue-media",
+        "label": "Catalogue and covers",
+        "focus": ["appCore", "remotePorts", "workerApi", "cloudGateways", "d1", "imageGateway", "r2"],
+        "note": "Worker routes consume injected ports; one composition root owns D1, R2, Images, and their bounded policy."
+      }
+    ]
+  },
+  "components": [
+    { "id": "reader", "type": "external", "label": "Reader", "pos": [20, 330], "size": [115, 64] },
+    { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
+    { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "local-first use cases", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
+    { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "validated message router", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
+    { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "migrations / durable tasks", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
+    { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "activeTab / cache / notifications", "pos": [650, 100], "size": [190, 64] },
+    { "id": "bookmarks", "type": "external", "label": "Browser bookmarks", "sublabel": "Import / optional projection", "pos": [930, 100], "size": [190, 64] },
+    { "id": "bootstrapStore", "type": "database", "label": "Browser storage", "sublabel": "Prefs + reprise cache + recovery", "pos": [650, 250], "size": [190, 64] },
+    { "id": "remotePorts", "type": "backend", "label": "Remote capability ports", "sublabel": "Consent / data / media", "pos": [650, 480], "size": [190, 64] },
+    { "id": "workerApi", "type": "cloud", "label": "Worker routes", "sublabel": "Injected ports only", "pos": [930, 390], "size": [170, 64] },
+    { "id": "cloudGateways", "type": "backend", "label": "Cloud composition", "sublabel": "Policy + replaceable adapters", "pos": [930, 550], "size": [190, 64], "tag": "single wiring root" },
+    { "id": "d1", "type": "database", "label": "D1 public index", "sublabel": "Consented associations + catalogue", "pos": [1140, 340], "size": [210, 64] },
+    { "id": "imageGateway", "type": "cloud", "label": "Image gateway", "sublabel": "3 fixed resize / quantize variants", "pos": [1140, 500], "size": [210, 64], "tag": "Cloudflare Images" },
+    { "id": "r2", "type": "cloud", "label": "R2 object storage", "sublabel": "Masters + public snapshots + backups", "pos": [1140, 660], "size": [210, 64] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "Private device boundary", "wraps": ["extensionUi", "extensionWorker", "appCore", "indexedDb", "browserAdapter", "bootstrapStore", "remotePorts"] },
+    { "kind": "region", "label": "Optional Cloudflare boundary", "wraps": ["workerApi", "cloudGateways", "d1", "imageGateway", "r2"] }
+  ],
+  "connections": [
+    { "id": "readerUi", "from": "reader", "to": "extensionUi", "label": "interacts", "variant": "emphasis", "labelAt": [158, 408] },
+    { "id": "uiCore", "from": "extensionUi", "to": "appCore", "label": "commands / queries", "variant": "emphasis", "labelAt": [360, 408] },
+    { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "schema-checked messages", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
+    { "id": "workerCore", "from": "extensionWorker", "to": "appCore", "label": "validated commands", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[370, 502], [370, 430], [485, 430]], "labelAt": [385, 450] },
+    { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "atomic domain transactions", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
+    { "id": "bookmarksImport", "from": "bookmarks", "to": "browserAdapter", "label": "import events", "fromSide": "bottom", "toSide": "bottom", "via": [[1025, 205], [745, 205]] },
+    { "id": "bookmarkProjection", "from": "browserAdapter", "to": "bookmarks", "label": "optional projection", "variant": "dashed", "fromSide": "top", "toSide": "top", "via": [[745, 65], [1025, 65]] },
+    { "id": "coreBrowser", "from": "appCore", "to": "browserAdapter", "label": "active page / cache commands", "fromSide": "right", "toSide": "bottom", "via": [[620, 362], [620, 230], [745, 230]], "labelAt": [645, 245] },
+    { "id": "bootstrapCore", "from": "bootstrapStore", "to": "appCore", "label": "prefs / cache / recovery pointer", "variant": "dashed", "labelAt": [725, 345] },
+    { "id": "coreRemote", "from": "appCore", "to": "remotePorts", "label": "optional typed capabilities", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[485, 512]] },
+    { "id": "portsWorker", "from": "remotePorts", "to": "workerApi", "label": "HTTPS contract", "variant": "dashed" },
+    { "id": "workerComposition", "from": "workerApi", "to": "cloudGateways", "label": "resolve injected services", "variant": "security", "fromSide": "bottom", "toSide": "top" },
+    { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "catalogue / consent ports", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
+    { "id": "workerImages", "from": "cloudGateways", "to": "imageGateway", "fromSide": "right", "toSide": "left" },
+    { "id": "workerR2", "from": "cloudGateways", "to": "r2", "label": "object storage ports", "variant": "security", "fromSide": "right", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Authority", "items": ["IndexedDB owns all active private state", "The five-item popup cache is expiring and non-authoritative"] },
+    { "dot": "cyan", "title": "Cloud gateways", "items": ["Routes never read provider bindings directly", "One composition root injects ports and bounded policy"] },
+    { "dot": "violet", "title": "Image discipline", "items": ["Rights-gated content-addressed R2 masters", "96x144, 192x288, and 384x576 variants only"] },
+    { "dot": "rose", "title": "Public + recovery", "items": ["Shared release revision remains available offline", "Backup is encrypted locally before immutable R2 I/O"] }
+  ]
+}

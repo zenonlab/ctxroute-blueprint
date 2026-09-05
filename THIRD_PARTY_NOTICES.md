@@ -1,19 +1,46 @@
 # Third-party notices
 
-FavLib ne redistribue aucun dataset tiers brut. Les métadonnées externes restent isolées avec leur provenance et leur attribution ; les images distantes sont téléchargées puis servies localement.
+## CTXRoute
 
-Pour chaque intégration réelle, enregistrer nom, version/release, URL officielle, licence, attribution requise, modifications éventuelles et emplacement d'utilisation.
+CTXRoute is copyright its contributors and is distributed under the MIT License.
 
-| Projet | Usage prévu | Licence |
-|---|---|---|
-| [shadcn/ui](https://github.com/shadcn-ui/ui) | composants et shell UI | MIT |
-| [Radix UI Primitives](https://github.com/radix-ui/primitives) | primitives accessibles | MIT |
-| [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) | styles et tokens | MIT |
-| [Lucide](https://github.com/lucide-icons/lucide) | icônes via `lucide-react` | ISC, avec héritage Feather indiqué par le projet |
-| [TanStack Query](https://github.com/TanStack/query) | état serveur client | MIT |
-| [next-themes](https://github.com/pacocoursey/next-themes) | thèmes Next.js | MIT |
-| [WXT](https://github.com/wxt-dev/wxt) | extension Web | MIT |
-| [Graphile Worker](https://github.com/graphile/worker) | file de jobs PostgreSQL | MIT |
-| [axe-core Playwright](https://github.com/dequelabs/axe-core-npm) | gate de test automatisé WCAG A/AA du Web | MPL-2.0 |
+Source: https://github.com/zenonlab/ctxroute
 
-Seanime, Suwayomi, Komga et Kavita sont uniquement des références UX tant qu'aucun code ou asset n'en est copié. Toute reprise future doit vérifier la licence du fichier source et reporter les notices nécessaires ici.
+The installed dependency includes its complete license text. CTXRoute is not
+relicensed by this repository's Apache-2.0 license.
+
+## MCP TypeScript SDK
+
+`@modelcontextprotocol/client` and `@modelcontextprotocol/server` 2.0.0 are
+distributed under the MIT License.
+
+Source: https://github.com/modelcontextprotocol/typescript-sdk
+
+## Tree-sitter grammars
+
+The pinned Tree-sitter runtime and JavaScript, TypeScript, Python, and Ruby
+grammar packages are distributed under their respective MIT licenses.
+
+Source: https://github.com/tree-sitter
+
+## anti-slop
+
+The vendored anti-slop Oxlint plugin is copyright Dillon Mulroy and is
+distributed under the MIT License. Production sources and licence are pinned to
+commit `e8c4880471b23ab7f216fba7b27d173a6ef07d4c`; provenance and the complete
+licence text are stored under `tools/oxlint/anti-slop/`.
+
+Source: https://github.com/dmmulroy/anti-slop
+
+## code-review-graph
+
+`code-review-graph` 2.3.8 is copyright its contributors and is distributed
+under the MIT License.
+
+Source: https://github.com/tirth8205/code-review-graph
+
+## Ignore matching
+
+`ignore` 7.0.8 is distributed under the MIT License.
+
+Source: https://github.com/kaelzhang/node-ignore

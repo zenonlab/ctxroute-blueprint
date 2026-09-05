@@ -1,0 +1,26 @@
+.review {
+  background: var(--color-canvas);
+  display: grid;
+  min-height: calc(100vh - var(--size-control-touch) - var(--space-6));
+  padding: var(--space-6);
+  place-items: center;
+  width: 100%;
+}
+
+.centeredState {
+  max-width: calc(var(--size-column-min) * 2);
+  width: 100%;
+}
+
+.preview {
+  background: var(--color-canvas);
+  min-height: 100%;
+}
+
+.preview .review {
+  min-height: calc(var(--size-column-min) * 2);
+}
+
+@media (max-width: 32rem) {
+  .review { padding: var(--space-4); }
+}

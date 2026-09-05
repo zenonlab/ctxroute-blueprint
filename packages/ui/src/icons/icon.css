@@ -1,0 +1,115 @@
+:root {
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-stroke-width: 1.75;
+}
+
+.ui-icon {
+  display: block;
+  fill: none;
+  flex: 0 0 auto;
+  height: var(--icon-size-md);
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: var(--icon-stroke-width);
+  width: var(--icon-size-md);
+}
+
+.ui-icon[data-size='sm'] {
+  height: var(--icon-size-sm);
+  width: var(--icon-size-sm);
+}
+
+.ui-icon[data-size='lg'] {
+  height: var(--icon-size-lg);
+  width: var(--icon-size-lg);
+}
+
+.ui-icon[data-folder-priority='true'] {
+  fill: currentcolor;
+}
+
+.ui-icon__priority {
+  fill: var(--ui-icon-priority-contrast, var(--color-surface-raised));
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+  stroke: none;
+  text-anchor: middle;
+}
+
+.icon-foundation {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  display: grid;
+  font-family: var(--font-family-sans);
+  gap: var(--space-6);
+  min-height: 100%;
+  padding: var(--space-8);
+  width: 100%;
+}
+
+.icon-foundation__header {
+  align-items: end;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.icon-foundation__eyebrow,
+.icon-foundation__index,
+.icon-foundation__rule {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.icon-foundation__eyebrow {
+  color: var(--color-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.icon-foundation__header h3 {
+  font-size: var(--font-size-title);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  margin: 0;
+}
+
+.icon-foundation__index,
+.icon-foundation__rule {
+  color: var(--color-text-subtle);
+}
+
+.icon-foundation__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-control-touch) * 2), 1fr));
+}
+
+.icon-foundation__sample {
+  align-items: center;
+  background: var(--color-surface);
+  border: var(--size-border) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  min-height: calc(var(--size-control-touch) * 2);
+  padding: var(--space-4);
+}
+
+.icon-foundation__sample code {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-meta);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.icon-foundation__rule {
+  border-top: var(--size-border) solid var(--color-border);
+  margin: 0;
+  padding-top: var(--space-3);
+}

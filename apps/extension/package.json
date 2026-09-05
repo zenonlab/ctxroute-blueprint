@@ -1,16 +1,32 @@
 {
-  "name": "@favlib/extension",
-  "version": "0.5.3",
+  "name": "@tobirink/extension",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
+  "license": "Apache-2.0",
   "scripts": {
-    "dev": "node node_modules/wxt/bin/wxt.mjs",
-    "build": "node node_modules/wxt/bin/wxt.mjs build --mv3 && node node_modules/wxt/bin/wxt.mjs build -b firefox --mv3 && node scripts/package-downloads.mjs",
-    "lint": "node node_modules/typescript/bin/tsc --noEmit",
-    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "dev": "wxt",
+    "postinstall": "wxt prepare",
     "test": "vitest run",
-    "verify:downloads": "node scripts/verify-published-downloads.mjs"
+    "test:security": "npm run build && npm run build:firefox && vitest run security",
+    "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@favlib/contracts": "workspace:*", "@favlib/metadata": "workspace:*" },
-  "devDependencies": { "@types/chrome": "0.0.280", "typescript": "5.7.3", "vitest": "2.1.8", "wxt": "0.19.29" }
+  "dependencies": {
+    "@tobirink/adapters-browser": "*",
+    "@tobirink/application": "*",
+    "@tobirink/ui": "*",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@wxt-dev/module-react": "1.2.2",
+    "wxt": "0.21.4",
+    "vitest": "4.1.11"
+  }
 }

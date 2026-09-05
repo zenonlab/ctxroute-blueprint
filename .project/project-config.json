@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "status": "initialized",
+  "tooling": {
+    "runtime": "node",
+    "packageManager": "npm"
+  },
+  "decisions": {
+    "language": "Strict TypeScript across product packages and shared contracts",
+    "runtime": "Manifest V3 browser contexts; Node.js 24 LTS product tooling; inherited governance keeps Node.js 22.13+ compatibility",
+    "frontend": "WXT 0.21.x extension entrypoints with React 19 and CSS Modules",
+    "backend": "Optional single Hono Cloudflare Worker for anonymous public capabilities; no Rails or Next.js in v1",
+    "storage": "Private state in IndexedDB through a Dexie adapter; optional anonymous public data in D1 through a repository adapter",
+    "deployment": "Deterministic WXT browser packages and separately approved Cloudflare inspect-plan-apply operations; no automatic production deployment",
+    "observability": "Provider-neutral TelemetryPort, bounded redacted local diagnostics, optional Workers Logs, and no remote extension telemetry by default",
+    "security": "Local-first privacy, least-privilege MV3 permissions, strict CSP, Zod validation at trust boundaries, provider isolation, and explicit operational approval",
+    "performance": "Local UI response under 200 ms, no unbounded background startup, target extension package below 1.5 MB compressed, and optional API p95 below 300 ms"
+  },
+  "commands": {
+    "test": "npm run test:coverage",
+    "initialize": "npm run initialize",
+    "lint": "npm run lint",
+    "typecheck": null,
+    "mutation": null,
+    "integration": "npm run integration",
+    "build": "npm run build:docs",
+    "workspaceCheck": "npm run workspace:check",
+    "crgUpdate": "npm run crg:update",
+    "governanceCheck": "npm run governance:check",
+    "progressRead": "npm run progress:read",
+    "progressValidate": "npm run progress:validate",
+    "progressApprove": "npm run progress:approve",
+    "progressMcp": "npm run progress:mcp",
+    "astCheck": "npm run ast:check",
+    "crgMcp": "npm run crg:mcp",
+    "crgSmoke": "npm run crg:smoke",
+    "performance": "npm run crg:smoke",
+    "sensorBlueprint": "npm run sensor:blueprint",
+    "mermaid": null
+  },
+  "quality": {
+    "sensor": {
+      "languages": [
+        "javascript",
+        "typescript",
+        "json"
+      ],
+      "antiSlopEffect": "auto"
+    },
+    "mutation": {
+      "decision": "recommended",
+      "preCommit": false,
+      "prePush": false
+    }
+  },
+  "directories": {
+    "source": [
+      "apps/",
+      "packages/",
+      "scripts/"
+    ],
+    "tests": [
+      "tests/"
+    ],
+    "generated": [
+      "coverage/",
+      "dist/",
+      "build/",
+      ".ctxroute/state/",
+      ".code-review-graph/",
+      "packages/code-review-graph/.venv/"
+    ]
+  },
+  "codeExtensions": [
+    ".js",
+    ".mjs",
+    ".ts",
+    ".tsx",
+    ".json"
+  ],
+  "architecture": {
+    "documents": [
+      "docs/architecture/src/tobirink.architecture.json",
+      "docs/architecture/src/ui-system.architecture.json"
+    ],
+    "internalDocuments": [
+      "docs/architecture/src/blueprint.architecture.json",
+      "docs/architecture/src/traffic.dataflow.json",
+      "docs/architecture/src/sensor.dataflow.json"
+    ]
+  },
+  "contracts": {
+    "patterns": [
+      "package.json",
+      "**/package.json",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+      "**/yarn.lock",
+      "**/bun.lock",
+      "**/pyproject.toml",
+      "**/requirements*.txt",
+      "**/Pipfile",
+      "**/poetry.lock",
+      "**/uv.lock",
+      "**/Cargo.toml",
+      "**/Cargo.lock",
+      "**/go.mod",
+      "**/go.sum",
+      "**/pom.xml",
+      "**/build.gradle",
+      "**/build.gradle.kts",
+      "**/composer.json",
+      "**/composer.lock",
+      "**/Gemfile",
+      "**/Gemfile.lock",
+      "**/*.proto",
+      "**/openapi*.yaml",
+      "**/openapi*.yml",
+      "**/openapi*.json",
+      "**/*.graphql",
+      "**/*.gql"
+    ]
+  },
+  "documentation": {
+    "roots": [
+      "docs/",
+      "documentation/",
+      "specs/"
+    ],
+    "extensions": [
+      ".md",
+      ".markdown",
+      ".rst",
+      ".adoc",
+      ".asciidoc",
+      ".txt",
+      ".mmd"
+    ]
+  },
+  "starter": {
+    "infrastructureRoots": [
+      ".codex/",
+      ".claude/",
+      ".githooks/",
+      ".github/",
+      ".project/",
+      "docs/",
+      "packages/",
+      "scripts/",
+      "tests/",
+      "tools/",
+      ".devcontainer/"
+    ],
+    "rootFiles": [
+      ".gitignore",
+      "eslint.config.mjs",
+      "oxlint.config.ts",
+      ".mcp.json",
+      ".gitmessage",
+      ".gitattributes",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "CONTRIBUTING.md",
+      "LICENSE",
+      "NOTICE",
+      "README.md",
+      "SECURITY.md",
+      "THIRD_PARTY_NOTICES.md",
+      "ctxroute-config.json",
+      "package.json",
+      "package-lock.json",
+      "skills-lock.json"
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "policy": "schema-first",
+  "documents": [
+    {
+      "id": "architecture",
+      "kind": "architecture-ir",
+      "audience": "internal",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/blueprint.architecture.json",
+      "narrative": "docs/architecture/README.md",
+      "validator": "npm run validate:architecture"
+    },
+    {
+      "id": "traffic-dataflow",
+      "kind": "traffic-dataflow-ir",
+      "audience": "internal",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/traffic.dataflow.json",
+      "narrative": "docs/architecture/README.md",
+      "validator": "node .githooks/archify validate internal"
+    },
+    {
+      "id": "sensor-dataflow",
+      "kind": "sensor-dataflow-ir",
+      "audience": "internal",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/sensor.dataflow.json",
+      "narrative": "docs/decisions/ADR-0021-honest-multilanguage-sensor-packs.md",
+      "validator": "node .githooks/archify validate internal"
+    },
+    {
+      "id": "project-brief",
+      "kind": "brief",
+      "format": "markdown",
+      "source": "docs/00-project-brief.md",
+      "requiredSections": ["Summary", "Constraints", "Decisions", "Success criteria"]
+    },
+    {
+      "id": "technology-decisions",
+      "kind": "decision-index",
+      "format": "markdown",
+      "source": "docs/01-technology-decisions.md"
+    },
+    {
+      "id": "quality-strategy",
+      "kind": "quality-strategy",
+      "format": "markdown",
+      "source": "docs/02-quality-strategy.md",
+      "requiredSections": ["Quality strategy", "Decision rule"]
+    },
+    {
+      "id": "architecture-decisions",
+      "kind": "adr-corpus",
+      "format": "markdown-frontmatter",
+      "sourceGlob": "docs/decisions/ADR-*.md",
+      "exclude": ["docs/decisions/ADR-0000-template.md"],
+      "requiredMetadata": ["scope", "review"]
+    },
+    {
+      "id": "sensor-rules",
+      "kind": "versioned-rule-config",
+      "format": "json",
+      "source": ".project/sensor-rules.json",
+      "requiredKeys": ["schemaVersion", "dangerousCommands", "sql"]
+    },
+    {
+      "id": "sensor-baseline",
+      "kind": "versioned-exception-config",
+      "format": "json",
+      "source": ".project/sensor-baseline.json",
+      "requiredKeys": ["schemaVersion", "exceptions"],
+      "validator": "npm run sensor:blueprint"
+    },
+    {
+      "id": "ui-design-contract",
+      "kind": "ui-contract",
+      "format": "json",
+      "source": ".project/ui-design-contract.json",
+      "narrative": "docs/ui-design-contract.md",
+      "requiredKeys": ["schemaVersion", "policy", "tokens", "components", "rules", "adapters"]
+    },
+    {
+      "id": "progress-checklist",
+      "kind": "progress-contract",
+      "format": "json",
+      "source": ".project/progress.json",
+      "narrative": "docs/progress.md",
+      "requiredKeys": ["schemaVersion", "goals"],
+      "validator": "npm run progress:validate"
+    }
+  ]
+}

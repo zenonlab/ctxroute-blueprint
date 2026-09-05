@@ -1,0 +1,56 @@
+---
+scope:
+  - .githooks/sensor-engine.mjs
+  - .githooks/sensor-checklist.mjs
+  - .codex/hooks/post-tool-sensor.mjs
+  - .project/sensor-rules.json
+  - package.json
+  - docs/architecture/src/blueprint.architecture.json
+  - docs/00-project-brief.md
+  - docs/02-quality-strategy.md
+  - tests/sensor.test.mjs
+  - tests/post-tool-sensor.test.mjs
+review: on-change
+revised: true
+contracts:
+  - package.json
+---
+# ADR-0011 — Sensor coverage registry and checklist
+
+## Decision
+
+The Sensor owns one executable adapter registry. Each entry
+declares language, extensions and filenames, exact grammar package/variant,
+actual mode, embedded extractor, availability, and fallback policy.
+Syntax-aware adapters remain separate from lexical adapters, so support for a
+file extension never implies AST or whole-program guarantees. The current lexical set covers common Rust,
+Go, JVM, native, scripting, mobile, functional, systems, infrastructure, and
+configuration formats, including Dockerfile/Makefile/Justfile and `.env`
+filenames. The registry currently contains 113 file extensions and 9
+extensionless filenames; this includes Ruby/Rails source and ERB/Haml/Slim plus
+common Phoenix, Blade, Jinja, Twig, Tera, Handlebars, Liquid, EJS, Pug, Razor,
+and JSP templates. Additional languages require an explicit registry entry and
+tests.
+
+The repository exposes `npm run sensor:checklist` as a read-only CLI. It reports
+the registry, bounded analysis contract, required configuration, architecture,
+and test evidence in human-readable or `--json` form. It does not modify files,
+permissions, hooks, or global configuration.
+
+## Consequences
+
+PostToolUse recognizes the same catalogue as the CLI. `PASS` is now computed
+from an actually loaded parser; lexical and extractor coverage is `PARTIAL`,
+and unverified entries are `MISSING`. Ruby and ERB use the required Tree-sitter
+Ruby grammar. PHP is recognized but remains `MISSING`, with lexical fallback
+available only for an ad hoc file. Fallback checks do not claim a grammar,
+type analysis, SQL dataflow, or runtime behavior proof.
+
+Official code-review-graph maintains its own parser and graph for context. It
+does not share this registry and cannot replace or bypass the Sensor gate.
+
+## Alternatives
+
+Claiming universal language support would hide false negatives. Installing a
+parser for every ecosystem would add unreviewed dependencies to a stack-neutral
+blueprint. A generated checklist that edits policy would exceed its audit role.

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tobirink — système UI et workbench local",
+    "output": "ui-system-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 520],
+    "legend": { "mode": "hidden" },
+    "views": [
+      {
+        "id": "component-discovery",
+        "label": "Découverte automatique",
+        "focus": ["previewModules", "registry", "workbench", "canvas"],
+        "note": "Chaque preview colocalisée rejoint le catalogue sans registre manuel."
+      },
+      {
+        "id": "product-reuse",
+        "label": "Réutilisation produit",
+        "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "extension"],
+        "note": "Le popup et les pages composent les mêmes composants publics; modèles sérialisables et actions restent séparés à leur frontière."
+      }
+    ]
+  },
+  "components": [
+    { "id": "lucide", "type": "external", "label": "Lucide React", "sublabel": "icônes nommées", "pos": [20, 190], "size": [140, 64] },
+    { "id": "designer", "type": "external", "label": "Contributeur", "sublabel": "conçoit et vérifie", "pos": [20, 320], "size": [140, 64] },
+    { "id": "previewModules", "type": "frontend", "label": "Previews colocalisées", "sublabel": "*.preview.tsx + métadonnées", "pos": [250, 320], "size": [180, 64] },
+    { "id": "registry", "type": "backend", "label": "Registre automatique", "sublabel": "import.meta.glob", "pos": [540, 320], "size": [170, 64] },
+    { "id": "workbench", "type": "frontend", "label": "UI Workbench", "sublabel": "catalogue / aperçu", "pos": [830, 320], "size": [180, 64] },
+    { "id": "canvas", "type": "frontend", "label": "Aperçu interactif", "sublabel": "composant / page / popup", "pos": [1130, 170], "size": [185, 64] },
+    { "id": "uiPackage", "type": "frontend", "label": "Package UI", "sublabel": "tokens + composants + marque", "pos": [210, 80], "size": [170, 64] },
+    { "id": "reviewResolver", "type": "frontend", "label": "ReviewResolver", "sublabel": "choix + navigation différée", "pos": [460, 80], "size": [180, 64] },
+    { "id": "memberNavigation", "type": "frontend", "label": "Shell membre", "sublabel": "recherche + cloche + bulle", "pos": [730, 80], "size": [180, 64] },
+    { "id": "extension", "type": "frontend", "label": "Extension Tobirink", "sublabel": "popup + pages + organisateur", "pos": [1030, 80], "size": [180, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Outils de développement locaux", "wraps": ["previewModules", "registry", "workbench", "canvas"] },
+    { "kind": "security-group", "label": "Code produit partagé", "wraps": ["uiPackage", "reviewResolver", "memberNavigation", "extension"] }
+  ],
+  "connections": [
+    { "id": "lucideUi", "from": "lucide", "to": "uiPackage", "label": "icônes nommées", "variant": "default", "labelAt": [185, 158] },
+    { "id": "designerPreview", "from": "designer", "to": "previewModules", "label": "crée", "variant": "emphasis" },
+    { "id": "previewRegistry", "from": "previewModules", "to": "registry", "label": "import.meta.glob", "variant": "emphasis" },
+    { "id": "registryWorkbench", "from": "registry", "to": "workbench", "label": "catalogue typé", "variant": "emphasis" },
+    { "id": "workbenchCanvas", "from": "workbench", "to": "canvas", "label": "rend la preview", "variant": "emphasis" },
+    { "id": "previewUi", "from": "previewModules", "to": "uiPackage", "label": "importe l’API publique", "variant": "default", "fromSide": "top", "toSide": "bottom", "via": [[340, 232], [295, 232]] },
+    { "id": "uiReviewResolver", "from": "uiPackage", "to": "reviewResolver", "label": "API publique", "variant": "default" },
+    { "id": "resolverNavigation", "from": "reviewResolver", "to": "memberNavigation", "label": "bulle de la cloche", "variant": "emphasis", "labelAt": [685, 158] },
+    { "id": "navigationExtension", "from": "memberNavigation", "to": "extension", "label": "enveloppe les pages", "variant": "default" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Découverte",
+      "items": [
+        "Une preview colocalisée suffit pour apparaître",
+        "Aucun registre de composants écrit à la main"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Réutilisation",
+      "items": [
+        "La cloche du header est l’unique entrée Review visible",
+        "La bulle Review compose le resolver partagé sans modaliser la page",
+        "L’empty Review compact garde seulement Inbox et un libellé",
+        "Les flèches parcourent la file sans soumettre de décision",
+        "Seules les candidates utilisent la coque WorkCard",
+        "Le popup réemploie WorkCard et Navigation compacte",
+        "Cette œuvre est en 3:2; ses cinq reprises restent en 2:3",
+        "Le popup garde trois préférences rapides et ouvre l’organisateur complet",
+        "L’organisateur édite un arbre ordonné puis ouvre un aperçu pleine page",
+        "Chaque règle ouvre ses filtres et affiche son rang contrasté dans le SVG dossier rempli",
+        "Réglages complets ne regroupe ni préparation, notifications, exports ni diagnostics",
+        "Le logo PNG FavLib officiel est partagé par les shells",
+        "Ses modèles sérialisables et callbacks séparés viennent de l’hôte",
+        "Sans port de lecture, le runtime annonce une indisponibilité explicite",
+        "FeedbackState centre SVG gris, texte et action sans coque visuelle",
+        "Tokens et comportements restent colocalisés"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Workbench ciblé",
+      "items": [
+        "Le viewport contient seulement catalogue et aperçu",
+        "Aucun éditeur ni source brute n’entre dans le build"
+      ]
+    }
+  ]
+}

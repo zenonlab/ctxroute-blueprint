@@ -1,1 +1,19 @@
-{ "extends":"../../tsconfig.base.json", "compilerOptions":{"lib":["ES2022","DOM","DOM.Iterable"],"types":["chrome"],"baseUrl":".","paths":{"@favlib/metadata":["../../packages/metadata/src/index.ts"]}}, "include":["**/*.ts","**/*.tsx","wxt.config.ts"] }
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": [".wxt/wxt.d.ts", "entrypoints", "runtime", "security", "wxt-entrypoints", "wxt.config.ts"]
+}

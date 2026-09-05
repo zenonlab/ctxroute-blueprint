@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "exactOptionalPropertyTypes": true,
+    "lib": ["DOM", "ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@tobirink/application": ["../application/src/index.ts"],
+      "@tobirink/domain": ["../domain/src/index.ts"]
+    },
+    "strict": true,
+    "target": "ES2022"
+  },
+  "exclude": ["src/**/*.test.ts"],
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ctxroute-progress": {
+      "type": "stdio",
+      "command": "npm",
+      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "progress:mcp"]
+    },
+    "code-review-graph": {
+      "type": "stdio",
+      "command": "npm",
+      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "crg:mcp"]
+    }
+  }
+}

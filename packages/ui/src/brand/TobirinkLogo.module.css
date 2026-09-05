@@ -1,0 +1,24 @@
+.preview {
+  align-items: center;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  display: flex;
+  font-family: var(--font-family-sans);
+  gap: var(--space-3);
+  justify-content: center;
+  min-height: calc(var(--space-8) * 8);
+}
+
+.logo {
+  display: block;
+  height: calc(var(--space-8) * 2);
+  object-fit: contain;
+  width: calc(var(--space-8) * 2);
+}
+
+.name {
+  color: var(--color-primary);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--letter-spacing-tight);
+}

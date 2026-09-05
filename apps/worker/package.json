@@ -1,1 +1,23 @@
-{"name":"@favlib/worker","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"tsx src/index.ts","build":"tsc --outDir dist --noEmit false","lint":"tsc --noEmit","typecheck":"tsc --noEmit","test":"vitest run --passWithNoTests","test:integration":"vitest run src/integration.test.ts"},"dependencies":{"@favlib/availability":"workspace:*","@favlib/config":"workspace:*","@favlib/connectors":"workspace:*","@favlib/database":"workspace:^","@favlib/metadata":"workspace:*","@favlib/notifications":"workspace:*","@favlib/progression":"workspace:*","@favlib/safe-http":"workspace:*","graphile-worker":"0.17.3","pg":"8.22.0","sharp":"0.35.3"},"devDependencies":{"@types/node":"22.10.5","@types/pg":"8.11.10","tsx":"4.19.2","typescript":"5.7.3","vitest":"2.1.8"}}
+{
+  "name": "@tobirink/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "test:security": "vitest run src/reviews",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tobirink/adapters-cloudflare": "*",
+    "@tobirink/application": "*",
+    "@tobirink/contracts": "*",
+    "hono": "4.13.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.1.4",
+    "wrangler": "4.129.0"
+  }
+}

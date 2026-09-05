@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/zenonlab/ctxroute/76b45a57543c940c51e382a41adb749faa44bbc4/ctxroute-config.schema.json",
+  "enabled": true,
+  "showNotification": true,
+  "mode": "once",
+  "defaultThreshold": 4,
+  "defaultDriftUnit": "turn",
+  "frames": 1,
+  "filterMode": "none",
+  "filterList": [],
+  "problemMemory": {
+    "enabled": true,
+    "recordOn": ["UserPromptSubmit", "PostToolUse"],
+    "recurrenceThreshold": 3,
+    "matching": {
+      "exactSignature": true,
+      "structuralMatch": true,
+      "semanticMatch": false,
+      "minimumConfidence": 0.9
+    },
+    "protectionMode": "propose"
+  }
+}
