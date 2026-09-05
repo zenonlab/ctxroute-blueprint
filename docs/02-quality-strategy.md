@@ -68,6 +68,9 @@ browser or `workerd` test when platform behavior is the risk.
 - Logs and CI artifacts redact URLs, titles, identifiers, payload bodies, and
   secrets unless a field is explicitly classified as safe.
 - Infrastructure `apply` refuses absent, stale, mismatched, or unapproved plans.
+- `npm run test:infra` proves deterministic plan hashes, a 30-minute maximum
+  lifetime, exact account/resource allowlists, state and preview drift refusal,
+  D1-before-Worker ordering, and zero provider invocation for invalid actions.
 
 ## Performance budgets
 

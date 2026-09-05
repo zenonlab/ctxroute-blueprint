@@ -33,6 +33,10 @@
     "build:extension:firefox": "npm run build:firefox --workspace @tobirink/extension",
     "test:security": "npm run test:security --workspace @tobirink/extension && npm run test:security --workspace @tobirink/worker",
     "test:worker": "npm run test --workspace @tobirink/worker",
+    "test:infra": "node --test scripts/infra/*.test.mjs",
+    "infra:inspect": "node scripts/infra/tobirink-provider-gate.mjs inspect",
+    "infra:plan": "node scripts/infra/tobirink-provider-gate.mjs plan",
+    "infra:apply": "node scripts/infra/tobirink-provider-gate.mjs apply",
     "test:d1": "npm run test --workspace @tobirink/worker -- src/catalogue",
     "test:a11y": "vitest run --root apps/extension accessibility",
     "test:performance": "npm run build:extension && npm run build:extension:firefox && vitest run --root . scripts/performance",
@@ -96,7 +100,7 @@
     "ci:summary": "node scripts/ci-summary.mjs",
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "integration": "node scripts/integration-check.mjs",
-    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run sensor:blueprint && npm run test:coverage",
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run sensor:blueprint && npm run test:infra && npm run test:coverage",
     "verify": "npm run validate && npm run crg:smoke && npm run integration && npm audit --audit-level=high && npm run build:docs"
   },
   "devDependencies": {

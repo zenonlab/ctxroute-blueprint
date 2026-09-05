@@ -7,13 +7,16 @@ scope:
   - apps/**
   - packages/**
   - scripts/infra/**
+  - package.json
   - .github/**
 review: on-change
+revised: true
 ---
 # ADR-0024 — Ports, adapters, and provider operation gates
 
 - Status: accepted
 - Date: 2026-09-02
+- Revised: 2026-09-05
 
 ## Context
 
@@ -32,6 +35,20 @@ All infrastructure mutations pass through one project-owned operational gate
 with `inspect`, `plan`, and `apply` phases. `apply` requires an approved fresh
 plan and an explicit account/resource allowlist. CI may inspect and plan but
 does not deploy production automatically.
+
+The gate core is provider-neutral and owns canonical plan hashing, a maximum
+30-minute lifetime, exact approval-digest matching, and account/resource
+allowlists. Before mutation it repeats inspection and preview and rejects any
+state or dry-run drift. The Cloudflare driver alone translates those operations
+to Wrangler. It derives Worker, D1, and R2 resource names from the checked-in
+Worker configuration; product use cases and runtime adapters never import the
+operational driver.
+
+The initial driver permits only D1 migration application and Worker deployment.
+It inspects authentication, current deployment, pending migrations, and every
+configured R2 bucket. D1 migrations always run before a Worker deployment.
+Adding an R2 mutation or another provider requires an explicit driver operation
+and its contract tests; it does not expand the generic gate implicitly.
 
 ## Consequences
 
