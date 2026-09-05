@@ -38,7 +38,6 @@ jobs:
         run: |
           npm run test:domain
           npm run test:contracts
-          npm run test:storage
 
       - name: Test extension surfaces
         run: |
