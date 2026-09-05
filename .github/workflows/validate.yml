@@ -1,0 +1,153 @@
+name: Validate Tobirink
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: tobirink-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Node 24 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: "0.11.2"
+          enable-cache: false
+
+      - name: Check installation prerequisites
+        run: npm run setup:check
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Synchronize frozen CRG environment
+        run: uv sync --project packages/code-review-graph --frozen --python 3.12
+
+      - name: Verify CRG version and MCP manifests
+        run: |
+          npm run crg:version
+          npm run mcp:validate
+
+      - name: Smoke-test Progress MCP transport
+        run: npm run mcp:smoke
+
+      - name: Smoke-test official CRG transport
+        if: runner.os != 'Windows'
+        shell: bash
+        run: node scripts/crg-smoke.mjs > "${RUNNER_TEMP}/crg-smoke.json"
+
+      - name: Run complete repository gate
+        run: npm run validate
+
+      - name: Materialize Sensor artifacts
+        shell: bash
+        run: |
+          node .githooks/sensor --checklist --json > sensor-checklist.json
+          node scripts/blueprint-sensor.mjs > sensor.json
+          node scripts/blueprint-sensor.mjs --sarif > sensor.sarif
+
+      - name: Upload unexpected Sensor diagnostics to code scanning
+        if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          sarif_file: sensor.sarif
+          category: tobirink-sensor
+
+      - name: Verify integration boundary
+        run: npm run integration
+
+      - name: Run dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Check POSIX hook syntax
+        if: runner.os != 'Windows'
+        run: sh -n .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
+
+      - name: Build Archify documentation
+        run: npm run build:docs
+
+      - name: Capture Archify visual evidence
+        if: runner.os == 'Linux'
+        run: npm run archify:visual-check
+
+      - name: Write validation summary
+        run: npm run ci:summary
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.2
+        with:
+          name: tobirink-validation-${{ runner.os }}
+          path: |
+            dist/
+            sensor.sarif
+            sensor.json
+            sensor-checklist.json
+            ${{ runner.temp }}/crg-smoke.json
+            ci-summary.md
+          if-no-files-found: warn
+
+  smoke-install:
+    name: Clean installation smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: "0.11.2"
+          enable-cache: false
+
+      - name: Verify clean install and idempotent checks
+        shell: bash
+        run: |
+          npm run setup
+          test -z "$(git status --porcelain)"
