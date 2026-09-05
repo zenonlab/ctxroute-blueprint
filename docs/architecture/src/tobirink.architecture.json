@@ -31,7 +31,7 @@
         "id": "catalogue-media",
         "label": "Catalogue and covers",
         "focus": ["appCore", "remotePorts", "workerApi", "cloudGateways", "d1", "imageGateway", "r2"],
-        "note": "Worker routes consume injected ports; one composition root owns D1, R2, Images, and their bounded policy."
+        "note": "Worker routes consume injected ports; exact title and reference reads use measured D1 indexes behind one composition root."
       },
       {
         "id": "provider-operations",
@@ -53,7 +53,7 @@
     { "id": "remotePorts", "type": "backend", "label": "Remote capability ports", "sublabel": "Consent / data / media", "pos": [650, 480], "size": [190, 64] },
     { "id": "workerApi", "type": "cloud", "label": "Worker routes", "sublabel": "Injected ports only", "pos": [930, 390], "size": [170, 64] },
     { "id": "cloudGateways", "type": "backend", "label": "Cloud composition", "sublabel": "Policy + replaceable adapters", "pos": [930, 550], "size": [190, 64], "tag": "single wiring root" },
-    { "id": "d1", "type": "database", "label": "D1 public index", "sublabel": "Consented associations + catalogue", "pos": [1140, 340], "size": [210, 64] },
+    { "id": "d1", "type": "database", "label": "D1 public index", "sublabel": "Title / reference catalogue indexes", "pos": [1140, 340], "size": [210, 64] },
     { "id": "imageGateway", "type": "cloud", "label": "Image gateway", "sublabel": "3 fixed resize / quantize variants", "pos": [1140, 500], "size": [210, 64], "tag": "Cloudflare Images" },
     { "id": "r2", "type": "cloud", "label": "R2 object storage", "sublabel": "Masters + public snapshots + backups", "pos": [1140, 660], "size": [210, 64] },
     { "id": "operator", "type": "external", "label": "Approved operator", "sublabel": "Exact plan approval", "pos": [390, 720], "size": [190, 64] },
@@ -78,7 +78,7 @@
     { "id": "coreRemote", "from": "appCore", "to": "remotePorts", "label": "optional typed capabilities", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[485, 512]] },
     { "id": "portsWorker", "from": "remotePorts", "to": "workerApi", "label": "HTTPS contract", "variant": "dashed" },
     { "id": "workerComposition", "from": "workerApi", "to": "cloudGateways", "label": "resolve injected services", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [1022, 468] },
-    { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "catalogue / consent ports", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
+    { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "bounded indexed reads / consent", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
     { "id": "workerImages", "from": "cloudGateways", "to": "imageGateway", "fromSide": "right", "toSide": "left" },
     { "id": "workerR2", "from": "cloudGateways", "to": "r2", "label": "object storage ports", "variant": "security", "fromSide": "right", "toSide": "left" },
     { "id": "operatorApproval", "from": "operator", "to": "operationGate", "label": "approve exact digest", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [615, 706] },

@@ -42,6 +42,9 @@ decide whether a next cursor exists, and enforces a server maximum of 100 rows.
 Work details bound titles and references independently. Provider resolution
 uses the unique `(provider, external_id)` key. Successful GET responses may be
 cached publicly; validation failures and missing records remain `no-store`.
+Exact title resolution uses a dedicated `(title COLLATE NOCASE, work_id)`
+index. The public route trims and bounds the query, returns at most the server
+maximum, and does not perform fuzzy matching or an unindexed substring scan.
 
 After a rights check, normalize each cover, strip sensitive metadata, preserve
 required attribution, hash the content, and store one master in private R2.

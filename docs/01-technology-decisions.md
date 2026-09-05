@@ -96,15 +96,18 @@ of SQL. Every public endpoint uses prepared statements, narrow column
 projections, bounded limits, and cursor pagination on stable ordered keys.
 
 Indexes are derived from proven query shapes: unique `(provider, external_id)`,
-lookup by Tobirink work ID, incremental catalogue reads by `(revision, id)`,
-and media lookup by `work_id`. `EXPLAIN QUERY PLAN` must show indexed search for
+exact case-insensitive title lookup by `(title, work_id)`, lookup by Tobirink
+work ID, incremental catalogue reads by `(revision, id)`, and media lookup by
+`work_id`. `EXPLAIN QUERY PLAN` must show indexed search for
 hot paths; `meta.rows_read` and rows returned form the cost budget. Indexes are
 not added speculatively. Migrations run `PRAGMA optimize`; global read
 replication is introduced only after measured latency justifies it.
 
 The materialized read API exposes `GET /v1/catalogue`,
 `GET /v1/catalogue/works/:workId`, and
-`GET /v1/catalogue/resolve?provider=&externalId=`. Incremental pages order by
+`GET /v1/catalogue/resolve?provider=&externalId=`. It also exposes the bounded
+exact lookup `GET /v1/catalogue/search?title=&limit=` for ambiguous Review
+contexts. Incremental pages order by
 the stable `(revision, work_id)` pair, default to 50 rows, reject limits above
 100, and return the last emitted pair as the next cursor only when another row
 exists. A work detail bounds localized titles and external references to 32

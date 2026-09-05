@@ -96,6 +96,9 @@ pagination, and indexes justified by measured access paths. Hot queries are
 reviewed with `EXPLAIN QUERY PLAN` and runtime row metrics; migrations run
 `PRAGMA optimize` after index changes. Read replication is enabled only after
 measurements show that its consistency and latency trade-off is appropriate.
+Review title lookup is exact and case-insensitive, capped by the shared
+catalogue policy, and backed by its own title/work index; fuzzy or substring
+matching is deliberately absent from the request path.
 
 ## Media delivery
 

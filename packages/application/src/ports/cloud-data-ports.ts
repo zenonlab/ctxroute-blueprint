@@ -21,6 +21,7 @@ export interface PublicCatalogueReadPort {
   listTitles(workId: string, limit: number): Promise<readonly PublicCatalogueTitle[]>;
   listWorksAfter(cursor: { id: string; revision: number }, limit: number): Promise<readonly PublicCatalogueWork[]>;
   resolveReference(provider: string, externalId: string): Promise<PublicCatalogueWork | undefined>;
+  searchWorksByTitle(title: string, limit: number): Promise<readonly PublicCatalogueWork[]>;
 }
 
 export interface CoverMasterReadPort {

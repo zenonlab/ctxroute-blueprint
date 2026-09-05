@@ -53,6 +53,23 @@ export class D1PublicCatalogueAdapter implements PublicCatalogueReadPort {
     return work ?? undefined;
   }
 
+  async searchWorksByTitle(title: string, limit: number): Promise<readonly PublicCatalogueWork[]> {
+    const result = await this.database.prepare(`
+      SELECT work.work_id AS id, work.media_kind AS mediaKind,
+        work.preferred_title AS preferredTitle, work.revision
+      FROM catalogue_works AS work
+      JOIN (
+        SELECT DISTINCT work_id
+        FROM catalogue_titles INDEXED BY catalogue_titles_by_title
+        WHERE title = ?1 COLLATE NOCASE
+        ORDER BY work_id
+        LIMIT ?2
+      ) AS matched ON matched.work_id = work.work_id
+      ORDER BY work.work_id
+    `).bind(title, limit).all<PublicCatalogueWork>();
+    return result.results;
+  }
+
   async listTitles(workId: string, limit: number): Promise<readonly PublicCatalogueTitle[]> {
     const result = await this.database.prepare(`
       SELECT locale, title FROM catalogue_titles

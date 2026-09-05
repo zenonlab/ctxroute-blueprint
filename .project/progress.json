@@ -871,6 +871,49 @@
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor SAFE passent; candidats limites a 6, requete exclusive reference ou titre, revision deterministe testee.",
             "Securite extension/Worker 12/12 et builds Chrome/Firefox passent avec host_permissions vide; docs, ADR et Archify Tobirink 9/9 passent."
           ]
+        },
+        {
+          "id": "step-7",
+          "title": "Ajouter une recherche de titres publique et bornee",
+          "status": "DONE",
+          "acceptance": [
+            "Le port catalogue recherche des oeuvres par titre exact insensible a la casse avec une limite explicite.",
+            "La route publique valide le titre et la limite, utilise une requete preparee et ne retourne aucun champ prive.",
+            "EXPLAIN QUERY PLAN prouve l utilisation de l index dedie et la lecture reste bornee.",
+            "Aucun deploiement, permission navigateur ou appel fournisseur nest effectue."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/01-technology-decisions.md",
+            "docs/decisions/ADR-0026-catalogue-and-media-pipeline.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.test.ts",
+            "apps/worker/migrations/0003_catalogue_title_search.sql",
+            "apps/worker/src/catalogue/catalogue-routes.ts",
+            "apps/worker/src/catalogue/catalogue-routes.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm test --workspace @tobirink/worker",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run test:security",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Adaptateur Cloudflare 19/19 et Worker 20/20 passent; recherche exacte insensible a la casse, limite stable, validation et cache public verifies.",
+            "EXPLAIN QUERY PLAN utilise catalogue_titles_by_title; mesure rows_read <= 2 pour un resultat; injection reste une valeur preparee.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, securite 12/12, Sensor SAFE, docs, decisions et Archify Tobirink 9/9 passent; aucun deploiement ni permission."
+          ]
         }
       ]
     },
