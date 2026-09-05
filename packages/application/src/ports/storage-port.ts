@@ -11,6 +11,7 @@ import type {
   ReminderId,
   Review,
   ReviewId,
+  ReviewStatus,
   Work,
   WorkId,
 } from '@tobirink/domain';
@@ -23,6 +24,11 @@ export interface FavoriteSourcePageQuery {
   limit: number;
 }
 
+export interface ReviewListQuery {
+  limit: number;
+  status: ReviewStatus;
+}
+
 export interface StorageReadPort {
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
@@ -32,6 +38,7 @@ export interface StorageReadPort {
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
+  listReviews(query: ReviewListQuery): Promise<readonly Review[]>;
 }
 
 export interface StorageWritePort {

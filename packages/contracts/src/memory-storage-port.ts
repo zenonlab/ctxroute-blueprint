@@ -64,6 +64,14 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, limit);
     },
+    listReviews: async ({ limit, status }) => {
+      requireStore('reviews');
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
+      return [...state.reviews.values()]
+        .filter((review) => review.status === status)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .slice(0, limit);
+    },
     putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); state.agenda.set(entry.id, entry); },
     putFavoriteSource: async (source: FavoriteSource) => {
       requireStore('favoriteSources');
@@ -94,6 +102,7 @@ export class MemoryStoragePort implements StoragePort {
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
+  listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);

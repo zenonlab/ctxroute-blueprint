@@ -13,7 +13,7 @@
         "id": "local-authority",
         "label": "Private local authority",
         "focus": ["reader", "extensionUi", "extensionWorker", "appCore", "indexedDb", "bootstrapStore"],
-        "note": "The MV3 background lazily opens Dexie v3; IndexedDB alone owns favorite sources, the private library, progress, agenda, and durable tasks."
+        "note": "MV3 lazily opens Dexie v3. IndexedDB alone owns private state; pending Reviews use a bounded query and schema-checked message."
       },
       {
         "id": "extension-security",

@@ -720,6 +720,61 @@
             "IndexedDB 2/2 plus contrat Chromium; builds Chrome/Firefox ~586 kB, securite 12/12 et performance 3/3 passent sans reseau.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/34 ADR et Archify Tobirink 9/9 passent."
           ]
+        },
+        {
+          "id": "step-4",
+          "title": "Publier la file Review locale par un message borne",
+          "status": "DONE",
+          "acceptance": [
+            "StoragePort liste au plus 100 Reviews par statut via l index local existant",
+            "Le cas d usage retourne uniquement des donnees serialisables et les Reviews pending dans un ordre stable",
+            "Le background expose un message Zod strict et ouvre IndexedDB uniquement a la demande",
+            "La lecture Review ne fait aucun appel reseau et ne confond pas IndexedDB avec le cache popup",
+            "Tests, typecheck, securite, performance, lint, Sensor, documentation et Archify passent"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/use-cases/read-review-queue.ts",
+            "packages/application/src/use-cases/read-review-queue.test.ts",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- packages/application/src/use-cases/read-review-queue.ts apps/extension/wxt-entrypoints/background.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 20/20, contrats 9/9 et IndexedDB Chromium passent: file filtree par statut, limite 100 et ordre stable.",
+            "Extension 62/62; securite 12/12 et performance 3/3: message Zod strict, ouverture lazy et zero appel reseau.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/34 ADR et Archify Tobirink 9/9 passent."
+          ]
         }
       ]
     },

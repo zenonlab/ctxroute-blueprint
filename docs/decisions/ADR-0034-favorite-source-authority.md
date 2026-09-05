@@ -45,6 +45,11 @@ but preserves its original import time and any existing resolved Review. An
 interruption may leave completed batches visible; rerunning the idempotent
 import safely converges without deleting local records absent from bookmarks.
 
+The local Review queue is read through the existing `status` index with an
+explicit maximum of 100 rows. Only `pending` Reviews enter that snapshot;
+resolved and no-match decisions remain stored but are excluded. Reading the
+queue does not contact D1 or any metadata provider.
+
 ## Consequences
 
 Library and Review read models can later join local source, Review, Work and

@@ -27,6 +27,8 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.getFavoriteSource(source.id))?.url === source.url, 'favorite source round-trip');
   assert((await storage.listFavoriteSources({ limit: 1 }))[0]?.id === source.id, 'favorite source bounded listing');
   assert((await storage.listFavoriteSources({ afterId: source.id, limit: 1 })).length === 0, 'favorite source stable cursor');
+  assert((await storage.listReviews({ limit: 1, status: 'resolved' }))[0]?.id === review.id, 'review bounded status listing');
+  assert((await storage.listReviews({ limit: 1, status: 'pending' })).length === 0, 'review status filtering');
 
   let duplicateBookmarkRejected = false;
   try {
@@ -43,6 +45,14 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     limitRejected = true;
   }
   assert(limitRejected, 'favorite source listing must enforce its bound');
+
+  let reviewLimitRejected = false;
+  try {
+    await storage.listReviews({ limit: 101, status: 'pending' });
+  } catch {
+    reviewLimitRejected = true;
+  }
+  assert(reviewLimitRejected, 'review listing must enforce its bound');
 
   let scopeRejected = false;
   try {

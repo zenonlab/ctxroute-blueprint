@@ -15,7 +15,7 @@ export type {
   TelemetryPort,
 } from './ports/capability-ports';
 export { privateStoreNames } from './ports/storage-port';
-export type { FavoriteSourcePageQuery, PrivateStoreName, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
+export type { FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
 export type {
   CoverImageRenderPort,
   CoverMasterReadPort,
@@ -33,6 +33,8 @@ export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';
 export { favoriteImportBatchSize, importFavoriteSources } from './use-cases/import-favorite-sources';
 export type { FavoriteImportSummary } from './use-cases/import-favorite-sources';
+export { readReviewQueue, reviewQueueLimit } from './use-cases/read-review-queue';
+export type { ReviewQueueItem, ReviewQueueSnapshot } from './use-cases/read-review-queue';
 export { recordProgress } from './use-cases/record-progress';
 export { resolveReview } from './use-cases/resolve-review';
 export * from './tasks';

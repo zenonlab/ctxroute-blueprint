@@ -1,4 +1,4 @@
-import { importFavoriteSources, readPopupContext } from '@tobirink/application';
+import { importFavoriteSources, readPopupContext, readReviewQueue } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
@@ -25,6 +25,14 @@ export default defineBackground({
       const parsed = extensionMessageSchema.safeParse(value);
       if (!parsed.success) return { error: 'invalid-message', ok: false };
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
+      if (parsed.data.type === 'review.queue.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, snapshot: await readReviewQueue(privateStorage.storage) };
+        } catch {
+          return { error: 'review-queue-unavailable', ok: false };
+        }
+      }
       if (parsed.data.type === 'popup.context.read') {
         try {
           await privateStorage.ensureReady();

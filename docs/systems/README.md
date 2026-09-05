@@ -23,8 +23,8 @@ a domain identifier or an authority for membership and progress.
 
 The storage package defines `StoragePort`, versioned records, migrations,
 export, import, and recovery contracts. The first adapter uses Dexie and
-IndexedDB, which is the sole active authority for the private library,
-progress, agenda, and durable task queue. `storage.local` is limited to
+IndexedDB, which is the sole active authority for favorite sources, Reviews,
+the private library, progress, agenda, and durable task queue. `storage.local` is limited to
 technical preferences and bootstrap state. `storage.sync` may hold only a
 small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
@@ -43,6 +43,11 @@ and sibling order. The application imports HTTP(S) entries into IndexedDB in
 bounded batches, atomically pairing each `FavoriteSource` with its Review. A
 rerun preserves the initial import time and resolved decisions; missing browser
 bookmarks are not interpreted as local deletions.
+
+The background exposes the pending Review queue as a bounded, schema-validated
+local snapshot. IndexedDB is opened on demand, at most 100 pending rows are
+read through the status index, and no public catalogue request is made by this
+read path.
 
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,

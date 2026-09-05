@@ -64,6 +64,11 @@ serializable records; the application use case writes bounded batches into
 IndexedDB. No inventory scan runs merely because the worker wakes, and the
 installation import performs no provider or public-service request.
 
+Review reads use a separate versioned message. The background opens IndexedDB
+only after that validated request and delegates to an application query capped
+at 100 pending records. The response is a frozen, serializable snapshot; it
+does not expose Dexie records, browser APIs or a provider client to React.
+
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its
 semantic shell and verifies the shared contrast, focus, reduced-motion and
