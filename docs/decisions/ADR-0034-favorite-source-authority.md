@@ -1,10 +1,12 @@
 ---
 scope:
+  - package-lock.json
   - docs/architecture/**
   - docs/systems/**
   - packages/domain/**
   - packages/application/**
   - packages/contracts/**
+  - packages/adapters-browser/**
   - packages/adapters-indexeddb/**
 review: on-change
 revised: true
@@ -62,6 +64,14 @@ reject stale context without returning the private URL. No network
 adapter is composed by this contract step; any future remote implementation
 still requires an explicit disclosure gate and a narrowly scoped host
 permission.
+
+The HTTP candidate adapter remains outside the application core. Its
+constructor accepts only an HTTPS origin with no credentials, path, query, or
+fragment, plus an injected fetch function. It translates the exclusive
+reference/title query to the owned catalogue routes, validates the complete
+JSON shape, rejects oversized results, and converts only public Work fields.
+It is exported but not composed by the extension background, so introducing
+the adapter alone neither transmits data nor changes browser permissions.
 
 ## Consequences
 

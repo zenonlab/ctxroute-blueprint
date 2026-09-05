@@ -914,6 +914,50 @@
             "EXPLAIN QUERY PLAN utilise catalogue_titles_by_title; mesure rows_read <= 2 pour un resultat; injection reste une valeur preparee.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, securite 12/12, Sensor SAFE, docs, decisions et Archify Tobirink 9/9 passent; aucun deploiement ni permission."
           ]
+        },
+        {
+          "id": "step-8",
+          "title": "Ajouter un adaptateur HTTP de candidats injectable",
+          "status": "DONE",
+          "acceptance": [
+            "L origine est une origine HTTPS injectee sans chemin, identifiants ou parametres.",
+            "Les requetes reference et titre utilisent uniquement les routes catalogue possedees et un fetch injecte.",
+            "Les reponses sont validees strictement, bornees et transformees en Work sans champ prive.",
+            "Aucun branchement background, permission navigateur, reseau reel ou deploiement nest ajoute."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "package-lock.json",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-browser/src/index.ts",
+            "packages/adapters-browser/src/catalogue/http-review-candidate-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-review-candidate-adapter.test.ts",
+            "packages/application/src/ports/review-candidate-port.ts",
+            "packages/application/src/use-cases/read-review-candidates.ts",
+            "packages/application/src/use-cases/read-review-candidates.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run test:security",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 23/23 et adaptateur navigateur 5/5 passent; reponses JSON strictes, erreurs normalisees, limites et chemins possedes testes.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor cible SAFE passent; securite extension/Worker 12/12 et builds Chrome/Firefox ~590 kB passent.",
+            "Manifestes Chrome/Firefox gardent host_permissions vide; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
+          ]
         }
       ]
     },

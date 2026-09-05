@@ -36,6 +36,12 @@ export type {
   ReviewRevisionPort,
   ReviewSourceReference,
   ReviewSourceReferenceParserPort,
+  ReviewCandidateWorkRecord,
+} from './ports/review-candidate-port';
+export {
+  reviewCandidateReferenceResponseSchema,
+  reviewCandidateTitleResponseSchema,
+  reviewCandidateWorkSchema,
 } from './ports/review-candidate-port';
 export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';

@@ -6,5 +6,8 @@
   "license": "Apache-2.0",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@tobirink/application": "*" }
+  "dependencies": {
+    "@tobirink/application": "*",
+    "@tobirink/domain": "*"
+  }
 }

@@ -1,4 +1,22 @@
 import type { FavoriteSource, Review, Work } from '@tobirink/domain';
+import { z } from 'zod';
+
+export const reviewCandidateWorkSchema = z.strictObject({
+  id: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u),
+  mediaKind: z.enum(['anime', 'manga']),
+  preferredTitle: z.string().trim().min(1).max(300),
+  revision: z.number().int().positive(),
+});
+
+export const reviewCandidateReferenceResponseSchema = z.strictObject({
+  work: reviewCandidateWorkSchema,
+});
+
+export const reviewCandidateTitleResponseSchema = z.strictObject({
+  items: z.array(reviewCandidateWorkSchema),
+});
+
+export type ReviewCandidateWorkRecord = z.infer<typeof reviewCandidateWorkSchema>;
 
 export interface ReviewSourceReference {
   externalId: string;

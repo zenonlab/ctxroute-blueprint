@@ -31,7 +31,7 @@
         "id": "catalogue-media",
         "label": "Catalogue and covers",
         "focus": ["appCore", "remotePorts", "workerApi", "cloudGateways", "d1", "imageGateway", "r2"],
-        "note": "Worker routes consume injected ports; exact title and reference reads use measured D1 indexes behind one composition root."
+        "note": "An uncomposed HTTP adapter targets owned title/reference routes; D1 reads stay indexed behind the Worker composition root."
       },
       {
         "id": "provider-operations",
@@ -50,7 +50,7 @@
     { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "activeTab / cache / notifications", "pos": [650, 100], "size": [190, 64] },
     { "id": "bookmarks", "type": "external", "label": "Browser bookmarks", "sublabel": "Import / optional projection", "pos": [930, 100], "size": [190, 64] },
     { "id": "bootstrapStore", "type": "database", "label": "Browser storage", "sublabel": "Prefs + reprise cache + recovery", "pos": [650, 250], "size": [190, 64] },
-    { "id": "remotePorts", "type": "backend", "label": "Remote capability ports", "sublabel": "Consent / data / media", "pos": [650, 480], "size": [190, 64] },
+    { "id": "remotePorts", "type": "backend", "label": "Remote capability ports", "sublabel": "Dormant HTTP / data / media", "pos": [650, 480], "size": [190, 64] },
     { "id": "workerApi", "type": "cloud", "label": "Worker routes", "sublabel": "Injected ports only", "pos": [930, 390], "size": [170, 64] },
     { "id": "cloudGateways", "type": "backend", "label": "Cloud composition", "sublabel": "Policy + replaceable adapters", "pos": [930, 550], "size": [190, 64], "tag": "single wiring root" },
     { "id": "d1", "type": "database", "label": "D1 public index", "sublabel": "Title / reference catalogue indexes", "pos": [1140, 340], "size": [210, 64] },
@@ -76,7 +76,7 @@
     { "id": "coreBrowser", "from": "appCore", "to": "browserAdapter", "label": "active page / cache commands", "fromSide": "right", "toSide": "bottom", "via": [[620, 362], [620, 230], [745, 230]], "labelAt": [645, 245] },
     { "id": "bootstrapCore", "from": "bootstrapStore", "to": "appCore", "label": "prefs / cache / recovery pointer", "variant": "dashed", "labelAt": [725, 345] },
     { "id": "coreRemote", "from": "appCore", "to": "remotePorts", "label": "optional typed capabilities", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[485, 512]] },
-    { "id": "portsWorker", "from": "remotePorts", "to": "workerApi", "label": "HTTPS contract", "variant": "dashed" },
+    { "id": "portsWorker", "from": "remotePorts", "to": "workerApi", "label": "injected origin / owned GET paths", "variant": "dashed", "labelAt": [885, 468] },
     { "id": "workerComposition", "from": "workerApi", "to": "cloudGateways", "label": "resolve injected services", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [1022, 468] },
     { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "bounded indexed reads / consent", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
     { "id": "workerImages", "from": "cloudGateways", "to": "imageGateway", "fromSide": "right", "toSide": "left" },

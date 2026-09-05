@@ -56,7 +56,13 @@ receive that raw URL. A candidate query carries either that public reference or
 a bounded title, never both. The application caps output and asks a replaceable
 local port with a deterministic default for an opaque revision so a later
 decision can reject a stale Review. This is only a contract: the extension
-still has no remote candidate adapter or host permission.
+still composes no remote candidate adapter and has no host permission.
+
+The browser-adapter package provides a dormant HTTP candidate client for the
+owned catalogue contract. Its origin and fetch capability are injected, its
+paths are closed to reference and exact-title reads, and malformed or
+over-limit JSON fails closed. The extension composition root does not construct
+this client until the separate permission and disclosure decision is approved.
 
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
