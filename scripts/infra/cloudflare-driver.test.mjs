@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { createCloudflareDriver, loadCloudflareConfig } from './cloudflare-driver.mjs';
+import { createCloudflareDriver, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
 
 const config = {
   worker: 'public-api',
@@ -9,15 +9,15 @@ const config = {
   r2: [{ binding: 'COVERS', name: 'public-covers' }],
 };
 
-test('the driver derives operation targets from configuration', () => {
+function test_derive_operation_targets() {
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async () => '' });
   assert.deepEqual(driver.listOperations(), [
     { name: 'worker-deploy', kind: 'worker-deploy', target: 'worker:public-api' },
     { name: 'd1-migrate:CATALOGUE_DB', kind: 'd1-migrate', target: 'd1:public-catalogue' },
   ]);
-});
+}
 
-test('inspect uses read-only Wrangler commands and returns normalized resources', async () => {
+async function test_inspect_read_only_resources() {
   const calls = [];
   const run = async args => {
     calls.push(args);
@@ -37,9 +37,9 @@ test('inspect uses read-only Wrangler commands and returns normalized resources'
     ['r2', 'bucket', 'info', 'public-covers', '--json'],
   ]);
   assert.equal(calls.some(args => args.includes('apply') || args[0] === 'deploy'), false);
-});
+}
 
-test('preview is dry-run and apply owns the only mutating Wrangler translations', async () => {
+async function test_preview_and_apply_translations() {
   const calls = [];
   const run = async args => { calls.push(args); return args.includes('--dry-run') ? 'bundle preview' : 'applied'; };
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run });
@@ -59,17 +59,17 @@ test('preview is dry-run and apply owns the only mutating Wrangler translations'
     ['d1', 'migrations', 'apply', 'CATALOGUE_DB', '--remote'],
     ['deploy'],
   ]);
-});
+}
 
-test('unknown operations and actions fail before invoking Wrangler', async () => {
+async function test_reject_unknown_operations() {
   const calls = [];
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async args => { calls.push(args); return ''; } });
   assert.throws(() => driver.resolveOperations(['r2-delete']), /unsupported-operation/u);
   await assert.rejects(() => driver.apply([{ kind: 'worker-deploy', target: 'worker:other' }]), /unsupported-action/u);
   assert.deepEqual(calls, []);
-});
+}
 
-test('the checked-in Wrangler config is the single resource source', async () => {
+async function test_load_checked_in_config() {
   const path = fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url));
   assert.deepEqual(await loadCloudflareConfig(path), {
     worker: 'tobirink-public-api',
@@ -79,4 +79,32 @@ test('the checked-in Wrangler config is the single resource source', async () =>
       { binding: 'RELEASE_SNAPSHOTS', name: 'tobirink-public-releases' },
     ],
   });
-});
+}
+
+function test_accept_valid_config() {
+  assert.doesNotThrow(() => validateCloudflareConfig(config));
+}
+
+function test_reject_missing_resource_collections() {
+  assert.throws(() => validateCloudflareConfig({ worker: 'public-api' }), /invalid-cloudflare-config/u);
+}
+
+function test_reject_invalid_d1_identifiers() {
+  assert.throws(() => validateCloudflareConfig({ ...config, d1: [{ binding: '', name: 'public-catalogue' }] }), /invalid-d1-binding/u);
+  assert.throws(() => validateCloudflareConfig({ ...config, d1: [{ binding: 'CATALOGUE_DB', name: '' }] }), /invalid-d1-name/u);
+}
+
+function test_reject_invalid_r2_identifiers() {
+  assert.throws(() => validateCloudflareConfig({ ...config, r2: [{ binding: '', name: 'public-covers' }] }), /invalid-r2-binding/u);
+  assert.throws(() => validateCloudflareConfig({ ...config, r2: [{ binding: 'COVERS', name: '' }] }), /invalid-r2-name/u);
+}
+
+test('the driver derives operation targets from configuration', test_derive_operation_targets);
+test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
+test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('unknown operations and actions fail before invoking Wrangler', test_reject_unknown_operations);
+test('the checked-in Wrangler config is the single resource source', test_load_checked_in_config);
+test('the driver accepts a complete provider configuration', test_accept_valid_config);
+test('the driver rejects missing resource collections', test_reject_missing_resource_collections);
+test('the driver rejects invalid D1 identifiers', test_reject_invalid_d1_identifiers);
+test('the driver rejects invalid R2 identifiers', test_reject_invalid_r2_identifiers);

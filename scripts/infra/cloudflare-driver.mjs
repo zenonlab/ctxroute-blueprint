@@ -21,7 +21,7 @@ export async function loadCloudflareConfig(path) {
 }
 
 export function createCloudflareDriver({ config, workerDirectory, run = runWrangler }) {
-  validateConfig(config);
+  validateCloudflareConfig(config);
   const operations = new Map([
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
@@ -108,7 +108,7 @@ function operationPriority(action) {
   return action.kind === 'd1-migrate' ? 0 : 1;
 }
 
-function validateConfig(config) {
+export function validateCloudflareConfig(config) {
   if (!config || !Array.isArray(config.d1) || !Array.isArray(config.r2)) throw new Error('invalid-cloudflare-config');
   requiredString(config.worker, 'worker-name');
   config.d1.forEach(item => { requiredString(item.binding, 'd1-binding'); requiredString(item.name, 'd1-name'); });

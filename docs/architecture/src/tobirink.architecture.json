@@ -37,7 +37,7 @@
         "id": "provider-operations",
         "label": "Provider operations",
         "focus": ["operator", "operationGate", "cloudDriver", "workerApi", "d1", "r2"],
-        "note": "A provider-neutral gate validates one fresh approved plan; only the replaceable Cloudflare driver knows Wrangler."
+        "note": "The provider-neutral gate checks one approved plan; the Cloudflare driver validates its resource map before translating it to Wrangler."
       }
     ]
   },
@@ -58,7 +58,7 @@
     { "id": "r2", "type": "cloud", "label": "R2 object storage", "sublabel": "Masters + public snapshots + backups", "pos": [1140, 660], "size": [210, 64] },
     { "id": "operator", "type": "external", "label": "Approved operator", "sublabel": "Exact plan approval", "pos": [390, 720], "size": [190, 64] },
     { "id": "operationGate", "type": "backend", "label": "Operation gate", "sublabel": "inspect → plan → apply", "pos": [650, 720], "size": [190, 64], "tag": "provider-neutral" },
-    { "id": "cloudDriver", "type": "backend", "label": "Cloudflare driver", "sublabel": "Wrangler commands only", "pos": [930, 720], "size": [190, 64], "tag": "replaceable" }
+    { "id": "cloudDriver", "type": "backend", "label": "Cloudflare driver", "sublabel": "Validated config / Wrangler", "pos": [930, 720], "size": [190, 64], "tag": "replaceable" }
   ],
   "boundaries": [
     { "kind": "security-group", "label": "Private device boundary", "wraps": ["extensionUi", "extensionWorker", "appCore", "indexedDb", "browserAdapter", "bootstrapStore", "remotePorts"] },

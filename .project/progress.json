@@ -1937,6 +1937,35 @@
             "Tobirink Archify passe 9/9 et le visual-check passe clair/sombre de 1440x900 à 2048x1320 sans overflow.",
             "Aucun appel Cloudflare réel, déploiement, secret, coût, push ou suppression effectué."
           ]
+        },
+        {
+          "id": "step-8",
+          "title": "Rendre la couverture du driver visible par CRG",
+          "status": "DONE",
+          "acceptance": [
+            "Les tests du driver gardent les mêmes assertions et deviennent des fonctions de test nommées",
+            "CRG relie les appels au driver et son risque maximal passe sous 0.70",
+            "La suite infra et npm run validate passent sans appel Cloudflare réel"
+          ],
+          "files": [
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:infra",
+            "npm run crg:build",
+            "uv run --project packages/code-review-graph --frozen code-review-graph detect-changes --repo . --base origin/main",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run archify:visual-check -- tobirink.architecture",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "CRG officiel relie les tests nommés au driver et abaisse le risque maximal de 0.80 à 0.65, sous le seuil high 0.70.",
+            "Infra 16/16 et npm run validate passent: 269 tests, 1 skip, 0 échec, couverture lignes 90.86%.",
+            "Tobirink Archify showcase passe 9/9; visual-check clair/sombre 1440x900 à 2048x1320 sans overflow; aucun appel Cloudflare réel."
+          ]
         }
       ]
     },

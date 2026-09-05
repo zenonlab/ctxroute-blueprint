@@ -120,6 +120,7 @@
 - [x] **Ajouter la sauvegarde chiffrée opt-in** — DONE _(evidence: Recovery 9/9; sécurité et gates verts.)_
 - [x] **Centraliser les accès cloud remplaçables** — DONE _(evidence: Application 14/14, Cloudflare adapters 19/19 and Worker 19/19 pass; all workspace typechecks pass., Worker route audit finds no direct D1, R2 or Images binding access; only composition.ts reads provider bindings., ESLint, Oxlint, Sensor SAFE, security 11/11, docs, decisions, diff-check and Tobirink Archify showcase 9/9 pass.)_
 - [x] **Ajouter une gate inspect plan apply et un driver Cloudflare isolé** — DONE _(evidence: Gate 12/12: hashes déterministes, plans modifiés/périmés/non approuvés/hors allowlist refusés, drift distant et dry-run refusés avant mutation., Driver isolé: seul cloudflare-driver.mjs connaît Wrangler; migrations D1 avant déploiement; audit global ne trouve aucun contournement., npm run validate passe (269 tests, 1 skip); Worker 19/19, typecheck, ESLint, Oxlint, Sensor SAFE, docs et décisions passent.)_
+- [x] **Rendre la couverture du driver visible par CRG** — DONE _(evidence: CRG officiel relie les tests nommés au driver et abaisse le risque maximal de 0.80 à 0.65, sous le seuil high 0.70., Infra 16/16 et npm run validate passent: 269 tests, 1 skip, 0 échec, couverture lignes 90.86%., Tobirink Archify showcase passe 9/9; visual-check clair/sombre 1440x900 à 2048x1320 sans overflow; aucun appel Cloudflare réel.)_
 
 ## Adopter Lucide comme source unique des icônes UI — DONE
 
