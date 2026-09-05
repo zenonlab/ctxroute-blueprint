@@ -1,0 +1,73 @@
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { extensionMessageSchema } from '../runtime/messages';
+
+const generatedManifestSchema = z.object({
+  action: z.object({
+    default_icon: z.record(z.string(), z.string()),
+    default_popup: z.string(),
+  }),
+  browser_specific_settings: z.object({
+    gecko: z.object({
+      data_collection_permissions: z.object({ required: z.tuple([z.literal('none')]) }),
+      id: z.literal('tobirink@tobirink.local'),
+    }),
+  }).optional(),
+  content_security_policy: z.object({ extension_pages: z.string() }),
+  host_permissions: z.array(z.string()).optional(),
+  icons: z.record(z.string(), z.string()),
+  manifest_version: z.number(),
+  permissions: z.array(z.string()),
+});
+
+async function chromeManifest() {
+  return generatedManifestSchema.parse(JSON.parse(await readFile('.output/chrome-mv3/manifest.json', 'utf8')));
+}
+
+async function firefoxManifest() {
+  return generatedManifestSchema.parse(JSON.parse(await readFile('.output/firefox-mv3/manifest.json', 'utf8')));
+}
+
+describe('extension security boundary', () => {
+  it.each([
+    ['chrome-mv3', chromeManifest],
+    ['firefox-mv3', firefoxManifest],
+  ])('generates a bounded %s manifest', async (_target, loadManifest) => {
+    const value = await loadManifest();
+    const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
+    expect(value.manifest_version).toBe(3);
+    expect(value.host_permissions ?? []).toEqual([]);
+    expect(value.permissions?.every((permission) => allowed.has(permission))).toBe(true);
+    expect(value.permissions).toEqual(expect.arrayContaining(['activeTab', 'alarms', 'bookmarks', 'notifications', 'storage']));
+    expect(value.icons).toEqual({
+      16: 'icons/tobirink-16.png',
+      32: 'icons/tobirink-32.png',
+      48: 'icons/tobirink-48.png',
+      128: 'icons/tobirink-128.png',
+    });
+    expect(value.action.default_icon).toEqual(value.icons);
+    expect(value.action.default_popup).toBe('popup.html');
+    const policy = value.content_security_policy.extension_pages;
+    expect(policy).toContain("script-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).not.toMatch(/https?:|unsafe-eval/);
+  });
+
+  it('accepts only the closed versioned message contract', () => {
+    expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ target: 'library', type: 'navigation.open', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ type: 'popup.context.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ target: 'tabs', type: 'navigation.open', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ target: 'library', token: 'extra', type: 'navigation.open', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 2 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ extra: true, type: 'popup.context.read', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse(null).success).toBe(false);
+  });
+
+  it('declares no Firefox data collection and a stable signing ID', async () => {
+    const value = await firefoxManifest();
+    expect(value.browser_specific_settings?.gecko.data_collection_permissions.required).toEqual(['none']);
+    expect(value.browser_specific_settings?.gecko.id).toBe('tobirink@tobirink.local');
+  });
+});

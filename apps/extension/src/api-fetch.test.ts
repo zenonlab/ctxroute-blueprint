@@ -1,7 +1,0 @@
-import { afterEach,describe,expect,it,vi } from 'vitest';import { apiFetch } from './api-fetch.js';
-afterEach(()=>vi.restoreAllMocks());
-describe('apiFetch',()=>{
-  it('refuses another origin',async()=>{await expect(apiFetch('https://evil.test/api/v1/x')).rejects.toMatchObject({code:'API_ORIGIN_REFUSED'})});
-  it('does not retry a non-idempotent mutation',async()=>{const fetcher=vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('offline'));await expect(apiFetch('https://favlib.home.arpa/api/v1/x',{method:'POST'})).rejects.toMatchObject({code:'API_NETWORK_ERROR'});expect(fetcher).toHaveBeenCalledOnce()});
-  it('lets interactive reads opt out of background retries',async()=>{const fetcher=vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('offline'));await expect(apiFetch('https://favlib.home.arpa/api/v1/extension/favorites',{}, {attempts:1,timeoutMs:2500})).rejects.toMatchObject({code:'API_NETWORK_ERROR',retryable:true});expect(fetcher).toHaveBeenCalledOnce();expect(fetcher.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)});
-});

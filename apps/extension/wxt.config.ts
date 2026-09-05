@@ -1,2 +1,34 @@
-const common={name:'FavLib — favoris privés',description:'Inventaire privé et réconciliable des favoris vers FavLib',permissions:['storage','bookmarks','alarms','webNavigation','scripting','activeTab'],host_permissions:['https://favlib.home.arpa/*'],optional_host_permissions:['https://*/*','http://*/*'],action:{default_popup:'popup.html'},options_ui:{page:'options.html',open_in_tab:true}};
-export default {manifestVersion:3,manifest:({browser}:{browser:string})=>browser==='firefox'?{...common,browser_specific_settings:{gecko:{id:'favlib@favlib.home.arpa',update_url:'https://favlib.home.arpa/downloads/favlib-extension-firefox-updates.json'}}}:common};
+import { defineConfig } from 'wxt';
+
+const extensionIcons = {
+  16: 'icons/tobirink-16.png',
+  32: 'icons/tobirink-32.png',
+  48: 'icons/tobirink-48.png',
+  128: 'icons/tobirink-128.png',
+} as const;
+
+export default defineConfig({
+  entrypointsDir: 'wxt-entrypoints',
+  manifest: ({ browser }) => ({
+    browser_specific_settings: browser === 'firefox'
+      ? {
+          gecko: {
+            data_collection_permissions: { required: ['none'] },
+            id: 'tobirink@tobirink.local',
+          },
+        }
+      : undefined,
+    content_security_policy: {
+      extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
+    },
+    description: 'Bibliothèque manga et anime locale, progression, Review et agenda.',
+    host_permissions: [],
+    icons: extensionIcons,
+    name: 'Tobirink',
+    permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'],
+    action: { default_icon: extensionIcons },
+    version: '0.0.0',
+  }),
+  manifestVersion: 3,
+  modules: ['@wxt-dev/module-react'],
+});

@@ -1,0 +1,25 @@
+{
+  "name": "@tobirink/adapters-indexeddb",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test:migrations": "node scripts/browser-contract.mjs /test/migrations.html",
+    "test:tasks": "node scripts/browser-contract.mjs /test/tasks.html",
+    "test": "vitest run && node scripts/browser-contract.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tobirink/application": "*",
+    "@tobirink/domain": "*",
+    "dexie": "4.4.5"
+  },
+  "devDependencies": {
+    "@tobirink/contracts": "*",
+    "vite": "8.2.2"
+  }
+}

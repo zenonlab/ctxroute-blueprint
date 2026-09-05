@@ -1,0 +1,35 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tobirink-public-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "COLLECTIVE_DB",
+      "database_name": "tobirink-public",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "COVER_BUCKET",
+      "bucket_name": "tobirink-covers"
+    },
+    {
+      "binding": "RELEASE_SNAPSHOTS",
+      "bucket_name": "tobirink-public-releases"
+    }
+  ],
+  "images": {
+    "binding": "COVER_IMAGES"
+  },
+  "vars": {
+    "COLLECTIVE_DAILY_QUOTA": "100"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
+}

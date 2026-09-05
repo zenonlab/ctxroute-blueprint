@@ -1,0 +1,10 @@
+{
+  "works": [
+    {
+      "externalReferences": [{ "externalId": "5114", "provider": "fixture" }],
+      "id": "work_migration",
+      "mediaKind": "anime",
+      "title": "Migration fixture"
+    }
+  ]
+}

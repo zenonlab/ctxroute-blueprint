@@ -1,0 +1,127 @@
+.dialog {
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  margin: auto;
+  max-height: calc(100dvh - var(--space-8) * 2);
+  max-width: calc(100vw - var(--space-8) * 2);
+  padding: 0;
+  width: min(520px, calc(100vw - var(--space-8) * 2));
+}
+
+.dialog::backdrop {
+  -webkit-backdrop-filter: blur(var(--space-1));
+  backdrop-filter: blur(var(--space-1));
+  background: color-mix(in srgb, var(--color-canvas) 72%, transparent);
+}
+
+.wide {
+  width: min(760px, calc(100vw - var(--space-8) * 2));
+}
+
+.panel {
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  border: var(--size-border) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  display: grid;
+  gap: var(--space-4);
+  max-height: inherit;
+  overflow: auto;
+  padding: var(--space-4);
+  position: relative;
+}
+
+.alert .panel {
+  border-color: color-mix(in srgb, var(--color-danger) 52%, var(--color-border));
+}
+
+.header {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.heading {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.heading > svg {
+  color: var(--color-danger);
+  flex: none;
+  margin-top: var(--space-1);
+}
+
+.heading h2 {
+  font-size: var(--font-size-section);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-compact);
+  margin: 0;
+}
+
+.heading p {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+  margin: var(--space-1) 0 0;
+}
+
+.close {
+  flex: none;
+}
+
+.body {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-normal);
+}
+
+.body > :first-child { margin-top: 0; }
+.body > :last-child { margin-bottom: 0; }
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.busy {
+  align-items: center;
+  backdrop-filter: blur(var(--space-2));
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  display: flex;
+  font-size: var(--font-size-caption);
+  gap: var(--space-2);
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+}
+
+.busy svg {
+  animation: dialog-spin calc(var(--motion-duration-slow) * 4) linear infinite;
+  color: var(--color-primary);
+}
+
+@keyframes dialog-spin {
+  to { transform: rotate(1turn); }
+}
+
+@media (max-width: 520px) {
+  .dialog {
+    max-height: calc(100dvh - var(--space-4) * 2);
+    max-width: calc(100vw - var(--space-4) * 2);
+    width: calc(100vw - var(--space-4) * 2);
+  }
+
+  .actions > * { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .busy svg { animation: none; }
+}

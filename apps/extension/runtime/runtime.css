@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body { min-width: 320px; }
+body[data-surface='popup'] { width: 360px; }

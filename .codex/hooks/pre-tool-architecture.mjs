@@ -1,0 +1,313 @@
+import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import process from 'node:process';
+import {
+  isAdr,
+  isArchitectureEvidence,
+  isCodePath,
+  isContractPath,
+  isDocumentationPath,
+  isGeneratedPath,
+  isSourcePath,
+  isStarterPath,
+  isTestPath,
+  loadProjectConfig,
+  normalizePath,
+} from '../../.githooks/project-policy.mjs';
+import { decisionDiagnostics, loadAdrs, syncAdrRules } from './decision-memory.mjs';
+
+let input;
+try { input = JSON.parse(await stdin()); }
+catch { block('Write blocked: invalid hook input.'); }
+const toolInput = input.tool_input ?? {};
+const paths = extractPaths(toolInput);
+const { config, failures } = loadProjectConfig();
+
+if (failures.length) {
+  const repairPaths = new Set(['.codex/architecture-policy.json', '.project/project-config.json']);
+  if (paths.length && paths.every(path => repairPaths.has(path))) {
+    context(`Configuration repair allowed: ${failures.join(', ')}`);
+    process.exit(0);
+  }
+  block(['Write blocked: invalid project configuration.', ...failures]);
+}
+
+const toolName = String(input.tool_name ?? '');
+const command = commandText(toolInput);
+const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
+if (toolName === 'apply_refactor_tool') {
+  if (toolInput.dry_run === true) {
+    context('CRG refactor preview allowed. Apply accepted changes with normal editing tools so architecture and Sensor controls remain active.');
+    process.exit(0);
+  }
+  block('Write blocked: apply_refactor_tool is restricted to dry_run: true; use normal editing tools for real changes.');
+}
+if (isShellTool(toolName) && isCrgGraphCommand(command)) {
+  context('CRG graph maintenance allowed: generated writes are confined to .code-review-graph/.');
+  process.exit(0);
+}
+if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateCommand(command)) {
+  block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
+}
+if (isShellTool(toolName) && config.status === 'initialized' && isDirectMutationCommand(command) && !isSafeDependencyMaterialization(command)) {
+  block('Write blocked: use a traceable editing tool for project files; direct shell writes cannot verify associated Archify evidence and ADRs.');
+}
+if (paths.includes('.project/project-config.json') && /["']status["']\s*:\s*["']initialized["']/u.test(addedContent(toolInput))) {
+  block('Write blocked: use npm run initialize to transition the blueprint; status must not be changed manually.');
+}
+
+if (!paths.length) {
+  process.exit(0);
+}
+
+const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
+const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
+const decisionStatus = decisionDiagnostics(changePaths);
+syncAdrRules(process.cwd());
+if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: invalid ADR metadata must be repaired before changing governed files.', `ADRs: ${invalidDecisionPaths.join(', ')}`]);
+}
+if (decisionStatus.superseded.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: a superseded ADR still covers the requested change.', `ADRs: ${decisionStatus.superseded.join(', ')}`, 'Revise or add the replacement ADR before changing governed files.']);
+}
+if (decisionStatus.conflicts.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
+  block(['Write blocked: applicable ADRs explicitly conflict.', `Conflicts: ${decisionStatus.conflicts.join(', ')}`, 'Revise or replace the conflicting ADR before changing governed files.']);
+}
+const architectureEvidence = changePaths.some(path => isArchitectureEvidence(path, config));
+const adrEvidence = changePaths.some(isAdr);
+const contractPaths = paths.filter(path => isContractPath(path, config));
+
+if (mutationTool && contractPaths.length && !adrEvidence) {
+  block([
+    'Write blocked: a contract or dependency requires an ADR in the same change.',
+    `Contracts: ${contractPaths.join(', ')}`,
+  ]);
+}
+
+const architecturalPaths = paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
+if (mutationTool && architecturalPaths.length && !decisionStatus.applicable.length && !adrEvidence) {
+  block(['Write blocked: architectural change has no applicable ADR.', `Files: ${architecturalPaths.join(', ')}`, 'Write or revise an ADR with a matching scope before changing these files.']);
+}
+
+if (config.status === 'template') {
+  const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isDocumentationPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
+  if (projectPaths.length) {
+    block([
+      'Write blocked: the project is still in template mode.',
+      `Product files: ${projectPaths.join(', ')}`,
+      'Complete the brief, decisions, Archify architecture evidence, and quality strategy, then set the configuration to initialized before writing product code.',
+    ]);
+  }
+  process.exit(0);
+}
+
+const codeOutsideDeclaredRoots = paths.filter(path => isCodePath(path, config) && !isSourcePath(path, config) && !isTestPath(path, config) && !isStarterPath(path, config) && !isGeneratedPath(path, config));
+if (codeOutsideDeclaredRoots.length) {
+  block([
+    'Write blocked: code is outside declared directories.',
+    `Files: ${codeOutsideDeclaredRoots.join(', ')}`,
+    'Declare the directory in .project/project-config.json or move the code.',
+  ]);
+}
+
+const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(path) && !isTestPath(path, config));
+const structuralChange = paths.some(path => isSourcePath(path, config)) && hasStructuralSignal(addedContent(toolInput));
+if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
+  block([
+    'Write blocked: structural change has no associated diagram.',
+    `Files: ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}`,
+    'Update the Archify source or a components/flows document in the same change.',
+  ]);
+}
+
+if (paths.some(path => isSourcePath(path, config))) {
+  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
+} else if (decisionStatus.applicable.length) {
+  context(formatDecisionStatus(decisionStatus));
+}
+
+function formatDecisionStatus(status) {
+  if (status.status !== 'partial') return '';
+  return `\n\nDecision status: partial. ${status.message}`;
+}
+
+function extractPaths(value) {
+  const paths = new Set();
+  visit(value, '');
+  return [...paths].map(path => normalizePath(path)).filter(Boolean);
+
+  function visit(current, key) {
+    if (current === String(current)) {
+      if (/^(?:file_?path|path|filename)$/iu.test(key) && !current.includes('\n')) paths.add(current);
+      for (const match of current.matchAll(/\*\*\*\s+(?:Add|Update|Delete)\s+File:\s*([^\n]+)/giu)) paths.add(match[1].trim().replace(/^['"]|['"]$/gu, ''));
+      return;
+    }
+    if (Array.isArray(current)) return current.forEach(item => visit(item, key));
+    if (current && current === Object(current)) {
+      for (const [childKey, child] of Object.entries(current)) visit(child, childKey);
+    }
+  }
+}
+
+function addedContent(value) {
+  const strings = [];
+  visit(value);
+  return strings.join('\n');
+
+  function visit(current) {
+    if (current === String(current)) return strings.push(current);
+    if (Array.isArray(current)) return current.forEach(visit);
+    if (current && current === Object(current)) Object.values(current).forEach(visit);
+  }
+}
+
+function hasStructuralSignal(content) {
+  return /(?:^|\n)\+?.*\b(?:class|interface|struct|module|namespace|trait|protocol|enum|record|service|message|export|extends|implements)\b|(?:^|\n)\+?.*\b(?:def|func|fn)\s+[A-Za-z_]/u.test(content);
+}
+
+function commandText(value) {
+  if (value === String(value)) return value;
+  return value?.cmd === String(value?.cmd) ? value.cmd : value?.command === String(value?.command) ? value.command : '';
+}
+
+function isShellTool(name) {
+  return /(?:exec_command|bash|shell)/iu.test(name);
+}
+
+function isSafeTemplateCommand(value) {
+  if (!value.trim()) return true;
+  const commands = splitSafeShellCommands(value);
+  if (!commands) return false;
+  return commands.every(line => {
+    if (/^find\b[^\n]*\s-(?:delete|exec)\b/iu.test(unquotedText(line))) return false;
+    if (/^npm\s+install\b/u.test(line)) return line === 'npm install --package-lock-only --ignore-scripts';
+    if (/^git\s+switch(?:\s+-c)?\s+[A-Za-z0-9._/-]+$/u.test(line)) return true;
+    if (/^npm\s+run\s+(?:workspace:check|governance:check|progress:read|crg:(?:build|update|status|review|mcp|smoke))$/u.test(line)) return true;
+    if (line === 'npm run initialize') return true;
+    if (/^npm\s+run\s+validate:coherence$/u.test(line)) return true;
+    if (/^sh\s+-n\s+\.githooks\/(?:pre-commit|pre-push|commit-msg)(?:\s+\.githooks\/(?:pre-commit|pre-push|commit-msg))*$/u.test(line)) return true;
+    if (/^npm\s+run\s+progress:validate\s+--\s+[A-Za-z0-9._/-]+$/u.test(line)) return true;
+    if (/^npm\s+run\s+sensor\s+--\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
+    if (/^node\s+\.githooks\/sensor\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
+    return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|fetch|pull|clone|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
+  });
+}
+
+function isCrgGraphCommand(value) {
+  const commands = splitSafeShellCommands(value);
+  return Boolean(commands?.length) && commands.every(line => /^npm\s+run\s+crg:(?:build|update|status|review|mcp|smoke)$/u.test(line));
+}
+
+function splitSafeShellCommands(value) {
+  const commands = [];
+  let start = 0;
+  let quote = '';
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === '\\' && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = '';
+      else if (quote === '"' && (character === '`' || (character === '$' && value[index + 1] === '('))) return null;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '`' || (character === '$' && value[index + 1] === '(') || /[;|><]/u.test(character)) return null;
+    const separatorLength = character === '\n' ? 1 : character === '&' && value[index + 1] === '&' ? 2 : 0;
+    if (!separatorLength) {
+      if (character === '&') return null;
+      continue;
+    }
+    const command = value.slice(start, index).trim();
+    if (command) commands.push(command);
+    index += separatorLength - 1;
+    start = index + 1;
+  }
+
+  if (quote || escaped) return null;
+  const command = value.slice(start).trim();
+  if (command) commands.push(command);
+  return commands;
+}
+
+function unquotedText(value) {
+  let result = '';
+  let quote = '';
+  let escaped = false;
+  for (const character of value) {
+    if (escaped) {
+      escaped = false;
+      result += ' ';
+    } else if (character === '\\' && quote !== "'") {
+      escaped = true;
+      result += ' ';
+    } else if (quote) {
+      if (character === quote) quote = '';
+      result += ' ';
+    } else if (character === "'" || character === '"') {
+      quote = character;
+      result += ' ';
+    } else {
+      result += character;
+    }
+  }
+  return result;
+}
+
+function isDirectMutationCommand(value) {
+  const command = value.replace(/(?:^|\s)2\s*>\s*\/dev\/null(?=\s|$)/gu, ' ');
+  return /[>]|\b(?:rm|mv|cp|touch|mkdir|tee|truncate|dd|install|ci)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b|\b(?:node|python|python3|ruby|perl)\s+-e\b/iu.test(command);
+}
+
+function isSafeDependencyMaterialization(value) {
+  const commands = splitSafeShellCommands(value);
+  if (!commands?.length) return false;
+  return commands.every(command => [
+    'npm install --package-lock-only --ignore-scripts',
+    'npm ci --ignore-scripts',
+    'npx --yes npm@10.9.9 install --package-lock-only --ignore-scripts',
+  ].includes(command));
+}
+
+function gitChangedFiles() {
+  const files = new Set();
+  for (const args of [
+    ['diff', '--name-only', '-z'],
+    ['diff', '--cached', '--name-only', '-z'],
+    ['ls-files', '--others', '--exclude-standard', '-z'],
+  ]) {
+    try {
+      execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean).forEach(path => files.add(normalizePath(path)));
+    } catch {}
+  }
+  return [...files];
+}
+
+function block(reason) {
+  process.stdout.write(JSON.stringify({ decision: 'block', reason: Array.isArray(reason) ? reason.join('\n') : reason }));
+  process.exit(0);
+}
+
+function context(message) {
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: message } }));
+}
+
+function stdin() {
+  return new Promise(resolveInput => {
+    let value = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => { value += chunk; });
+    process.stdin.on('end', () => resolveInput(value || '{}'));
+  });
+}

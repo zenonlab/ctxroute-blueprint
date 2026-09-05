@@ -1,0 +1,181 @@
+:root {
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  --shadow-flat: none;
+  --shadow-raised: 0 8px 24px color-mix(in srgb, var(--color-canvas) 72%, transparent);
+  --shadow-overlay: 0 16px 32px color-mix(in srgb, var(--color-canvas) 84%, transparent);
+
+  --motion-duration-instant: 0ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-standard: 180ms;
+  --motion-duration-slow: 240ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.effects-foundation {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  display: grid;
+  font-family: var(--font-family-sans);
+  gap: var(--space-6);
+  min-height: 100%;
+  padding: var(--space-8);
+  width: 100%;
+}
+
+.effects-foundation__header {
+  align-items: end;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.effects-foundation__eyebrow,
+.effects-foundation__index,
+.effects-foundation__section h4,
+.effects-foundation__token,
+.effects-foundation__rule {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.effects-foundation__eyebrow {
+  color: var(--color-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.effects-foundation__header h3 {
+  font-size: var(--font-size-title);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  margin: 0;
+}
+
+.effects-foundation__index,
+.effects-foundation__section h4,
+.effects-foundation__token,
+.effects-foundation__rule {
+  color: var(--color-text-subtle);
+}
+
+.effects-foundation__section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.effects-foundation__section h4,
+.effects-foundation__rule {
+  margin: 0;
+}
+
+.effects-foundation__grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.effects-foundation__sample {
+  align-content: end;
+  background: var(--color-surface-raised);
+  border: var(--size-border) solid var(--color-border);
+  display: grid;
+  gap: var(--space-2);
+  min-height: calc(var(--size-control-touch) * 2);
+  padding: var(--space-4);
+}
+
+.effects-foundation__sample--radius-sm { border-radius: var(--radius-sm); }
+.effects-foundation__sample--radius-md { border-radius: var(--radius-md); }
+.effects-foundation__sample--radius-lg { border-radius: var(--radius-lg); }
+.effects-foundation__sample--flat { box-shadow: var(--shadow-flat); }
+.effects-foundation__sample--raised { box-shadow: var(--shadow-raised); }
+.effects-foundation__sample--overlay { box-shadow: var(--shadow-overlay); }
+
+.effects-foundation__sample strong {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-compact);
+}
+
+.effects-foundation__token {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.effects-foundation__motion {
+  background: var(--color-surface);
+  border: var(--size-border) solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.effects-foundation__motion-row {
+  align-items: center;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: var(--size-column-min) minmax(0, 1fr);
+}
+
+.effects-foundation__track {
+  background: var(--color-surface-overlay);
+  border-radius: var(--radius-sm);
+  height: var(--space-2);
+  overflow: hidden;
+}
+
+.effects-foundation__marker {
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  display: block;
+  height: 100%;
+  transform: translateX(0);
+  width: var(--space-8);
+}
+
+.effects-foundation[data-state='active'] .effects-foundation__marker {
+  transform: translateX(calc(100% - var(--space-8)));
+}
+
+.effects-foundation__marker--fast {
+  transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.effects-foundation__marker--standard {
+  transition: transform var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.effects-foundation__marker--slow {
+  transition: transform var(--motion-duration-slow) var(--motion-easing-standard);
+}
+
+.effects-foundation[data-state='reduced'] .effects-foundation__marker {
+  transition-duration: var(--motion-duration-instant);
+}
+
+.effects-foundation__rule {
+  border-top: var(--size-border) solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+@media (max-width: 680px) {
+  .effects-foundation__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .effects-foundation__motion-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-standard: 0ms;
+    --motion-duration-slow: 0ms;
+  }
+}

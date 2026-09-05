@@ -1,0 +1,108 @@
+.status {
+  --indicator-color: var(--color-text-muted);
+
+  align-items: center;
+  color: var(--indicator-color);
+  display: inline-flex;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-strong);
+  gap: var(--space-2);
+  line-height: var(--line-height-compact);
+  white-space: nowrap;
+}
+
+.dot {
+  background: currentColor;
+  border-radius: 50%;
+  flex: 0 0 calc(var(--space-2) - (var(--size-border) * 2));
+  height: calc(var(--space-2) - (var(--size-border) * 2));
+  width: calc(var(--space-2) - (var(--size-border) * 2));
+}
+
+.neutral {
+  --indicator-color: var(--color-text-muted);
+}
+
+.accent {
+  --indicator-color: var(--color-primary);
+}
+
+.success {
+  --indicator-color: var(--color-success);
+}
+
+.warning {
+  --indicator-color: var(--color-warning);
+}
+
+.danger {
+  --indicator-color: var(--color-danger);
+}
+
+.preview {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  display: grid;
+  font-family: var(--font-family-sans);
+  gap: var(--space-6);
+  min-height: 100%;
+  padding: var(--space-8);
+  width: 100%;
+}
+
+.previewHeader {
+  align-items: end;
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.eyebrow,
+.index,
+.rule {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--color-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.previewHeader h3 {
+  font-size: var(--font-size-title);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  margin: 0;
+}
+
+.index,
+.rule {
+  color: var(--color-text-subtle);
+}
+
+.examples {
+  display: grid;
+  gap: var(--space-4);
+  max-width: var(--size-column-min);
+}
+
+.sample {
+  background: var(--color-surface);
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-4);
+}
+
+.rule {
+  margin: 0;
+}
+
+.rule {
+  border-top: var(--size-border) solid var(--color-border);
+  padding-top: var(--space-3);
+}

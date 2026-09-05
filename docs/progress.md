@@ -1,0 +1,180 @@
+# Progress checklist
+
+## Document the Tobirink clean-room foundation — DONE
+
+- [x] **Record the collaborative doctrine and product decisions** — DONE _(evidence: npm run validate:decisions, git diff --check)_
+- [x] **Update the product documentation and architecture** — DONE _(evidence: npm run validate:architecture (showcase pass), npm run validate:docs -- --all)_
+- [x] **Define quality gates and verify the documentation step** — DONE _(evidence: npm run validate passed after lifecycle-aware fixture corrections, Project status transitioned to initialized through npm run initialize, npm run archify:validate -- tobirink.architecture passed showcase)_
+
+## Align the UI contract with the selected extension stack — DONE
+
+- [x] **Document the React implementation adapter without changing the neutral contract** — DONE _(evidence: npm run validate:ui)_
+
+## Document the authoritative data and optimized media architecture — DONE
+
+- [x] **Record data authority and recovery decisions** — DONE _(evidence: docs/00-project-brief.md and docs/01-technology-decisions.md define IndexedDB authority, browser storage boundaries, and recovery, ADR-0025 accepted, npm run validate:decisions passed)_
+- [x] **Document optimized catalogue and media delivery** — DONE _(evidence: ADR-0026 accepted, D1 measured-index and bounded-query policy documented, R2/Cloudflare Images fixed resize and quantization pipeline documented)_
+- [x] **Update and showcase-validate the product architecture** — DONE _(evidence: docs/architecture/src/tobirink.architecture.json shows local authority, bookmark import/projection, recovery bootstrap, D1 catalogue, fixed image gateway, and R2, npm run validate:architecture passed showcase with 9 checks, 0 errors, and 0 warnings, npm run validate:docs -- --all passed)_
+
+## Initialize the documented Tobirink project — DONE
+
+- [x] **Make template tests fixture-based and initialize Tobirink** — DONE _(evidence: Five repository-state assertions replaced with lifecycle-aware or isolated-fixture checks, npm run initialize completed successfully, npm run validate passed with 239 passing tests and 1 skipped)_
+
+## Fix initialization placeholder detection — DONE
+
+- [x] **Distinguish starter placeholders from Markdown links** — DONE _(evidence: Placeholder detection now ignores Markdown links while retaining bracket-placeholder rejection, Isolated incomplete and Markdown-link initialization tests passed, Real project status is initialized)_
+
+## Nettoyer Review et rendre sa navigation différée explicite — DONE
+
+- [x] **Retirer le panneau Source/Code et Monaco du Workbench** — DONE _(evidence: Workbench réduit à deux zones Catalogue/Aperçu; onglet et panneau Code supprimés avec CodePanel.tsx, MonacoEditor.tsx et monaco.ts., Aucune référence Monaco, ?raw, rawSources, SourceDocument ou pane--code dans le code/lockfile; dépendances @monaco-editor/react et monaco-editor désinstallées (0 vulnérabilité)., Tests: Workbench 6/6, UI 111/111, extension 44/44; typecheck, ESLint, Oxlint, anti-slop, docs, décisions et contrat UI passent.)_
+
+## Migrer Tobirink vers le nouveau CTXRoute Blueprint sans perdre les décisions produit — DONE
+
+- [x] **Établir le périmètre de migration et la stratégie de préservation** — DONE _(evidence: ADR-0027 pins upstream abd9d8e67d9a525998a769e6d260629614fb63f3 and defines preserve/adopt/manual-merge boundaries., docs/ci.md records the three migration categories and final npm run verify gate., npm run validate:decisions passed with 27 decisions and 190 scopes.)_
+- [x] **Intégrer le nouveau plan de contrôle CTXRoute** — DONE _(evidence: Merged pinned upstream abd9d8e67d9a525998a769e6d260629614fb63f3 with no tracked deletions., Tobirink product documents and progress goals were preserved; upstream control-plane implementations were adopted., 52 Progress/MCP tests passed.)_
+- [x] **Adapter l’état initialisé et la progression Tobirink** — DONE _(evidence: Project status remains initialized with all Tobirink stack decisions and product diagram declarations preserved., New documentation roots and extensions are explicit in .project/project-config.json., npm run validate:config passed.)_
+- [x] **Vérifier la migration complète et auditer l’architecture** — DONE _(evidence: npm run verify passed end to end., 264 tests passed with 1 intentional skip; coverage thresholds passed., All four declared Archify sources passed showcase validation with 9 checks, 0 errors, and 0 warnings.)_
+- [x] **Corriger la boucle d’autorisation et la sélection Progress** — DONE _(evidence: 101 targeted Stop/Progress tests: 100 pass, 1 skip, ADR/docs/CTXRoute/coherence/lint validations passed, Coverage: 268 pass, 1 skip; only pre-existing MCP manifest test fails)_
+
+## Résoudre les incohérences documentaires après migration — DONE
+
+- [x] **Renuméroter l’ADR dashboard et réaligner les références** — DONE _(evidence: ADR dashboard renumbered from 0022 to unique 0028 without content loss., Component-boundaries goal now reserves ADR-0029 through the authenticated Progress API., ADR-0021 now documents the two exact reviewed Sensor exceptions.)_
+
+## Documenter l’inventaire, la résolution et la Review locale — BLOCKED
+
+- [ ] **Définir le parcours minimal d’inventaire, résolution et Review** — BLOCKED _(evidence: Le retrait graphique a supprimé les conflits de routes et croisements., La composition restait sous le seuil de lisibilité desktop avec une erreur et aucun avertissement., Deux corrections ciblées de libellés n'ont pas réduit cette erreur; Archify impose l'arrêt.)_
+
+## Concevoir l’architecture UI et le catalogue visuel — DONE
+
+- [x] **Cartographier les écrans, parcours et états produit** — DONE _(evidence: docs/ui/00-screen-map.md distingue popup, bibliothèque, Review, agenda, réglages, side panel et workbench., docs/ui/01-state-matrix.md couvre vide, chargement, partiel, hors ligne, erreur récupérable et blocage., ui-system.architecture.json passe les 9 contrôles showcase avec 0 erreur et 0 avertissement.)_
+- [x] **Fixer les frontières des composants et modules** — DONE _(evidence: ADR-0029 accepte les frontières domaine, application, adaptateurs, UI, extension et workbench., Le contrat exige API publique, colocalisation implementation/styles/tests/preview et sources Monaco bornées en lecture seule., Le plan utilise désormais le workbench Vite/Monaco dans les 22 étapes concernées; audit sans référence résiduelle.)_
+- [x] **Construire le workbench Monaco local** — DONE _(evidence: UI package test: 1/1 passed; workbench tests: 3/3 passed., npm run build:ui-workbench passed with Monaco isolated behind a lazy chunk., Browser verified 26 catalogue entries, search, Review selection and read-only Monaco at 1512x827.)_
+
+## Construire les fondations visuelles partagées — DONE
+
+- [x] **Définir les tokens de couleur et de contraste** — DONE _(evidence: FavLib visual direction independently reconstructed as ink/graphite/ivory/amber semantic tokens., Atomic preview contains only surface levels, contrast pairs, and semantic states; no product screen or domain component., UI tests passed: 18/18; workbench tests passed: 3/3.)_
+- [x] **Définir typographie, espacements et dimensions** — DONE _(evidence: Atomic typography and spacing preview contains only type ramp, spacing scale, and control dimensions., Six spacing tokens, seven type sizes, and 32/36/44px control heights are enforced by tests., UI tests passed: 23/23; workbench tests passed: 3/3.)_
+- [x] **Définir rayons, ombres, icônes et mouvement** — DONE _(evidence: Effects tokens cover radii, shadows, motion, and reduced-motion behavior in an isolated preview., Lucide registry exposes 38 named icons behind the public @tobirink/ui Icon API., 30 UI tests and 3 workbench tests passed; build, lint, anti-slop, Sensor, and browser render passed.)_
+
+## Construire chaque primitive UI isolément — DONE
+
+- [x] **Construire Button** — DONE _(evidence: 37 UI and 3 workbench tests passed; production build passed., Browser measured a centered X at 0px delta, 42px idle width, left-side label reveal, keyboard focus, and no overflow., Computed gradient and shadow are none; ESLint, anti-slop, Sensor SAFE, UI contract, docs, and diff checks passed.)_
+- [x] **Construire SearchField** — DONE _(evidence: 42 UI tests; build, lint, Sensor and axe pass.)_
+- [x] **Construire FacetSelect** — DONE _(evidence: 49 UI tests; build; Sensor; browser pass.)_
+- [x] **Retirer Checkbox autonome** — DONE _(evidence: 49 UI; 3 WB; build; Sensor.)_
+- [x] **Construire Switch** — DONE _(evidence: Tests; build; lint.)_
+- [x] **Construire Status** — DONE _(evidence: Tests; build; lint.)_
+- [x] **Construire Surface** — DONE _(evidence: 65 UI; 3 WB; build; lint; Sensor SAFE.)_
+- [x] **Construire Dialog** — DONE _(evidence: Dialog natif reproduit la modale FavLib sobre avec variantes default/alert et verrou busy., Browser: :modal actif, focus initial sur Fermer, Escape ferme en état normal, retourne le focus à Ouvrir et reste bloqué en busy., 6 tests Dialog, build workbench, ESLint et anti-slop passent; aucun changement d’architecture requis dans la frontière UI existante.)_
+- [x] **Construire la navigation** — DONE _(evidence: Navigation reprend la DA FavLib pour primary, tabs et compact avec une convention active unique., Browser: Bibliothèque annoncée par aria-current, tabs avec un seul tabindex=0; ArrowRight déplace le focus de Résumé à Sources sans sélectionner., Compact: trois cibles de 44px, largeur 404px et aucun overflow; 6 tests, build, ESLint et anti-slop passent.)_
+- [x] **Construire Loading, Empty et Error states** — DONE _(evidence: FeedbackState sépare loading, empty et error par un contrat typé; seule l’erreur recoverable accepte une action., Browser: aria-busy actif au chargement, 0 bouton pour empty/error terminale, 1 bouton Réessayer pour error recoverable et 0 overflow., 89 tests UI et 3 tests workbench passent; build, ESLint, anti-slop, validate:ui et Archify showcase passent.)_
+
+## Construire les composants métier réutilisables — DONE
+
+- [x] **Construire WorkCard** — DONE _(evidence: WorkCard reprend la cover FavLib 196×294 au ratio 2:3, sans badge ni panneau., Correction validée dans le navigateur: progression uniquement en haut à droite (37 / 120), un seul enfant poster, aucun texte À vérifier ni ligne basse., 6 tests UI et 3 tests workbench passent; build, ESLint et anti-slop passent.)_
+- [x] **Construire ProgressControl** — DONE _(evidence: Progression enregistrée et détectée sont affichées séparément dans un contrôle compact inspiré de FavLib., Browser: une baisse de 37 à 20 conserve 37 au premier submit, révèle Confirmer la baisse, puis enregistre 20 au second; aucun overflow., 6 tests ProgressControl, build Workbench, ESLint et anti-slop passent.)_
+- [x] **Construire ReviewCandidateCard** — DONE _(evidence: ReviewCandidateCard reprend la carte-cover FavLib 180×270 avec overlays titre, alias, type et provenance., Browser: favori original séparé, aria-pressed passe de false à true, aucun contrôle Valider/Confirmer et 0 overflow., 6 tests ReviewCandidateCard, build Workbench, ESLint et anti-slop passent.)_
+- [x] **Construire ReviewDecisionForm** — DONE _(evidence: ReviewDecisionForm sépare candidat, ID, URL et aucun résultat dans un groupe radio nommé., Browser: 4 choix, ID vide annoncé sans décision; conflit bloque Confirmer, Recharger supprime le conflit et réactive le submit; 0 overflow., 6 tests ReviewDecisionForm, build Workbench, ESLint, anti-slop et diff-check passent.)_
+- [x] **Construire AgendaItem** — DONE _(evidence: AgendaItem reprend la carte calendrier FavLib 180×270 et distingue officielle, confirmée, estimation et indisponible par texte et ton., Browser: official expose un datetime; estimated n’invente aucun time et reste warning, confirmed est success; nom accessible complet et 0 overflow., 6 tests AgendaItem; 113 tests UI, 3 Workbench, build, ESLint, anti-slop, validate:ui et Archify showcase passent.)_
+- [x] **Construire ReminderControl** — DONE _(evidence: ReminderControl compose Switch et Button sans API navigateur et garde badge/native indépendants., Browser: badge et native changent séparément; prompt désactive seulement native, Autoriser le réactive; 0 overflow., 6 tests ciblés, build Workbench, ESLint, anti-slop et diff-check passent.)_
+- [x] **Construire recherche et filtres** — DONE _(evidence: LibraryFilters compose un SearchField et trois FacetSelect; aucune primitive, input, select ou badge parallèle., Browser: requête générale conservée, recherche interne ani filtre Anime, sélection annoncée inclus et 0 overflow., 6 tests ciblés; 125 tests UI; 3 Workbench; build, ESLint, anti-slop, validate:ui, diff-check et Archify showcase passent.)_
+
+## Assembler chaque surface produit séparément — DONE
+
+- [x] **Assembler le Popup** — DONE _(evidence: Popup découvert comme Implémenté avec six sources Monaco., Sept états, actions et absence de débordement vérifiés dans le navigateur., 6 tests Popup et 3 tests Workbench réussis.)_
+- [x] **Assembler la Bibliothèque** — DONE _(evidence: LibraryFilters, WorkCard, ProgressControl et FeedbackState sont composés sans duplication., Browser : pagination 4→6, recherche, sélection, progression 141 et huit états vérifiés sans overflow., 6 tests Library, Workbench, build, lint, anti-slop, UI et Archify passent.)_
+- [x] **Assembler la surface Review** — DONE _(evidence: ReviewCandidateCard et ReviewDecisionForm composés sans validation implicite., Browser : candidat, décision manuelle, aucun résultat et conflit résolu par relecture; 0 overflow., 6 tests Review, 127 tests UI, Workbench, build, lint, anti-slop, UI et Archify passent.)_
+- [x] **Assembler l’Agenda** — DONE _(evidence: AgendaItem et ReminderControl composés avec quatre niveaux de certitude explicites., Browser : badge/native indépendants, permission, sept états et cache hors ligne vérifiés; 0 overflow., 6 tests Agenda, Workbench, build, lint, anti-slop et Archify passent.)_
+- [x] **Assembler les Réglages** — DONE _(evidence: Import, projection, rappels, export et récupération restent cinq capacités séparées., Browser : Annuler/Confirmer projection, restauration confirmée, six états et disponibilité hors ligne vérifiés; 0 overflow., 6 tests Settings, 127 tests UI, Workbench, build, lint, anti-slop, UI et Archify passent.)_
+- [x] **Assembler le Side panel** — DONE _(evidence: SidePanel compose une seule WorkCard inchangée, ProgressControl, un fallback Lucide monochrome et au plus une action contextuelle; aucune API navigateur, IndexedDB ou requête directe., 6 tests SidePanel, 127 tests UI, 36 tests extension et 3 tests Workbench passent; build, ESLint, anti-slop, contrat UI, Sensor SAFE, diff-check et Archify showcase passent., Chrome à 390 px: carte 196 px dans 242 px sans overflow; focus carte → progression → Enregistrer → Review, mouvement réduit à 0 s, sept états et callbacks vérifiés.)_
+
+## Construire le domaine, les ports et le stockage local — DONE
+
+- [x] **Définir les entités et invariants** — DONE _(evidence: Six identités opaques et stables couvrent Work, Library, Progress, Review, AgendaEntry et Reminder; elles rejettent URLs et identifiants fournisseur., Les invariants de références, unicité, progression, résolution, dates et rappels passent 7 tests Vitest avec TypeScript strict., ESLint, anti-slop, Sensor SAFE, diff-check et Archify showcase passent; packages/domain n’importe aucun framework ni fournisseur.)_
+- [x] **Définir les cas d’usage et ports** — DONE _(evidence: StoragePort possède six stores privés et des transactions à portée explicite; Bookmark, Bootstrap, Catalogue, Media, Notification, PageContext, Telemetry et Clock traversent des ports application., Trois cas d’usage locaux utilisent seulement @tobirink/domain et les ports; les fakes passent le contrat partagé, y compris portée et rollback transactionnels., TypeScript strict et 6 tests application/contrats passent; ESLint, anti-slop, Sensor SAFE, décisions, diff-check et deux validations Archify showcase passent.)_
+- [x] **Implémenter IndexedDB avec Dexie** — DONE _(evidence: Dexie 4.4.5 est épinglé; l’adaptateur expose six stores IndexedDB et des transactions à portée explicite derrière StoragePort., Le contrat partagé vérifie round-trip, portée et rollback; un smoke test Chromium réel couvre aussi Review, Agenda et Reminder., TypeScript strict, 15 tests/smokes, ESLint, anti-slop, Sensor SAFE, décisions, docs, diff-check et les deux Archify showcase passent.)_
+- [x] **Implémenter migrations et intégrité** — DONE _(evidence: La fixture v1 migre vers la fixture v2 dans une transaction Dexie réelle; le schéma courant est version 2., Une exception injectée pendant upgrade conserve exactement l’état v1, sans publication partielle., Le contrôle d’intégrité relit les six stores et leurs références sans réseau; tests Chromium, stockage, typecheck, lint, Sensor SAFE et Archify passent.)_
+- [x] **Implémenter export et import** — DONE _(evidence: L’enveloppe tobirink-private-export v1 est sérialisée, validée par Zod 4.5.4 puis rematérialisée avec tous les invariants domaine et références croisées., L’import invalide et l’absence de jeton explicite échouent avant replaceSnapshot; le fake prouve le rollback d’un remplacement en erreur., 3 tests recovery ciblés et 9 tests application/contrats passent avec typecheck strict, lint, Sensor SAFE, décisions, docs, diff-check et Archify showcase.)_
+- [x] **Implémenter la file durable MV3** — DONE _(evidence: READY, CLAIMED, EFFECT_RECORDED, COMMITTED, RETRY_AT et BLOCKED survivent à une fermeture/réouverture IndexedDB réelle dans Chromium., La clé d’idempotence unique empêche un second enqueue et un claim expiré est repris transactionnellement avec la même clé., Les transitions n’utilisent ni timer ni tableau comme autorité; tests tâches/stockage, typecheck, lint, Sensor SAFE, docs, diff-check et deux Archify showcase passent.)_
+
+## Livrer les parcours fonctionnels verticaux — DONE
+
+- [x] **Livrer import, résolution et Review** — DONE _(evidence: review-flow: 1/1 passing; Review surface: 7/7 passing, contracts: application 5/5 and contracts 6/6 passing; typecheck, lint and anti-slop passing, Workbench production build passes; tobirink.architecture validates 9/9 with 0 warnings)_
+- [x] **Livrer bibliothèque et progression** — DONE _(evidence: library-progress: 2/2 passing; offline snapshot and bookmark-removal preservation proven, observed progress remains unpersisted until confirmation; regression rejected unless explicitly allowed, domain: 7/7; typecheck, lint, anti-slop and Sensor SAFE; architecture 9/9 with 0 warnings)_
+- [x] **Livrer agenda, rappels et notifications** — DONE _(evidence: agenda-notifications: 2/2; estimates schedule no native task and official reminders publish once, durable tasks: application 2/2 plus IndexedDB Chromium contract; expired work survives worker restart, Agenda surface: 8/8 and uses WorkCard, never AgendaItem; Workbench build passes)_
+
+## Durcir et livrer l’extension — BLOCKED
+
+- [x] **Matérialiser et sécuriser la coque WXT MV3** — DONE _(evidence: WXT 0.21.4 et module React 1.2.2 matérialisés sans lifecycle scripts implicites; Chromium et Firefox MV3 construisent 7 entrypoints., Tests sécurité 4/4: aucun host permission, permissions bornées, CSP locale, messages Zod stricts; Firefox déclare ID stable et aucune collecte., Bundles installables: Chrome 393.97 kB, Firefox 394.12 kB; extension 48/48, UI 111/111, Workbench 6/6; ESLint, Oxlint, Sensor SAFE, docs, ADR et Archify passent.)_
+- [ ] **Vérifier accessibilité et responsive** — BLOCKED _(evidence: Automated: a11y 5/5, UI 111/111, extension 53/53, Workbench 6/6; strict typecheck, build, lint, Oxlint, UI contract, docs and decisions pass., Responsive/semantic contract verifies six rendered surfaces, header search then Review bell, dialog naming, AA token contrast, touch sizes, narrow breakpoints and reduced motion., external: connected browser controller reports No browser is available; manual Chromium/Firefox keyboard, 200% zoom, computed overflow and forced-colour pass is recorded but cannot run in this environment.)_
+- [x] **Vérifier performance et bundle** — DONE _(evidence: test:performance 3/3 after fresh Chromium/Firefox builds; representative local renders 0.64–11.27 ms against 200 ms., Packages: Chromium 394,013 raw / 108,571 gzip-proxy bytes; Firefox 394,163 / 108,634, each 17 files and ~7.3% of 1.5 MB budget., Background startup has no fetch, IndexedDB scan, collection materialization or timer; lint, Oxlint, Sensor SAFE, docs, decisions, Archify and diff-check pass.)_
+- [ ] **Vérifier Chrome et Firefox** — BLOCKED _(evidence: Automated cross-target evidence passes: WXT builds seven Chromium and Firefox MV3 entrypoints; security 4/4 and shared extension flows 53/53., Generated differences audited: Chrome service_worker + side_panel/sidePanel; Firefox background scripts + sidebar_action, stable Gecko ID and no-data declaration., external: Firefox and web-ext are absent and the connected browser controller reports No browser is available; real Chrome/Firefox journeys and web-ext lint cannot run.)_
+- [x] **Préparer packaging et rollback** — DONE _(evidence: Two fresh packaging runs are identical: Chrome f44dbc06f94ff1bf57bbb2718864eadeaf31a7ad1f6f185245e8f0f29f267eac and Firefox ae16cfea9fb6bbbaf30b3cccf56c751c09ef66a7da9263339f15e1063fc7668a., Both ZIPs contain 21 sorted entries including four official logos; unzip -t reports no errors and release tests pass 2/2., Submission remains manual and docs/release.md defines verified prior-artifact rollback without automatic data mutation.)_
+
+## Ajouter les capacités cloud après le MVP local — DONE
+
+- [x] **Ajouter l’index collectif consenti** — DONE _(evidence: Workerd/D1 4/4; application 11/11; contrats 9/9; adaptateur 2/2., Sécurité, types, lints, docs, Archify 9/9 et audit 0 passent.)_
+- [x] **Ajouter le catalogue public D1** — DONE _(evidence: D1 4/4; Worker 14/14; index mesurés; gates verts.)_
+- [x] **Ajouter les couvertures R2 et variantes** — DONE _(evidence: Média 13/13; Worker 14/14; Sensor/Archify verts.)_
+- [x] **Ajouter le calendrier public minimal** — DONE _(evidence: Agenda 11/11; Worker 19/19; gates verts.)_
+- [x] **Ajouter la sauvegarde chiffrée opt-in** — DONE _(evidence: Recovery 9/9; sécurité et gates verts.)_
+- [x] **Centraliser les accès cloud remplaçables** — DONE _(evidence: Application 14/14, Cloudflare adapters 19/19 and Worker 19/19 pass; all workspace typechecks pass., Worker route audit finds no direct D1, R2 or Images binding access; only composition.ts reads provider bindings., ESLint, Oxlint, Sensor SAFE, security 11/11, docs, decisions, diff-check and Tobirink Archify showcase 9/9 pass.)_
+
+## Adopter Lucide comme source unique des icônes UI — DONE
+
+- [x] **Installer Lucide et exposer le registre FavLib nettoyé** — DONE _(evidence: lucide-react@1.40.0 is pinned and deduplicated., The cleaned FavLib-derived registry contains 38 unique named imports and no whole-catalogue dynamic import., Browser verified 38 rendered Lucide SVGs with no horizontal overflow or error overlay.)_
+
+## Gouverner la dépendance Lucide du package UI — DONE
+
+- [x] **Documenter et matérialiser Lucide sans scripts** — DONE _(evidence: ADR-0030 records Lucide ownership and public API boundaries; decision validation passed., UI architecture showcase passed all 9 checks with 0 errors and 0 warnings., Dependency materialization completed with scripts disabled and npm reported 0 vulnerabilities.)_
+
+## Augmenter la capacité bornée de Progress sans perdre l’historique — DONE
+
+- [x] **Porter la limite Progress à 128 Kio** — DONE _(evidence: 40 Progress tests; decisions; docs; diff pass.)_
+
+## Aligner l’autorisation avec le mode autonome confirmé — DONE
+
+- [x] **Autoriser l’exécution continue des étapes matérialisées en mode autonome** — DONE _(evidence: ADR and docs validation pass; autonomous continuation bounded.)_
+
+## Corriger le Dialog selon la direction validée — DONE
+
+- [x] **Unifier la surface et les actions du Dialog** — DONE _(evidence: Dialog forme une surface continue sans séparateurs header/footer; Fermer déploie son texte à gauche depuis un X centré., Browser: Annuler et Confirmer sont iconés; Escape ferme et rend le focus à Ouvrir; busy conserve la modale; 0 overflow., 8 tests Dialog; 127 tests UI; 3 Workbench; build, ESLint, anti-slop, validate:ui, diff-check et Archify showcase passent.)_
+
+## Raccorder les surfaces extension au Workbench — DONE
+
+- [x] **Ajouter le workspace extension et sa découverte automatique** — DONE _(evidence: Les previews extension sont découvertes automatiquement et leurs sources chargées dans Monaco., test:e2e Popup, tests Workbench et build réussis sans nouvelle version externe.)_
+
+## Étendre la fondation workspace aux applications — DONE
+
+- [x] **Réviser le contrat workspace pour apps extension** — DONE _(evidence: ADR-0005 couvre apps/* et packages/*; le manifeste extension porte Apache-2.0., Le lockfile enregistre @tobirink/extension sans nouvelle version externe., Décisions, docs, workspace, diff-check et Archify showcase passent.)_
+
+## Nettoyer les cartes métier héritées — DONE
+
+- [x] **Supprimer les coques concurrentes à WorkCard** — DONE _(evidence: Deleted both legacy component directories and removed their catalogue definitions; catalogue now contains 24 entries., No positive production reference remains; Library, Review, Agenda and SidePanel use WorkCard, with negative regression assertions retained., UI 115/115, extension 41/41, Workbench 3/3; production Workbench build, lint, anti-slop, Sensor SAFE, UI contract and diff-check pass.)_
+
+## Structurer les variantes métier de WorkCard — DONE
+
+- [x] **Unifier les cartes métier dans WorkCard** — DONE _(evidence: WorkCard exposes library, review, agenda and side-panel; obsolete continued and review state removed., Workbench integration test switches to agenda and review and asserts each fixture is rendered inside WorkCard., Review-specific placeholder gradient and SidePanel cover overlay removed; one shared Lucide fallback and selected state live in WorkCard.)_
+
+## Réaligner les candidats Review sur la carte retournable FavLib — DONE
+
+- [x] **Ajouter la face de décision retournable aux WorkCard candidates** — DONE _(evidence: WorkCard Review candidates preserve the 2:3 front and expose the FavLib two-zone back; original Review, library, agenda and side-panel cards remain single-face., Chrome runtime: desktop hover transforms to rotateY(180deg) and returns to none; touch flips; keyboard focus reaches Select; 390px viewport measures 196x294 with 0px page overflow; reduced motion transition is 0s., UI 116/116, extension 41/41 and Workbench 5/5 pass; typecheck, production build, ESLint, oxlint, anti-slop snapshot, targeted Sensor SAFE and UI contract pass.)_
+
+## Rendre toute la face arrière Review cliquable — DONE
+
+- [x] **Retirer la face avant du hit-testing après retournement** — DONE _(evidence: Chrome before fix returned the invisible front .copy span at the center of Source de l’œuvre; after fix elementFromPoint returns the source span inside its anchor, front pointer-events is none, and a physical coordinate click sets the link click receipt., The flippable front is visual-only for hit-testing while the container retains touch flip; the back remains the sole interactive plane with z-index 1., WorkCard 7/7 and Workbench 5/5 pass; typecheck, production build, ESLint, oxlint, targeted Sensor SAFE, UI contract and diff-check pass.)_
+
+## Nettoyer les contrôles métier artificiels — DONE
+
+- [x] **Nettoyer les contrôles métier artificiels et réaligner les flux sur FavLib** — DONE _(evidence: Deleted the exact ReviewDecisionForm and ReminderControl directories; Workbench catalogue now has 22 entries and browser confirms both removed entries are absent., Review restores FavLib behavior: WorkCard back Ajouter submits candidate directly, Source remains accessible, manual ID/URL and no-match submit directly, and conflict exposes only Recharger., Agenda has no global notification control; Settings composes badge/native permission controls from Surface, Switch and Button.)_
+
+## Intégrer Review et corriger les surfaces extension — DONE
+
+- [x] **Rendre l’organisateur FavLib fidèle et interactif** — DONE _(evidence: Playwright: dossier 20x20 plein ambre, rang 12px centré; deux chiffres tiennent., Le rang reprend exactement le fond rgb(25,25,31); le path est rempli rgb(255,178,36)., Aperçu: largeur égale à la surface, hauteur 100vh, bordure/rayon 0px et aucune ombre.)_
+- [x] **Centrer les états Library et Review** — DONE _(evidence: FeedbackState publie les layouts inline/centered et une icône Lucide configurable; Library et Review réutilisent ce contrat sans nouvelle coque., Library retire son header et son compteur, rend filtres/cartes uniquement dans les états utilisables et centre empty/loading/error/blocked; Review explique ses sept états tandis que le resolver reste dans la cloche., Chrome headless vérifie Library empty et Review ready à 390 px sans débordement horizontal (scrollWidth = innerWidth = 390), ainsi que Library ready à 1440 px.)_
+- [x] **Épurer les états centrés et corriger le CTA Library** — DONE _(evidence: FeedbackState centered calcule background transparent, quatre bordures à 0 px et quatre paddings à 0 px; inline conserve sa coque existante., Chrome 390 px mesure les SVG Lucide Library et Review à 48 × 48 px en rgb(123,123,133), avec scrollWidth = innerWidth = 390 et CTA entièrement visible., Library affiche Télécharger l’extension via onDownloadExtension; aucune URL ni destination de téléchargement n’est codée dans la surface.)_
+- [x] **Réaligner l’empty Review sur FavLib** — DONE _(evidence: Référence FavLib auditée: notification-empty mesure 280 × 170 px, contient Inbox 46 px et un seul libellé; la nouvelle bulle reproduit ce contrat avec les tokens partagés., Chrome mesure la bulle empty à 276 × 166 px sur desktop et 390 px, avec Inbox 48 px gris rgb(123,123,133), aucun header interne et le seul texte Aucune correspondance à vérifier., La bulle conserve son caret et son dialog accessible; scrollWidth égale innerWidth à 390 et 1440 px.)_
+- [x] **Reconstruire le popup comme surface extension** — DONE _(evidence: Popup compose une coque 360 × 540 avec marque, viewport et tablist compacte Page/Sorties/Réglages; Page et Sorties réutilisent WorkCard., Les modèles discriminés injectent œuvres, sorties et préférences; Popup ne contient ni browser API, IndexedDB, URL distante ni réglage métier fixé dans son composant., Navigation compacte accepte les onglets avec rôles ARIA et focus roving; le test Workbench parcourt les trois panneaux et vérifie les réglages rapides.)_
+- [x] **Finaliser le design et le contrat runtime du popup** — DONE _(evidence: Popup sépare canvas, header et navigation basse; marque 扉/Tobirink, indicateur injecté et WorkCard Page à 196 px restaurent une hiérarchie compacte sans coque concurrente., PopupWork, PopupAgendaModel, PopupPageModel, PopupPreference, PopupPreferencesModel et PopupConnection ne contiennent que des données sérialisables; retry et mutations sont des callbacks séparés., Le runtime rend blocked et Données non raccordées tant que Page/Agenda/préférences n’ont pas de ports de lecture; aucune œuvre, sortie, préférence ou chargement factice n’est injecté.)_
+- [x] **Restaurer les logos FavLib officiels sur toutes les surfaces de marque** — DONE _(evidence: Les 5 PNG copiés correspondent bit-à-bit aux originaux FavLib; dimensions 16, 32, 48 et 128 px confirmées., UI 114/114, extension 55/55, Workbench 7/7, accessibilité 6/6 et sécurité manifeste 4/4 passent., Builds Chrome et Firefox contiennent les 4 icônes et déclarent la même série dans icons et action.default_icon.)_
+- [x] **Transformer le popup en reprise contextuelle** — DONE _(evidence: Popup affiche « Cette œuvre » avec WorkCard active-work 3:2 et reprises 2:3 sous « Continuer mes œuvres »; viewport vertical tactile et liens vers la dernière URL utile., Cache storage.local versionné: cinq entrées maximum, TTL 30 jours, terminées/invalides exclues; activeTab HTTP(S) uniquement derrière message Zod strict et adaptateurs., Application 8/8, UI 114/114, extension 58/58, Workbench 7/7, a11y 6/6, performance 3/3; typecheck, builds Chrome/Firefox, sécurité 7/7, lint, anti-slop, docs et Archify passent.)_

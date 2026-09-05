@@ -1,8 +1,0 @@
-import { describe, expect, it } from 'vitest';
-import { hashPairingCode, pairingCode, toWebBookmark, parseBookmarkTitle } from './extension.js';
-import {importBatchAcknowledgementContract} from './index.js';
-describe('Wave 3 contracts',()=>{it('uses random, eight digit, salted one-way codes',()=>{const c=pairingCode(new Uint8Array([1,2,3,4,5]));expect(c).toMatch(/^\d{8}$/);expect(hashPairingCode(c,'salt')).not.toBe(c)});it('inventories non-media HTTP(S) bookmarks',()=>expect(toWebBookmark({id:'1',title:'Docs',url:'https://example.test/docs'})).toMatchObject({id:'1',event:'created'}));it('rejects non-Web URLs',()=>expect(toWebBookmark({id:'1',title:'Local',url:'file:///tmp/a'})).toBeNull());it('sends the parsed title hint for Voiranime releases',()=>expect(parseBookmarkTitle('To Love-Ru - To Love Ru - 11 VOSTFR - 11 - Voiranime')).toBe('To Love-Ru'));it('removes chapter and provider suffixes globally',()=>expect(parseBookmarkTitle('The Strongest Magical Swordsman Ever Reborn As An F-Rank Adventurer. Chapter 88 - ManhwaZ')).toBe('The Strongest Magical Swordsman Ever Reborn As An F-Rank Adventurer.'));it('removes chapter suffixes without a provider suffix',()=>expect(parseBookmarkTitle('Read Maou no Ore ga Dorei Elf wo Yome ni Shitanda ga, Dou Medereba ii? Chapter 24-eng-li Online')).toBe('Maou no Ore ga Dorei Elf wo Yome ni Shitanda ga, Dou Medereba ii?'))});
-
-it('acknowledges imports with the bounded server inventory receipt',()=>{
-  expect(importBatchAcknowledgementContract.parse({ok:true,accepted:1,cursor:'cursor-synthetic',receipt:{inventoryTotal:1,recognizedCount:1,reviewCount:0,excludedCount:0,inventoryDigest:'a'.repeat(64),serverSyncedAt:'2026-08-11T00:00:00.000Z'}}).receipt.inventoryTotal).toBe(1);
-});

@@ -1,58 +1,79 @@
-# FavLib
+# Tobirink
 
-FavLib est une application privée, locale et multi-utilisateur pour suivre mangas, manhwa, manhua et anime depuis les favoris Chrome synchronisés par Google.
+Tobirink is a clean-room, local-first browser extension for managing a manga
+and anime library, progress, agenda, reminders, and browser-assisted discovery.
 
-Chaque utilisateur installe l'extension dans son profil Chrome et l'appaire à son compte FavLib. Tous ses favoris HTTP(S) sont inventoriés par l’API locale puis classés explicitement `recognized`, `review` ou `excluded`. Les œuvres reconnues deviennent des abonnements surveillés.
+FavLib is used only to recover product intent. None of its source code,
+structure, migrations, or packages are retained.
 
-FavLib n'héberge et ne fournit aucun contenu. Il détecte les sorties, conserve la progression déduite des favoris et ouvre la page d'origine.
+## Architecture baseline
 
-Une œuvre peut regrouper plusieurs sites, langues, éditions ou groupes. FavLib met en cache uniquement métadonnées et disponibilité, puis choisit ou propose la meilleure origine au moment d'ouvrir ; aucun contenu média tiers n'est mis en cache ou servi.
+The product is built around inward dependencies:
 
-PostgreSQL maintient aussi un catalogue canonique local à provenance autorisée : titres natifs, romaji, traductions, synonymes, identifiants externes, saisons et relations. Un fournisseur autorisé peut annoncer une diffusion ; la disponibilité réelle d'un épisode ou chapitre est confirmée par le connecteur du site.
+1. Domain rules know only library, progress, and agenda concepts.
+2. Application use cases coordinate domain rules through owned ports.
+3. Browser, storage, UI, content-source, telemetry, and cloud adapters implement
+   those ports.
+4. WXT, React, Dexie, and Cloudflare stay at the outer edge and are replaceable.
 
-## Documentation
+The selected extension stack is strict TypeScript, WXT 0.21.x pinned exactly,
+React 19, CSS Modules, IndexedDB through Dexie, Zod 4, Vitest, and Playwright.
+An optional Hono Worker and D1 database may serve anonymous public data. Rails,
+accounts, private cloud synchronization, queues, and microservices are outside
+the v1 baseline.
 
-Validation reproductible de la documentation et des fixtures :
+See the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md), [architecture](docs/architecture/README.md), and [quality strategy](docs/02-quality-strategy.md).
 
-```bash
-./scripts/validate-wave-0.sh
+## Collaboration contract
+
+This project is developed one bounded decision at a time.
+
+- Read-only research and validation may proceed.
+- Every mutation requires explicit approval for the exact step.
+- Approval never carries to a later step.
+- Installs, provider mutations, deployments, commits, pushes, and deletions
+  require their own approval.
+- No file is deleted automatically.
+
+[AGENTS.md](AGENTS.md) is authoritative and [CLAUDE.md](CLAUDE.md) imports it
+directly.
+
+## Current status
+
+The product foundation is being documented before initialization. No product
+implementation or product dependency has been added yet. The inherited
+blueprint control plane remains available for validation but never appears in
+product diagrams or runtime code.
+
+## Repository commands
+
+The current commands validate the repository foundation:
+
+```sh
+npm run setup:check
+npm run validate
+npm run verify
+npm run archify:validate -- tobirink
 ```
 
-- [Vision et règles produit](docs/01-produit.md)
-- [Design et écrans](docs/02-design.md)
-- [Architecture multi-utilisateur locale](docs/03-architecture.md)
-- [Favoris, fournisseurs et connecteurs](docs/04-sources.md)
-- [Roadmap par waves](docs/05-roadmap.md)
-- [Décisions actées et points ouverts](docs/06-decisions.md)
-- [Plan de test de chaque wave](docs/07-waves-et-tests.md)
-- [Checklist transversale complète](docs/08-checklist-transversale.md)
-- [Wireframes Wave 0](docs/09-maquettes-wireframes.md)
-- [Exploitation locale et sauvegardes](docs/10-exploitation-locale.md)
-- [Contrat et responsabilités de l'API](docs/11-api.md)
-- [APIs, fournisseurs, langages et stack vérifiés](docs/12-api-fournisseurs-et-stack.md)
-- [Jeux de données, dumps et imports locaux](docs/13-jeux-de-donnees-et-imports.md)
-- [Audit sauvegardes, limites API, logique et extension](docs/14-audit-sauvegardes-api-extension.md)
-- [Préparation du démarrage de l'implémentation](docs/15-preparation-demarrage.md)
-- [Modèle de menace](docs/16-modele-de-menace.md)
-- [Déploiement et reprise de la pipeline](docs/17-deploiement-pipeline.md)
-- [Audit live des fournisseurs](docs/18-audit-live-fournisseurs.md)
-- [Décisions d'architecture](docs/adr/README.md)
-- [Validation AniList historique, anime uniquement](docs/VALIDATION-ANILIST.md)
+Product build, test, packaging, infrastructure, and release commands will be
+added only in separately approved implementation steps and then recorded in
+.project/project-config.json.
 
-## Boucle métier
+## Documentation map
 
-```text
-favoris Chrome de chaque utilisateur
-  → extension appairée
-  → examen local idempotent de tous les favoris
-  → inventaire HTTP(S) → tri API/site → identité locale → fournisseur canonique selon le type
-  → œuvre + source suivie
-  → découverte bornée + validation d'alternatives
-  → worker public mutualisé ou extension privée best effort
-  → regroupement des origines par sortie
-  → nouvelle sortie + alternatives dans l'inbox
-```
+- [Project brief](docs/00-project-brief.md): scope and constraints.
+- [Technology decisions](docs/01-technology-decisions.md): selected stack and research.
+- [Quality strategy](docs/02-quality-strategy.md): verification contract.
+- [Architecture](docs/architecture/README.md): product-only Archify source.
+- [Decisions](docs/decisions/README.md): durable architectural decisions.
+- [Systems](docs/systems/README.md): subsystem ownership and boundaries.
+- [Workflows](docs/workflows/README.md): product and operational flows.
+- [CI/CD](docs/ci.md): delivery policy.
+- [Security](SECURITY.md): security policy and trust boundaries.
 
-Un favori vers une fiche d'œuvre signifie « je suis cette œuvre ». Un favori vers un chapitre ou épisode précis indique également une position. Après consentement, l'extension peut aussi observer une page suivante appartenant à cette même œuvre favorite et avancer une progression marquée « observée ». La nouveauté disponible est détectée par le connecteur du site, pas par une modification du favori.
+## License
 
-Le projet reste local et privé. Les utilisateurs peuvent créer normalement leur compte avec une adresse e-mail et un mot de passe ; l'administrateur gère ensuite les rôles et l'accès à l'instance.
+The repository remains licensed under Apache-2.0. Third-party tooling and future
+product dependencies retain their own licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

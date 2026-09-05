@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "upstream": "https://github.com/dmmulroy/anti-slop",
+  "commit": "e8c4880471b23ab7f216fba7b27d173a6ef07d4c",
+  "license": "MIT",
+  "scope": "LICENSE plus production TypeScript sources under src; upstream tests are not runtime-vendored",
+  "oxlint": "1.78.0",
+  "@oxlint/plugins": "1.78.0",
+  "snapshotSha256": "216e88e62cfbcc374c6e845255ce4b60f05b33eba33c487b1e7afd05c4802b65"
+}

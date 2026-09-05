@@ -1,0 +1,50 @@
+import { createWork, workId } from '@tobirink/domain';
+import { describe, expect, it } from 'vitest';
+
+import { MemoryRecoveryStore } from '../../../../contracts/src/export/memory-recovery-store';
+import {
+  createEncryptedBackup,
+  parseEncryptedBackupBlob,
+  restoreEncryptedBackup,
+} from './encrypted-backup';
+
+const empty = { agenda: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
+const privateTitle = 'Titre privé de récupération';
+const passphrase = 'phrase secrète locale robuste';
+
+function sourceStore() {
+  const work = createWork({ externalReferences: [], id: workId('work_private'), mediaKind: 'manga', preferredTitle: privateTitle });
+  return new MemoryRecoveryStore({ ...empty, works: [work] });
+}
+
+describe('encrypted cloud recovery', () => {
+  it('encrypts the complete private export before producing an uploadable blob', async () => {
+    const blob = await createEncryptedBackup(sourceStore(), '2026-09-05T10:00:00.000Z', passphrase);
+    expect(blob.serialized).not.toContain(privateTitle);
+    expect(blob.serialized).not.toContain(passphrase);
+    expect(parseEncryptedBackupBlob(blob)).toMatchObject({ cipher: 'AES-GCM-256', format: 'tobirink-encrypted-backup', version: 1 });
+  });
+
+  it('decrypts and validates before one confirmed atomic replacement', async () => {
+    const blob = await createEncryptedBackup(sourceStore(), '2026-09-05T10:00:00.000Z', passphrase);
+    const target = new MemoryRecoveryStore(empty);
+    await restoreEncryptedBackup(blob, passphrase, target, 'replace-private-state');
+    expect(target.replaceCount).toBe(1);
+    expect((await target.readSnapshot()).works[0]?.preferredTitle).toBe(privateTitle);
+  });
+
+  it('leaves local state untouched for a wrong passphrase or altered ciphertext', async () => {
+    const blob = await createEncryptedBackup(sourceStore(), '2026-09-05T10:00:00.000Z', passphrase);
+    const wrongPassphraseTarget = new MemoryRecoveryStore(empty);
+    await expect(restoreEncryptedBackup(blob, 'une autre phrase secrète', wrongPassphraseTarget, 'replace-private-state')).rejects.toThrow();
+    expect(wrongPassphraseTarget.replaceCount).toBe(0);
+
+    const envelope = parseEncryptedBackupBlob(blob);
+    const last = envelope.ciphertext.at(-1);
+    envelope.ciphertext = `${envelope.ciphertext.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`;
+    const altered = { format: blob.format, serialized: JSON.stringify(envelope) };
+    const alteredTarget = new MemoryRecoveryStore(empty);
+    await expect(restoreEncryptedBackup(altered, passphrase, alteredTarget, 'replace-private-state')).rejects.toThrow();
+    expect(alteredTarget.replaceCount).toBe(0);
+  });
+});

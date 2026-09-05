@@ -1,0 +1,284 @@
+:root {
+  color-scheme: dark;
+
+  --color-canvas: #09090b;
+  --color-surface: #121216;
+  --color-surface-raised: #19191f;
+  --color-surface-overlay: #23232b;
+  --color-border: #303039;
+  --color-border-strong: #4a4a55;
+
+  --color-text: #f4f4f5;
+  --color-text-muted: #a1a1aa;
+  --color-text-subtle: #7b7b85;
+  --color-text-on-accent: #241800;
+
+  --color-primary: #ffb224;
+  --color-primary-hover: #ffc14d;
+  --color-primary-soft: #32260e;
+  --color-focus: #ffd277;
+
+  --color-success: #72d6a1;
+  --color-success-soft: #142d22;
+  --color-warning: #efbd5c;
+  --color-warning-soft: #33270f;
+  --color-danger: #f28b8b;
+  --color-danger-soft: #371d20;
+
+  --color-disabled-surface: #17171b;
+  --color-disabled-text: #66666f;
+}
+
+.color-foundation {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  display: grid;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  gap: 28px;
+  min-height: 100%;
+  padding: 30px;
+  width: 100%;
+}
+
+.color-foundation[data-theme='Clair'] {
+  color-scheme: light;
+
+  --color-canvas: #f4f3f0;
+  --color-surface: #fbfaf7;
+  --color-surface-raised: #ffffff;
+  --color-surface-overlay: #eceae4;
+  --color-border: #d8d4ca;
+  --color-border-strong: #aaa59b;
+  --color-text: #171719;
+  --color-text-muted: #5f5d59;
+  --color-text-subtle: #716e68;
+  --color-text-on-accent: #241800;
+  --color-primary: #f2a30d;
+  --color-primary-hover: #d88d00;
+  --color-primary-soft: #fff0c9;
+  --color-focus: #9a6200;
+  --color-success: #23764c;
+  --color-success-soft: #dff3e7;
+  --color-warning: #805400;
+  --color-warning-soft: #ffefc6;
+  --color-danger: #ad3944;
+  --color-danger-soft: #ffe4e5;
+  --color-disabled-surface: #ebe9e4;
+  --color-disabled-text: #88857e;
+}
+
+.color-foundation__header {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+.color-foundation__eyebrow,
+.color-foundation__index,
+.color-foundation__token,
+.color-foundation__ratio,
+.color-foundation__usage {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.color-foundation__eyebrow {
+  color: var(--color-primary);
+  margin: 0 0 7px;
+}
+
+.color-foundation__header h3 {
+  font-size: 24px;
+  letter-spacing: -0.045em;
+  margin: 0;
+}
+
+.color-foundation__index {
+  color: var(--color-text-subtle);
+}
+
+.color-foundation__section {
+  display: grid;
+  gap: 11px;
+}
+
+.color-foundation__section h4 {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.color-foundation__surfaces {
+  border: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.color-foundation__swatch {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 116px;
+  padding: 14px;
+}
+
+.color-foundation__swatch + .color-foundation__swatch {
+  border-left: 1px solid var(--color-border);
+}
+
+.color-foundation__swatch--canvas { background: var(--color-canvas); }
+.color-foundation__swatch--surface { background: var(--color-surface); }
+.color-foundation__swatch--raised { background: var(--color-surface-raised); }
+.color-foundation__swatch--overlay { background: var(--color-surface-overlay); }
+
+.color-foundation__token {
+  color: var(--color-text);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
+.color-foundation__role {
+  color: var(--color-text-subtle);
+  font-size: 10px;
+}
+
+.color-foundation__contrast-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.color-foundation__contrast {
+  align-items: center;
+  background: var(--sample-background);
+  border: 1px solid var(--color-border);
+  color: var(--sample-foreground);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 74px;
+  padding: 13px 15px;
+}
+
+.color-foundation__contrast--primary {
+  --sample-background: var(--color-surface);
+  --sample-foreground: var(--color-text);
+}
+
+.color-foundation__contrast--muted {
+  --sample-background: var(--color-surface);
+  --sample-foreground: var(--color-text-muted);
+}
+
+.color-foundation__contrast--accent {
+  --sample-background: var(--color-primary);
+  --sample-foreground: var(--color-text-on-accent);
+}
+
+.color-foundation__contrast--inverse {
+  --sample-background: var(--color-text);
+  --sample-foreground: var(--color-canvas);
+}
+
+.color-foundation__sample {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.color-foundation__ratio {
+  border: 1px solid currentColor;
+  padding: 4px 6px;
+}
+
+.color-foundation__states {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.color-foundation__state {
+  align-items: center;
+  border: 1px solid;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 64px;
+  padding: 11px;
+}
+
+.color-foundation__state--success {
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.color-foundation__state--warning {
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.color-foundation__state--danger {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.color-foundation__symbol {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.color-foundation__state strong,
+.color-foundation__state small { display: block; }
+
+.color-foundation__state strong {
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.color-foundation__state small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.color-foundation[data-state='focus'] {
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+
+.color-foundation[data-state='disabled'] .color-foundation__section { opacity: 0.52; }
+
+.color-foundation__usage {
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding-top: 15px;
+  text-transform: none;
+}
+
+@media (max-width: 720px) {
+  .color-foundation { gap: 22px; padding: 20px; }
+  .color-foundation__surfaces,
+  .color-foundation__contrast-grid,
+  .color-foundation__states { grid-template-columns: 1fr; }
+  .color-foundation__swatch { min-height: 78px; }
+  .color-foundation__swatch + .color-foundation__swatch {
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+  }
+}
