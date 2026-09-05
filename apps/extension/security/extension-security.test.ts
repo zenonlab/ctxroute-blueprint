@@ -70,4 +70,18 @@ describe('extension security boundary', () => {
     expect(value.browser_specific_settings?.gecko.data_collection_permissions.required).toEqual(['none']);
     expect(value.browser_specific_settings?.gecko.id).toBe('tobirink@tobirink.local');
   });
+
+  it('keeps IndexedDB behind the background composition root', async () => {
+    const packageManifest = z.object({
+      dependencies: z.record(z.string(), z.string()),
+    }).parse(JSON.parse(await readFile('package.json', 'utf8')));
+    const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
+    const localStorage = await readFile('runtime/local-storage.ts', 'utf8');
+
+    expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
+    expect(background).toMatch(/createExtensionLocalStorage\(\)/);
+    expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
+    expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
+    expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
+  });
 });

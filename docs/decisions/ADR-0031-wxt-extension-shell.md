@@ -8,12 +8,14 @@ scope:
   - oxlint.config.ts
   - docs/architecture/src/tobirink.architecture.json
 review: on-change
+revised: true
 ---
 
 # ADR-0031 — WXT extension shell
 
 - Status: accepted
 - Date: 2026-09-04
+- Revised: 2026-09-06
 
 ## Context
 
@@ -46,6 +48,15 @@ The background entrypoint owns WebExtension API access. Browser globals are
 read only inside its `main` callback. Its message router accepts only a closed,
 versioned set of commands, validates every field before dispatch, and returns a
 structured error for malformed or unknown inputs.
+
+The background also owns the extension-local composition root. It constructs
+the Dexie storage adapter once per worker lifetime and opens the versioned
+`tobirink-private` database lazily inside the already validated popup-context
+request. Opening runs schema migration before the response, but startup never
+scans or materializes private collections. The popup continuation cache remains
+a separate bounded `storage.local` adapter and never becomes authoritative. The
+extension workspace declares `@tobirink/adapters-indexeddb` directly because
+the composition root imports it; the dependency is not obtained transitively.
 
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its

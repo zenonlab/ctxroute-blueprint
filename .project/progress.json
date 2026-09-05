@@ -615,6 +615,52 @@
             "IndexedDB 2/2 + contrat Chromium passent; migrations Chromium v1/v2 vers v3 passent et integrite refuse une FavoriteSource orpheline.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, docs, 34 ADR, infrastructure 16/16 et Archify Tobirink 9/9 passent; validate global est uniquement interrompu par .codex/config.toml modifie hors scope dans une autre session."
           ]
+        },
+        {
+          "id": "step-2",
+          "title": "Composer Dexie dans le background sans confondre cache et autorite",
+          "status": "DONE",
+          "acceptance": [
+            "Le popup installe ouvre et migre la base tobirink-private v3 avant de repondre",
+            "Un module de composition background possede Dexie et l UI ne depend jamais de Dexie",
+            "Le cache de reprise reste exclusivement dans browser.storage.local et aucun appel distant n est ajoute",
+            "Les tests, builds Chrome et Firefox, securite, performance, documentation et Archify passent"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/extension/runtime/local-storage.ts",
+            "apps/extension/runtime/local-storage.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:storage",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Extension 60/60: composition Dexie construite une fois, ouverture lazy coalescee, reprise apres echec et nom stable tobirink-private.",
+            "IndexedDB 2/2 + contrat Chromium; builds Chrome/Firefox ~584 kB; securite 12/12 et performance 3/3 passent sans scan, timer, reseau ni nouvelle permission.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR, lockfile coherent et Archify Tobirink 9/9 passent; navigateur integre indisponible, donc aucun smoke UI manuel revendique."
+          ]
         }
       ]
     },

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@tobirink/adapters-browser": "*",
+    "@tobirink/adapters-indexeddb": "*",
     "@tobirink/application": "*",
     "@tobirink/ui": "*",
     "react": "19.2.8",

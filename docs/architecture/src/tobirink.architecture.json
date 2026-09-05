@@ -13,7 +13,7 @@
         "id": "local-authority",
         "label": "Private local authority",
         "focus": ["reader", "extensionUi", "extensionWorker", "appCore", "indexedDb", "bootstrapStore"],
-        "note": "IndexedDB alone owns favorite sources, the private library, progress, agenda, and durable tasks."
+        "note": "The MV3 background lazily opens Dexie v3; IndexedDB alone owns favorite sources, the private library, progress, agenda, and durable tasks."
       },
       {
         "id": "extension-security",
@@ -45,7 +45,7 @@
     { "id": "reader", "type": "external", "label": "Reader", "pos": [20, 330], "size": [115, 64] },
     { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
     { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "local-first use cases", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
-    { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "validated message router", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
+    { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "router + local composition", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
     { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "favorite sources / domain state", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
     { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "activeTab / cache / notifications", "pos": [650, 100], "size": [190, 64] },
     { "id": "bookmarks", "type": "external", "label": "Browser bookmarks", "sublabel": "Import / optional projection", "pos": [930, 100], "size": [190, 64] },
@@ -70,7 +70,7 @@
     { "id": "uiCore", "from": "extensionUi", "to": "appCore", "label": "commands / queries", "variant": "emphasis", "labelAt": [360, 408] },
     { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "schema-checked messages", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
     { "id": "workerCore", "from": "extensionWorker", "to": "appCore", "label": "validated commands", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[370, 502], [370, 430], [485, 430]], "labelAt": [385, 450] },
-    { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "sources + atomic domain state", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
+    { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "ports / lazy Dexie v3", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
     { "id": "bookmarksImport", "from": "bookmarks", "to": "browserAdapter", "label": "import events", "fromSide": "bottom", "toSide": "bottom", "via": [[1025, 205], [745, 205]] },
     { "id": "bookmarkProjection", "from": "browserAdapter", "to": "bookmarks", "label": "optional projection", "variant": "dashed", "fromSide": "top", "toSide": "top", "via": [[745, 65], [1025, 65]] },
     { "id": "coreBrowser", "from": "appCore", "to": "browserAdapter", "label": "active page / cache commands", "fromSide": "right", "toSide": "bottom", "via": [[620, 362], [620, 230], [745, 230]], "labelAt": [645, 245] },

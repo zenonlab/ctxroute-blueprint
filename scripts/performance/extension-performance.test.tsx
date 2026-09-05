@@ -58,6 +58,7 @@ describe('extension performance budgets', () => {
 
   it('keeps background startup free of storage scans, timers and network dependencies', () => {
     const source = readFileSync(join(root, 'apps/extension/wxt-entrypoints/background.ts'), 'utf8');
+    const localStorage = readFileSync(join(root, 'apps/extension/runtime/local-storage.ts'), 'utf8');
     const forbiddenStartupOperations = [
       /\bfetch\s*\(/,
       /\bXMLHttpRequest\b/,
@@ -70,6 +71,9 @@ describe('extension performance budgets', () => {
 
     expect(source).toMatch(/main\(\) \{/);
     expect(source).toMatch(/browser\.runtime\.onMessage\.addListener/);
+    expect(source.indexOf('await privateStorage.ensureReady()')).toBeGreaterThan(source.indexOf('browser.runtime.onMessage.addListener'));
     for (const forbidden of forbiddenStartupOperations) expect(source).not.toMatch(forbidden);
+    for (const forbidden of forbiddenStartupOperations) expect(localStorage).not.toMatch(forbidden);
+    expect(localStorage).toMatch(/storage\.database\.open\(\)/);
   });
 });

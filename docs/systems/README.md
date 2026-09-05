@@ -30,6 +30,13 @@ small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
 on the public service.
 
+The installed MV3 background is the local composition root. It creates one
+Dexie adapter per worker lifetime and lazily opens `tobirink-private` before a
+validated popup-context response. This activates schema migration without a
+background-wide record scan. React surfaces receive serialized messages only;
+they never import Dexie or open IndexedDB directly. The popup continuation
+cache remains a separate, disposable `storage.local` record.
+
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
 folder path, sibling order, import time and associated Review. Resolution stays
