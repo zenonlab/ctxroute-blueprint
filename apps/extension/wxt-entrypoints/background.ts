@@ -1,12 +1,15 @@
-import { importFavoriteSources, readPopupContext, readReviewQueue } from '@tobirink/application';
+import { importFavoriteSources, readLibraryPage, readPopupContext, readReviewQueue } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
   WebExtensionPageContextAdapter,
   WebExtensionPopupContinuationCacheAdapter,
 } from '@tobirink/adapters-browser';
+import { libraryId, workId } from '@tobirink/domain';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
+
+const primaryLibraryId = libraryId('library_primary');
 
 export default defineBackground({
   type: 'module',
@@ -31,6 +34,30 @@ export default defineBackground({
           return { ok: true, snapshot: await readReviewQueue(privateStorage.storage) };
         } catch {
           return { error: 'review-queue-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'library.page.read') {
+        try {
+          await privateStorage.ensureReady();
+          const input = parsed.data.afterId
+            ? { afterId: workId(parsed.data.afterId), libraryId: primaryLibraryId }
+            : { libraryId: primaryLibraryId };
+          const snapshot = await readLibraryPage(privateStorage.storage, input);
+          return {
+            ok: true,
+            snapshot: {
+              items: snapshot.items.map((work) => ({
+                id: work.id,
+                mediaType: work.mediaKind,
+                source: work.externalReferences[0]?.provider ?? work.mediaKind,
+                title: work.preferredTitle,
+              })),
+              missingWorkIds: snapshot.missingWorkIds,
+              nextCursor: snapshot.nextCursor,
+            },
+          };
+        } catch {
+          return { error: 'library-page-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'popup.context.read') {

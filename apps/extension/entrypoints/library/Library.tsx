@@ -12,7 +12,7 @@ export interface LibraryProps {
   items: readonly LibraryWork[];
   navigation: MemberNavigationConfig;
   onChangeFilters: (value: LibraryFiltersValue) => void;
-  onDownloadExtension: () => void;
+  onDownloadExtension?: () => void;
   onLoadMore: () => void;
   onOpenRecovery: () => void;
   onRetry: () => void;
@@ -51,7 +51,9 @@ export function Library({
 
         {state === 'empty' ? (
           <FeedbackState
-            action={<Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button>}
+            action={onDownloadExtension
+              ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button>
+              : undefined}
             className={styles.centeredState}
             description="Importez vos favoris ou ajoutez une première œuvre."
             icon="library-big"

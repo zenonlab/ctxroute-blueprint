@@ -37,6 +37,12 @@ background-wide record scan. React surfaces receive serialized messages only;
 they never import Dexie or open IndexedDB directly. The popup continuation
 cache remains a separate, disposable `storage.local` record.
 
+The Library surface reads the primary local library through that background
+boundary in stable pages of at most 24 Work identifiers. Missing Work records
+produce a partial local snapshot instead of being silently replaced; the page
+request performs no remote lookup and React receives only a strict serialized
+projection.
+
 On the explicit extension installation or update event, the browser adapter
 reads the bookmark tree and emits serializable records with their folder path
 and sibling order. The application imports HTTP(S) entries into IndexedDB in

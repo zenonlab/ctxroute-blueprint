@@ -958,6 +958,63 @@
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor cible SAFE passent; securite extension/Worker 12/12 et builds Chrome/Firefox ~590 kB passent.",
             "Manifestes Chrome/Firefox gardent host_permissions vide; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
           ]
+        },
+        {
+          "id": "step-9",
+          "title": "Lire la bibliotheque locale dans la surface extension",
+          "status": "DONE",
+          "acceptance": [
+            "Le background lit la bibliotheque primaire par un cas d usage borne a 24 oeuvres et sans reseau.",
+            "Le message et sa reponse sont strictement valides et ne transportent que des donnees serialisables.",
+            "La surface affiche des etats loading empty ready partial et error issus de la lecture reelle sans contenu de demonstration.",
+            "Aucune permission navigateur, origine distante, API directe dans React ou modification des autres surfaces nest ajoutee.",
+            "Tests, builds, securite, lint, anti-slop, documentation et architecture produit passent."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/library/read-library-page.ts",
+            "packages/application/src/library/read-library-page.test.ts",
+            "packages/application/src/library/index.ts",
+            "packages/application/src/index.ts",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.tsx",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.test.tsx",
+            "apps/extension/entrypoints/library/Library.tsx",
+            "apps/extension/entrypoints/library/Library.test.tsx",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/library-progress.test.ts",
+            "apps/extension/accessibility/extension-accessibility.test.tsx"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- packages/application/src/library/read-library-page.ts packages/ui/src/features/library/library-filters/LibraryFilters.tsx apps/extension/runtime/messages.ts apps/extension/runtime/ExtensionSurface.tsx apps/extension/wxt-entrypoints/background.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 25/25, UI 117/117, extension 67/67, Workbench 9/9, accessibilite 7/7 et IndexedDB Chromium passent; pagination stable de 24 et references manquantes testees.",
+            "Recherche et filtre Type utilisent les donnees locales; facettes sans options et CTA telechargement sans callback ne sont pas rendus; Chrome headless charge #library a 390 px sans overlay.",
+            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; host_permissions reste vide."
+          ]
         }
       ]
     },

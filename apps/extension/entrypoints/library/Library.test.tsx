@@ -25,6 +25,7 @@ describe('Library', () => {
     expect(component).toMatch(/layout="centered"/);
     expect(component).toMatch(/icon="library-big"/);
     expect(component).toMatch(/onDownloadExtension/);
+    expect(component).toMatch(/action=\{onDownloadExtension/);
     expect(component).toMatch(/Télécharger l’extension/);
     expect(component).not.toMatch(/onImport|>Importer</);
     expect(component).toMatch(/\{usable \? \([\s\S]*<LibraryFilters/);

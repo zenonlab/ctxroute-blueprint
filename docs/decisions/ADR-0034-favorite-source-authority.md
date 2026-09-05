@@ -73,8 +73,14 @@ JSON shape, rejects oversized results, and converts only public Work fields.
 It is exported but not composed by the extension background, so introducing
 the adapter alone neither transmits data nor changes browser permissions.
 
+The installed Library reads its primary local collection through the MV3
+background in stable pages of at most 24 identifiers. The application use case
+reports missing Work records explicitly, and the serialized response contains
+only the Work projection needed by the surface. This read remains local and
+does not activate the dormant candidate adapter.
+
 ## Consequences
 
-Library and Review read models can later join local source, Review, Work and
-Progress records without fabricated links. Source URLs remain private and
+Library pages now project bounded local Work records; richer Review/source and
+Progress joins remain explicit later use cases. Source URLs remain private and
 local; they never enter D1, R2, telemetry, or public catalogue requests.

@@ -25,6 +25,9 @@ describe('LibraryFilters', () => {
     expect(component).toContain('label="Type"');
     expect(component).toContain('label="Statut"');
     expect(component).toContain('label="Progression"');
+    expect(component).toMatch(/options\.type\.length > 0/);
+    expect(component).toMatch(/options\.status\.length > 0/);
+    expect(component).toMatch(/options\.progress\.length > 0/);
   });
 
   it('does not recreate a field, select or badge', () => {

@@ -25,7 +25,13 @@ const reviewQueueMessageSchema = z.strictObject({
   version: z.literal(extensionMessageVersion),
 });
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema]);
+const libraryPageMessageSchema = z.strictObject({
+  afterId: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u).optional(),
+  type: z.literal('library.page.read'),
+  version: z.literal(extensionMessageVersion),
+});
+
+export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, libraryPageMessageSchema]);
 export const popupContextResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(true),
@@ -50,10 +56,27 @@ export const reviewQueueResponseSchema = z.discriminatedUnion('ok', [
   }),
   z.strictObject({ error: z.string(), ok: z.literal(false) }),
 ]);
+export const libraryPageResponseSchema = z.discriminatedUnion('ok', [
+  z.strictObject({
+    ok: z.literal(true),
+    snapshot: z.strictObject({
+      items: z.array(z.strictObject({
+        id: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u),
+        mediaType: z.enum(['anime', 'manga']),
+        source: z.string().min(1).max(32),
+        title: z.string().min(1).max(300),
+      })).max(24),
+      missingWorkIds: z.array(z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u)).max(24),
+      nextCursor: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u).optional(),
+    }),
+  }),
+  z.strictObject({ error: z.string(), ok: z.literal(false) }),
+]);
 export type ExtensionMessage = z.infer<typeof extensionMessageSchema>;
 export type NavigationTarget = (typeof navigationTargets)[number];
 export type PopupContextResponse = z.infer<typeof popupContextResponseSchema>;
 export type ReviewQueueResponse = z.infer<typeof reviewQueueResponseSchema>;
+export type LibraryPageResponse = z.infer<typeof libraryPageResponseSchema>;
 
 export async function sendExtensionMessage(message: ExtensionMessage): Promise<void> {
   await browser.runtime.sendMessage(message);
@@ -67,6 +90,15 @@ export async function readPopupContextMessage(): Promise<Extract<PopupContextRes
 
 export async function readReviewQueueMessage(): Promise<Extract<ReviewQueueResponse, { ok: true }>['snapshot']> {
   const response = reviewQueueResponseSchema.parse(await browser.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
+  if (!response.ok) throw new Error(response.error);
+  return response.snapshot;
+}
+
+export async function readLibraryPageMessage(afterId?: string): Promise<Extract<LibraryPageResponse, { ok: true }>['snapshot']> {
+  const message = afterId
+    ? { afterId, type: 'library.page.read' as const, version: extensionMessageVersion }
+    : { type: 'library.page.read' as const, version: extensionMessageVersion };
+  const response = libraryPageResponseSchema.parse(await browser.runtime.sendMessage(message));
   if (!response.ok) throw new Error(response.error);
   return response.snapshot;
 }
