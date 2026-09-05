@@ -54,6 +54,12 @@ export class DexieStoragePort implements StoragePort {
     return {
       getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); const entry = await this.database.agenda.get(id); return entry && createAgendaEntry(entry); },
       getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); const source = await this.database.favoriteSources.get(id); return source && createFavoriteSource(source); },
+      findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
+        requireStore('favoriteSources');
+        const matches = await this.database.favoriteSources.where('reviewId').equals(reviewId).limit(2).toArray();
+        if (matches.length > 1) throw new Error('A Review may belong to only one favorite source.');
+        return matches[0] && createFavoriteSource(matches[0]);
+      },
       getLibrary: async (id: LibraryId) => { requireStore('libraries'); const library = await this.database.libraries.get(id); return library && createLibrary(library.id, library.workIds); },
       getProgress: async (id: ProgressId) => { requireStore('progress'); const progress = await this.database.progress.get(id); return progress && createProgress(progress); },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
@@ -75,7 +81,12 @@ export class DexieStoragePort implements StoragePort {
           .sort((left, right) => left.id.localeCompare(right.id));
       },
       putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); await this.database.agenda.put(createAgendaEntry(entry)); },
-      putFavoriteSource: async (source: FavoriteSource) => { requireStore('favoriteSources'); await this.database.favoriteSources.put(createFavoriteSource(source)); },
+      putFavoriteSource: async (source: FavoriteSource) => {
+        requireStore('favoriteSources');
+        const existing = await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
+        if (existing && existing.id !== source.id) throw new Error('A Review may belong to only one favorite source.');
+        await this.database.favoriteSources.put(createFavoriteSource(source));
+      },
       putLibrary: async (library: Library) => { requireStore('libraries'); await this.database.libraries.put(createLibrary(library.id, library.workIds)); },
       putProgress: async (progress: Progress) => { requireStore('progress'); await this.database.progress.put(createProgress(progress)); },
       putReminder: async (reminder: Reminder) => { requireStore('reminders'); await this.database.reminders.put(createReminder(reminder)); },
@@ -86,6 +97,7 @@ export class DexieStoragePort implements StoragePort {
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
+  findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);

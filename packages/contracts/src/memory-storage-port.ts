@@ -51,6 +51,12 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
   return {
     getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); return state.agenda.get(id); },
     getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); return state.favoriteSources.get(id); },
+    findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
+      requireStore('favoriteSources');
+      const matches = [...state.favoriteSources.values()].filter((source) => source.reviewId === reviewId);
+      if (matches.length > 1) throw new Error('A Review may belong to only one favorite source.');
+      return matches[0];
+    },
     getLibrary: async (id: LibraryId) => { requireStore('libraries'); return state.libraries.get(id); },
     getProgress: async (id: ProgressId) => { requireStore('progress'); return state.progress.get(id); },
     getReminder: async (id: ReminderId) => { requireStore('reminders'); return state.reminders.get(id); },
@@ -77,6 +83,8 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
       requireStore('favoriteSources');
       const duplicate = [...state.favoriteSources.values()].find((record) => record.bookmarkId === source.bookmarkId && record.id !== source.id);
       if (duplicate) throw new Error('A bookmark may belong to only one favorite source.');
+      const duplicateReview = [...state.favoriteSources.values()].find((record) => record.reviewId === source.reviewId && record.id !== source.id);
+      if (duplicateReview) throw new Error('A Review may belong to only one favorite source.');
       state.favoriteSources.set(source.id, source);
     },
     putLibrary: async (library: Library) => { requireStore('libraries'); state.libraries.set(library.id, library); },
@@ -96,6 +104,7 @@ export class MemoryStoragePort implements StoragePort {
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
+  findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);

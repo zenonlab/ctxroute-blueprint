@@ -12,6 +12,7 @@ describe('DexieStoragePort structure', () => {
     }
     expect(adapter).toMatch(/implements StoragePort/);
     expect(adapter).toMatch(/reviews\.where\('status'\)\.equals\(status\)\.limit\(limit\)/);
+    expect(adapter).toMatch(/favoriteSources\.where\('reviewId'\)\.equals\(reviewId\)\.limit\(2\)/);
   });
 
   it('opens explicit read-write scopes and revalidates domain records', () => {

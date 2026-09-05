@@ -828,6 +828,49 @@
             "UI 117/117, extension 65/65, Workbench 9/9 et accessibilite 7/7; builds Chrome/Firefox ~589 kB, securite et performance passent.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, contrat UI, Sensor SAFE, docs et deux architectures Archify 9/9 passent."
           ]
+        },
+        {
+          "id": "step-6",
+          "title": "Definir le contrat local des candidats Review",
+          "status": "DONE",
+          "acceptance": [
+            "Une Review pending retrouve au plus une FavoriteSource par reviewId via le port de stockage.",
+            "Le cas d usage publie un snapshot serialisable et borne sans exposer l URL privee ni une implementation fournisseur.",
+            "Une decision ulterieure peut detecter une Review perimee avec une revision deterministe.",
+            "Aucune migration IndexedDB, permission navigateur ou requete reseau nest ajoutee."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/ports/review-candidate-port.ts",
+            "packages/application/src/use-cases/read-review-candidates.ts",
+            "packages/application/src/use-cases/read-review-candidates.test.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run test:security",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 23/23, contrats 9/9 et IndexedDB 2/2 plus contrat Chromium passent; lookup reviewId borne et doublons refuses.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor SAFE passent; candidats limites a 6, requete exclusive reference ou titre, revision deterministe testee.",
+            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent avec host_permissions vide; docs, ADR et Archify Tobirink 9/9 passent."
+          ]
         }
       ]
     },

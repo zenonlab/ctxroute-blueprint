@@ -50,6 +50,19 @@ explicit maximum of 100 rows. Only `pending` Reviews enter that snapshot;
 resolved and no-match decisions remain stored but are excluded. Reading the
 queue does not contact D1 or any metadata provider.
 
+A candidate-resolution context joins one pending Review to at most one
+`FavoriteSource` through the existing `reviewId` index. Duplicate links are
+treated as corrupted private state instead of selecting an arbitrary source.
+The raw favorite URL may be inspected only by a local source-reference parser;
+the candidate port receives at most a public provider/external identifier and
+a bounded title query, never both. Its result is capped before it reaches a
+delivery surface. A replaceable local revision port with a deterministic
+default derives an opaque token from the records so a later decision can
+reject stale context without returning the private URL. No network
+adapter is composed by this contract step; any future remote implementation
+still requires an explicit disclosure gate and a narrowly scoped host
+permission.
+
 ## Consequences
 
 Library and Review read models can later join local source, Review, Work and

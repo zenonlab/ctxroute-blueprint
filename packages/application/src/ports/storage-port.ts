@@ -32,6 +32,7 @@ export interface ReviewListQuery {
 export interface StorageReadPort {
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
+  findFavoriteSourceByReviewId(reviewId: ReviewId): Promise<FavoriteSource | undefined>;
   getLibrary(id: LibraryId): Promise<Library | undefined>;
   getProgress(id: ProgressId): Promise<Progress | undefined>;
   getReminder(id: ReminderId): Promise<Reminder | undefined>;

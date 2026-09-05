@@ -49,6 +49,15 @@ local snapshot. IndexedDB is opened on demand, at most 100 pending rows are
 read through the status index, and no public catalogue request is made by this
 read path.
 
+Candidate preparation performs a bounded `reviewId` join against the existing
+favorite-source index. A local parser may reduce the private URL to a public
+provider reference, but the candidate port and its serialized result never
+receive that raw URL. A candidate query carries either that public reference or
+a bounded title, never both. The application caps output and asks a replaceable
+local port with a deterministic default for an opaque revision so a later
+decision can reject a stale Review. This is only a contract: the extension
+still has no remote candidate adapter or host permission.
+
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
 folder path, sibling order, import time and associated Review. Resolution stays

@@ -25,6 +25,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.getLibrary(library.id))?.workIds[0] === id, 'library round-trip');
   assert((await storage.getProgress(progress.id))?.value === 12, 'progress round-trip');
   assert((await storage.getFavoriteSource(source.id))?.url === source.url, 'favorite source round-trip');
+  assert((await storage.findFavoriteSourceByReviewId(review.id))?.id === source.id, 'favorite source lookup by Review');
   assert((await storage.listFavoriteSources({ limit: 1 }))[0]?.id === source.id, 'favorite source bounded listing');
   assert((await storage.listFavoriteSources({ afterId: source.id, limit: 1 })).length === 0, 'favorite source stable cursor');
   assert((await storage.listReviews({ limit: 1, status: 'resolved' }))[0]?.id === review.id, 'review bounded status listing');
@@ -37,6 +38,14 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     duplicateBookmarkRejected = true;
   }
   assert(duplicateBookmarkRejected, 'bookmark identity must be unique across favorite sources');
+
+  let duplicateReviewRejected = false;
+  try {
+    await storage.putFavoriteSource(createFavoriteSource({ ...source, bookmarkId: 'bookmark-other', id: favoriteSourceId('source_other') }));
+  } catch {
+    duplicateReviewRejected = true;
+  }
+  assert(duplicateReviewRejected, 'Review identity must be unique across favorite sources');
 
   let limitRejected = false;
   try {

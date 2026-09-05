@@ -29,12 +29,22 @@ export type {
   PublicReleasePointerRecord,
   PublicReleaseSnapshotRecord,
 } from './ports/cloud-data-ports';
+export type {
+  ReviewCandidatePort,
+  ReviewCandidateQuery,
+  ReviewRevisionInput,
+  ReviewRevisionPort,
+  ReviewSourceReference,
+  ReviewSourceReferenceParserPort,
+} from './ports/review-candidate-port';
 export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';
 export { favoriteImportBatchSize, importFavoriteSources } from './use-cases/import-favorite-sources';
 export type { FavoriteImportSummary } from './use-cases/import-favorite-sources';
 export { readReviewQueue, reviewQueueLimit } from './use-cases/read-review-queue';
 export type { ReviewQueueItem, ReviewQueueSnapshot } from './use-cases/read-review-queue';
+export { localReviewRevisionPort, readReviewCandidates, reviewCandidateLimit } from './use-cases/read-review-candidates';
+export type { ReviewCandidateSnapshot } from './use-cases/read-review-candidates';
 export { recordProgress } from './use-cases/record-progress';
 export { resolveReview } from './use-cases/resolve-review';
 export * from './tasks';
