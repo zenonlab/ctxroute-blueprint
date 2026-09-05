@@ -4,11 +4,13 @@ import {
   addWork,
   agendaEntryId,
   createAgendaEntry,
+  createFavoriteSource,
   createLibrary,
   createProgress,
   createReminder,
   createReview,
   createWork,
+  favoriteSourceId,
   libraryId,
   progressId,
   reminderId,
@@ -54,6 +56,25 @@ describe('Work and Library invariants', () => {
     expect(populated.id).toBe(empty.id);
     expect(populated.workIds).toEqual([frierenId]);
     expect(() => addWork(populated, frierenId)).toThrowError(/only once/);
+  });
+});
+
+describe('FavoriteSource invariant', () => {
+  it('preserves a private bookmark source without using it as Work identity', () => {
+    const source = createFavoriteSource({
+      bookmarkId: ' bookmark-42 ',
+      folderPath: [' Lectures ', ' Manga '],
+      id: favoriteSourceId('source_bookmark42'),
+      importedAt: '2026-09-05T20:00:00.000Z',
+      order: 3,
+      reviewId: reviewId('review_bookmark42'),
+      title: ' Frieren chapitre 140 ',
+      url: 'https://reader.example/frieren/140',
+    });
+    expect(source).toMatchObject({ bookmarkId: 'bookmark-42', folderPath: ['Lectures', 'Manga'], order: 3, title: 'Frieren chapitre 140' });
+    expect(Object.isFrozen(source.folderPath)).toBe(true);
+    expect(() => createFavoriteSource({ ...source, url: 'chrome://bookmarks' })).toThrowError(/HTTP/);
+    expect(() => createFavoriteSource({ ...source, order: 1.5 })).toThrowError(/integer/);
   });
 });
 

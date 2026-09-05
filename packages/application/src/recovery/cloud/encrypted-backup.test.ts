@@ -1,4 +1,4 @@
-import { createWork, workId } from '@tobirink/domain';
+import { createFavoriteSource, createReview, createWork, favoriteSourceId, reviewId, workId } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 
 import { MemoryRecoveryStore } from '../../../../contracts/src/export/memory-recovery-store';
@@ -8,19 +8,23 @@ import {
   restoreEncryptedBackup,
 } from './encrypted-backup';
 
-const empty = { agenda: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
+const empty = { agenda: [], favoriteSources: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
 const privateTitle = 'Titre privé de récupération';
+const privateUrl = 'https://reader.example/private-work';
 const passphrase = 'phrase secrète locale robuste';
 
 function sourceStore() {
   const work = createWork({ externalReferences: [], id: workId('work_private'), mediaKind: 'manga', preferredTitle: privateTitle });
-  return new MemoryRecoveryStore({ ...empty, works: [work] });
+  const review = createReview({ id: reviewId('review_private'), matchedWorkId: work.id, sourceLabel: 'reader.example', status: 'resolved', title: privateTitle });
+  const source = createFavoriteSource({ bookmarkId: 'bookmark-private', folderPath: ['Privé'], id: favoriteSourceId('source_private'), importedAt: '2026-09-05T09:00:00.000Z', order: 0, reviewId: review.id, title: privateTitle, url: privateUrl });
+  return new MemoryRecoveryStore({ ...empty, favoriteSources: [source], reviews: [review], works: [work] });
 }
 
 describe('encrypted cloud recovery', () => {
   it('encrypts the complete private export before producing an uploadable blob', async () => {
     const blob = await createEncryptedBackup(sourceStore(), '2026-09-05T10:00:00.000Z', passphrase);
     expect(blob.serialized).not.toContain(privateTitle);
+    expect(blob.serialized).not.toContain(privateUrl);
     expect(blob.serialized).not.toContain(passphrase);
     expect(parseEncryptedBackupBlob(blob)).toMatchObject({ cipher: 'AES-GCM-256', format: 'tobirink-encrypted-backup', version: 1 });
   });
@@ -31,6 +35,7 @@ describe('encrypted cloud recovery', () => {
     await restoreEncryptedBackup(blob, passphrase, target, 'replace-private-state');
     expect(target.replaceCount).toBe(1);
     expect((await target.readSnapshot()).works[0]?.preferredTitle).toBe(privateTitle);
+    expect((await target.readSnapshot()).favoriteSources[0]?.url).toBe(privateUrl);
   });
 
   it('leaves local state untouched for a wrong passphrase or altered ciphertext', async () => {

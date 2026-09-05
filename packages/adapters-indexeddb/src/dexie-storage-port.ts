@@ -1,6 +1,7 @@
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
+  createFavoriteSource,
   createLibrary,
   createProgress,
   createReminder,
@@ -10,6 +11,8 @@ import {
 import type {
   AgendaEntry,
   AgendaEntryId,
+  FavoriteSource,
+  FavoriteSourceId,
   Library,
   LibraryId,
   Progress,
@@ -34,6 +37,7 @@ export class DexieStoragePort implements StoragePort {
   private tables(stores: readonly PrivateStoreName[]): Table[] {
     const tables = {
       agenda: this.database.agenda,
+      favoriteSources: this.database.favoriteSources,
       libraries: this.database.libraries,
       progress: this.database.progress,
       reminders: this.database.reminders,
@@ -49,12 +53,22 @@ export class DexieStoragePort implements StoragePort {
     };
     return {
       getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); const entry = await this.database.agenda.get(id); return entry && createAgendaEntry(entry); },
+      getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); const source = await this.database.favoriteSources.get(id); return source && createFavoriteSource(source); },
       getLibrary: async (id: LibraryId) => { requireStore('libraries'); const library = await this.database.libraries.get(id); return library && createLibrary(library.id, library.workIds); },
       getProgress: async (id: ProgressId) => { requireStore('progress'); const progress = await this.database.progress.get(id); return progress && createProgress(progress); },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
       getWork: async (id: WorkId) => { requireStore('works'); const work = await this.database.works.get(id); return work && createWork(work); },
+      listFavoriteSources: async ({ afterId, limit }) => {
+        requireStore('favoriteSources');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Favorite source page limit must be an integer between 1 and 100.');
+        const collection = afterId === undefined
+          ? this.database.favoriteSources.orderBy('id')
+          : this.database.favoriteSources.where('id').above(afterId);
+        return (await collection.limit(limit).toArray()).map(createFavoriteSource);
+      },
       putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); await this.database.agenda.put(createAgendaEntry(entry)); },
+      putFavoriteSource: async (source: FavoriteSource) => { requireStore('favoriteSources'); await this.database.favoriteSources.put(createFavoriteSource(source)); },
       putLibrary: async (library: Library) => { requireStore('libraries'); await this.database.libraries.put(createLibrary(library.id, library.workIds)); },
       putProgress: async (progress: Progress) => { requireStore('progress'); await this.database.progress.put(createProgress(progress)); },
       putReminder: async (reminder: Reminder) => { requireStore('reminders'); await this.database.reminders.put(createReminder(reminder)); },
@@ -64,12 +78,15 @@ export class DexieStoragePort implements StoragePort {
   }
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
+  getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
+  putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
   putProgress: StoragePort['putProgress'] = (progress) => this.session().putProgress(progress);
   putReminder: StoragePort['putReminder'] = (reminder) => this.session().putReminder(reminder);

@@ -30,6 +30,14 @@ small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
 on the public service.
 
+An imported bookmark is preserved as a private `FavoriteSource`: its stable
+Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
+folder path, sibling order, import time and associated Review. Resolution stays
+on the Review record, and only a resolved Review points to a `Work`. This keeps
+the original navigation target available after import without turning either
+the bookmark or its URL into a Work identity. Favorite-source reads are bounded
+and ordered by stable source ID.
+
 Full recovery uses a versioned local export or an explicit opt-in encrypted
 backup. Encryption happens before upload, and neither the service nor browser
 sync stores the plaintext key or passphrase. Public catalogue records are

@@ -13,7 +13,7 @@ export type {
   TelemetryPort,
 } from './ports/capability-ports';
 export { privateStoreNames } from './ports/storage-port';
-export type { PrivateStoreName, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
+export type { FavoriteSourcePageQuery, PrivateStoreName, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
 export type {
   CoverImageRenderPort,
   CoverMasterReadPort,

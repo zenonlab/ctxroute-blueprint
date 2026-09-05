@@ -40,9 +40,9 @@
 
 - [x] **Renuméroter l’ADR dashboard et réaligner les références** — DONE _(evidence: ADR dashboard renumbered from 0022 to unique 0028 without content loss., Component-boundaries goal now reserves ADR-0029 through the authenticated Progress API., ADR-0021 now documents the two exact reviewed Sensor exceptions.)_
 
-## Documenter l’inventaire, la résolution et la Review locale — BLOCKED
+## Documenter l’inventaire, la résolution et la Review locale — DONE
 
-- [ ] **Définir le parcours minimal d’inventaire, résolution et Review** — BLOCKED _(evidence: Le retrait graphique a supprimé les conflits de routes et croisements., La composition restait sous le seuil de lisibilité desktop avec une erreur et aucun avertissement., Deux corrections ciblées de libellés n'ont pas réduit cette erreur; Archify impose l'arrêt.)_
+- [x] **Preserver les sources favorites locales comme donnees privees autoritaires** — DONE _(evidence: Domaine 8/8, application 15/15, contrats 9/9 et recovery 10/10 passent; export prive v2 preserve FavoriteSource et importe v1 vide., IndexedDB 2/2 + contrat Chromium passent; migrations Chromium v1/v2 vers v3 passent et integrite refuse une FavoriteSource orpheline., Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, docs, 34 ADR, infrastructure 16/16 et Archify Tobirink 9/9 passent; validate global est uniquement interrompu par .codex/config.toml modifie hors scope dans une autre session.)_
 
 ## Concevoir l’architecture UI et le catalogue visuel — DONE
 

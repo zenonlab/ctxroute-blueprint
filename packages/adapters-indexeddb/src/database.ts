@@ -1,10 +1,11 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { AgendaEntry, Library, Progress, Reminder, Review, Work } from '@tobirink/domain';
+import type { AgendaEntry, FavoriteSource, Library, Progress, Reminder, Review, Work } from '@tobirink/domain';
 import { migrateVersion1To2 } from './migrations/v2';
 
 export class TobirinkDatabase extends Dexie {
   readonly agenda!: Table<AgendaEntry, string>;
+  readonly favoriteSources!: Table<FavoriteSource, string>;
   readonly libraries!: Table<Library, string>;
   readonly progress!: Table<Progress, string>;
   readonly reminders!: Table<Reminder, string>;
@@ -29,5 +30,14 @@ export class TobirinkDatabase extends Dexie {
       reviews: '&id, status',
       works: '&id, mediaKind, preferredTitle',
     }).upgrade(migrateVersion1To2);
+    this.version(3).stores({
+      agenda: '&id, workId, occursAt, availability',
+      favoriteSources: '&id, &bookmarkId, reviewId, importedAt',
+      libraries: '&id',
+      progress: '&id, workId, kind',
+      reminders: '&id, agendaEntryId, channel',
+      reviews: '&id, status',
+      works: '&id, mediaKind, preferredTitle',
+    });
   }
 }
