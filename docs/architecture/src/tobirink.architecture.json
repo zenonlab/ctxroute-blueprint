@@ -71,11 +71,5 @@
     { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "catalogue / consent ports", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
     { "id": "workerImages", "from": "cloudGateways", "to": "imageGateway", "fromSide": "right", "toSide": "left" },
     { "id": "workerR2", "from": "cloudGateways", "to": "r2", "label": "object storage ports", "variant": "security", "fromSide": "right", "toSide": "left" }
-  ],
-  "cards": [
-    { "dot": "emerald", "title": "Authority", "items": ["IndexedDB owns all active private state", "The five-item popup cache is expiring and non-authoritative"] },
-    { "dot": "cyan", "title": "Cloud gateways", "items": ["Routes never read provider bindings directly", "One composition root injects ports and bounded policy"] },
-    { "dot": "violet", "title": "Image discipline", "items": ["Rights-gated content-addressed R2 masters", "96x144, 192x288, and 384x576 variants only"] },
-    { "dot": "rose", "title": "Public + recovery", "items": ["Shared release revision remains available offline", "Backup is encrypted locally before immutable R2 I/O"] }
   ]
 }

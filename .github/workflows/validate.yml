@@ -91,9 +91,9 @@ jobs:
       - name: Build Archify documentation
         run: npm run build:docs
 
-      - name: Capture Archify visual evidence
+      - name: Capture Tobirink architecture visual evidence
         if: runner.os == 'Linux'
-        run: npm run archify:visual-check
+        run: npm run archify:visual-check -- tobirink.architecture
 
       - name: Write validation summary
         run: npm run ci:summary
