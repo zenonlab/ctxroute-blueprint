@@ -4321,7 +4321,7 @@
         {
           "id": "step-3",
           "title": "Partager les compositions Workbench",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Tokens CSS exposés publiquement par @tobirink/ui",
             "MemberNavigation accepte des routes configurables avec défauts Extension inchangés",
@@ -4346,7 +4346,13 @@
             "git diff --check",
             "git commit -m \"refactor(ui): share workbench member surfaces\""
           ],
-          "evidence": []
+          "evidence": [
+            "@tobirink/ui exposes one tokens.css entry, LibraryFilters, Agenda and its week model",
+            "MemberNavigation accepts brand/home/library/agenda URLs while preserving #home/#library/#agenda defaults",
+            "Extension Agenda and week-model files are compatibility re-exports; no file or Workbench style was deleted",
+            "UI 121/121, Extension 95/95, Workbench 9/9, full typecheck, ESLint, UI contract and Workbench build passed",
+            "ui-system.architecture passed Archify showcase 9/9 with 0 errors and 0 warnings"
+          ]
         },
         {
           "id": "step-4",

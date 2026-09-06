@@ -1,7 +1,7 @@
 import { Button, FeedbackState, MemberNavigation, Status, WorkCard } from '@tobirink/ui';
 import type { MemberNavigationConfig } from '@tobirink/ui';
-import { LibraryFilters } from '../../../../packages/ui/src/features/library/library-filters';
-import type { LibraryFilterOptions, LibraryFiltersValue } from '../../../../packages/ui/src/features/library/library-filters';
+import { LibraryFilters } from '@tobirink/ui';
+import type { LibraryFilterOptions, LibraryFiltersValue } from '@tobirink/ui';
 import type { LibraryState, LibraryVariant, LibraryWork } from './library.contract';
 import styles from './Library.module.css';
 

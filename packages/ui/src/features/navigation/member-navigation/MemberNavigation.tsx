@@ -12,23 +12,26 @@ export interface MemberNavigationConfig {
   activeId?: MemberNavigationItemId;
   onSearch: (query: string) => void;
   review: MemberReviewConfig;
+  routes?: MemberNavigationRoutes;
+}
+
+export interface MemberNavigationRoutes {
+  agenda?: string;
+  brand?: string;
+  home?: string;
+  library?: string;
 }
 
 export interface MemberNavigationProps extends MemberNavigationConfig {
   children: ReactNode;
 }
 
-const navigationItems = [
-  { href: '#home', icon: 'house' as const, id: 'home', label: 'Accueil' },
-  { href: '#library', icon: 'library-big' as const, id: 'library', label: 'Bibliothèque' },
-  { href: '#agenda', icon: 'calendar-days' as const, id: 'agenda', label: 'Agenda' },
-];
-
 export function MemberNavigation({
   activeId,
   children,
   onSearch,
   review,
+  routes,
 }: MemberNavigationProps) {
   const [query, setQuery] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -39,6 +42,11 @@ export function MemberNavigation({
   const reviewPanelRef = useRef<HTMLDivElement>(null);
   const normalizedCount = Number.isFinite(review.count) ? Math.max(0, Math.trunc(review.count)) : 0;
   const reviewIsEmpty = review.resolver.state === 'empty';
+  const navigationItems = [
+    { href: routes?.home ?? '#home', icon: 'house' as const, id: 'home', label: 'Accueil' },
+    { href: routes?.library ?? '#library', icon: 'library-big' as const, id: 'library', label: 'Bibliothèque' },
+    { href: routes?.agenda ?? '#agenda', icon: 'calendar-days' as const, id: 'agenda', label: 'Agenda' },
+  ];
 
   useEffect(() => {
     if (!reviewOpen) return;
@@ -76,7 +84,7 @@ export function MemberNavigation({
     <div className={styles.shell}>
       <header className={styles.siteHeader}>
         <div className={styles.headerInner}>
-          <a className={styles.brand} href="#home">
+          <a className={styles.brand} href={routes?.brand ?? routes?.home ?? '#home'}>
             <TobirinkLogo className={styles.brandLogo} />
             <span>Tobirink</span>
           </a>

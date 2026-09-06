@@ -1,3 +1,5 @@
+'use client';
+
 export type {
   ComponentPreview,
   PreviewCategory,
@@ -43,6 +45,10 @@ export type {
 } from './components/navigation';
 export { WorkCard, workCardStates, workCardVariants } from './features/library/work-card';
 export type { WorkCardProps, WorkCardState, WorkCardVariant } from './features/library/work-card';
+export { LibraryFilters, emptyLibraryFilters, libraryFiltersStates, libraryFiltersVariants } from './features/library/library-filters';
+export type { LibraryFilterOptions, LibraryFiltersProps, LibraryFiltersState, LibraryFiltersValue, LibraryFiltersVariant } from './features/library/library-filters';
+export { Agenda, agendaStates, agendaVariants, createAgendaDays, createLocalAgendaPeriod } from './features/agenda';
+export type { AgendaAvailability, AgendaDay, AgendaPeriodItem, AgendaProps, AgendaRelease, AgendaState, AgendaVariant, LocalAgendaPeriod } from './features/agenda';
 export { ReviewResolver, reviewResolverStates } from './features/review/review-resolver';
 export type {
   ReviewCandidate,
@@ -56,6 +62,7 @@ export type {
   MemberNavigationConfig,
   MemberNavigationItemId,
   MemberNavigationProps,
+  MemberNavigationRoutes,
   MemberNavigationState,
   MemberNavigationVariant,
   MemberReviewConfig,

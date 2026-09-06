@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { emptyLibraryFilters } from '../../../packages/ui/src/features/library/library-filters';
-import type { LibraryFiltersValue } from '../../../packages/ui/src/features/library/library-filters';
+import { emptyLibraryFilters } from '@tobirink/ui';
+import type { LibraryFiltersValue } from '@tobirink/ui';
 import { Agenda } from '../entrypoints/agenda';
 import { Library } from '../entrypoints/library';
 import { Settings } from '../entrypoints/options';
