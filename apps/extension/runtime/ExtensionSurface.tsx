@@ -14,6 +14,7 @@ import type { LibraryPageResponse } from './messages';
 import { useLocalAgenda } from './use-local-agenda';
 import { useLocalOrganizerSettings } from './use-local-organizer-settings';
 import { useLocalReviewNavigation } from './use-local-review-navigation';
+import { useQuickPreferences } from './use-quick-preferences';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
 
@@ -124,6 +125,7 @@ function OptionsSurface() {
 
 function PopupSurface() {
   const localAgenda = useLocalAgenda();
+  const quickPreferences = useQuickPreferences();
   const [loadKey, setLoadKey] = useState(0);
   const [model, setModel] = useState<{
     continuations: ComponentProps<typeof Popup>['continuations'];
@@ -183,10 +185,11 @@ function PopupSurface() {
           : { label: 'Données locales prêtes', tone: 'ready' }}
       continuations={model.continuations}
       onOpenFullSettings={() => open('settings')}
+      onPreferenceChange={quickPreferences.onChange}
       onRetryAgenda={localAgenda.onRetry}
       onRetryPage={retry}
       page={model.page}
-      preferences={{ state: 'blocked' }}
+      preferences={quickPreferences.model}
     />
   );
 }

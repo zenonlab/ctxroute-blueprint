@@ -2428,7 +2428,7 @@
         {
           "id": "step-6",
           "title": "Raccorder agenda, rappels, notifications et réglages rapides",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Agenda et Sorties consomment le snapshot public via un port caché et restent utilisables hors ligne",
             "Seules les dates officielles ou confirmées peuvent programmer un rappel natif dédupliqué",
@@ -2452,7 +2452,14 @@
             "npm run test:a11y",
             "npm run archify:validate -- tobirink.architecture"
           ],
-          "evidence": []
+          "evidence": [
+            "Agenda hydrate uniquement le dernier snapshot public strict via PublicReleaseCachePort; œuvres privées, progression, rappels et tâches durables restent autoritaires dans IndexedDB.",
+            "Seules les sorties official/confirmed créent une tâche datée et idempotente; les estimations sont exclues et une ancienne date reprogrammée est bloquée sans notification.",
+            "browser.storage.local conserve uniquement le cache public versionné et les deux préférences rapides strictes; notifications natives désactivées par défaut et aucun host_permissions ni fetch distant ajouté.",
+            "L alarme MV3 est recréée au démarrage et draine au plus 20 échéances; agenda-notifications 6/6 et contrat IndexedDB Chromium passent.",
+            "Application 50/50, extension 87/87, navigateur 7/7, Cloudflare 19/19, sécurité 12/12, accessibilité 8/8 et typecheck passent.",
+            "Builds Chrome 635.15 kB et Firefox 635.27 kB, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, décisions, UI et diff-check passent; Tobirink Archify 9/9 sans erreur ni avertissement."
+          ]
         },
         {
           "id": "step-7",

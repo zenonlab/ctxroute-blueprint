@@ -1,7 +1,8 @@
-import { agendaEntryId, reminderId } from '@tobirink/domain';
+import { agendaEntryId, createReminder, reminderId } from '@tobirink/domain';
 import type { AgendaEntry, AgendaEntryId, Reminder, ReminderId } from '@tobirink/domain';
 import type { NotificationPort } from '../ports/capability-ports';
 import type { StorageReadPort } from '../ports/storage-port';
+import type { StoragePort } from '../ports/storage-port';
 import type { TaskStorePort } from '../tasks/task-store-port';
 import type { DurableTask } from '../tasks/task-state';
 
@@ -35,13 +36,32 @@ export async function scheduleAgendaNotification(
   if (entry.availability === 'estimated') return { state: 'prediction-only' };
 
   const payload: AgendaNotificationPayload = { agendaEntryId: entry.id, reminderId: reminder.id };
-  const task = await tasks.enqueue({
-    id: `agenda-notification-${reminder.id}`,
-    idempotencyKey: `agenda-notification:${reminder.id}:${entry.occursAt}`,
+  if (!entry.occursAt) return { state: 'not-scheduled' };
+  const availableAt = new Date(new Date(entry.occursAt).getTime() - reminder.leadMinutes * 60_000).toISOString();
+  const idempotencyKey = `agenda-notification:${reminder.id}:${entry.occursAt}`;
+  const task = await tasks.schedule({
+    id: idempotencyKey,
+    idempotencyKey,
     kind: agendaNotificationKind,
     payload: `${payload.agendaEntryId}\n${payload.reminderId}`,
-  });
+  }, availableAt);
   return { state: 'scheduled', task };
+}
+
+export async function scheduleAgendaPeriodNotifications(
+  storage: StoragePort,
+  tasks: TaskStorePort,
+  entries: readonly AgendaEntry[],
+): Promise<number> {
+  let scheduled = 0;
+  for (const entry of entries) {
+    if (entry.availability !== 'official' && entry.availability !== 'confirmed') continue;
+    const suffix = entry.id.replace(/^agenda_/u, '');
+    const reminder = createReminder({ agendaEntryId: entry.id, channel: 'native', enabled: true, id: reminderId(`reminder_${suffix}`), leadMinutes: 0 });
+    await storage.putReminder(reminder);
+    if ((await scheduleAgendaNotification(tasks, entry, reminder)).state === 'scheduled') scheduled += 1;
+  }
+  return scheduled;
 }
 
 export async function resumeDueAgendaNotification(
@@ -63,7 +83,11 @@ export async function resumeDueAgendaNotification(
     return 'notifiable-entry-missing';
   }
 
-  const effect = task.idempotencyKey;
+  const effect = `agenda-notification:${reminder.id}:${entry.occursAt}`;
+  if (task.idempotencyKey !== effect) {
+    await dependencies.tasks.block(task.id, input.claimToken, 'Release date changed after this notification was scheduled.');
+    return 'notifiable-entry-missing';
+  }
   await dependencies.notifications.publish({ body: entry.releaseLabel, deduplicationKey: effect, title: 'Sortie à venir' });
   await dependencies.tasks.recordEffect(task.id, input.claimToken, effect);
   await dependencies.tasks.commit(task.id, input.claimToken);

@@ -59,6 +59,11 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   fourni des choix vérifiables.
 - Toute date d'agenda affiche son statut officiel, confirmé ou estimé au même
   endroit que la date.
+- Le cache public strict hydrate seulement les œuvres déjà présentes dans la
+  base privée. Son absence conserve l’Agenda local et n’invente aucune sortie.
+- Les notifications globales sont désactivées par défaut. Une activation locale
+  programme à l’heure exacte uniquement les sorties officielles ou confirmées;
+  le worker reprend les échéances manquées au démarrage et par alarme dédupliquée.
 - Les sept jours de l’Agenda restent côte à côte sur mobile dans un rail
   horizontal focusable; ils ne deviennent jamais une pile verticale infinie.
 - Le workbench isole l'échec d'une preview afin que le catalogue et les autres

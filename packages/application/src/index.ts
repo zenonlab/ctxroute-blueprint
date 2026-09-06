@@ -17,6 +17,8 @@ export type {
 export { privateStoreNames } from './ports/storage-port';
 export { agendaEntryListLimit, assertAgendaEntryListQuery, assertReviewMatchListQuery, reviewMatchListLimit } from './ports/storage-port';
 export type { AgendaEntryListQuery, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, ReviewMatchListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
+export { defaultQuickPreferences, quickPreferencesSchema } from './ports/quick-preferences-port';
+export type { QuickPreferences, QuickPreferencesPort } from './ports/quick-preferences-port';
 export type {
   CoverImageRenderPort,
   CoverMasterReadPort,

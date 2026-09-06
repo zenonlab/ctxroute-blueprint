@@ -2,10 +2,13 @@ import { z } from 'zod';
 import { organizerConfigurationSchema, popupContinuationRecordSchema } from '@tobirink/application';
 import { librarySearchMessageSchema, searchOpenMessageSchema } from './library-search-messages';
 import { reviewCandidatesMessageSchema, reviewDecisionMessageSchema, reviewQueueMessageSchema } from './review-messages';
+import { quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema } from './preference-messages';
 export { librarySearchResponseSchema, openSearchMessage, readLibrarySearchMessage } from './library-search-messages';
 export type { LibrarySearchResponse } from './library-search-messages';
 export { readReviewCandidatesMessage, readReviewQueueMessage, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema, writeReviewDecisionMessage } from './review-messages';
 export type { ReviewCandidatesResponse, ReviewQueueResponse } from './review-messages';
+export { quickPreferencesResponseSchema, readQuickPreferencesMessage, writeQuickPreferencesMessage } from './preference-messages';
+export type { QuickPreferencesResponse } from './preference-messages';
 
 export const extensionMessageVersion = 1 as const;
 export const navigationTargets = ['library', 'review', 'agenda', 'settings'] as const;
@@ -56,7 +59,7 @@ const organizerPreviewReadMessageSchema = z.strictObject({
   version: z.literal(extensionMessageVersion),
 });
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema]);
+export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema]);
 export const popupContextResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(true),
@@ -99,6 +102,8 @@ export const agendaPeriodResponseSchema = z.discriminatedUnion('ok', [
         workId: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u),
       })).max(100),
       missingWorkIds: z.array(z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u)).max(100),
+      source: z.enum(['cache', 'local']),
+      updatedAt: z.string(),
     }),
   }),
   z.strictObject({ error: z.string(), ok: z.literal(false) }),

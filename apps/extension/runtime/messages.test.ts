@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, librarySearchResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema } from './messages';
+import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, librarySearchResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, quickPreferencesResponseSchema, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema } from './messages';
 
 const organizerConfiguration = {
   folders: [{
@@ -59,13 +59,25 @@ describe('extension Agenda messages', () => {
       snapshot: {
         items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'https://reader.example/frieren/29', title: 'Frieren', workId: 'work_frieren-one' }],
         missingWorkIds: [],
+        source: 'local',
+        updatedAt: '2026-09-06T08:00:00.000Z',
       },
     }).success).toBe(true);
     expect(agendaPeriodResponseSchema.safeParse({
       ok: true,
-      snapshot: { items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'javascript:alert(1)', title: 'Frieren', workId: 'work_frieren-one' }], missingWorkIds: [] },
+      snapshot: { items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'javascript:alert(1)', title: 'Frieren', workId: 'work_frieren-one' }], missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' },
     }).success).toBe(false);
     expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { items: Array.from({ length: 101 }, () => ({})), missingWorkIds: [] } }).success).toBe(false);
+  });
+});
+
+describe('extension quick preference messages', () => {
+  it('accepts only the two persisted preference keys', () => {
+    const preferences = { nativeNotifications: true, showEstimatedReleases: false };
+    expect(extensionMessageSchema.safeParse({ type: 'preferences.quick.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ preferences, type: 'preferences.quick.write', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ preferences: { ...preferences, extra: true }, type: 'preferences.quick.write', version: 1 }).success).toBe(false);
+    expect(quickPreferencesResponseSchema.safeParse({ ok: true, preferences }).success).toBe(true);
   });
 });
 

@@ -92,6 +92,8 @@ describe('extension accessibility contract', () => {
   it('keeps organizer storage and preview behind serialized local messages', () => {
     expect(extensionSurface).toContain('useLocalOrganizerSettings()');
     expect(extensionSurface).not.toContain('state="blocked"');
+    expect(extensionSurface).toMatch(/useQuickPreferences\(\)/);
+    expect(extensionSurface).toMatch(/onPreferenceChange={quickPreferences\.onChange}/);
     expect(organizerSettingsHook).toContain('readOrganizerConfigurationMessage()');
     expect(organizerSettingsHook).toContain('writeOrganizerConfigurationMessage(configuration)');
     expect(organizerSettingsHook).toContain('readOrganizerPreviewMessage(configuration)');

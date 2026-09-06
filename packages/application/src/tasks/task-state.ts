@@ -21,6 +21,11 @@ export function createDurableTask(input: Pick<DurableTask, 'id' | 'idempotencyKe
   return Object.freeze({ attempt: 0, id: required(input.id, 'id'), idempotencyKey: required(input.idempotencyKey, 'idempotencyKey'), kind: required(input.kind, 'kind'), payload: input.payload, state: 'READY' });
 }
 
+export function createScheduledDurableTask(input: Pick<DurableTask, 'id' | 'idempotencyKey' | 'kind' | 'payload'>, availableAt: string): DurableTask {
+  instant(availableAt, 'availableAt');
+  return Object.freeze({ ...createDurableTask(input), retryAt: availableAt, state: 'RETRY_AT' });
+}
+
 export function isTaskAvailable(task: DurableTask, now: string): boolean {
   const current = instant(now, 'now');
   if (task.state === 'READY') return true;

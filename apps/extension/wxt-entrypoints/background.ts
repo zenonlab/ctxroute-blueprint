@@ -1,13 +1,18 @@
-import { importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, saveOrganizerConfiguration } from '@tobirink/application';
+import { hydrateAgendaFromPublicReleaseCache, importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
   WebExtensionPageContextAdapter,
   WebExtensionPopupContinuationCacheAdapter,
+  WebExtensionNotificationAdapter,
+  WebExtensionPublicReleaseCacheAdapter,
+  WebExtensionQuickPreferencesAdapter,
 } from '@tobirink/adapters-browser';
+import { DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
+import { drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
 
@@ -18,12 +23,33 @@ export default defineBackground({
   main() {
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
+    const releaseCache = new WebExtensionPublicReleaseCacheAdapter(browser.storage.local);
+    const preferences = new WebExtensionQuickPreferencesAdapter(browser.storage.local);
+    const tasks = new DexieTaskStore();
+    const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
     const bookmarks = new WebExtensionBookmarkImportAdapter(browser.bookmarks);
     const privateStorage = createExtensionLocalStorage();
+    const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     browser.runtime.onInstalled.addListener(async () => {
       await privateStorage.ensureReady();
       const favorites = normalizeBookmarks(await bookmarks.importBookmarks());
       await importFavoriteSources(favorites, privateStorage.storage, new Date().toISOString());
+      await ensureReminderAlarm();
+      await resumeNotifications();
+    });
+    const resumeNotifications = async () => {
+      await privateStorage.ensureReady();
+      const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
+      if ((await preferences.read()).nativeNotifications) {
+        await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
+      }
+      await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
+    };
+    browser.runtime.onStartup.addListener(() => {
+      void ensureReminderAlarm().then(resumeNotifications).catch(() => undefined);
+    });
+    browser.alarms.onAlarm.addListener((alarm) => {
+      if (alarm.name === reminderAlarmName) void resumeNotifications().catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
@@ -102,11 +128,16 @@ export default defineBackground({
       if (parsed.data.type === 'agenda.period.read') {
         try {
           await privateStorage.ensureReady();
+          const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
+          const quickPreferences = await preferences.read();
           const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);
+          if (quickPreferences.nativeNotifications) {
+            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, snapshot.items.map(({ entry }) => entry));
+          }
           return {
             ok: true,
             snapshot: {
-              items: snapshot.items.map(({ entry, source, work }) => {
+              items: snapshot.items.filter(({ entry }) => quickPreferences.showEstimatedReleases || entry.availability !== 'estimated').map(({ entry, source, work }) => {
                 const item = {
                   availability: entry.availability,
                   id: entry.id,
@@ -119,11 +150,29 @@ export default defineBackground({
                 };
                 return source ? { ...item, sourceUrl: source.url } : item;
               }),
-              missingWorkIds: snapshot.missingWorkIds,
+              missingWorkIds: [...snapshot.missingWorkIds, ...hydration.missingWorkIds],
+              source: hydration.state === 'hydrated' ? 'cache' : 'local',
+              updatedAt: hydration.generatedAt ?? new Date().toISOString(),
             },
           };
         } catch {
           return { error: 'agenda-period-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'preferences.quick.read') {
+        try {
+          return { ok: true, preferences: await preferences.read() };
+        } catch {
+          return { error: 'quick-preferences-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'preferences.quick.write') {
+        try {
+          await preferences.write(parsed.data.preferences);
+          if (parsed.data.preferences.nativeNotifications) await resumeNotifications();
+          return { ok: true, preferences: await preferences.read() };
+        } catch {
+          return { error: 'quick-preferences-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'organizer.configuration.read') {

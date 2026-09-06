@@ -23,8 +23,8 @@ export function useLocalAgenda(): AgendaModel {
       const count = days.reduce((total, day) => total + day.releases.length, 0);
       setResult({
         days,
-        state: snapshot.missingWorkIds.length > 0 ? 'partial' : count > 0 ? 'ready' : 'empty',
-        updatedAt: new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date()),
+        state: snapshot.missingWorkIds.length > 0 ? 'partial' : snapshot.source === 'cache' && count > 0 ? 'offline' : count > 0 ? 'ready' : 'empty',
+        updatedAt: new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(snapshot.updatedAt)),
       });
     }).catch(() => {
       if (active) setResult({ days: [], state: 'error', updatedAt: '' });

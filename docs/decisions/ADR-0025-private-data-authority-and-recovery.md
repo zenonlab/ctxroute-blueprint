@@ -58,6 +58,22 @@ bounded results to their private `FavoriteSource` records. Multiple favorites
 for one Work remain valid and the preferred link is chosen deterministically
 by folder path, bookmark order, then stable identifier.
 
+The public release cache is a separate strict `storage.local` envelope. It
+contains at most 200 public release identities, Work identities, qualified
+availability values and timestamps; it contains no source URL, progress or
+user identity. The application validates it before hydrating only Agenda rows
+whose Work already exists in private IndexedDB. Missing Works are reported and
+the previous local Agenda is never deleted. The extension currently composes
+only this cache port: the remote loader remains dormant until an origin and a
+narrow host permission are explicitly approved.
+
+Quick preferences use their own strict versioned adapter. The privacy-safe
+defaults disable native notifications and show estimated releases. Enabling
+notifications creates deterministic zero-lead reminders only for official or
+confirmed entries; disabling them leaves durable tasks intact but prevents
+publication. The estimated-release preference filters delivery projections,
+not the cached or authoritative records.
+
 ## Consequences
 
 Clearing a disposable cache can be repaired from stable catalogue IDs. Losing

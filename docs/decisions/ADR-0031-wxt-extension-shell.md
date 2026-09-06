@@ -69,6 +69,15 @@ only after that validated request and delegates to an application query capped
 at 100 pending records. The response is a frozen, serializable snapshot; it
 does not expose Dexie records, browser APIs or a provider client to React.
 
+Agenda reads hydrate the strict public release cache before querying the local
+period. The background never composes the dormant remote loader. A named
+one-minute browser alarm and `runtime.onStartup` both drain the durable task
+store in batches of at most 20. Tasks remain unavailable until their exact
+release time, use the browser notification identifier as their deduplication
+key, and publish only while the persisted native-notification preference is
+enabled. Preference messages expose only the two versioned booleans used by
+Agenda and the popup.
+
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its
 semantic shell and verifies the shared contrast, focus, reduced-motion and

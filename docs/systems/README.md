@@ -122,6 +122,14 @@ feed. The strict object contains no installation, library, progress, reminder or
 account identifier. The extension may retain only the last validated snapshot
 behind its local cache port so Agenda remains readable offline.
 
+The extension never reads that endpoint directly from a React surface. Its MV3
+background consumes the validated cache through the application port, persists
+Agenda entries only for locally known works, and keeps private works, progress,
+reminders, and durable notification tasks in IndexedDB. Quick notification and
+estimate-display preferences use versioned `browser.storage.local` records.
+Official and confirmed releases schedule idempotent tasks; estimates never do.
+The background alarm is recreated and overdue tasks are drained after restart.
+
 D1 repositories use prepared statements, narrow projections, bounded cursor
 pagination, and indexes justified by measured access paths. Hot queries are
 reviewed with `EXPLAIN QUERY PLAN` and runtime row metrics; migrations run
