@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir, rm } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
-import { loadOrchestratorConfig, safeRelativePath } from './orchestrator-core.mjs';
+import { loadOrchestratorConfig, readOrchestratorState, safeRelativePath } from './orchestrator-core.mjs';
 
 export async function prepareMissionWorktree(missionId, root = process.cwd()) {
   if (!/^[a-z][a-z0-9-]{0,127}$/u.test(missionId)) throw new Error('invalid mission id');
@@ -38,6 +38,35 @@ export function rollbackMissionWorktree(worktreePath, root = process.cwd(), forc
   execFileSync('git', ['worktree', 'remove', ...(force ? ['--force'] : []), absolute], { cwd: root, stdio: 'pipe', timeout: 30_000 });
   execFileSync('git', ['worktree', 'prune'], { cwd: root, stdio: 'pipe', timeout: 30_000 });
   return { removed: rootRelative, force };
+}
+
+export async function reconcileManagedWorktrees(root = process.cwd()) {
+  const config = await loadOrchestratorConfig(root);
+  const state = await readOrchestratorState(root);
+  const active = new Set(state.goals.flatMap(goal => goal.missions)
+    .filter(mission => !['COMPLETED', 'CANCELLED'].includes(mission.status) && mission.worktree)
+    .map(mission => mission.worktree.replaceAll('\\', '/')));
+  const registered = listManagedWorktrees(root, config.worktreeRoot);
+  const removed = [];
+  for (const absolute of registered) {
+    const rootRelative = relative(root, absolute).replaceAll('\\', '/');
+    if (active.has(rootRelative)) continue;
+    rollbackMissionWorktree(rootRelative, root, true);
+    removed.push(rootRelative);
+  }
+  execFileSync('git', ['worktree', 'prune'], { cwd: root, stdio: 'pipe', timeout: config.subprocessTimeoutMs });
+  const worktreeRoot = resolve(root, config.worktreeRoot);
+  if (existsSync(worktreeRoot)) {
+    const entries = await readdir(worktreeRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !/^[a-z][a-z0-9-]{0,127}$/u.test(entry.name)) continue;
+      const rootRelative = `${config.worktreeRoot}/${entry.name}`.replaceAll('\\', '/');
+      if (active.has(rootRelative) || registered.includes(resolve(root, rootRelative))) continue;
+      await rm(resolve(root, rootRelative), { recursive: true, force: true });
+      removed.push(rootRelative);
+    }
+  }
+  return { removed: [...new Set(removed)].sort(), active: [...active].sort() };
 }
 
 function listManagedWorktrees(root, worktreeRoot) {

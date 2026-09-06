@@ -90,7 +90,7 @@ test('architecture evidence rejects unrelated documentation', () => {
 
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
-    SessionStart: ['mission-context.mjs'],
+    SessionStart: ['worktree-reconcile.mjs', 'mission-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs'],
     PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['problem-memory.mjs'],
@@ -286,8 +286,8 @@ test('both lifecycle dialects enforce local governance without automatic CTXRout
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.ok(result.stdout.length > 0, harness);
-    assert.doesNotMatch(result.stdout, /CTXRoute context|Relevant context/u, harness);
+    assert.equal(result.stdout.trim(), '', `${harness} nominal PreToolUse should stay silent`);
+    assert.equal(result.stderr.trim(), '', `${harness} nominal PreToolUse should not emit diagnostics`);
   }
 });
 

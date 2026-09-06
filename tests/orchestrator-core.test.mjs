@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { currentSwarmMode, readOrchestratorState, transactOrchestrator, validateAuditReport, validateWorkerReport } from '../scripts/orchestrator-core.mjs';
 import { prepareMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
-import { rollbackMissionWorktree } from '../scripts/worktree-manager.mjs';
+import { reconcileManagedWorktrees, rollbackMissionWorktree } from '../scripts/worktree-manager.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -57,6 +57,19 @@ test('SWARM_ON isolates a mission, verifies its diff, and records a complete rep
   assert.deepEqual(validateWorkerReport(report), []);
   const rollback = rollbackMissionWorktree(mission.worktree, root, true);
   assert.equal(rollback.force, true);
+});
+
+test('reconciliation removes completed mission worktrees and preserves active ones', async () => {
+  const root = fixture(true);
+  await transactOrchestrator({ operation_id: 'goal-create', expected_revision: 0, action: 'goal.create', payload: { id: 'goal-one', title: 'Reconcile worktrees' } }, root);
+  const prepared = await prepareMission(missionCommand(1), root);
+  const mission = prepared.state.goals[0].missions[0];
+  const reconciledActive = await reconcileManagedWorktrees(root);
+  assert.deepEqual(reconciledActive.removed, []);
+  await transactOrchestrator({ operation_id: 'mission-cancel', expected_revision: 2, action: 'mission.transition', payload: { mission_id: mission.mission_id, status: 'CANCELLED' } }, root);
+  const reconciled = await reconcileManagedWorktrees(root);
+  assert.deepEqual(reconciled.removed, [mission.worktree]);
+  assert.equal(existsSync(join(root, mission.worktree)), false);
 });
 
 test('report and audit contracts reject secrets and support orchestrator-only goal adjustment', async () => {
