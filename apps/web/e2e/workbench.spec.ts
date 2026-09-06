@@ -23,7 +23,7 @@ const fixture: BridgeFixture = {
   ],
 };
 
-async function installBridge(page: Page) {
+async function installBridge(page: Page, selectedFixture: BridgeFixture = fixture) {
   await page.addInitScript((bridgeFixture: BridgeFixture) => {
     window.__agendaReads = 0;
     window.__libraryReads = 0;
@@ -49,7 +49,7 @@ async function installBridge(page: Page) {
       }
       if (value) window.postMessage({ requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, window.location.origin);
     });
-  }, fixture);
+  }, selectedFixture);
 }
 
 test('desktop Workbench renders real bridge projections and navigation', async ({ page }) => {
@@ -81,6 +81,19 @@ test('Library keeps filters in the URL and remains bounded on mobile', async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+});
+
+test('connected empty Library matches the Workbench empty surface', async ({ page }) => {
+  await installBridge(page, { agenda: [], library: [] });
+  await page.goto('/library');
+  await expect(page.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Votre bibliothèque est vide' })).toBeVisible();
+  await expect(page.getByText('Importez vos favoris ou ajoutez une première œuvre.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Télécharger l’extension' })).toBeVisible();
+  await expect(page.locator('[data-layout="centered"] > span svg')).toHaveCSS('width', '48px');
+  await expect(page.locator('[data-variant="library"]')).toHaveCount(1);
+  await expect(page.locator('h2').filter({ hasText: 'Votre bibliothèque est vide' })).toHaveCSS('font-size', '18px');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('Agenda keeps seven horizontal days and emits one read per week', async ({ page }) => {
