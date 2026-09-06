@@ -92,7 +92,7 @@
       "dot": "rose",
       "title": "Workbench ciblé",
       "items": [
-        "Le viewport contient seulement catalogue et aperçu",
+        "Le viewport contient seulement catalogue et aperçu, sans hero parasite sur l’accueil",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }

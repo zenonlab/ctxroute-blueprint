@@ -62,5 +62,5 @@ function HomePrivateOverview() {
 }
 
 export default function HomePage() {
-  return <SiteShell><main className="member-page"><header className="member-hero"><p className="eyebrow">Tobirink Workbench</p><h1>Reprendre le fil.</h1><p>Votre bibliothèque et vos sorties restent sur cet appareil, projetées par l’extension uniquement pendant cette session.</p></header><HomePrivateOverview /></main></SiteShell>;
+  return <SiteShell><main className="member-page"><HomePrivateOverview /></main></SiteShell>;
 }

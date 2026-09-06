@@ -58,10 +58,8 @@ test('desktop Workbench renders real bridge projections and navigation', async (
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Reprendre le fil.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '4 œuvres' })).toBeVisible();
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(4);
-  await expect(page.getByRole('heading', { name: 'Reprendre le fil.' })).toHaveCSS('font-size', '32px');
   await expect(page.locator('a[data-variant="library"]').first()).toHaveCSS('width', '196px');
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
