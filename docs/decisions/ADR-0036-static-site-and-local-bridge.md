@@ -32,7 +32,7 @@ and keeps API routes separate from the export. The site exposes only `/`,
 download page. There is no account, authentication, web settings, Review
 route, radio route, or browser storage access.
 
-The web workspace pins TypeScript 5.9.3 locally. Next 16.2.6's build-time
+The web workspace pins TypeScript 5.9.3 locally. Next 16.3.4's build-time
 typechecker is not compatible with the repository's TypeScript 7 toolchain;
 other workspaces may continue using TypeScript 7, but npm must not deduplicate
 the web compiler across that boundary. The web build remains strict and does
@@ -55,6 +55,14 @@ Agenda projection and accepts exactly one date-only Monday-to-Monday half-open
 week; it reads at most 100 dated entries. Both projections retain only locally
 available progress, favorite-source, release-label, availability and HTTP(S)
 URL fields, and shorten their item arrays before the transport limit.
+
+The static app owns one client-side provider for the session. It waits 1.5
+seconds for initial detection, validates the correlated transport envelope and
+the operation-specific projection before rendering, and schedules expiry from
+the extension-issued timestamp. One automatic reconnection is allowed; a
+second loss becomes a recoverable error requiring an explicit retry. Global
+search navigates to the URL-addressable Library query, while the bounded Review
+snapshot feeds the Workbench bell and its existing decision command.
 
 ## Consequences
 

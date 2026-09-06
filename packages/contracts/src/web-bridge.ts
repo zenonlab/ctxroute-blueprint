@@ -131,6 +131,41 @@ export const webBridgeErrorResponseSchema = z.object({
   type: z.literal('tobirink.webbridge.response'),
 }).strict();
 
+export const webBridgeSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+  requestId: boundedText(128),
+  type: z.literal('tobirink.webbridge.response'),
+  value: z.json(),
+}).strict();
+
+export const webPageBridgeResponseSchema = z.object({
+  requestId: boundedText(128),
+  response: z.union([
+    webHandshakeResponseSchema,
+    webBridgeSuccessResponseSchema,
+    webBridgeErrorResponseSchema,
+  ]),
+  type: z.literal('tobirink.webbridge.response'),
+}).strict();
+
+const webPageBridgeVersionedHandshakeResponseSchema = z.object({
+  requestId: boundedText(128),
+  response: z.object({
+    expiresAt: z.number().int().positive(),
+    nonce: boundedText(128),
+    ok: z.literal(true),
+    protocolVersion: z.number().int().positive(),
+    requestId: boundedText(128),
+    type: z.literal('tobirink.webbridge.response'),
+  }).strict(),
+  type: z.literal('tobirink.webbridge.response'),
+}).strict();
+
+export const webPageBridgeInboundSchema = z.union([
+  webPageBridgeResponseSchema,
+  webPageBridgeVersionedHandshakeResponseSchema,
+]);
+
 export type WebBootstrapSnapshot = z.infer<typeof webBootstrapSnapshotSchema>;
 export type WebLibraryQuery = z.infer<typeof webLibraryQuerySchema>;
 export type WebLibraryPage = z.infer<typeof webLibraryPageSchema>;

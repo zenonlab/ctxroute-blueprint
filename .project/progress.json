@@ -4357,7 +4357,7 @@
         {
           "id": "step-4",
           "title": "Construire le runtime web privé",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Provider client WebBridge unique avec états bornés et validation Contracts",
             "Détection 1,5 s, session 60 s, une reconnexion automatique",
@@ -4382,7 +4382,11 @@
             "git diff --check",
             "git commit -m \"feat(web): add bounded member bridge runtime\""
           ],
-          "evidence": []
+          "evidence": [
+            "WebBridge provider: 1.5 s detection, 60 s extension session, one automatic reconnect, six explicit states",
+            "Operation-specific Zod validation and correlated 64 KiB page envelopes; global search and bounded Review wired",
+            "Web typecheck and static Next build pass; Contracts 7/7; Archify product IRs showcase 9/9; docs and diff checks pass"
+          ]
         },
         {
           "id": "step-5",

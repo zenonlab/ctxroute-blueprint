@@ -24,7 +24,7 @@
     { "id": "extension", "type": "frontend", "label": "Extension TobiRink", "sublabel": "popup · agenda", "stage": 1, "row": 0, "width": 144, "tag": "MV3" },
     { "id": "indexeddb", "type": "database", "label": "IndexedDB privé", "sublabel": "Work · sources", "stage": 2, "row": 0, "width": 144, "tag": "autorité" },
     { "id": "bridge", "type": "security", "label": "WebBridgePort v2", "sublabel": "session · Zod", "stage": 3, "row": 0, "width": 144, "tag": "64 KiB" },
-    { "id": "site", "type": "frontend", "label": "Site TobiRink", "sublabel": "accueil · bibliothèque · agenda", "stage": 4, "row": 0, "width": 144, "tag": "statique" }
+    { "id": "site", "type": "frontend", "label": "Site TobiRink", "sublabel": "provider · six états", "stage": 4, "row": 0, "width": 144, "tag": "statique" }
   ],
   "flows": [
     { "from": "browser", "to": "extension", "label": "import", "classification": "premier démarrage", "variant": "emphasis", "route": "straight", "labelDy": 53 },
@@ -35,6 +35,6 @@
   "cards": [
     { "dot": "emerald", "title": "Autorité locale", "items": ["IndexedDB reste l’autorité privée unique", "L’installation importe les favoris dans une base neuve", "Le site ne lit jamais le stockage privé directement"] },
     { "dot": "cyan", "title": "Bridge borné", "items": ["Session émise par l’extension, requête et version sont validées", "Library applique recherche normalisée, facette, curseur et limite 24", "Agenda transmet les timestamps et disponibilités locales sans précision inventée"] },
-    { "dot": "amber", "title": "États honnêtes", "items": ["Extension absente et reconnexion sont explicites", "Hors ligne conserve les lectures locales disponibles", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
+    { "dot": "amber", "title": "États honnêtes", "items": ["Détection 1,5 s et reconnexion unique sont explicites", "Incompatibilité et erreur récupérable restent distinctes", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
   ]
 }

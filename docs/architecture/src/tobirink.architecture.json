@@ -31,7 +31,7 @@
         "id": "site-bridge",
         "label": "Static site and local bridge",
         "focus": ["site", "webBridge", "extensionUi", "appCore", "indexedDb"],
-        "note": "Protocol v2 uses extension-issued 60-second sessions, anti-replay request ids and 64 KiB UTF-8 projections."
+        "note": "One site provider detects in 1.5 seconds, validates v2 projections and attempts one automatic reconnect per 60-second session."
       },
       {
         "id": "radio-local",
@@ -44,7 +44,7 @@
   "components": [
     { "id": "reader", "type": "external", "label": "Reader", "pos": [20, 330], "size": [115, 64] },
     { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
-    { "id": "site", "type": "frontend", "label": "Static TobiRink site", "sublabel": "Public routes / local views", "pos": [1130, 250], "size": [190, 64], "tag": "exported HTML" },
+    { "id": "site", "type": "frontend", "label": "Static TobiRink site", "sublabel": "One provider / six states", "pos": [1130, 250], "size": [190, 64], "tag": "exported HTML" },
     { "id": "webBridge", "type": "security", "label": "WebBridgePort v2", "sublabel": "origin / session / anti-replay", "pos": [900, 250], "size": [190, 64], "tag": "64 KiB UTF-8" },
     { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "Search / Review / Organizer", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
     { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "router / alarm recovery", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
