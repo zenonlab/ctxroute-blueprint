@@ -250,3 +250,8 @@
 
 - [x] **Versionner la surface de publication reproductible** — DONE _(evidence: PR #7 merged to origin/main at 1b8a16c after all seven GitHub checks passed, including Windows and Worker contracts., npm run verify passed: 270/270 tests plus one intentional skip, audit 0 vulnerabilities, integration and Archify build., Web export and 1.0.0 packages built; static scan found no sample-work, Exemple public or 0.0.0; Archify showcase passed 9/9.)_
 - [x] **Appliquer le plan Cloudflare exact et vérifier la production** — DONE _(evidence: Cloudflare exact-plan apply published both 1.0.0 R2 artifacts and deployed the Worker; the approved corrective Worker-only apply now serves version db2bc1cd-4a75-4f75-9422-1412e627f722 at 100%., Production verification: /, /library, /agenda, /privacy and /download return 200; an unknown route returns 404; /download exposes both versioned MV3 links with immutable cache headers., Remote SHA-256 values match the published bytes: Chrome 237aa4165022d0dd44042812a24ba2d1a198b64071e992e789a9864ef0452794; Firefox 62ecb5d2afdc027eccf5ce136219aacee70abe24e184123ff5889f74ca1c6d48; product dataflow and architecture validate showcase 9/9.)_
+
+## Réaligner la production web sur les surfaces Workbench — ACTIVE
+
+- [x] **Partager et appliquer les surfaces Workbench** — DONE _(evidence: Library est exportée par @tobirink/ui et l’Extension reste un adaptateur; Surface et FeedbackState rétablissent cartes et SVG partagés., Playwright 4/4 mesure titres 32px, cartes 196px, SVG 48px, grille mobile 2 colonnes sans débordement., UI 124/124, Extension 92/92, Web 9/9, Workbench 9/9; typecheck, lint, Sensor SAFE, builds et Archify showcase 9/9 passent.)_
+- [ ] **Vérifier, fusionner et redéployer la production** — PENDING

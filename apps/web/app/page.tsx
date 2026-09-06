@@ -51,7 +51,7 @@ function HomePrivateOverview() {
       <header className="section-heading"><div><p className="eyebrow">Bibliothèque locale</p><h2 id="library-overview-title">{bootstrap?.libraryCount ?? library.items.length} œuvres</h2></div><a className="text-link" href="/library">Tout voir</a></header>
       {library.items.length === 0
         ? <FeedbackState kind="empty" title="Bibliothèque vide" description="Importez vos favoris depuis l’extension pour commencer." />
-        : <div className="work-grid">{library.items.map((item) => <WorkCard coverSrc={item.coverUrl} context={item.mediaKind === 'anime' ? 'Anime' : 'Manga'} detail={item.progressLabel ?? 'Progression non renseignée'} href={item.sourceUrl} key={item.workId} title={item.title} variant="library" />)}</div>}
+        : <div className="work-grid">{library.items.map((item) => <WorkCard coverSrc={item.coverUrl} context={item.mediaKind === 'anime' ? 'Anime' : 'Manga'} detail={item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale'} href={item.sourceUrl} indicator={item.progressLabel} key={item.workId} title={item.title} variant="library" />)}</div>}
     </section>
     <section className="member-section" aria-labelledby="agenda-overview-title">
       <header className="section-heading"><div><p className="eyebrow">Semaine locale</p><h2 id="agenda-overview-title">{period.label}</h2></div><a className="text-link" href="/agenda">Ouvrir l’agenda</a></header>

@@ -106,9 +106,9 @@ const libraryPreview = definePreview({
   fixtures: ['6 œuvres locales · pagination par 4 · progression automatique sur les cartes'],
   sources: [
     { label: 'API publique', path: 'entrypoints/library/index.ts' },
-    { label: 'Contrat', path: 'entrypoints/library/library.contract.ts' },
-    { label: 'Surface', path: 'entrypoints/library/Library.tsx' },
-    { label: 'Styles', path: 'entrypoints/library/Library.module.css' },
+    { label: 'Contrat partagé', path: 'packages/ui/src/features/library/library-surface/library-surface.contract.ts' },
+    { label: 'Surface partagée', path: 'packages/ui/src/features/library/library-surface/Library.tsx' },
+    { label: 'Styles partagés', path: 'packages/ui/src/features/library/library-surface/Library.module.css' },
     { label: 'Preview', path: 'entrypoints/library/Library.preview.tsx' },
     { label: 'Tests', path: 'entrypoints/library/Library.test.tsx' },
   ],
@@ -118,7 +118,7 @@ const libraryPreview = definePreview({
     'Les états asynchrones utilisent les composants FeedbackState partagés',
     'Chaque progression synchronisée reste lisible dans la zone dédiée de WorkCard',
   ],
-  usage: `import { Library } from '@tobirink/extension/entrypoints/library';`,
+  usage: `import { Library } from '@tobirink/ui';`,
   render: ({ state }) => (
     <section className={styles.preview}>
       <LibraryDemo key={state} state={isState(state) ? state : 'ready'} />

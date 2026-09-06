@@ -4817,6 +4817,86 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-web-visual-parity",
+      "title": "Réaligner la production web sur les surfaces Workbench",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Partager et appliquer les surfaces Workbench",
+          "status": "DONE",
+          "acceptance": [
+            "Library web réutilise la surface Workbench publique sans hero parallèle",
+            "Tous les titres web respectent la rampe typographique, avec display plafonné à 32 px",
+            "Les cartes Library gardent 196 px sur desktop et la grille Workbench à deux colonnes sur mobile",
+            "Les états WebBridge utilisent FeedbackState et les SVG partagés",
+            "Les panneaux Privacy et Download utilisent Surface"
+          ],
+          "files": [
+            "docs/architecture/src/ui-system.architecture.json",
+            "packages/ui/src/features/library/library-surface/**",
+            "packages/ui/src/index.ts",
+            "apps/extension/entrypoints/library/Library.tsx",
+            "apps/extension/entrypoints/library/Library.module.css",
+            "apps/extension/entrypoints/library/library.contract.ts",
+            "apps/extension/entrypoints/library/index.ts",
+            "apps/web/app/**",
+            "apps/web/tests/**",
+            "apps/web/e2e/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- ui-system.architecture",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web",
+            "npm run typecheck",
+            "npm run build --workspace @tobirink/web",
+            "git diff --check",
+            "git commit -m \"fix(web): restore workbench visual parity\""
+          ],
+          "evidence": [
+            "Library est exportée par @tobirink/ui et l’Extension reste un adaptateur; Surface et FeedbackState rétablissent cartes et SVG partagés.",
+            "Playwright 4/4 mesure titres 32px, cartes 196px, SVG 48px, grille mobile 2 colonnes sans débordement.",
+            "UI 124/124, Extension 92/92, Web 9/9, Workbench 9/9; typecheck, lint, Sensor SAFE, builds et Archify showcase 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Vérifier, fusionner et redéployer la production",
+          "status": "TODO",
+          "acceptance": [
+            "La matrice locale et CI passe sans régression",
+            "Le diff ne contient aucune suppression ni donnée fictive",
+            "Le plan Cloudflare exact ne cible que worker:tobirink-public-api",
+            "La production rend les tailles, surfaces, SVG et cartes validés",
+            "Les routes et téléchargements publics restent opérationnels"
+          ],
+          "files": [
+            ".ctxroute/state/tobirink-production-plan.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "git diff --check",
+            "git push origin fix/tobirink-web-visual-parity",
+            "gh pr checks --watch",
+            "gh pr merge --merge",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation worker-deploy",
+            "npm run infra:apply -- --plan .ctxroute/state/tobirink-production-plan.json --approve <reviewed-digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow worker:tobirink-public-api",
+            "curl production routes and downloads"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
