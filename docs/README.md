@@ -22,6 +22,7 @@ IR is the architecture source of truth.
 - `02-quality-strategy.md`: test and quality strategy.
 - `architecture/`: versioned Archify JSON IR and architecture guidance.
 - `decisions/`: durable decisions as ADRs.
+- `diff/`: evidence-backed architecture audits, comparisons, external research, risks, and validation records.
 - `systems/`: subsystem contracts and responsibilities.
 - `workflows/`: important procedures and interactions.
 - `templates/`: documentation templates to copy and adapt.
