@@ -24,7 +24,7 @@ export function handlerPlan(harness, event, root = projectRoot) {
   if (harness !== 'codex' && harness !== 'claude') return [];
 
   return {
-    SessionStart: [local('mission-context.mjs')],
+    SessionStart: [local('worktree-reconcile.mjs'), local('mission-context.mjs')],
     PreToolUse: [local('pre-tool-architecture.mjs')],
     PostToolUse: [local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [problemMemory('UserPromptSubmit')],
