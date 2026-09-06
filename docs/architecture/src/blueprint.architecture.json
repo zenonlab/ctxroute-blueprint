@@ -7,7 +7,7 @@
     "viewBox": [1390, 700],
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The V2 orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
-      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "Pending intent is authoritative; reconciliation preserves ambiguous worktrees and rollback captures bounded evidence first." },
+      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -18,7 +18,7 @@
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "On-demand context", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "orchestrator", "type": "backend", "label": "Orchestrator", "sublabel": "MCP + mirror CLI", "pos": [30, 230], "size": [170, 60] },
+    { "id": "orchestrator", "type": "backend", "label": "Orchestrator", "sublabel": "Bootstrap + MCP + CLI", "pos": [30, 230], "size": [170, 60] },
     { "id": "workers", "type": "external", "label": "Isolated workers", "sublabel": "Minimal mission + worktree", "pos": [30, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },

@@ -21,6 +21,8 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   validationReceiptV2: 'https://ctxroute.dev/schemas/orchestrator/validation-receipt-v2.schema.json',
   worktreeOperationV2: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation-v2.schema.json',
   decisionEventV1: 'https://ctxroute.dev/schemas/orchestrator/decision-event-v1.schema.json',
+  decisionEventV2: 'https://ctxroute.dev/schemas/orchestrator/decision-event-v2.schema.json',
+  bootstrapReportV2: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report-v2.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [

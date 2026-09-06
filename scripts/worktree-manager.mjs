@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, lstat, mkdir, open, readdir, realpath, rename, statfs } from 'node:fs/promises';
+import { access, lstat, mkdir, open, readFile, readdir, realpath, rename, statfs } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { loadOrchestratorConfig, readOrchestratorState, safeRelativePath } from './orchestrator-core.mjs';
@@ -65,41 +65,62 @@ export async function inspectMissionChanges(worktreePath, fileScope, root = proc
   return { files, outsideScope, ok: outsideScope.length === 0, head: (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim() };
 }
 
-export async function reconcileManagedWorktrees(root = process.cwd(), dependencies = {}) {
+export async function reconcileManagedWorktrees(root = process.cwd(), dependencies = {}, suppliedState = null) {
   const deps = createWorktreeDependencies(dependencies);
+  const repair = dependencies.repair !== false;
   const config = await loadOrchestratorConfig(root);
-  const state = await readOrchestratorState(root);
+  const state = suppliedState ?? await readOrchestratorState(root);
   const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
-  const missions = new Map(state.goals.flatMap(goal => goal.missions).filter(mission => mission.worktree_allocation?.path).map(mission => [normalizePath(mission.worktree_allocation.path), mission]));
+  const missions = new Map(state.goals.flatMap(goal => goal.missions).filter(mission => mission.worktree_allocation?.path && !['REMOVED', 'ROLLED_BACK'].includes(mission.worktree_allocation.status)).map(mission => [normalizePath(mission.worktree_allocation.path), mission]));
   const registered = await listManagedWorktrees(root, config, deps);
   const remaining = new Map(registered.map(item => [item.relative, item]));
   const results = [];
   let shouldPrune = false;
+  const foldedPaths = new Map();
+  for (const path of [...missions.keys(), ...registered.map(item => item.relative)]) {
+    const folded = path.toLocaleLowerCase('en-US');
+    const values = foldedPaths.get(folded) ?? new Set(); values.add(path); foldedPaths.set(folded, values);
+  }
+  const collisions = new Set([...foldedPaths.values()].filter(values => values.size > 1).flatMap(values => [...values]));
   for (const [worktreePath, mission] of missions) {
     const registration = remaining.get(worktreePath);
-    const present = await pathExists(resolve(root, worktreePath));
-    if (!registration) { results.push(result(worktreePath, present ? 'DIRECTORY_NOT_REGISTERED' : 'METADATA_MISSING', 'NEEDS_ATTENTION')); continue; }
+    const physical = await lstat(resolve(root, worktreePath)).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+    if (collisions.has(worktreePath)) { results.push(result(worktreePath, 'CASE_COLLISION', 'NEEDS_ATTENTION', mission.worktree_allocation.base_revision)); continue; }
+    if (physical?.isSymbolicLink()) { results.push(result(worktreePath, 'SYMLINK', 'NEEDS_ATTENTION', mission.worktree_allocation.base_revision)); continue; }
+    if (!registration) { results.push(result(worktreePath, physical ? 'DIRECTORY_NOT_REGISTERED' : 'METADATA_MISSING', 'NEEDS_ATTENTION', mission.worktree_allocation.base_revision)); continue; }
     remaining.delete(worktreePath);
-    if (!registration.present) { shouldPrune = true; results.push(result(worktreePath, 'REGISTERED_PATH_MISSING', 'PRUNE_METADATA')); continue; }
+    if (registration.symlink) { results.push(result(worktreePath, 'SYMLINK', 'NEEDS_ATTENTION', mission.worktree_allocation.base_revision)); continue; }
+    if (!registration.present) { shouldPrune = true; results.push(result(worktreePath, 'REGISTERED_PATH_MISSING', 'PRUNE_METADATA', mission.worktree_allocation.base_revision)); continue; }
     const status = await worktreeStatus(registration.absolute, config, deps);
-    if (!TERMINAL.has(mission.status)) { results.push(result(worktreePath, status.dirty ? 'ACTIVE_DIRTY' : 'ACTIVE_COHERENT', 'PRESERVED')); continue; }
-    if (status.dirty) { results.push(result(worktreePath, 'TERMINAL_DIRTY', 'NEEDS_ATTENTION')); continue; }
-    await git(root, ['worktree', 'remove', registration.absolute], config, deps);
-    results.push(result(worktreePath, 'TERMINAL_CLEAN', 'REMOVED'));
+    const base = mission.worktree_allocation.base_revision;
+    if (status.indexLock) { results.push(result(worktreePath, 'INDEX_LOCK', 'NEEDS_ATTENTION', base, status)); continue; }
+    if (!TERMINAL.has(mission.status)) { results.push(result(worktreePath, status.dirty ? 'ACTIVE_DIRTY' : 'ACTIVE_COHERENT', 'PRESERVED', base, status)); continue; }
+    if (status.dirty) { results.push(result(worktreePath, 'TERMINAL_DIRTY', 'NEEDS_ATTENTION', base, status)); continue; }
+    if (status.head !== base) { results.push(result(worktreePath, 'REVISION_DIVERGED', 'NEEDS_ATTENTION', base, status)); continue; }
+    if (repair) {
+      await git(root, ['worktree', 'remove', registration.absolute], config, deps);
+      await deps.fault?.('afterWorktreeRemove', worktreePath);
+    }
+    results.push(result(worktreePath, 'TERMINAL_CLEAN', repair ? 'REMOVED' : 'PRESERVED', base, status));
   }
   for (const registration of remaining.values()) {
+    if (collisions.has(registration.relative)) { results.push(result(registration.relative, 'CASE_COLLISION', 'NEEDS_ATTENTION')); continue; }
+    if (registration.symlink) { results.push(result(registration.relative, 'SYMLINK', 'NEEDS_ATTENTION')); continue; }
     if (!registration.present) { shouldPrune = true; results.push(result(registration.relative, 'ORPHAN_REGISTERED_MISSING', 'PRUNE_METADATA')); continue; }
     const status = await worktreeStatus(registration.absolute, config, deps);
-    results.push(result(registration.relative, status.dirty ? 'ORPHAN_REGISTERED_DIRTY' : 'ORPHAN_REGISTERED_CLEAN', 'NEEDS_ATTENTION'));
+    results.push(result(registration.relative, status.indexLock ? 'INDEX_LOCK' : status.dirty ? 'ORPHAN_REGISTERED_DIRTY' : 'ORPHAN_REGISTERED_CLEAN', 'NEEDS_ATTENTION', null, status));
   }
   const registeredPaths = new Set(registered.filter(item => item.present).map(item => item.absolute));
   for (const entry of await readdir(managedRoot, { withFileTypes: true })) {
     const absolute = resolve(managedRoot, entry.name);
-    if (!entry.isDirectory() || entry.isSymbolicLink() || registeredPaths.has(absolute)) continue;
-    results.push(result(`${config.worktreeRoot}/${entry.name}`, 'DIRECTORY_NOT_REGISTERED', 'NEEDS_ATTENTION'));
+    if (registeredPaths.has(absolute)) continue;
+    const path = `${config.worktreeRoot}/${entry.name}`;
+    if (results.some(item => item.path === path)) continue;
+    results.push(result(path, entry.isSymbolicLink() ? 'SYMLINK' : entry.isDirectory() ? 'DIRECTORY_NOT_REGISTERED' : 'UNKNOWN_ENTRY', 'NEEDS_ATTENTION'));
   }
-  if (shouldPrune) await git(root, ['worktree', 'prune'], config, deps);
-  return { results: results.sort((left, right) => left.path.localeCompare(right.path)), changed: results.some(item => ['REMOVED', 'PRUNE_METADATA'].includes(item.action)) };
+  if (shouldPrune && repair) await git(root, ['worktree', 'prune'], config, deps);
+  if (!repair) for (const item of results) if (item.action === 'PRUNE_METADATA') item.action = 'PRESERVED';
+  return { results: results.sort((left, right) => left.path.localeCompare(right.path)), changed: repair && results.some(item => ['REMOVED', 'PRUNE_METADATA'].includes(item.action)) };
 }
 
 export async function rollbackMissionWorktree(mission, root = process.cwd(), dependencies = {}) {
@@ -116,15 +137,38 @@ export async function rollbackMissionWorktree(mission, root = process.cwd(), dep
   const header = `${JSON.stringify({ schemaVersion: 1, mission_id: missionId, head: inventory.head, files: inventory.files, digest: patchDigest })}\n`;
   const proof = Buffer.concat([Buffer.from(header), patch]);
   if (proof.byteLength > config.rollbackBytes) throw categorized('ROLLBACK_PROOF_TOO_LARGE', `rollback proof exceeds ${config.rollbackBytes} bytes`);
-  const recoveryRoot = resolve(root, '.ctxroute/recovery');
+  const recoveryRoot = resolve(root, config.recoveryRoot);
   await mkdir(recoveryRoot, { recursive: true, mode: 0o700 });
-  const proofRelative = `.ctxroute/recovery/${missionId}-${deps.now().toISOString().replace(/[:.]/gu, '-')}.patch`;
+  const proofRelative = `${config.recoveryRoot.replace(/\/$/u, '')}/${missionId}-${deps.now().toISOString().replace(/[:.]/gu, '-')}.patch`;
   const temporary = resolve(root, `${proofRelative}.${process.pid}.tmp`);
   const handle = await open(temporary, 'wx', 0o600);
   try { await handle.writeFile(proof); await handle.sync(); } finally { await handle.close(); }
   await rename(temporary, resolve(root, proofRelative));
+  await deps.fault?.('afterRecoveryProof', proofRelative);
   await git(root, ['worktree', 'remove', '--force', worktree], config, deps);
+  await deps.fault?.('afterRollbackRemove', worktreePath);
   return { mission_id: missionId, worktree: worktreePath, status: 'ROLLED_BACK', proof: proofRelative, digest: `sha256:${createHash('sha256').update(proof).digest('hex')}` };
+}
+
+export async function recoverRollbackProof(missionId, root = process.cwd()) {
+  if (!ID.test(String(missionId))) throw new Error('invalid rollback mission');
+  const config = await loadOrchestratorConfig(root);
+  const recoveryRoot = resolve(root, config.recoveryRoot);
+  const entries = await readdir(recoveryRoot, { withFileTypes: true }).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error));
+  const candidates = entries.filter(entry => entry.isFile() && !entry.isSymbolicLink() && entry.name.startsWith(`${missionId}-`) && entry.name.endsWith('.patch')).sort((left, right) => right.name.localeCompare(left.name));
+  for (const entry of candidates) {
+    const relativePath = `${config.recoveryRoot.replace(/\/$/u, '')}/${entry.name}`;
+    const bytes = await readFile(resolve(recoveryRoot, entry.name));
+    if (bytes.length > config.rollbackBytes) continue;
+    const newline = bytes.indexOf(10);
+    if (newline < 0 || newline > 4096) continue;
+    let header;
+    try { header = JSON.parse(bytes.subarray(0, newline).toString('utf8')); } catch { continue; }
+    const patch = bytes.subarray(newline + 1);
+    if (header?.schemaVersion !== 1 || header.mission_id !== missionId || header.digest !== `sha256:${createHash('sha256').update(patch).digest('hex')}`) continue;
+    return { mission_id: missionId, status: 'ROLLED_BACK', proof: relativePath, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
+  }
+  throw categorized('ROLLBACK_PROOF_MISSING', 'pending rollback removed its worktree without a valid recovery proof');
 }
 
 export async function purgeMissionWorktree({ mission_id, worktree, confirmation, reason }, root = process.cwd(), dependencies = {}) {
@@ -133,6 +177,7 @@ export async function purgeMissionWorktree({ mission_id, worktree, confirmation,
   const config = await loadOrchestratorConfig(root);
   const absolute = await resolveManagedPath(root, config.worktreeRoot, worktree, true);
   await git(root, ['worktree', 'remove', '--force', absolute], config, deps);
+  await deps.fault?.('afterPurgeRemove', worktree);
   return { mission_id, worktree, status: 'PURGED' };
 }
 
@@ -154,7 +199,11 @@ async function capturePatch(worktree, files, config, deps) {
 }
 async function worktreeStatus(worktree, config, deps) {
   const source = (await git(worktree, ['status', '--porcelain=v1', '-z'], config, deps)).stdout;
-  return { dirty: source.length > 0, files: parseNull(source).map(record => normalizePath(record.slice(3))).sort() };
+  const head = (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  const gitDirectoryOutput = (await git(worktree, ['rev-parse', '--path-format=absolute', '--git-dir'], config, deps)).stdout.trim();
+  const gitDirectory = resolve(worktree, gitDirectoryOutput);
+  const lock = await lstat(resolve(gitDirectory, 'index.lock')).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  return { dirty: source.length > 0, files: parseNull(source).map(record => normalizePath(record.slice(3))).sort(), head, indexLock: Boolean(lock) };
 }
 async function listManagedWorktrees(root, config, deps) {
   const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
@@ -166,7 +215,8 @@ async function listManagedWorktrees(root, config, deps) {
     if (!first) continue;
     const absolute = first.slice(9);
     if (absolute !== managedRoot && !absolute.startsWith(`${managedRoot}${sep}`)) continue;
-    entries.push({ absolute, relative: normalizePath(relative(repository, absolute)), present: await pathExists(absolute) });
+    const details = await lstat(absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+    entries.push({ absolute, relative: normalizePath(relative(repository, absolute)), present: Boolean(details), symlink: details?.isSymbolicLink() ?? false });
   }
   return entries;
 }
@@ -204,7 +254,7 @@ async function git(cwd, args, config, deps, acceptFailure = false) {
   }
 }
 function scopeContains(scope, file, ignoreCase) { const normalize = value => ignoreCase ? normalizePath(value).toLocaleLowerCase('en-US') : normalizePath(value); const left = normalize(scope).replace(/\/$/u, ''); const right = normalize(file); return right === left || right.startsWith(`${left}/`); }
-function result(path, classification, action) { return { path, classification, action }; }
+function result(path, classification, action, baseRevision = null, status = {}) { return { path, classification, action, head: status.head ?? null, base_revision: baseRevision, dirty: status.dirty ?? null, index_lock: status.indexLock ?? false }; }
 function parseNull(source) { return source.split('\0').filter(Boolean); }
 function normalizePath(path) { return path.replaceAll('\\', '/'); }
 function assertContained(parent, child, label) { if (child !== parent && !child.startsWith(`${parent}${sep}`)) throw new Error(`${label} escapes its managed root`); }

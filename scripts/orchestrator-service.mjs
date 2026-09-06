@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   beginOrchestratorTransaction, blockOrchestratorTransaction, completeOrchestratorTransaction,
-  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateMission,
+  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateMission, withGlobalMutationLock,
 } from './orchestrator-core.mjs';
+import { assertBootstrapAllows, bootstrapOrchestrator } from './orchestrator-bootstrap.mjs';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { runMissionValidations } from './orchestrator-validation.mjs';
 import {
@@ -25,14 +26,18 @@ export async function readCoordination(root = process.cwd(), environment = proce
   return view;
 }
 
-export async function mutateCoordination(command, root = process.cwd(), environment = process.env) {
+export async function mutateCoordination(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => mutateCoordination(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment);
   if (command.action === 'skill.register') await assertSkillRegistration(command.payload, root);
   if (['mission.prepare', 'report.submit', 'worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} must use its dedicated service operation`);
-  return transactOrchestrator(command, root);
+  return transactOrchestrator(command, root, dependencies);
 }
 
 export async function prepareMission(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => prepareMission(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment);
   assertOrchestratorContract('transaction-v2', command);
   if (command.action !== 'mission.prepare') throw new Error('prepare-mission requires action mission.prepare');
@@ -75,6 +80,8 @@ export async function prepareMission(command, root = process.cwd(), environment 
 }
 
 export async function submitWorkerReport(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => submitWorkerReport(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorContract('transaction-v2', command);
   if (command.action !== 'report.submit') throw new Error('submit-report requires action report.submit');
   const report = command.payload.report;
@@ -104,16 +111,21 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
 }
 
 export async function reconcileWorktrees(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => reconcileWorktrees(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment); assertAction(command, 'worktree.reconcile');
-  const begun = await beginOrchestratorTransaction(command, root, dependencies);
+  const plan = await reconcileManagedWorktrees(root, { ...dependencies, repair: false });
+  const begun = await beginOrchestratorTransaction(command, root, dependencies, state => ({ ...state, worktree_operations: [...state.worktree_operations, ...reconciliationOperations(state, command.operation_id, plan, 'PENDING')] }));
   if (begun.replayed && !begun.pending) return begun;
   try {
-    const reconciliation = await reconcileManagedWorktrees(root, dependencies);
+    const reconciliation = await reconcileManagedWorktrees(root, { ...dependencies, repair: command.payload.repair });
     return completeOrchestratorTransaction(command, state => applyReconciliation(state, command.operation_id, reconciliation), 'RECONCILED', root, dependencies);
   } catch (error) { await blockOrchestratorTransaction(command, error.causeCode ?? 'RECONCILIATION_FAILED', root, dependencies); throw error; }
 }
 
 export async function rollbackMission(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => rollbackMission(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment); assertAction(command, 'mission.rollback');
   const begun = await beginOrchestratorTransaction(command, root, dependencies, state => {
     const entry = findMission(state, command.payload.mission_id);
@@ -134,6 +146,8 @@ export async function rollbackMission(command, root = process.cwd(), environment
 }
 
 export async function purgeWorktree(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => purgeWorktree(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment); assertAction(command, 'worktree.purge');
   const begun = await beginOrchestratorTransaction(command, root, dependencies, state => {
     const entry = findMission(state, command.payload.mission_id);
@@ -195,10 +209,12 @@ function applyReconciliation(state, operationId, reconciliation) {
     const found = state.goals.flatMap(goal => goal.missions.map(mission => ({ goal, mission }))).find(entry => entry.mission.worktree_allocation?.path === item.path);
     if (found && item.action === 'REMOVED') next = updateMission(next, found.goal.goal_id, found.mission.mission_id, mission => ({ ...mission, worktree_allocation: { ...mission.worktree_allocation, status: 'REMOVED' } }));
     if (found && item.action === 'NEEDS_ATTENTION') next = updateMission(next, found.goal.goal_id, found.mission.mission_id, mission => ({ ...mission, worktree_allocation: { ...mission.worktree_allocation, status: 'NEEDS_ATTENTION' } }));
-    if (found) operations.push({ operation_id: operationId, mission_id: found.mission.mission_id, kind: 'RECONCILE', status: 'COMPLETED', classification: mapClassification(item.classification), path: item.path, base_revision: found.mission.worktree_allocation.base_revision, dirty: item.classification.includes('DIRTY'), proof_ref: null, cause: item.action === 'NEEDS_ATTENTION' ? 'NEEDS_ATTENTION' : null });
+    if (found) operations.push({ operation_id: operationId, mission_id: found.mission.mission_id, kind: 'RECONCILE', status: 'COMPLETED', classification: mapClassification(item.classification), path: item.path, base_revision: found.mission.worktree_allocation.base_revision, dirty: item.dirty, proof_ref: null, cause: item.action === 'NEEDS_ATTENTION' ? 'NEEDS_ATTENTION' : null });
   }
-  return { ...next, worktree_operations: [...next.worktree_operations, ...operations] };
+  const keys = new Set(operations.map(item => `${item.operation_id}\0${item.mission_id}`));
+  return { ...next, worktree_operations: [...next.worktree_operations.filter(item => !keys.has(`${item.operation_id}\0${item.mission_id}`)), ...operations] };
 }
+function reconciliationOperations(state, operationId, reconciliation, status) { return reconciliation.results.flatMap(item => { const found = state.goals.flatMap(goal => goal.missions).find(mission => mission.worktree_allocation?.path === item.path); return found ? [{ operation_id: operationId, mission_id: found.mission_id, kind: 'RECONCILE', status, classification: mapClassification(item.classification), path: item.path, base_revision: found.worktree_allocation.base_revision, dirty: item.dirty, proof_ref: null, cause: null }] : []; }); }
 function mapClassification(value) { if (value === 'ACTIVE_COHERENT') return value; if (value === 'TERMINAL_CLEAN') return value; if (value === 'TERMINAL_DIRTY') return value; if (value.startsWith('ORPHAN_REGISTERED')) return 'REGISTERED_ORPHAN'; if (value === 'DIRECTORY_NOT_REGISTERED') return 'UNREGISTERED_DIRECTORY'; if (value.includes('METADATA') || value.includes('MISSING')) return 'BROKEN_METADATA'; return 'NEEDS_ATTENTION'; }
 function scopesOverlap(left, right) { const a = left.replace(/\/$/u, '').toLocaleLowerCase('en-US'); const b = right.replace(/\/$/u, '').toLocaleLowerCase('en-US'); return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`); }
 function assertAction(command, action) { assertOrchestratorContract('transaction-v2', command); if (command.action !== action) throw new Error(`expected action ${action}`); }

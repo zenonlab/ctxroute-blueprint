@@ -25,8 +25,9 @@ test('a real stdio client reads and mutates the orchestrator idempotently', asyn
   await withClient(join(root, 'scripts/orchestrator-mcp.mjs'), fixture, async client => {
     const listed = await client.listTools();
     assert.deepEqual(listed.tools.map(tool => tool.name).sort(), [...ORCHESTRATOR_TOOL_NAMES].sort());
-    assert.ok(listed.tools.some(tool => tool.name === 'orchestrator_reconcile_worktrees'));
-    assert.ok(listed.tools.some(tool => tool.name === 'orchestrator_rollback_mission'));
+    assert.ok(listed.tools.some(tool => tool.name === 'orchestrator_health'));
+    assert.ok(!listed.tools.some(tool => tool.name === 'orchestrator_reconcile_worktrees'));
+    assert.ok(!listed.tools.some(tool => tool.name === 'orchestrator_rollback_mission'));
     assert.ok(!listed.tools.some(tool => tool.name.includes('purge')));
     assert.ok(JSON.stringify(listed.tools).length < 8000);
     const initial = await client.callTool({ name: 'orchestrator_read', arguments: {} });

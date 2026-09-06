@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { lstat, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
 
@@ -43,7 +43,7 @@ export function createOrchestratorDependencies(overrides = {}) {
 }
 
 export function emptyOrchestratorState(mode = 'SWARM_ON') {
-  const state = { schemaVersion: 2, revision: 0, mode, telemetry_sequence: 0, goals: [], skills: [], audits: [], transactions: [], worktree_operations: [] };
+  const state = { schemaVersion: 2, revision: 0, mode, telemetry_sequence: 0, migration_receipt: null, goals: [], skills: [], audits: [], transactions: [], worktree_operations: [] };
   assertOrchestratorContract('state-v2', state);
   return state;
 }
@@ -66,22 +66,21 @@ export async function loadOrchestratorConfig(root = process.cwd()) {
   }
 }
 
-export async function readOrchestratorState(root = process.cwd(), dependencies = {}) {
-  const deps = createOrchestratorDependencies(dependencies);
+export async function readOrchestratorState(root = process.cwd(), _dependencies = {}) {
   const config = await loadOrchestratorConfig(root);
   const path = resolve(root, config.statePath);
+  const details = await lstat(path).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!details) throw categorized('STATE_MISSING', 'Cannot read orchestrator state: state is not initialized');
+  if (!details.isFile() || details.isSymbolicLink()) throw categorized('STATE_UNSAFE', 'Cannot read orchestrator state: state path must be a regular file');
   let source;
   try { source = await readFile(path, 'utf8'); }
   catch (error) {
-    if (error.code !== 'ENOENT') throw new Error(`Cannot read orchestrator state: ${error.message}`);
-    const initial = emptyOrchestratorState(config.defaultMode);
-    await atomicWriteState(path, initial, config.stateBytes, deps);
-    return initial;
+    throw new Error(`Cannot read orchestrator state: ${error.message}`);
   }
   if (Buffer.byteLength(source) > config.stateBytes) throw new Error('Cannot read orchestrator state: state exceeds its byte budget');
   let state;
   try { state = JSON.parse(source); } catch (error) { throw new Error(`Cannot read orchestrator state: corrupt JSON (${error.message})`); }
-  if (state?.schemaVersion === 1) return resetKnownV1(root, path, state, config, deps);
+  if (state?.schemaVersion === 1) throw categorized('V1_RESET_REQUIRED', 'Cannot read orchestrator state: recognized V1 state requires bootstrap');
   if (state?.schemaVersion !== 2) throw new Error(`Cannot read orchestrator state: unsupported schemaVersion ${String(state?.schemaVersion)}`);
   try { assertNoSecrets(state); assertOrchestratorContract('state-v2', state); }
   catch (error) { throw new Error(`Cannot read orchestrator state: ${error.message}`); }
@@ -95,18 +94,20 @@ export async function currentSwarmMode(root = process.cwd(), environment = proce
     return { mode: override, mode_source: 'environment' };
   }
   const config = await loadOrchestratorConfig(root);
-  const state = await readOrchestratorState(root);
+  const state = await readOrchestratorState(root).catch(error => error.causeCode === 'STATE_MISSING' ? null : Promise.reject(error));
+  if (!state) return { mode: config.defaultMode, mode_source: 'default' };
   if (state.revision > 0 || state.mode !== config.defaultMode) return { mode: state.mode, mode_source: 'state' };
   return { mode: config.defaultMode, mode_source: 'default' };
 }
 
 export async function beginOrchestratorTransaction(command, root = process.cwd(), dependencies = {}, intentMutation = null) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => beginOrchestratorTransaction(command, root, locked, intentMutation));
   assertNoSecrets(command);
   assertOrchestratorContract('transaction-v2', command);
   const config = await loadOrchestratorConfig(root);
   const path = resolve(root, config.statePath);
   const deps = createOrchestratorDependencies(dependencies);
-  await readOrchestratorState(root, deps);
+  await ensureOrchestratorState(root, deps);
   return withLock(`${path}.lock`, config.lockTimeoutMs, deps, async () => {
     const state = await readOrchestratorState(root, deps);
     const digest = transactionDigest(command);
@@ -116,7 +117,7 @@ export async function beginOrchestratorTransaction(command, root = process.cwd()
       return { replayed: true, pending: prior.status === 'PENDING', receipt: prior, state };
     }
     if (command.expected_revision !== state.revision) throw new Error(`revision conflict: expected ${command.expected_revision}, actual ${state.revision}`);
-    const receipt = { operation_id: command.operation_id, digest, action: command.action, status: 'PENDING', start_revision: state.revision, end_revision: null, result: null, cause: null };
+    const receipt = { operation_id: command.operation_id, digest, action: command.action, intent: structuredClone(command.payload), status: 'PENDING', start_revision: state.revision, end_revision: null, result: null, cause: null };
     const intended = intentMutation ? await intentMutation(state) : state;
     const next = { ...intended, revision: state.revision + 1, telemetry_sequence: state.telemetry_sequence + 1, transactions: [...intended.transactions, receipt] };
     assertOrchestratorContract('state-v2', next);
@@ -127,6 +128,7 @@ export async function beginOrchestratorTransaction(command, root = process.cwd()
 }
 
 export async function completeOrchestratorTransaction(command, mutation, result = 'UPDATED', root = process.cwd(), dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => completeOrchestratorTransaction(command, mutation, result, root, locked));
   const config = await loadOrchestratorConfig(root);
   const path = resolve(root, config.statePath);
   const deps = createOrchestratorDependencies(dependencies);
@@ -143,16 +145,19 @@ export async function completeOrchestratorTransaction(command, mutation, result 
     const receipt = { ...prior, status: 'COMPLETED', end_revision: revision, result, cause: null };
     const transactions = [...mutated.transactions];
     transactions[index] = receipt;
-    const next = { ...mutated, revision, telemetry_sequence: state.telemetry_sequence + 1, transactions };
+    const provisional = { ...mutated, revision, transactions };
+    const events = decisionEvents(command, state, provisional, result === 'UNCHANGED' ? 'NO_CHANGE' : 'SUCCESS');
+    const next = { ...provisional, telemetry_sequence: state.telemetry_sequence + events.length };
     assertNoSecrets(next);
     assertOrchestratorContract('state-v2', next);
     await atomicWriteState(path, next, config.stateBytes, deps);
-    await emitSafely(root, config, { sequence: next.telemetry_sequence, event_type: eventType(command.action), operation_id: command.operation_id, revision_before: state.revision, revision_after: next.revision, entity_type: entityType(command.action), entity_id: entityId(command), result: result === 'UNCHANGED' ? 'NO_CHANGE' : 'SUCCESS', ...eventDetails(command, next) }, deps);
+    for (const [offset, event] of events.entries()) await emitSafely(root, config, { ...event, sequence: state.telemetry_sequence + offset + 1 }, deps);
     return { replayed: false, pending: false, receipt, state: next };
   });
 }
 
 export async function blockOrchestratorTransaction(command, cause, root = process.cwd(), dependencies = {}, mutation = null) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => blockOrchestratorTransaction(command, cause, root, locked, mutation));
   if (!/^[A-Z][A-Z0-9_]{0,63}$/u.test(cause)) cause = 'UNCLASSIFIED_FAILURE';
   const config = await loadOrchestratorConfig(root);
   const path = resolve(root, config.statePath);
@@ -168,22 +173,26 @@ export async function blockOrchestratorTransaction(command, cause, root = proces
     const revision = state.revision + 1;
     const receipt = { ...prior, status: 'BLOCKED', end_revision: revision, result: null, cause };
     const transactions = [...blockedState.transactions]; transactions[index] = receipt;
-    const next = { ...blockedState, revision, telemetry_sequence: state.telemetry_sequence + 1, transactions };
+    const provisional = { ...blockedState, revision, transactions };
+    const events = decisionEvents(command, state, provisional, 'BLOCKED', cause);
+    const next = { ...provisional, telemetry_sequence: state.telemetry_sequence + events.length };
     assertOrchestratorContract('state-v2', next);
     await atomicWriteState(path, next, config.stateBytes, deps);
-    await emitSafely(root, config, { sequence: next.telemetry_sequence, event_type: 'BLOCKED', operation_id: command.operation_id, revision_before: state.revision, revision_after: next.revision, entity_type: entityType(command.action), entity_id: entityId(command), result: 'BLOCKED', cause }, deps);
+    for (const [offset, event] of events.entries()) await emitSafely(root, config, { ...event, sequence: state.telemetry_sequence + offset + 1 }, deps);
     return { replayed: false, blocked: true, receipt, state: next };
   });
 }
 
 export async function transactOrchestrator(command, root = process.cwd(), dependencies = {}) {
-  const begun = await beginOrchestratorTransaction(command, root, dependencies);
-  if (begun.replayed && !begun.pending) return begun;
-  try { return await completeOrchestratorTransaction(command, null, operationResult(command.action), root, dependencies); }
-  catch (error) {
-    await blockOrchestratorTransaction(command, error.causeCode ?? 'OPERATION_REJECTED', root, dependencies).catch(() => {});
-    throw error;
-  }
+  return withGlobalMutationLock(root, dependencies, async locked => {
+    const begun = await beginOrchestratorTransaction(command, root, locked);
+    if (begun.replayed && !begun.pending) return begun;
+    try { return await completeOrchestratorTransaction(command, null, operationResult(command.action), root, locked); }
+    catch (error) {
+      await blockOrchestratorTransaction(command, error.causeCode ?? 'OPERATION_REJECTED', root, locked).catch(() => {});
+      throw error;
+    }
+  });
 }
 
 export function validateWorkerReport(report, maximumBytes = DEFAULTS.reportBytes) { return validateContract('worker-report-v2', report, maximumBytes, 'worker report'); }
@@ -232,18 +241,92 @@ export function updateGoal(state, goalId, operation) { const index = state.goals
 export function updateMission(state, goalId, missionId, operation) { return updateGoal(state, goalId, goal => { const index = goal.missions.findIndex(mission => mission.mission_id === missionId); if (index < 0) throw new Error(`unknown mission: ${missionId}`); const missions = [...goal.missions]; missions[index] = operation(missions[index]); return { ...goal, missions }; }); }
 export function findMission(state, missionId) { return state.goals.flatMap(goal => goal.missions.map(mission => ({ goal, mission }))).find(item => item.mission.mission_id === missionId) ?? null; }
 
-async function resetKnownV1(root, path, state, config, deps) {
-  if (!knownV1(state)) throw new Error('Cannot read orchestrator state: unrecognized V1 state');
-  const directory = dirname(path);
-  const base = path.split('/').at(-1);
-  const known = (await readdir(directory).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error))).filter(name => name === `${base}.lock` || (name.startsWith(`${base}.`) && name.endsWith('.tmp')));
-  await Promise.all([unlink(path), ...known.map(name => unlink(resolve(directory, name)).catch(() => {}))]);
-  const fresh = { ...emptyOrchestratorState(config.defaultMode), telemetry_sequence: 1 };
-  await atomicWriteState(path, fresh, config.stateBytes, deps);
-  await emitSafely(root, config, { sequence: 1, event_type: 'STATE_RESET', revision_before: state.revision, revision_after: 0, entity_type: 'state', result: 'SUCCESS' }, deps);
-  return fresh;
+export async function ensureOrchestratorState(root = process.cwd(), dependencies = {}) {
+  const deps = createOrchestratorDependencies(dependencies);
+  const config = await loadOrchestratorConfig(root);
+  const path = resolve(root, config.statePath);
+  const details = await lstat(path).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!details) {
+    const initial = emptyOrchestratorState(config.defaultMode);
+    await atomicWriteState(path, initial, config.stateBytes, deps);
+    const cleaned = await cleanupDeadStateTemporaries(path, deps);
+    return { state: initial, reset: false, initialized: true, cleaned };
+  }
+  if (!details.isFile() || details.isSymbolicLink()) throw categorized('STATE_UNSAFE', 'Cannot bootstrap orchestrator state: state path must be a regular file');
+  const source = await readFile(path, 'utf8');
+  if (Buffer.byteLength(source) > config.stateBytes) throw categorized('STATE_TOO_LARGE', 'Cannot bootstrap orchestrator state: state exceeds its byte budget');
+  let state;
+  try { state = JSON.parse(source); } catch (error) { throw categorized('STATE_CORRUPT', `Cannot bootstrap orchestrator state: corrupt JSON (${error.message})`); }
+  if (state?.schemaVersion === 1) return resetKnownV1(root, path, source, state, config, deps);
+  if (state?.schemaVersion !== 2) throw categorized('STATE_VERSION_UNKNOWN', `Cannot bootstrap orchestrator state: unsupported schemaVersion ${String(state?.schemaVersion)}`);
+  assertNoSecrets(state); assertOrchestratorContract('state-v2', state);
+  const cleaned = await cleanupDeadStateTemporaries(path, deps);
+  return { state, reset: false, initialized: false, cleaned };
 }
-function knownV1(state) { if (!state || state.schemaVersion !== 1 || !Number.isInteger(state.revision) || !MODES.includes(state.mode)) return false; const allowed = new Set(['schemaVersion', 'revision', 'mode', 'goals', 'skills', 'audits', 'transactions']); return Object.keys(state).every(key => allowed.has(key)) && ['goals', 'skills', 'audits', 'transactions'].every(key => Array.isArray(state[key])); }
+
+async function cleanupDeadStateTemporaries(path, deps) {
+  const directory = dirname(path);
+  const pattern = new RegExp(`^${escapeRegex(basename(path))}\\.([1-9][0-9]*)\\.[a-z0-9-]{1,128}\\.tmp$`, 'u');
+  const names = await readdir(directory).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error));
+  let cleaned = false;
+  for (const name of names) {
+    const match = pattern.exec(name);
+    if (!match || deps.processAlive(Number(match[1]))) continue;
+    const temporary = resolve(directory, name);
+    const details = await lstat(temporary);
+    if (!details.isFile() || details.isSymbolicLink()) throw categorized('STATE_TEMP_UNSAFE', 'Cannot bootstrap orchestrator state: temporary path is unsafe');
+    await unlink(temporary);
+    cleaned = true;
+  }
+  return cleaned;
+}
+
+async function resetKnownV1(root, path, source, state, config, deps) {
+  if (!knownV1(state)) throw categorized('V1_UNRECOGNIZED', 'Cannot bootstrap orchestrator state: unrecognized V1 state');
+  const directory = dirname(path);
+  const base = basename(path);
+  const names = await readdir(directory).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error));
+  const lockPath = resolve(directory, `${base}.lock`);
+  if (names.includes(`${base}.lock`)) await assertInactiveV1Lock(lockPath, deps);
+  const temporaryPattern = new RegExp(`^${escapeRegex(base)}\\.([1-9][0-9]*)\\.([a-z0-9-]{8,128})\\.tmp$`, 'u');
+  const temporaries = names.filter(name => temporaryPattern.test(name));
+  for (const name of temporaries) {
+    const match = temporaryPattern.exec(name);
+    const details = await lstat(resolve(directory, name));
+    if (!details.isFile() || details.isSymbolicLink() || deps.processAlive(Number(match[1]))) throw categorized('V1_TEMP_ACTIVE', 'Cannot bootstrap orchestrator state: V1 temporary is active or unsafe');
+  }
+  const digest = createHash('sha256').update(source).digest('hex');
+  const fresh = { ...emptyOrchestratorState(config.defaultMode), telemetry_sequence: 1, migration_receipt: { from_schema_version: 1, from_revision: state.revision, source_digest: digest } };
+  await atomicWriteState(path, fresh, config.stateBytes, deps);
+  if (names.includes(`${base}.lock`)) await unlink(lockPath);
+  for (const name of temporaries) await unlink(resolve(directory, name));
+  await emitSafely(root, config, { sequence: 1, event_type: 'STATE_RESET', revision_before: state.revision, revision_after: 0, entity_type: 'state', result: 'SUCCESS', evidence_digest: digest }, deps);
+  return { state: fresh, reset: true, initialized: false, cleaned: temporaries.length > 0 };
+}
+function knownV1(state) {
+  if (!exactObject(state, ['schemaVersion', 'revision', 'mode', 'goals', 'skills', 'audits', 'transactions']) || state.schemaVersion !== 1 || !Number.isInteger(state.revision) || state.revision < 0 || !MODES.includes(state.mode)) return false;
+  if (!['goals', 'skills', 'audits', 'transactions'].every(key => Array.isArray(state[key]))) return false;
+  if (!state.goals.every(goal => exactObject(goal, ['id', 'title', 'status', 'missions']) && safeV1Id(goal.id) && safeV1Text(goal.title) && GOAL_STATUSES.includes(goal.status) && Array.isArray(goal.missions) && goal.missions.every(knownV1Mission))) return false;
+  if (!state.skills.every(skill => exactObject(skill, ['skill_id', 'version', 'path']) && safeV1Id(skill.skill_id) && safeV1Text(skill.version) && safeRelativePath(skill.path))) return false;
+  if (!state.transactions.every(transaction => exactObject(transaction, ['operation_id', 'digest', 'revision']) && safeV1Id(transaction.operation_id) && /^sha256:[a-f0-9]{64}$/u.test(transaction.digest) && Number.isInteger(transaction.revision) && transaction.revision > 0)) return false;
+  return state.audits.every(knownV1Audit);
+}
+function knownV1Mission(mission) { return exactObject(mission, ['mission_id', 'skill_id', 'skill_version', 'file_scope', 'acceptance', 'validation_commands', 'response_format', 'status', 'worktree', 'report']) && safeV1Id(mission.mission_id) && safeV1Id(mission.skill_id) && safeV1Text(mission.skill_version) && arraysOf(mission.file_scope, safeRelativePath) && arraysOf(mission.acceptance, safeV1Text) && arraysOf(mission.validation_commands, safeV1Text) && safeV1Text(mission.response_format) && ['ASSIGNED', 'RUNNING', 'COMPLETED', 'BLOCKED', 'CANCELLED'].includes(mission.status) && (mission.worktree === null || safeRelativePath(mission.worktree)) && (mission.report === null || knownV1Report(mission.report)); }
+function knownV1Report(report) { return exactObject(report, ['mission_id', 'skill_id', 'skill_version', 'files_touched', 'commands', 'summary', 'material_evidence', 'blockers']) && safeV1Id(report.mission_id) && safeV1Id(report.skill_id) && safeV1Text(report.skill_version) && arraysOf(report.files_touched, safeRelativePath) && Array.isArray(report.commands) && report.commands.every(item => exactObject(item, ['command', 'exit_code']) && safeV1Text(item.command) && Number.isInteger(item.exit_code)) && safeV1Text(report.summary) && arraysOf(report.material_evidence, safeV1Text) && arraysOf(report.blockers, safeV1Text); }
+function knownV1Audit(audit) { return exactObject(audit, ['decision', 'patch_applied', 'rollback', 'sessions_examined', 'signals_detected', 'validations', 'subject']) && ['decision', 'patch_applied', 'rollback'].every(key => safeV1Text(audit[key])) && ['sessions_examined', 'signals_detected', 'validations'].every(key => arraysOf(audit[key], safeV1Text)) && exactObject(audit.subject, ['type', 'id']) && ['skill', 'goal', 'mission', 'blueprint'].includes(audit.subject.type) && safeV1Text(audit.subject.id); }
+function exactObject(value, keys) { return Boolean(value && value === Object(value) && !Array.isArray(value) && Object.keys(value).sort().join('\0') === [...keys].sort().join('\0')); }
+function arraysOf(value, predicate) { return Array.isArray(value) && value.every(predicate); }
+function safeV1Id(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,127}$/u.test(value); }
+function safeV1Text(value) { return value === String(value) && value.trim().length > 0 && value.length <= 4096 && ![...value].some(character => character.codePointAt(0) < 9); }
+
+async function assertInactiveV1Lock(path, deps) {
+  const details = await lstat(path);
+  if (!details.isFile() || details.isSymbolicLink()) throw categorized('V1_LOCK_UNSAFE', 'Cannot bootstrap orchestrator state: V1 lock is unsafe');
+  let value;
+  try { value = JSON.parse(await readFile(path, 'utf8')); } catch { throw categorized('V1_LOCK_UNPROVEN', 'Cannot bootstrap orchestrator state: V1 lock is not recognized'); }
+  if (!value?.token || !Number.isInteger(value.pid) || Number.isNaN(Date.parse(value.created_at))) throw categorized('V1_LOCK_UNPROVEN', 'Cannot bootstrap orchestrator state: V1 lock is not recognized');
+  if (deps.processAlive(value.pid)) throw categorized('V1_LOCK_LIVE', 'Cannot bootstrap orchestrator state: V1 lock owner is alive');
+}
 
 async function atomicWriteState(path, state, maximumBytes, deps) {
   const source = `${JSON.stringify(state, null, 2)}\n`;
@@ -272,7 +355,7 @@ async function withLock(path, timeoutMs, deps, operation) {
     } catch (error) {
       await handle?.close().catch(() => {}); handle = null;
       if (error.code !== 'EEXIST') throw error;
-      await recoverStaleLock(path, timeoutMs, deps);
+      await recoverStaleLock(path, deps);
       if (deps.now().getTime() - started >= timeoutMs) throw new Error('orchestrator transaction lock timeout');
       await deps.wait(25);
     }
@@ -284,11 +367,21 @@ async function withLock(path, timeoutMs, deps, operation) {
     if (current?.token === token) await unlink(path).catch(() => {});
   }
 }
-async function recoverStaleLock(path, timeoutMs, deps) {
+
+export async function withGlobalMutationLock(root = process.cwd(), dependencies = {}, operation) {
+  const canonicalRoot = resolve(root);
+  const deps = createOrchestratorDependencies(dependencies);
+  if (deps.globalMutationRoot === canonicalRoot) return operation(deps);
+  const config = await loadOrchestratorConfig(root);
+  const path = resolve(root, `${config.statePath}.mutation.lock`);
+  return withLock(path, config.lockTimeoutMs, deps, () => operation({ ...deps, globalMutationRoot: canonicalRoot }));
+}
+
+async function recoverStaleLock(path, deps) {
   let first;
   try { first = JSON.parse(await readFile(path, 'utf8')); } catch { return; }
   if (!first?.token || !Number.isInteger(first.pid) || Number.isNaN(Date.parse(first.created_at))) return;
-  if (deps.now().getTime() - Date.parse(first.created_at) <= timeoutMs || deps.processAlive(first.pid)) return;
+  if (deps.processAlive(first.pid)) return;
   const second = await readFile(path, 'utf8').then(JSON.parse).catch(() => null);
   if (second?.token === first.token) await unlink(path).catch(() => {});
 }
@@ -303,4 +396,27 @@ async function emitSafely(root, config, event, deps) { try { if (deps.emitTeleme
 function eventType(action) { if (action === 'report.submit') return 'VALIDATION'; if (action === 'audit.apply') return 'AUDIT'; if (action === 'skill.register') return 'SKILL_REGISTRATION'; if (action === 'worktree.reconcile') return 'RECONCILIATION'; if (action === 'mission.rollback') return 'ROLLBACK'; if (action === 'worktree.purge') return 'PURGE'; if (action.includes('transition')) return 'TRANSITION'; return 'TRANSACTION'; }
 function entityType(action) { if (action === 'report.submit') return 'validation'; if (action.startsWith('goal.')) return 'goal'; if (action.startsWith('mission.')) return 'mission'; if (action.startsWith('worktree.')) return 'worktree'; if (action.startsWith('audit.')) return 'audit'; if (action.startsWith('skill.')) return 'skill'; if (action.startsWith('mode.')) return 'mode'; return 'transaction'; }
 function entityId(command) { return command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.goal_id ?? command.payload?.audit_id ?? command.payload?.skill_id ?? null; }
-function eventDetails(command, state) { if (command.action !== 'report.submit') return {}; const found = findMission(state, command.payload.report.mission_id); const item = found?.mission.validation_receipt?.results?.[0]; return item ? { validation_id: item.id, duration_ms: item.duration_ms, exit_code: item.exit_code } : {}; }
+function decisionEvents(command, before, after, result, cause = null) {
+  const common = { operation_id: command.operation_id, revision_before: before.revision, revision_after: after.revision, result, cause };
+  const events = [];
+  const beforeEntity = transitionEntity(before, command);
+  const afterEntity = transitionEntity(after, command);
+  if (beforeEntity?.status && afterEntity?.status && beforeEntity.status !== afterEntity.status) {
+    const transition = `${beforeEntity.status}->${afterEntity.status}`;
+    events.push({ ...common, event_type: 'TRANSITION', entity_type: command.action.startsWith('goal.') ? 'goal' : 'mission', entity_id: entityId(command), transition, policy_id: transitionPolicy(command.action), schema_id: command.action.startsWith('goal.') ? 'state-v2' : 'mission-record-v2', git_oid_before: beforeEntity.worktree_allocation?.base_revision ?? null, git_oid_after: afterEntity.worktree_allocation?.base_revision ?? null, evidence_digest: evidenceDigest({ transition, cause }) });
+  }
+  const validationResults = command.action === 'report.submit' ? afterEntity?.validation_receipt?.results ?? [] : [];
+  for (const item of validationResults) events.push({ ...common, event_type: 'VALIDATION', entity_type: 'validation', entity_id: item.id, validation_id: item.id, duration_ms: item.duration_ms, exit_code: item.exit_code, policy_id: 'mission-validation-v2', schema_id: 'validation-receipt-v2', git_oid_before: beforeEntity?.worktree_allocation?.base_revision ?? null, git_oid_after: afterEntity?.worktree_allocation?.base_revision ?? null, evidence_digest: evidenceDigest({ id: item.id, status: item.status, exit_code: item.exit_code, cause: item.cause }) });
+  if (events.length === 0) events.push({ ...common, event_type: cause ? 'BLOCKED' : eventType(command.action), entity_type: entityType(command.action), entity_id: entityId(command), policy_id: actionPolicy(command.action), schema_id: 'transaction-v2', evidence_digest: evidenceDigest({ action: command.action, result, cause }) });
+  return events;
+}
+function transitionEntity(state, command) {
+  if (command.action.startsWith('goal.')) return state.goals.find(goal => goal.goal_id === command.payload.goal_id) ?? null;
+  const missionId = command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.mission?.mission_id;
+  return missionId ? findMission(state, missionId)?.mission ?? null : null;
+}
+function transitionPolicy(action) { return action.startsWith('goal.') ? 'goal-transition-v2' : 'mission-transition-v2'; }
+function actionPolicy(action) { return `${action.replaceAll('.', '-')}-v2`; }
+function evidenceDigest(value) { return createHash('sha256').update(stableJson(value)).digest('hex'); }
+function categorized(code, message) { const error = new Error(message); error.causeCode = code; return error; }
+function escapeRegex(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }

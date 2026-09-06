@@ -26,7 +26,7 @@
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 0, "row": 2, "tag": "consumer" },
     { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "on-demand references", "stage": 1, "row": 0, "tag": "bounded query" },
-    { "id": "orchestrator", "type": "messagebus", "label": "Orchestrator V2", "sublabel": "contracts + pending state", "stage": 1, "row": 2, "tag": "transactional" },
+    { "id": "orchestrator", "type": "messagebus", "label": "Orchestrator V2", "sublabel": "bootstrap + pending state", "stage": 1, "row": 2, "tag": "fail closed" },
     { "id": "worker", "type": "backend", "label": "Worker", "sublabel": "mission view + worktree", "stage": 2, "row": 0, "tag": "minimal mission" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
     { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "fail-open", "stage": 3, "row": 2, "tag": "final guard" },
@@ -44,7 +44,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Environment, persisted state, then default determine mode", "Workers receive a positive MissionViewV2 without conversation", "CTXRoute context is queried explicitly and remains byte-bounded"] },
-    { "dot": "emerald", "title": "Transactional verification", "items": ["The orchestrator persists PENDING intent before Git effects", "Worker declarations never replace orchestrator validation replay", "Identical operation replays converge while payload drift fails"] },
+    { "dot": "emerald", "title": "Transactional verification", "items": ["Bootstrap holds one global lock through every Git effect", "Pending intents resume from desired and physical state", "Worker declarations never replace orchestrator validation replay"] },
     { "dot": "rose", "title": "Recovery boundary", "items": ["Dirty or ambiguous worktrees require attention", "Rollback captures bounded restorable proof before removal", "Telemetry is redacted, rotated, and secondary to state"] }
   ]
 }

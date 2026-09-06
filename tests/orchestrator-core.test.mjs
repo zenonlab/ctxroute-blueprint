@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import {
   beginOrchestratorTransaction, currentSwarmMode, readOrchestratorState, transactOrchestrator,
   validateAuditReport, validateWorkerReport,
 } from '../scripts/orchestrator-core.mjs';
+import { bootstrapOrchestrator } from '../scripts/orchestrator-bootstrap.mjs';
 import { prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -17,6 +18,7 @@ test('V2 state is created atomically and mode reports its source', async () => {
   const root = fixture();
   assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM_ON', mode_source: 'default' });
   assert.deepEqual(await currentSwarmMode(root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' }), { mode: 'SWARM_OFF', mode_source: 'environment' });
+  await bootstrapOrchestrator(root);
   const state = await readOrchestratorState(root);
   assert.equal(state.schemaVersion, 2);
   assert.equal(existsSync(join(root, '.ctxroute/orchestrator/state.json')), true);
@@ -42,24 +44,52 @@ test('known V1 state resets without touching worktrees, while corrupt and unknow
   const statePath = join(root, '.ctxroute/orchestrator/state.json');
   mkdirSync(join(root, '.ctxroute/orchestrator'), { recursive: true });
   mkdirSync(join(root, '.ctxroute/worktrees/legacy'), { recursive: true });
+  mkdirSync(join(root, '.ctxroute/recovery'), { recursive: true });
+  mkdirSync(join(root, '.ctxroute/reports'), { recursive: true });
   writeFileSync(join(root, '.ctxroute/worktrees/legacy/evidence.txt'), 'preserve');
+  writeFileSync(join(root, '.ctxroute/recovery/proof.patch'), 'proof');
+  writeFileSync(join(root, '.ctxroute/reports/report.json'), 'report');
   writeFileSync(statePath, JSON.stringify({ schemaVersion: 1, revision: 3, mode: 'SWARM_ON', goals: [], skills: [], audits: [], transactions: [] }));
-  writeFileSync(`${statePath}.lock`, 'legacy');
-  writeFileSync(`${statePath}.12.old.tmp`, 'partial');
+  writeFileSync(`${statePath}.lock`, JSON.stringify({ token: 'legacy-dead', pid: 999999, created_at: '2020-01-01T00:00:00.000Z' }));
+  writeFileSync(`${statePath}.999999.deadbeef.tmp`, 'partial');
+  await assert.rejects(() => readOrchestratorState(root), /requires bootstrap/u);
+  const reset = await bootstrapOrchestrator(root, { processAlive: () => false });
+  assert.equal(reset.changed, true);
   assert.equal((await readOrchestratorState(root)).schemaVersion, 2);
+  assert.equal((await readOrchestratorState(root)).migration_receipt.from_revision, 3);
   assert.equal(readFileSync(join(root, '.ctxroute/worktrees/legacy/evidence.txt'), 'utf8'), 'preserve');
+  assert.equal(readFileSync(join(root, '.ctxroute/recovery/proof.patch'), 'utf8'), 'proof');
+  assert.equal(readFileSync(join(root, '.ctxroute/reports/report.json'), 'utf8'), 'report');
   assert.equal(existsSync(`${statePath}.lock`), false);
   writeFileSync(statePath, '{bad');
-  await assert.rejects(() => readOrchestratorState(root), /corrupt JSON/u);
+  await assert.rejects(() => bootstrapOrchestrator(root), /corrupt JSON/u);
   assert.equal(readFileSync(statePath, 'utf8'), '{bad');
   writeFileSync(statePath, JSON.stringify({ schemaVersion: 99 }));
-  await assert.rejects(() => readOrchestratorState(root), /unsupported schemaVersion 99/u);
+  await assert.rejects(() => bootstrapOrchestrator(root), /unsupported schemaVersion 99/u);
   assert.equal(JSON.parse(readFileSync(statePath)).schemaVersion, 99);
+});
+
+test('V1 reset refuses live, malformed, and symlinked state evidence without deletion', async () => {
+  const root = fixture();
+  const directory = join(root, '.ctxroute/orchestrator');
+  const statePath = join(directory, 'state.json');
+  const v1 = JSON.stringify({ schemaVersion: 1, revision: 3, mode: 'SWARM_ON', goals: [], skills: [], audits: [], transactions: [] });
+  mkdirSync(directory, { recursive: true }); writeFileSync(statePath, v1);
+  writeFileSync(`${statePath}.lock`, JSON.stringify({ token: 'live', pid: process.pid, created_at: new Date().toISOString() }));
+  await assert.rejects(() => bootstrapOrchestrator(root), /owner is alive/u);
+  assert.equal(readFileSync(statePath, 'utf8'), v1);
+  writeFileSync(`${statePath}.lock`, 'unrecognized');
+  await assert.rejects(() => bootstrapOrchestrator(root), /not recognized/u);
+  assert.equal(readFileSync(statePath, 'utf8'), v1);
+  const target = join(directory, 'actual-v1.json'); writeFileSync(target, v1);
+  unlinkSync(`${statePath}.lock`); unlinkSync(statePath); symlinkSync(target, statePath);
+  await assert.rejects(() => bootstrapOrchestrator(root), /regular file/u);
+  assert.equal(readFileSync(target, 'utf8'), v1);
 });
 
 test('stale dead locks recover but a live lock times out', async () => {
   const root = fixture();
-  await readOrchestratorState(root);
+  await bootstrapOrchestrator(root);
   const lock = join(root, '.ctxroute/orchestrator/state.json.lock');
   writeFileSync(lock, JSON.stringify({ token: 'stale', pid: 999999, created_at: '2020-01-01T00:00:00.000Z' }));
   const recovered = await transactOrchestrator(goalCommand(), root, { processAlive: () => false });
@@ -85,7 +115,9 @@ test('environment SWARM_OFF and explicit direct execution create no mission or w
 test('coordinated mission is isolated and completes only after orchestrator validation replay', async () => {
   const root = fixture(true);
   let state = (await transactOrchestrator(goalCommand(), root)).state;
-  const prepared = await prepareMission(missionCommand(state.revision), root);
+  const prepareCommand = missionCommand(state.revision);
+  prepareCommand.payload.mission.validations.push({ id: 'syntax-again', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 });
+  const prepared = await prepareMission(prepareCommand, root);
   let mission = prepared.state.goals[0].missions[0];
   assert.equal(mission.status, 'ASSIGNED');
   assert.equal(mission.response_format, 'worker-report-v2');
@@ -100,6 +132,9 @@ test('coordinated mission is isolated and completes only after orchestrator vali
   mission = result.state.goals[0].missions[0];
   assert.equal(mission.status, 'COMPLETED');
   assert.equal(mission.validation_receipt.status, 'PASSED');
+  const events = readFileSync(join(root, '.ctxroute/orchestrator/events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(events.filter(event => event.operation_id === 'report-one' && event.event_type === 'VALIDATION').length, 2);
+  assert.ok(events.some(event => event.operation_id === 'report-one' && event.transition === 'RUNNING->COMPLETED'));
   assert.deepEqual(validateWorkerReport(report), []);
 });
 
@@ -130,6 +165,40 @@ test('reconciliation preserves dirty terminal worktrees and removes only clean t
   assert.ok(reconciled.state.worktree_operations.some(item => item.classification === 'TERMINAL_DIRTY'));
 });
 
+test('reconciliation removes clean terminal worktrees but preserves clean revision divergence', async () => {
+  const root = fixture(true);
+  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let prepared = await prepareMission(missionCommand(state.revision), root);
+  const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
+  state = (await transactOrchestrator({ operation_id: 'cancel-clean', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
+  let reconciled = await reconcileWorktrees({ operation_id: 'reconcile-clean', expected_revision: state.revision, action: 'worktree.reconcile', payload: { repair: true } }, root);
+  assert.equal(existsSync(join(root, worktree)), false);
+  assert.ok(reconciled.state.worktree_operations.some(item => item.classification === 'TERMINAL_CLEAN'));
+
+  const second = missionCommand(reconciled.state.revision, 'prepare-diverged');
+  second.payload.mission.mission_id = 'mission-diverged';
+  prepared = await prepareMission(second, root);
+  const diverged = prepared.state.goals[0].missions.find(item => item.mission_id === 'mission-diverged').worktree_allocation.path;
+  writeFileSync(join(root, diverged, 'src/committed.mjs'), 'export const committed = true;\n');
+  git(join(root, diverged), ['add', '.']); git(join(root, diverged), ['commit', '-qm', 'test: preserve divergence']);
+  state = (await transactOrchestrator({ operation_id: 'cancel-diverged', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-diverged', status: 'CANCELLED' } }, root)).state;
+  reconciled = await reconcileWorktrees({ operation_id: 'reconcile-diverged', expected_revision: state.revision, action: 'worktree.reconcile', payload: { repair: true } }, root);
+  assert.equal(existsSync(join(root, diverged)), true);
+  assert.ok(reconciled.state.worktree_operations.some(item => item.mission_id === 'mission-diverged' && item.classification === 'NEEDS_ATTENTION'));
+});
+
+test('reconciliation never removes a worktree with an index lock', async () => {
+  const root = fixture(true);
+  const goal = await transactOrchestrator(goalCommand(), root);
+  const prepared = await prepareMission(missionCommand(goal.state.revision), root);
+  const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
+  const gitDirectory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-dir'], { cwd: join(root, worktree), encoding: 'utf8' }).trim();
+  writeFileSync(join(gitDirectory, 'index.lock'), 'live lock evidence');
+  const result = await reconcileWorktrees({ operation_id: 'reconcile-index-lock', expected_revision: prepared.state.revision, action: 'worktree.reconcile', payload: { repair: true } }, root);
+  assert.equal(existsSync(join(root, worktree)), true);
+  assert.ok(result.state.worktree_operations.some(item => item.mission_id === 'mission-one' && item.classification === 'NEEDS_ATTENTION'));
+});
+
 test('rollback captures a bounded recovery proof before force removal', async () => {
   const root = fixture(true);
   let state = (await transactOrchestrator(goalCommand(), root)).state;
@@ -151,7 +220,7 @@ test('worker authority and symlinked worktrees fail closed', async () => {
   mkdirSync(join(root, '.ctxroute/worktrees'), { recursive: true });
   symlinkSync(join(root, 'src'), join(root, '.ctxroute/worktrees/mission-one'));
   const state = (await transactOrchestrator(goalCommand(), root)).state;
-  await assert.rejects(() => prepareMission(missionCommand(state.revision), root), /symlink|already exists/u);
+  await assert.rejects(() => prepareMission(missionCommand(state.revision), root), /symlink|SYMLINK|already exists/u);
 });
 
 test('formal report and audit contracts reject unknown fields and conversational content', () => {
