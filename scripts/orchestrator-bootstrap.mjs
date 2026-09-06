@@ -57,8 +57,8 @@ export async function bootstrapOrchestrator(root = process.cwd(), dependencies =
     const status = causes.length ? 'BLOCKED' : reconciliation.results.some(item => ['TERMINAL_CLEAN', 'REGISTERED_PATH_MISSING', 'ORPHAN_REGISTERED_MISSING'].includes(item.classification)) ? 'DEGRADED' : 'READY';
     const classifications = reconciliation.results;
     const inventory_digest = createHash('sha256').update(stableJson(classifications)).digest('hex');
-    const report = { schemaVersion: 2, status, inventory_digest, classifications, causes, recovery_actions: status === 'BLOCKED' ? [...RECOVERY_ACTIONS] : [], changed: prepared.reset || prepared.initialized || prepared.cleaned || state.revision !== initialRevision };
-    assertOrchestratorContract('bootstrap-report-v2', report);
+    const report = { status, inventory_digest, classifications, causes, recovery_actions: status === 'BLOCKED' ? [...RECOVERY_ACTIONS] : [], changed: prepared.initialized || prepared.cleaned || state.revision !== initialRevision };
+    assertOrchestratorContract('bootstrap-report', report);
     return report;
   });
 }

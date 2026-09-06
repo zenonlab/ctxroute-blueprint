@@ -134,7 +134,7 @@ export async function rollbackMissionWorktree(mission, root = process.cwd(), dep
   const inventory = await inspectRollbackState(worktree, config, deps);
   const patch = await capturePatch(worktree, inventory.files, config, deps);
   const patchDigest = `sha256:${createHash('sha256').update(patch).digest('hex')}`;
-  const header = `${JSON.stringify({ schemaVersion: 1, mission_id: missionId, head: inventory.head, files: inventory.files, digest: patchDigest })}\n`;
+  const header = `${JSON.stringify({ mission_id: missionId, head: inventory.head, files: inventory.files, digest: patchDigest })}\n`;
   const proof = Buffer.concat([Buffer.from(header), patch]);
   if (proof.byteLength > config.rollbackBytes) throw categorized('ROLLBACK_PROOF_TOO_LARGE', `rollback proof exceeds ${config.rollbackBytes} bytes`);
   const recoveryRoot = resolve(root, config.recoveryRoot);
@@ -165,7 +165,7 @@ export async function recoverRollbackProof(missionId, root = process.cwd()) {
     let header;
     try { header = JSON.parse(bytes.subarray(0, newline).toString('utf8')); } catch { continue; }
     const patch = bytes.subarray(newline + 1);
-    if (header?.schemaVersion !== 1 || header.mission_id !== missionId || header.digest !== `sha256:${createHash('sha256').update(patch).digest('hex')}`) continue;
+    if (header?.mission_id !== missionId || header.digest !== `sha256:${createHash('sha256').update(patch).digest('hex')}`) continue;
     return { mission_id: missionId, status: 'ROLLED_BACK', proof: relativePath, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
   }
   throw categorized('ROLLBACK_PROOF_MISSING', 'pending rollback removed its worktree without a valid recovery proof');

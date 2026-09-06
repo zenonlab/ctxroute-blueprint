@@ -55,11 +55,11 @@ that registration themselves.
 
 ## Mission and evidence contracts
 
-JSON Schema 2020-12 is canonical. `MissionRequestV2` is the accepted request,
-`MissionRecordV2` is orchestrator-owned state, and `MissionViewV2` is the
+JSON Schema 2020-12 is canonical. `MissionRequest` is the accepted request,
+`MissionRecord` is orchestrator-owned state, and `MissionView` is the
 positive worker projection. A worker view contains only mission identity,
 relative file scope, skill/version, acceptance criteria, structured
-validations, `response_format: worker-report-v2`, and its managed worktree
+validations, `response_format: worker-report`, and its managed worktree
 reference. Conversation, prompts, reasoning, history, and raw environment are
 rejected. Active missions with overlapping scopes are rejected before work;
 distinct concurrent missions receive distinct worktrees.
@@ -85,15 +85,13 @@ orchestrator state directly.
 
 ## Recovery and safety
 
-State schema V2 is stored under ignored `.ctxroute/orchestrator/` using a
+State is stored under ignored `.ctxroute/orchestrator/` using a
 tokenized global mutation lock, file and supported directory fsync, and atomic
 rename. Bootstrap runs before MCP startup and every mutating CLI operation; it
-resumes `PENDING` actions before accepting ordinary work. A recognized valid V1
-`state.json` is reread under that lock, deleted, and replaced with empty V2 state
-plus a revision/digest-only migration receipt. Ordinary reads never reset state.
-Live or unprovable V1 locks, symlinks, corrupt JSON, and unknown versions are
-refused without deletion. Worktrees, reports, and recovery evidence are never
-part of reset.
+resumes `PENDING` actions before accepting ordinary work. There is one current
+state contract and no migration or reset path. Symlinks, corrupt JSON, and
+unknown fields are refused without deletion. Worktrees, reports, and recovery
+evidence are never mutated by state loading.
 
 Reconciliation inventories desired missions, Git registrations, directories,
 cleanliness, base revisions, and locks. It automatically removes only clean
@@ -109,9 +107,9 @@ rollback evidence rather than arbitrary workflow step counts. Worktrees isolate
 concurrent write sets but are not sandboxes.
 
 Decision events are appended locally as mode-0600 JSONL with byte rotation.
-V2 emits one causally identified event per validation and transition, including
+The orchestrator emits one causally identified event per validation and transition, including
 bounded policy/schema identifiers, expurgated schema location, evidence digest,
-Git OID, outcome, and duration metadata only. V1 remains readable as history.
+Git OID, outcome, and duration metadata only.
 Append and Windows-compatible rotation share a lock. Prompts, conversation, private reasoning,
 environment dumps, raw output, file contents, and credentials are forbidden.
 Transactional state remains authoritative if telemetry fails.

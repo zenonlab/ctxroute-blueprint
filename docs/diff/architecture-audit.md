@@ -2,7 +2,7 @@
 
 Audit date: 2026-09-06. Scope: the checked-out `main` tree at `eb4b822`; repository runtime was not modified. This blueprint is local agent-orchestration tooling, not an HTTP application framework.
 
-This document preserves the observations at that audited revision. The V2
+This document preserves the observations at that audited revision. The current
 remediation addendum below records their disposition; it does not rewrite the
 historical evidence as though the defects had never existed.
 
@@ -106,10 +106,10 @@ Actions are SHA-pinned and permissions are narrow (`.github/workflows/validate.y
 5. **P2 — artifact generation:** progressively validate skill-produced artifacts and the evidence chain before transactional registration.
 6. **P3 — heavy industrial mechanisms:** no resident controller, hardware simulation, application canary, Kubernetes dependency, or HTTP framework unless a measured operational need appears.
 
-## V2 remediation addendum
+## Remediation addendum
 
 The accepted remediation moves persistence and public messages directly to
-schema V2, consolidates full-payload transaction replay, adds orchestrator-owned
+schema, consolidates full-payload transaction replay, adds orchestrator-owned
 validation, recoverable two-phase worktree operations, bounded decision
 telemetry, and a deterministic network-free HOOTL bench. Documentation and CI
 now describe only stdio/CLI/local-file interfaces and the actual Linux-full,

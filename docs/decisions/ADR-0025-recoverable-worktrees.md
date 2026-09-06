@@ -9,9 +9,9 @@ scope:
 review: on-change
 revised: true
 contracts:
-  - .project/schemas/orchestrator/worktree-operation-v2.schema.json
+  - .project/schemas/orchestrator/worktree-operation.schema.json
 ---
-# ADR-0025 — Recoverable worktree effects and V1 reset
+# ADR-0025 — Recoverable worktree effects
 
 - Status: accepted
 - Date: 2026-09-06
@@ -34,14 +34,10 @@ An unprovable intent or any `NEEDS_ATTENTION` inventory item blocks ordinary
 mutation while leaving read, doctor, reconciliation, rollback, and confirmed
 CLI purge available.
 
-At bootstrap, only the exact known V1 shape is recognized after the global lock
-has been acquired and the file has been reread. Ordinary state reads never
-perform migration. A live or unprovable V1 lock, a symlink, corrupt JSON, or an
-unknown version fails closed without deletion. Exactly its `state.json`, an
-inactive recognized lock, and known same-directory temporary files are removed,
-then an empty V2 state is installed atomically with a receipt containing only
-the V1 revision and SHA-256 digest. Worktrees, reports, and recovery proofs are
-never part of this reset.
+There is one state contract and no migration path. A symlink, corrupt JSON, or
+state outside that contract fails closed without deletion. Bootstrap may remove
+only recognized dead temporary files created by atomic state writes. Worktrees,
+reports, and recovery proofs are never reset as a side effect of loading state.
 
 Reconciliation compares desired missions, Git worktree registrations, physical
 directories, cleanliness, base revisions, locks, and disk budget. It removes

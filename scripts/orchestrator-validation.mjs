@@ -36,7 +36,7 @@ export async function runMissionValidations(mission, worktree, root = process.cw
   }
   const status = results.some(item => item.status === 'TIMED_OUT') ? 'TIMED_OUT' : results.some(item => item.status !== 'PASSED') ? 'FAILED' : 'PASSED';
   const receipt = { receipt_id: `receipt-${mission.mission_id}-${now().getTime()}`, mission_id: mission.mission_id, status, results, completed_at: now().toISOString() };
-  assertOrchestratorContract('validation-receipt-v2', receipt);
+  assertOrchestratorContract('validation-receipt', receipt);
   return receipt;
 }
 

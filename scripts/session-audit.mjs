@@ -46,7 +46,6 @@ export async function auditSessions({ sessionPaths, approvedRoots, excludedPaths
   if (skippedExcluded) signals.push('self-traces-excluded');
   if (!signals.length) signals.push('no-defect-detected');
   return {
-    schemaVersion: 2,
     audit_id: `audit-${safeIdentifier(mission?.mission_id ?? 'session-traces')}`,
     audit_type: 'session-audit',
     subject: { type: mission ? 'mission' : 'blueprint', id: safeText(mission?.mission_id ?? 'session-traces') },

@@ -1,11 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ctxroute.dev/schemas/crg-risk-acceptance-v1.schema.json",
-  "title": "CrgRiskAcceptanceV1",
+  "$id": "https://ctxroute.dev/schemas/crg-risk-acceptance.schema.json",
+  "title": "CrgRiskAcceptance",
   "type": "object",
-  "required": ["schemaVersion", "pr", "sha", "score", "risk", "threshold", "report_digest", "approver", "justification", "tracking_issue", "approved_at"],
+  "required": ["pr", "sha", "score", "risk", "threshold", "report_digest", "approver", "justification", "tracking_issue", "approved_at"],
   "properties": {
-    "schemaVersion": { "const": 1 },
     "pr": { "type": "integer", "minimum": 1 },
     "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "score": { "type": "number", "minimum": 0, "maximum": 1 },

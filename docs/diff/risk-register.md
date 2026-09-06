@@ -25,14 +25,14 @@ Severity: Critical, High, Medium, Low. Probability: High, Medium, Low. Impact de
 | R-15 | Documentation attributes removed HTTP/Progress behavior and conflicts with current runtime/CI. | High | High | Maintainers infer nonexistent application HTTP capabilities and wrong gates. | P1 reconcile brief/ADRs/CI narrative in a separate documentation decision. |
 | R-16 | Duplicate active ADR number 0022 and no semantic/number uniqueness check. | High | High | Competing decisions appear simultaneously authoritative. | P1 add uniqueness/conflict validation; explicitly supersede/renumber through governance. |
 | R-17 | CI docs say blocking CRG high-risk gate while YAML uses `fail-on-risk: none`. | High | High | Expected merge protection is absent or miscommunicated. | P1 choose intended policy, then align YAML, tests and docs in one change. |
-| R-18 | Telemetry lacks timestamps/durations, effective mode source, Git before/after and categorical causes. | Medium | High | Incidents cannot be reconstructed reliably without raw logs. | P1 bounded redacted `DecisionEventV1`; retention by bytes. |
+| R-18 | Telemetry lacks timestamps/durations, effective mode source, Git before/after and categorical causes. | Medium | High | Incidents cannot be reconstructed reliably without raw logs. | P1 bounded redacted `DecisionEvent`; retention by bytes. |
 | R-19 | Power-loss durability after rename is unverified; containing directory is not fsynced. | Medium | Low | Latest state file may not be durable on some filesystems. | P0 fault-model documentation/test where feasible; P1 directory sync if portability allows. |
 | R-20 | Scope comparison is lexical and untested for symlinks, case folding and platform path rules. | High | Medium | Changes can be misclassified in edge filesystems. | P0 adversarial fixture matrix; canonicalize against real worktree root without following unsafe links. |
 
 ## Acceptance boundary
 
-The original observations and scores above remain the historical baseline. V2
-may close an implementation defect only when the matching contract and test in
+The original observations and scores above remain the historical baseline. An
+implementation defect may close only when the matching contract and test in
 [remediation-closure.md](remediation-closure.md) pass. Local tests do not prove
 hostile-process isolation, arbitrary-filesystem power-loss durability, hosted
 branch protection, or a production SLA.

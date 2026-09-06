@@ -1,15 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ctxroute.dev/schemas/orchestrator/config-v2.schema.json",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/config.schema.json",
   "type": "object",
-  "required": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+  "required": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
   "properties": {
-    "schemaVersion": { "const": 2 },
     "defaultMode": { "enum": ["SWARM_ON", "SWARM_OFF"] },
-    "statePath": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
-    "worktreeRoot": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
-    "recoveryRoot": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
-    "telemetryPath": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
+    "statePath": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "worktreeRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "recoveryRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "telemetryPath": { "$ref": "common.schema.json#/$defs/relativePath" },
     "limits": {
       "type": "object",
       "required": ["stateBytes", "reportBytes", "contextBytes", "lockTimeoutMs", "subprocessTimeoutMs", "parallelWorktrees", "minimumFreeBytes", "telemetryBytes", "recoveryBytes", "auditTraceBytes", "auditTraceFiles"],

@@ -1,7 +1,7 @@
 # Validation evidence
 
 This record separates executed commands from code inspection and external
-analogy. The first table preserves the 2026-09-06 pre-remediation audit. V2
+analogy. The first table preserves the 2026-09-06 pre-remediation audit. Current
 handoff evidence is appended separately so historical observations are not
 silently rewritten.
 
@@ -29,7 +29,7 @@ silently rewritten.
 
 External discovery used official-source web searches and direct reads for JSON Schema, OpenAPI, Kubernetes, Flux/OpenGitOps, Git, Node, GitHub Actions, Bazel/Google testing and Epsilon3. The source ledger and access limitations are in [external-research.md](external-research.md).
 
-### V2 governance remediation
+### Governance remediation
 
 | Command | Result | What it proves |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ External discovery used official-source web searches and direct reads for JSON S
 | `npm run validate:decisions` | PASS: 25 active decisions, 163 scopes at this checkpoint | The active ADR corpus has unique numeric identifiers and valid supersession references; retired ADRs are outside that corpus. |
 | `npm run validate:docs -- --all` | PASS | Updated active documentation and local links satisfy the document-contract checks. |
 
-The full V2 command set and final counts belong to the release handoff after all
+The full command set and final counts belong to the release handoff after all
 implementation milestones converge. The closure matrix in
 [remediation-closure.md](remediation-closure.md) defines that gate.
 
@@ -47,7 +47,7 @@ implementation milestones converge. The closure matrix in
 - The targeted orchestration suite uses real temporary Git repositories and predetermined reports, but does not inject network calls, LLM calls, timeouts, kill signals or multi-process races (`tests/orchestrator-core.test.mjs:145-161`).
 - Atomic rename behavior is code-observed; abrupt power-loss durability was not tested.
 - The original “no runtime modification” result applies only to the audited
-  `eb4b822` diff. V2 remediation intentionally changes runtime and governance.
+  `eb4b822` diff. Remediation intentionally changes runtime and governance.
 - No remote GitHub Actions run was triggered. Local validation cannot prove repository settings, branch protection, hosted-runner behavior or secrets configuration.
 - No Epsilon3 product instance was accessed. Publisher claims remain analogies.
 - No HTTP application flow was found in the current orchestrator. Historical Progress/dashboard documentation is explicitly classified as stale documentation, not implementation.

@@ -1,13 +1,13 @@
 ---
 scope:
-  - .github/schemas/crg-risk-acceptance-v1.schema.json
+  - .github/schemas/crg-risk-acceptance.schema.json
   - .github/workflows/code-review-graph*.yml
   - scripts/crg-disposition.mjs
   - tests/crg-disposition.test.mjs
 review: on-change
 revised: true
 contracts:
-  - .github/schemas/crg-risk-acceptance-v1.schema.json
+  - .github/schemas/crg-risk-acceptance.schema.json
 ---
 # ADR-0028 — Privileged CRG disposition
 
@@ -23,7 +23,7 @@ artifact and report digest, passes risk below `high`, and otherwise requires an
 `APPROVED` review on the exact SHA from a repository administrator other than
 the PR author. The review body supplies a 32–512 character justification and a
 tracking issue reference. Accepted high/critical risk produces a bounded
-`CrgRiskAcceptanceV1` attestation. A new SHA or report digest cannot reuse it.
+`CrgRiskAcceptance` attestation. A new SHA or report digest cannot reuse it.
 
 The acceptance review must contain `Justification:`, a tracking issue, and
 `CRG-report-sha256:<digest>`. This is the only exceptional acceptance path;

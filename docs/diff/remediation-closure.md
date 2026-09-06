@@ -1,6 +1,6 @@
-# V2 remediation closure
+# Remediation closure
 
-This matrix links the historical R-01…R-20 observations to the V2 delivery
+This matrix links the historical R-01…R-20 observations to the delivered
 scope and its executable evidence. Commit references use the coherent commit
 subject so they remain stable across rebases; the release handoff records the
 final hashes and command results. `PASS` means the cited behavior is exercised
