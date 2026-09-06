@@ -4,9 +4,10 @@
   "meta": {
     "title": "CTXRoute Blueprint Control Plane",
     "quality_profile": "showcase",
-    "viewBox": [1280, 520],
+    "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "workers", "lifecycle", "ctxroute", "crg", "graph"], "note": "The orchestrator owns goals and minimal missions; CTXRoute resolves context on demand; workers receive no global history." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The V2 orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
+      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "Pending intent is authoritative; reconciliation preserves ambiguous worktrees and rollback captures bounded evidence first." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -25,6 +26,12 @@
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [1060, 230], "size": [170, 60] },
     { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Matrix + fork-safe review", "pos": [1060, 410], "size": [190, 60] },
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
+    ,{ "id": "contracts", "type": "security", "label": "V2 contract registry", "sublabel": "JSON Schema 2020-12 + Ajv", "pos": [280, 410], "size": [210, 60] }
+    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "V2 intent + receipts", "pos": [540, 410], "size": [190, 60] }
+    ,{ "id": "validation", "type": "backend", "label": "Validation runner", "sublabel": "execFile / no shell", "pos": [30, 580], "size": [190, 60] }
+    ,{ "id": "worktrees", "type": "database", "label": "Managed worktrees", "sublabel": "reconciled Git state", "pos": [280, 580], "size": [210, 60] }
+    ,{ "id": "recovery", "type": "database", "label": "Recovery proofs", "sublabel": "bounded restorable patch", "pos": [540, 580], "size": [190, 60] }
+    ,{ "id": "telemetry", "type": "database", "label": "Decision events", "sublabel": "bounded JSONL rotation", "pos": [790, 580], "size": [190, 60] }
   ],
   "connections": [
     { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "six lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
@@ -34,7 +41,7 @@
     { "id": "agents-orchestrator", "from": "agents", "to": "orchestrator", "label": "MCP or CLI transaction", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [110, 170] },
     { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "targeted mission", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [315, 140] },
     { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
-    { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [275, 350] },
+    { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
@@ -42,5 +49,12 @@
     { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned PR risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
     { "id": "ci-archify", "from": "githubActions", "to": "archify", "label": "build + visual-check", "fromSide": "right", "toSide": "right", "via": [[1260, 440], [1260, 80]], "labelAt": [1195, 320] },
     { "id": "ci-artifacts", "from": "githubActions", "to": "ciArtifacts", "label": "publish bounded evidence", "labelAt": [1020, 484] }
+    ,{ "id": "contracts-orchestrator", "from": "contracts", "to": "orchestrator", "label": "validate every boundary", "variant": "security", "fromSide": "top", "toSide": "right", "via": [[385, 380], [240, 380], [240, 260]], "labelAt": [320, 395] }
+    ,{ "id": "orchestrator-state", "from": "orchestrator", "to": "state", "label": "PENDING then terminal receipt", "variant": "emphasis", "fromSide": "right", "toSide": "top", "via": [[230, 260], [230, 325], [635, 325]], "labelAt": [480, 310] }
+    ,{ "id": "workers-validation", "from": "workers", "to": "validation", "label": "declared report", "fromSide": "bottom", "toSide": "top", "labelAt": [105, 535] }
+    ,{ "id": "validation-orchestrator", "from": "validation", "to": "orchestrator", "label": "orchestrator receipt", "variant": "security", "fromSide": "left", "toSide": "left", "via": [[10, 610], [10, 260]], "labelAt": [45, 520] }
+    ,{ "id": "state-worktrees", "from": "state", "to": "worktrees", "label": "desired versus actual", "fromSide": "bottom", "toSide": "top", "labelAt": [460, 535] }
+    ,{ "id": "worktrees-recovery", "from": "worktrees", "to": "recovery", "label": "capture before rollback", "variant": "security", "labelAt": [510, 655] }
+    ,{ "id": "state-telemetry", "from": "state", "to": "telemetry", "label": "secondary redacted events", "fromSide": "bottom", "toSide": "top", "via": [[635, 520], [885, 520]], "labelAt": [780, 505] }
   ]
 }
