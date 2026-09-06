@@ -49,6 +49,11 @@ authenticated format/version context. Only the strict ciphertext envelope may
 cross the backup adapter. Restore decrypts and validates the complete private
 export before calling the existing confirmed atomic replacement once.
 
+Local Agenda reads use canonical half-open time ranges through `StorageReadPort`.
+Memory and Dexie adapters enforce the same maximum of 100 ordered entries; the
+application joins Work records after the bounded query and reports missing
+local references instead of requesting remote replacements.
+
 ## Consequences
 
 Clearing a disposable cache can be repaired from stable catalogue IDs. Losing

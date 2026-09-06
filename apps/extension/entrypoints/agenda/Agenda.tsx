@@ -56,10 +56,6 @@ export function Agenda({
         <FeedbackState description="Lecture des sorties enregistrées pour la période." kind="loading" title="Préparation de l’agenda…" />
       ) : null}
 
-      {state === 'empty' ? (
-        <FeedbackState description="Aucune date officielle, confirmée ou estimée pour cette période." kind="empty" title="Aucune sortie connue" />
-      ) : null}
-
       {state === 'error' ? (
         <FeedbackState
           action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>}

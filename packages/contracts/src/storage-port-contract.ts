@@ -1,5 +1,5 @@
 import type { StoragePort } from '@tobirink/application';
-import { createFavoriteSource, createLibrary, createProgress, createReview, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
+import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createReview, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`StoragePort contract failed: ${message}`);
@@ -13,13 +13,15 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   const progress = createProgress({ id: progressId('progress_contract'), kind: 'chapter', value: 12, workId: id });
   const review = createReview({ id: reviewId('review_contract'), matchedWorkId: id, sourceLabel: 'Source contractuelle', status: 'resolved', title: work.preferredTitle });
   const source = createFavoriteSource({ bookmarkId: 'bookmark-contract', folderPath: ['Lectures'], id: favoriteSourceId('source_contract'), importedAt: '2026-09-05T20:00:00.000Z', order: 0, reviewId: review.id, title: work.preferredTitle, url: 'https://reader.example/work/contract' });
+  const agenda = createAgendaEntry({ availability: 'official', id: agendaEntryId('agenda_contract'), occursAt: '2026-09-08T10:00:00.000Z', releaseLabel: 'Episode contractuel', workId: id });
 
-  await storage.transaction(['works', 'libraries', 'progress', 'reviews', 'favoriteSources'], async (session) => {
+  await storage.transaction(['works', 'libraries', 'progress', 'reviews', 'favoriteSources', 'agenda'], async (session) => {
     await session.putWork(work);
     await session.putLibrary(library);
     await session.putProgress(progress);
     await session.putReview(review);
     await session.putFavoriteSource(source);
+    await session.putAgendaEntry(agenda);
   });
   assert((await storage.getWork(id))?.preferredTitle === 'Contract work', 'work round-trip');
   assert((await storage.getLibrary(library.id))?.workIds[0] === id, 'library round-trip');
@@ -30,6 +32,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.listFavoriteSources({ afterId: source.id, limit: 1 })).length === 0, 'favorite source stable cursor');
   assert((await storage.listReviews({ limit: 1, status: 'resolved' }))[0]?.id === review.id, 'review bounded status listing');
   assert((await storage.listReviews({ limit: 1, status: 'pending' })).length === 0, 'review status filtering');
+  assert((await storage.listAgendaEntries({ from: '2026-09-08T00:00:00.000Z', limit: 1, to: '2026-09-09T00:00:00.000Z' }))[0]?.id === agenda.id, 'agenda bounded period listing');
 
   let duplicateBookmarkRejected = false;
   try {
@@ -62,6 +65,14 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     reviewLimitRejected = true;
   }
   assert(reviewLimitRejected, 'review listing must enforce its bound');
+
+  let agendaLimitRejected = false;
+  try {
+    await storage.listAgendaEntries({ from: '2026-09-08T00:00:00.000Z', limit: 101, to: '2026-09-09T00:00:00.000Z' });
+  } catch {
+    agendaLimitRejected = true;
+  }
+  assert(agendaLimitRejected, 'agenda listing must enforce its bound');
 
   let scopeRejected = false;
   try {

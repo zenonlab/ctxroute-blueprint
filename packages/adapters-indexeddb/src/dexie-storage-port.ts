@@ -1,3 +1,4 @@
+import { assertAgendaEntryListQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
@@ -65,6 +66,13 @@ export class DexieStoragePort implements StoragePort {
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
       getWork: async (id: WorkId) => { requireStore('works'); const work = await this.database.works.get(id); return work && createWork(work); },
+      listAgendaEntries: async (query) => {
+        requireStore('agenda');
+        assertAgendaEntryListQuery(query);
+        return (await this.database.agenda.where('occursAt').between(query.from, query.to, true, false).limit(query.limit).toArray())
+          .map(createAgendaEntry)
+          .sort((left, right) => (left.occursAt ?? '').localeCompare(right.occursAt ?? '') || left.id.localeCompare(right.id));
+      },
       listFavoriteSources: async ({ afterId, limit }) => {
         requireStore('favoriteSources');
         if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Favorite source page limit must be an integer between 1 and 100.');
@@ -103,6 +111,7 @@ export class DexieStoragePort implements StoragePort {
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);

@@ -1,3 +1,4 @@
+import { assertAgendaEntryListQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import type {
   AgendaEntry,
@@ -62,6 +63,14 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
     getReminder: async (id: ReminderId) => { requireStore('reminders'); return state.reminders.get(id); },
     getReview: async (id: ReviewId) => { requireStore('reviews'); return state.reviews.get(id); },
     getWork: async (id: WorkId) => { requireStore('works'); return state.works.get(id); },
+    listAgendaEntries: async (query) => {
+      requireStore('agenda');
+      assertAgendaEntryListQuery(query);
+      return [...state.agenda.values()]
+        .filter((entry) => entry.occursAt !== undefined && entry.occursAt >= query.from && entry.occursAt < query.to)
+        .sort((left, right) => (left.occursAt ?? '').localeCompare(right.occursAt ?? '') || left.id.localeCompare(right.id))
+        .slice(0, query.limit);
+    },
     listFavoriteSources: async ({ afterId, limit }) => {
       requireStore('favoriteSources');
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Favorite source page limit must be an integer between 1 and 100.');
@@ -110,6 +119,7 @@ export class MemoryStoragePort implements StoragePort {
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);

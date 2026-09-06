@@ -43,6 +43,11 @@ produce a partial local snapshot instead of being silently replaced; the page
 request performs no remote lookup and React receives only a strict serialized
 projection.
 
+Agenda uses the same boundary for half-open weekly `occursAt` ranges. The
+storage port returns at most 100 ordered entries, the application joins only
+their local Work records, and a missing Work makes the serialized period
+partial without triggering catalogue traffic.
+
 On the explicit extension installation or update event, the browser adapter
 reads the bookmark tree and emits serializable records with their folder path
 and sibling order. The application imports HTTP(S) entries into IndexedDB in

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   blockTask,
@@ -68,6 +69,14 @@ class MemoryTaskStore implements TaskStorePort {
 }
 
 describe('agenda notifications', () => {
+  it('routes local Agenda periods through the background without a remote read', () => {
+    const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
+    const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
+    expect(background).toMatch(/readAgendaPeriod\(privateStorage\.storage, parsed\.data\)/);
+    expect(surface).toMatch(/useLocalAgenda\(\)/);
+    expect(surface).not.toMatch(/days=\{\[\]\}/);
+  });
+
   it('never schedules a native notification from an estimate alone', async () => {
     const tasks = new MemoryTaskStore();
     const estimated = createAgendaEntry({

@@ -32,6 +32,7 @@ describe('Agenda surface', () => {
     expect(css).toMatch(/grid-template-columns: repeat\(7, 11\.25rem\)/);
     expect(preview).toContain('Semaine de 7 jours');
     expect(component).not.toContain('>Aucune sortie</p>');
+    expect(component).not.toContain('Aucune sortie connue');
     expect(css).not.toContain('.emptyDay');
   });
 

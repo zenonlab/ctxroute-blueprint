@@ -24,6 +24,25 @@ export interface FavoriteSourcePageQuery {
   limit: number;
 }
 
+export const agendaEntryListLimit = 100;
+
+export interface AgendaEntryListQuery {
+  from: string;
+  limit: number;
+  to: string;
+}
+
+export function assertAgendaEntryListQuery(query: AgendaEntryListQuery): void {
+  const from = new Date(query.from);
+  const to = new Date(query.to);
+  const canonical = !Number.isNaN(from.valueOf()) && !Number.isNaN(to.valueOf())
+    && from.toISOString() === query.from && to.toISOString() === query.to;
+  if (!canonical || from >= to) throw new TypeError('Agenda period requires increasing canonical ISO bounds.');
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > agendaEntryListLimit) {
+    throw new RangeError('Agenda entry limit must be an integer between 1 and 100.');
+  }
+}
+
 export interface ReviewListQuery {
   limit: number;
   status: ReviewStatus;
@@ -38,6 +57,7 @@ export interface StorageReadPort {
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
+  listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
   listReviews(query: ReviewListQuery): Promise<readonly Review[]>;
 }

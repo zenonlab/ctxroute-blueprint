@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extensionMessageSchema, libraryPageResponseSchema, reviewQueueResponseSchema } from './messages';
+import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, reviewQueueResponseSchema } from './messages';
 
 describe('extension Review messages', () => {
   it('accepts only the exact versioned queue read command', () => {
@@ -21,6 +21,20 @@ describe('extension Review messages', () => {
       ok: true,
       snapshot: { items: [{ id: 'invalid', sourceLabel: '', title: '' }], status: 'pending' },
     }).success).toBe(false);
+  });
+});
+
+describe('extension Agenda messages', () => {
+  it('validates period commands and bounded local projections', () => {
+    expect(extensionMessageSchema.safeParse({ from: '2026-09-07T00:00:00.000Z', to: '2026-09-14T00:00:00.000Z', type: 'agenda.period.read', version: 1 }).success).toBe(true);
+    expect(agendaPeriodResponseSchema.safeParse({
+      ok: true,
+      snapshot: {
+        items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', title: 'Frieren', workId: 'work_frieren-one' }],
+        missingWorkIds: [],
+      },
+    }).success).toBe(true);
+    expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { items: Array.from({ length: 101 }, () => ({})), missingWorkIds: [] } }).success).toBe(false);
   });
 });
 

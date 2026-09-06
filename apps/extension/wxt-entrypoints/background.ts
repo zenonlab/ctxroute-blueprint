@@ -1,4 +1,4 @@
-import { importFavoriteSources, readLibraryPage, readPopupContext, readReviewQueue } from '@tobirink/application';
+import { importFavoriteSources, readAgendaPeriod, readLibraryPage, readPopupContext, readReviewQueue } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
@@ -58,6 +58,30 @@ export default defineBackground({
           };
         } catch {
           return { error: 'library-page-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'agenda.period.read') {
+        try {
+          await privateStorage.ensureReady();
+          const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);
+          return {
+            ok: true,
+            snapshot: {
+              items: snapshot.items.map(({ entry, work }) => ({
+                availability: entry.availability,
+                id: entry.id,
+                mediaType: work.mediaKind,
+                occursAt: entry.occursAt,
+                release: entry.releaseLabel,
+                source: work.externalReferences[0]?.provider ?? work.mediaKind,
+                title: work.preferredTitle,
+                workId: work.id,
+              })),
+              missingWorkIds: snapshot.missingWorkIds,
+            },
+          };
+        } catch {
+          return { error: 'agenda-period-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'popup.context.read') {

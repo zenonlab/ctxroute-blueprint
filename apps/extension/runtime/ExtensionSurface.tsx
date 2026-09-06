@@ -11,6 +11,7 @@ import { Review } from '../entrypoints/review';
 import type { NavigationTarget } from './messages';
 import { readLibraryPageMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
 import type { LibraryPageResponse } from './messages';
+import { useLocalAgenda } from './use-local-agenda';
 import { useLocalReviewNavigation } from './use-local-review-navigation';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
@@ -105,7 +106,8 @@ function ReviewSurface() {
 
 function AgendaSurface() {
   const navigation = useLocalReviewNavigation('agenda');
-  return <Agenda canNext={false} canPrevious={false} days={[]} navigation={navigation} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel="Cette semaine" state="empty" updatedAt="Jamais" />;
+  const agenda = useLocalAgenda();
+  return <Agenda {...agenda} navigation={navigation} />;
 }
 
 function OptionsSurface() {
