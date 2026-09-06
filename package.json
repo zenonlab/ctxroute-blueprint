@@ -53,6 +53,7 @@
     "crg:smoke": "node scripts/crg-smoke.mjs",
     "governance:check": "node scripts/agent-governance.mjs context.scope",
     "orchestrator:read": "node scripts/orchestrator-cli.mjs read",
+    "orchestrator:doctor": "node scripts/orchestrator-cli.mjs doctor",
     "orchestrator:cli": "node scripts/orchestrator-cli.mjs",
     "orchestrator:mcp": "node scripts/orchestrator-mcp.mjs",
     "orchestrator:contracts": "node scripts/validate-orchestrator-contracts.mjs",

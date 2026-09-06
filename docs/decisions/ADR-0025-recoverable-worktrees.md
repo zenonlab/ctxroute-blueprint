@@ -25,11 +25,23 @@ rename, and directory fsync where supported. Locks contain a token, PID, and
 timestamp; recovery requires an unchanged token, a dead local owner, and an
 expired age.
 
-At first orchestrator access, only a structurally valid V1 state is recognized.
-Exactly its `state.json`, lock, and known same-directory temporary files are
-removed, then an empty V2 state is installed atomically. Worktrees, reports,
-and recovery proofs are never part of this reset. Corrupt JSON, unsafe paths,
-and unknown or higher schema versions fail closed without deletion.
+A central bootstrap runs before MCP service startup and before every mutating
+CLI operation. It holds a distinct global mutation lock across state intent,
+the complete Git effect, and the terminal receipt. A lock may be recovered only
+after its token is stable and its owner PID is dead; age alone never permits
+recovery. Bootstrap inventories and resumes every recoverable `PENDING` action.
+An unprovable intent or any `NEEDS_ATTENTION` inventory item blocks ordinary
+mutation while leaving read, doctor, reconciliation, rollback, and confirmed
+CLI purge available.
+
+At bootstrap, only the exact known V1 shape is recognized after the global lock
+has been acquired and the file has been reread. Ordinary state reads never
+perform migration. A live or unprovable V1 lock, a symlink, corrupt JSON, or an
+unknown version fails closed without deletion. Exactly its `state.json`, an
+inactive recognized lock, and known same-directory temporary files are removed,
+then an empty V2 state is installed atomically with a receipt containing only
+the V1 revision and SHA-256 digest. Worktrees, reports, and recovery proofs are
+never part of this reset.
 
 Reconciliation compares desired missions, Git worktree registrations, physical
 directories, cleanliness, base revisions, locks, and disk budget. It removes

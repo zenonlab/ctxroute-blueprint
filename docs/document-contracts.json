@@ -174,6 +174,28 @@
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
+      "id": "orchestrator-decision-event-v2-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/decision-event-v2.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-bootstrap-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/bootstrap-report-v2.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "crg-risk-acceptance-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".github/schemas/crg-risk-acceptance-v1.schema.json",
+      "narrative": "docs/ci.md",
+      "requiredKeys": ["$schema", "$id", "additionalProperties"]
+    },
+    {
       "id": "architecture-audit",
       "kind": "architecture-audit",
       "format": "markdown",

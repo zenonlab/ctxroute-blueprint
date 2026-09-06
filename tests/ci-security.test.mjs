@@ -37,3 +37,16 @@ test('trusted commenter never checks out code and validates the complete artifac
     assert.ok(workflow.includes(proof), proof);
   }
 });
+
+test('privileged CRG disposition is exact-SHA, report-bound, admin-only, and never checks out PR code', () => {
+  const workflow = read('.github/workflows/code-review-graph-disposition.yml');
+  assert.match(workflow, /name: CRG disposition/u);
+  assert.match(workflow, /checks: write/u);
+  assert.match(workflow, /pull_request_review:/u);
+  assert.match(workflow, /name: 'CRG disposition'/u);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
+  assert.doesNotMatch(workflow, /ref:.*head\.sha/u);
+  for (const proof of ['report sha256:', 'getCollaboratorPermissionLevel', 'persist-credentials: false', 'MAX_ARCHIVE_BYTES']) assert.ok(workflow.includes(proof), proof);
+  const policy = read('scripts/crg-disposition.mjs');
+  for (const proof of ["!== 'admin'", 'CRG-report-sha256:', 'review.commit_id !== context.sha', 'login === context.author']) assert.ok(policy.includes(proof), proof);
+});
