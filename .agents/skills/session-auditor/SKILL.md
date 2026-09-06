@@ -15,11 +15,14 @@ directly when an audit signal exists.
 
 ## Workflow
 
-1. Obtain the mission contract and trace paths. Treat `.codex/sessions` as an
-   opportunistic source, never a runtime API.
-2. Run `node scripts/session-audit.mjs --mission <mission.json> <trace...>`.
+1. Obtain the mission contract, trace paths, and explicit approved trace roots.
+   Treat `.codex/sessions` as an opportunistic source, never a runtime API.
+2. Run `node scripts/session-audit.mjs --root <approved-absolute-root>
+   --mission <mission.json> --current-session <current-trace>
+   --output <this-audit-output> <trace...>`.
    Use only its redacted compact output; never paste or load a raw trace into
-   the primary conversation.
+   the primary conversation. Only regular, non-symlinked, inactive traces under
+   an approved root are eligible; the audit's mission and output are excluded.
 3. Compare mission, selected skill/version, touched files, required commands,
    exit codes, material evidence, and actual result. Classify defects as skill,
    context, decomposition, validation, or orchestration failures.

@@ -1,8 +1,16 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "skillId": "blueprint-audit",
   "version": "1.0.0",
   "modes": ["SWARM_ON", "SWARM_OFF"],
   "mutationAuthority": "orchestrator",
-  "validation": ["npm run blueprint:review", "npm run verify"]
+  "validations": [
+    {
+      "id": "reviewer-syntax",
+      "executable": "node",
+      "args": ["--check", "scripts/blueprint-review.mjs"],
+      "cwd": ".",
+      "timeout_ms": 30000
+    }
+  ]
 }

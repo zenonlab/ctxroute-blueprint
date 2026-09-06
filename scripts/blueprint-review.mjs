@@ -1,10 +1,26 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { trackedControlFiles } from './blueprint-sync.mjs';
 import { validateBlueprintSkills } from './validate-blueprint-skills.mjs';
+
+export const REQUIRED_SKILL_RUNTIME = Object.freeze([
+  'scripts/blueprint-review.mjs',
+  'scripts/session-audit.mjs',
+  'scripts/validate-blueprint-skills.mjs',
+  'scripts/verify-blueprint-skills.mjs',
+  '.agents/skills/blueprint-audit/SKILL.md',
+  '.agents/skills/blueprint-audit/blueprint.json',
+  '.agents/skills/session-auditor/SKILL.md',
+  '.agents/skills/session-auditor/blueprint.json',
+  '.agents/skills/skill-creator/SKILL.md',
+  '.agents/skills/skill-creator/blueprint.json',
+]);
 
 export function reviewBlueprint(root = process.cwd()) {
   const errors = [...validateBlueprintSkills(root)];
+  errors.push(...validateRuntimeAllowlist(root));
   const runtimePaths = ['package.json', '.mcp.json', '.codex/config.toml', '.codex/hooks/lifecycle.mjs', '.codex/hooks/stop-review.mjs', 'scripts/integration-check.mjs', 'scripts/validate-mcp-installation.mjs'];
   for (const path of runtimePaths) {
     const source = readFileSync(`${root}/${path}`, 'utf8');
@@ -21,6 +37,28 @@ export function reviewBlueprint(root = process.cwd()) {
     errors: [...new Set(errors)],
     rollback: changed.length ? 'revert the reviewed commit or apply the orchestrator-recorded inverse patch' : 'not required',
   };
+}
+
+export function validateRuntimeAllowlist(root = process.cwd()) {
+  const selected = new Set(trackedControlFiles(root));
+  const errors = REQUIRED_SKILL_RUNTIME.filter(file => !selected.has(file)).map(file => `blueprint runtime allowlist omits ${file}`);
+  for (const file of selected) {
+    if (!/\.(?:[cm]?js)$/iu.test(file)) continue;
+    const source = readFileSync(resolve(root, file), 'utf8');
+    for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/gu)) {
+      const dependency = resolveLocalDependency(root, file, match[1]);
+      if (dependency && !selected.has(dependency)) errors.push(`blueprint runtime allowlist omits transitive dependency ${dependency} imported by ${file}`);
+    }
+  }
+  return [...new Set(errors)];
+}
+
+function resolveLocalDependency(root, importer, specifier) {
+  const candidate = resolve(dirname(resolve(root, importer)), specifier);
+  for (const path of [candidate, `${candidate}.mjs`, `${candidate}.js`, `${candidate}.cjs`, `${candidate}.json`, resolve(candidate, 'index.mjs'), resolve(candidate, 'index.js')]) {
+    if (existsSync(path)) return relative(root, path).replaceAll('\\', '/');
+  }
+  return null;
 }
 
 function changedFiles(root) {

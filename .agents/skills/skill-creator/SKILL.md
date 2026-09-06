@@ -29,6 +29,9 @@ for deterministic mechanics and references only for conditional detail. Never
 make swarm mode reduce a skill's tools or capabilities.
 
 Validate the manifest with `node scripts/validate-blueprint-skills.mjs` and
-exercise any added scripts. Then invoke the `blueprint-audit` skill. Return the
+execute its structured validations through `npm run skills:verify`. A skill
+validation must never invoke the repository-wide `validate`, `verify`,
+`blueprint:review`, or `skills:verify` scripts recursively. Then invoke the
+`blueprint-audit` skill. Return the
 decision and evidence to the orchestrator, which alone registers the skill and
 associates it with future missions.
