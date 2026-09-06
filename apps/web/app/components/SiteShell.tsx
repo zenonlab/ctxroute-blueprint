@@ -1,7 +1,7 @@
 'use client';
 
 import { MemberNavigation } from '@tobirink/ui';
-import type { ReviewDecision, ReviewResolverProps } from '@tobirink/ui';
+import type { MemberNavigationConfig, ReviewDecision, ReviewResolverProps } from '@tobirink/ui';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { WebBridgeProvider, useWebBridge } from './WebBridgeProvider';
@@ -14,7 +14,7 @@ function activeNavigation(pathname: string) {
   return 'home' as const;
 }
 
-function ConnectedShell({ children }: Readonly<{ children: ReactNode }>) {
+export function useWebMemberNavigation(): MemberNavigationConfig {
   const router = useRouter();
   const pathname = usePathname();
   const { bootstrap, decideReview, refreshReview, review, status } = useWebBridge();
@@ -52,20 +52,21 @@ function ConnectedShell({ children }: Readonly<{ children: ReactNode }>) {
     onSubmitDecision: submitDecision,
     state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' ? 'empty' : 'offline',
   };
-  return (
-    <MemberNavigation
-      activeId={activeNavigation(pathname)}
-      onSearch={(query) => router.push(query ? `/library?search=${encodeURIComponent(query)}` : '/library')}
-      review={{ count: bootstrap?.pendingReviewCount ?? 0, resolver }}
-      routes={memberRoutes}
-    >
-      {children}
-    </MemberNavigation>
-  );
+  return {
+    activeId: activeNavigation(pathname),
+    onSearch: (query) => router.push(query ? `/library?search=${encodeURIComponent(query)}` : '/library'),
+    review: { count: bootstrap?.pendingReviewCount ?? 0, resolver },
+    routes: memberRoutes,
+  };
+}
+
+export function WebMemberShell({ children }: Readonly<{ children: ReactNode }>) {
+  const navigation = useWebMemberNavigation();
+  return <MemberNavigation {...navigation}>{children}</MemberNavigation>;
 }
 
 export function SiteShell({ children }: Readonly<{ children: ReactNode }>) {
-  return <WebBridgeProvider><ConnectedShell>{children}</ConnectedShell></WebBridgeProvider>;
+  return <WebBridgeProvider><WebMemberShell>{children}</WebMemberShell></WebBridgeProvider>;
 }
 
 export function BridgeState() {

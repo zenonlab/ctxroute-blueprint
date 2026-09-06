@@ -12,6 +12,7 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 | Agenda | aucune sortie connue pour la période | squelette de groupes temporels | dates estimées séparées des dates confirmées | dernier agenda local daté et consultable | actualiser la période concernée | permission de notification refusée pour un rappel |
 | Réglages complets | arbre racine visible, invitation à créer un premier dossier | calcul de l’aperçu annoncé sans masquer l’arbre | règles locales visibles, métadonnées nécessaires absentes | édition et aperçu local restent disponibles | relire la configuration ou recalculer uniquement l’aperçu | organisateur indisponible si le message local ou IndexedDB échoue |
 | Workbench local | aucun résultat pour le filtre ou aucun composant découvert | chargement du module de preview sélectionné | preview disponible, fichier source facultatif absent | identique : aucune dépendance réseau nécessaire | recharger la preview isolée | erreur de compilation localisée avec chemin du fichier |
+| Site membre | semaine ou bibliothèque locale vide, sans carte synthétique | handshake puis projection concernée | dates estimées et champs locaux absents restent explicités | extension absente ou session expirée, sans projection privée | une reconnexion automatique puis nouvelle tentative explicite | version WebBridge incompatible et mise à jour requise |
 
 ## Règles communes
 
@@ -70,5 +71,12 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   le worker reprend les échéances manquées au démarrage et par alarme dédupliquée.
 - Les sept jours de l’Agenda restent côte à côte sur mobile dans un rail
   horizontal focusable; ils ne deviennent jamais une pile verticale infinie.
+- Le site distingue chargement, extension absente, reconnexion, incompatibilité,
+  connexion et erreur récupérable avant d’afficher une projection privée.
+- La Bibliothèque web conserve recherche et facette dans l’URL, retire le
+  curseur à chaque changement de filtre et demande au plus 24 œuvres.
+- L’Agenda web demande une seule période date-only lundi `[from,to)` par
+  changement de semaine; les heures et disponibilités viennent du timestamp
+  local projeté et ne sont jamais complétées par une fixture.
 - Le workbench isole l'échec d'une preview afin que le catalogue et les autres
   composants restent inspectables.

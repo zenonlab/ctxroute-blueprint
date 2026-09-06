@@ -227,11 +227,14 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
     setBootstrap(nextBootstrap);
   }, [rawRequest, withReconnect]);
 
+  const readAgenda = useCallback((from: string, to: string) => withReconnect(() => rawRequest({ from, to, type: 'agenda.read' }, webAgendaPeriodSchema)), [rawRequest, withReconnect]);
+  const readLibrary = useCallback((query: WebLibraryQuery) => withReconnect(() => rawRequest({ query, type: 'library.read' }, webLibraryPageSchema)), [rawRequest, withReconnect]);
+
   const value = useMemo<WebBridgeContextValue>(() => ({
     bootstrap,
     decideReview,
-    readAgenda: (from, to) => withReconnect(() => rawRequest({ from, to, type: 'agenda.read' }, webAgendaPeriodSchema)),
-    readLibrary: (query) => withReconnect(() => rawRequest({ query, type: 'library.read' }, webLibraryPageSchema)),
+    readAgenda,
+    readLibrary,
     refreshReview,
     retry: () => {
       automaticReconnectUsedRef.current = false;
@@ -239,7 +242,7 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
     },
     review,
     status,
-  }), [bootstrap, decideReview, establishConnection, rawRequest, refreshReview, review, status, withReconnect]);
+  }), [bootstrap, decideReview, establishConnection, readAgenda, readLibrary, refreshReview, review, status]);
 
   return <WebBridgeContext.Provider value={value}>{children}</WebBridgeContext.Provider>;
 }

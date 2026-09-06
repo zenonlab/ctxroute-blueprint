@@ -32,6 +32,8 @@ describe('shared Agenda surface', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
     expect(component).toContain("state === 'partial'");
     expect(component).toContain("state === 'offline'");
+    expect(component).toContain("state === 'empty'");
+    expect(component).toContain('Semaine vide');
     expect(component).toContain("state === 'error'");
   });
 });

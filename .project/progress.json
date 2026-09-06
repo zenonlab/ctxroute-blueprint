@@ -4391,7 +4391,7 @@
         {
           "id": "step-5",
           "title": "Refaire toutes les routes web",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Routes /, /library et /agenda utilisent exclusivement les projections privées réelles",
             "Tous les états privés et la pagination/navigation bornées sont distincts",
@@ -4415,7 +4415,13 @@
             "git diff --check",
             "git commit -m \"feat(web): rebuild workbench member pages\""
           ],
-          "evidence": []
+          "evidence": [
+            "Home reads a real count, four bridge works and the current local week only after connection",
+            "Library keeps search/facet/cursor in URL, resets cursor on filters and reads at most 24; private cards link only to local source URLs",
+            "Agenda renders Monday-Sunday in the shared horizontal rail and deduplicates one agenda.read per [from,to) period",
+            "Download links hidden; public work route has no sample; output scan finds no sample-work, public example or 0.0.0",
+            "Web route tests 3/3, shared Agenda 3/3, typecheck and strict static export pass; Archify UX IR showcase 9/9"
+          ]
         },
         {
           "id": "step-6",

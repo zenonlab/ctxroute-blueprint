@@ -8,7 +8,7 @@
     "quality_profile": "showcase",
     "views": [
       { "id": "new-install", "label": "Nouvelle installation", "focus": ["browser", "extension", "indexeddb"], "note": "Les favoris HTTP(S) entrent dans une base locale neuve avant toute projection UI." },
-      { "id": "site-bridge", "label": "Site connecté", "focus": ["site", "bridge", "indexeddb"], "note": "Library scanne 500 œuvres au plus; Agenda lit une semaine lundi [from,to) et 100 entrées au plus." },
+      { "id": "site-bridge", "label": "Site connecté", "focus": ["site", "bridge", "indexeddb"], "note": "Accueil lit 4 œuvres; Library garde filtres et curseur dans l’URL; Agenda émet une lecture par semaine lundi [from,to)." },
       { "id": "offline-recovery", "label": "Hors ligne et reprise", "focus": ["indexeddb", "extension", "site"], "note": "Les parcours privés restent lisibles localement et signalent l’absence de connexion." }
     ]
   },
