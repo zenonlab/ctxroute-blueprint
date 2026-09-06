@@ -74,6 +74,9 @@ describe('agenda notifications', () => {
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
     expect(background).toMatch(/readAgendaPeriod\(privateStorage\.storage, parsed\.data\)/);
     expect(surface).toMatch(/useLocalAgenda\(\)/);
+    expect(surface).toMatch(/agenda=\{agenda\}/);
+    expect(surface).toMatch(/onRetryAgenda=\{localAgenda\.onRetry\}/);
+    expect(surface).not.toMatch(/agenda=\{\{ state: 'blocked' \}\}/);
     expect(surface).not.toMatch(/days=\{\[\]\}/);
   });
 

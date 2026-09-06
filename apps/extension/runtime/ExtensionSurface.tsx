@@ -120,6 +120,7 @@ function OptionsSurface() {
 }
 
 function PopupSurface() {
+  const localAgenda = useLocalAgenda();
   const [loadKey, setLoadKey] = useState(0);
   const [model, setModel] = useState<{
     continuations: ComponentProps<typeof Popup>['continuations'];
@@ -154,16 +155,31 @@ function PopupSurface() {
     return () => { active = false; };
   }, [loadKey]);
 
+  const agendaItems = localAgenda.days.flatMap((day) => day.releases).map((release): PopupWork => ({
+    href: '#agenda',
+    indicator: release.displayDate,
+    mediaType: 'Sortie',
+    source: `${release.release} · ${release.source}`,
+    title: release.title,
+  }));
+  const agenda = localAgenda.state === 'loading' || localAgenda.state === 'error'
+    ? { state: localAgenda.state } as const
+    : agendaItems.length > 0
+      ? { items: agendaItems, state: 'ready' } as const
+      : { state: 'empty' } as const;
+
   return (
     <Popup
-      agenda={{ state: 'blocked' }}
+      agenda={agenda}
       connection={model.page.state === 'loading'
         ? { label: 'Lecture du contexte local', tone: 'syncing' }
         : model.page.state === 'error'
           ? { label: 'Lecture locale interrompue', tone: 'error' }
           : { label: 'Données locales prêtes', tone: 'ready' }}
       continuations={model.continuations}
+      onOpenAgenda={() => open('agenda')}
       onOpenFullSettings={() => open('settings')}
+      onRetryAgenda={localAgenda.onRetry}
       onRetryPage={retry}
       page={model.page}
       preferences={{ state: 'blocked' }}

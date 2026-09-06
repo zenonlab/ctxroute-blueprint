@@ -49,6 +49,7 @@ export interface PopupProps {
   connection?: PopupConnection;
   continuations: PopupContinuationsModel;
   initialPanel?: PopupVariant;
+  onOpenAgenda: () => void;
   onOpenFullSettings: () => void;
   onPreferenceChange?: (id: string, enabled: boolean) => void;
   onRetryAgenda?: () => void;
@@ -67,15 +68,20 @@ function PanelHeading({ children }: { children: string }) {
   return <h2 className={styles.panelTitle}>{children}</h2>;
 }
 
-function Work({ item, variant }: { item: PopupWork; variant: 'active-work' | 'agenda' | 'library' }) {
+function Work({ item, onOpen, variant }: { item: PopupWork; onOpen?: () => void; variant: 'active-work' | 'agenda' | 'library' }) {
   return (
     <WorkCard
+      aria-label={onOpen ? `Ouvrir Agenda pour ${item.title}` : undefined}
       coverAlt={item.coverAlt}
       coverSrc={item.coverSrc}
       context={item.mediaType}
       detail={item.source}
       href={item.href}
       indicator={item.indicator}
+      onClick={onOpen ? (event) => {
+        event.preventDefault();
+        onOpen();
+      } : undefined}
       rel="noreferrer"
       target="_blank"
       title={item.title}
@@ -89,6 +95,7 @@ export function Popup({
   connection,
   continuations,
   initialPanel = 'page',
+  onOpenAgenda,
   onOpenFullSettings,
   onPreferenceChange,
   onRetryAgenda,
@@ -145,9 +152,8 @@ export function Popup({
         {activePanel === 'agenda' ? (
           <section aria-label="Sorties" className={styles.panel} data-state={agenda.state}>
             <PanelHeading>Sorties</PanelHeading>
-            {agenda.state === 'ready' && agenda.items.length > 0 ? <div className={styles.cardGrid}>{agenda.items.map((item) => <Work item={item} key={`${item.href}-${item.title}`} variant="agenda" />)}</div> : null}
+            {agenda.state === 'ready' && agenda.items.length > 0 ? <div className={styles.cardGrid}>{agenda.items.map((item) => <Work item={item} key={`${item.href}-${item.title}`} onOpen={onOpenAgenda} variant="agenda" />)}</div> : null}
             {agenda.state === 'loading' ? <FeedbackState className={styles.feedback} kind="loading" layout="centered" title="Lecture des sorties…" /> : null}
-            {agenda.state === 'empty' || (agenda.state === 'ready' && agenda.items.length === 0) ? <FeedbackState className={styles.feedback} description="Les prochaines dates apparaîtront ici." icon="calendar-days" kind="empty" layout="centered" title="Aucune sortie à venir" /> : null}
             {agenda.state === 'error' && onRetryAgenda ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetryAgenda}>Réessayer</Button>} className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable title="Agenda indisponible" /> : null}
             {agenda.state === 'error' && !onRetryAgenda ? <FeedbackState className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable={false} title="Agenda indisponible" /> : null}
             {agenda.state === 'blocked' ? <FeedbackState className={styles.feedback} description="Le menu n’a pas encore accès aux sorties locales." icon="calendar-days" kind="error" layout="centered" recoverable={false} title="Sorties indisponibles" /> : null}
