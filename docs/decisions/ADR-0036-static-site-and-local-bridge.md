@@ -64,6 +64,12 @@ second loss becomes a recoverable error requiring an explicit retry. Global
 search navigates to the URL-addressable Library query, while the bounded Review
 snapshot feeds the Workbench bell and its existing decision command.
 
+Extension release version `1.0.0` is owned by the extension package manifest.
+WXT and the web download surface read that source, while the deterministic
+packager uses it for both archive names and verifies the exact production
+origin in the generated manifests. The download surface keeps links absent
+until a separately approved upload has been verified.
+
 ## Consequences
 
 The public site remains cacheable and deployable independently from the

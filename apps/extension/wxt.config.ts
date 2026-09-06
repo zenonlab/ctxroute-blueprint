@@ -1,4 +1,5 @@
 import { defineConfig } from 'wxt';
+import extensionPackage from './package.json' with { type: 'json' };
 
 const siteOrigin = process.env.WXT_PUBLIC_SITE_ORIGIN?.trim();
 const externallyConnectableMatches = siteOrigin ? [`${siteOrigin}/*`] : [];
@@ -31,7 +32,7 @@ export default defineConfig({
     name: 'Tobirink',
     permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'],
     action: { default_icon: extensionIcons },
-    version: '0.0.0',
+    version: extensionPackage.version,
   }),
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],

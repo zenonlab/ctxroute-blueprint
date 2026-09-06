@@ -22,7 +22,7 @@
         "id": "release-artifacts",
         "label": "Artefacts de livraison",
         "focus": ["browserBuilds", "packageManifest", "releaseEvidence", "releaseGate"],
-        "note": "Les archives reproductibles et leurs SHA-256 alimentent la décision sans publier automatiquement."
+        "note": "Les archives 1.0.0 reproductibles, l’origine exacte et leurs SHA-256 alimentent la décision sans publier automatiquement."
       }
     ]
   },
@@ -35,13 +35,13 @@
   ],
   "nodes": [
     { "id": "repository", "type": "backend", "label": "Sources TobiRink", "sublabel": "extension / app", "stage": 0, "row": 1, "tag": "versionnées" },
-    { "id": "browserBuilds", "type": "backend", "label": "Builds WXT MV3", "sublabel": "Chrome + Firefox", "stage": 1, "row": 1, "tag": "20 fichiers chacun" },
+    { "id": "browserBuilds", "type": "backend", "label": "Builds WXT MV3", "sublabel": "Chrome + Firefox", "stage": 1, "row": 1, "tag": "21 fichiers chacun" },
     { "id": "contractSuites", "type": "security", "label": "Contrats", "sublabel": "Intégration / IndexedDB", "stage": 2, "row": 0, "tag": "local" },
     { "id": "uiEvidence", "type": "frontend", "label": "UI accessible", "sublabel": "UI / Workbench / a11y", "stage": 2, "row": 2, "tag": "automatisé" },
     { "id": "securityEvidence", "type": "security", "label": "Sécurité + perf", "sublabel": "CSP / permissions", "stage": 2, "row": 4, "tag": "sans host permission" },
     { "id": "chromeRuntime", "type": "external", "label": "Runtime Chrome", "sublabel": "worker MV3 chargé", "stage": 3, "row": 0, "tag": "partiel" },
     { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "en attente" },
-    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP / SHA-256", "stage": 3, "row": 4, "tag": "local uniquement" },
+    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.0 / SHA-256", "stage": 3, "row": 4, "tag": "local uniquement" },
     { "id": "releaseEvidence", "type": "backend", "label": "Preuves versionnées", "sublabel": "support / a11y / release", "stage": 4, "row": 4, "tag": "auditables" },
     { "id": "releaseGate", "type": "security", "label": "Gate de livraison", "sublabel": "tous les parcours requis", "stage": 4, "row": 1, "tag": "aucune publication auto" }
   ],

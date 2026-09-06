@@ -4426,7 +4426,7 @@
         {
           "id": "step-6",
           "title": "Préparer la version 1.0.0",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "1.0.0 est la source unique de version extension et artefacts",
             "ZIP Chrome/Firefox 1.0.0 et manifeste SHA-256 générés localement",
@@ -4455,7 +4455,13 @@
             "git diff --check",
             "git commit -m \"chore(release): prepare tobirink 1.0.0\""
           ],
-          "evidence": []
+          "evidence": [
+            "apps/extension/package.json owns version 1.0.0; WXT and web download surface derive it",
+            "Release packager pins and validates https://tobirink.com/* before packaging; both generated manifests are 1.0.0",
+            "Chrome ZIP: 21 files, 237186 bytes, SHA-256 88cd26bebcdcfc3f586befd1e4faf1d444eb87a183cade7f1bb01f2b2796036c",
+            "Firefox ZIP: 21 files, 237237 bytes, SHA-256 1ddc0e9bdf10aa1f71194ac164b16ddd4ca586140bd41b10f8070774d409ab6e",
+            "Packaging reproducibility 2/2, extension typecheck, web export, docs, decisions and Archify showcase pass; no remote operation executed"
+          ]
         },
         {
           "id": "step-7",

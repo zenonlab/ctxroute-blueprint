@@ -12,6 +12,7 @@ in the same approved step that introduces its corresponding product surface.
 | Static | required | Strict TypeScript, lint, anti-slop, and dependency direction | Typecheck, lint, Sensor, and dependency-cruiser pass |
 | Contract | required | Storage, browser, messaging, public-data, telemetry, import/export, and provider gates | The same contract suite passes against fakes and every real adapter |
 | UI | required | React components and extension documents | Vitest Browser Mode with interaction and accessibility assertions |
+| Static web UI | required | Workbench routes, bridge states, URL filters, weekly rail and secondary pages | Vitest/jsdom plus Playwright at 1440×900 and 390×844 against the static export |
 | Extension E2E | required | Install, library update, progress, background wake-up, permissions, and recovery | Playwright Chromium journeys plus Firefox `web-ext` smoke |
 | Worker integration | required | Hono routes, D1 repository, prepared queries, pagination, validation, errors, and redaction | Cloudflare Vitest pool running in `workerd` against every migration |
 | Migration / recovery | required | IndexedDB upgrade, export/import, browser-sync recovery envelope, encrypted backup, interrupted operation, and rollback compatibility | Fixture matrix for every supported schema version |
@@ -57,6 +58,9 @@ browser or `workerd` test when platform behavior is the risk.
   blob, proves zero replacements after wrong-passphrase and tamper failures,
   and verifies that the R2 adapter rejects plaintext before storage access.
 - Every extension message and external payload is rejected on schema mismatch.
+- WebBridge release packages must contain version `1.0.0`, the exact
+  `https://tobirink.com/*` content-script match and the same
+  `externally_connectable` match before their SHA-256 is recorded.
 - Collective-index tests prove explicit consent, write/revoke credential
   separation, nonce replay rejection, daily quota enforcement and immediate
   revocation; fixtures assert that title, URL, library and progress fields fail.

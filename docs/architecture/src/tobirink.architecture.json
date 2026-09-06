@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Tobirink — clean-room product architecture",
-    "subtitle": "Static public site, bounded local bridge, extension-only radio and IndexedDB authority",
+    "subtitle": "Static Workbench site, bounded local bridge, extension 1.0.0 and IndexedDB authority",
     "output": "tobirink-architecture.html",
     "quality_profile": "showcase",
     "visual_preset": "signal-flow",

@@ -10,9 +10,10 @@ const extensionRoot = join(root, 'apps/extension');
 const outputRoot = join(extensionRoot, '.output');
 const packageRoot = join(outputRoot, 'packages');
 const version = JSON.parse(readFileSync(join(extensionRoot, 'package.json'), 'utf8')).version;
+const siteOrigin = 'https://tobirink.com';
 
 function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, encoding: 'utf8', stdio: 'inherit' });
+  const result = spawnSync(command, args, { cwd: root, encoding: 'utf8', env: { ...process.env, WXT_PUBLIC_SITE_ORIGIN: siteOrigin }, stdio: 'inherit' });
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed with status ${result.status}.`);
 }
 
@@ -25,6 +26,11 @@ function filesUnder(directory) {
 
 function packageTarget(target) {
   const source = join(outputRoot, target);
+  const builtManifest = JSON.parse(readFileSync(join(source, 'manifest.json'), 'utf8'));
+  const expectedMatch = `${siteOrigin}/*`;
+  if (builtManifest.version !== version) throw new Error(`Manifest version mismatch for ${target}.`);
+  if (!builtManifest.content_scripts?.some((entry) => entry.matches?.includes(expectedMatch))) throw new Error(`WebBridge origin missing for ${target}.`);
+  if (!builtManifest.externally_connectable?.matches?.includes(expectedMatch)) throw new Error(`External origin missing for ${target}.`);
   const entries = filesUnder(source).map((path) => ({ content: readFileSync(path), name: relative(source, path) }));
   const first = createDeterministicZip(entries);
   const second = createDeterministicZip(entries);
@@ -46,6 +52,6 @@ run('npm', ['run', 'build:extension']);
 run('npm', ['run', 'build:extension:firefox']);
 mkdirSync(packageRoot, { recursive: true });
 const artifacts = [packageTarget('chrome-mv3'), packageTarget('firefox-mv3')];
-const manifest = { artifacts, schemaVersion: 1 };
+const manifest = { artifacts, schemaVersion: 1, siteOrigin, version };
 writeFileSync(join(packageRoot, 'release-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);

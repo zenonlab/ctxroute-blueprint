@@ -14,7 +14,12 @@
 - Out of scope for v1: accounts, private library synchronization, payments,
   social graph, general-purpose web application, microservices, queues, and
   reuse of FavLib source code.
-- Product shape: local-first WebExtension with an optional edge API.
+- Product shape: local-first WebExtension, a static Next App Router export for
+  public catalogue and connected local projections, and an optional edge API.
+  The site is not a general-purpose web application and has no account,
+  authentication, private storage access, Review route, or radio surface.
+- Release candidate: `1.0.0`; the extension package is the sole version source
+  for WXT manifests, local ZIP names and the unpublished download surface.
 
 ## Discovery context
 
@@ -73,8 +78,10 @@ not become runtime dependencies of Tobirink.
   optional Worker while keeping provider boundaries explicit.
 - Runtime: browser Manifest V3 service worker and pages; Node.js 24 LTS for
   product build/test; Cloudflare Workers only for optional public capabilities.
-- Frontend: React 19 inside WXT entrypoints, with CSS Modules and the existing
-  framework-neutral design contract. No Next.js application in v1.
+- Frontend: React 19 inside WXT entrypoints and a static Next App Router site,
+  with CSS Modules and the existing framework-neutral design contract. The
+  site is exported and served by the Worker with an explicit route fallback;
+  it is not a server-centred application.
 - Backend: one Hono Worker only when a public use case needs it. Rails is not
   selected for v1 because the authoritative workflows are local and do not yet
   justify a server-centred application.
@@ -89,6 +96,9 @@ not become runtime dependencies of Tobirink.
   Workers integration tests in `workerd`.
 - Deployment: WXT-generated browser artifacts and a separately approved
   Cloudflare gate with inspect, plan, and apply phases.
+- WebBridge delivery: release packaging pins the exact non-secret site origin
+  `https://tobirink.com` into both manifests and refuses an origin or version
+  mismatch before producing an archive.
 - Observability: a `TelemetryPort`, bounded redacted local diagnostics, and
   Workers Logs for the public service; remote extension telemetry is off by
   default.
@@ -96,6 +106,17 @@ not become runtime dependencies of Tobirink.
   adapter contract tests, dependency audit, and threat-model review.
 - Performance: enforce the budgets above in build reports, browser journeys,
   and Worker tests before release.
+
+## Clean-room and cutover boundary
+
+FavLib remains an intact functional reference and rollback artifact only.
+TobiRink starts with a new extension identity, a new IndexedDB name, and new
+Cloudflare resource names. It never reads, migrates, or reuses FavLib local
+databases, identifiers, D1 bindings, R2 buckets, or private projections.
+Existing browser HTTP(S) bookmarks may be imported as fresh sources on first
+launch. Preview, cutover, and rollback keep the two products isolated; a
+rollback restores the previous site or Worker artifact without converting or
+deleting the new local database.
 
 See [`docs/01-technology-decisions.md`](01-technology-decisions.md) for the
 questions, trade-offs, and research anchors used to make these decisions.
