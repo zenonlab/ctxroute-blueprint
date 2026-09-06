@@ -27,6 +27,7 @@ export type {
   PublicCatalogueReference,
   PublicCatalogueTitle,
   PublicCatalogueWork,
+  PublicReleaseArtifactRecord,
   PublicReleaseEntryRecord,
   PublicReleaseObjectPort,
   PublicReleasePointerRecord,

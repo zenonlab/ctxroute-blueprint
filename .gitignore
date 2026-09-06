@@ -11,6 +11,8 @@ ci-summary.md
 coverage/
 dist/
 build/
+**/.next/
+**/out/
 .output/
 .wxt/
 .env

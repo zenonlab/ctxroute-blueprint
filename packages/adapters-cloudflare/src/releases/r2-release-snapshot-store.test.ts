@@ -43,4 +43,17 @@ describe('R2PublicReleaseObjectAdapter', () => {
     const adapter = new R2PublicReleaseObjectAdapter({ async get() { return object({ revision: 'valid', userId: 'private' }); } });
     await expect(adapter.readPointer('current')).rejects.toThrow();
   });
+
+  it('streams public artifacts with provider metadata', async () => {
+    const body = new ReadableStream<Uint8Array>();
+    const adapter = new R2PublicReleaseObjectAdapter({
+      async get(key) {
+        return key === 'downloads/archive.zip'
+          ? { ...object({ revision: 'unused' }), body, httpEtag: '"artifact-1"', httpMetadata: { contentType: 'application/zip' } }
+          : null;
+      },
+    });
+    await expect(adapter.readArtifact('downloads/archive.zip')).resolves.toEqual({ body, contentType: 'application/zip', etag: '"artifact-1"' });
+    await expect(adapter.readArtifact('downloads/missing.zip')).resolves.toBeUndefined();
+  });
 });

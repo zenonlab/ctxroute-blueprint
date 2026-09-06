@@ -15,6 +15,16 @@ function test_derive_operation_targets() {
     { name: 'worker-deploy', kind: 'worker-deploy', target: 'worker:public-api' },
     { name: 'd1-migrate:CATALOGUE_DB', kind: 'd1-migrate', target: 'd1:public-catalogue' },
   ]);
+
+  const releaseDriver = createCloudflareDriver({
+    config: { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
+    workerDirectory: '/worker',
+    run: async () => '',
+  });
+  assert.deepEqual(releaseDriver.listOperations().filter(operation => operation.kind === 'r2-publish').map(operation => operation.target), [
+    'r2:public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
+    'r2:public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip',
+  ]);
 }
 
 async function test_inspect_read_only_resources() {
@@ -61,6 +71,27 @@ async function test_preview_and_apply_translations() {
   ]);
 }
 
+async function test_release_publish_is_hashed_and_translated() {
+  const calls = [];
+  const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
+  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return 'uploaded'; } });
+  const actions = driver.resolveOperations(['r2-publish:tobirink-chrome-mv3-1.0.0.zip']);
+  const preview = await driver.preview(actions);
+  assert.deepEqual(preview.artifacts, [{
+    target: 'r2:public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
+    sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2',
+    size: 3,
+  }]);
+  await driver.apply(actions);
+  assert.deepEqual(calls, [[
+    'r2', 'object', 'put', 'public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
+    '--file', fileURLToPath(new URL('../../apps/extension/.output/packages/tobirink-chrome-mv3-1.0.0.zip', import.meta.url)),
+    '--content-type', 'application/zip',
+    '--content-disposition', 'attachment; filename="tobirink-chrome-mv3-1.0.0.zip"',
+    '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force',
+  ]]);
+}
+
 async function test_reject_unknown_operations() {
   const calls = [];
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async args => { calls.push(args); return ''; } });
@@ -102,6 +133,7 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('release publication hashes bytes before translating the bounded R2 upload', test_release_publish_is_hashed_and_translated);
 test('unknown operations and actions fail before invoking Wrangler', test_reject_unknown_operations);
 test('the checked-in Wrangler config is the single resource source', test_load_checked_in_config);
 test('the driver accepts a complete provider configuration', test_accept_valid_config);

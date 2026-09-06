@@ -58,7 +58,14 @@ export interface PublicReleaseSnapshotRecord {
   revision: string;
 }
 
+export interface PublicReleaseArtifactRecord {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+  etag: string;
+}
+
 export interface PublicReleaseObjectPort {
   readPointer(key: string): Promise<PublicReleasePointerRecord | undefined>;
   readSnapshot(key: string): Promise<PublicReleaseSnapshotRecord | undefined>;
+  readArtifact(key: string): Promise<PublicReleaseArtifactRecord | undefined>;
 }

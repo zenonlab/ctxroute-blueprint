@@ -1,9 +1,30 @@
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const DRIVER_ID = 'cloudflare-wrangler';
+
+function releasePublishOperations(config) {
+  const releaseBucket = config.r2.find(resource => resource.binding === 'RELEASE_SNAPSHOTS');
+  if (!releaseBucket) return [];
+  const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
+  const version = JSON.parse(readFileSync(resolve(extensionRoot, 'package.json'), 'utf8')).version;
+  return ['chrome', 'firefox'].map(browser => {
+    const artifact = `tobirink-${browser}-mv3-${version}.zip`;
+    return [`r2-publish:${artifact}`, {
+      artifact,
+      bucket: releaseBucket.name,
+      kind: 'r2-publish',
+      source: resolve(extensionRoot, '.output', 'packages', artifact),
+      target: `r2:${releaseBucket.name}/downloads/${artifact}`,
+    }];
+  });
+}
 
 export async function loadCloudflareConfig(path) {
   const parsed = JSON.parse(await readFile(path, 'utf8'));
@@ -20,9 +41,10 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2 };
 }
 
-export function createCloudflareDriver({ config, workerDirectory, run = runWrangler }) {
+export function createCloudflareDriver({ config, workerDirectory, run = runWrangler, read = readFile }) {
   validateCloudflareConfig(config);
   const operations = new Map([
+    ...releasePublishOperations(config),
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
   ]);
@@ -58,6 +80,11 @@ export function createCloudflareDriver({ config, workerDirectory, run = runWrang
       if (actions.some(action => action.kind === 'worker-deploy')) {
         output.worker = (await run(['deploy', '--dry-run'], { cwd: workerDirectory })).trim();
       }
+      const artifacts = await Promise.all(actions.filter(action => action.kind === 'r2-publish').map(async action => {
+        const content = await read(action.source);
+        return { target: action.target, sha256: createHash('sha256').update(content).digest('hex'), size: content.length };
+      }));
+      if (artifacts.length > 0) output.artifacts = artifacts;
       output.actions = actions.map(({ kind, target }) => ({ kind, target }));
       return output;
     },
@@ -67,14 +94,21 @@ export function createCloudflareDriver({ config, workerDirectory, run = runWrang
         .sort((left, right) => operationPriority(left) - operationPriority(right));
       const results = [];
       for (const action of selected) {
-        const args = action.kind === 'worker-deploy'
-          ? ['deploy']
-          : ['d1', 'migrations', 'apply', action.binding, '--remote'];
+        const args = mutationArguments(action);
         results.push({ kind: action.kind, target: action.target, output: (await run(args, { cwd: workerDirectory })).trim() });
       }
       return results;
     },
   };
+}
+
+function mutationArguments(action) {
+  if (action.kind === 'worker-deploy') return ['deploy'];
+  if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
+  if (action.kind === 'r2-publish') {
+    return ['r2', 'object', 'put', `${action.bucket}/downloads/${action.artifact}`, '--file', action.source, '--content-type', 'application/zip', '--content-disposition', `attachment; filename="${action.artifact}"`, '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force'];
+  }
+  throw new Error(`unsupported-action-kind:${action.kind}`);
 }
 
 async function runWrangler(args, { cwd }) {
@@ -105,7 +139,9 @@ function findAction(operations, expected) {
 }
 
 function operationPriority(action) {
-  return action.kind === 'd1-migrate' ? 0 : 1;
+  if (action.kind === 'd1-migrate') return 0;
+  if (action.kind === 'r2-publish') return 1;
+  return 2;
 }
 
 export function validateCloudflareConfig(config) {

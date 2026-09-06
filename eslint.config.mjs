@@ -9,9 +9,12 @@ const nodeGlobals = Object.fromEntries([
   'structuredClone',
 ].map(name => [name, 'readonly']));
 
+const generatedIgnores = ['.agents/**', '.claude/skills/**', '.code-review-graph/**', '.ctxroute/**', 'coverage/**', '**/dist/**', '**/.next/**', '**/out/**', '**/.output/**', '**/.wxt/**', '**/node_modules/**', 'packages/code-review-graph/.venv/**'];
+
 export default [{
+  ignores: generatedIgnores,
+}, {
   files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
-  ignores: ['.agents/**', '.claude/skills/**', '.code-review-graph/**', '.ctxroute/**', 'coverage/**', '**/dist/**', '**/.output/**', '**/.wxt/**', '**/node_modules/**', 'packages/code-review-graph/.venv/**'],
   languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: nodeGlobals },
   linterOptions: { reportUnusedDisableDirectives: 'error' },
   rules: {
