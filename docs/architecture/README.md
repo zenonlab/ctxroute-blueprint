@@ -26,6 +26,12 @@ documents the runtime data path from the voluntarily exposed active tab through
 local identity correlation, the monotonic progress guard, IndexedDB and the
 reconstructible continuation cache to the popup WorkCard.
 
+[`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
+maps the delivery evidence from the shared extension sources through automated
+contracts, browser builds and reproducible packages to the release gate. It
+keeps the remaining interactive Chrome and Firefox checks explicit instead of
+presenting an incomplete browser pass as a finished delivery.
+
 The extension build uses a dedicated WXT entrypoint directory so its generated
 Manifest V3 shell remains separate from reusable React surfaces and previews.
 The generated manifest carries only documented browser permissions, local-only
