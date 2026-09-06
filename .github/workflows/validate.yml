@@ -146,6 +146,9 @@ jobs:
       - name: Audit high-severity production and development dependencies
         run: npm run audit:dependencies -- --required
 
+      - name: Verify npm audit compatibility
+        run: npm audit --audit-level=high
+
   smoke-install:
     name: Clean installation smoke test
     runs-on: ubuntu-latest
