@@ -88,7 +88,7 @@ test('connected empty Library matches the Workbench empty surface', async ({ pag
   await expect(page.getByRole('heading', { name: 'Votre bibliothèque est vide' })).toBeVisible();
   await expect(page.getByText('Importez vos favoris ou ajoutez une première œuvre.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Télécharger l’extension' })).toBeVisible();
-  await expect(page.locator('[data-layout="centered"] > span svg')).toHaveCSS('width', '48px');
+  await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
   await expect(page.locator('[data-variant="library"]')).toHaveCount(1);
   await expect(page.locator('h2').filter({ hasText: 'Votre bibliothèque est vide' })).toHaveCSS('font-size', '18px');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -106,11 +106,12 @@ test('Agenda keeps seven horizontal days and emits one read per week', async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test('missing extension exposes no private cards while verified downloads stay public', async ({ page, request }) => {
+test('missing extension keeps the Workbench empty surfaces while verified downloads stay public', async ({ page, request }) => {
   await page.goto('/');
-  await expect(page.getByText(/Extension absente/u)).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole('heading', { name: 'Bibliothèque vide' })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole('heading', { name: 'Semaine vide' })).toBeVisible();
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(0);
-  await expect(page.locator('[data-layout="centered"] > span svg')).toHaveCSS('width', '48px');
+  await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
   await page.goto('/download');
   await expect(page.getByRole('heading', { name: 'Choisir votre navigateur' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Installer, puis importer.' })).toHaveCSS('font-size', '32px');

@@ -25,6 +25,19 @@ function agendaDays(period: ReturnType<typeof createLocalAgendaPeriod>, agenda?:
   })) ?? [] });
 }
 
+function EmptyHomeOverview() {
+  return <>
+    <section className="member-section" aria-labelledby="library-overview-title">
+      <header className="section-heading"><div><p className="eyebrow">Bibliothèque locale</p><h2 id="library-overview-title">Bibliothèque</h2></div><a className="text-link" href="/library">Tout voir</a></header>
+      <FeedbackState kind="empty" layout="centered" title="Bibliothèque vide" description="Installez TobiRink pour importer vos favoris sur cet appareil." />
+    </section>
+    <section className="member-section" aria-labelledby="agenda-overview-title">
+      <header className="section-heading"><div><p className="eyebrow">Semaine locale</p><h2 id="agenda-overview-title">Agenda</h2></div><a className="text-link" href="/agenda">Ouvrir l’agenda</a></header>
+      <FeedbackState kind="empty" layout="centered" title="Semaine vide" description="Les sorties locales apparaîtront ici après l’installation de TobiRink." />
+    </section>
+  </>;
+}
+
 function HomePrivateOverview() {
   const { bootstrap, readAgenda, readLibrary, status } = useWebBridge();
   const [library, setLibrary] = useState<WebLibraryPage>();
@@ -42,7 +55,8 @@ function HomePrivateOverview() {
       .catch(() => setFailed(true));
   }, [period, readAgenda, readLibrary, retryCount, status]);
 
-  if (status !== 'connected') return <section className="member-intro"><BridgeState /></section>;
+  if (status === 'loading' || status === 'reconnecting') return <section className="member-intro"><BridgeState /></section>;
+  if (status === 'extension-missing') return <EmptyHomeOverview />;
   if (failed) return <section className="member-section"><FeedbackState action={<Button icon="refresh-cw" onClick={() => setRetryCount((count) => count + 1)}>Réessayer</Button>} kind="error" recoverable title="Aperçu local indisponible" description="La bibliothèque et l’agenda restent intacts dans l’extension." /></section>;
   if (!library || !agenda) return <section className="member-section"><FeedbackState kind="loading" title="Préparation de votre espace…" description="Lecture des projections locales de la bibliothèque et de la semaine." /></section>;
   const days = agendaDays(period, agenda);

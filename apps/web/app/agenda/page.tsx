@@ -34,7 +34,8 @@ function AgendaSurface() {
     void readAgenda(from, to).then(setSnapshot).catch(() => setFailed(true));
   }, [from, readAgenda, status, to]);
 
-  if (status !== 'connected') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'extension-missing') return <Agenda canNext={false} canPrevious={false} days={createAgendaDays(period, { items: [] })} navigation={navigation} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel={period.label} state="empty" updatedAt="" />;
   const items: AgendaPeriodItem[] = snapshot?.entries.map((entry) => ({
     availability: entry.availability,
     id: `${entry.workId}_${entry.occursAt}`,
