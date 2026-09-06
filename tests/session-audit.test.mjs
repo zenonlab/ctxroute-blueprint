@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { auditSessions } from '../scripts/session-audit.mjs';
+import { validateOrchestratorContract } from '../scripts/orchestrator-contracts.mjs';
 
 test('session audit streams bounded traces, redacts secrets, and detects defective evidence', async () => {
   const root = mkdtempSync(join(tmpdir(), 'session-audit-'));
@@ -13,13 +14,14 @@ test('session audit streams bounded traces, redacts secrets, and detects defecti
     JSON.stringify({ exit_code: 1, command: 'npm test', message: 'password=must-not-leak' }),
   ].join('\n'));
   const report = await auditSessions({ sessionPaths: [path], approvedRoots: [root], mission: { mission_id: 'mission-one', skill_id: 'expected-skill', file_scope: ['src/'], validation_commands: ['npm test', 'npm run lint'] } });
-  assert.ok(report.signals_detected.includes('skill-id-mismatch'));
-  assert.ok(report.signals_detected.includes('files-outside-scope:1'));
-  assert.ok(report.signals_detected.includes('validations-missing:1'));
-  assert.ok(report.signals_detected.includes('validations-failed:1'));
-  assert.ok(report.signals_detected.some(signal => signal.startsWith('redacted-secret-fields:')));
+  assert.ok(report.signals.includes('skill-id-mismatch'));
+  assert.ok(report.signals.includes('files-outside-scope'));
+  assert.ok(report.signals.includes('validations-missing'));
+  assert.ok(report.signals.includes('validations-failed'));
+  assert.ok(report.signals.includes('secret-fields-redacted'));
   assert.doesNotMatch(JSON.stringify(report), /must-not-leak/u);
   assert.equal(report.decision, 'repair');
+  assert.equal(validateOrchestratorContract('auditReportV2', report).valid, true);
 });
 
 test('session audit stops at byte limits without returning raw content', async () => {
@@ -27,7 +29,7 @@ test('session audit stops at byte limits without returning raw content', async (
   const path = join(root, 'large.jsonl');
   writeFileSync(path, `${JSON.stringify({ message: 'x'.repeat(1000) })}\n`);
   const report = await auditSessions({ sessionPaths: [path], approvedRoots: [root], maxBytes: 32 });
-  assert.ok(report.signals_detected.includes('bounded-read-truncated'));
+  assert.ok(report.signals.includes('bounded-read-truncated'));
   assert.doesNotMatch(JSON.stringify(report), /xxxxxxxx/u);
 });
 
@@ -37,8 +39,8 @@ test('session audit skips traces marked active', async () => {
   writeFileSync(trace, `${JSON.stringify({ mission_id: 'wrong' })}\n`);
   writeFileSync(`${trace}.active`, '1');
   const report = await auditSessions({ sessionPaths: [trace], approvedRoots: [directory], mission: { mission_id: 'expected', skill_id: 'skill', file_scope: [], validation_commands: [] } });
-  assert.deepEqual(report.sessions_examined, []);
-  assert.ok(report.signals_detected.includes('active-sessions-skipped:1'));
+  assert.ok(report.signals.includes('active-sessions-skipped'));
+  assert.match(report.validations[0].diagnostic, /files=0/u);
 });
 
 test('session audit rejects traces outside approved roots and symlink traces', async () => {
@@ -70,7 +72,7 @@ test('session audit excludes its own declared output and compares structured val
     sessionPaths: [trace], approvedRoots: [root], outputPath: trace,
     mission: { mission_id: 'mission', skill_id: 'skill', file_scope: [], validations: [{ executable: 'node', args: ['--check', 'src/change.mjs'] }] },
   });
-  assert.deepEqual(report.sessions_examined, []);
-  assert.ok(report.signals_detected.includes('self-traces-excluded:1'));
-  assert.ok(report.signals_detected.includes('validations-missing:1'));
+  assert.ok(report.signals.includes('self-traces-excluded'));
+  assert.ok(report.signals.includes('validations-missing'));
+  assert.match(report.validations[0].diagnostic, /files=0/u);
 });
