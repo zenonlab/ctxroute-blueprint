@@ -43,6 +43,9 @@ records and always run without a shell. A worker report only declares results;
 the orchestrator replays every required validation and only its bounded receipt
 can complete the mission.
 
+The release gate runs contract compilation, targeted skill validations, and
+the bounded lifecycle performance harness as first-class package commands.
+
 Transactions persist a SHA-256 digest of the canonical action and complete
 payload, excluding only `expected_revision`. An identical replay may converge
 after its expected revision is stale. Reuse of an operation identifier with any

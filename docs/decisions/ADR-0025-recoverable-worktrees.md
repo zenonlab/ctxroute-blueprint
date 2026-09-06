@@ -7,6 +7,7 @@ scope:
   - .ctxroute/recovery/**
   - tests/orchestrator-*.test.mjs
 review: on-change
+revised: true
 contracts:
   - .project/schemas/orchestrator/worktree-operation-v2.schema.json
 ---
@@ -35,6 +36,10 @@ directories, cleanliness, base revisions, locks, and disk budget. It removes
 only clean worktrees belonging to terminal missions and prunes only metadata
 whose path is truly absent. Dirty, unknown, symlinked, or ambiguous targets are
 classified `NEEDS_ATTENTION` and are not recursively erased.
+
+Allocation, reconciliation, rollback, and purge entries retain an explicit
+categorical outcome, including `ROLLED_BACK` and `PURGED`, independently from
+the mission allocation status.
 
 Rollback first captures bounded Git state, file inventory, digest, and a binary
 restorable patch under `.ctxroute/recovery/`. Failed or oversized capture blocks
