@@ -78,7 +78,7 @@ export function ReviewResolver({
   };
 
   if (state === 'loading') {
-    return <FeedbackState description="Lecture de la file conservée sur cet appareil." kind="loading" title="Préparation des Reviews…" />;
+    return <FeedbackState className={styles.centeredState} description="Lecture de la file conservée sur cet appareil." kind="loading" layout="centered" title="Préparation des Reviews…" />;
   }
 
   if (state === 'empty') {
@@ -97,8 +97,10 @@ export function ReviewResolver({
     return (
       <FeedbackState
         action={<Button disabled={busy} icon="refresh-cw" onClick={onRetry}>Recharger les candidats</Button>}
+        className={styles.centeredState}
         description="La file locale est conservée. Seuls les candidats seront relus."
         kind="error"
+        layout="centered"
         recoverable
         title="Candidats indisponibles"
       />

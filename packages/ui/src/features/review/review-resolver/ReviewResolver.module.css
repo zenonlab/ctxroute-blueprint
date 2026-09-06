@@ -24,6 +24,13 @@
   min-height: calc(var(--size-control-touch) * 3);
 }
 
+.centeredState {
+  align-self: center;
+  justify-self: center;
+  max-width: calc(var(--size-column-min) * 2);
+  width: 100%;
+}
+
 .reviewNavigation {
   align-items: center;
   border-top: var(--size-border) solid var(--color-border);

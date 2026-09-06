@@ -16,9 +16,9 @@ export function Agenda({ canNext, canPrevious, days, navigation, onNext, onPrevi
   return <MemberNavigation {...navigation}>
     <main aria-labelledby="agenda-title" className={styles.agenda} data-state={state} data-variant={variant}>
       <header className={styles.header}><div><p>Calendrier local</p><h1 id="agenda-title">Agenda</h1></div><span className={styles.count}>{releaseCount}</span></header>
-      {state === 'loading' ? <FeedbackState description="Lecture des sorties enregistrées pour la période." kind="loading" title="Préparation de l’agenda…" /> : null}
-      {state === 'empty' ? <FeedbackState description="Aucune sortie datée n’est enregistrée entre ces deux lundis." icon="calendar-days" kind="empty" title="Semaine vide" /> : null}
-      {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} description="Le cache précédent reste intact." kind="error" recoverable title="Actualisation interrompue" /> : null}
+      {state === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des sorties enregistrées pour la période." kind="loading" layout="centered" title="Préparation de l’agenda…" /> : null}
+      {state === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucune sortie datée n’est enregistrée entre ces deux lundis." icon="calendar-days" kind="empty" layout="centered" title="Semaine vide" /> : null}
+      {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable title="Actualisation interrompue" /> : null}
       {usable ? <>
         {state === 'partial' ? <Status tone="accent">Dates estimées séparées · certaines sources manquent</Status> : null}
         {state === 'offline' ? <Status tone="warning">{`Cache local du ${updatedAt} · hors ligne`}</Status> : null}
