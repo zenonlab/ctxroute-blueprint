@@ -35,27 +35,33 @@ export function LibraryFilters({
       />
 
       <div aria-label="Facettes" className={styles.facets} role="group">
-        <FacetSelect
-          disabled={disabled}
-          label="Type"
-          onChange={(type) => onChange({ ...value, type })}
-          options={options.type}
-          value={value.type}
-        />
-        <FacetSelect
-          disabled={disabled}
-          label="Statut"
-          onChange={(status) => onChange({ ...value, status })}
-          options={options.status}
-          value={value.status}
-        />
-        <FacetSelect
-          disabled={disabled}
-          label="Progression"
-          onChange={(progress) => onChange({ ...value, progress })}
-          options={options.progress}
-          value={value.progress}
-        />
+        {options.type.length > 0 ? (
+          <FacetSelect
+            disabled={disabled}
+            label="Type"
+            onChange={(type) => onChange({ ...value, type })}
+            options={options.type}
+            value={value.type}
+          />
+        ) : null}
+        {options.status.length > 0 ? (
+          <FacetSelect
+            disabled={disabled}
+            label="Statut"
+            onChange={(status) => onChange({ ...value, status })}
+            options={options.status}
+            value={value.status}
+          />
+        ) : null}
+        {options.progress.length > 0 ? (
+          <FacetSelect
+            disabled={disabled}
+            label="Progression"
+            onChange={(progress) => onChange({ ...value, progress })}
+            options={options.progress}
+            value={value.progress}
+          />
+        ) : null}
       </div>
     </section>
   );

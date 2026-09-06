@@ -31,11 +31,13 @@ describe('D1PublicCatalogueAdapter', () => {
     await expect(adapter.listWorksAfter({ id: 'work_dandadan', revision: 1 }, 51)).resolves.toHaveLength(1);
     await expect(adapter.findWork('work_frieren')).resolves.toMatchObject({ id: 'work_frieren' });
     await expect(adapter.resolveReference('anilist', '154587')).resolves.toMatchObject({ id: 'work_frieren' });
+    await expect(adapter.searchWorksByTitle('Frieren', 6)).resolves.toHaveLength(1);
 
     expect(calls.map(({ values }) => values)).toEqual([
       [1, 'work_dandadan', 51],
       ['work_frieren'],
       ['anilist', '154587'],
+      ['Frieren', 6],
     ]);
     expect(calls.every(({ query }) => query.includes('?1'))).toBe(true);
   });

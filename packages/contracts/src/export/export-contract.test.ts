@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PrivateSnapshot } from '../../../application/src/recovery/private-export';
 import { MemoryRecoveryStore } from './memory-recovery-store';
 
-const empty: PrivateSnapshot = { agenda: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
+const empty: PrivateSnapshot = { agenda: [], favoriteSources: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
 
 describe('RecoveryStorePort contract', () => {
   it('does not publish state when replacement fails', async () => {

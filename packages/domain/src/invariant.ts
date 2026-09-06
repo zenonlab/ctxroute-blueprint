@@ -6,7 +6,8 @@ export type DomainInvariantCode =
   | 'invalid-id'
   | 'invalid-number'
   | 'invalid-review-resolution'
-  | 'invalid-text';
+  | 'invalid-text'
+  | 'invalid-url';
 
 export class DomainInvariantError extends Error {
   readonly code: DomainInvariantCode;

@@ -1,0 +1,26 @@
+.agenda { background: var(--color-canvas); color: var(--color-text); display: grid; font-family: var(--font-family-sans); gap: var(--space-6); min-height: 100%; padding: var(--space-6); width: 100%; }
+.header { align-items: end; display: flex; gap: var(--space-4); justify-content: space-between; }
+.header p { color: var(--color-primary); font-size: var(--font-size-meta); font-weight: var(--font-weight-strong); letter-spacing: var(--letter-spacing-label); margin: 0; text-transform: uppercase; }
+.header h1 { font-size: var(--font-size-display); letter-spacing: var(--letter-spacing-tight); line-height: var(--line-height-tight); margin: var(--space-1) 0 0; }
+.count, .periodTitle span { color: var(--color-text-subtle); font-size: var(--font-size-section); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-strong); }
+.period { display: grid; gap: var(--space-4); }
+.periodTitle { align-items: center; border-bottom: var(--size-border) solid var(--color-border); display: grid; gap: var(--space-4); grid-template-columns: auto minmax(0, 1fr) auto; padding-bottom: var(--space-2); text-align: center; }
+.periodTitle h2 { font-size: var(--font-size-title); letter-spacing: var(--letter-spacing-tight); margin: 0; }
+.week { display: grid; gap: var(--space-4); grid-template-columns: repeat(7, minmax(11.25rem, 1fr)); overflow-x: auto; padding: var(--space-1) var(--space-1) var(--space-4); scrollbar-gutter: stable; }
+.week:focus-visible { border-radius: var(--radius-sm); box-shadow: var(--shadow-focus); outline: 0; }
+.day, .releases { display: grid; gap: var(--space-4); }
+.day { align-content: start; min-width: 11.25rem; }
+.dayHeader { display: grid; gap: var(--space-1); }
+.dayHeader h3 { font-size: var(--font-size-caption); margin: 0; text-transform: capitalize; }
+.dayHeader span { color: var(--color-text-subtle); font-size: var(--font-size-meta); }
+.day[data-today='true'] .dayHeader h3 { color: var(--color-primary); }
+.release { min-width: 0; }
+.srOnly { height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; clip-path: inset(50%); }
+@media (max-width: 32rem) {
+  .agenda { padding: var(--space-4); }
+  .periodTitle { gap: var(--space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .periodTitle h2 { grid-column: 1 / -1; grid-row: 1; }
+  .periodTitle button:first-child { grid-column: 1; }
+  .periodTitle button:last-child { grid-column: 2; }
+  .week { grid-template-columns: repeat(7, 11.25rem); }
+}

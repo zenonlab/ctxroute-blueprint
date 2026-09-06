@@ -1,5 +1,6 @@
 export { Settings } from './Settings';
 export type {
+  AvailableSettingsProps,
   OrganizerChoice,
   OrganizerConditions,
   OrganizerFilterOptions,

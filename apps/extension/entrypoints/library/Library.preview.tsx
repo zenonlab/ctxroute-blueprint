@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { definePreview } from '@tobirink/ui/preview-contract';
-import type { LibraryFiltersValue } from '../../../../packages/ui/src/features/library/library-filters';
-import { emptyLibraryFilters } from '../../../../packages/ui/src/features/library/library-filters';
+import { emptyLibraryFilters } from '@tobirink/ui';
+import type { LibraryFiltersValue } from '@tobirink/ui';
 import '../../../../packages/ui/src/tokens/color.css';
 import '../../../../packages/ui/src/tokens/layout.css';
 import '../../../../packages/ui/src/tokens/effects.css';

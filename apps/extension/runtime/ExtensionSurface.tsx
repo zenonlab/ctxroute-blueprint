@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
-import type { MemberNavigationConfig } from '@tobirink/ui';
-import { emptyLibraryFilters } from '../../../packages/ui/src/features/library/library-filters';
-import type { LibraryFiltersValue } from '../../../packages/ui/src/features/library/library-filters';
+import { emptyLibraryFilters } from '@tobirink/ui';
+import type { LibraryFiltersValue } from '@tobirink/ui';
 import { Agenda } from '../entrypoints/agenda';
 import { Library } from '../entrypoints/library';
 import { Settings } from '../entrypoints/options';
@@ -10,65 +9,123 @@ import { Popup } from '../entrypoints/popup';
 import type { PopupWork } from '../entrypoints/popup';
 import { Review } from '../entrypoints/review';
 import type { NavigationTarget } from './messages';
-import { readPopupContextMessage, sendExtensionMessage } from './messages';
+import { readLibraryPageMessage, readLibrarySearchMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
+import type { LibraryPageResponse } from './messages';
+import { useLocalAgenda } from './use-local-agenda';
+import { useLocalOrganizerSettings } from './use-local-organizer-settings';
+import { useLocalReviewNavigation } from './use-local-review-navigation';
+import { useQuickPreferences } from './use-quick-preferences';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
-
-const emptyFilterOptions = { progress: [], status: [], type: [] } as const;
 
 function open(target: NavigationTarget) {
   void sendExtensionMessage({ target, type: 'navigation.open', version: 1 });
 }
 
-function emptyNavigation(activeId?: 'agenda' | 'home' | 'library'): MemberNavigationConfig {
-  return {
-    activeId,
-    onSearch: () => undefined,
-    review: {
-      count: 0,
-      resolver: {
-        canNext: false,
-        canPrevious: false,
-        onNext: () => undefined,
-        onPrevious: () => undefined,
-        onRefresh: () => undefined,
-        onRetry: () => undefined,
-        onSubmitDecision: () => undefined,
-        state: 'empty',
-      },
-    },
-  };
-}
-
 function LibrarySurface() {
-  const [filters, setFilters] = useState<LibraryFiltersValue>(emptyLibraryFilters);
+  const initialQuery = typeof window === 'undefined' ? '' : new URL(window.location.href).searchParams.get('query')?.trim() ?? '';
+  const [filters, setFilters] = useState<LibraryFiltersValue>({ ...emptyLibraryFilters, query: initialQuery });
+  const [loadKey, setLoadKey] = useState(0);
+  const [model, setModel] = useState<{
+    items: Extract<LibraryPageResponse, { ok: true }>['snapshot']['items'];
+    loadingMore: boolean;
+    nextCursor?: string;
+    state: 'empty' | 'error' | 'loading' | 'partial' | 'ready';
+  }>({ items: [], loadingMore: false, state: 'loading' });
+  const navigation = useLocalReviewNavigation('library');
+
+  const filterOptions = useMemo(() => ({
+    progress: [],
+    status: [],
+    type: (['manga', 'anime'] as const).flatMap((value) => {
+      const count = model.items.filter((item) => item.mediaType === value).length;
+      return count > 0 ? [{ count, label: value === 'manga' ? 'Manga' : 'Anime', value }] : [];
+    }),
+  }), [model.items]);
+  const visibleItems = useMemo(() => {
+    const query = filters.query.trim().toLocaleLowerCase('fr');
+    const hasIncludedType = Object.values(filters.type).includes('include');
+    return model.items.filter((item) => {
+      const typeState = filters.type[item.mediaType];
+      const matchesType = typeState !== 'exclude' && (!hasIncludedType || typeState === 'include');
+      return matchesType && (query.length === 0 || item.title.toLocaleLowerCase('fr').includes(query));
+    });
+  }, [filters.query, filters.type, model.items]);
+
+  useEffect(() => {
+    let active = true;
+    setModel({ items: [], loadingMore: false, state: 'loading' });
+    const request = initialQuery ? readLibrarySearchMessage(initialQuery) : readLibraryPageMessage();
+    void request.then((snapshot) => {
+      if (!active) return;
+      if ('truncated' in snapshot) {
+        setModel({ items: snapshot.items, loadingMore: false, state: snapshot.items.length > 0 ? 'ready' : 'empty' });
+        return;
+      }
+      setModel({
+        items: snapshot.items,
+        loadingMore: false,
+        nextCursor: snapshot.nextCursor,
+        state: snapshot.missingWorkIds.length > 0 ? 'partial' : snapshot.items.length > 0 ? 'ready' : 'empty',
+      });
+    }).catch(() => {
+      if (active) setModel({ items: [], loadingMore: false, state: 'error' });
+    });
+    return () => { active = false; };
+  }, [initialQuery, loadKey]);
+
+  const loadMore = useCallback(() => {
+    if (!model.nextCursor || model.loadingMore) return;
+    setModel((current) => ({ ...current, loadingMore: true }));
+    void readLibraryPageMessage(model.nextCursor).then((snapshot) => {
+      setModel((current) => ({
+        items: [...current.items, ...snapshot.items],
+        loadingMore: false,
+        nextCursor: snapshot.nextCursor,
+        state: current.state === 'partial' || snapshot.missingWorkIds.length > 0 ? 'partial' : 'ready',
+      }));
+    }).catch(() => setModel((current) => ({ ...current, loadingMore: false })));
+  }, [model.loadingMore, model.nextCursor]);
 
   return (
     <Library
-      filterOptions={emptyFilterOptions}
+      filterOptions={filterOptions}
       filters={filters}
-      items={[]}
-      navigation={emptyNavigation('library')}
+      hasMore={Boolean(model.nextCursor)}
+      items={visibleItems}
+      navigation={navigation}
       onChangeFilters={setFilters}
-      onDownloadExtension={() => undefined}
-      onLoadMore={() => undefined}
+      onLoadMore={loadMore}
       onOpenRecovery={() => open('settings')}
-      onRetry={() => undefined}
-      state="empty"
+      onRetry={() => setLoadKey((key) => key + 1)}
+      state={model.state}
     />
   );
+}
+
+function ReviewSurface() {
+  const navigation = useLocalReviewNavigation();
+  const resolver = navigation.review.resolver;
+  const state = resolver.state === 'loading' || resolver.state === 'empty' || resolver.state === 'partial' || resolver.state === 'error'
+    ? resolver.state
+    : 'ready';
+  return <Review navigation={navigation} onRetry={resolver.onRetry} state={state} />;
+}
+
+function AgendaSurface() {
+  const navigation = useLocalReviewNavigation('agenda');
+  const agenda = useLocalAgenda();
+  return <Agenda {...agenda} navigation={navigation} />;
 }
 
 function OptionsSurface() {
-  return (
-    <Settings
-      onRetry={() => undefined}
-      state="blocked"
-    />
-  );
+  const settings = useLocalOrganizerSettings();
+  return <Settings {...settings} />;
 }
 
 function PopupSurface() {
+  const localAgenda = useLocalAgenda();
+  const quickPreferences = useQuickPreferences();
   const [loadKey, setLoadKey] = useState(0);
   const [model, setModel] = useState<{
     continuations: ComponentProps<typeof Popup>['continuations'];
@@ -103,9 +160,24 @@ function PopupSurface() {
     return () => { active = false; };
   }, [loadKey]);
 
+  const agendaItems = localAgenda.days.flatMap((day) => day.releases).map((release): PopupWork => {
+    const item = {
+      indicator: release.displayDate,
+      mediaType: 'Sortie',
+      source: `${release.release} · ${release.source}`,
+      title: release.title,
+    };
+    return release.href ? { ...item, href: release.href } : item;
+  });
+  const agenda = localAgenda.state === 'loading' || localAgenda.state === 'error'
+    ? { state: localAgenda.state } as const
+    : agendaItems.length > 0
+      ? { items: agendaItems, state: 'ready' } as const
+      : { state: 'empty' } as const;
+
   return (
     <Popup
-      agenda={{ state: 'blocked' }}
+      agenda={agenda}
       connection={model.page.state === 'loading'
         ? { label: 'Lecture du contexte local', tone: 'syncing' }
         : model.page.state === 'error'
@@ -113,9 +185,11 @@ function PopupSurface() {
           : { label: 'Données locales prêtes', tone: 'ready' }}
       continuations={model.continuations}
       onOpenFullSettings={() => open('settings')}
+      onPreferenceChange={quickPreferences.onChange}
+      onRetryAgenda={localAgenda.onRetry}
       onRetryPage={retry}
       page={model.page}
-      preferences={{ state: 'blocked' }}
+      preferences={quickPreferences.model}
     />
   );
 }
@@ -130,17 +204,11 @@ export function ExtensionSurface({ name }: { name: ExtensionSurfaceName }) {
   }
 
   if (name === 'review') {
-    return (
-      <Review
-        navigation={emptyNavigation()}
-        onRetry={() => undefined}
-        state="empty"
-      />
-    );
+    return <ReviewSurface />;
   }
 
   if (name === 'agenda') {
-    return <Agenda canNext={false} canPrevious={false} days={[]} navigation={emptyNavigation('agenda')} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel="Cette semaine" state="empty" updatedAt="Jamais" />;
+    return <AgendaSurface />;
   }
 
   if (name === 'options') {

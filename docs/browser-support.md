@@ -27,16 +27,28 @@ components do not branch on a browser name.
   six declared entrypoints for both targets.
 - `npm run test:security` validates both generated manifests, their local-only
   CSP, permission allowlist, empty host permissions and Firefox metadata.
-- `npm run test:e2e` passes the 53 shared extension contract and vertical-flow
-  tests.
+- `npm run test:e2e` passes 88 Vitest integration, contract and vertical-flow
+  tests across 16 files. Despite its historical script name, this command does
+  not launch a browser and is not evidence of an installed-extension journey.
+- Google Chrome 152 loaded the unpacked Chromium output in an isolated temporary
+  profile and exposed the Tobirink MV3 service worker as an active
+  `chrome-extension://` target. This proves manifest loading and background
+  startup, but not the interactive journeys below.
+- `npm run package:extension` reproduced both 20-file archives byte-for-byte;
+  the local release manifest records their SHA-256 values.
 
 ## External browser pass still required
 
-No manual compatibility claim is made for this session. Google Chrome is
-installed, but the connected browser controller reports `No browser is
-available`. Firefox and the optional `web-ext` validator are not installed.
+No complete manual compatibility claim is made for this session. Google Chrome
+is installed and accepts the unpacked package, but the connected browser
+controller reports `Browser is not available: extension`. Firefox and the
+optional `web-ext` validator are not installed.
 Adding that dependency was not part of the approved step, so the repository
 was not expanded silently.
+
+The release gate therefore remains open: the local Vitest suite, generated
+manifest checks and one Chrome service-worker load cannot replace the required
+interactive Chrome and Firefox journeys.
 
 Before release, run the packaged extension in current stable Chrome and Firefox
 and record extension-menu launch, header navigation, Review bell/popover, candidate

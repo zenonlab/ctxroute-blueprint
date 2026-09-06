@@ -1,4 +1,4 @@
-import { blockTask, claimTask, commitTask, createDurableTask, isTaskAvailable, recordTaskEffect, retryTask } from '@tobirink/application';
+import { blockTask, claimTask, commitTask, createDurableTask, createScheduledDurableTask, isTaskAvailable, recordTaskEffect, retryTask } from '@tobirink/application';
 import type { DurableTask, TaskStorePort } from '@tobirink/application';
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
@@ -16,6 +16,13 @@ export class DexieTaskStore implements TaskStorePort {
       const existing = await this.database.tasks.where('idempotencyKey').equals(input.idempotencyKey).first();
       if (existing) return existing;
       const task = createDurableTask(input); await this.database.tasks.add(task); return task;
+    });
+  }
+  async schedule(input: Pick<DurableTask, 'id' | 'idempotencyKey' | 'kind' | 'payload'>, availableAt: string): Promise<DurableTask> {
+    return this.database.transaction('rw', this.database.tasks, async () => {
+      const existing = await this.database.tasks.where('idempotencyKey').equals(input.idempotencyKey).first();
+      if (existing) return existing;
+      const task = createScheduledDurableTask(input, availableAt); await this.database.tasks.add(task); return task;
     });
   }
   get(id: string) { return this.database.tasks.get(id); }

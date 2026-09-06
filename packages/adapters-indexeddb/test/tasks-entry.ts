@@ -7,8 +7,9 @@ try {
   await take('c-committed', 'c3'); await store.recordEffect('c-committed', 'c3', 'effect:key:c-committed'); await store.commit('c-committed', 'c3');
   await take('d-retry', 'c4'); await store.retry('d-retry', 'c4', '2026-09-04T11:00:00.000Z');
   await take('e-blocked', 'c5'); await store.block('e-blocked', 'c5', 'fixture'); await add('z-ready');
+  await store.schedule({ id: 'f-scheduled', idempotencyKey: 'key:f-scheduled', kind: 'fixture', payload: '{}' }, '2026-09-04T12:00:00.000Z');
   store.close(); store = new DexieTaskStore(name);
-  const states = new Map([['a-claimed', 'CLAIMED'], ['b-effect', 'EFFECT_RECORDED'], ['c-committed', 'COMMITTED'], ['d-retry', 'RETRY_AT'], ['e-blocked', 'BLOCKED'], ['z-ready', 'READY']]);
+  const states = new Map([['a-claimed', 'CLAIMED'], ['b-effect', 'EFFECT_RECORDED'], ['c-committed', 'COMMITTED'], ['d-retry', 'RETRY_AT'], ['e-blocked', 'BLOCKED'], ['f-scheduled', 'RETRY_AT'], ['z-ready', 'READY']]);
   for (const [id, state] of states) if ((await store.get(id))?.state !== state) throw new Error(`${state} was not persistent.`);
   if ((await store.enqueue({ id: 'duplicate', idempotencyKey: 'key:z-ready', kind: 'fixture', payload: '{}' })).id !== 'z-ready') throw new Error('Idempotency failed.');
   const resumed = await store.claimNext('resumed', '2026-09-04T10:06:00.000Z', '2026-09-04T10:07:00.000Z');

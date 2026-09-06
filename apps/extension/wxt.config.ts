@@ -1,4 +1,8 @@
 import { defineConfig } from 'wxt';
+import extensionPackage from './package.json' with { type: 'json' };
+
+const siteOrigin = process.env.WXT_PUBLIC_SITE_ORIGIN?.trim();
+const externallyConnectableMatches = siteOrigin ? [`${siteOrigin}/*`] : [];
 
 const extensionIcons = {
   16: 'icons/tobirink-16.png',
@@ -22,12 +26,13 @@ export default defineConfig({
       extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
     },
     description: 'Bibliothèque manga et anime locale, progression, Review et agenda.',
+    externally_connectable: { matches: externallyConnectableMatches },
     host_permissions: [],
     icons: extensionIcons,
     name: 'Tobirink',
     permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'],
     action: { default_icon: extensionIcons },
-    version: '0.0.0',
+    version: extensionPackage.version,
   }),
   manifestVersion: 3,
   modules: ['@wxt-dev/module-react'],

@@ -1,6 +1,6 @@
 # Accessibility and responsive evidence
 
-Date: 2026-09-05
+Date: 2026-09-06
 
 ## Scope
 
@@ -10,6 +10,9 @@ component catalogue and is not part of the extension package.
 
 ## Automated evidence
 
+- The root `test:e2e` script currently runs 88 Vitest integration, contract and
+  vertical-flow tests. It does not start Chrome or Firefox; all browser-specific
+  accessibility observations remain part of the manual record below.
 - `npm run test:a11y` renders all five product surfaces and verifies named landmarks,
   the search-then-Review-bell header order, non-modal popover semantics, touch target
   tokens, narrow viewport constraints, persistent focus styles and reduced
@@ -25,6 +28,9 @@ component catalogue and is not part of the extension package.
 - The organizer exposes labelled folder-name fields, named icon actions, an
   explicit configuration/preview sequence, and a table whose headers identify
   bookmark, destination and action columns.
+- Apply and Restore each use a named confirmation dialog. Apply stays disabled
+  without a fresh preview; Restore is omitted until a verified IndexedDB
+  snapshot exists.
 - The agenda exposes one focusable horizontal week containing seven named day
   sections; the same direction is preserved at 390 px.
 - CSS contracts keep the 360 × 540 px extension menu, 320 px minimum runtime canvas,
@@ -39,10 +45,11 @@ component catalogue and is not part of the extension package.
 
 ## Manual review record
 
-A targeted Chromium pass covers the organizer in the Workbench at 1440 × 900
-and 390 × 844. Configuration and preview render without an error overlay;
-the narrow layout has zero horizontal overflow, three labelled text fields,
-no unnamed button, and a full-width 278 × 44 px Restore action. The preview
+A targeted Chromium pass covers the organizer in the Workbench at 1440 × 1000
+and in its simulated 390 px canvas. Configuration and preview render without an
+error overlay; the product surface has labelled text fields, no unnamed button,
+and a full-width narrow Restore action. The 2026-09-06 pass also removed an
+unintended stretched gap between the introduction and folder tree. The preview
 shows three rows and keeps Apply unavailable until a fresh preview exists.
 The complete Workbench pass opens all 23 deep-linked previews and renders 154
 variant/state combinations without an application error or Vite overlay. Page
@@ -52,6 +59,13 @@ popup previews remain bounded and horizontally scrollable at the simulated
 the Dialog starts closed and opens from its labelled trigger, and no nested
 `main` landmark is produced. The Workbench favicon uses the existing Tobirink
 asset, leaving the browser console free of missing-resource errors.
+The Workbench narrow-shell fix stacks the preview heading and all controls below
+820 px, expands both selectors to the available width, and confines explicit
+390/768 px canvases to the preview's own horizontal scroller. The responsive
+Workbench test covers the explicit 390 px canvas. A Chromium layout measurement
+at its 500 px headless minimum reports matching 500 px document, body, preview
+and control widths, with no document-level horizontal overflow; direct CSS
+inspection confirms that the compact breakpoint applies through 390 px.
 Firefox, 200% zoom and forced-colour behaviour still require a dedicated run.
 
 When a browser is available, record these checks for the extension menu (360 px

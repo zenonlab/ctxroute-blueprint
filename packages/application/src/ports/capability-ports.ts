@@ -2,14 +2,21 @@ import type { WorkId } from '@tobirink/domain';
 
 export interface BookmarkRecord {
   bookmarkId: string;
+  folderPath: readonly string[];
+  order: number;
   title: string;
   url: string;
 }
 
-export interface BookmarkPort {
+export interface BookmarkImportPort {
   importBookmarks(): Promise<readonly BookmarkRecord[]>;
+}
+
+export interface BookmarkProjectionPort {
   projectWork(input: { bookmarkId?: string; title: string; url: string; workId: WorkId }): Promise<string>;
 }
+
+export interface BookmarkPort extends BookmarkImportPort, BookmarkProjectionPort {}
 
 export interface BootstrapEnvelope {
   backupLocator?: string;

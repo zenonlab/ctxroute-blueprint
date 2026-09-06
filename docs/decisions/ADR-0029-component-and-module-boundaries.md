@@ -21,7 +21,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-03
-- Revised: 2026-09-05
+- Revised: 2026-09-06
 
 ## Context
 
@@ -40,13 +40,17 @@ Keep product dependencies directed inward:
   depend on the domain, never on React, WXT, Dexie or provider SDKs.
 - Application recovery validates serialized import envelopes with the selected
   Zod boundary library before invoking an atomic replacement port.
-- `packages/contracts` contains provider-neutral fakes and reusable adapter
-  contract suites. It may depend inward on application and domain public APIs,
-  but no production package depends on it.
+- `packages/contracts` contains provider-neutral fakes, reusable adapter
+  contract suites, and strict serializable boundary schemas. Fakes and suites
+  stay test-only; runtime adapters may consume boundary schemas from this
+  package, while the schemas themselves depend inward on application and
+  domain public APIs.
 - Adapter packages implement application ports and contain browser, storage,
   network or provider details.
 - `packages/adapters-browser` validates bookmark URLs and owns WebExtension
   notification calls; application resolution receives only normalized records.
+  The package exposes its adapter contract tests through its own workspace test
+  script so root and focused gates execute the same maintained suite.
 - The IndexedDB adapter owns versioned Dexie migrations, local integrity
   checks, and browser-only migration fixtures. Root scripts expose these
   package checks without moving persistence behavior into the workspace root.
@@ -57,6 +61,10 @@ Keep product dependencies directed inward:
 - `packages/ui` contains tokens, primitives and domain components. Components
   receive serializable state and callbacks; they do not call IndexedDB,
   browser APIs or cloud providers directly.
+- The package exports one CSS token entry, routable `MemberNavigation`,
+  `LibraryFilters`, and the complete Agenda composition plus its week model.
+  Extension files keep compatibility re-exports while the static web app uses
+  the same public API; neither consumer owns a visual fork.
 - `apps/extension` composes application use cases, adapters and shared UI into
   popup, library, Review, agenda and settings surfaces.
 - `apps/ui-workbench` is a local development adapter. It imports the same

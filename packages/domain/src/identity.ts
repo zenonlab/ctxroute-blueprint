@@ -7,6 +7,7 @@ type StableId<TKind extends string> = string & {
 };
 
 export type WorkId = StableId<'work'>;
+export type FavoriteSourceId = StableId<'source'>;
 export type LibraryId = StableId<'library'>;
 export type ProgressId = StableId<'progress'>;
 export type ReviewId = StableId<'review'>;
@@ -22,6 +23,7 @@ function stableId<TKind extends string>(value: string, prefix: TKind): StableId<
 }
 
 export const workId = (value: string): WorkId => stableId(value, 'work');
+export const favoriteSourceId = (value: string): FavoriteSourceId => stableId(value, 'source');
 export const libraryId = (value: string): LibraryId => stableId(value, 'library');
 export const progressId = (value: string): ProgressId => stableId(value, 'progress');
 export const reviewId = (value: string): ReviewId => stableId(value, 'review');

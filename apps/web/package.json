@@ -1,0 +1,35 @@
+{
+  "name": "@tobirink/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "setup:browser": "npm exec --yes --package=@playwright/test@1.63.0 -- playwright install chromium",
+    "setup:test-dependencies": "npm install --ignore-scripts",
+    "serve:test": "node tests/static-server.mjs",
+    "test": "vitest run",
+    "test:e2e": "npm exec --yes --package=@playwright/test@1.63.0 -- playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tobirink/contracts": "*",
+    "@tobirink/ui": "*",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.10.13",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.0.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

@@ -58,6 +58,8 @@ describe('extension security boundary', () => {
     expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ target: 'library', type: 'navigation.open', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ type: 'popup.context.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ type: 'review.queue.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ type: 'organizer.configuration.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ target: 'tabs', type: 'navigation.open', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ target: 'library', token: 'extra', type: 'navigation.open', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 2 }).success).toBe(false);
@@ -69,5 +71,36 @@ describe('extension security boundary', () => {
     const value = await firefoxManifest();
     expect(value.browser_specific_settings?.gecko.data_collection_permissions.required).toEqual(['none']);
     expect(value.browser_specific_settings?.gecko.id).toBe('tobirink@tobirink.local');
+  });
+
+  it('keeps IndexedDB behind the background composition root', async () => {
+    const packageManifest = z.object({
+      dependencies: z.record(z.string(), z.string()),
+    }).parse(JSON.parse(await readFile('package.json', 'utf8')));
+    const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
+    const localStorage = await readFile('runtime/local-storage.ts', 'utf8');
+
+    expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
+    expect(background).toMatch(/createExtensionLocalStorage\(\)/);
+    expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
+    expect(background).toMatch(/browser\.runtime\.onInstalled\.addListener/);
+    expect(background).toMatch(/normalizeBookmarks\(await bookmarks\.importBookmarks\(\)\)/);
+    expect(background).toMatch(/importFavoriteSources\(favorites, privateStorage\.storage/);
+    expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
+    expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);
+    expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
+    expect(background).toMatch(/readLocalSearchSnapshot\(privateStorage\.storage/);
+    expect(background).not.toMatch(/HttpReviewCandidateAdapter|fetch\(/);
+    expect(background).toMatch(/WebExtensionPublicReleaseCacheAdapter\(browser\.storage\.local\)/);
+    expect(background).toMatch(/WebExtensionQuickPreferencesAdapter\(browser\.storage\.local\)/);
+    expect(background).not.toMatch(/PublicReleaseSnapshotAdapter|loadLatest\(/);
+    expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
+    expect(background).toMatch(/saveOrganizerConfiguration\(privateStorage\.storage/);
+    expect(background).toMatch(/readOrganizerPreview\(privateStorage\.storage/);
+    expect(background).toMatch(/applyConfirmedOrganizerPreview/);
+    expect(background).toMatch(/DexieOrganizerSnapshotStore/);
+    expect(background).not.toMatch(/bookmarks\.(?:create|move|remove|update)\s*\(/);
+    expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
+    expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
   });
 });

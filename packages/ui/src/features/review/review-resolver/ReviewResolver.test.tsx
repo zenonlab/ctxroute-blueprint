@@ -19,6 +19,13 @@ describe('ReviewResolver', () => {
     expect(component).not.toMatch(/ReviewCandidateCard|ReviewDecisionForm/);
   });
 
+  it('keeps local context navigable without rendering fake decisions', () => {
+    expect(component).toMatch(/candidatesDeferred = state === 'partial'/);
+    expect(component).toMatch(/Les candidats ne sont pas encore disponibles/);
+    expect(component).toMatch(/!candidatesDeferred && manualOpen/);
+    expect(component).toMatch(/item\.sourceUrl \?/);
+  });
+
   it('matches the compact FavLib empty state without redundant copy or shell', () => {
     expect(component).toMatch(/className={styles\.empty}/);
     expect(component).toMatch(/icon="inbox"/);

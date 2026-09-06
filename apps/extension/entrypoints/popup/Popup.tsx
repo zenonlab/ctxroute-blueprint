@@ -6,7 +6,7 @@ import styles from './Popup.module.css';
 export interface PopupWork {
   coverAlt?: string;
   coverSrc?: string;
-  href: string;
+  href?: string;
   indicator?: string;
   mediaType: string;
   source: string;
@@ -145,9 +145,8 @@ export function Popup({
         {activePanel === 'agenda' ? (
           <section aria-label="Sorties" className={styles.panel} data-state={agenda.state}>
             <PanelHeading>Sorties</PanelHeading>
-            {agenda.state === 'ready' && agenda.items.length > 0 ? <div className={styles.cardGrid}>{agenda.items.map((item) => <Work item={item} key={`${item.href}-${item.title}`} variant="agenda" />)}</div> : null}
+            {agenda.state === 'ready' && agenda.items.length > 0 ? <div className={styles.cardGrid}>{agenda.items.map((item) => <Work item={item} key={`${item.href ?? 'unavailable'}-${item.title}`} variant="agenda" />)}</div> : null}
             {agenda.state === 'loading' ? <FeedbackState className={styles.feedback} kind="loading" layout="centered" title="Lecture des sorties…" /> : null}
-            {agenda.state === 'empty' || (agenda.state === 'ready' && agenda.items.length === 0) ? <FeedbackState className={styles.feedback} description="Les prochaines dates apparaîtront ici." icon="calendar-days" kind="empty" layout="centered" title="Aucune sortie à venir" /> : null}
             {agenda.state === 'error' && onRetryAgenda ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetryAgenda}>Réessayer</Button>} className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable title="Agenda indisponible" /> : null}
             {agenda.state === 'error' && !onRetryAgenda ? <FeedbackState className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable={false} title="Agenda indisponible" /> : null}
             {agenda.state === 'blocked' ? <FeedbackState className={styles.feedback} description="Le menu n’a pas encore accès aux sorties locales." icon="calendar-days" kind="error" layout="centered" recoverable={false} title="Sorties indisponibles" /> : null}

@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Validation de livraison de l’extension",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 820],
+    "views": [
+      {
+        "id": "automated-proof",
+        "label": "Preuves automatisées",
+        "focus": ["repository", "browserBuilds", "contractSuites", "uiEvidence", "securityEvidence"],
+        "note": "Les mêmes sources produisent les deux cibles et traversent les contrats, l’UI, la sécurité et la performance."
+      },
+      {
+        "id": "runtime-proof",
+        "label": "Preuves navigateur",
+        "focus": ["browserBuilds", "chromeRuntime", "firefoxRuntime", "releaseGate"],
+        "note": "Chrome charge le worker; le site statique traverse Vitest/jsdom et Playwright desktop/mobile avant les parcours d’extension."
+      },
+      {
+        "id": "release-artifacts",
+        "label": "Artefacts de livraison",
+        "focus": ["browserBuilds", "packageManifest", "releaseEvidence", "releaseGate"],
+        "note": "Les archives 1.0.0 reproductibles, l’origine exacte et leurs SHA-256 alimentent la décision sans publier automatiquement."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Sources" },
+    { "label": "Construire" },
+    { "label": "Vérifier" },
+    { "label": "Matérialiser" },
+    { "label": "Décider" }
+  ],
+  "nodes": [
+    { "id": "repository", "type": "backend", "label": "Sources TobiRink", "sublabel": "extension / app", "stage": 0, "row": 1, "tag": "versionnées" },
+    { "id": "browserBuilds", "type": "backend", "label": "Builds WXT MV3", "sublabel": "Chrome + Firefox", "stage": 1, "row": 1, "tag": "21 fichiers chacun" },
+    { "id": "contractSuites", "type": "security", "label": "Contrats", "sublabel": "Intégration / IndexedDB", "stage": 2, "row": 0, "tag": "local" },
+    { "id": "uiEvidence", "type": "frontend", "label": "UI accessible", "sublabel": "UI / Workbench / a11y", "stage": 2, "row": 2, "tag": "automatisé" },
+    { "id": "securityEvidence", "type": "security", "label": "Sécurité + perf", "sublabel": "CSP / permissions", "stage": 2, "row": 4, "tag": "sans host permission" },
+    { "id": "chromeRuntime", "type": "external", "label": "Runtime Chrome", "sublabel": "worker MV3 chargé", "stage": 3, "row": 0, "tag": "partiel" },
+    { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "en attente" },
+    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.0 / SHA-256", "stage": 3, "row": 4, "tag": "local uniquement" },
+    { "id": "releaseEvidence", "type": "backend", "label": "Preuves versionnées", "sublabel": "support / a11y / release", "stage": 4, "row": 4, "tag": "auditables" },
+    { "id": "releaseGate", "type": "security", "label": "Gate de livraison", "sublabel": "tous les parcours requis", "stage": 4, "row": 1, "tag": "aucune publication auto" }
+  ],
+  "flows": [
+    { "id": "sourcesToBuilds", "from": "repository", "to": "browserBuilds", "label": "sources uniques", "classification": "versionné", "variant": "emphasis" },
+    { "id": "buildsToContracts", "from": "browserBuilds", "to": "contractSuites", "label": "artefacts + runtime local", "classification": "automatisé", "variant": "security" },
+    { "id": "buildsToUi", "from": "browserBuilds", "to": "uiEvidence", "label": "UI", "classification": "automatisé", "variant": "default", "labelAt": [522, 328] },
+    { "id": "buildsToSecurity", "from": "browserBuilds", "to": "securityEvidence", "label": "manifestes et bundles", "classification": "automatisé", "variant": "security" },
+    { "id": "contractsToChrome", "from": "contractSuites", "to": "chromeRuntime", "label": "package unpacked", "classification": "runtime réel", "variant": "emphasis" },
+    { "id": "uiToFirefox", "from": "uiEvidence", "to": "firefoxRuntime", "label": "focus / zoom / responsive", "classification": "passage requis", "variant": "dashed", "labelAt": [638, 428] },
+    { "id": "securityToPackages", "from": "securityEvidence", "to": "packageManifest", "label": "budget accepté", "classification": "reproductible", "variant": "security" },
+    { "id": "packagesToEvidence", "from": "packageManifest", "to": "releaseEvidence", "label": "hashes et tailles", "classification": "preuve locale", "variant": "default" },
+    { "id": "chromeToGate", "from": "chromeRuntime", "to": "releaseGate", "label": "chargement prouvé", "classification": "partiel", "variant": "emphasis" },
+    { "id": "firefoxToGate", "from": "firefoxRuntime", "to": "releaseGate", "label": "parcours à accepter", "classification": "bloquant", "variant": "dashed" },
+    { "id": "evidenceToGate", "from": "releaseEvidence", "to": "releaseGate", "label": "dossier de preuve", "classification": "auditable", "variant": "security", "labelAt": [960, 656] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Acquis",
+      "items": [
+        "Contrats, UI, sécurité, accessibilité et performance passent",
+        "Chrome charge le service worker MV3 du package unpacked",
+        "Les deux archives sont reproduites avec des SHA-256 stables"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Condition restante",
+      "items": [
+        "Exécuter les parcours interactifs dans Chrome et Firefox",
+        "Vérifier clavier, focus, zoom 200 %, mouvement réduit et formats étroits",
+        "La gate interdit toute déclaration de livraison avant cette preuve"
+      ]
+    }
+  ]
+}

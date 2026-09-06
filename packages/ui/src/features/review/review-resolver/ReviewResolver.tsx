@@ -52,6 +52,7 @@ export function ReviewResolver({
   const manualInputId = useId();
   const manualPanelId = useId();
   const manualErrorId = useId();
+  const candidatesDeferred = state === 'partial' && item?.candidates.length === 0;
 
   useEffect(() => {
     setManualOpen(false);
@@ -137,50 +138,56 @@ export function ReviewResolver({
           <strong>{item.title}</strong>
           <span>{[item.sourceLabel, item.progress].filter(Boolean).join(' · ')}</span>
         </div>
-        <div className={styles.sourceActions}>
-          <a href={item.sourceUrl} rel="noreferrer" target="_blank">Source ↗</a>
-        </div>
+        {item.sourceUrl ? (
+          <div className={styles.sourceActions}>
+            <a href={item.sourceUrl} rel="noreferrer" target="_blank">Source ↗</a>
+          </div>
+        ) : null}
       </section>
 
-      <h3 className={styles.question}>Quelle œuvre correspond à ce favori&nbsp;?</h3>
+      {candidatesDeferred ? (
+        <p className={styles.noCandidates}>Les candidats ne sont pas encore disponibles.</p>
+      ) : (
+        <>
+          <h3 className={styles.question}>Quelle œuvre correspond à ce favori&nbsp;?</h3>
+          <div className={styles.candidates}>
+            {item.candidates.map((candidate) => (
+              <WorkCard
+                coverAlt={candidate.coverAlt}
+                coverSrc={candidate.coverSrc}
+                context={candidate.mediaType}
+                detail={candidate.provider}
+                href={candidate.href}
+                indicator={candidate.providerId}
+                key={candidate.candidateId}
+                reviewActions={{
+                  disabled: busy,
+                  onSelect: () => onSubmitDecision({ candidateId: candidate.candidateId, kind: 'candidate', revision: item.revision }),
+                  selectLabel: 'Choisir cette œuvre',
+                  sourceLabel: 'Voir la source',
+                }}
+                title={candidate.title}
+                variant="review"
+              />
+            ))}
+            <button
+              aria-controls={manualPanelId}
+              aria-expanded={manualOpen}
+              aria-label="Saisir un identifiant ou une URL"
+              className={`${styles.manualChoice}${manualOpen ? ` ${styles.selected}` : ''}`}
+              disabled={busy}
+              onClick={() => setManualOpen((open) => !open)}
+              type="button"
+            >
+              <Icon aria-hidden="true" name="plus" size="lg" />
+              <span>{item.candidates.length > 0 ? 'Autre œuvre' : 'Saisie manuelle'}</span>
+            </button>
+          </div>
+          {item.candidates.length === 0 ? <p className={styles.noCandidates}>Aucun candidat proposé par les sources disponibles.</p> : null}
+        </>
+      )}
 
-      <div className={styles.candidates}>
-        {item.candidates.map((candidate) => (
-          <WorkCard
-            coverAlt={candidate.coverAlt}
-            coverSrc={candidate.coverSrc}
-            context={candidate.mediaType}
-            detail={candidate.provider}
-            href={candidate.href}
-            indicator={candidate.providerId}
-            key={candidate.candidateId}
-            reviewActions={{
-              disabled: busy,
-              onSelect: () => onSubmitDecision({ candidateId: candidate.candidateId, kind: 'candidate', revision: item.revision }),
-              selectLabel: 'Choisir cette œuvre',
-              sourceLabel: 'Voir la source',
-            }}
-            title={candidate.title}
-            variant="review"
-          />
-        ))}
-        <button
-          aria-controls={manualPanelId}
-          aria-expanded={manualOpen}
-          aria-label="Saisir un identifiant ou une URL"
-          className={`${styles.manualChoice}${manualOpen ? ` ${styles.selected}` : ''}`}
-          disabled={busy}
-          onClick={() => setManualOpen((open) => !open)}
-          type="button"
-        >
-          <Icon aria-hidden="true" name="plus" size="lg" />
-          <span>{item.candidates.length > 0 ? 'Autre œuvre' : 'Saisie manuelle'}</span>
-        </button>
-      </div>
-
-      {item.candidates.length === 0 ? <p className={styles.noCandidates}>Aucun candidat proposé par les sources disponibles.</p> : null}
-
-      {manualOpen ? (
+      {!candidatesDeferred && manualOpen ? (
         <div className={styles.manualPanel} id={manualPanelId}>
           <form onSubmit={submitManual}>
             <label htmlFor={manualInputId}>Identifiant ou URL fournisseur</label>

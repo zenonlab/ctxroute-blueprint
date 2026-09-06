@@ -49,7 +49,7 @@ describe('extension performance budgets', () => {
     const packages = [packageMetrics('chrome-mv3'), packageMetrics('firefox-mv3')];
 
     for (const bundle of packages) {
-      expect(bundle.files).toBe(19);
+      expect(bundle.files).toBe(20);
       expect(bundle.compressedBytes).toBeLessThan(bundleBudgetBytes);
     }
 
@@ -58,6 +58,7 @@ describe('extension performance budgets', () => {
 
   it('keeps background startup free of storage scans, timers and network dependencies', () => {
     const source = readFileSync(join(root, 'apps/extension/wxt-entrypoints/background.ts'), 'utf8');
+    const localStorage = readFileSync(join(root, 'apps/extension/runtime/local-storage.ts'), 'utf8');
     const forbiddenStartupOperations = [
       /\bfetch\s*\(/,
       /\bXMLHttpRequest\b/,
@@ -70,6 +71,13 @@ describe('extension performance budgets', () => {
 
     expect(source).toMatch(/main\(\) \{/);
     expect(source).toMatch(/browser\.runtime\.onMessage\.addListener/);
+    expect(source).toMatch(/browser\.runtime\.onInstalled\.addListener/);
+    const readinessCalls = [...source.matchAll(/await privateStorage\.ensureReady\(\)/g)].map((match) => match.index);
+    expect(readinessCalls.length).toBeGreaterThan(0);
+    for (const call of readinessCalls) expect(call).toBeGreaterThan(source.indexOf('browser.runtime.onInstalled.addListener'));
+    expect(source.slice(source.indexOf('main() {'), source.indexOf('browser.runtime.onInstalled.addListener'))).not.toMatch(/ensureReady\(\)/);
     for (const forbidden of forbiddenStartupOperations) expect(source).not.toMatch(forbidden);
+    for (const forbidden of forbiddenStartupOperations) expect(localStorage).not.toMatch(forbidden);
+    expect(localStorage).toMatch(/database\.open\(\)/);
   });
 });

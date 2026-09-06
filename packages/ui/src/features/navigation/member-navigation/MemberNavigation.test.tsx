@@ -17,6 +17,10 @@ describe('MemberNavigation', () => {
     expect(component).toMatch(/Navigation principale/);
     expect(component).toMatch(/Navigation mobile/);
     for (const label of ['Accueil', 'Bibliothèque', 'Agenda']) expect(component).toContain(label);
+    expect(component).toMatch(/routes\?\.home \?\? '#home'/);
+    expect(component).toMatch(/routes\?\.library \?\? '#library'/);
+    expect(component).toMatch(/routes\?\.agenda \?\? '#agenda'/);
+    expect(component).toMatch(/<TobirinkLogo className={styles\.brandLogo} src={logoSrc} \/>/);
   });
 
   it('submits search and delegates Review to the shared resolver', () => {

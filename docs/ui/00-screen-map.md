@@ -12,7 +12,7 @@ qu'un résumé ou un raccourci vers celle-ci.
 | Bibliothèque | Parcourir et maintenir les œuvres suivies | filtres puis cartes directement, ou un état central illustré si aucun contenu n'est utilisable | un miroir de favoris navigateur ou un second titre sous la navigation |
 | Panneau Review | Résoudre les correspondances ambiguës depuis le header | contexte condensé, candidats, preuve de source, saisie manuelle AniList/MangaUpdates, absence de correspondance, conflit de révision | une page autonome, une carte mère ou un avis utilisateur |
 | Agenda | Comprendre les prochaines sorties | semaine de sept jours, lecture horizontale, dates officielles, confirmées ou estimées | une liste verticale infinie ou une date présentée comme certaine sans provenance |
-| Réglages complets de l’extension | Organiser les favoris depuis l’extension | arbre de dossiers ordonné, filtres facultatifs, aperçu des déplacements, application et restauration | une page générale de préférences, de diagnostic ou d’export |
+| Réglages complets de l’extension | Organiser les favoris depuis l’extension | arbre de dossiers ordonné, filtres réellement disponibles et aperçu local des déplacements | une page générale de préférences, de diagnostic ou d’export |
 
 Les pages complètes Bibliothèque et Agenda partagent une shell membre
 unique. Il reprend le logo, les trois destinations principales de
@@ -29,9 +29,13 @@ panneau nomme l’élément détecté « Cette œuvre » : sa `WorkCard` paysage
 ouvre la dernière URL utile observée. « Continuer mes œuvres » vient dessous,
 dans le même viewport verticalement défilable, avec au plus cinq `WorkCard`
 portrait 2:3 représentant des œuvres interrompues et non terminées. Sorties
-reste un onglet distinct. Page et Sorties réutilisent `WorkCard`; leurs états sans contenu utilisent le même
-état central illustré que les pages. Réglages contient seulement les
-préférences quotidiennes et un accès à l’organisateur complet. La surface reçoit
+reste un onglet distinct. Page et Sorties réutilisent `WorkCard`; l’onglet
+Sorties lit la même période Agenda locale hydratée par le cache public que la page complète et ne rend rien
+lorsque cette période est vide. Une sortie ouvre sa source favorite locale ;
+sans source, la même `WorkCard` reste visible mais non interactive et annonce
+son indisponibilité. Réglages contient seulement les préférences réellement
+persistées — notifications des sorties officielles ou confirmées à leur heure
+et affichage des estimations — ainsi qu’un accès à l’organisateur complet. La surface reçoit
 ses modèles sérialisables séparément de ses callbacks, sans lire le navigateur,
 IndexedDB ou le réseau. Tant que les ports de lecture ne sont pas raccordés,
 le runtime affiche une indisponibilité explicite au lieu d’un chargement ou
@@ -40,12 +44,17 @@ trente jours, n’est ni exporté ni autoritaire et peut disparaître avec les
 données de l’extension. Les Réglages complets reprennent l’organisateur FavLib en page entière,
 sans recherche globale ni navigation du site. La première vue édite l’arbre de
 dossiers et ses filtres dans l’ordre de priorité ; la seconde devient une page
-d’aperçu complète, sans coque de dialogue, avant application. Les préférences
-rapides restent dans le popup.
+d’aperçu complète, sans coque de dialogue. L’application apparaît seulement
+après un aperçu frais et ouvre une confirmation courte; le background recalcule
+le même aperçu avant de capturer l’arbre complet dans IndexedDB puis de déplacer
+les favoris. Restaurer exige sa propre confirmation et remet uniquement les
+favoris encore présents à leur parent et rang sauvegardés, sans suppression.
+Les préférences rapides restent dans le popup.
 L’arbre est récursif : un dossier peut créer ses propres enfants. Le rang est
 affiché en contraste au centre du pictogramme de dossier rempli et correspond
-uniquement à sa place parmi ses frères. Le bouton Filtres développe sous le dossier les choix Type,
-statut éditorial et progression personnelle ; « Arrêté » peut recevoir un seuil.
+uniquement à sa place parmi ses frères. Le bouton Filtres développe sous le dossier
+les groupes réellement fournis par l’hôte. Le runtime actuel propose Manga et
+Anime ; les statuts éditoriaux et la progression restent absents faute de données locales fiables.
 Renommer, filtrer, créer, supprimer ou réordonner invalide immédiatement l’aperçu.
 Chaque règle, aperçu et action provient de l’hôte sous forme sérialisable ou de
 callback ; la surface ne lit aucune API navigateur, aucun stockage et aucun réseau.
@@ -59,6 +68,16 @@ par `Icon` et Lucide ; ils ne remplacent jamais la marque.
 La cloche reste visuellement identifiable au repos, immédiatement à droite de
 la recherche. Le pied du resolver affiche précédent, position courante et
 suivant ; avancer reporte temporairement l'élément sans enregistrer de décision.
+La file locale alimente ce compteur et cette navigation sur Bibliothèque,
+Agenda et la route Review. Si aucun candidat n'est encore disponible, le
+contexte du favori et les flèches restent visibles mais aucune saisie ni action
+de décision factice n'est proposée.
+La recherche du header ouvre la Bibliothèque sur un résultat local borné et
+accent-insensible. Elle interroge IndexedDB via le worker, ne filtre pas
+seulement la première page visible et ne contacte aucun fournisseur distant.
+Review propose uniquement les œuvres locales qui possèdent déjà une source
+HTTP(S) résolue. Une saisie manuelle vérifie de la même manière un identifiant
+ou une URL locale unique avant d'écrire ; elle ne déclenche aucun appel D1.
 Quand la file est vide, la bulle reprend l'empty state FavLib compact : une
 icône Inbox grise et le seul libellé « Aucune correspondance à vérifier », sans
 en-tête ni description internes supplémentaires.
@@ -74,9 +93,10 @@ résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
 
 | Parcours | Entrée | Surface de travail | Résultat visible |
 | --- | --- | --- | --- |
-| Organisation des favoris | Réglages complets | Arbre puis aperçu | déplacements explicitement prévisualisés avant application |
+| Organisation des favoris | Réglages complets | Arbre puis aperçu | règles enregistrées localement et déplacements explicitement prévisualisés |
 | Résolution | Cloche du header | Panneau Review | décision atomique locale puis candidat suivant |
-| Observation de progression | Page compatible | contexte de lecture transmis au cas d’usage applicatif | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
+| Recherche globale | Recherche du header | Bibliothèque filtrée par la requête locale | jusqu’à 24 œuvres locales, sans réseau |
+| Observation de progression | Ouverture du popup sur une page compatible | titre et URL `activeTab` corrélés à une œuvre locale unique | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
 | Consultation d'une sortie | Bibliothèque ou onglet Sorties du menu d’extension | Agenda | date qualifiée par son niveau de confiance |
 | Configuration d'un rappel | Agenda | Agenda puis Réglages si permission absente | rappel local confirmé ou raison du blocage |
 

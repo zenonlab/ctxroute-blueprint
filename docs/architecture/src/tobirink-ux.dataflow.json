@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "TobiRink — parcours UX local-first",
+    "output": "tobirink-ux.dataflow.html",
+    "viewBox": [1080, 560],
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "new-install", "label": "Nouvelle installation", "focus": ["browser", "extension", "indexeddb"], "note": "Les favoris HTTP(S) entrent dans une base locale neuve avant toute projection UI." },
+      { "id": "site-bridge", "label": "Site connecté", "focus": ["site", "bridge", "indexeddb"], "note": "Accueil lit 4 œuvres; Library garde filtres et curseur dans l’URL; Agenda émet une lecture par semaine lundi [from,to)." },
+      { "id": "offline-recovery", "label": "Hors ligne et reprise", "focus": ["indexeddb", "extension", "site"], "note": "Les parcours privés restent lisibles localement et signalent l’absence de connexion." }
+    ]
+  },
+  "stages": [
+    { "label": "Sources utilisateur" },
+    { "label": "Surfaces" },
+    { "label": "Bridge applicatif" },
+    { "label": "Autorité privée" },
+    { "label": "Projections" }
+  ],
+  "nodes": [
+    { "id": "browser", "type": "external", "label": "Favoris navigateur", "sublabel": "HTTP(S)", "stage": 0, "row": 0, "tag": "source locale" },
+    { "id": "extension", "type": "frontend", "label": "Extension TobiRink", "sublabel": "popup · agenda", "stage": 1, "row": 0, "width": 144, "tag": "MV3" },
+    { "id": "indexeddb", "type": "database", "label": "IndexedDB privé", "sublabel": "Work · sources", "stage": 2, "row": 0, "width": 144, "tag": "autorité" },
+    { "id": "bridge", "type": "security", "label": "WebBridgePort v2", "sublabel": "session · Zod", "stage": 3, "row": 0, "width": 144, "tag": "64 KiB" },
+    { "id": "site", "type": "frontend", "label": "Site TobiRink", "sublabel": "provider · six états", "stage": 4, "row": 0, "width": 144, "tag": "statique" }
+  ],
+  "flows": [
+    { "from": "browser", "to": "extension", "label": "import", "classification": "premier démarrage", "variant": "emphasis", "route": "straight", "labelDy": 53 },
+    { "from": "extension", "to": "indexeddb", "label": "écrit local", "classification": "transaction privée", "variant": "emphasis", "route": "straight", "labelDy": 53 },
+    { "from": "indexeddb", "to": "bridge", "label": "projection bornée", "classification": "500 œuvres · 100 entrées", "variant": "security", "route": "straight", "labelDy": 53 },
+    { "from": "bridge", "to": "site", "label": "rendu", "classification": "site sans accès direct", "variant": "dashed", "route": "straight", "labelDy": 53 }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Autorité locale", "items": ["IndexedDB reste l’autorité privée unique", "L’installation importe les favoris dans une base neuve", "Le site ne lit jamais le stockage privé directement"] },
+    { "dot": "cyan", "title": "Bridge borné", "items": ["Session émise par l’extension, requête et version sont validées", "Library applique recherche normalisée, facette, curseur et limite 24", "Agenda transmet les timestamps et disponibilités locales sans précision inventée"] },
+    { "dot": "amber", "title": "États honnêtes", "items": ["Détection 1,5 s et reconnexion unique sont explicites", "Incompatibilité et erreur récupérable restent distinctes", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
+  ]
+}

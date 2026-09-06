@@ -38,6 +38,16 @@ function validPublicId(value: string): boolean {
   return publicIdPattern.test(value);
 }
 
+function parseTitle(value: string | undefined): string | undefined {
+  const title = value?.trim();
+  if (!title || title.length > 200) return undefined;
+  const hasControlCharacter = [...title].some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && (codePoint < 0x20 || codePoint === 0x7f);
+  });
+  return hasControlCharacter ? undefined : title;
+}
+
 export function createCatalogueApp(injected?: CatalogueServices) {
   const app = new Hono<WorkerRuntime>();
 
@@ -71,6 +81,15 @@ export function createCatalogueApp(injected?: CatalogueServices) {
     }
     const work = await routeServices(context, injected).catalogue.resolveReference(provider, externalId);
     return work ? context.json({ work }) : context.json({ error: 'not-found' }, 404);
+  });
+
+  app.get('/v1/catalogue/search', async (context) => {
+    const services = routeServices(context, injected);
+    const title = parseTitle(context.req.query('title'));
+    const limit = parseLimit(context.req.query('limit'), services);
+    if (title === undefined || limit === undefined) return context.json({ error: 'invalid-query' }, 400);
+    const items = await services.catalogue.searchWorksByTitle(title, limit);
+    return context.json({ items });
   });
 
   app.get('/v1/catalogue/works/:workId', async (context) => {

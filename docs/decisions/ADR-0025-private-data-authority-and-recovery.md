@@ -49,6 +49,40 @@ authenticated format/version context. Only the strict ciphertext envelope may
 cross the backup adapter. Restore decrypts and validates the complete private
 export before calling the existing confirmed atomic replacement once.
 
+Local Agenda reads use canonical half-open time ranges through `StorageReadPort`.
+Memory and Dexie adapters enforce the same maximum of 100 ordered entries; the
+application joins Work records after the bounded query and reports missing
+local references instead of requesting remote replacements. Dexie schema v4
+indexes resolved Reviews by `matchedWorkId`; the application follows those
+bounded results to their private `FavoriteSource` records. Multiple favorites
+for one Work remain valid and the preferred link is chosen deterministically
+by folder path, bookmark order, then stable identifier.
+
+The public release cache is a separate strict `storage.local` envelope. It
+contains at most 200 public release identities, Work identities, qualified
+availability values and timestamps; it contains no source URL, progress or
+user identity. The application validates it before hydrating only Agenda rows
+whose Work already exists in private IndexedDB. Missing Works are reported and
+the previous local Agenda is never deleted. The extension currently composes
+only this cache port: the remote loader remains dormant until an origin and a
+narrow host permission are explicitly approved.
+
+Quick preferences use their own strict versioned adapter. The privacy-safe
+defaults disable native notifications and show estimated releases. Enabling
+notifications creates deterministic zero-lead reminders only for official or
+confirmed entries; disabling them leaves durable tasks intact but prevents
+publication. The estimated-release preference filters delivery projections,
+not the cached or authoritative records.
+
+Organizer projection is a confirmed outward side effect, never a second
+authority. The application accepts only the exact complete preview it can
+recalculate from current private state. It captures and verifies one complete
+minimal bookmark-tree snapshot through a dedicated IndexedDB port before the
+first move. Restore moves only surviving bookmark nodes to surviving saved
+parents and indexes; it never recreates or deletes a bookmark. Local private
+export v3 already includes organizer rules, while encrypted backup remains a
+separate explicit opt-in flow and cannot replace IndexedDB silently.
+
 ## Consequences
 
 Clearing a disposable cache can be repaired from stable catalogue IDs. Losing

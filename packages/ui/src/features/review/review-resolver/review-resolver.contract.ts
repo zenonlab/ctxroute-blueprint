@@ -30,7 +30,7 @@ export interface ReviewItem {
   progress?: string;
   revision: string;
   sourceLabel: string;
-  sourceUrl: string;
+  sourceUrl?: string;
   title: string;
   total?: number;
 }

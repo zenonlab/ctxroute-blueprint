@@ -554,48 +554,795 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-review-resolution",
       "title": "Documenter l’inventaire, la résolution et la Review locale",
-      "status": "BLOCKED",
-      "executionMode": "collaborative",
-      "modeOffered": false,
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
       "steps": [
         {
           "id": "step-1",
-          "title": "Définir le parcours minimal d’inventaire, résolution et Review",
-          "status": "BLOCKED",
+          "title": "Preserver les sources favorites locales comme donnees privees autoritaires",
+          "status": "DONE",
           "acceptance": [
-            "Tout favori HTTP(S) importé reçoit un état explicite et aucun élément n’est écarté silencieusement.",
-            "L’ordre de résolution est documenté sans imposer au domaine un fournisseur ou un transport.",
-            "Review désigne une vérification humaine d’association ambiguë et jamais un avis éditorial.",
-            "La file locale permet de choisir un candidat, fournir un identifiant ou une URL fournisseur, ou décider qu’aucun candidat ne correspond.",
-            "La décision est atomique, protégée contre les révisions obsolètes, stockée dans IndexedDB et déclenche ensuite l’enrichissement.",
-            "Aucune association ambiguë n’est envoyée automatiquement.",
-            "La contribution collective transmet uniquement une association explicitement validée après consentement distinct et reste hors du MVP local.",
-            "Le workflow Archify passe la validation showcase sans erreur ni avertissement.",
-            "Les validations des décisions et de la documentation passent."
+            "FavoriteSource preserve une identite Tobirink, le bookmark source, le titre brut, l URL HTTP(S), le chemin et l ordre de dossier, la date d import et la Review associee sans faire du bookmark une identite Work.",
+            "StoragePort fournit des lectures bornees et des ecritures transactionnelles de FavoriteSource; les fakes et Dexie appliquent le meme contrat.",
+            "IndexedDB passe en version 3 sans perte: les bases v1 et v2 migrent avec un store favoriteSources vide et un controle d integrite couvrant la nouvelle relation.",
+            "L export prive version 2 inclut FavoriteSource et importe encore les exports version 1 avec une liste vide; une erreur ne publie aucun etat partiel.",
+            "ADR, documentation et architecture indiquent que FavoriteSource reste local dans IndexedDB; aucun composant UI, appel distant, deploiement, push ou suppression n est effectue."
           ],
           "files": [
-            "docs/00-project-brief.md",
-            "docs/01-technology-decisions.md",
-            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/architecture/src/tobirink.architecture.json",
             "docs/systems/README.md",
-            "docs/workflows/README.md",
-            "docs/decisions/ADR-0030-review-resolution-and-collective-signals.md",
-            "docs/architecture/drafts/review.workflow.json",
-            ".project/project-config.json"
+            "packages/domain/src/favorite-source.ts",
+            "packages/domain/src/identity.ts",
+            "packages/domain/src/invariant.ts",
+            "packages/domain/src/index.ts",
+            "packages/domain/src/domain.test.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/index.ts",
+            "packages/application/src/recovery/private-export.ts",
+            "packages/application/src/recovery/recovery.test.ts",
+            "packages/application/src/recovery/cloud/encrypted-backup.test.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/contracts/src/export/memory-recovery-store.ts",
+            "packages/contracts/src/export/export-contract.test.ts",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "packages/adapters-indexeddb/src/migrations/integrity.ts",
+            "packages/adapters-indexeddb/test/migrations-entry.ts",
+            "packages/adapters-indexeddb/test/browser-entry.ts",
+            "packages/adapters-indexeddb/test/fixtures/v3-after.json"
           ],
           "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "npm run typecheck",
             "npm run validate:decisions",
-            "npm run validate:docs -- --all",
-            "npm run archify:validate -- review.workflow",
-            "npm run validate:architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
             "git diff --check",
-            "git diff -- docs/ .project/project-config.json"
+            "git commit -m feat(domain):preserve-local-favorite-sources"
           ],
           "evidence": [
-            "Le retrait graphique a supprimé les conflits de routes et croisements.",
-            "La composition restait sous le seuil de lisibilité desktop avec une erreur et aucun avertissement.",
-            "Deux corrections ciblées de libellés n'ont pas réduit cette erreur; Archify impose l'arrêt.",
-            "Rollback appliqué: branche collective et registre d'architecture restaurés à leur état initial."
+            "Domaine 8/8, application 15/15, contrats 9/9 et recovery 10/10 passent; export prive v2 preserve FavoriteSource et importe v1 vide.",
+            "IndexedDB 2/2 + contrat Chromium passent; migrations Chromium v1/v2 vers v3 passent et integrite refuse une FavoriteSource orpheline.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, docs, 34 ADR, infrastructure 16/16 et Archify Tobirink 9/9 passent; validate global est uniquement interrompu par .codex/config.toml modifie hors scope dans une autre session."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Composer Dexie dans le background sans confondre cache et autorite",
+          "status": "DONE",
+          "acceptance": [
+            "Le popup installe ouvre et migre la base tobirink-private v3 avant de repondre",
+            "Un module de composition background possede Dexie et l UI ne depend jamais de Dexie",
+            "Le cache de reprise reste exclusivement dans browser.storage.local et aucun appel distant n est ajoute",
+            "Les tests, builds Chrome et Firefox, securite, performance, documentation et Archify passent"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/extension/runtime/local-storage.ts",
+            "apps/extension/runtime/local-storage.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:storage",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Extension 60/60: composition Dexie construite une fois, ouverture lazy coalescee, reprise apres echec et nom stable tobirink-private.",
+            "IndexedDB 2/2 + contrat Chromium; builds Chrome/Firefox ~584 kB; securite 12/12 et performance 3/3 passent sans scan, timer, reseau ni nouvelle permission.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR, lockfile coherent et Archify Tobirink 9/9 passent; navigateur integre indisponible, donc aucun smoke UI manuel revendique."
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Ecrire FavoriteSource et Review depuis l inventaire navigateur",
+          "status": "DONE",
+          "acceptance": [
+            "L adaptateur WebExtension conserve bookmarkId URL titre chemin de dossiers et ordre",
+            "Chaque favori HTTP(S) est importe localement avec FavoriteSource et Review dans une transaction",
+            "La reimportation est idempotente et preserve date initiale et Review resolue",
+            "onInstalled declenche seulement l import local sans reseau et le cache popup reste separe",
+            "Tests builds securite performance documentation et Archify passent"
+          ],
+          "files": [
+            "packages/application/src/ports/capability-ports.ts",
+            "packages/application/src/resolution/favorite-resolution.ts",
+            "packages/application/src/use-cases/import-favorite-sources.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "packages/application/src/index.ts",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-browser/src/bookmarks/web-extension-bookmark-adapter.ts",
+            "packages/adapters-browser/src/bookmarks/web-extension-bookmark-adapter.test.ts",
+            "packages/adapters-browser/src/bookmarks/normalize-bookmarks.ts",
+            "packages/adapters-browser/src/index.ts",
+            "packages/contracts/src/capability-fakes.ts",
+            "apps/extension/review-flow.test.ts",
+            "apps/extension/runtime/local-storage.ts",
+            "apps/extension/runtime/local-storage.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/decisions/ADR-0029-component-and-module-boundaries.md",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test --workspace @tobirink/adapters-browser",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:storage",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 18/18, adaptateur navigateur 2/2 et extension 60/60: import HTTP(S) transactionnel, chemins/ordre preserves et reimport idempotent.",
+            "IndexedDB 2/2 plus contrat Chromium; builds Chrome/Firefox ~586 kB, securite 12/12 et performance 3/3 passent sans reseau.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/34 ADR et Archify Tobirink 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Publier la file Review locale par un message borne",
+          "status": "DONE",
+          "acceptance": [
+            "StoragePort liste au plus 100 Reviews par statut via l index local existant",
+            "Le cas d usage retourne uniquement des donnees serialisables et les Reviews pending dans un ordre stable",
+            "Le background expose un message Zod strict et ouvre IndexedDB uniquement a la demande",
+            "La lecture Review ne fait aucun appel reseau et ne confond pas IndexedDB avec le cache popup",
+            "Tests, typecheck, securite, performance, lint, Sensor, documentation et Archify passent"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/use-cases/read-review-queue.ts",
+            "packages/application/src/use-cases/read-review-queue.test.ts",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "scripts/performance/extension-performance.test.tsx",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- packages/application/src/use-cases/read-review-queue.ts apps/extension/wxt-entrypoints/background.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 20/20, contrats 9/9 et IndexedDB Chromium passent: file filtree par statut, limite 100 et ordre stable.",
+            "Extension 62/62; securite 12/12 et performance 3/3: message Zod strict, ouverture lazy et zero appel reseau.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/34 ADR et Archify Tobirink 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Raccorder la cloche du header a la file Review locale",
+          "status": "DONE",
+          "acceptance": [
+            "Bibliotheque, Agenda et Review partagent le meme modele de cloche alimente par review.queue.read",
+            "Le compteur et les etats loading, empty, error et partial refletent la file locale sans fixture",
+            "Les fleches precedent et suivant parcourent la file et les decisions absentes ne sont pas simulees",
+            "Une source non HTTP(S) ne produit aucun lien et aucune API navigateur ou IndexedDB n entre dans les composants UI",
+            "Tests UI, extension, accessibilite, Workbench, builds, lints, Sensor, documentation et deux architectures Archify passent"
+          ],
+          "files": [
+            "apps/extension/runtime/review-navigation-model.ts",
+            "apps/extension/runtime/review-navigation-model.test.ts",
+            "apps/extension/runtime/use-local-review-navigation.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "packages/ui/src/features/review/review-resolver/review-resolver.contract.ts",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.tsx",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.test.tsx",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.preview.tsx",
+            "apps/extension/accessibility/extension-accessibility.test.tsx",
+            "docs/ui/00-screen-map.md",
+            "docs/ui/01-state-matrix.md",
+            "docs/architecture/src/ui-system.architecture.json",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:ui",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:ui-workbench",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:ui-workbench",
+            "npm run test:performance",
+            "npm run test:security",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:ui",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- apps/extension/runtime/use-local-review-navigation.ts packages/ui/src/features/review/review-resolver/ReviewResolver.tsx",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Chrome headless 390 px: etat partial sans question ni saisie, contexte + 1/3 visibles, scrollWidth=innerWidth=390 et aucun overlay.",
+            "UI 117/117, extension 65/65, Workbench 9/9 et accessibilite 7/7; builds Chrome/Firefox ~589 kB, securite et performance passent.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, contrat UI, Sensor SAFE, docs et deux architectures Archify 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Definir le contrat local des candidats Review",
+          "status": "DONE",
+          "acceptance": [
+            "Une Review pending retrouve au plus une FavoriteSource par reviewId via le port de stockage.",
+            "Le cas d usage publie un snapshot serialisable et borne sans exposer l URL privee ni une implementation fournisseur.",
+            "Une decision ulterieure peut detecter une Review perimee avec une revision deterministe.",
+            "Aucune migration IndexedDB, permission navigateur ou requete reseau nest ajoutee."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/ports/review-candidate-port.ts",
+            "packages/application/src/use-cases/read-review-candidates.ts",
+            "packages/application/src/use-cases/read-review-candidates.test.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run test:security",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 23/23, contrats 9/9 et IndexedDB 2/2 plus contrat Chromium passent; lookup reviewId borne et doublons refuses.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor SAFE passent; candidats limites a 6, requete exclusive reference ou titre, revision deterministe testee.",
+            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent avec host_permissions vide; docs, ADR et Archify Tobirink 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Ajouter une recherche de titres publique et bornee",
+          "status": "DONE",
+          "acceptance": [
+            "Le port catalogue recherche des oeuvres par titre exact insensible a la casse avec une limite explicite.",
+            "La route publique valide le titre et la limite, utilise une requete preparee et ne retourne aucun champ prive.",
+            "EXPLAIN QUERY PLAN prouve l utilisation de l index dedie et la lecture reste bornee.",
+            "Aucun deploiement, permission navigateur ou appel fournisseur nest effectue."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/01-technology-decisions.md",
+            "docs/decisions/ADR-0026-catalogue-and-media-pipeline.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.test.ts",
+            "apps/worker/migrations/0003_catalogue_title_search.sql",
+            "apps/worker/src/catalogue/catalogue-routes.ts",
+            "apps/worker/src/catalogue/catalogue-routes.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm test --workspace @tobirink/worker",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run test:security",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Adaptateur Cloudflare 19/19 et Worker 20/20 passent; recherche exacte insensible a la casse, limite stable, validation et cache public verifies.",
+            "EXPLAIN QUERY PLAN utilise catalogue_titles_by_title; mesure rows_read <= 2 pour un resultat; injection reste une valeur preparee.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, securite 12/12, Sensor SAFE, docs, decisions et Archify Tobirink 9/9 passent; aucun deploiement ni permission."
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Ajouter un adaptateur HTTP de candidats injectable",
+          "status": "DONE",
+          "acceptance": [
+            "L origine est une origine HTTPS injectee sans chemin, identifiants ou parametres.",
+            "Les requetes reference et titre utilisent uniquement les routes catalogue possedees et un fetch injecte.",
+            "Les reponses sont validees strictement, bornees et transformees en Work sans champ prive.",
+            "Aucun branchement background, permission navigateur, reseau reel ou deploiement nest ajoute."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "package-lock.json",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-browser/src/index.ts",
+            "packages/adapters-browser/src/catalogue/http-review-candidate-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-review-candidate-adapter.test.ts",
+            "packages/application/src/ports/review-candidate-port.ts",
+            "packages/application/src/use-cases/read-review-candidates.ts",
+            "packages/application/src/use-cases/read-review-candidates.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run test:security",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 23/23 et adaptateur navigateur 5/5 passent; reponses JSON strictes, erreurs normalisees, limites et chemins possedes testes.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor cible SAFE passent; securite extension/Worker 12/12 et builds Chrome/Firefox ~590 kB passent.",
+            "Manifestes Chrome/Firefox gardent host_permissions vide; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-9",
+          "title": "Lire la bibliotheque locale dans la surface extension",
+          "status": "DONE",
+          "acceptance": [
+            "Le background lit la bibliotheque primaire par un cas d usage borne a 24 oeuvres et sans reseau.",
+            "Le message et sa reponse sont strictement valides et ne transportent que des donnees serialisables.",
+            "La surface affiche des etats loading empty ready partial et error issus de la lecture reelle sans contenu de demonstration.",
+            "Aucune permission navigateur, origine distante, API directe dans React ou modification des autres surfaces nest ajoutee.",
+            "Tests, builds, securite, lint, anti-slop, documentation et architecture produit passent."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/library/read-library-page.ts",
+            "packages/application/src/library/read-library-page.test.ts",
+            "packages/application/src/library/index.ts",
+            "packages/application/src/index.ts",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.tsx",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.test.tsx",
+            "apps/extension/entrypoints/library/Library.tsx",
+            "apps/extension/entrypoints/library/Library.test.tsx",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/library-progress.test.ts",
+            "apps/extension/accessibility/extension-accessibility.test.tsx"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- packages/application/src/library/read-library-page.ts packages/ui/src/features/library/library-filters/LibraryFilters.tsx apps/extension/runtime/messages.ts apps/extension/runtime/ExtensionSurface.tsx apps/extension/wxt-entrypoints/background.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 25/25, UI 117/117, extension 67/67, Workbench 9/9, accessibilite 7/7 et IndexedDB Chromium passent; pagination stable de 24 et references manquantes testees.",
+            "Recherche et filtre Type utilisent les donnees locales; facettes sans options et CTA telechargement sans callback ne sont pas rendus; Chrome headless charge #library a 390 px sans overlay.",
+            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; host_permissions reste vide."
+          ]
+        },
+        {
+          "id": "step-10",
+          "title": "Lire la periode Agenda locale dans la surface extension",
+          "status": "DONE",
+          "acceptance": [
+            "StorageReadPort expose une lecture occursAt ordonnee et bornee a 100 entrees par periode avec implementations memoire et Dexie equivalentes.",
+            "Le cas d usage joint les Work locales et signale les references manquantes sans appel distant.",
+            "Le background et React echangent un message strict serialisable et la surface construit sept jours avec navigation de semaine reelle.",
+            "Les jours vides ne rendent aucune carte ni texte artificiel et les etats loading empty partial ready error proviennent de la lecture reelle.",
+            "Aucune permission navigateur, requete reseau, deploiement ou donnee de demonstration nest ajoutee; toutes les validations passent."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/agenda/read-agenda-period.ts",
+            "packages/application/src/agenda/read-agenda-period.test.ts",
+            "packages/application/src/agenda/index.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "apps/extension/entrypoints/agenda/Agenda.tsx",
+            "apps/extension/entrypoints/agenda/Agenda.test.tsx",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/runtime/agenda-period-model.ts",
+            "apps/extension/runtime/agenda-period-model.test.ts",
+            "apps/extension/runtime/use-local-agenda.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/agenda-notifications.test.ts",
+            "apps/extension/accessibility/extension-accessibility.test.tsx"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "npm run sensor -- packages/application/src/agenda/read-agenda-period.ts packages/application/src/ports/storage-port.ts packages/adapters-indexeddb/src/dexie-storage-port.ts apps/extension/runtime/messages.ts apps/extension/runtime/ExtensionSurface.tsx apps/extension/wxt-entrypoints/background.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 27/27, contrats 9/9, IndexedDB 2/2 plus contrat Chromium et extension 71/71 passent; plage demi-ouverte, ordre, limite 100 et Work manquante sont testes.",
+            "Agenda utilise un modele de semaine et un hook runtime separes; navigation precedente/suivante interroge le background local; Chrome 390 px confirme le flux horizontal et aucun texte dans les jours vides.",
+            "Typecheck 8 workspaces, UI 117/117, accessibilite 7/7, builds Chrome/Firefox ~597 kB, securite 12/12, lints, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent sans permission reseau."
+          ]
+        },
+        {
+          "id": "step-11",
+          "title": "Raccorder Agenda au popup local",
+          "status": "DONE",
+          "acceptance": [
+            "Popup Agenda reads the current local weekly period without fixtures.",
+            "Empty popup Agenda renders no fake release text or card.",
+            "Popup retry reloads only the Agenda period and navigation remains keyboard accessible.",
+            "No network call, host permission, direct IndexedDB access or duplicated application contract is introduced.",
+            "Extension, UI, Workbench, accessibility, builds, security, lint, anti-slop and Archify validations pass."
+          ],
+          "files": [
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/runtime/use-local-agenda.ts",
+            "apps/extension/runtime/agenda-period-model.ts",
+            "apps/extension/entrypoints/popup/**",
+            "apps/extension/accessibility/**",
+            "docs/ui/00-screen-map.md",
+            "docs/ui/01-state-matrix.md",
+            "docs/architecture/src/ui-system.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/ui-workbench",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security --workspace @tobirink/extension",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Popup runtime reuses useLocalAgenda; local releases map to WorkCard and open the full Agenda through a host callback; empty periods render no placeholder copy.",
+            "Extension 71/71, UI 117/117, Workbench 9/9 and accessibility 7/7 pass; typecheck passes all 8 workspaces.",
+            "Chrome and Firefox builds remain about 597 kB; extension security 8/8 and both manifests retain empty host_permissions.",
+            "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, docs and UI contract validations pass.",
+            "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings.",
+            "external: no in-app browser instance was available for an additional manual screenshot; automated Workbench and accessibility checks passed."
+          ]
+        },
+        {
+          "id": "step-12",
+          "title": "Ouvrir la source locale depuis Agenda",
+          "status": "DONE",
+          "acceptance": [
+            "Agenda resolves a deterministic preferred FavoriteSource through bounded resolved Reviews matched to each Work.",
+            "Multiple sources remain valid and are ordered by folder path, bookmark order and stable identifier.",
+            "Dexie uses an indexed matchedWorkId lookup with a tested version migration.",
+            "Agenda and popup WorkCards open the exact preferred local HTTP(S) source when present.",
+            "A WorkCard without a local source remains visually identical but is non-interactive and does not claim to open a source.",
+            "No network call, host permission or direct storage access is introduced in UI surfaces.",
+            "Application, contracts, IndexedDB browser contract, extension, UI, accessibility, builds, security, lint, anti-slop and Archify validations pass."
+          ],
+          "files": [
+            "packages/application/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/agenda/**",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "packages/adapters-indexeddb/test/**",
+            "packages/ui/src/features/library/work-card/**",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/runtime/agenda-period-model.ts",
+            "apps/extension/runtime/agenda-period-model.test.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/agenda-notifications.test.ts",
+            "apps/extension/entrypoints/agenda/**",
+            "apps/extension/entrypoints/popup/**",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/systems/README.md",
+            "docs/ui/00-screen-map.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/ui-system.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run test:migrations --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/ui-workbench",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security --workspace @tobirink/extension",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 28/28 and contracts 9/9 pass; multiple resolved favorites are preserved, ordered by folder path, bookmark order and stable ID, with source reads coalesced per Work.",
+            "Dexie v4 indexes matchedWorkId; adapter 2/2, Chromium StoragePort contract and v1/v2/v3-to-v4 migration checks pass.",
+            "Extension 72/72, UI 118/118, Workbench 9/9 and accessibility 7/7 pass; sourceUrl accepts only HTTP(S) and source-less WorkCard has no href.",
+            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with empty host_permissions.",
+            "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, UI/docs/34 ADR validations and git diff check pass.",
+            "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings."
+          ]
+        },
+        {
+          "id": "step-13",
+          "title": "Définir le noyau local de l organisateur de favoris",
+          "status": "DONE",
+          "acceptance": [
+            "Le domaine valide un arbre de règles local borné avec identifiants uniques types statuts et progressions connus",
+            "Le calcul d aperçu est déterministe applique la première règle gagnante et combine les conditions avec AND",
+            "Une donnée absente incertaine ou non reconnue ne produit jamais de déplacement",
+            "Le noyau ne lit ni IndexedDB ni API navigateur ni réseau et ne modifie aucun favori",
+            "Les tests la documentation et l architecture Archify valident la frontière modulaire"
+          ],
+          "files": [
+            "packages/domain/src/organizer/**",
+            "packages/domain/src/index.ts",
+            "packages/domain/src/domain.test.ts",
+            "packages/application/src/organizer/**",
+            "packages/application/src/index.ts",
+            "packages/application/src/application.test.ts",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):define-local-preview-core"
+          ],
+          "evidence": [
+            "Domaine 11/11 et application 33/33 passent; arbre borne a 100 dossiers et 8 niveaux, identifiants uniques, premiere regle gagnante et conditions AND testes.",
+            "Contexte absent duplique incomplet ou non reconnu produit keep; le noyau pur ne depend ni d IndexedDB ni du navigateur ni du reseau et ne modifie aucun favori.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/35 ADR, diff-check et Archify Tobirink 9/9 sans erreur ni avertissement passent."
+          ]
+        },
+        {
+          "id": "step-14",
+          "title": "Persister la configuration de l organisateur dans IndexedDB",
+          "status": "DONE",
+          "acceptance": [
+            "Une configuration organizer singleton validee contient l arbre local et une revision temporelle canonique",
+            "StoragePort fakes et Dexie relisent et ecrivent la configuration avec le meme contrat transactionnel",
+            "Dexie v5 ajoute le store organizer sans perte depuis les schemas v1 a v4 et le controle d integrite couvre le singleton",
+            "L export prive v3 preserve organizer et importe v1 v2 avec une configuration absente sans en inventer",
+            "Aucune API navigateur aucun reseau et aucun deplacement de favori ne sont ajoutes; tests docs architecture et gates passent"
+          ],
+          "files": [
+            "packages/domain/src/organizer/**",
+            "packages/domain/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/recovery/**",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/contracts/src/export/**",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "packages/adapters-indexeddb/src/migrations/**",
+            "packages/adapters-indexeddb/test/**",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):persist-local-configuration"
+          ],
+          "evidence": [
+            "Domaine 12/12, application 34/34 et contrats 9/9 passent; le singleton organizer est revalide sur ecriture et lecture dans les fakes et Dexie.",
+            "Chromium valide le StoragePort IndexedDB et les migrations v1 v2 v3 v4 vers Dexie v5; Work Review et FavoriteSource sont conserves et le nouveau store reste vide sans configuration.",
+            "Recovery 7/7 et backup chiffre 3/3 preservent export prive v3 et organizer tout en important v1 v2 sans invention; typecheck 8 workspaces, lints, Sensor SAFE, docs et Archify 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-15",
+          "title": "Raccorder Reglages et l apercu organisateur au runtime local",
+          "status": "DONE",
+          "acceptance": [
+            "La page Reglages charge une configuration IndexedDB ou un arbre racine vide sans donnees de demonstration",
+            "Les editions utilisent un message strict et enregistrent une configuration revalidee avant de publier le nouvel etat",
+            "L apercu joint au plus 500 FavoriteSource Review et Work locaux et echoue ferme pour les metadonnees absentes",
+            "Le runtime ne propose que les filtres alimentes par le modele local et ne rend ni Appliquer ni Restaurer sans callback reel",
+            "Aucun appel D1 aucun acces direct UI a Dexie et aucune creation modification suppression ou deplacement de favori ne sont ajoutes",
+            "Tests UI extension application accessibilite securite builds docs et deux architectures Archify passent"
+          ],
+          "files": [
+            "packages/application/src/organizer/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/recovery/**",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/**",
+            "apps/extension/security/**",
+            "packages/ui/**",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/ui/**",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/ui-system.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:a11y",
+            "npm run test:security",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:ui",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):connect-local-settings"
+          ],
+          "evidence": [
+            "Application 37/37, contrats 9/9 et stockage IndexedDB 2/2 plus contrat Chromium passent; l apercu joint au plus 500 FavoriteSource Review Work et echoue ferme si le contexte manque.",
+            "Extension 80/80, UI 118/118, Workbench 9/9, accessibilite 8/8 et securite 12/12 passent; Reglages lit et serialise les ecritures par messages stricts sans Dexie navigateur reseau ni action Apply Restore fictive.",
+            "Typecheck 8 workspaces, performance 3/3, builds Chrome 613.91 kB et Firefox 614.03 kB, lints, anti-slop, Sensor SAFE, docs, decisions, diff-check et deux Archify 9/9 passent; audit Chromium desktop corrige l espace etire, shell Workbench natif 390 px reste un correctif distinct."
           ]
         }
       ]
@@ -694,6 +1441,39 @@
             "npm audit found 0 vulnerabilities after the DOMPurify 3.4.14 security override.",
             "Architecture showcase validation passed with 9 checks, 0 errors and 0 warnings.",
             "Full validation reaches only the pre-existing .codex/config.toml MCP manifest mismatch; UI acceptance gates pass."
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Corriger le shell Workbench natif a 390 px",
+          "status": "DONE",
+          "acceptance": [
+            "Catalogue et Apercu restent accessibles par la navigation mobile",
+            "Le header et les controles Variante Etat Viewport restent entierement visibles",
+            "La preview 390 px ne provoque aucun debordement horizontal du document",
+            "Tests Workbench build capture Chromium et validations UI docs Archify passent"
+          ],
+          "files": [
+            "apps/ui-workbench/src/styles.css",
+            "apps/ui-workbench/src/App.test.tsx",
+            "docs/ui/accessibility-evidence.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:ui-workbench",
+            "npm run build:ui-workbench",
+            "npm run validate:ui",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- ui-system.architecture",
+            "git diff --check",
+            "git commit -m fix(workbench): fit narrow viewport"
+          ],
+          "evidence": [
+            "Le shell Workbench empile le titre, le statut, Variante, État et Viewport sous 820 px; les sélecteurs occupent la largeur disponible et le canvas explicite défile sans élargir le document.",
+            "Chromium headless mesure innerWidth, document, body, preview et controls à 500 px, sans débordement document; le test Workbench couvre le canvas 390 px.",
+            "Workbench 9/9, build TypeScript/Vite, ESLint, Oxlint, anti-slop, contrat UI, docs et diff-check passent.",
+            "Sensor CSS SAFE; ui-system.architecture passe 9 contrôles showcase, 0 erreur et 0 avertissement."
           ]
         }
       ]
@@ -1467,7 +2247,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-vertical-flows",
       "title": "Livrer les parcours fonctionnels verticaux",
-      "status": "DONE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -1542,6 +2322,214 @@
             "durable tasks: application 2/2 plus IndexedDB Chromium contract; expired work survives worker restart",
             "Agenda surface: 8/8 and uses WorkCard, never AgendaItem; Workbench build passes",
             "typecheck, lint, anti-slop, Sensor SAFE; decisions/workspace/diff pass; architecture 9/9 with 0 warnings"
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Raccorder la page active et la progression automatique",
+          "status": "DONE",
+          "acceptance": [
+            "Le contexte compatible de l’onglet devient un modèle sérialisable sans API navigateur dans React",
+            "La progression observée est enregistrée automatiquement; une valeur égale n’écrit rien et une baisse est ignorée",
+            "Cette œuvre et les reprises utilisent la dernière URL utile sans commande manuelle de progression",
+            "Toute nouvelle permission est décidée explicitement avant implémentation"
+          ],
+          "files": [
+            "packages/application/src/popup/popup-context.ts",
+            "packages/application/src/popup/popup-context.test.ts",
+            "packages/application/src/progress/progress-flow.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/library-progress.test.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "docs/decisions/ADR-0032-popup-context-cache.md",
+            "docs/ui/00-screen-map.md",
+            "docs/ui/01-state-matrix.md",
+            "docs/workflows/README.md",
+            "docs/architecture/README.md",
+            "docs/architecture/src/active-page-progress.dataflow.json",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:e2e -- library-progress",
+            "npm run test --workspace @tobirink/application",
+            "npm run test --workspace @tobirink/contracts",
+            "npm run test --workspace @tobirink/adapters-indexeddb",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:a11y",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:config",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:ui",
+            "npm run sensor -- changed-files",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m feat(progress): observe active pages"
+          ],
+          "evidence": [
+            "Le popup corrèle au plus 500 FavoriteSource via Review résolue vers une Work unique; ambiguïté ou limite atteinte conserve la carte générique sans écriture.",
+            "Un marqueur explicite chapitre ou épisode crée ou augmente Progress dans une transaction locale; égalité, baisse, type incompatible et maximum dépassé ne modifient rien.",
+            "Application 40/40, contrats 9/9, extension 80/80, flux ciblé 3/3 et IndexedDB 2/2 plus contrat Chromium passent.",
+            "A11y 8/8, sécurité extension 8/8 et Worker 4/4, performance 3/3, typecheck, builds Chrome 616.48 kB et Firefox 616.60 kB passent.",
+            "Aucune permission, host permission, content script ou requête réseau ajouté; React reçoit toujours uniquement le snapshot sérialisé.",
+            "Sensor SAFE, lints, anti-slop, config, décisions, docs et UI passent; dataflow et les trois diagrammes produit passent 9 contrôles showcase sans erreur ni avertissement."
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Raccorder Review et la recherche globale",
+          "status": "DONE",
+          "acceptance": [
+            "La cloche lit les candidats vérifiables et enregistre chaque décision atomique locale",
+            "Précédent et suivant parcourent la file sans écrire et la décision avance vers le prochain élément",
+            "La recherche globale retourne des résultats locaux et aucun callback ignoreSearch ne subsiste",
+            "Les fournisseurs distants restent derrière les ports et la gate opérationnelle"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/entrypoints/review",
+            "packages/application/src/use-cases",
+            "packages/application/src/ports",
+            "packages/adapters-browser/src",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:e2e -- review-flow",
+            "npm run test:contracts",
+            "npm run test:security",
+            "npm run test:a11y",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": [
+            "La cloche charge au plus six candidats locaux munis d une source HTTP vérifiable; candidat, saisie locale unique et aucun résultat révisent une seule Review dans une transaction avec contrôle de révision.",
+            "Précédent et suivant ne font que déplacer le curseur; après une décision, la file pending est relue et l élément suivant occupe la position courante.",
+            "La recherche globale n utilise plus ignoreSearch: elle inspecte au plus 500 œuvres de la bibliothèque, retourne 24 résultats accent-insensibles et ouvre la surface Library locale.",
+            "Le client HTTP D1 reste non composé, aucune permission hôte ni fetch runtime ajouté; les messages sont stricts et les projections sont isolées du routeur WXT.",
+            "Review E2E 2/2, application 47/47, extension 83/83, contrats 9/9, sécurité 12/12, accessibilité 8/8, typecheck et deux builds passent.",
+            "ESLint, Oxlint, anti-slop, Sensor SAFE, docs, décisions, UI, diff-check et Tobirink Archify 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Raccorder agenda, rappels, notifications et réglages rapides",
+          "status": "DONE",
+          "acceptance": [
+            "Agenda et Sorties consomment le snapshot public via un port caché et restent utilisables hors ligne",
+            "Seules les dates officielles ou confirmées peuvent programmer un rappel natif dédupliqué",
+            "Alarmes et notifications reprennent les échéances manquées après redémarrage",
+            "Les préférences rapides viennent du stockage local et ne restent plus bloquées par défaut"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints",
+            "packages/application/src/agenda",
+            "packages/application/src/tasks",
+            "packages/adapters-browser/src/notifications",
+            "packages/adapters-cloudflare/src/releases",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:e2e -- agenda-notifications",
+            "npm run test:tasks",
+            "npm run test:security",
+            "npm run test:a11y",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": [
+            "Agenda hydrate uniquement le dernier snapshot public strict via PublicReleaseCachePort; œuvres privées, progression, rappels et tâches durables restent autoritaires dans IndexedDB.",
+            "Seules les sorties official/confirmed créent une tâche datée et idempotente; les estimations sont exclues et une ancienne date reprogrammée est bloquée sans notification.",
+            "browser.storage.local conserve uniquement le cache public versionné et les deux préférences rapides strictes; notifications natives désactivées par défaut et aucun host_permissions ni fetch distant ajouté.",
+            "L alarme MV3 est recréée au démarrage et draine au plus 20 échéances; agenda-notifications 6/6 et contrat IndexedDB Chromium passent.",
+            "Application 50/50, extension 87/87, navigateur 7/7, Cloudflare 19/19, sécurité 12/12, accessibilité 8/8 et typecheck passent.",
+            "Builds Chrome 635.15 kB et Firefox 635.27 kB, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, décisions, UI et diff-check passent; Tobirink Archify 9/9 sans erreur ni avertissement."
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Finaliser application, restauration et sauvegarde des réglages",
+          "status": "DONE",
+          "acceptance": [
+            "Appliquer exige un aperçu frais et une confirmation explicite avant tout déplacement",
+            "Un snapshot local précède chaque projection et Restaurer remet ce snapshot sans supprimer de favori",
+            "Les contrôles n’existent que lorsque leurs callbacks réels sont disponibles",
+            "Export local et sauvegarde chiffrée opt-in restent séparés et ne remplacent jamais IndexedDB"
+          ],
+          "files": [
+            "apps/extension/entrypoints/options",
+            "apps/extension/runtime",
+            "packages/application/src/organizer",
+            "packages/application/src/recovery",
+            "packages/adapters-browser/src",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:recovery",
+            "npm run test:security",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": [
+            "Appliquer exige la confirmation littérale et recalcule exactement l aperçu attendu; aperçu partiel, tronqué ou modifié est rejeté avant toute capture ou mutation.",
+            "Un snapshot minimal complet de l arbre navigateur est capturé puis relu via DexieOrganizerSnapshotStore avant le premier move; le contrat IndexedDB Chromium prouve sa persistance locale.",
+            "Le navigateur est isolé derrière WebExtensionOrganizerAdapter; restore déplace uniquement les favoris encore présents vers un parent sauvegardé existant et ne crée ni ne supprime aucun favori.",
+            "Le bouton Restaurer reste absent sans snapshot réel; Appliquer et Restaurer utilisent deux Dialog de confirmation et seulement des callbacks runtime sérialisés.",
+            "Export privé v3 avec règles organisateur et backup AES-GCM opt-in restent séparés: recovery 7/7, contrat export 1/1 et adaptateur backup 3/3 passent.",
+            "Application 53/53, navigateur 8/8, extension 88/88, sécurité 12/12, a11y 8/8, typecheck, lints, anti-slop, Sensor SAFE et builds Chrome 641.68 kB / Firefox 641.80 kB passent; Archify 9/9 sans avertissement."
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Valider les parcours UX de bout en bout avant livraison",
+          "status": "BLOCKED",
+          "acceptance": [
+            "Import, bibliothèque, progression, Review, agenda et réglages passent dans une extension chargée",
+            "Clavier, focus, zoom 200 pourcent, mouvement réduit et formats étroits passent sur Chrome et Firefox",
+            "Les états vide, chargement, partiel, hors ligne, erreur, conflit et blocage sont vérifiés sans contenu inventé",
+            "Le package final reste déterministe et aucune publication ni aucun déploiement n’est automatique"
+          ],
+          "files": [
+            "tests/e2e",
+            "apps/extension",
+            "docs/ui/accessibility-evidence.md",
+            "docs/browser-support.md",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run test:e2e",
+            "npm run test:a11y",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run verify"
+          ],
+          "evidence": [
+            "Extension tests 88/88 and accessibility tests 8/8 pass; security tests pass extension 8/8 and Worker 4/4.",
+            "Performance suite 3/3 passes; Chrome and Firefox WXT builds are deterministic-sized at 641.68 kB and 641.80 kB.",
+            "npm run archify:validate -- tobirink-ux.dataflow passes all 9 showcase checks with 0 errors and 0 warnings.",
+            "Delivered UX dataflow artifact SHA-256 0b9c46fe1fc7f186f93732584dc00f4f22bb2ca0545018cb98453eceaebb00a4; visual-check passes light/dark at 1440x900, 1600x1000, 1920x1080 and 2048x1320 with no overflow.",
+            "Manual screenshot inspection confirms the five-stage UX path, labels, legend, and conclusion cards are readable in the delivered light artifact.",
+            "npm run verify reaches architecture, docs, UI, lint, anti-slop, Sensor and AST gates, then fails only at mcp:validate because pre-existing .codex/config.toml adds four tool overrides.",
+            "external: browser controller reports Browser is not available; real loaded-extension Chrome/Firefox journeys, zoom 200 percent and multi-browser focus checks cannot run in this environment."
           ]
         }
       ]
@@ -2884,6 +3872,725 @@
             "Popup affiche « Cette œuvre » avec WorkCard active-work 3:2 et reprises 2:3 sous « Continuer mes œuvres »; viewport vertical tactile et liens vers la dernière URL utile.",
             "Cache storage.local versionné: cinq entrées maximum, TTL 30 jours, terminées/invalides exclues; activeTab HTTP(S) uniquement derrière message Zod strict et adaptateurs.",
             "Application 8/8, UI 114/114, extension 58/58, Workbench 7/7, a11y 6/6, performance 3/3; typecheck, builds Chrome/Firefox, sécurité 7/7, lint, anti-slop, docs et Archify passent."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-full-replacement",
+      "title": "Remplacer entièrement FavLib par TobiRink",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Porter Progress à 256 Kio et matérialiser le chantier",
+          "status": "DONE",
+          "acceptance": [
+            "Limite 256 Kio et plafond goals augmenté sans suppression",
+            "Tests Progress verts",
+            "Goal matérialisé"
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs",
+            "npm run progress:read",
+            "npm run progress:validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "scripts/progress-core.mjs uses a 256 KiB file limit and a 40-goal ceiling without removing history",
+            "node --test tests/progress-core.test.mjs passed 40 tests",
+            "ADR-0014 records the 256 KiB and 40-goal limits",
+            "npm run progress:validate -- .project/progress/full-replacement-plan.json passed with no errors",
+            "git diff --check passed"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Refondre l’architecture produit TobiRink",
+          "status": "DONE",
+          "acceptance": [
+            "Site bridge radio documentés",
+            "Clean-room documenté",
+            "Archify produit vert"
+          ],
+          "files": [
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/tobirink-ux.dataflow.json",
+            "docs/decisions",
+            "docs/00-project-brief.md"
+          ],
+          "commands": [
+            "npm run validate:architecture",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all"
+          ],
+          "evidence": [
+            "ADR-0036 records the static Next export and bounded WebBridgePort contract",
+            "ADR-0037 records the extension-only provider-neutral RadioPort",
+            "ADR-0038 records isolated resources, inspect-plan-apply, parallel cutover and rollback",
+            "docs/00-project-brief.md records clean-room boundaries and static site scope",
+            "npm run archify:validate -- tobirink passed 9 checks with 0 errors and 0 warnings",
+            "Archify deliver passed: specification dd fc 2c ca and artifact 4031626b",
+            "Archify visual-check passed at 1440x900, 1600x1000, 1920x1080 and 2048x1320 in light/dark captures",
+            "npm run validate:decisions, npm run validate:docs -- --all and git diff --check passed"
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Créer le site web statique modulaire",
+          "status": "DONE",
+          "acceptance": [
+            "Routes publiques présentes",
+            "Routes privées absentes",
+            "Export statique séparé"
+          ],
+          "files": [
+            "apps/web",
+            "package.json",
+            "package-lock.json",
+            "packages/ui"
+          ],
+          "commands": [
+            "npm run workspace:check",
+            "npm run test:coverage",
+            "npm run build"
+          ],
+          "evidence": [
+            "apps/web defines the requested static App Router routes and reuses @tobirink/ui WorkCard",
+            "SiteShell performs only a local handshake and displays installation/reconnection state without fabricated private data",
+            "Worker assets binding points to apps/web/out and explicit public route fallback serves only the static site routes",
+            "web sensor SAFE, typecheck passes, ESLint and anti-slop pass",
+            "Next 16.2.6 strict build passes with workspace-local TypeScript 5.9.3 and prerenders all required routes",
+            "Worker tests pass 20/20"
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Créer le bridge site-extension borné",
+          "status": "DONE",
+          "acceptance": [
+            "Transport strict",
+            "Lectures bornées et écriture Review unique",
+            "Pas d’accès direct au stockage"
+          ],
+          "files": [
+            "packages/contracts",
+            "packages/application",
+            "packages/adapters-browser",
+            "apps/extension",
+            "apps/web"
+          ],
+          "commands": [
+            "npm run test:coverage",
+            "npm run typecheck",
+            "npm run security"
+          ],
+          "evidence": [
+            "WebBridgePort and strict schemas cover bootstrap, paginated library, agenda and Review projections",
+            "Chrome externally_connectable and Firefox origin-limited content script use WXT_PUBLIC_SITE_ORIGIN",
+            "Nonce, expiry, exact sender origin, protocol version and 64 KiB envelope bound are enforced",
+            "Only review.decision.write mutates state and it calls the transactional local Review use-case",
+            "No site code imports IndexedDB, browser.storage or browser APIs",
+            "Extension bridge tests passed 12 tests, contracts tests passed 17 tests, typechecks and lint passed",
+            "Chrome and Firefox production builds passed at 750.48 kB and 750.60 kB"
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Finaliser l’extension neuve et son identité locale",
+          "status": "DONE",
+          "acceptance": [
+            "Identité et base neuves",
+            "Import HTTP(S) sans FavLib",
+            "WorkCard unique"
+          ],
+          "files": [
+            "apps/extension",
+            "packages/adapters-indexeddb",
+            "packages/contracts",
+            "docs"
+          ],
+          "commands": [
+            "npm run test:coverage",
+            "npm run build:extension",
+            "npm run security"
+          ],
+          "evidence": [
+            "Firefox identity is tobirink@tobirink.local and Chrome identity is generated from the new manifest",
+            "Primary IndexedDB authority is tobirink-local-v1; no FavLib database name or migration path is referenced",
+            "First-install onInstalled imports normalized browser bookmarks into the new authority",
+            "WorkCard remains the shared library/review card surface and no alternate read-only card was added",
+            "IndexedDB browser contract, local-storage tests, extension typecheck and Chrome/Firefox builds passed"
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Refondre la radio dans l’extension",
+          "status": "DONE",
+          "acceptance": [
+            "RadioPort neutre",
+            "Fonctions extension-only",
+            "Aucun raccord avant validation"
+          ],
+          "files": [
+            "apps/extension",
+            "packages/contracts",
+            "packages/adapters-browser",
+            "docs/architecture/src"
+          ],
+          "commands": [
+            "npm run test:coverage",
+            "npm run build:extension",
+            "npm run validate:architecture"
+          ],
+          "evidence": [
+            "Application exports provider-neutral RadioPort, RadioSession, RadioTrack, filters, queue and preferences",
+            "Contracts validate HTTP(S) audio URLs, season/format/OP-ED filters, sorting, volume, bounded queue and compact state",
+            "Radio contract and LocalRadioPort tests pass (17 contract tests in the full contracts suite; 10 adapter tests)",
+            "No AnimeThemes adapter, site radio route, or production placeholder has been added",
+            "Workbench radio preview covers expanded/compact/queue variants and idle/playing/paused/filtered-empty states",
+            "UI 118/118, UI Workbench 9/9 and Workbench build pass",
+            "Playwright capture at 390px shows bounded two-column controls with no horizontal control overflow",
+            "Extension performance tests pass 3/3 with 21-file Chrome/Firefox artifacts under the 1.5 MB compressed budget"
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Centraliser l’environnement et isoler le cloud",
+          "status": "DONE",
+          "acceptance": [
+            "PublicRuntimeConfig typé",
+            "Aucun identifiant FavLib",
+            "Inspect-plan-apply"
+          ],
+          "files": [
+            "packages/contracts",
+            "apps/worker",
+            "apps/extension",
+            "apps/web",
+            "docs/operations",
+            "docs/decisions"
+          ],
+          "commands": [
+            "npm run security",
+            "npm run validate:docs -- --all",
+            "npm run workspace:check"
+          ],
+          "evidence": [
+            "PublicRuntimeConfig now requires explicit site origin, Chrome/Firefox IDs, semver and download URLs",
+            "Public runtime config parser tests pass in the 17-test contracts suite",
+            "docs/operations/cloudflare.env.example documents only CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID names",
+            "Infrastructure gate tests pass 16/16 and validate inspect, dry-run plan, exact approval and fail-closed apply",
+            "No production fallback origin, extension ID or artifact URL is encoded in the config parser",
+            "Cloudflare resource names remain isolated in the existing TobiRink Wrangler configuration",
+            "Inspect-plan-apply gate remains the only provider operation path; secret values are not read or printed"
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Valider le remplacement de bout en bout",
+          "status": "DONE",
+          "acceptance": [
+            "Parcours nouvelle installation et bridge",
+            "UX/accessibilité/responsive ou blocages prouvés",
+            "Builds et docs cohérents"
+          ],
+          "files": [
+            "tests",
+            "apps",
+            "packages",
+            "docs"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run lint",
+            "npm run test:coverage",
+            "npm run build"
+          ],
+          "evidence": [
+            "extension-delivery-validation.dataflow and tobirink-ux.dataflow pass Archify showcase 9/9 each with 0 errors and 0 warnings",
+            "npm run verify passes end to end: validate, CRG smoke, integration, npm audit at 0 vulnerabilities, and build:docs",
+            "Next 16.3.4 strict static build and web typecheck pass; all requested routes prerender",
+            "UI 118/118, Workbench 9/9, extension 90/90, accessibility 8/8, application/contracts 53/53, IndexedDB 3/3 plus Chromium browser contract, Worker 20/20 and performance 3/3 pass",
+            "Chrome and Firefox builds and reproducible packaging pass with 21 files each; package reproducibility 2/2",
+            "MCP validation and stdio integration pass 5/5 after correcting server-section parsing without changing user Codex configuration"
+          ]
+        },
+        {
+          "id": "step-9",
+          "title": "Préversion, bascule et rollback",
+          "status": "DONE",
+          "acceptance": [
+            "Préversion et rollback documentés",
+            "Aucun déploiement automatique",
+            "Artefacts séparés"
+          ],
+          "files": [
+            "docs/release.md",
+            "docs/operations",
+            "docs/decisions",
+            "apps/worker"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run security",
+            "git diff --check"
+          ],
+          "evidence": [
+            "docs/release.md now defines isolated preversion comparison, exact cutover approval and non-destructive FavLib rollback",
+            "Local package:extension produced separate Chrome/Firefox ZIPs with 21 files and SHA-256 manifests",
+            "Vitest packaging reproducibility test passes 2/2",
+            "No publish, deploy, push, deletion or Cloudflare mutation was performed"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-cloudflare-cutover",
+      "title": "Nettoyage Cloudflare FavLib et production TobiRink",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Étendre et verrouiller la gate Cloudflare inspect-plan-apply",
+          "status": "DONE",
+          "acceptance": [
+            "Gate inspect/plan/apply pour suppressions D1/R2/Worker, créations D1/R2 et déploiement Worker",
+            "Allowlist exacte des 7 ressources FavLib; toute cible inattendue refusée avant Wrangler",
+            "Plans signés par digest, expirables, liés au compte/driver; dérive distante et preview modifiée refusées avant mutation",
+            "Tests des refus de cible, plan expiré, état distant modifié et digest incorrect",
+            "Documentation de /Users/hazenawsky/FavLib/.env en mémoire sans copie ni affichage",
+            "Aucun appel Cloudflare, suppression, création, déploiement, publication ou commit"
+          ],
+          "files": [
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/tobirink-provider-gate.mjs",
+            "scripts/infra/provider-gate-core.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "scripts/infra/provider-gate-core.test.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0038-parallel-clean-room-cutover.md",
+            ".project/progress/**"
+          ],
+          "commands": [
+            "npm run progress:status",
+            "npm run progress:validate",
+            "npm run test:infra",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Gate catalog now contains the seven exact FavLib cleanup targets, three TobiRink creation targets, configured D1 migration and Worker deployment.",
+            "Wrangler mutation translations are isolated in the driver and ordered delete → create → migrate → deploy.",
+            "17/17 infrastructure tests pass, including exact resource translation and fail-closed negative guards.",
+            "git diff --check passes; no Cloudflare command, deletion, creation, deployment, publication or commit was executed."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-artifacts",
+      "title": "Préparer les artefacts publics TobiRink",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Rebuilder et préparer les artefacts publics Chrome/Firefox",
+          "status": "DONE",
+          "acceptance": [
+            "ZIP Chrome et Firefox reconstruits de manière reproductible avec manifest SHA-256",
+            "/download ne contient plus de placeholder et pointe vers URLs versionnées sous https://tobirink.com/downloads/",
+            "Documentation distingue préparation locale et publication distante",
+            "Aucun upload, publication, suppression, création, déploiement ou commit"
+          ],
+          "files": [
+            "scripts/release/package-extension.mjs",
+            "scripts/release/package-extension.test.mjs",
+            "apps/web/app/download/page.tsx",
+            "docs/release.md",
+            ".project/progress/**"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run test:infra",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run package:extension rebuilt Chrome/Firefox with 21 files each and SHA-256 manifest: Chrome 855a7f0303b0550b509101caf6460920675861dabc42221aaafcd024abd1481c; Firefox 1687025237e0fe97777d0ca720ca6b7803a1a8c2bb1b3193b6e6e03bfc93216e.",
+            "npx vitest run scripts/release/package-extension.test.mjs passed 2/2.",
+            "Next static web build passed and /download now points to versioned https://tobirink.com/downloads/ URLs with no placeholder.",
+            "git diff --check passed; no upload, publication, deletion, creation or deployment was executed."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-web-workbench-production",
+      "title": "Refaire les surfaces web Workbench jusqu’au production-ready",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Matérialiser et sécuriser le chantier",
+          "status": "DONE",
+          "acceptance": [
+            "Goal Progress autonome matérialisé",
+            "WebBridge v2 impose origine exacte, nonce de session, expiration, anti-rejeu, corrélation et limite UTF-8 64 Kio",
+            "review.decision.write reste la seule mutation",
+            "Tests ciblés et audit du diff passent"
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            ".project/progress/**",
+            "packages/contracts/src/web-bridge*",
+            "packages/application/src/ports/web-bridge-port.ts",
+            "apps/extension/runtime/web-bridge-*",
+            "apps/extension/wxt-entrypoints/web-bridge.content.ts",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/contracts",
+            "npm run test --workspace @tobirink/extension -- web-bridge-runtime.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m \"fix(web-bridge): secure private projection sessions\""
+          ],
+          "evidence": [
+            "WebBridge v2 issues 60-second extension nonces and enforces exact origin, expiry equality, anti-replay and request correlation",
+            "64 KiB UTF-8 checks cover inbound messages and outbound responses; Review remains the only write command",
+            "Contracts 18/18 and bridge runtime 4/4 passed; full typecheck, ESLint, decisions and Archify showcase 9/9 passed",
+            "git diff --check passed; no deletion, deployment, upload, push or Cloudflare call"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Corriger les projections privées",
+          "status": "DONE",
+          "acceptance": [
+            "bootstrap.read ne lit ni ne retourne Agenda",
+            "agenda.read exige une semaine date-only lundi [from,to) et borne 100 entrées",
+            "library.read applique recherche, facette, curseur, limite 1..24 et scan 500",
+            "Projections locales fidèles et tronquées sous 64 Kio",
+            "Tests de projections passent"
+          ],
+          "files": [
+            "packages/contracts/src/web-bridge*",
+            "apps/extension/runtime/web-bridge-*",
+            "apps/extension/runtime/local-storage*",
+            "packages/adapters-indexeddb/src/**",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "docs/architecture/src/tobirink-ux.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/contracts",
+            "npm run test --workspace @tobirink/extension -- web-bridge-runtime.test.ts",
+            "npm run test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "git diff --check",
+            "git commit -m \"fix(web-bridge): bound library and agenda projections\""
+          ],
+          "evidence": [
+            "Library applies accent-insensitive search, facet, cursor and limit 24 after scanning at most 500 local works",
+            "Agenda accepts only Monday-to-Monday date-only weeks, forwards exact local-midnight [from,to), and reads at most 100 dated entries",
+            "Progress, favorite source URL, release label, availability and exact timestamps are projected only when locally available; oversized arrays shrink below 60 KiB",
+            "Contracts 19/19, WebBridge projections/runtime 8/8 and IndexedDB 3/3 plus Chromium contract passed; typecheck, ESLint and Archify showcase 9/9 passed"
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Partager les compositions Workbench",
+          "status": "DONE",
+          "acceptance": [
+            "Tokens CSS exposés publiquement par @tobirink/ui",
+            "MemberNavigation accepte des routes configurables avec défauts Extension inchangés",
+            "Agenda, contrat, modèle de semaine et LibraryFilters sont publics dans @tobirink/ui",
+            "Adaptateurs Extension conservés sans suppression ni changement visuel du Workbench",
+            "IR UI showcase validé"
+          ],
+          "files": [
+            "packages/ui/src/**",
+            "packages/ui/package.json",
+            "apps/extension/entrypoints/agenda/**",
+            "apps/extension/entrypoints/library/**",
+            "apps/extension/runtime/agenda-period-model*",
+            "docs/architecture/src/ui-system.architecture.json"
+          ],
+          "commands": [
+            "npm run test:ui",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:ui-workbench",
+            "npm run build:ui-workbench",
+            "npm run archify:validate -- ui-system.architecture",
+            "git diff --check",
+            "git commit -m \"refactor(ui): share workbench member surfaces\""
+          ],
+          "evidence": [
+            "@tobirink/ui exposes one tokens.css entry, LibraryFilters, Agenda and its week model",
+            "MemberNavigation accepts brand/home/library/agenda URLs while preserving #home/#library/#agenda defaults",
+            "Extension Agenda and week-model files are compatibility re-exports; no file or Workbench style was deleted",
+            "UI 121/121, Extension 95/95, Workbench 9/9, full typecheck, ESLint, UI contract and Workbench build passed",
+            "ui-system.architecture passed Archify showcase 9/9 with 0 errors and 0 warnings"
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Construire le runtime web privé",
+          "status": "DONE",
+          "acceptance": [
+            "Provider client WebBridge unique avec états bornés et validation Contracts",
+            "Détection 1,5 s, session 60 s, une reconnexion automatique",
+            "Recherche globale route vers /library?search=…",
+            "Review bornée alimente la cloche et décisions restent contractuelles",
+            "Aucun import IndexedDB, browser.storage ou API extension dans apps/web"
+          ],
+          "files": [
+            "apps/web/app/components/**",
+            "apps/web/app/**",
+            "apps/web/package.json",
+            "packages/contracts/src/**",
+            "packages/ui/src/**",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/tobirink-ux.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/web",
+            "npm run typecheck --workspace @tobirink/web",
+            "npm run lint",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m \"feat(web): add bounded member bridge runtime\""
+          ],
+          "evidence": [
+            "WebBridge provider: 1.5 s detection, 60 s extension session, one automatic reconnect, six explicit states",
+            "Operation-specific Zod validation and correlated 64 KiB page envelopes; global search and bounded Review wired",
+            "Web typecheck and static Next build pass; Contracts 7/7; Archify product IRs showcase 9/9; docs and diff checks pass"
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Refaire toutes les routes web",
+          "status": "DONE",
+          "acceptance": [
+            "Routes /, /library et /agenda utilisent exclusivement les projections privées réelles",
+            "Tous les états privés et la pagination/navigation bornées sont distincts",
+            "Routes secondaires adoptent le shell Workbench sans faux contenu ni liens d’artefacts non publiés",
+            "Aucun sample-work ni fixture dans la sortie statique",
+            "Tests UI et export strict passent"
+          ],
+          "files": [
+            "apps/web/app/**",
+            "apps/web/tests/**",
+            "apps/web/e2e/**",
+            "apps/web/package.json",
+            "docs/ui/01-state-matrix.md",
+            "docs/architecture/src/tobirink-ux.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/web",
+            "npm run build --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web",
+            "rg \"sample-work|Exemple public|0.0.0\" apps/web/out",
+            "git diff --check",
+            "git commit -m \"feat(web): rebuild workbench member pages\""
+          ],
+          "evidence": [
+            "Home reads a real count, four bridge works and the current local week only after connection",
+            "Library keeps search/facet/cursor in URL, resets cursor on filters and reads at most 24; private cards link only to local source URLs",
+            "Agenda renders Monday-Sunday in the shared horizontal rail and deduplicates one agenda.read per [from,to) period",
+            "Download links hidden; public work route has no sample; output scan finds no sample-work, public example or 0.0.0",
+            "Web route tests 3/3, shared Agenda 3/3, typecheck and strict static export pass; Archify UX IR showcase 9/9"
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Préparer la version 1.0.0",
+          "status": "DONE",
+          "acceptance": [
+            "1.0.0 est la source unique de version extension et artefacts",
+            "ZIP Chrome/Firefox 1.0.0 et manifeste SHA-256 générés localement",
+            "Aucun lien non publié ou non vérifié affiché",
+            "Documentation et IR produit mis à jour et validés",
+            "Aucun push, upload, déploiement ni appel Cloudflare"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "apps/extension/wxt.config.ts",
+            "apps/web/app/download/page.tsx",
+            "scripts/release/**",
+            "artifacts/**",
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/ui/01-state-matrix.md",
+            "docs/release.md",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "docs/architecture/src/**"
+          ],
+          "commands": [
+            "npm run build:extension",
+            "npm run package:extension",
+            "npm run validate:docs -- --all",
+            "npm run validate:architecture",
+            "git diff --check",
+            "git commit -m \"chore(release): prepare tobirink 1.0.0\""
+          ],
+          "evidence": [
+            "apps/extension/package.json owns version 1.0.0; WXT and web download surface derive it",
+            "Release packager pins and validates https://tobirink.com/* before packaging; both generated manifests are 1.0.0",
+            "Chrome ZIP: 21 files, 237186 bytes, SHA-256 88cd26bebcdcfc3f586befd1e4faf1d444eb87a183cade7f1bb01f2b2796036c",
+            "Firefox ZIP: 21 files, 237237 bytes, SHA-256 1ddc0e9bdf10aa1f71194ac164b16ddd4ca586140bd41b10f8070774d409ab6e",
+            "Packaging reproducibility 2/2, extension typecheck, web export, docs, decisions and Archify showcase pass; no remote operation executed"
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Vérifier et auditer de bout en bout",
+          "status": "DONE",
+          "acceptance": [
+            "Vitest 4.1.11, Testing Library 16.3.3, jsdom 30.0.1 et Playwright 1.51.1 ajoutés à apps/web avec Chromium installé",
+            "Tests desktop/mobile, HTTP, sécurité, performance, builds et packaging passent",
+            "Archify showcase 9/9 et scans statiques passent",
+            "Audit gouvernance, diff, imports, duplications, effets de bord et suppressions terminé",
+            "Tous les pas Progress sont DONE avec preuves courtes"
+          ],
+          "files": [
+            "apps/web/package.json",
+            "apps/web/vitest.config.ts",
+            "apps/web/playwright.config.ts",
+            "apps/web/tests/**",
+            "apps/web/e2e/**",
+            "package-lock.json",
+            "docs/architecture/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm audit",
+            "npm run build",
+            "npm run package:extension",
+            "git diff --check",
+            "git commit -m \"test(web): verify production-ready member surfaces\""
+          ],
+          "evidence": [
+            "Web 8/8 and Playwright 4/4 pass at desktop/mobile; agent-browser confirms content, logo, navigation and no console or framework overlay errors",
+            "All workspace tests pass: 371 tests; repository validation passes 269/269 plus one intentional skip; typecheck, security, performance and Workbench builds pass",
+            "Final 1.0.0 packages: Chrome b85062786fcf5d224fac197108c22b1f0fbef590866b719849fcd4f1d4a9da8d; Firefox 2af60f3d164cd502491182edcc833b8b3fad48d9ad295a844800d36f4b17d730",
+            "Production dependency graph audits at 0 vulnerabilities with dev/optional omitted; exact requested Playwright 1.51.1 retains GHSA-7mvr-c777-76hp in test tooling"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-playwright-audit",
+      "title": "Corriger l’audit Playwright du Workbench web",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Mettre à niveau le harnais Playwright et rétablir le gate sécurité",
+          "status": "DONE",
+          "acceptance": [
+            "Le web et ses scripts utilisent exactement Playwright 1.63.0",
+            "Chromium Playwright est installé sans supprimer les anciens navigateurs",
+            "Les tests web, E2E et le build statique passent",
+            "npm audit et npm run verify passent sans vulnérabilité haute"
+          ],
+          "files": [
+            "apps/web/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --workspace @tobirink/web --save-dev --save-exact @playwright/test@1.63.0 --ignore-scripts",
+            "npm run setup:browser --workspace @tobirink/web",
+            "npm run test --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web",
+            "npm run build --workspace @tobirink/web",
+            "npm audit --audit-level=high",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m \"chore(web): upgrade Playwright test harness\""
+          ],
+          "evidence": [
+            "@playwright/test, playwright et playwright-core sont tous résolus en 1.63.0; Chromium 153 build 1243 est installé",
+            "npm audit --audit-level=high passe avec 0 vulnérabilité",
+            "Web 8/8, Playwright 4/4 et export Next passent",
+            "npm run verify passe intégralement: validation 269/269 plus un skip intentionnel, CRG, intégration, audit et Archify showcase"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-pr-ci-prerequisites",
+      "title": "Rétablir les prérequis CI du Workbench sur checkout propre",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Versionner les limites Progress et déclarations Archify requises",
+          "status": "DONE",
+          "acceptance": [
+            "Progress accepte le fichier versionné sous la limite documentée de 256 Kio et 40 goals",
+            "tobirink-ux.dataflow est déclaré comme IR produit",
+            "Les tests ciblés et npm run verify passent",
+            "Le commit est poussé sur la Pull Request"
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs",
+            "npm run validate:config",
+            "npm run validate:architecture",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m \"fix(ci): restore clean-checkout prerequisites\"",
+            "git push origin fix/tobirink-workflows"
+          ],
+          "evidence": [
+            "Progress 40/256 Kio: 40 tests ciblés passent",
+            "Configuration, MCP et Archify showcase 9/9 passent",
+            "npm run verify passe: 269 tests, 1 skip, audit 0"
           ]
         }
       ]

@@ -23,6 +23,10 @@ describe('Settings organizer surface', () => {
     expect(shell).toContain('Aperçu du tri');
     expect(shell).toContain('Appliquer le tri');
     expect(shell).toContain('Restaurer l’organisation précédente ?');
+    expect(shell).toContain('props.onApplyPreview ?');
+    expect(shell).toContain('props.onRestore ?');
+    expect(shell).toContain('folderCount === 0 || !props.configurationValid');
+    expect(shell).toContain("props.onRequestPreview() !== false");
     expect(shell).toContain("useState<'config' | 'preview'>");
   });
 
@@ -43,6 +47,7 @@ describe('Settings organizer surface', () => {
     expect(css).not.toMatch(/box-shadow: var\(--shadow-overlay\)/);
     expect(css).not.toMatch(/max-width: var\(--size-content-wide\)/);
     expect(css).toContain('min-height: 100dvh');
+    expect(css).toContain('align-content: start');
   });
 
   it('opens real FavLib filters rather than a decorative settings action', () => {
@@ -52,6 +57,9 @@ describe('Settings organizer surface', () => {
     expect(editor).toContain("changeGroup('types'");
     expect(editor).toContain("changeGroup('statuses'");
     expect(editor).toContain("changeGroup('progressStates'");
+    expect(editor).toContain('filterOptions.types.length > 0');
+    expect(editor).toContain('filterOptions.statuses.length > 0');
+    expect(editor).toContain('filterOptions.progressStates.length > 0');
     expect(editor).toContain('disabled={!selected}');
     expect(model).toContain('stoppedAfter?: number');
   });

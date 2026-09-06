@@ -52,6 +52,30 @@ describe('public D1 catalogue', () => {
     expect(boundedWork.work.titles).toHaveLength(32);
   });
 
+  it('searches exact titles case-insensitively with a stable bound', async () => {
+    await env.COLLECTIVE_DB.batch([
+      env.COLLECTIVE_DB.prepare('INSERT INTO catalogue_works (work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)').bind('work_frieren_anime', 'anime', 'Frieren anime', 2),
+      env.COLLECTIVE_DB.prepare('INSERT INTO catalogue_titles (work_id, locale, title) VALUES (?1, ?2, ?3)').bind('work_frieren_anime', 'fr', 'FRIEREN'),
+    ]);
+    try {
+      const url = new URL('https://tobirink.test/v1/catalogue/search');
+      url.searchParams.set('title', '  frieren  ');
+      url.searchParams.set('limit', '1');
+      const response = await SELF.fetch(url);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('public, max-age=300, stale-while-revalidate=3600');
+      expect(await response.json()).toEqual({
+        items: [{ id: 'work_frieren', mediaKind: 'manga', preferredTitle: 'Frieren', revision: 2 }],
+      });
+    } finally {
+      await env.COLLECTIVE_DB.batch([
+        env.COLLECTIVE_DB.prepare('DELETE FROM catalogue_titles WHERE work_id = ?1').bind('work_frieren_anime'),
+        env.COLLECTIVE_DB.prepare('DELETE FROM catalogue_works WHERE work_id = ?1').bind('work_frieren_anime'),
+      ]);
+    }
+  });
+
   it('rejects malformed bounds and treats injection text as data', async () => {
     for (const query of ['limit=0', 'limit=101', 'limit=1.5', 'cursor=broken']) {
       const url = new URL('https://tobirink.test/v1/catalogue');
@@ -66,6 +90,20 @@ describe('public D1 catalogue', () => {
     injectionUrl.searchParams.set('externalId', "154587' OR 1=1 --");
     const response = await SELF.fetch(injectionUrl);
     expect(response.status).toBe(400);
+
+    for (const title of ['', 'x'.repeat(201), 'bad\u0000title']) {
+      const searchUrl = new URL('https://tobirink.test/v1/catalogue/search');
+      searchUrl.searchParams.set('title', title);
+      const rejected = await SELF.fetch(searchUrl);
+      expect(rejected.status).toBe(400);
+      expect(rejected.headers.get('cache-control')).toBe('no-store');
+    }
+
+    const preparedUrl = new URL('https://tobirink.test/v1/catalogue/search');
+    preparedUrl.searchParams.set('title', "Frieren' OR 1=1 --");
+    const prepared = await SELF.fetch(preparedUrl);
+    expect(prepared.status).toBe(200);
+    expect(await prepared.json()).toEqual({ items: [] });
   });
 
   it('stores only reconstructible columns and proves hot queries use their indexes', async () => {
@@ -105,5 +143,18 @@ describe('public D1 catalogue', () => {
       WHERE provider = ?1 AND external_id = ?2 LIMIT 1
     `).bind('anilist', '154587').all<{ detail: string }>();
     expect(resolution.results.map(({ detail }) => detail).join(' ')).toContain('sqlite_autoindex_catalogue_external_references_1');
+
+    const titleSearch = await env.COLLECTIVE_DB.prepare(`
+      EXPLAIN QUERY PLAN SELECT DISTINCT work_id FROM catalogue_titles INDEXED BY catalogue_titles_by_title
+      WHERE title = ?1 COLLATE NOCASE ORDER BY work_id LIMIT ?2
+    `).bind('frieren', 6).all<{ detail: string }>();
+    expect(titleSearch.results.map(({ detail }) => detail).join(' ')).toContain('catalogue_titles_by_title');
+
+    const measuredTitleSearch = await env.COLLECTIVE_DB.prepare(`
+      SELECT DISTINCT work_id FROM catalogue_titles INDEXED BY catalogue_titles_by_title
+      WHERE title = ?1 COLLATE NOCASE ORDER BY work_id LIMIT ?2
+    `).bind('frieren', 6).all();
+    expect(measuredTitleSearch.results).toHaveLength(1);
+    expect(measuredTitleSearch.meta.rows_read).toBeLessThanOrEqual(2);
   });
 });

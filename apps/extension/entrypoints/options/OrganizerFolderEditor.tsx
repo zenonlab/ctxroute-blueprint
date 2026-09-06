@@ -36,23 +36,23 @@ function FilterPanel({ filterOptions, folder, onConditionsChange }: Pick<FolderE
 
   return (
     <>
-      <fieldset>
+      {filterOptions.types.length > 0 ? <fieldset>
         <legend>Type <span>Facultatif</span></legend>
         <div className={styles.chips}>
           {filterOptions.types.map((choice) => (
             <button aria-pressed={folder.conditions.types.includes(choice.id)} key={choice.id} onClick={() => changeGroup('types', choice.id)} type="button">{choice.label}</button>
           ))}
         </div>
-      </fieldset>
-      <fieldset>
+      </fieldset> : null}
+      {filterOptions.statuses.length > 0 ? <fieldset>
         <legend>Statut de l’œuvre <span>Source éditoriale</span></legend>
         <div className={styles.chips}>
           {filterOptions.statuses.map((choice) => (
             <button aria-pressed={folder.conditions.statuses.includes(choice.id)} key={choice.id} onClick={() => changeGroup('statuses', choice.id)} type="button">{choice.label}</button>
           ))}
         </div>
-      </fieldset>
-      <fieldset>
+      </fieldset> : null}
+      {filterOptions.progressStates.length > 0 ? <fieldset>
         <legend>Progression personnelle <span>Indépendante du statut</span></legend>
         <div className={styles.chips}>
           {filterOptions.progressStates.map((choice) => {
@@ -86,7 +86,7 @@ function FilterPanel({ filterOptions, folder, onConditionsChange }: Pick<FolderE
             );
           })}
         </div>
-      </fieldset>
+      </fieldset> : null}
       {hasFilters ? <p className={styles.filterHint}>Les groupes actifs sont combinés par ET.</p> : null}
     </>
   );

@@ -19,16 +19,88 @@ events into application commands. An optional mode also projects selected
 changes back to the linked bookmark. A bookmark identifier or URL never becomes
 a domain identifier or an authority for membership and progress.
 
+The local organizer owns a bounded folder-rule tree and a pure preview use
+case. Rules run in pre-order, the first complete match wins, and their selected
+conditions use AND semantics. Missing context fails closed and never moves an
+item. The pure calculation has no storage, browser or network dependency. Its
+single configuration is private IndexedDB state behind `StoragePort`, included
+in private export v3. The options runtime reads, validates and saves it through
+strict background messages, then joins at most 500 local favorite sources,
+Reviews and Works for its full-page preview. It offers only filters backed by
+current local metadata. Apply sends the exact serialized preview back with an
+explicit confirmation; the application recalculates it and rejects partial,
+truncated, or changed input. Before the first browser move, a complete minimal
+bookmark-tree snapshot is written and verified through a dedicated IndexedDB
+port. Restore moves only bookmarks that still exist back to a surviving saved
+parent and index. It creates no missing bookmark and deletes nothing.
+
 ## Local persistence
 
 The storage package defines `StoragePort`, versioned records, migrations,
 export, import, and recovery contracts. The first adapter uses Dexie and
-IndexedDB, which is the sole active authority for the private library,
-progress, agenda, and durable task queue. `storage.local` is limited to
+IndexedDB, which is the sole active authority for favorite sources, Reviews,
+the private library, progress, agenda, organizer rules and verified organizer
+snapshot, and durable task queue. `storage.local` is limited to
 technical preferences and bootstrap state. `storage.sync` may hold only a
 small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
 on the public service.
+
+The installed MV3 background is the local composition root. It creates one
+Dexie adapter per worker lifetime and lazily opens `tobirink-private` before a
+validated popup-context response. This activates schema migration without a
+background-wide record scan. React surfaces receive serialized messages only;
+they never import Dexie or open IndexedDB directly. The popup continuation
+cache remains a separate, disposable `storage.local` record.
+
+The Library surface reads the primary local library through that background
+boundary in stable pages of at most 24 Work identifiers. Missing Work records
+produce a partial local snapshot instead of being silently replaced; the page
+request performs no remote lookup and React receives only a strict serialized
+projection.
+
+Agenda uses the same boundary for half-open weekly `occursAt` ranges. The
+storage port returns at most 100 ordered entries, the application joins only
+their local Work records, and a missing Work makes the serialized period
+partial without triggering catalogue traffic. A bounded indexed Review lookup
+then resolves the preferred private favorite URL by folder path, bookmark order
+and stable identifier. The serialized item omits the URL when no local source
+exists; its WorkCard stays visible but is not a link.
+
+On the explicit extension installation or update event, the browser adapter
+reads the bookmark tree and emits serializable records with their folder path
+and sibling order. The application imports HTTP(S) entries into IndexedDB in
+bounded batches, atomically pairing each `FavoriteSource` with its Review. A
+rerun preserves the initial import time and resolved decisions; missing browser
+bookmarks are not interpreted as local deletions.
+
+The background exposes the pending Review queue as a bounded, schema-validated
+local snapshot. IndexedDB is opened on demand, at most 100 pending rows are
+read through the status index, and no public catalogue request is made by this
+read path.
+
+Candidate preparation performs a bounded `reviewId` join against the existing
+favorite-source index. A local parser may reduce the private URL to a public
+provider reference, but the candidate port and its serialized result never
+receive that raw URL. A candidate query carries either that public reference or
+a bounded title, never both. The application caps output and asks a replaceable
+local port with a deterministic default for an opaque revision so a later
+decision can reject a stale Review. This is only a contract: the extension
+still composes no remote candidate adapter and has no host permission.
+
+The browser-adapter package provides a dormant HTTP candidate client for the
+owned catalogue contract. Its origin and fetch capability are injected, its
+paths are closed to reference and exact-title reads, and malformed or
+over-limit JSON fails closed. The extension composition root does not construct
+this client until the separate permission and disclosure decision is approved.
+
+An imported bookmark is preserved as a private `FavoriteSource`: its stable
+Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
+folder path, sibling order, import time and associated Review. Resolution stays
+on the Review record, and only a resolved Review points to a `Work`. This keeps
+the original navigation target available after import without turning either
+the bookmark or its URL into a Work identity. Favorite-source reads are bounded
+and ordered by stable source ID.
 
 Full recovery uses a versioned local export or an explicit opt-in encrypted
 backup. Encryption happens before upload, and neither the service nor browser
@@ -55,11 +127,22 @@ feed. The strict object contains no installation, library, progress, reminder or
 account identifier. The extension may retain only the last validated snapshot
 behind its local cache port so Agenda remains readable offline.
 
+The extension never reads that endpoint directly from a React surface. Its MV3
+background consumes the validated cache through the application port, persists
+Agenda entries only for locally known works, and keeps private works, progress,
+reminders, and durable notification tasks in IndexedDB. Quick notification and
+estimate-display preferences use versioned `browser.storage.local` records.
+Official and confirmed releases schedule idempotent tasks; estimates never do.
+The background alarm is recreated and overdue tasks are drained after restart.
+
 D1 repositories use prepared statements, narrow projections, bounded cursor
 pagination, and indexes justified by measured access paths. Hot queries are
 reviewed with `EXPLAIN QUERY PLAN` and runtime row metrics; migrations run
 `PRAGMA optimize` after index changes. Read replication is enabled only after
 measurements show that its consistency and latency trade-off is appropriate.
+Review title lookup is exact and case-insensitive, capped by the shared
+catalogue policy, and backed by its own title/work index; fuzzy or substring
+matching is deliberately absent from the request path.
 
 ## Media delivery
 

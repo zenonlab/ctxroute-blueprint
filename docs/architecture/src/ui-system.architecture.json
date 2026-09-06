@@ -17,8 +17,8 @@
       {
         "id": "product-reuse",
         "label": "Réutilisation produit",
-        "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "extension"],
-        "note": "Le popup et les pages composent les mêmes composants publics; modèles sérialisables et actions restent séparés à leur frontière."
+        "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "sharedSurfaces", "extension"],
+        "note": "Extension et web consomment l’API publique: tokens, navigation routable, filtres et Agenda horizontal."
       }
     ]
   },
@@ -32,11 +32,12 @@
     { "id": "uiPackage", "type": "frontend", "label": "Package UI", "sublabel": "tokens + composants + marque", "pos": [210, 80], "size": [170, 64] },
     { "id": "reviewResolver", "type": "frontend", "label": "ReviewResolver", "sublabel": "choix + navigation différée", "pos": [460, 80], "size": [180, 64] },
     { "id": "memberNavigation", "type": "frontend", "label": "Shell membre", "sublabel": "recherche + cloche + bulle", "pos": [730, 80], "size": [180, 64] },
-    { "id": "extension", "type": "frontend", "label": "Extension Tobirink", "sublabel": "popup + pages + organisateur", "pos": [1030, 80], "size": [180, 64] }
+    { "id": "sharedSurfaces", "type": "frontend", "label": "Compositions membre", "sublabel": "Agenda + LibraryFilters", "pos": [730, 190], "size": [180, 64], "tag": "API publique" },
+    { "id": "extension", "type": "frontend", "label": "Surfaces Tobirink", "sublabel": "extension + web statique", "pos": [1030, 80], "size": [180, 64] }
   ],
   "boundaries": [
     { "kind": "region", "label": "Outils de développement locaux", "wraps": ["previewModules", "registry", "workbench", "canvas"] },
-    { "kind": "security-group", "label": "Code produit partagé", "wraps": ["uiPackage", "reviewResolver", "memberNavigation", "extension"] }
+    { "kind": "security-group", "label": "Code produit partagé", "wraps": ["uiPackage", "reviewResolver", "memberNavigation", "sharedSurfaces", "extension"] }
   ],
   "connections": [
     { "id": "lucideUi", "from": "lucide", "to": "uiPackage", "label": "icônes nommées", "variant": "default", "labelAt": [185, 158] },
@@ -47,7 +48,9 @@
     { "id": "previewUi", "from": "previewModules", "to": "uiPackage", "label": "importe l’API publique", "variant": "default", "fromSide": "top", "toSide": "bottom", "via": [[340, 232], [295, 232]] },
     { "id": "uiReviewResolver", "from": "uiPackage", "to": "reviewResolver", "label": "API publique", "variant": "default" },
     { "id": "resolverNavigation", "from": "reviewResolver", "to": "memberNavigation", "label": "bulle de la cloche", "variant": "emphasis", "labelAt": [685, 158] },
-    { "id": "navigationExtension", "from": "memberNavigation", "to": "extension", "label": "enveloppe les pages", "variant": "default" }
+    { "id": "uiSharedSurfaces", "from": "uiPackage", "to": "sharedSurfaces", "label": "tokens + primitives", "variant": "default", "fromSide": "bottom", "toSide": "left" },
+    { "id": "sharedSurfacesConsumer", "from": "sharedSurfaces", "to": "extension", "label": "Agenda + filtres", "variant": "emphasis", "fromSide": "top", "toSide": "left" },
+    { "id": "navigationExtension", "from": "extension", "to": "memberNavigation", "label": "routes + file locale", "variant": "default" }
   ],
   "cards": [
     {
@@ -63,19 +66,24 @@
       "title": "Réutilisation",
       "items": [
         "La cloche du header est l’unique entrée Review visible",
+        "MemberNavigation conserve les fragments Extension par défaut et accepte les routes web",
+        "Agenda, son modèle de semaine et LibraryFilters sont exportés par le package UI",
         "La bulle Review compose le resolver partagé sans modaliser la page",
         "L’empty Review compact garde seulement Inbox et un libellé",
         "Les flèches parcourent la file sans soumettre de décision",
+        "Sans candidat, le contexte local reste navigable mais aucune décision factice n’apparaît",
         "Seules les candidates utilisent la coque WorkCard",
         "Le popup réemploie WorkCard et Navigation compacte",
+        "Son onglet Sorties lit la période Agenda locale partagée",
+        "Une sortie ouvre sa source favorite locale ou reste non interactive",
         "Cette œuvre est en 3:2; ses cinq reprises restent en 2:3",
         "Le popup garde trois préférences rapides et ouvre l’organisateur complet",
-        "L’organisateur édite un arbre ordonné puis ouvre un aperçu pleine page",
+        "L’organisateur édite l’arbre IndexedDB puis calcule un aperçu local borné en pleine page",
         "Chaque règle ouvre ses filtres et affiche son rang contrasté dans le SVG dossier rempli",
         "Réglages complets ne regroupe ni préparation, notifications, exports ni diagnostics",
-        "Le logo PNG FavLib officiel est partagé par les shells",
+        "Le logo PNG TobiRink officiel est partagé par les shells",
         "Ses modèles sérialisables et callbacks séparés viennent de l’hôte",
-        "Sans port de lecture, le runtime annonce une indisponibilité explicite",
+        "Une action sans port réel reste absente de la surface",
         "FeedbackState centre SVG gris, texte et action sans coque visuelle",
         "Tokens et comportements restent colocalisés"
       ]

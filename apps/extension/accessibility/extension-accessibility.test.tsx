@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { ExtensionSurface } from '../runtime/ExtensionSurface';
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+const extensionSurface = read('../runtime/ExtensionSurface.tsx');
+const reviewNavigationHook = read('../runtime/use-local-review-navigation.ts');
+const organizerSettingsHook = read('../runtime/use-local-organizer-settings.ts');
 
 const styles = {
   button: read('../../../packages/ui/src/components/button/Button.module.css'),
@@ -58,6 +61,18 @@ describe('extension accessibility contract', () => {
     expect(styles.memberNavigation).toMatch(/\.reviewPanel::before/);
   });
 
+  it('feeds every member-page bell through one local serialized queue boundary', () => {
+    expect(extensionSurface.match(/useLocalReviewNavigation\(/g)).toHaveLength(3);
+    expect(extensionSurface).not.toMatch(/emptyNavigation/);
+    expect(reviewNavigationHook).toMatch(/readReviewQueueMessage\(\)/);
+    expect(reviewNavigationHook).toMatch(/readReviewCandidatesMessage\(selectedId\)/);
+    expect(reviewNavigationHook).toMatch(/writeReviewDecisionMessage/);
+    expect(reviewNavigationHook).toMatch(/openSearchMessage\(query\)/);
+    expect(reviewNavigationHook).not.toMatch(/ignoreSearch/);
+    expect(reviewNavigationHook).toMatch(/if \(!active\) return/);
+    expect(reviewNavigationHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\./);
+  });
+
   it('keeps the popup shell and compact tablist available while runtime context loads', () => {
     const markup = renderToStaticMarkup(<ExtensionSurface name="popup" />);
 
@@ -72,6 +87,19 @@ describe('extension accessibility contract', () => {
     expect(markup).toContain('Analyse de la page…');
     expect(markup).toContain('Continuer mes œuvres');
     expect(markup).not.toContain('Les Carnets de l’Apothicaire');
+  });
+
+  it('keeps organizer storage and preview behind serialized local messages', () => {
+    expect(extensionSurface).toContain('useLocalOrganizerSettings()');
+    expect(extensionSurface).not.toContain('state="blocked"');
+    expect(extensionSurface).toMatch(/useQuickPreferences\(\)/);
+    expect(extensionSurface).toMatch(/onPreferenceChange={quickPreferences\.onChange}/);
+    expect(organizerSettingsHook).toContain('readOrganizerConfigurationMessage()');
+    expect(organizerSettingsHook).toContain('writeOrganizerConfigurationMessage(configuration)');
+    expect(organizerSettingsHook).toContain('readOrganizerPreviewMessage(configuration)');
+    expect(organizerSettingsHook).toContain('applyOrganizerPreviewMessage(configuration, expected)');
+    expect(organizerSettingsHook).toContain('restoreOrganizerSnapshotMessage()');
+    expect(organizerSettingsHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\.|fetch\(/);
   });
 
   it('meets WCAG AA contrast for the production text, muted text, accent and focus pairs', () => {

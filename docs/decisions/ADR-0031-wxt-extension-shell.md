@@ -8,12 +8,14 @@ scope:
   - oxlint.config.ts
   - docs/architecture/src/tobirink.architecture.json
 review: on-change
+revised: true
 ---
 
 # ADR-0031 — WXT extension shell
 
 - Status: accepted
 - Date: 2026-09-04
+- Revised: 2026-09-06
 
 ## Context
 
@@ -46,6 +48,35 @@ The background entrypoint owns WebExtension API access. Browser globals are
 read only inside its `main` callback. Its message router accepts only a closed,
 versioned set of commands, validates every field before dispatch, and returns a
 structured error for malformed or unknown inputs.
+
+The background also owns the extension-local composition root. It constructs
+the Dexie storage adapter once per worker lifetime and opens the versioned
+`tobirink-private` database lazily inside the already validated popup-context
+request. Opening runs schema migration before the response, but startup never
+scans or materializes private collections. The popup continuation cache remains
+a separate bounded `storage.local` adapter and never becomes authoritative. The
+extension workspace declares `@tobirink/adapters-indexeddb` directly because
+the composition root imports it; the dependency is not obtained transitively.
+
+The explicit `runtime.onInstalled` lifecycle event performs the initial local
+bookmark import. The browser adapter flattens `bookmarks.getTree()` into owned,
+serializable records; the application use case writes bounded batches into
+IndexedDB. No inventory scan runs merely because the worker wakes, and the
+installation import performs no provider or public-service request.
+
+Review reads use a separate versioned message. The background opens IndexedDB
+only after that validated request and delegates to an application query capped
+at 100 pending records. The response is a frozen, serializable snapshot; it
+does not expose Dexie records, browser APIs or a provider client to React.
+
+Agenda reads hydrate the strict public release cache before querying the local
+period. The background never composes the dormant remote loader. A named
+one-minute browser alarm and `runtime.onStartup` both drain the durable task
+store in batches of at most 20. Tasks remain unavailable until their exact
+release time, use the browser notification identifier as their deduplication
+key, and publish only while the persisted native-notification preference is
+enabled. Preference messages expose only the two versioned booleans used by
+Agenda and the popup.
 
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its

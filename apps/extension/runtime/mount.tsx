@@ -1,8 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../../packages/ui/src/tokens/color.css';
-import '../../../packages/ui/src/tokens/layout.css';
-import '../../../packages/ui/src/tokens/effects.css';
+import '@tobirink/ui/tokens.css';
 import { ExtensionSurface } from './ExtensionSurface';
 import type { ExtensionSurfaceName } from './ExtensionSurface';
 import { sendExtensionMessage } from './messages';

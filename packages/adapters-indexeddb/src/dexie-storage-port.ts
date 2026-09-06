@@ -1,7 +1,10 @@
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
+  createFavoriteSource,
   createLibrary,
+  createOrganizerConfiguration,
   createProgress,
   createReminder,
   createReview,
@@ -10,8 +13,11 @@ import {
 import type {
   AgendaEntry,
   AgendaEntryId,
+  FavoriteSource,
+  FavoriteSourceId,
   Library,
   LibraryId,
+  OrganizerConfiguration,
   Progress,
   ProgressId,
   Reminder,
@@ -34,7 +40,9 @@ export class DexieStoragePort implements StoragePort {
   private tables(stores: readonly PrivateStoreName[]): Table[] {
     const tables = {
       agenda: this.database.agenda,
+      favoriteSources: this.database.favoriteSources,
       libraries: this.database.libraries,
+      organizer: this.database.organizer,
       progress: this.database.progress,
       reminders: this.database.reminders,
       reviews: this.database.reviews,
@@ -49,13 +57,63 @@ export class DexieStoragePort implements StoragePort {
     };
     return {
       getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); const entry = await this.database.agenda.get(id); return entry && createAgendaEntry(entry); },
+      getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); const source = await this.database.favoriteSources.get(id); return source && createFavoriteSource(source); },
+      findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
+        requireStore('favoriteSources');
+        const matches = await this.database.favoriteSources.where('reviewId').equals(reviewId).limit(2).toArray();
+        if (matches.length > 1) throw new Error('A Review may belong to only one favorite source.');
+        return matches[0] && createFavoriteSource(matches[0]);
+      },
       getLibrary: async (id: LibraryId) => { requireStore('libraries'); const library = await this.database.libraries.get(id); return library && createLibrary(library.id, library.workIds); },
+      getOrganizerConfiguration: async () => { requireStore('organizer'); const configuration = await this.database.organizer.get('organizer'); return configuration && createOrganizerConfiguration(configuration); },
       getProgress: async (id: ProgressId) => { requireStore('progress'); const progress = await this.database.progress.get(id); return progress && createProgress(progress); },
+      findProgressByWorkId: async (workId: WorkId) => {
+        requireStore('progress');
+        const matches = await this.database.progress.where('workId').equals(workId).limit(2).toArray();
+        if (matches.length > 1) throw new Error('A Work may have only one progress record.');
+        return matches[0] && createProgress(matches[0]);
+      },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
       getWork: async (id: WorkId) => { requireStore('works'); const work = await this.database.works.get(id); return work && createWork(work); },
+      listAgendaEntries: async (query) => {
+        requireStore('agenda');
+        assertAgendaEntryListQuery(query);
+        return (await this.database.agenda.where('occursAt').between(query.from, query.to, true, false).limit(query.limit).toArray())
+          .map(createAgendaEntry)
+          .sort((left, right) => (left.occursAt ?? '').localeCompare(right.occursAt ?? '') || left.id.localeCompare(right.id));
+      },
+      listFavoriteSources: async ({ afterId, limit }) => {
+        requireStore('favoriteSources');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Favorite source page limit must be an integer between 1 and 100.');
+        const collection = afterId === undefined
+          ? this.database.favoriteSources.orderBy('id')
+          : this.database.favoriteSources.where('id').above(afterId);
+        return (await collection.limit(limit).toArray()).map(createFavoriteSource);
+      },
+      listReviews: async ({ limit, status }) => {
+        requireStore('reviews');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
+        return (await this.database.reviews.where('status').equals(status).limit(limit).toArray())
+          .map(createReview)
+          .sort((left, right) => left.id.localeCompare(right.id));
+      },
+      listReviewsByWorkId: async (query) => {
+        requireStore('reviews');
+        assertReviewMatchListQuery(query);
+        return (await this.database.reviews.where('matchedWorkId').equals(query.workId).limit(query.limit).toArray())
+          .map(createReview)
+          .sort((left, right) => left.id.localeCompare(right.id));
+      },
       putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); await this.database.agenda.put(createAgendaEntry(entry)); },
+      putFavoriteSource: async (source: FavoriteSource) => {
+        requireStore('favoriteSources');
+        const existing = await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
+        if (existing && existing.id !== source.id) throw new Error('A Review may belong to only one favorite source.');
+        await this.database.favoriteSources.put(createFavoriteSource(source));
+      },
       putLibrary: async (library: Library) => { requireStore('libraries'); await this.database.libraries.put(createLibrary(library.id, library.workIds)); },
+      putOrganizerConfiguration: async (configuration: OrganizerConfiguration) => { requireStore('organizer'); await this.database.organizer.put(createOrganizerConfiguration(configuration)); },
       putProgress: async (progress: Progress) => { requireStore('progress'); await this.database.progress.put(createProgress(progress)); },
       putReminder: async (reminder: Reminder) => { requireStore('reminders'); await this.database.reminders.put(createReminder(reminder)); },
       putReview: async (review: Review) => { requireStore('reviews'); await this.database.reviews.put(createReview(review)); },
@@ -64,13 +122,23 @@ export class DexieStoragePort implements StoragePort {
   }
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
+  getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
+  findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
+  getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
+  findProgressByWorkId: StoragePort['findProgressByWorkId'] = (workId) => this.session().findProgressByWorkId(workId);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
+  listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
+  listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
+  listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
+  putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
+  putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);
   putProgress: StoragePort['putProgress'] = (progress) => this.session().putProgress(progress);
   putReminder: StoragePort['putReminder'] = (reminder) => this.session().putReminder(reminder);
   putReview: StoragePort['putReview'] = (review) => this.session().putReview(review);

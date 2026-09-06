@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claimTask, commitTask, createDurableTask, isTaskAvailable, recordTaskEffect, retryTask } from './task-state';
+import { claimTask, commitTask, createDurableTask, createScheduledDurableTask, isTaskAvailable, recordTaskEffect, retryTask } from './task-state';
 describe('durable tasks', () => {
   it('records effects before commit', () => {
     const ready = createDurableTask({ id: 'task-1', idempotencyKey: 'key-1', kind: 'fixture', payload: '{}' });
@@ -12,5 +12,10 @@ describe('durable tasks', () => {
     const claimed = claimTask(ready, 'token', '2026-09-04T10:00:00.000Z', '2026-09-04T10:01:00.000Z');
     expect(isTaskAvailable(claimed, '2026-09-04T10:02:00.000Z')).toBe(true);
     expect(isTaskAvailable(retryTask(claimed, 'token', '2026-09-04T10:03:00.000Z'), '2026-09-04T10:02:00.000Z')).toBe(false);
+  });
+  it('keeps scheduled work unavailable until its exact instant', () => {
+    const scheduled = createScheduledDurableTask({ id: 'task-3', idempotencyKey: 'key-3', kind: 'fixture', payload: '{}' }, '2026-09-04T10:03:00.000Z');
+    expect(isTaskAvailable(scheduled, '2026-09-04T10:02:59.999Z')).toBe(false);
+    expect(isTaskAvailable(scheduled, '2026-09-04T10:03:00.000Z')).toBe(true);
   });
 });
