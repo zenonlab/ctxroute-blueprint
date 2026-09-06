@@ -4822,7 +4822,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-web-visual-parity",
       "title": "Réaligner la production web sur les surfaces Workbench",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -4871,7 +4871,7 @@
         {
           "id": "step-2",
           "title": "Vérifier, fusionner et redéployer la production",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "La matrice locale et CI passe sans régression",
             "Le diff ne contient aucune suppression ni donnée fictive",
@@ -4894,7 +4894,11 @@
             "npm run infra:apply -- --plan .ctxroute/state/tobirink-production-plan.json --approve <reviewed-digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow worker:tobirink-public-api",
             "curl production routes and downloads"
           ],
-          "evidence": []
+          "evidence": [
+            "PR #11 fusionnée en cca1391d après 6/6 contrôles CI verts; npm run verify passe avec 270 tests, 1 skip intentionnel et audit 0.",
+            "Plan 0a444ff6… limité à worker:tobirink-public-api appliqué; production à 100% sur 55c42579-d2af-4197-8e8a-ecc12580407e, rollback db2bc1cd… conservé.",
+            "Playwright production 4/4 confirme 32px, cartes 196px, SVG 48px, grille mobile et surfaces; cinq routes 200, inconnue 404, ZIP 1.0.0 inchangés."
+          ]
         }
       ]
     }
