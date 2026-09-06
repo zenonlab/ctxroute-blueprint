@@ -8,6 +8,12 @@ const moduleRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const requestLocal = globalThis.fetch;
 const AbortSignal = globalThis.AbortSignal;
 export const DASHBOARD_STATE_PATH = '.ctxroute/state/progress-dashboard.json';
+export const DEFAULT_DASHBOARD_STARTUP_TIMEOUT_MS = 3_000;
+export const WINDOWS_DASHBOARD_STARTUP_TIMEOUT_MS = 10_000;
+
+export function dashboardStartupTimeoutMs(platform = process.platform) {
+  return platform === 'win32' ? WINDOWS_DASHBOARD_STARTUP_TIMEOUT_MS : DEFAULT_DASHBOARD_STARTUP_TIMEOUT_MS;
+}
 
 export async function openProgressDashboard(root = process.cwd(), options = {}) {
   const statePath = resolve(root, options.statePath ?? DASHBOARD_STATE_PATH);
@@ -17,20 +23,29 @@ export async function openProgressDashboard(root = process.cwd(), options = {}) 
   const instanceId = randomUUID();
   const environment = { ...process.env, PROGRESS_DASHBOARD_TOKEN: token, PROGRESS_DASHBOARD_INSTANCE_ID: instanceId, PROGRESS_DASHBOARD_STATE_PATH: statePath };
   if (options.idleMs) environment.PROGRESS_DASHBOARD_IDLE_MS = String(options.idleMs);
-  const child = spawn(process.execPath, [join(moduleRoot, 'scripts', 'progress-dashboard.mjs'), resolve(root)], {
+  const spawnDashboard = options.spawnImpl ?? spawn;
+  const child = spawnDashboard(options.execPath ?? process.execPath, [join(moduleRoot, 'scripts', 'progress-dashboard.mjs'), resolve(root)], {
     cwd: root,
     detached: true,
     stdio: 'ignore',
     env: environment,
   });
+  let launchError;
+  child.once('error', error => { launchError = error; });
   child.unref();
-  const deadline = Date.now() + (options.startupTimeoutMs ?? 3_000);
+  const startupTimeoutMs = options.startupTimeoutMs ?? dashboardStartupTimeoutMs(options.platform);
+  const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
+    if (launchError) throw new Error(`Progress dashboard failed to launch: ${launchError.message}`, { cause: launchError });
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`Progress dashboard exited before becoming ready (${child.signalCode ?? child.exitCode})`);
+    }
     const state = await readState(statePath);
     if (state?.instanceId === instanceId && await isLive(state)) return publicResult(state, false);
     await delay(25);
   }
-  throw new Error('Progress dashboard did not become ready');
+  if (launchError) throw new Error(`Progress dashboard failed to launch: ${launchError.message}`, { cause: launchError });
+  throw new Error(`Progress dashboard did not become ready within ${startupTimeoutMs}ms`);
 }
 
 export async function dashboardSessionNotice(sessionId, root = process.cwd(), options = {}) {

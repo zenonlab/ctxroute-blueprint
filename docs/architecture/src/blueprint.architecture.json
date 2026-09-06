@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1280, 520],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns revision-checked goals and its editable localhost UI; Stop hands off; CTXRoute dispatches lifecycle; clients own stdio." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns goals and bounded platform-aware dashboard startup; Stop hands off; CTXRoute dispatches lifecycle." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -34,7 +34,7 @@
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-progress", "from": "agents", "to": "progressMcp", "label": "client-owned stdio", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [190, 170] },
     { "id": "progress-stop", "from": "progressMcp", "to": "lifecycle", "label": "runnable next / qualified block", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [250, 304] },
-    { "id": "progress-dashboard", "from": "progressMcp", "to": "progressDashboard", "label": "start / reuse + revised mutations", "fromSide": "bottom", "toSide": "top", "labelAt": [130, 350] },
+    { "id": "progress-dashboard", "from": "progressMcp", "to": "progressDashboard", "label": "bounded start / reuse + mutations", "fromSide": "bottom", "toSide": "top", "labelAt": [130, 350] },
     { "id": "dashboard-state", "from": "progressDashboard", "to": "dashboardState", "label": "ephemeral instance metadata", "labelAt": [250, 494] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
