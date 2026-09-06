@@ -9,7 +9,7 @@ import { synchronizeBlueprint, trackedControlFiles } from '../scripts/blueprint-
 
 test('blueprint sync includes transitive local dependencies of control files', () => {
   const files = trackedControlFiles(source);
-  for (const dependency of ['scripts/progress-handoff.mjs', 'scripts/crg-runner.mjs', 'scripts/archify-registry.mjs', '.githooks/project-policy.mjs', '.githooks/ast-registry.mjs', '.githooks/sensor-engine.mjs', '.githooks/sensor-ir.mjs']) {
+  for (const dependency of ['scripts/orchestrator-core.mjs', 'scripts/crg-runner.mjs', 'scripts/archify-registry.mjs', '.githooks/project-policy.mjs', '.githooks/ast-registry.mjs', '.githooks/sensor-engine.mjs', '.githooks/sensor-ir.mjs']) {
     assert.ok(files.includes(dependency), dependency);
   }
 });
@@ -39,7 +39,7 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   assert.equal(applied.targetVersion, '2026.09.05.2');
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), readFileSync(join(source, 'AGENTS.md'), 'utf8'));
   assert.equal(readFileSync(join(target, '.ctxroute/blueprint-backups/fixture/AGENTS.md'), 'utf8'), 'old doctrine\n');
-  assert.ok(existsSync(join(target, '.codex/agents/progress-worker.toml')));
+  assert.ok(existsSync(join(target, 'scripts/orchestrator-core.mjs')));
   assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.05.2');
   await assert.rejects(() => synchronizeBlueprint({ source, target, apply: true }), /dirty/u);
 });
