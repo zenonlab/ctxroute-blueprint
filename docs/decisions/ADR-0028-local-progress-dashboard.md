@@ -69,6 +69,12 @@ PID, URL, token, and hashed session markers. Stop uses Codex's official
 failure without altering continuation policy. `stop_hook_active` returns before
 any dashboard work to prevent recursive Stop behavior.
 
+Readiness remains bounded and requires both the matching instance state and its
+authenticated health response. POSIX systems retain a three-second startup
+deadline; Windows receives ten seconds to absorb slower process and filesystem
+startup. Spawn failures and early process exits fail immediately with an
+explicit diagnostic instead of waiting for the readiness deadline.
+
 ## Consequences
 
 The dashboard is a local development surface, not product architecture. Its

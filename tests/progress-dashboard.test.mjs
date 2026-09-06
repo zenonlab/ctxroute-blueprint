@@ -4,9 +4,16 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
+import { EventEmitter } from 'node:events';
 import { approvePlan } from '../scripts/progress-core.mjs';
 import { DASHBOARD_BODY_LIMIT, startProgressDashboard } from '../scripts/progress-dashboard.mjs';
-import { dashboardSessionNotice, openProgressDashboard } from '../scripts/progress-dashboard-manager.mjs';
+import {
+  dashboardSessionNotice,
+  dashboardStartupTimeoutMs,
+  DEFAULT_DASHBOARD_STARTUP_TIMEOUT_MS,
+  openProgressDashboard,
+  WINDOWS_DASHBOARD_STARTUP_TIMEOUT_MS,
+} from '../scripts/progress-dashboard-manager.mjs';
 import { request } from '../scripts/progress-dashboard-client.js';
 
 const requestLocal = globalThis.fetch;
@@ -200,4 +207,42 @@ test('detached dashboard instances are reused and replaced after death', async (
   } finally {
     try { process.kill(pid, 'SIGTERM'); } catch {}
   }
+});
+
+test('dashboard startup uses a bounded Windows allowance and reports launch errors', async () => {
+  assert.equal(dashboardStartupTimeoutMs('linux'), DEFAULT_DASHBOARD_STARTUP_TIMEOUT_MS);
+  assert.equal(dashboardStartupTimeoutMs('darwin'), DEFAULT_DASHBOARD_STARTUP_TIMEOUT_MS);
+  assert.equal(dashboardStartupTimeoutMs('win32'), WINDOWS_DASHBOARD_STARTUP_TIMEOUT_MS);
+
+  const root = mkdtempSync(join(tmpdir(), 'progress-dashboard-launch-error-'));
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.unref = () => {};
+  const opening = openProgressDashboard(root, {
+    spawnImpl: () => {
+      void Promise.resolve().then(() => child.emit('error', new Error('executable unavailable')));
+      return child;
+    },
+    startupTimeoutMs: 1_000,
+  });
+  await assert.rejects(opening, /failed to launch: executable unavailable/u);
+
+  const exitedChild = new EventEmitter();
+  exitedChild.exitCode = 1;
+  exitedChild.signalCode = null;
+  exitedChild.unref = () => {};
+  await assert.rejects(
+    openProgressDashboard(root, { spawnImpl: () => exitedChild }),
+    /exited before becoming ready \(1\)/u,
+  );
+
+  const stalledChild = new EventEmitter();
+  stalledChild.exitCode = null;
+  stalledChild.signalCode = null;
+  stalledChild.unref = () => {};
+  await assert.rejects(
+    openProgressDashboard(root, { spawnImpl: () => stalledChild, startupTimeoutMs: 1 }),
+    /did not become ready within 1ms/u,
+  );
 });

@@ -4594,6 +4594,137 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-post-merge-cleanup",
+      "title": "Nettoyer et stabiliser l’état post-fusion",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Préserver le travail local et isoler le correctif",
+          "status": "DONE",
+          "acceptance": [
+            "Tous les changements préexistants sont conservés dans un stash nommé et récupérable",
+            "Le correctif démarre sur une branche dédiée dont l’arbre de base correspond à main",
+            "Aucune donnée utilisateur n’est supprimée"
+          ],
+          "files": [
+            ".codex/config.toml",
+            ".gitignore",
+            "apps/extension/**",
+            "apps/ui-workbench/**",
+            "apps/worker/**",
+            "docs/architecture/drafts/**",
+            "docs/decisions/ADR-0037-extension-only-radio-port.md",
+            "docs/decisions/ADR-0038-parallel-clean-room-cutover.md",
+            "docs/operations/**",
+            "packages/**",
+            "scripts/**"
+          ],
+          "commands": [
+            "git status --short",
+            "git stash push -u -m \"preserve preexisting work before post-merge cleanup\" -- <audited paths>",
+            "git switch -c fix/post-merge-cleanup",
+            "git stash list"
+          ],
+          "evidence": [
+            "All audited preexisting source, configuration and generated-output changes are preserved in two named recoverable stashes.",
+            "fix/post-merge-cleanup has the same tree as origin/main; only Progress tracking files remain modified.",
+            "No user data or tracked file was deleted."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Stabiliser le démarrage du dashboard sur Windows",
+          "status": "DONE",
+          "acceptance": [
+            "Le délai de disponibilité reste borné et tient compte du démarrage Windows",
+            "Les erreurs de lancement échouent rapidement et explicitement",
+            "Les tests couvrent les délais Windows et non-Windows ainsi que le cycle détaché"
+          ],
+          "files": [
+            "scripts/progress-dashboard-manager.mjs",
+            "tests/progress-dashboard.test.mjs",
+            "docs/decisions/ADR-0028-local-progress-dashboard.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test tests/progress-dashboard.test.mjs",
+            "npm run lint",
+            "npm run validate:decisions",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Dashboard startup remains bounded at 3 seconds on POSIX and uses a tested 10-second allowance on Windows.",
+            "Spawn errors and early child exits now fail explicitly; 10/10 dashboard tests pass, including detached reuse/replacement and launch failure.",
+            "Internal blueprint architecture validates at showcase quality: 9/9 checks, 0 errors, 0 warnings."
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Nettoyer les artefacts obsolètes et auditer les sorties",
+          "status": "DONE",
+          "acceptance": [
+            "Seuls les deux ZIP 0.0.0 explicitement identifiés sont supprimés",
+            "Les ZIP et le manifeste 1.0.0 restent intacts et concordants",
+            "La sortie statique ne contient aucun exemple ni version 0.0.0"
+          ],
+          "files": [
+            "apps/extension/.output/packages/tobirink-chrome-mv3-0.0.0.zip",
+            "apps/extension/.output/packages/tobirink-firefox-mv3-0.0.0.zip",
+            "apps/extension/.output/packages/release-manifest.json",
+            "apps/web/out/**"
+          ],
+          "commands": [
+            "git clean -fX -- <two exact 0.0.0 ZIP paths>",
+            "shasum -a 256 apps/extension/.output/packages/*1.0.0.zip",
+            "rg \"sample-work|Exemple public|0.0.0\" apps/web/out"
+          ],
+          "evidence": [
+            "The two obsolete 0.0.0 ZIPs were removed from the workspace into a dedicated recoverable stash; only 1.0.0 packages and the manifest remain.",
+            "The release manifest is version 1.0.0 with exactly two artifacts and contains no 0.0.0 reference.",
+            "Preserved 1.0.0 SHA-256 values match the audited release: Chrome b8506278…a9da8d; Firefox 2af60f3d…17d730."
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Vérifier et livrer le correctif post-fusion",
+          "status": "DONE",
+          "acceptance": [
+            "Tests ciblés, npm run verify, CRG et diff-check passent",
+            "Le commit dédié ne contient que le correctif, sa documentation et Progress",
+            "La PR dédiée est fusionnée après CI verte",
+            "Le stash de préservation reste disponible"
+          ],
+          "files": [
+            "scripts/progress-dashboard-manager.mjs",
+            "tests/progress-dashboard.test.mjs",
+            "docs/decisions/ADR-0028-local-progress-dashboard.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run crg:review",
+            "git diff --check",
+            "git commit -m \"fix(progress): stabilize detached dashboard startup\"",
+            "git push origin fix/post-merge-cleanup",
+            "gh pr create",
+            "gh pr checks",
+            "gh pr merge"
+          ],
+          "evidence": [
+            "npm run verify passed end to end: 270/270 repository tests plus one intentional skip, CRG smoke, integration, audit at 0 vulnerabilities and docs build.",
+            "Next 16.3.4 static export passed for all eight routes; output scan found no sample-work, Exemple public or 0.0.0.",
+            "Final diff is limited to Progress evidence, dashboard manager/test, ADR-0028 and the internal Archify source; git diff --check passes."
+          ]
+        }
+      ]
     }
   ]
 }
