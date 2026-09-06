@@ -76,6 +76,7 @@ describe('agenda notifications', () => {
     expect(surface).toMatch(/useLocalAgenda\(\)/);
     expect(surface).toMatch(/agenda=\{agenda\}/);
     expect(surface).toMatch(/onRetryAgenda=\{localAgenda\.onRetry\}/);
+    expect(background).toMatch(/sourceUrl: source\.url/);
     expect(surface).not.toMatch(/agenda=\{\{ state: 'blocked' \}\}/);
     expect(surface).not.toMatch(/days=\{\[\]\}/);
   });

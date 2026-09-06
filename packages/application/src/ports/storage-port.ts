@@ -48,6 +48,19 @@ export interface ReviewListQuery {
   status: ReviewStatus;
 }
 
+export const reviewMatchListLimit = 100;
+
+export interface ReviewMatchListQuery {
+  limit: number;
+  workId: WorkId;
+}
+
+export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > reviewMatchListLimit) {
+    throw new RangeError('Matched Review limit must be an integer between 1 and 100.');
+  }
+}
+
 export interface StorageReadPort {
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
@@ -60,6 +73,7 @@ export interface StorageReadPort {
   listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
   listReviews(query: ReviewListQuery): Promise<readonly Review[]>;
+  listReviewsByWorkId(query: ReviewMatchListQuery): Promise<readonly Review[]>;
 }
 
 export interface StorageWritePort {

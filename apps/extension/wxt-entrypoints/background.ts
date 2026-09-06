@@ -67,16 +67,19 @@ export default defineBackground({
           return {
             ok: true,
             snapshot: {
-              items: snapshot.items.map(({ entry, work }) => ({
-                availability: entry.availability,
-                id: entry.id,
-                mediaType: work.mediaKind,
-                occursAt: entry.occursAt,
-                release: entry.releaseLabel,
-                source: work.externalReferences[0]?.provider ?? work.mediaKind,
-                title: work.preferredTitle,
-                workId: work.id,
-              })),
+              items: snapshot.items.map(({ entry, source, work }) => {
+                const item = {
+                  availability: entry.availability,
+                  id: entry.id,
+                  mediaType: work.mediaKind,
+                  occursAt: entry.occursAt,
+                  release: entry.releaseLabel,
+                  source: work.externalReferences[0]?.provider ?? work.mediaKind,
+                  title: work.preferredTitle,
+                  workId: work.id,
+                };
+                return source ? { ...item, sourceUrl: source.url } : item;
+              }),
               missingWorkIds: snapshot.missingWorkIds,
             },
           };

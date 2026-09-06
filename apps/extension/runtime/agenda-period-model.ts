@@ -43,16 +43,18 @@ export function createAgendaDays(period: LocalAgendaPeriod, snapshot: AgendaSnap
     id,
     isToday: id === localDayId(new Date()),
     label: dayLabel.format(date),
-    releases: snapshot.items.filter((item) => localDayId(new Date(item.occursAt)) === id).map((item) => ({
-      availability: item.availability,
-      displayDate: timeLabel.format(new Date(item.occursAt)),
-      href: `#work-${item.workId}`,
-      id: item.id,
-      occursAt: item.occursAt,
-      precision: item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire local',
-      release: item.release,
-      source: item.source,
-      title: item.title,
-    })),
+    releases: snapshot.items.filter((item) => localDayId(new Date(item.occursAt)) === id).map((item) => {
+      const release = {
+        availability: item.availability,
+        displayDate: timeLabel.format(new Date(item.occursAt)),
+        id: item.id,
+        occursAt: item.occursAt,
+        precision: item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire local',
+        release: item.release,
+        source: item.source,
+        title: item.title,
+      };
+      return item.sourceUrl ? { ...release, href: item.sourceUrl } : release;
+    }),
   }));
 }

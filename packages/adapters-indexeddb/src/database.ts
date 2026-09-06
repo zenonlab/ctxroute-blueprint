@@ -39,5 +39,14 @@ export class TobirinkDatabase extends Dexie {
       reviews: '&id, status',
       works: '&id, mediaKind, preferredTitle',
     });
+    this.version(4).stores({
+      agenda: '&id, workId, occursAt, availability',
+      favoriteSources: '&id, &bookmarkId, reviewId, importedAt',
+      libraries: '&id',
+      progress: '&id, workId, kind',
+      reminders: '&id, agendaEntryId, channel',
+      reviews: '&id, status, matchedWorkId',
+      works: '&id, mediaKind, preferredTitle',
+    });
   }
 }

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { pointInRect, tiltAt } from './card-motion';
-import { workCardStates, workCardVariants } from './index';
+import { WorkCard, workCardStates, workCardVariants } from './index';
 
 const component = readFileSync(new URL('./WorkCard.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('./WorkCard.module.css', import.meta.url), 'utf8');
@@ -50,11 +52,22 @@ describe('WorkCard', () => {
   });
 
   it('uses a named link and an accessible cover fallback', () => {
-    expect(component).toMatch(/aria-label=.*Ouvrir la source de/);
+    expect(component).toMatch(/Ouvrir la source de/);
+    expect(component).toMatch(/Source indisponible pour/);
+    expect(component).toMatch(/aria-disabled=/);
     expect(component).toMatch(/Couverture indisponible pour/);
     expect(component).toMatch(/role="img"/);
     expect(component).toMatch(/href={href}/);
     expect(component).toMatch(/fallbackIcon\[variant\]/);
+  });
+
+  it('keeps the full visual shell without exposing a false link when the source is absent', () => {
+    const markup = renderToStaticMarkup(createElement(WorkCard, { context: 'Anime', title: 'Frieren', variant: 'agenda' }));
+    expect(markup).toContain('aria-disabled="true"');
+    expect(markup).toContain('aria-label="Source indisponible pour Frieren"');
+    expect(markup).not.toContain('href=');
+    expect(markup).toContain('Couverture indisponible pour Frieren');
+    expect(markup).toContain('- / -');
   });
 
   it('publishes one isolated workbench example', () => {

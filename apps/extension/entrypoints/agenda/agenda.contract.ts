@@ -10,7 +10,7 @@ export interface AgendaRelease {
   coverAlt?: string;
   coverSrc?: string;
   displayDate: string;
-  href: string;
+  href?: string;
   id: string;
   occursAt?: string;
   precision: string;

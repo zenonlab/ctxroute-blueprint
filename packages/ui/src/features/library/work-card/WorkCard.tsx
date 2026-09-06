@@ -11,7 +11,7 @@ export interface WorkCardProps extends Omit<AnchorHTMLAttributes<HTMLAnchorEleme
   coverSrc?: string;
   context: string;
   detail?: string;
-  href: string;
+  href?: string;
   indicator?: string;
   reviewActions?: {
     disabled?: boolean;
@@ -178,7 +178,8 @@ export function WorkCard({
   return (
     <a
       {...props}
-      aria-label={props['aria-label'] ?? `Ouvrir la source de ${title}`}
+      aria-disabled={props['aria-disabled'] ?? (href ? undefined : true)}
+      aria-label={props['aria-label'] ?? (href ? `Ouvrir la source de ${title}` : `Source indisponible pour ${title}`)}
       className={classes}
       data-state={state}
       data-variant={variant}

@@ -15,8 +15,8 @@ export type {
   TelemetryPort,
 } from './ports/capability-ports';
 export { privateStoreNames } from './ports/storage-port';
-export { agendaEntryListLimit, assertAgendaEntryListQuery } from './ports/storage-port';
-export type { AgendaEntryListQuery, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
+export { agendaEntryListLimit, assertAgendaEntryListQuery, assertReviewMatchListQuery, reviewMatchListLimit } from './ports/storage-port';
+export type { AgendaEntryListQuery, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, ReviewMatchListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
 export type {
   CoverImageRenderPort,
   CoverMasterReadPort,

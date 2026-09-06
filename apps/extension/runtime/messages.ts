@@ -90,6 +90,7 @@ export const agendaPeriodResponseSchema = z.discriminatedUnion('ok', [
         occursAt: z.string(),
         release: z.string().min(1).max(300),
         source: z.string().min(1).max(32),
+        sourceUrl: z.string().regex(/^https?:\/\/[^\s]+$/u).optional(),
         title: z.string().min(1).max(300),
         workId: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u),
       })).max(100),

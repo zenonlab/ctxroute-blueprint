@@ -36,7 +36,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   if (JSON.stringify(migrated) !== JSON.stringify(versionThree.works)) throw new Error('Legacy fixture did not migrate to the version 3 work fixture.');
   if (JSON.stringify(sources) !== JSON.stringify(versionThree.favoriteSources)) throw new Error('Version 3 favorite source store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 3 || report.checkedRecords !== 1) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 4 || report.checkedRecords !== 1) throw new Error('Integrity report did not cover the migrated database.');
   database.close();
 }
 

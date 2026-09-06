@@ -13,7 +13,7 @@
         "id": "local-authority",
         "label": "Private local authority",
         "focus": ["reader", "extensionUi", "extensionWorker", "appCore", "indexedDb", "bootstrapStore"],
-        "note": "Dexie v3 owns private state; pending Reviews join one source by reviewId before a bounded candidate port."
+        "note": "Dexie v4 owns private state; indexed resolved Reviews join works to ordered favorite sources without a scan."
       },
       {
         "id": "extension-security",

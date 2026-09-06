@@ -1,4 +1,4 @@
-import { assertAgendaEntryListQuery } from '@tobirink/application';
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import type {
   AgendaEntry,
@@ -87,6 +87,14 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, limit);
     },
+    listReviewsByWorkId: async (query) => {
+      requireStore('reviews');
+      assertReviewMatchListQuery(query);
+      return [...state.reviews.values()]
+        .filter((review) => review.matchedWorkId === query.workId)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .slice(0, query.limit);
+    },
     putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); state.agenda.set(entry.id, entry); },
     putFavoriteSource: async (source: FavoriteSource) => {
       requireStore('favoriteSources');
@@ -122,6 +130,7 @@ export class MemoryStoragePort implements StoragePort {
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
+  listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);

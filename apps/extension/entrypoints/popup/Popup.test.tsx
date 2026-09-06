@@ -47,8 +47,7 @@ describe('Popup', () => {
     expect(component).toMatch(/PopupConnection/);
     expect(component).toMatch(/preferences\.items\.map/);
     expect(component).toMatch(/onPreferenceChange\?\.\(preference\.id, enabled\)/);
-    expect(component).toMatch(/onOpenAgenda/);
-    expect(component).toMatch(/event\.preventDefault\(\)/);
+    expect(component).not.toMatch(/onOpenAgenda|event\.preventDefault\(\)/);
     expect(component).not.toMatch(/Aucune sortie à venir|Les prochaines dates apparaîtront ici/);
     expect(component).not.toMatch(/Mise à jour des favoris|Observer la navigation|Assistant de navigation/);
     expect(component).not.toMatch(/browser\.|indexedDB|https?:\/\//);

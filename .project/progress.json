@@ -1125,6 +1125,76 @@
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings.",
             "external: no in-app browser instance was available for an additional manual screenshot; automated Workbench and accessibility checks passed."
           ]
+        },
+        {
+          "id": "step-12",
+          "title": "Ouvrir la source locale depuis Agenda",
+          "status": "DONE",
+          "acceptance": [
+            "Agenda resolves a deterministic preferred FavoriteSource through bounded resolved Reviews matched to each Work.",
+            "Multiple sources remain valid and are ordered by folder path, bookmark order and stable identifier.",
+            "Dexie uses an indexed matchedWorkId lookup with a tested version migration.",
+            "Agenda and popup WorkCards open the exact preferred local HTTP(S) source when present.",
+            "A WorkCard without a local source remains visually identical but is non-interactive and does not claim to open a source.",
+            "No network call, host permission or direct storage access is introduced in UI surfaces.",
+            "Application, contracts, IndexedDB browser contract, extension, UI, accessibility, builds, security, lint, anti-slop and Archify validations pass."
+          ],
+          "files": [
+            "packages/application/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/agenda/**",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "packages/adapters-indexeddb/test/**",
+            "packages/ui/src/features/library/work-card/**",
+            "apps/extension/runtime/messages.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/runtime/agenda-period-model.ts",
+            "apps/extension/runtime/agenda-period-model.test.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/agenda-notifications.test.ts",
+            "apps/extension/entrypoints/agenda/**",
+            "apps/extension/entrypoints/popup/**",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/systems/README.md",
+            "docs/ui/00-screen-map.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/ui-system.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run test:migrations --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/ui-workbench",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run test:security --workspace @tobirink/extension",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 28/28 and contracts 9/9 pass; multiple resolved favorites are preserved, ordered by folder path, bookmark order and stable ID, with source reads coalesced per Work.",
+            "Dexie v4 indexes matchedWorkId; adapter 2/2, Chromium StoragePort contract and v1/v2/v3-to-v4 migration checks pass.",
+            "Extension 72/72, UI 118/118, Workbench 9/9 and accessibility 7/7 pass; sourceUrl accepts only HTTP(S) and source-less WorkCard has no href.",
+            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with empty host_permissions.",
+            "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, UI/docs/34 ADR validations and git diff check pass.",
+            "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings."
+          ]
         }
       ]
     },

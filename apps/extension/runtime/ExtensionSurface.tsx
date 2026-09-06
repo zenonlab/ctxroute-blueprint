@@ -155,13 +155,15 @@ function PopupSurface() {
     return () => { active = false; };
   }, [loadKey]);
 
-  const agendaItems = localAgenda.days.flatMap((day) => day.releases).map((release): PopupWork => ({
-    href: '#agenda',
-    indicator: release.displayDate,
-    mediaType: 'Sortie',
-    source: `${release.release} · ${release.source}`,
-    title: release.title,
-  }));
+  const agendaItems = localAgenda.days.flatMap((day) => day.releases).map((release): PopupWork => {
+    const item = {
+      indicator: release.displayDate,
+      mediaType: 'Sortie',
+      source: `${release.release} · ${release.source}`,
+      title: release.title,
+    };
+    return release.href ? { ...item, href: release.href } : item;
+  });
   const agenda = localAgenda.state === 'loading' || localAgenda.state === 'error'
     ? { state: localAgenda.state } as const
     : agendaItems.length > 0
@@ -177,7 +179,6 @@ function PopupSurface() {
           ? { label: 'Lecture locale interrompue', tone: 'error' }
           : { label: 'Données locales prêtes', tone: 'ready' }}
       continuations={model.continuations}
-      onOpenAgenda={() => open('agenda')}
       onOpenFullSettings={() => open('settings')}
       onRetryAgenda={localAgenda.onRetry}
       onRetryPage={retry}

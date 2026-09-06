@@ -52,7 +52,11 @@ export before calling the existing confirmed atomic replacement once.
 Local Agenda reads use canonical half-open time ranges through `StorageReadPort`.
 Memory and Dexie adapters enforce the same maximum of 100 ordered entries; the
 application joins Work records after the bounded query and reports missing
-local references instead of requesting remote replacements.
+local references instead of requesting remote replacements. Dexie schema v4
+indexes resolved Reviews by `matchedWorkId`; the application follows those
+bounded results to their private `FavoriteSource` records. Multiple favorites
+for one Work remain valid and the preferred link is chosen deterministically
+by folder path, bookmark order, then stable identifier.
 
 ## Consequences
 

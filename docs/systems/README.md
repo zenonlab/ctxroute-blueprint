@@ -46,7 +46,10 @@ projection.
 Agenda uses the same boundary for half-open weekly `occursAt` ranges. The
 storage port returns at most 100 ordered entries, the application joins only
 their local Work records, and a missing Work makes the serialized period
-partial without triggering catalogue traffic.
+partial without triggering catalogue traffic. A bounded indexed Review lookup
+then resolves the preferred private favorite URL by folder path, bookmark order
+and stable identifier. The serialized item omits the URL when no local source
+exists; its WorkCard stays visible but is not a link.
 
 On the explicit extension installation or update event, the browser adapter
 reads the bookmark tree and emits serializable records with their folder path

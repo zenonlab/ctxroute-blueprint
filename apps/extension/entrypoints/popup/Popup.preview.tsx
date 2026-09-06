@@ -76,7 +76,6 @@ function PopupDemo({ state, variant }: { state: PopupState; variant: PopupVarian
       connection={{ label: 'Données locales prêtes', tone: 'ready' }}
       continuations={continuations}
       initialPanel={variant}
-      onOpenAgenda={() => undefined}
       onOpenFullSettings={() => undefined}
       onPreferenceChange={(id, enabled) => {
         if (id === 'popup-auto-favorites') setFavoritesEnabled(enabled);

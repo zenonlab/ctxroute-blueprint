@@ -30,10 +30,14 @@ describe('extension Agenda messages', () => {
     expect(agendaPeriodResponseSchema.safeParse({
       ok: true,
       snapshot: {
-        items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', title: 'Frieren', workId: 'work_frieren-one' }],
+        items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'https://reader.example/frieren/29', title: 'Frieren', workId: 'work_frieren-one' }],
         missingWorkIds: [],
       },
     }).success).toBe(true);
+    expect(agendaPeriodResponseSchema.safeParse({
+      ok: true,
+      snapshot: { items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'javascript:alert(1)', title: 'Frieren', workId: 'work_frieren-one' }], missingWorkIds: [] },
+    }).success).toBe(false);
     expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { items: Array.from({ length: 101 }, () => ({})), missingWorkIds: [] } }).success).toBe(false);
   });
 });

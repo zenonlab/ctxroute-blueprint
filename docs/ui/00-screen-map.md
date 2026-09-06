@@ -31,7 +31,9 @@ dans le même viewport verticalement défilable, avec au plus cinq `WorkCard`
 portrait 2:3 représentant des œuvres interrompues et non terminées. Sorties
 reste un onglet distinct. Page et Sorties réutilisent `WorkCard`; l’onglet
 Sorties lit la même période Agenda locale que la page complète et ne rend rien
-lorsque cette période est vide. Réglages contient seulement les
+lorsque cette période est vide. Une sortie ouvre sa source favorite locale ;
+sans source, la même `WorkCard` reste visible mais non interactive et annonce
+son indisponibilité. Réglages contient seulement les
 préférences quotidiennes et un accès à l’organisateur complet. La surface reçoit
 ses modèles sérialisables séparément de ses callbacks, sans lire le navigateur,
 IndexedDB ou le réseau. Tant que les ports de lecture ne sont pas raccordés,
