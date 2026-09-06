@@ -25,7 +25,7 @@
         "id": "bookmark-boundary",
         "label": "Bookmark connector",
         "focus": ["appCore", "browserAdapter", "bookmarks"],
-        "note": "A bounded onInstalled import preserves browser folder paths and order in IndexedDB; bookmarks remain non-authoritative."
+        "note": "IndexedDB preserves bookmark order; the pure organizer previews deterministic moves without touching the connector."
       },
       {
         "id": "catalogue-media",
@@ -44,7 +44,7 @@
   "components": [
     { "id": "reader", "type": "external", "label": "Reader", "pos": [20, 330], "size": [115, 64] },
     { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
-    { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "Library / Agenda / Review", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
+    { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "Local flows / Organizer", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
     { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "router + local composition", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
     { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "favorite sources / domain state", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
     { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "activeTab / cache / notifications", "pos": [650, 100], "size": [190, 64] },

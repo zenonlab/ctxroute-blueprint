@@ -19,6 +19,13 @@ events into application commands. An optional mode also projects selected
 changes back to the linked bookmark. A bookmark identifier or URL never becomes
 a domain identifier or an authority for membership and progress.
 
+The local organizer owns a bounded folder-rule tree and a pure preview use
+case. Rules run in pre-order, the first complete match wins, and their selected
+conditions use AND semantics. Missing context fails closed and never moves an
+item. This core has no storage, browser or network dependency; persistence,
+fresh-preview confirmation, snapshot and bookmark projection remain separate
+adapter steps requiring the bookmarks permission before activation.
+
 ## Local persistence
 
 The storage package defines `StoragePort`, versioned records, migrations,

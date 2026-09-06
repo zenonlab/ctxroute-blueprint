@@ -62,3 +62,4 @@ export * from './agenda';
 export * from './popup';
 export * from './collective-index';
 export * from './recovery';
+export * from './organizer';

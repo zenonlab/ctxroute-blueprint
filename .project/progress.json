@@ -1195,6 +1195,47 @@
             "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, UI/docs/34 ADR validations and git diff check pass.",
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings."
           ]
+        },
+        {
+          "id": "step-13",
+          "title": "Définir le noyau local de l organisateur de favoris",
+          "status": "DONE",
+          "acceptance": [
+            "Le domaine valide un arbre de règles local borné avec identifiants uniques types statuts et progressions connus",
+            "Le calcul d aperçu est déterministe applique la première règle gagnante et combine les conditions avec AND",
+            "Une donnée absente incertaine ou non reconnue ne produit jamais de déplacement",
+            "Le noyau ne lit ni IndexedDB ni API navigateur ni réseau et ne modifie aucun favori",
+            "Les tests la documentation et l architecture Archify valident la frontière modulaire"
+          ],
+          "files": [
+            "packages/domain/src/organizer/**",
+            "packages/domain/src/index.ts",
+            "packages/domain/src/domain.test.ts",
+            "packages/application/src/organizer/**",
+            "packages/application/src/index.ts",
+            "packages/application/src/application.test.ts",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):define-local-preview-core"
+          ],
+          "evidence": [
+            "Domaine 11/11 et application 33/33 passent; arbre borne a 100 dossiers et 8 niveaux, identifiants uniques, premiere regle gagnante et conditions AND testes.",
+            "Contexte absent duplique incomplet ou non reconnu produit keep; le noyau pur ne depend ni d IndexedDB ni du navigateur ni du reseau et ne modifie aucun favori.",
+            "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/35 ADR, diff-check et Archify Tobirink 9/9 sans erreur ni avertissement passent."
+          ]
         }
       ]
     },
