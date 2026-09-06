@@ -2393,7 +2393,7 @@
         {
           "id": "step-5",
           "title": "Raccorder Review et la recherche globale",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "La cloche lit les candidats vérifiables et enregistre chaque décision atomique locale",
             "Précédent et suivant parcourent la file sans écrire et la décision avance vers le prochain élément",
@@ -2416,7 +2416,14 @@
             "npm run test:a11y",
             "npm run archify:validate -- tobirink.architecture"
           ],
-          "evidence": []
+          "evidence": [
+            "La cloche charge au plus six candidats locaux munis d une source HTTP vérifiable; candidat, saisie locale unique et aucun résultat révisent une seule Review dans une transaction avec contrôle de révision.",
+            "Précédent et suivant ne font que déplacer le curseur; après une décision, la file pending est relue et l élément suivant occupe la position courante.",
+            "La recherche globale n utilise plus ignoreSearch: elle inspecte au plus 500 œuvres de la bibliothèque, retourne 24 résultats accent-insensibles et ouvre la surface Library locale.",
+            "Le client HTTP D1 reste non composé, aucune permission hôte ni fetch runtime ajouté; les messages sont stricts et les projections sont isolées du routeur WXT.",
+            "Review E2E 2/2, application 47/47, extension 83/83, contrats 9/9, sécurité 12/12, accessibilité 8/8, typecheck et deux builds passent.",
+            "ESLint, Oxlint, anti-slop, Sensor SAFE, docs, décisions, UI, diff-check et Tobirink Archify 9/9 passent."
+          ]
         },
         {
           "id": "step-6",

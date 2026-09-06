@@ -79,8 +79,19 @@ reports missing Work records explicitly, and the serialized response contains
 only the Work projection needed by the surface. This read remains local and
 does not activate the dormant candidate adapter.
 
+Global search and the installed Review panel reuse a bounded local title query:
+at most 500 primary-library identifiers are inspected and at most 24 results or
+six Review candidates cross the message boundary. A Review candidate is shown
+only when a resolved local Review provides an HTTP(S) source that can verify it.
+Candidate, manual local identifier/source, and no-match decisions re-read the
+pending Review, its source, revision and selected Work inside one IndexedDB
+transaction. A stale revision, missing Work, non-library Work or ambiguous
+manual match fails closed. Previous and next only move the in-memory cursor.
+The dormant HTTP candidate adapter remains uncomposed; no D1 call or host
+permission is introduced by local search.
+
 ## Consequences
 
-Library pages now project bounded local Work records; richer Review/source and
-Progress joins remain explicit later use cases. Source URLs remain private and
+Library pages and global search now project bounded local Work records. Review
+joins remain explicit application use cases. Source URLs remain private and
 local; they never enter D1, R2, telemetry, or public catalogue requests.

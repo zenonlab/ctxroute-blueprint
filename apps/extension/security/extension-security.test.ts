@@ -87,6 +87,10 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/normalizeBookmarks\(await bookmarks\.importBookmarks\(\)\)/);
     expect(background).toMatch(/importFavoriteSources\(favorites, privateStorage\.storage/);
     expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
+    expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);
+    expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
+    expect(background).toMatch(/readLocalSearchSnapshot\(privateStorage\.storage/);
+    expect(background).not.toMatch(/HttpReviewCandidateAdapter|fetch\(/);
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).toMatch(/saveOrganizerConfiguration\(privateStorage\.storage/);
     expect(background).toMatch(/readOrganizerPreview\(privateStorage\.storage/);

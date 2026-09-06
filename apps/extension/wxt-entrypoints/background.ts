@@ -6,6 +6,8 @@ import {
   WebExtensionPopupContinuationCacheAdapter,
 } from '@tobirink/adapters-browser';
 import { libraryId, workId } from '@tobirink/domain';
+import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
+import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
 
@@ -36,6 +38,23 @@ export default defineBackground({
           return { error: 'review-queue-unavailable', ok: false };
         }
       }
+      if (parsed.data.type === 'review.candidates.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, snapshot: await readLocalReviewCandidateSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.reviewId) };
+        } catch {
+          return { error: 'review-candidates-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'review.decision.write') {
+        try {
+          await privateStorage.ensureReady();
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data);
+          return { ok: true, status: review.status };
+        } catch (error) {
+          return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };
+        }
+      }
       if (parsed.data.type === 'library.page.read') {
         try {
           await privateStorage.ensureReady();
@@ -58,6 +77,26 @@ export default defineBackground({
           };
         } catch {
           return { error: 'library-page-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'library.search.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, snapshot: await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query) };
+        } catch {
+          return { error: 'library-search-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'search.open') {
+        try {
+          await privateStorage.ensureReady();
+          await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query);
+          const target = new URL(browser.runtime.getURL('/library.html'));
+          target.searchParams.set('query', parsed.data.query.trim());
+          await browser.tabs.create({ url: target.toString() });
+          return { ok: true };
+        } catch {
+          return { error: 'library-search-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'agenda.period.read') {

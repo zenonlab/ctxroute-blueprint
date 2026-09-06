@@ -1,17 +1,25 @@
 import type { MemberReviewConfig } from '@tobirink/ui';
 import type { ReviewQueueResponse } from './messages';
+import type { ReviewCandidatesResponse } from './messages';
 
 type ReviewQueueSnapshot = Extract<ReviewQueueResponse, { ok: true }>['snapshot'];
+type ReviewCandidateSnapshot = Extract<ReviewCandidatesResponse, { ok: true }>['snapshot'];
 
 export type LocalReviewQueueState =
   | { state: 'error' }
   | { state: 'loading' }
   | { snapshot: ReviewQueueSnapshot; state: 'ready' };
 
+export type LocalReviewCandidateState =
+  | { state: 'conflict' }
+  | { state: 'error' }
+  | { state: 'loading' }
+  | { snapshot: ReviewCandidateSnapshot; state: 'ready' };
+
 export interface LocalReviewNavigationCallbacks {
   onIndexChange: (index: number) => void;
   onRetry: () => void;
-  onUnavailableDecision: () => void;
+  onSubmitDecision: MemberReviewConfig['resolver']['onSubmitDecision'];
 }
 
 function sourceUrl(value: string): string | undefined {
@@ -28,6 +36,7 @@ export function createLocalReviewNavigation(
   queue: LocalReviewQueueState,
   requestedIndex: number,
   callbacks: LocalReviewNavigationCallbacks,
+  candidates?: LocalReviewCandidateState,
 ): MemberReviewConfig {
   const shared = {
     canNext: false,
@@ -36,7 +45,7 @@ export function createLocalReviewNavigation(
     onPrevious: callbacks.onRetry,
     onRefresh: callbacks.onRetry,
     onRetry: callbacks.onRetry,
-    onSubmitDecision: callbacks.onUnavailableDecision,
+    onSubmitDecision: callbacks.onSubmitDecision,
   } as const;
 
   if (queue.state === 'loading' || queue.state === 'error') {
@@ -49,11 +58,14 @@ export function createLocalReviewNavigation(
   const index = Math.min(Math.max(0, Math.trunc(requestedIndex)), items.length - 1);
   const source = items[index];
   if (!source) return { count: 0, resolver: { ...shared, state: 'empty' } };
+  if (!candidates || candidates.state === 'loading') return { count: items.length, resolver: { ...shared, state: 'loading' } };
+  if (candidates.state === 'error' || candidates.state === 'conflict') return { count: items.length, resolver: { ...shared, state: candidates.state } };
+  if (candidates.snapshot.reviewId !== source.id) return { count: items.length, resolver: { ...shared, state: 'loading' } };
   const item = {
-    candidates: [],
+    candidates: candidates.snapshot.candidates,
     id: source.id,
     position: index + 1,
-    revision: source.id,
+    revision: candidates.snapshot.revision,
     sourceLabel: source.sourceLabel,
     title: source.title,
     total: items.length,
@@ -69,7 +81,7 @@ export function createLocalReviewNavigation(
       item: url ? { ...item, sourceUrl: url } : item,
       onNext: () => callbacks.onIndexChange(index + 1),
       onPrevious: () => callbacks.onIndexChange(index - 1),
-      state: 'partial',
+      state: candidates.snapshot.state,
     },
   };
 }

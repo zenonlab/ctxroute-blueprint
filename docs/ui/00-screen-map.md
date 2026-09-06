@@ -68,6 +68,12 @@ La file locale alimente ce compteur et cette navigation sur Bibliothèque,
 Agenda et la route Review. Si aucun candidat n'est encore disponible, le
 contexte du favori et les flèches restent visibles mais aucune saisie ni action
 de décision factice n'est proposée.
+La recherche du header ouvre la Bibliothèque sur un résultat local borné et
+accent-insensible. Elle interroge IndexedDB via le worker, ne filtre pas
+seulement la première page visible et ne contacte aucun fournisseur distant.
+Review propose uniquement les œuvres locales qui possèdent déjà une source
+HTTP(S) résolue. Une saisie manuelle vérifie de la même manière un identifiant
+ou une URL locale unique avant d'écrire ; elle ne déclenche aucun appel D1.
 Quand la file est vide, la bulle reprend l'empty state FavLib compact : une
 icône Inbox grise et le seul libellé « Aucune correspondance à vérifier », sans
 en-tête ni description internes supplémentaires.
@@ -85,6 +91,7 @@ résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
 | --- | --- | --- | --- |
 | Organisation des favoris | Réglages complets | Arbre puis aperçu | règles enregistrées localement et déplacements explicitement prévisualisés |
 | Résolution | Cloche du header | Panneau Review | décision atomique locale puis candidat suivant |
+| Recherche globale | Recherche du header | Bibliothèque filtrée par la requête locale | jusqu’à 24 œuvres locales, sans réseau |
 | Observation de progression | Ouverture du popup sur une page compatible | titre et URL `activeTab` corrélés à une œuvre locale unique | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
 | Consultation d'une sortie | Bibliothèque ou onglet Sorties du menu d’extension | Agenda | date qualifiée par son niveau de confiance |
 | Configuration d'un rappel | Agenda | Agenda puis Réglages si permission absente | rappel local confirmé ou raison du blocage |

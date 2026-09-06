@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, reviewQueueResponseSchema } from './messages';
+import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, librarySearchResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema } from './messages';
 
 const organizerConfiguration = {
   folders: [{
@@ -18,6 +18,21 @@ describe('extension Review messages', () => {
     expect(extensionMessageSchema.safeParse({ type: 'review.queue.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ extra: true, type: 'review.queue.read', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ type: 'review.queue.read', version: 2 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ reviewId: 'review_source1', type: 'review.candidates.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ decision: { kind: 'candidate', workId: 'work_candidate1' }, reviewId: 'review_source1', revision: 'review-v1-current', type: 'review.decision.write', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ decision: { kind: 'manual', source: 'url', value: 'javascript:alert(1)' }, reviewId: 'review_source1', revision: 'review-v1-current', type: 'review.decision.write', version: 1 }).success).toBe(true);
+  });
+
+  it('bounds candidate snapshots and decision responses', () => {
+    expect(reviewCandidatesResponseSchema.safeParse({ ok: true, snapshot: {
+      candidates: [{ candidateId: 'work_candidate1', href: 'https://reader.example/one', mediaType: 'anime', provider: 'anilist', providerId: '1', title: 'One' }],
+      reviewId: 'review_source1', revision: 'review-v1-current', state: 'ready', title: 'One',
+    } }).success).toBe(true);
+    expect(reviewCandidatesResponseSchema.safeParse({ ok: true, snapshot: {
+      candidates: [{ candidateId: 'work_candidate1', href: 'javascript:alert(1)', mediaType: 'anime', provider: 'local', providerId: '1', title: 'One' }],
+      reviewId: 'review_source1', revision: 'review-v1-current', state: 'ready', title: 'One',
+    } }).success).toBe(false);
+    expect(reviewDecisionResponseSchema.safeParse({ ok: false, error: 'conflict' }).success).toBe(true);
   });
 
   it('bounds and validates the serializable pending snapshot', () => {
@@ -70,6 +85,13 @@ describe('extension Library messages', () => {
       ok: true,
       snapshot: { items: Array.from({ length: 25 }, () => ({ id: 'work_library-one', mediaType: 'manga', source: 'local', title: 'Titre' })), missingWorkIds: [] },
     }).success).toBe(false);
+  });
+
+  it('validates bounded local search commands and results', () => {
+    expect(extensionMessageSchema.safeParse({ query: 'Frieren', type: 'library.search.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ query: 'Frieren', type: 'search.open', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ query: '', type: 'search.open', version: 1 }).success).toBe(false);
+    expect(librarySearchResponseSchema.safeParse({ ok: true, snapshot: { items: [{ id: 'work_library-one', mediaType: 'manga', source: 'local', title: 'Frieren' }], truncated: false } }).success).toBe(true);
   });
 });
 

@@ -52,6 +52,8 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   présente une correspondance à la fois et son propriétaire fournit la suivante.
 - Les flèches de pied parcourent la file sans écrire de décision ; elles sont
   désactivées aux bornes et pendant l'enregistrement d'un choix.
+- La recherche globale inspecte au plus 500 identifiants de la bibliothèque et
+  retourne au plus 24 œuvres ; elle reste locale et accent-insensible.
 - Une Review locale sans candidat affiche son contexte et sa position, mais ni
   saisie manuelle ni action de décision tant qu'un port de résolution n'a pas
   fourni des choix vérifiables.

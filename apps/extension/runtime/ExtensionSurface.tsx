@@ -9,7 +9,7 @@ import { Popup } from '../entrypoints/popup';
 import type { PopupWork } from '../entrypoints/popup';
 import { Review } from '../entrypoints/review';
 import type { NavigationTarget } from './messages';
-import { readLibraryPageMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
+import { readLibraryPageMessage, readLibrarySearchMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
 import type { LibraryPageResponse } from './messages';
 import { useLocalAgenda } from './use-local-agenda';
 import { useLocalOrganizerSettings } from './use-local-organizer-settings';
@@ -22,7 +22,8 @@ function open(target: NavigationTarget) {
 }
 
 function LibrarySurface() {
-  const [filters, setFilters] = useState<LibraryFiltersValue>(emptyLibraryFilters);
+  const initialQuery = typeof window === 'undefined' ? '' : new URL(window.location.href).searchParams.get('query')?.trim() ?? '';
+  const [filters, setFilters] = useState<LibraryFiltersValue>({ ...emptyLibraryFilters, query: initialQuery });
   const [loadKey, setLoadKey] = useState(0);
   const [model, setModel] = useState<{
     items: Extract<LibraryPageResponse, { ok: true }>['snapshot']['items'];
@@ -53,8 +54,13 @@ function LibrarySurface() {
   useEffect(() => {
     let active = true;
     setModel({ items: [], loadingMore: false, state: 'loading' });
-    void readLibraryPageMessage().then((snapshot) => {
+    const request = initialQuery ? readLibrarySearchMessage(initialQuery) : readLibraryPageMessage();
+    void request.then((snapshot) => {
       if (!active) return;
+      if ('truncated' in snapshot) {
+        setModel({ items: snapshot.items, loadingMore: false, state: snapshot.items.length > 0 ? 'ready' : 'empty' });
+        return;
+      }
       setModel({
         items: snapshot.items,
         loadingMore: false,
@@ -65,7 +71,7 @@ function LibrarySurface() {
       if (active) setModel({ items: [], loadingMore: false, state: 'error' });
     });
     return () => { active = false; };
-  }, [loadKey]);
+  }, [initialQuery, loadKey]);
 
   const loadMore = useCallback(() => {
     if (!model.nextCursor || model.loadingMore) return;

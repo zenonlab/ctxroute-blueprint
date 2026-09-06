@@ -65,6 +65,10 @@ describe('extension accessibility contract', () => {
     expect(extensionSurface.match(/useLocalReviewNavigation\(/g)).toHaveLength(3);
     expect(extensionSurface).not.toMatch(/emptyNavigation/);
     expect(reviewNavigationHook).toMatch(/readReviewQueueMessage\(\)/);
+    expect(reviewNavigationHook).toMatch(/readReviewCandidatesMessage\(selectedId\)/);
+    expect(reviewNavigationHook).toMatch(/writeReviewDecisionMessage/);
+    expect(reviewNavigationHook).toMatch(/openSearchMessage\(query\)/);
+    expect(reviewNavigationHook).not.toMatch(/ignoreSearch/);
     expect(reviewNavigationHook).toMatch(/if \(!active\) return/);
     expect(reviewNavigationHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\./);
   });
