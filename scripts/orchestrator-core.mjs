@@ -256,7 +256,7 @@ async function atomicWriteState(path, state, maximumBytes, deps) {
   await rename(temporary, path);
   await deps.fault?.('afterStateRename');
   const directory = await open(dirname(path), constants.O_RDONLY).catch(() => null);
-  try { await directory?.sync(); } catch (error) { if (!['EINVAL', 'ENOTSUP', 'EBADF'].includes(error.code)) throw error; } finally { await directory?.close(); }
+  try { await directory?.sync(); } catch (error) { if (!['EINVAL', 'ENOTSUP', 'EBADF', 'EPERM'].includes(error.code)) throw error; } finally { await directory?.close(); }
 }
 
 async function withLock(path, timeoutMs, deps, operation) {
