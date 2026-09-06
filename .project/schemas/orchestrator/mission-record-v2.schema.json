@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/mission-record-v2.schema.json",
+  "type": "object",
+  "required": ["mission_id", "skill_id", "requested_skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "execution", "execution_reason", "status", "worktree_allocation", "report", "validation_receipt"],
+  "properties": {
+    "mission_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "skill_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "requested_skill_id": { "oneOf": [{ "$ref": "common-v2.schema.json#/$defs/identifier" }, { "type": "null" }] },
+    "skill_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32 },
+    "file_scope": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/relativePath" } },
+    "acceptance": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/text" } },
+    "validations": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/validation" } },
+    "response_format": { "const": "worker-report-v2" },
+    "execution": { "enum": ["auto", "direct", "coordinated"] },
+    "execution_reason": { "enum": ["ENVIRONMENT_SWARM_OFF", "EXPLICIT_DIRECT", "EXPLICIT_COORDINATED", "AUTO_SINGLE_SCOPE", "AUTO_COORDINATED", "PERSISTED_MODE", "DEFAULT_MODE"] },
+    "status": { "enum": ["PREPARING", "ASSIGNED", "RUNNING", "BLOCKED", "COMPLETED", "CANCELLED"] },
+    "worktree_allocation": { "oneOf": [{ "$ref": "common-v2.schema.json#/$defs/worktreeAllocation" }, { "type": "null" }] },
+    "report": { "oneOf": [{ "$ref": "worker-report-v2.schema.json" }, { "type": "null" }] },
+    "validation_receipt": { "oneOf": [{ "$ref": "validation-receipt-v2.schema.json" }, { "type": "null" }] }
+  },
+  "unevaluatedProperties": false
+}

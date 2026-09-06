@@ -1,11 +1,16 @@
 ---
 scope:
   - .project/orchestrator-config.json
+  - .project/project-config.json
   - .project/schemas/orchestrator/**
+  - docs/document-contracts.json
+  - package.json
+  - package-lock.json
   - scripts/orchestrator-*.mjs
   - scripts/worktree-manager.mjs
   - tests/orchestrator-*.test.mjs
 review: on-change
+revised: true
 contracts:
   - docs/document-contracts.json
   - package.json
