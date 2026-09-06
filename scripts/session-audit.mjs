@@ -22,8 +22,9 @@ export async function auditSessions({ sessionPaths, approvedRoots, excludedPaths
   const ownArtifacts = [currentSessionPath, outputPath].filter(Boolean);
   const exclusions = await canonicalExclusions([...excludedPaths, ...ownArtifacts, SCRIPT_PATH]);
   const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
   const observations = { files: new Set(), commands: new Map(), missionIds: new Set(), skillIds: new Set(), redactions: 0, malformed: 0, bytes: 0, truncated: false };
-  const sessions = [];
+  let sessionsExamined = 0;
   const seen = new Set();
   let skippedActive = 0;
   let skippedExcluded = 0;
@@ -34,24 +35,31 @@ export async function auditSessions({ sessionPaths, approvedRoots, excludedPaths
     seen.add(trace);
     if (exclusions.has(trace)) { skippedExcluded += 1; continue; }
     if (isActiveTrace(trace)) { skippedActive += 1; continue; }
-    sessions.push(`trace-${sessions.length + 1}`);
+    sessionsExamined += 1;
     await streamTrace(trace, observations, maxBytes, deadline);
   }
   const signals = compareMission(mission, observations);
-  if (observations.redactions) signals.push(`redacted-secret-fields:${observations.redactions}`);
-  if (observations.malformed) signals.push(`malformed-records:${observations.malformed}`);
+  if (observations.redactions) signals.push('secret-fields-redacted');
+  if (observations.malformed) signals.push('malformed-records');
   if (observations.truncated) signals.push('bounded-read-truncated');
-  if (skippedActive) signals.push(`active-sessions-skipped:${skippedActive}`);
-  if (skippedExcluded) signals.push(`self-traces-excluded:${skippedExcluded}`);
+  if (skippedActive) signals.push('active-sessions-skipped');
+  if (skippedExcluded) signals.push('self-traces-excluded');
   if (!signals.length) signals.push('no-defect-detected');
   return {
-    sessions_examined: sessions,
-    signals_detected: signals,
+    schemaVersion: 2,
+    audit_id: `audit-${safeIdentifier(mission?.mission_id ?? 'session-traces')}`,
+    audit_type: 'session-audit',
     subject: { type: mission ? 'mission' : 'blueprint', id: safeText(mission?.mission_id ?? 'session-traces') },
+    signals: [...new Set(signals)],
     decision: signals.length === 1 && signals[0] === 'no-defect-detected' ? 'accept' : 'repair',
-    patch_applied: 'none',
-    validations: [`streamed-bytes:${observations.bytes}`, `records-malformed:${observations.malformed}`],
-    rollback: 'not-required',
+    evidence_refs: [],
+    proposed_action: signals.length === 1 && signals[0] === 'no-defect-detected' ? null : 'route-repair-through-orchestrator',
+    applied_action: null,
+    validations: [{
+      id: 'trace-stream', status: 'PASSED', exit_code: null, duration_ms: Math.min(Date.now() - startedAt, 300_000), timed_out: false, cause: null,
+      diagnostic: `files=${sessionsExamined};bytes=${observations.bytes};malformed=${observations.malformed};redactions=${observations.redactions};active-skipped=${skippedActive};self-excluded=${skippedExcluded}`,
+    }],
+    rollback_ref: null,
   };
 }
 
@@ -150,18 +158,19 @@ function compareMission(mission, observations) {
   if (observations.skillIds.size && !observations.skillIds.has(mission.skill_id)) signals.push('skill-id-mismatch');
   const scopes = Array.isArray(mission.file_scope) ? mission.file_scope : [];
   const outside = [...observations.files].filter(path => !scopes.some(scope => path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)));
-  if (outside.length) signals.push(`files-outside-scope:${outside.length}`);
+  if (outside.length) signals.push('files-outside-scope');
   const expectedCommands = Array.isArray(mission.validations)
     ? mission.validations.map(validation => [validation.executable, ...(validation.args ?? [])].join(' '))
     : Array.isArray(mission.validation_commands) ? mission.validation_commands : [];
   const missingCommands = expectedCommands.filter(command => !observations.commands.has(command));
-  if (missingCommands.length) signals.push(`validations-missing:${missingCommands.length}`);
+  if (missingCommands.length) signals.push('validations-missing');
   const failed = [...observations.commands.values()].filter(code => Number.isInteger(code) && code !== 0).length;
-  if (failed) signals.push(`validations-failed:${failed}`);
+  if (failed) signals.push('validations-failed');
   return signals;
 }
 
 function safeText(value) { return redact(String(value), { redactions: 0 }).slice(0, 128); }
+function safeIdentifier(value) { return String(value).toLowerCase().replace(/[^a-z0-9._-]+/gu, '-').replace(/^[^a-z0-9]+|[^a-z0-9]+$/gu, '').slice(0, 120) || 'session-traces'; }
 async function main() {
   const args = process.argv.slice(2);
   const roots = takeOptions(args, '--root');
