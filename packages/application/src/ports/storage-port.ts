@@ -69,6 +69,7 @@ export interface StorageReadPort {
   getLibrary(id: LibraryId): Promise<Library | undefined>;
   getOrganizerConfiguration(): Promise<OrganizerConfiguration | undefined>;
   getProgress(id: ProgressId): Promise<Progress | undefined>;
+  findProgressByWorkId(workId: WorkId): Promise<Progress | undefined>;
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;

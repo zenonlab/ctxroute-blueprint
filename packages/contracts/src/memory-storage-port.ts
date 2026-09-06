@@ -66,6 +66,12 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
     getLibrary: async (id: LibraryId) => { requireStore('libraries'); return state.libraries.get(id); },
     getOrganizerConfiguration: async () => { requireStore('organizer'); return state.organizer; },
     getProgress: async (id: ProgressId) => { requireStore('progress'); return state.progress.get(id); },
+    findProgressByWorkId: async (workId: WorkId) => {
+      requireStore('progress');
+      const matches = [...state.progress.values()].filter((progress) => progress.workId === workId);
+      if (matches.length > 1) throw new Error('A Work may have only one progress record.');
+      return matches[0];
+    },
     getReminder: async (id: ReminderId) => { requireStore('reminders'); return state.reminders.get(id); },
     getReview: async (id: ReviewId) => { requireStore('reviews'); return state.reviews.get(id); },
     getWork: async (id: WorkId) => { requireStore('works'); return state.works.get(id); },
@@ -132,6 +138,7 @@ export class MemoryStoragePort implements StoragePort {
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
+  findProgressByWorkId: StoragePort['findProgressByWorkId'] = (workId) => this.session().findProgressByWorkId(workId);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);

@@ -32,6 +32,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.getWork(id))?.preferredTitle === 'Contract work', 'work round-trip');
   assert((await storage.getLibrary(library.id))?.workIds[0] === id, 'library round-trip');
   assert((await storage.getProgress(progress.id))?.value === 12, 'progress round-trip');
+  assert((await storage.findProgressByWorkId(id))?.id === progress.id, 'progress lookup by Work');
   assert((await storage.getOrganizerConfiguration())?.folders[0]?.id === 'manga', 'organizer configuration round-trip');
   assert((await storage.getFavoriteSource(source.id))?.url === source.url, 'favorite source round-trip');
   assert((await storage.findFavoriteSourceByReviewId(review.id))?.id === source.id, 'favorite source lookup by Review');

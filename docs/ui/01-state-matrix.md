@@ -28,6 +28,9 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 - La carte « Cette œuvre » reste en 3:2. Les reprises sous-jacentes restent en
   2:3, sont bornées à cinq entrées inachevées et n’empêchent jamais le scroll
   vertical du viewport.
+- Le popup n’écrit une progression observée que si un marqueur explicite de
+  chapitre ou d’épisode correspond à une seule œuvre locale résolue. Sinon, la
+  carte générique et sa dernière URL utile restent disponibles sans mutation.
 - Un état partiel nomme la donnée absente et conserve les actions locales sûres.
 - Le mode hors ligne ne bloque jamais une lecture ou une mutation dont
   IndexedDB possède déjà toutes les données nécessaires.

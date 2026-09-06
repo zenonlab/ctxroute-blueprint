@@ -15,6 +15,7 @@ describe('DexieStoragePort structure', () => {
     expect(database).toMatch(/reviews: '&id, status, matchedWorkId'/);
     expect(adapter).toMatch(/reviews\.where\('matchedWorkId'\)\.equals\(query\.workId\)\.limit\(query\.limit\)/);
     expect(adapter).toMatch(/favoriteSources\.where\('reviewId'\)\.equals\(reviewId\)\.limit\(2\)/);
+    expect(adapter).toMatch(/progress\.where\('workId'\)\.equals\(workId\)\.limit\(2\)/);
     expect(adapter).toMatch(/agenda\.where\('occursAt'\)\.between\(query\.from, query\.to, true, false\)\.limit\(query\.limit\)/);
     expect(adapter).toMatch(/getOrganizerConfiguration:[\s\S]*createOrganizerConfiguration\(configuration\)/);
     expect(adapter).toMatch(/putOrganizerConfiguration:[\s\S]*createOrganizerConfiguration\(configuration\)/);

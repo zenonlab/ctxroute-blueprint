@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Tobirink — contexte actif et progression locale",
+    "output": "active-page-progress.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 760],
+    "views": [
+      {
+        "id": "active-context",
+        "label": "Contexte actif",
+        "focus": ["activeTab", "pageAdapter", "pageContext", "progressGuard", "continuationCache", "popup"],
+        "note": "Le popup lit uniquement le titre et l’URL HTTP(S), puis conserve la dernière URL utile dans un cache reconstructible."
+      },
+      {
+        "id": "safe-progress",
+        "label": "Progression sûre",
+        "focus": ["pageContext", "localIdentity", "progressGuard", "progressRecord", "popup"],
+        "note": "Une identité locale unique autorise l’écriture; égalité, baisse, dépassement ou ambiguïté restent sans effet."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Page active" },
+    { "label": "Adaptation" },
+    { "label": "Corrélation locale" },
+    { "label": "Effets gardés" },
+    { "label": "Présentation" }
+  ],
+  "nodes": [
+    { "id": "activeTab", "type": "external", "label": "Onglet actif", "sublabel": "titre + URL HTTP(S)", "stage": 0, "row": 0, "width": 150, "tag": "activeTab" },
+    { "id": "pageAdapter", "type": "backend", "label": "PageContextPort", "sublabel": "adaptateur WebExtension", "stage": 1, "row": 0, "width": 170, "tag": "lecture volontaire" },
+    { "id": "localIdentity", "type": "database", "label": "Identité locale", "sublabel": "Source / Review / Work", "stage": 1, "row": 2, "width": 180, "tag": "IndexedDB" },
+    { "id": "pageContext", "type": "messagebus", "label": "Contexte corrélé", "sublabel": "œuvre + chapitre ou épisode", "stage": 2, "row": 0, "width": 180, "tag": "unique ou générique" },
+    { "id": "progressGuard", "type": "security", "label": "Garde de progression", "sublabel": "hausse compatible seulement", "stage": 3, "row": 0, "width": 180, "tag": "fail-closed" },
+    { "id": "continuationCache", "type": "database", "label": "Cache de reprise", "sublabel": "5 entrées / 30 jours", "stage": 3, "row": 3, "width": 180, "tag": "reconstructible" },
+    { "id": "progressRecord", "type": "database", "label": "Progression locale", "sublabel": "Progress dans IndexedDB", "stage": 4, "row": 0, "width": 180, "tag": "autorité privée" },
+    { "id": "popup", "type": "frontend", "label": "WorkCard du popup", "sublabel": "Cette œuvre + reprises", "stage": 4, "row": 3, "width": 180, "tag": "props sérialisables" }
+  ],
+  "flows": [
+    { "from": "activeTab", "to": "pageAdapter", "label": "titre + URL", "classification": "lecture à l’ouverture", "variant": "security", "route": "straight", "labelAt": [203, 95] },
+    { "from": "pageAdapter", "to": "pageContext", "label": "normalise", "classification": "HTTP(S) validé", "variant": "emphasis", "route": "straight", "labelAt": [420, 95] },
+    { "from": "localIdentity", "to": "pageContext", "label": "résout", "classification": "une œuvre locale unique", "variant": "security", "route": "vertical-channel" },
+    { "from": "pageContext", "to": "progressGuard", "label": "observe", "classification": "chapitre ou épisode", "variant": "emphasis", "route": "straight", "labelAt": [638, 95] },
+    { "from": "progressGuard", "to": "progressRecord", "label": "hausse", "classification": "égalité et baisse ignorées", "variant": "security", "route": "straight", "labelAt": [853, 95] },
+    { "from": "progressGuard", "to": "continuationCache", "label": "enrichit", "classification": "ou conserve le contexte générique", "variant": "dashed", "route": "vertical-channel" },
+    { "from": "continuationCache", "to": "popup", "label": "reprises", "classification": "maximum cinq", "variant": "dashed", "route": "straight", "labelAt": [853, 437] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Autorité locale", "items": ["IndexedDB reste la seule progression métier", "Le cache conserve seulement la navigation récente", "React reçoit des données sérialisables"] },
+    { "dot": "amber", "title": "Écriture fail-closed", "items": ["Une seule œuvre locale doit correspondre", "Seule une hausse compatible est persistée", "Ambiguïté, égalité et baisse ne modifient rien"] },
+    { "dot": "cyan", "title": "Permission minimale", "items": ["Lecture après ouverture volontaire du popup", "Aucun script injecté dans la page", "Aucune permission hôte ou requête distante"] }
+  ]
+}

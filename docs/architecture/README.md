@@ -21,6 +21,11 @@ their declared states, and keeps its viewport limited to the catalogue and
 preview canvas. It bundles neither Monaco nor raw project sources and never
 enters the production extension bundle.
 
+[`src/active-page-progress.dataflow.json`](src/active-page-progress.dataflow.json)
+documents the runtime data path from the voluntarily exposed active tab through
+local identity correlation, the monotonic progress guard, IndexedDB and the
+reconstructible continuation cache to the popup WorkCard.
+
 The extension build uses a dedicated WXT entrypoint directory so its generated
 Manifest V3 shell remains separate from reusable React surfaces and previews.
 The generated manifest carries only documented browser permissions, local-only
@@ -33,8 +38,9 @@ the product registry, preview, `build:docs`, `visual-check`, and selector `all`
 exclude them. A product diagram must never contain CTXRoute, Progress MCP, CRG,
 Sensor, Archify, hook, or other blueprint implementation components.
 
-Validate one product diagram with `npm run archify:validate -- tobirink` or
-`npm run archify:validate -- ui-system`, and validate all product diagrams with
+Validate one product diagram with `npm run archify:validate -- tobirink`,
+`npm run archify:validate -- ui-system` or `npm run archify:validate -- dataflow`,
+and validate all product diagrams with
 `npm run archify:validate -- all`.
 Generate the interactive HTML with `npm run build:docs`; output stays under
 ignored `dist/` and must never be edited manually or committed.

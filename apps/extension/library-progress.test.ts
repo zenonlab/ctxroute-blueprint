@@ -27,7 +27,9 @@ describe('offline library and automatic progress', () => {
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
 
     expect(background).toMatch(/readLibraryPage\(privateStorage\.storage, input\)/);
+    expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).not.toMatch(/library\.page\.read[\s\S]{0,900}fetch\(/);
+    expect(background).not.toMatch(/defineContentScript|browser\.scripting/);
     expect(surface).toMatch(/readLibraryPageMessage\(model\.nextCursor\)/);
     expect(surface).not.toMatch(/items=\{\[\]\}/);
     expect(surface).not.toMatch(/indexedDB|Dexie/);

@@ -14,6 +14,14 @@ export interface ObservedProgress {
   relation: 'ahead' | 'equal' | 'regression';
 }
 
+export function reconcileProgressObservation(explicit: Progress, value: number): Pick<ObservedProgress, 'explicit' | 'relation'> {
+  const relation = value > explicit.value ? 'ahead' : value < explicit.value ? 'regression' : 'equal';
+  return {
+    explicit: relation === 'ahead' ? updateProgress(explicit, value) : explicit,
+    relation,
+  };
+}
+
 export async function observeProgress(
   storage: StoragePort,
   observation: ProgressObservation,
@@ -23,8 +31,7 @@ export async function observeProgress(
   return storage.transaction(['progress'], async (session) => {
     const current = await session.getProgress(observation.progressId);
     if (!current) throw new Error(`Explicit progress ${observation.progressId} was not found.`);
-    const relation = observation.value > current.value ? 'ahead' : observation.value < current.value ? 'regression' : 'equal';
-    const explicit = relation === 'ahead' ? updateProgress(current, observation.value) : current;
+    const { explicit, relation } = reconcileProgressObservation(current, observation.value);
     if (relation === 'ahead') await session.putProgress(explicit);
 
     return { explicit, observation: frozenObservation, relation };

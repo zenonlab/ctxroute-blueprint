@@ -81,7 +81,8 @@
   "architecture": {
     "documents": [
       "docs/architecture/src/tobirink.architecture.json",
-      "docs/architecture/src/ui-system.architecture.json"
+      "docs/architecture/src/ui-system.architecture.json",
+      "docs/architecture/src/active-page-progress.dataflow.json"
     ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",

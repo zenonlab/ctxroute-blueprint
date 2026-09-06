@@ -85,7 +85,7 @@ résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
 | --- | --- | --- | --- |
 | Organisation des favoris | Réglages complets | Arbre puis aperçu | règles enregistrées localement et déplacements explicitement prévisualisés |
 | Résolution | Cloche du header | Panneau Review | décision atomique locale puis candidat suivant |
-| Observation de progression | Page compatible | contexte de lecture transmis au cas d’usage applicatif | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
+| Observation de progression | Ouverture du popup sur une page compatible | titre et URL `activeTab` corrélés à une œuvre locale unique | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
 | Consultation d'une sortie | Bibliothèque ou onglet Sorties du menu d’extension | Agenda | date qualifiée par son niveau de confiance |
 | Configuration d'un rappel | Agenda | Agenda puis Réglages si permission absente | rappel local confirmé ou raison du blocage |
 

@@ -2327,7 +2327,7 @@
         {
           "id": "step-4",
           "title": "Raccorder la page active et la progression automatique",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le contexte compatible de l’onglet devient un modèle sérialisable sans API navigateur dans React",
             "La progression observée est enregistrée automatiquement; une valeur égale n’écrit rien et une baisse est ignorée",
@@ -2335,22 +2335,60 @@
             "Toute nouvelle permission est décidée explicitement avant implémentation"
           ],
           "files": [
-            "apps/extension/wxt-entrypoints",
-            "apps/extension/runtime",
-            "packages/application/src/progress",
-            "packages/application/src/popup",
-            "packages/adapters-browser/src",
-            "docs/ui",
-            "docs/architecture/src/tobirink.architecture.json"
+            "packages/application/src/popup/popup-context.ts",
+            "packages/application/src/popup/popup-context.test.ts",
+            "packages/application/src/progress/progress-flow.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/library-progress.test.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "docs/decisions/ADR-0032-popup-context-cache.md",
+            "docs/ui/00-screen-map.md",
+            "docs/ui/01-state-matrix.md",
+            "docs/workflows/README.md",
+            "docs/architecture/README.md",
+            "docs/architecture/src/active-page-progress.dataflow.json",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
           ],
           "commands": [
             "npm run test:e2e -- library-progress",
-            "npm run test:security",
+            "npm run test --workspace @tobirink/application",
+            "npm run test --workspace @tobirink/contracts",
+            "npm run test --workspace @tobirink/adapters-indexeddb",
+            "npm run test --workspace @tobirink/extension",
             "npm run test:a11y",
+            "npm run test:security",
+            "npm run test:performance",
             "npm run typecheck",
-            "npm run archify:validate -- tobirink.architecture"
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:config",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:ui",
+            "npm run sensor -- changed-files",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m feat(progress): observe active pages"
           ],
-          "evidence": []
+          "evidence": [
+            "Le popup corrèle au plus 500 FavoriteSource via Review résolue vers une Work unique; ambiguïté ou limite atteinte conserve la carte générique sans écriture.",
+            "Un marqueur explicite chapitre ou épisode crée ou augmente Progress dans une transaction locale; égalité, baisse, type incompatible et maximum dépassé ne modifient rien.",
+            "Application 40/40, contrats 9/9, extension 80/80, flux ciblé 3/3 et IndexedDB 2/2 plus contrat Chromium passent.",
+            "A11y 8/8, sécurité extension 8/8 et Worker 4/4, performance 3/3, typecheck, builds Chrome 616.48 kB et Firefox 616.60 kB passent.",
+            "Aucune permission, host permission, content script ou requête réseau ajouté; React reçoit toujours uniquement le snapshot sérialisé.",
+            "Sensor SAFE, lints, anti-slop, config, décisions, docs et UI passent; dataflow et les trois diagrammes produit passent 9 contrôles showcase sans erreur ni avertissement."
+          ]
         },
         {
           "id": "step-5",

@@ -67,6 +67,12 @@ export class DexieStoragePort implements StoragePort {
       getLibrary: async (id: LibraryId) => { requireStore('libraries'); const library = await this.database.libraries.get(id); return library && createLibrary(library.id, library.workIds); },
       getOrganizerConfiguration: async () => { requireStore('organizer'); const configuration = await this.database.organizer.get('organizer'); return configuration && createOrganizerConfiguration(configuration); },
       getProgress: async (id: ProgressId) => { requireStore('progress'); const progress = await this.database.progress.get(id); return progress && createProgress(progress); },
+      findProgressByWorkId: async (workId: WorkId) => {
+        requireStore('progress');
+        const matches = await this.database.progress.where('workId').equals(workId).limit(2).toArray();
+        if (matches.length > 1) throw new Error('A Work may have only one progress record.');
+        return matches[0] && createProgress(matches[0]);
+      },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
       getWork: async (id: WorkId) => { requireStore('works'); const work = await this.database.works.get(id); return work && createWork(work); },
@@ -121,6 +127,7 @@ export class DexieStoragePort implements StoragePort {
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
+  findProgressByWorkId: StoragePort['findProgressByWorkId'] = (workId) => this.session().findProgressByWorkId(workId);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);

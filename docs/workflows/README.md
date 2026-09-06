@@ -6,12 +6,13 @@ The UI validates a command and calls an application use case. The use case
 applies domain rules, persists through `StoragePort`, and returns a view model.
 IndexedDB events refresh other extension contexts. No cloud call is required.
 
-## Browser-assisted discovery
+## Popup-assisted discovery
 
-A content script extracts only the minimum page facts allowed by its adapter
-contract. The background entrypoint validates the message, normalizes data, and
-invokes an application use case. Site-specific selectors never enter the
-domain.
+After the user opens the popup, the `activeTab` adapter reads only the active
+page title and HTTP(S) URL. The background entrypoint validates the local
+message and invokes the application use case, which correlates a bounded local
+identity and applies the monotonic progress rule. No content script, DOM
+selector, host permission or network request participates in this flow.
 
 ## Bookmark import and projection
 

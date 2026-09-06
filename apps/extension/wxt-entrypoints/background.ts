@@ -116,7 +116,7 @@ export default defineBackground({
       if (parsed.data.type === 'popup.context.read') {
         try {
           await privateStorage.ensureReady();
-          const snapshot = await readPopupContext({ cache, now: () => new Date().toISOString(), pageContext });
+          const snapshot = await readPopupContext({ cache, now: () => new Date().toISOString(), pageContext, storage: privateStorage.storage });
           return { ok: true, snapshot };
         } catch {
           return { error: 'popup-context-unavailable', ok: false };

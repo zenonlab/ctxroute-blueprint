@@ -1,8 +1,13 @@
 import type { PageContextPort } from '../ports/capability-ports';
+import type { FavoriteSource, Progress, Work } from '@tobirink/domain';
+import { createProgress, progressId } from '@tobirink/domain';
+import type { StoragePort, StorageSession } from '../ports/storage-port';
+import { reconcileProgressObservation } from '../progress/progress-flow';
 import { z } from 'zod';
 
 export const popupContinuationLimit = 5;
 export const popupContinuationTtlMs = 30 * 24 * 60 * 60 * 1000;
+export const popupLocalMatchLimit = 500;
 
 export const popupContinuationRecordSchema = z.strictObject({
   completed: z.boolean().optional(),
@@ -39,6 +44,12 @@ export interface ReadPopupContextDependencies {
   cache: PopupContinuationCachePort;
   now: () => string;
   pageContext: PageContextPort;
+  storage: StoragePort;
+}
+
+export interface PageProgressObservation {
+  kind: 'chapter' | 'episode';
+  value: number;
 }
 
 function isHttpPage(url: string): boolean {
@@ -65,6 +76,28 @@ function titleFromPage(rawTitle: string, url: string): string {
   const progress = /^(?:chapter|chapitre|ch|episode|épisode|ep|tome|volume)\s*#?\s*\d+[\w.-]*$/iu;
   const parts = rawTitle.split(/\s+(?:[-–—|·])\s+/u).map((part) => part.trim()).filter(Boolean);
   return parts.find((part) => normalise(part) !== siteName && !progress.test(part)) ?? rawTitle.trim();
+}
+
+function decodedPageLocation(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const location = `${parsed.pathname} ${parsed.search} ${parsed.hash}`;
+    try {
+      return decodeURIComponent(location);
+    } catch {
+      return location;
+    }
+  } catch {
+    return '';
+  }
+}
+
+export function parsePageProgress(page: { title: string; url: string }): PageProgressObservation | undefined {
+  const match = `${page.title} ${decodedPageLocation(page.url)}`.match(/\b(chapter|chapitre|ch|episode|épisode|ep)\b[\s._/#:-]*(\d+(?:[.,]\d+)?)/iu);
+  if (!match?.[1] || !match[2]) return undefined;
+  const value = Number(match[2].replace(',', '.'));
+  if (!Number.isFinite(value) || value < 0 || value > 100_000) return undefined;
+  return { kind: /^(?:episode|épisode|ep)$/iu.test(match[1]) ? 'episode' : 'chapter', value };
 }
 
 function isFresh(record: PopupContinuationRecord, nowMs: number): boolean {
@@ -94,14 +127,91 @@ function recordFromPage(page: { title: string; url: string }, visitedAt: string)
   };
 }
 
-export async function readPopupContext({ cache, now, pageContext }: ReadPopupContextDependencies): Promise<PopupContextSnapshot> {
+async function readBoundedFavoriteSources(session: StorageSession): Promise<readonly FavoriteSource[] | undefined> {
+  const sources: FavoriteSource[] = [];
+  let afterId: FavoriteSource['id'] | undefined;
+  while (sources.length <= popupLocalMatchLimit) {
+    const limit = Math.min(100, popupLocalMatchLimit + 1 - sources.length);
+    const batch = await session.listFavoriteSources(afterId ? { afterId, limit } : { limit });
+    if (batch.length === 0) return sources;
+    sources.push(...batch);
+    if (batch.length < limit) return sources;
+    afterId = batch.at(-1)?.id;
+  }
+  return undefined;
+}
+
+interface LocalPageMatch {
+  progress?: Progress;
+  work: Work;
+}
+
+async function matchLocalPage(session: StorageSession, page: { title: string; url: string }): Promise<LocalPageMatch | undefined> {
+  const sources = await readBoundedFavoriteSources(session);
+  if (!sources) return undefined;
+  const titleKey = normalise(titleFromPage(page.title, page.url));
+  const matchingSources = sources.filter((source) => normalise(titleFromPage(source.title, source.url)) === titleKey);
+  const workIds = new Set<Work['id']>();
+  for (const source of matchingSources) {
+    const review = await session.getReview(source.reviewId);
+    if (review?.status === 'resolved' && review.matchedWorkId) workIds.add(review.matchedWorkId);
+  }
+  if (workIds.size !== 1) return undefined;
+  const [matchedWorkId] = workIds;
+  if (!matchedWorkId) return undefined;
+  const work = await session.getWork(matchedWorkId);
+  if (!work) return undefined;
+  const progress = await session.findProgressByWorkId(work.id);
+  return progress ? { progress, work } : { work };
+}
+
+function observedProgress(match: LocalPageMatch, page: { title: string; url: string }): Progress | undefined {
+  const observation = parsePageProgress(page);
+  const expectedKind = match.work.mediaKind === 'manga' ? 'chapter' : 'episode';
+  if (!observation || observation.kind !== expectedKind) return match.progress;
+  if (!match.progress) {
+    const suffix = match.work.id.replace(/^work_/u, '');
+    return createProgress({ id: progressId(`progress_auto_${suffix}`), kind: expectedKind, value: observation.value, workId: match.work.id });
+  }
+  if (match.progress.kind !== expectedKind) return match.progress;
+  if (match.progress.maximum !== undefined && observation.value > match.progress.maximum) return match.progress;
+  return reconcileProgressObservation(match.progress, observation.value).explicit;
+}
+
+async function enrichActiveRecord(
+  storage: StoragePort,
+  page: { title: string; url: string },
+  record: PopupContinuationRecord,
+): Promise<PopupContinuationRecord | undefined> {
+  return storage.transaction(['favoriteSources', 'reviews', 'works', 'progress'], async (session) => {
+    const match = await matchLocalPage(session, page);
+    if (!match) return undefined;
+    const progress = observedProgress(match, page);
+    if (progress && progress !== match.progress) await session.putProgress(progress);
+    const completed = progress?.maximum !== undefined && progress.value >= progress.maximum;
+    const enriched = {
+      ...record,
+      id: match.work.id,
+      indicator: progress ? `${progress.value} / ${progress.maximum ?? '-'}` : record.indicator,
+      mediaType: match.work.mediaKind === 'manga' ? 'Manga' : 'Anime',
+      title: match.work.preferredTitle,
+    };
+    return completed ? { ...enriched, completed: true } : enriched;
+  });
+}
+
+export async function readPopupContext({ cache, now, pageContext, storage }: ReadPopupContextDependencies): Promise<PopupContextSnapshot> {
   const currentTime = now();
   const nowMs = Date.parse(currentTime);
   const cached = (await cache.read())
     .filter((record) => Number.isFinite(nowMs) && isFresh(record, nowMs))
     .sort((left, right) => Date.parse(right.visitedAt) - Date.parse(left.visitedAt));
   const page = await pageContext.readActivePage();
-  const active = page ? recordFromPage(page, currentTime) : undefined;
+  let active = page ? recordFromPage(page, currentTime) : undefined;
+  if (active && page) {
+    const enriched = await enrichActiveRecord(storage, page, active).catch(() => undefined);
+    if (enriched) active = enriched;
+  }
 
   if (!active) {
     const continuations = cached.slice(0, popupContinuationLimit);
@@ -109,7 +219,10 @@ export async function readPopupContext({ cache, now, pageContext }: ReadPopupCon
     return { continuations };
   }
 
-  const continuations = cached.filter((record) => record.id !== active.id).slice(0, popupContinuationLimit - 1);
+  const activeTitle = normalise(active.title);
+  const continuations = cached
+    .filter((record) => record.id !== active.id && normalise(record.title) !== activeTitle)
+    .slice(0, popupContinuationLimit - 1);
   await cache.write([active, ...continuations]);
   return { active, continuations };
 }
