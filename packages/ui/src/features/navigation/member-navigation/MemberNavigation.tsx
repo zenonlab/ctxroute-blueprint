@@ -10,6 +10,7 @@ import styles from './MemberNavigation.module.css';
 
 export interface MemberNavigationConfig {
   activeId?: MemberNavigationItemId;
+  logoSrc?: string;
   onSearch: (query: string) => void;
   review: MemberReviewConfig;
   routes?: MemberNavigationRoutes;
@@ -29,6 +30,7 @@ export interface MemberNavigationProps extends MemberNavigationConfig {
 export function MemberNavigation({
   activeId,
   children,
+  logoSrc,
   onSearch,
   review,
   routes,
@@ -85,7 +87,7 @@ export function MemberNavigation({
       <header className={styles.siteHeader}>
         <div className={styles.headerInner}>
           <a className={styles.brand} href={routes?.brand ?? routes?.home ?? '#home'}>
-            <TobirinkLogo className={styles.brandLogo} />
+            <TobirinkLogo className={styles.brandLogo} src={logoSrc} />
             <span>Tobirink</span>
           </a>
 

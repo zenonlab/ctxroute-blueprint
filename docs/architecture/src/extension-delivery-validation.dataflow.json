@@ -16,7 +16,7 @@
         "id": "runtime-proof",
         "label": "Preuves navigateur",
         "focus": ["browserBuilds", "chromeRuntime", "firefoxRuntime", "releaseGate"],
-        "note": "Chrome charge le worker; les parcours interactifs Chrome et Firefox restent une condition distincte."
+        "note": "Chrome charge le worker; le site statique traverse Vitest/jsdom et Playwright desktop/mobile avant les parcours d’extension."
       },
       {
         "id": "release-artifacts",

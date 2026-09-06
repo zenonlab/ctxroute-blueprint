@@ -6,6 +6,11 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "setup:browser": "npm exec --yes --package=@playwright/test@1.51.1 -- playwright install chromium",
+    "setup:test-dependencies": "npm install --ignore-scripts",
+    "serve:test": "node tests/static-server.mjs",
+    "test": "vitest run",
+    "test:e2e": "npm exec --yes --package=@playwright/test@1.51.1 -- playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,9 +22,14 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.51.1",
+    "@testing-library/react": "16.3.3",
     "@types/node": "24.10.13",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
-    "typescript": "5.9.3"
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.0.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
   }
 }

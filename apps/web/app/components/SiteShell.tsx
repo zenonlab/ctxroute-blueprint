@@ -4,6 +4,7 @@ import { MemberNavigation } from '@tobirink/ui';
 import type { MemberNavigationConfig, ReviewDecision, ReviewResolverProps } from '@tobirink/ui';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
+import logo from '../../../extension/public/icons/tobirink-128.png';
 import { WebBridgeProvider, useWebBridge } from './WebBridgeProvider';
 
 const memberRoutes = { agenda: '/agenda', brand: '/', home: '/', library: '/library' } as const;
@@ -54,6 +55,7 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
   };
   return {
     activeId: activeNavigation(pathname),
+    logoSrc: logo.src,
     onSearch: (query) => router.push(query ? `/library?search=${encodeURIComponent(query)}` : '/library'),
     review: { count: bootstrap?.pendingReviewCount ?? 0, resolver },
     routes: memberRoutes,

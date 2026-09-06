@@ -4243,7 +4243,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-web-workbench-production",
       "title": "Refaire les surfaces web Workbench jusqu’au production-ready",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -4466,7 +4466,7 @@
         {
           "id": "step-7",
           "title": "Vérifier et auditer de bout en bout",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Vitest 4.1.11, Testing Library 16.3.3, jsdom 30.0.1 et Playwright 1.51.1 ajoutés à apps/web avec Chromium installé",
             "Tests desktop/mobile, HTTP, sécurité, performance, builds et packaging passent",
@@ -4498,7 +4498,12 @@
             "git diff --check",
             "git commit -m \"test(web): verify production-ready member surfaces\""
           ],
-          "evidence": []
+          "evidence": [
+            "Web 8/8 and Playwright 4/4 pass at desktop/mobile; agent-browser confirms content, logo, navigation and no console or framework overlay errors",
+            "All workspace tests pass: 371 tests; repository validation passes 269/269 plus one intentional skip; typecheck, security, performance and Workbench builds pass",
+            "Final 1.0.0 packages: Chrome b85062786fcf5d224fac197108c22b1f0fbef590866b719849fcd4f1d4a9da8d; Firefox 2af60f3d164cd502491182edcc833b8b3fad48d9ad295a844800d36f4b17d730",
+            "Production dependency graph audits at 0 vulnerabilities with dev/optional omitted; exact requested Playwright 1.51.1 retains GHSA-7mvr-c777-76hp in test tooling"
+          ]
         }
       ]
     }
