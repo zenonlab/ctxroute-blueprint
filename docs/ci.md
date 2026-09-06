@@ -52,7 +52,7 @@ caractères, une issue de suivi et `CRG-report-sha256:<digest>`. L’acceptation
 produit un artefact `CrgRiskAcceptance`; tout nouveau SHA ou rapport l’invalide.
 
 Après le premier run distant réussi, rendre le check **CRG disposition**
-obligatoire sur `main` à la place du check brut, en le conservant avec les checks existants,
+obligatoire sur `main` à la place du check brut, en le conservant avec tous les checks déjà requis,
 `strict: true`. Le workflow de commentaire ne doit pas être obligatoire.
 Les Actions internes à l'Action composite CRG sont des dépendances transitives
 du commit officiel et sont réévaluées lors de toute mise à jour du pin.

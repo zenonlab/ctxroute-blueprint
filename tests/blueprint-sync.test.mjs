@@ -27,7 +27,7 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   const preview = await synchronizeBlueprint({ source, target, timestamp: 'fixture' });
   assert.equal(preview.applied, false);
   assert.equal(preview.current, false);
-  assert.equal(preview.sourceVersion, '2026.09.06.5');
+  assert.equal(preview.sourceVersion, '2026.09.06.6');
   assert.equal(preview.targetVersion, null);
   assert.ok(preview.changes.some(change => change.file === 'AGENTS.md' && change.action === 'update'));
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), 'old doctrine\n');
@@ -36,11 +36,11 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   assert.equal(JSON.parse(check.stdout).current, false);
   const applied = await synchronizeBlueprint({ source, target, apply: true, timestamp: 'fixture' });
   assert.equal(applied.applied, true);
-  assert.equal(applied.targetVersion, '2026.09.06.5');
+  assert.equal(applied.targetVersion, '2026.09.06.6');
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), readFileSync(join(source, 'AGENTS.md'), 'utf8'));
   assert.equal(readFileSync(join(target, '.ctxroute/blueprint-backups/fixture/AGENTS.md'), 'utf8'), 'old doctrine\n');
   assert.ok(existsSync(join(target, 'scripts/orchestrator-core.mjs')));
-  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.06.5');
+  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.06.6');
   await assert.rejects(() => synchronizeBlueprint({ source, target, apply: true }), /dirty/u);
 });
 

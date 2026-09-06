@@ -8,7 +8,7 @@
     "views": [
       { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
       { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
-      { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
+      { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg", "githubActions", "ciArtifacts"], "note": "Sensor blocks unsafe changes; CRG stays fail-closed at high and accepts only exact-SHA, digest-bound administrator dispositions." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
   },
@@ -46,7 +46,7 @@
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },
-    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned PR risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
+    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "high gate + disposition", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
     { "id": "ci-archify", "from": "githubActions", "to": "archify", "label": "build + visual-check", "fromSide": "right", "toSide": "right", "via": [[1260, 440], [1260, 80]], "labelAt": [1195, 320] },
     { "id": "ci-artifacts", "from": "githubActions", "to": "ciArtifacts", "label": "publish bounded evidence", "labelAt": [1020, 484] }
     ,{ "id": "contracts-orchestrator", "from": "contracts", "to": "orchestrator", "label": "validate every boundary", "variant": "security", "fromSide": "top", "toSide": "right", "via": [[385, 380], [240, 380], [240, 260]], "labelAt": [320, 395] }

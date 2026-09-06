@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
+import { isUtf8 } from 'node:buffer';
 import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isUtf8 } from 'node:buffer';
 
 const EXACT_ARTIFACT_FILES = new Set(['crg-comment.md', 'head-sha.txt', 'pr-number.txt']);
 const ISSUE = /(?:^|\s)(#[1-9][0-9]*|https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/[1-9][0-9]*)(?=$|[\s.,;:)])/u;
