@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/crg-risk-acceptance-v1.schema.json",
+  "title": "CrgRiskAcceptanceV1",
+  "type": "object",
+  "required": ["schemaVersion", "pr", "sha", "score", "risk", "threshold", "report_digest", "approver", "justification", "tracking_issue", "approved_at"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "pr": { "type": "integer", "minimum": 1 },
+    "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "risk": { "enum": ["HIGH", "CRITICAL"] },
+    "threshold": { "const": "high" },
+    "report_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approver": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9-]+$" },
+    "justification": { "type": "string", "minLength": 32, "maxLength": 512, "pattern": "^[^\\u0000-\\u001f]+$" },
+    "tracking_issue": { "type": "string", "minLength": 2, "maxLength": 256, "pattern": "^(?:#[1-9][0-9]*|https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*)$" },
+    "approved_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

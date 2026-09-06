@@ -1,0 +1,149 @@
+name: CRG disposition
+
+on:
+  workflow_run:
+    workflows: [code-review-graph]
+    types: [completed]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number to reevaluate
+        required: true
+        type: number
+
+permissions:
+  actions: read
+  checks: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: crg-disposition-${{ github.event.workflow_run.id || github.event.pull_request.number || inputs.pull_request }}
+  cancel-in-progress: true
+
+jobs:
+  disposition:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the exact completed analyzer run
+        id: source
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            let prNumber;
+            let headSha;
+            let runId;
+            if (context.eventName === 'workflow_run') {
+              const run = context.payload.workflow_run;
+              if (run.name !== 'code-review-graph' || run.event !== 'pull_request' || run.status !== 'completed' || run.repository.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+                core.setFailed('Untrusted or unrelated analyzer run'); return;
+              }
+              const pulls = run.pull_requests || [];
+              if (pulls.length !== 1) { core.setFailed('Analyzer run must identify exactly one pull request'); return; }
+              prNumber = pulls[0].number; headSha = run.head_sha; runId = run.id;
+            } else {
+              prNumber = context.eventName === 'pull_request_review' ? context.payload.pull_request.number : Number('${{ inputs.pull_request }}');
+              const { data: pull } = await github.rest.pulls.get({ ...context.repo, pull_number: prNumber });
+              headSha = pull.head.sha;
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, { ...context.repo, workflow_id: 'code-review-graph.yml', event: 'pull_request', status: 'completed', per_page: 100 });
+              const matching = runs.filter(run => run.head_sha === headSha).sort((a, b) => b.id - a.id);
+              if (!matching.length) { core.setFailed('No completed analyzer run exists for the current SHA'); return; }
+              runId = matching[0].id;
+            }
+            if (!/^[0-9a-f]{40}$/.test(headSha)) { core.setFailed('Invalid head SHA'); return; }
+            core.setOutput('pr', String(prNumber)); core.setOutput('sha', headSha); core.setOutput('run-id', String(runId));
+
+      - name: Check out trusted default-branch governance only
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Locate exactly one bounded analyzer artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_ARCHIVE_BYTES: "100000"
+          RUN_ID: ${{ steps.source.outputs.run-id }}
+        run: |
+          set -euo pipefail
+          mapfile -t rows < <(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" --jq '.artifacts[] | select(.name == "crg-report" and (.expired | not)) | [.id, .size_in_bytes] | @tsv')
+          [ "${#rows[@]}" -eq 1 ] || { echo 'Expected exactly one crg-report artifact' >&2; exit 1; }
+          IFS=$'\t' read -r artifact_id artifact_size <<< "${rows[0]}"
+          [[ "${artifact_id}" =~ ^[0-9]+$ && "${artifact_size}" =~ ^[0-9]+$ ]]
+          [ "${artifact_size}" -gt 0 ] && [ "${artifact_size}" -le "${MAX_ARCHIVE_BYTES}" ]
+          printf 'id=%s\n' "${artifact_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download without checking out pull-request code
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ steps.artifact.outputs.id }}
+          path: ${{ runner.temp }}/crg-report
+          run-id: ${{ steps.source.outputs.run-id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect current reviews and repository roles
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CONTEXT_PATH: ${{ runner.temp }}/crg-context.json
+          EXPECTED_PR: ${{ steps.source.outputs.pr }}
+          EXPECTED_SHA: ${{ steps.source.outputs.sha }}
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = Number(process.env.EXPECTED_PR);
+            const { data: pull } = await github.rest.pulls.get({ ...context.repo, pull_number: prNumber });
+            if (pull.head.sha !== process.env.EXPECTED_SHA) { core.setFailed('Pull request SHA changed'); return; }
+            const reviews = await github.paginate(github.rest.pulls.listReviews, { ...context.repo, pull_number: prNumber, per_page: 100 });
+            const permissions = {};
+            for (const login of [...new Set(reviews.map(review => review.user && review.user.login).filter(Boolean))]) {
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: login });
+                permissions[login] = data.permission;
+              } catch (error) { if (error.status !== 404) throw error; permissions[login] = 'none'; }
+            }
+            const value = { pr: prNumber, sha: pull.head.sha, author: pull.user.login, reviews, permissions };
+            fs.writeFileSync(process.env.CONTEXT_PATH, JSON.stringify(value), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+
+      - name: Validate artifact and decide disposition
+        id: evaluate
+        env:
+          ATTESTATION_PATH: ${{ runner.temp }}/crg-risk-acceptance.json
+          CONTEXT_PATH: ${{ runner.temp }}/crg-context.json
+          RESULT_PATH: ${{ runner.temp }}/crg-disposition.json
+        run: |
+          set -euo pipefail
+          node scripts/crg-disposition.mjs "${RUNNER_TEMP}/crg-report" "${CONTEXT_PATH}" "${RESULT_PATH}" "${ATTESTATION_PATH}"
+          node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); for (const [k,v] of Object.entries({conclusion:r.conclusion,reason:r.reason,digest:r.report.digest,attestation:String(Boolean(r.attestation))})) fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${v}\n`)' "${RESULT_PATH}"
+
+      - name: Publish bounded exceptional acceptance
+        if: steps.evaluate.outputs.attestation == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: crg-risk-acceptance-${{ steps.source.outputs.pr }}-${{ steps.source.outputs.sha }}
+          path: ${{ runner.temp }}/crg-risk-acceptance.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish exact-SHA check and redacted PR disposition
+        if: always() && steps.source.outputs.sha != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CONCLUSION: ${{ steps.evaluate.outputs.conclusion || 'failure' }}
+          DIGEST: ${{ steps.evaluate.outputs.digest || 'unavailable' }}
+          PR_NUMBER: ${{ steps.source.outputs.pr }}
+          REASON: ${{ steps.evaluate.outputs.reason || 'DISPOSITION_ERROR' }}
+          SHA: ${{ steps.source.outputs.sha }}
+        with:
+          script: |
+            const conclusion = process.env.CONCLUSION === 'success' ? 'success' : 'failure';
+            const summary = `${process.env.REASON}; report sha256:${process.env.DIGEST}`;
+            await github.rest.checks.create({ ...context.repo, name: 'CRG disposition', head_sha: process.env.SHA, status: 'completed', conclusion, output: { title: `CRG disposition: ${conclusion}`, summary } });
+            const marker = '<!-- crg-disposition -->';
+            const body = `${marker}\n\n**CRG disposition:** ${conclusion}\n\nReason: \`${process.env.REASON}\`  \nReport: \`sha256:${process.env.DIGEST}\`  \nSHA: \`${process.env.SHA}\``;
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: Number(process.env.PR_NUMBER), per_page: 100 });
+            const prior = comments.find(comment => comment.user.login === 'github-actions[bot]' && comment.body.startsWith(marker));
+            if (prior) await github.rest.issues.updateComment({ ...context.repo, comment_id: prior.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: Number(process.env.PR_NUMBER), body });

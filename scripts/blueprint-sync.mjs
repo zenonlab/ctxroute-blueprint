@@ -7,13 +7,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const CONTROL_FILES = Object.freeze([
   'AGENTS.md', 'CLAUDE.md', '.gitignore', '.codex/hooks.json', '.claude/settings.json',
-  '.github/workflows/validate.yml', 'eslint.config.mjs',
+  '.github/workflows/validate.yml', '.github/workflows/code-review-graph.yml',
+  '.github/workflows/code-review-graph-disposition.yml',
+  '.github/schemas/crg-risk-acceptance-v1.schema.json', 'eslint.config.mjs',
   '.project/blueprint-version.json',
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/worktree-manager.mjs',
   'scripts/session-audit.mjs', 'scripts/validate-blueprint-skills.mjs',
   'scripts/blueprint-sync.mjs', 'scripts/blueprint-version.mjs',
-  'scripts/blueprint-sensor.mjs', 'scripts/dependency-audit.mjs', 'scripts/hook-performance.mjs',
+  'scripts/blueprint-sensor.mjs', 'scripts/crg-disposition.mjs',
+  'scripts/dependency-audit.mjs', 'scripts/hook-performance.mjs',
   '.githooks/validate-ctxroute.mjs',
 ]);
 export const CONTROL_DIRECTORIES = Object.freeze([

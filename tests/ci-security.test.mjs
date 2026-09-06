@@ -18,15 +18,26 @@ test('validation matrix pins Python and uv and captures Archify visual evidence'
   assert.doesNotMatch(auditJob, /npm ci/u);
 });
 
-test('untrusted CRG review is read-only, pinned, constrained, and blocks only critical risk', () => {
+test('untrusted CRG review is read-only, pinned, constrained, and blocks high risk', () => {
   const workflow = read('.github/workflows/code-review-graph.yml');
   assert.match(workflow, /permissions:\n  contents: read/u);
   assert.match(workflow, /tirth8205\/code-review-graph@2c6dae32643572ee528eb9b77dbcc17f58f3a8c9/u);
   assert.match(workflow, /PIP_CONSTRAINT:/u);
-  assert.match(workflow, /fail-on-risk: none/u);
+  assert.match(workflow, /fail-on-risk: high/u);
   assert.match(workflow, /if: always\(\).*comment-file/u);
   assert.doesNotMatch(workflow, /pull-requests: write/u);
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);
+});
+
+test('privileged CRG disposition uses trusted code and exact-SHA bounded evidence', () => {
+  const workflow = read('.github/workflows/code-review-graph-disposition.yml');
+  const evaluator = read('scripts/crg-disposition.mjs');
+  assert.match(workflow, /name: CRG disposition/u);
+  assert.match(workflow, /checks: write/u);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
+  assert.doesNotMatch(workflow, /ref: \$\{\{ github\.event\.pull_request/u);
+  for (const proof of ['EXPECTED_SHA', 'permission', 'crg-risk-acceptance-', "name: 'CRG disposition'"]) assert.ok(workflow.includes(proof), proof);
+  assert.ok(evaluator.includes('CRG-report-sha256:'), 'digest-bound review evidence');
 });
 
 test('trusted commenter never checks out code and validates the complete artifact boundary', () => {
