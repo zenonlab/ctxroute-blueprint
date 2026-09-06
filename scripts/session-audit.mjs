@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -13,8 +13,10 @@ export async function auditSessions({ sessionPaths, mission, maxBytes = 2 * 1024
   const deadline = Date.now() + timeoutMs;
   const observations = { files: new Set(), commands: new Map(), missionIds: new Set(), skillIds: new Set(), redactions: 0, malformed: 0, bytes: 0, truncated: false };
   const sessions = [];
+  let skippedActive = 0;
   for (const path of sessionPaths) {
     if (Date.now() >= deadline || observations.bytes >= maxBytes) { observations.truncated = true; break; }
+    if (isActiveTrace(path)) { skippedActive += 1; continue; }
     sessions.push(basename(path));
     await streamTrace(path, observations, maxBytes, deadline);
   }
@@ -22,6 +24,7 @@ export async function auditSessions({ sessionPaths, mission, maxBytes = 2 * 1024
   if (observations.redactions) signals.push(`redacted-secret-fields:${observations.redactions}`);
   if (observations.malformed) signals.push(`malformed-records:${observations.malformed}`);
   if (observations.truncated) signals.push('bounded-read-truncated');
+  if (skippedActive) signals.push(`active-sessions-skipped:${skippedActive}`);
   if (!signals.length) signals.push('no-defect-detected');
   return {
     sessions_examined: sessions,
@@ -32,6 +35,10 @@ export async function auditSessions({ sessionPaths, mission, maxBytes = 2 * 1024
     validations: [`streamed-bytes:${observations.bytes}`, `records-malformed:${observations.malformed}`],
     rollback: 'revert the orchestrator audit transaction and its referenced patch commit',
   };
+}
+
+function isActiveTrace(path) {
+  return existsSync(`${path}.active`) || existsSync(`${path}.lock`);
 }
 
 async function streamTrace(path, observations, maximum, deadline) {

@@ -30,3 +30,13 @@ test('session audit stops at byte limits without returning raw content', async (
   assert.ok(report.signals_detected.includes('bounded-read-truncated'));
   assert.doesNotMatch(JSON.stringify(report), /xxxxxxxx/u);
 });
+
+test('session audit skips traces marked active', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'session-audit-active-'));
+  const trace = join(directory, 'active.jsonl');
+  writeFileSync(trace, `${JSON.stringify({ mission_id: 'wrong' })}\n`);
+  writeFileSync(`${trace}.active`, '1');
+  const report = await auditSessions({ sessionPaths: [trace], mission: { mission_id: 'expected', skill_id: 'skill', file_scope: [], validation_commands: [] } });
+  assert.deepEqual(report.sessions_examined, []);
+  assert.ok(report.signals_detected.includes('active-sessions-skipped:1'));
+});
