@@ -4730,7 +4730,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -4787,7 +4787,7 @@
         {
           "id": "step-2",
           "title": "Appliquer le plan Cloudflare exact et vérifier la production",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "The reviewed plan mutates only the two versioned R2 object keys and worker:tobirink-public-api in account 6aef9b2e29d0671c8b5dd36b0b660f4b",
             "No D1 data, FavLib resource, unrelated R2 object, secret, store listing or browser extension store is mutated",
@@ -4810,7 +4810,11 @@
             "curl production routes and downloads",
             "shasum -a 256 downloaded artifacts"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare exact-plan apply published both 1.0.0 R2 artifacts and deployed the Worker; the approved corrective Worker-only apply now serves version db2bc1cd-4a75-4f75-9422-1412e627f722 at 100%.",
+            "Production verification: /, /library, /agenda, /privacy and /download return 200; an unknown route returns 404; /download exposes both versioned MV3 links with immutable cache headers.",
+            "Remote SHA-256 values match the published bytes: Chrome 237aa4165022d0dd44042812a24ba2d1a198b64071e992e789a9864ef0452794; Firefox 62ecb5d2afdc027eccf5ce136219aacee70abe24e184123ff5889f74ca1c6d48; product dataflow and architecture validate showcase 9/9."
+          ]
         }
       ]
     }
