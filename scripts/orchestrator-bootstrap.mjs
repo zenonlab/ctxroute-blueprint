@@ -46,7 +46,7 @@ export async function bootstrapOrchestrator(root = process.cwd(), dependencies =
     const attention = reconciliation.results.filter(item => item.action === 'NEEDS_ATTENTION');
     const latestOperations = new Map();
     for (const item of state.worktree_operations) latestOperations.set(item.mission_id, item);
-    const stateAttention = [...latestOperations.values()].filter(item => item.status === 'BLOCKED' && item.classification === 'NEEDS_ATTENTION');
+    const stateAttention = [...latestOperations.values()].filter(item => item.status !== 'COMPLETED' && item.classification === 'NEEDS_ATTENTION');
     const blockedRecovery = state.transactions.filter(item => item.status === 'BLOCKED' && item.cause?.startsWith('PENDING_'));
     const causes = [...new Set([
       ...recoveryCauses,
