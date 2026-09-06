@@ -88,6 +88,41 @@
       "narrative": "docs/orchestration.md",
       "requiredKeys": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "limits"],
       "validator": "npm run blueprint:review"
+    },
+    {
+      "id": "architecture-audit",
+      "kind": "architecture-audit",
+      "format": "markdown",
+      "source": "docs/diff/architecture-audit.md",
+      "requiredSections": ["Architecture audit", "Evidence labels", "Current architecture", "Execution flows", "Findings and priorities"]
+    },
+    {
+      "id": "target-comparison",
+      "kind": "architecture-comparison",
+      "format": "markdown",
+      "source": "docs/diff/target-comparison.md",
+      "requiredSections": ["Current-to-target comparison", "Comparison matrix", "Proposed contract version", "Priority order"]
+    },
+    {
+      "id": "external-research",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/diff/external-research.md",
+      "requiredSections": ["External research", "Evidence scale", "Sources", "Research limits"]
+    },
+    {
+      "id": "risk-register",
+      "kind": "risk-register",
+      "format": "markdown",
+      "source": "docs/diff/risk-register.md",
+      "requiredSections": ["Risk register", "Scoring", "Risks", "Acceptance boundary"]
+    },
+    {
+      "id": "validation-evidence",
+      "kind": "validation-evidence",
+      "format": "markdown",
+      "source": "docs/diff/validation-evidence.md",
+      "requiredSections": ["Validation evidence", "Environment", "Commands and results", "Proof limits"]
     }
   ]
 }
