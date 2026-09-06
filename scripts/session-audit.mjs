@@ -1,48 +1,99 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { constants, createReadStream, existsSync } from 'node:fs';
+import { lstat, readFile, realpath } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|password|private[_-]?key|secret|token)/iu;
 const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|password|secret|token)\s*[:=]\s*\S+)/giu;
+const MAX_FILES = 32;
+const MAX_DIAGNOSTIC_LENGTH = 1024;
+const SCRIPT_PATH = fileURLToPath(import.meta.url);
 
-export async function auditSessions({ sessionPaths, mission, maxBytes = 2 * 1024 * 1024, timeoutMs = 10_000 }) {
+export async function auditSessions({ sessionPaths, approvedRoots, excludedPaths = [], currentSessionPath, outputPath, mission, maxBytes = 2 * 1024 * 1024, maxFiles = MAX_FILES, timeoutMs = 10_000 }) {
   if (!Array.isArray(sessionPaths) || sessionPaths.length === 0) throw new Error('sessionPaths must contain at least one trace');
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error('audit limits must be positive integers');
+  if (!Array.isArray(approvedRoots) || approvedRoots.length === 0) throw new Error('approvedRoots must contain at least one directory');
+  if (!Array.isArray(excludedPaths)) throw new Error('excludedPaths must be an array');
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 2 * 1024 * 1024 || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new Error('audit limits are outside the supported range');
+  if (!Number.isSafeInteger(maxFiles) || maxFiles < 1 || maxFiles > MAX_FILES) throw new Error(`maxFiles must be between 1 and ${MAX_FILES}`);
+  if (sessionPaths.length > maxFiles) throw new Error(`sessionPaths exceeds the ${maxFiles} file limit`);
+
+  const roots = await canonicalDirectories(approvedRoots);
+  const ownArtifacts = [currentSessionPath, outputPath].filter(Boolean);
+  const exclusions = await canonicalExclusions([...excludedPaths, ...ownArtifacts, SCRIPT_PATH]);
   const deadline = Date.now() + timeoutMs;
   const observations = { files: new Set(), commands: new Map(), missionIds: new Set(), skillIds: new Set(), redactions: 0, malformed: 0, bytes: 0, truncated: false };
   const sessions = [];
+  const seen = new Set();
   let skippedActive = 0;
-  for (const path of sessionPaths) {
+  let skippedExcluded = 0;
+  for (const candidate of sessionPaths) {
     if (Date.now() >= deadline || observations.bytes >= maxBytes) { observations.truncated = true; break; }
-    if (isActiveTrace(path)) { skippedActive += 1; continue; }
-    sessions.push(basename(path));
-    await streamTrace(path, observations, maxBytes, deadline);
+    const trace = await authorizeTrace(candidate, roots);
+    if (seen.has(trace)) continue;
+    seen.add(trace);
+    if (exclusions.has(trace)) { skippedExcluded += 1; continue; }
+    if (isActiveTrace(trace)) { skippedActive += 1; continue; }
+    sessions.push(`trace-${sessions.length + 1}`);
+    await streamTrace(trace, observations, maxBytes, deadline);
   }
   const signals = compareMission(mission, observations);
   if (observations.redactions) signals.push(`redacted-secret-fields:${observations.redactions}`);
   if (observations.malformed) signals.push(`malformed-records:${observations.malformed}`);
   if (observations.truncated) signals.push('bounded-read-truncated');
   if (skippedActive) signals.push(`active-sessions-skipped:${skippedActive}`);
+  if (skippedExcluded) signals.push(`self-traces-excluded:${skippedExcluded}`);
   if (!signals.length) signals.push('no-defect-detected');
   return {
     sessions_examined: sessions,
     signals_detected: signals,
-    subject: { type: mission ? 'mission' : 'blueprint', id: mission?.mission_id ?? 'session-traces' },
-    decision: signals.length === 1 && signals[0] === 'no-defect-detected' ? 'accept' : 'correct-through-orchestrator',
-    patch_applied: 'none; submit a reviewed patch through orchestrator audit.apply when correction is warranted',
+    subject: { type: mission ? 'mission' : 'blueprint', id: safeText(mission?.mission_id ?? 'session-traces') },
+    decision: signals.length === 1 && signals[0] === 'no-defect-detected' ? 'accept' : 'repair',
+    patch_applied: 'none',
     validations: [`streamed-bytes:${observations.bytes}`, `records-malformed:${observations.malformed}`],
-    rollback: 'revert the orchestrator audit transaction and its referenced patch commit',
+    rollback: 'not-required',
   };
 }
 
-function isActiveTrace(path) {
-  return existsSync(`${path}.active`) || existsSync(`${path}.lock`);
+async function canonicalDirectories(paths) {
+  const result = [];
+  for (const path of paths) {
+    if (path !== String(path) || !isAbsolute(path)) throw new Error('approved roots must be absolute paths');
+    const details = await lstat(path);
+    if (details.isSymbolicLink() || !details.isDirectory()) throw new Error('approved roots must be real directories, not symlinks');
+    result.push(await realpath(path));
+  }
+  return [...new Set(result)];
 }
 
+async function canonicalExclusions(paths) {
+  const result = new Set();
+  for (const path of paths) {
+    if (path !== String(path) || !isAbsolute(path)) throw new Error('excluded paths must be absolute paths');
+    try { result.add(await realpath(path)); } catch (error) { if (error.code !== 'ENOENT') throw error; result.add(resolve(path)); }
+  }
+  return result;
+}
+
+async function authorizeTrace(path, roots) {
+  if (path !== String(path) || !isAbsolute(path)) throw new Error('session trace paths must be absolute');
+  const details = await lstat(path);
+  if (details.isSymbolicLink() || !details.isFile()) throw new Error('session traces must be regular non-symlink files');
+  const canonical = await realpath(path);
+  if (!roots.some(root => isWithin(root, canonical))) throw new Error('session trace is outside approved roots');
+  return canonical;
+}
+
+function isWithin(root, candidate) {
+  const path = relative(root, candidate);
+  return path === '' || (!path.startsWith('..') && !isAbsolute(path));
+}
+
+function isActiveTrace(path) { return existsSync(`${path}.active`) || existsSync(`${path}.lock`); }
+
 async function streamTrace(path, observations, maximum, deadline) {
-  const stream = createReadStream(path, { encoding: 'utf8', highWaterMark: 16 * 1024 });
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0);
+  const stream = createReadStream(path, { encoding: 'utf8', highWaterMark: 16 * 1024, flags });
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
   try {
     for await (const line of lines) {
@@ -57,10 +108,10 @@ async function streamTrace(path, observations, maximum, deadline) {
 
 function redact(value, observations, depth = 0) {
   if (depth > 12) return '<depth-limit>';
-  if (Array.isArray(value)) return value.map(item => redact(item, observations, depth + 1));
+  if (Array.isArray(value)) return value.slice(0, 256).map(item => redact(item, observations, depth + 1));
   if (value && value === Object(value)) {
     const result = {};
-    for (const [key, item] of Object.entries(value)) {
+    for (const [key, item] of Object.entries(value).slice(0, 256)) {
       if (SECRET_KEY.test(key)) { result[key] = '<redacted>'; observations.redactions += 1; }
       else result[key] = redact(item, observations, depth + 1);
     }
@@ -97,25 +148,43 @@ function compareMission(mission, observations) {
   const signals = [];
   if (observations.missionIds.size && !observations.missionIds.has(mission.mission_id)) signals.push('mission-id-mismatch');
   if (observations.skillIds.size && !observations.skillIds.has(mission.skill_id)) signals.push('skill-id-mismatch');
-  const outside = [...observations.files].filter(path => !mission.file_scope.some(scope => path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)));
+  const scopes = Array.isArray(mission.file_scope) ? mission.file_scope : [];
+  const outside = [...observations.files].filter(path => !scopes.some(scope => path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)));
   if (outside.length) signals.push(`files-outside-scope:${outside.length}`);
-  const missingCommands = mission.validation_commands.filter(command => !observations.commands.has(command));
+  const expectedCommands = Array.isArray(mission.validations)
+    ? mission.validations.map(validation => [validation.executable, ...(validation.args ?? [])].join(' '))
+    : Array.isArray(mission.validation_commands) ? mission.validation_commands : [];
+  const missingCommands = expectedCommands.filter(command => !observations.commands.has(command));
   if (missingCommands.length) signals.push(`validations-missing:${missingCommands.length}`);
   const failed = [...observations.commands.values()].filter(code => Number.isInteger(code) && code !== 0).length;
   if (failed) signals.push(`validations-failed:${failed}`);
   return signals;
 }
 
+function safeText(value) { return redact(String(value), { redactions: 0 }).slice(0, 128); }
 async function main() {
-  const argumentsList = process.argv.slice(2);
-  const missionIndex = argumentsList.indexOf('--mission');
-  let mission;
-  if (missionIndex >= 0) {
-    mission = JSON.parse(await readFile(argumentsList[missionIndex + 1], 'utf8'));
-    argumentsList.splice(missionIndex, 2);
-  }
-  const report = await auditSessions({ sessionPaths: argumentsList, mission });
+  const args = process.argv.slice(2);
+  const roots = takeOptions(args, '--root');
+  const exclusions = takeOptions(args, '--exclude');
+  const currentSessions = takeOptions(args, '--current-session');
+  const outputPaths = takeOptions(args, '--output');
+  const missionPaths = takeOptions(args, '--mission');
+  if (missionPaths.length > 1) throw new Error('--mission may be supplied only once');
+  if (currentSessions.length > 1 || outputPaths.length > 1) throw new Error('--current-session and --output may each be supplied only once');
+  const mission = missionPaths[0] ? JSON.parse(await readFile(missionPaths[0], 'utf8')) : undefined;
+  const report = await auditSessions({ sessionPaths: args, approvedRoots: roots, excludedPaths: [...exclusions, ...missionPaths.map(path => resolve(path))], currentSessionPath: currentSessions[0], outputPath: outputPaths[0], mission });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main().catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
+function takeOptions(args, name) {
+  const values = [];
+  for (let index = 0; index < args.length;) {
+    if (args[index] !== name) { index += 1; continue; }
+    if (!args[index + 1]) throw new Error(`${name} requires a value`);
+    values.push(resolve(args[index + 1]));
+    args.splice(index, 2);
+  }
+  return values;
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main().catch(error => { process.stderr.write(`${String(error.message).slice(0, MAX_DIAGNOSTIC_LENGTH)}\n`); process.exitCode = 1; });

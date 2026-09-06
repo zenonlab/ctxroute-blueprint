@@ -12,12 +12,13 @@ export const CONTROL_FILES = Object.freeze([
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/worktree-manager.mjs',
   'scripts/session-audit.mjs', 'scripts/validate-blueprint-skills.mjs',
+  'scripts/verify-blueprint-skills.mjs', 'scripts/blueprint-review.mjs',
   'scripts/blueprint-sync.mjs', 'scripts/blueprint-version.mjs',
   'scripts/blueprint-sensor.mjs', 'scripts/dependency-audit.mjs', 'scripts/hook-performance.mjs',
   '.githooks/validate-ctxroute.mjs',
 ]);
 export const CONTROL_DIRECTORIES = Object.freeze([
-  '.codex/agents', '.codex/hooks', '.claude/agents', '.claude/hooks/docs',
+  '.agents/skills', '.codex/agents', '.codex/hooks', '.claude/agents', '.claude/hooks/docs',
 ]);
 
 export async function synchronizeBlueprint({ source = scriptRoot, target, apply = false, timestamp = new Date().toISOString().replace(/[:.]/gu, '-') } = {}) {

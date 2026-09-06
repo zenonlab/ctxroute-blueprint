@@ -1,8 +1,16 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "skillId": "session-auditor",
   "version": "1.0.0",
   "modes": ["SWARM_ON", "SWARM_OFF"],
   "mutationAuthority": "orchestrator",
-  "validation": ["node scripts/validate-blueprint-skills.mjs", "npm run blueprint:review"]
+  "validations": [
+    {
+      "id": "session-audit-tests",
+      "executable": "node",
+      "args": ["--test", "tests/session-audit.test.mjs"],
+      "cwd": ".",
+      "timeout_ms": 30000
+    }
+  ]
 }
