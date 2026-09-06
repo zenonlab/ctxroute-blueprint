@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { popupContinuationRecordSchema } from '@tobirink/application';
+import { webHandshakeSchema, webRequestEnvelopeSchema } from '@tobirink/contracts/web-bridge';
 import { librarySearchMessageSchema, searchOpenMessageSchema } from './library-search-messages';
 import { organizerApplyMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerRestoreMessageSchema } from './organizer-messages';
 import { reviewCandidatesMessageSchema, reviewDecisionMessageSchema, reviewQueueMessageSchema } from './review-messages';
@@ -45,7 +46,17 @@ const agendaPeriodMessageSchema = z.strictObject({
   version: z.literal(extensionMessageVersion),
 });
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerApplyMessageSchema, organizerRestoreMessageSchema]);
+const webBridgeHandshakeMessageSchema = z.strictObject({
+  handshake: webHandshakeSchema,
+  type: z.literal('webbridge.handshake'),
+});
+
+const webBridgeRequestMessageSchema = z.strictObject({
+  envelope: webRequestEnvelopeSchema,
+  type: z.literal('webbridge.request'),
+});
+
+export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerApplyMessageSchema, organizerRestoreMessageSchema, webBridgeHandshakeMessageSchema, webBridgeRequestMessageSchema]);
 export const popupContextResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(true),

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Tobirink — authoritative data and media architecture",
-    "subtitle": "WXT MV3 shell, IndexedDB authority, consented public signals, optimized catalogue and covers",
+    "title": "Tobirink — clean-room product architecture",
+    "subtitle": "Static public site, bounded local bridge, extension-only radio and IndexedDB authority",
     "output": "tobirink-architecture.html",
     "quality_profile": "showcase",
     "visual_preset": "signal-flow",
@@ -22,52 +22,59 @@
         "note": "WXT generates the least-privilege manifest; local-only CSP and validated messages guard the MV3 worker."
       },
       {
-        "id": "bookmark-boundary",
-        "label": "Bookmark connector",
-        "focus": ["appCore", "browserAdapter", "bookmarks"],
-        "note": "IndexedDB keeps bookmark order and the verified tree snapshot; only confirmed moves and non-destructive restore cross the browser adapter."
-      },
-      {
         "id": "catalogue-media",
         "label": "Catalogue and covers",
         "focus": ["appCore", "remotePorts", "workerApi", "cloudGateways", "d1", "imageGateway", "r2"],
         "note": "An uncomposed HTTP adapter targets owned title/reference routes; D1 reads stay indexed behind the Worker composition root."
       },
       {
-        "id": "provider-operations",
-        "label": "Provider operations",
-        "focus": ["operator", "operationGate", "cloudDriver", "workerApi", "d1", "r2"],
-        "note": "The provider-neutral gate checks one approved plan; the Cloudflare driver validates its resource map before translating it to Wrangler."
+        "id": "site-bridge",
+        "label": "Static site and local bridge",
+        "focus": ["site", "webBridge", "extensionUi", "appCore", "indexedDb"],
+        "note": "Protocol v2 uses extension-issued 60-second sessions, anti-replay request ids and 64 KiB UTF-8 projections."
+      },
+      {
+        "id": "radio-local",
+        "label": "Extension-only radio",
+        "focus": ["extensionUi", "radioPort", "radioAdapter", "bootstrapStore"],
+        "note": "Radio state, queue and cache remain local behind a provider-neutral port; the site has no radio surface."
       }
     ]
   },
   "components": [
     { "id": "reader", "type": "external", "label": "Reader", "pos": [20, 330], "size": [115, 64] },
     { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
+    { "id": "site", "type": "frontend", "label": "Static TobiRink site", "sublabel": "Public routes / local views", "pos": [1130, 250], "size": [190, 64], "tag": "exported HTML" },
+    { "id": "webBridge", "type": "security", "label": "WebBridgePort v2", "sublabel": "origin / session / anti-replay", "pos": [900, 250], "size": [190, 64], "tag": "64 KiB UTF-8" },
     { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "Search / Review / Organizer", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
     { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "router / alarm recovery", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
     { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "domain state / organizer snapshot", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
     { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "tabs / caches / alerts", "pos": [650, 100], "size": [190, 64] },
     { "id": "bookmarks", "type": "external", "label": "Browser bookmarks", "sublabel": "Import / optional projection", "pos": [930, 100], "size": [190, 64] },
     { "id": "bootstrapStore", "type": "database", "label": "Browser storage", "sublabel": "Prefs + release/reprise caches", "pos": [650, 250], "size": [190, 64] },
+    { "id": "radioPort", "type": "backend", "label": "RadioPort", "sublabel": "session / queue / prefs", "pos": [50, 600], "size": [170, 64], "tag": "provider-neutral" },
+    { "id": "radioAdapter", "type": "backend", "label": "Radio adapter", "sublabel": "replaceable catalogue source", "pos": [260, 600], "size": [190, 64], "tag": "extension-only" },
     { "id": "remotePorts", "type": "backend", "label": "Remote capability ports", "sublabel": "Dormant HTTP / data / media", "pos": [650, 480], "size": [190, 64] },
     { "id": "workerApi", "type": "cloud", "label": "Worker routes", "sublabel": "Injected ports only", "pos": [930, 390], "size": [170, 64] },
     { "id": "cloudGateways", "type": "backend", "label": "Cloud composition", "sublabel": "Policy + replaceable adapters", "pos": [930, 550], "size": [190, 64], "tag": "single wiring root" },
     { "id": "d1", "type": "database", "label": "D1 public index", "sublabel": "Title / reference catalogue indexes", "pos": [1140, 340], "size": [210, 64] },
     { "id": "imageGateway", "type": "cloud", "label": "Image gateway", "sublabel": "3 fixed resize / quantize variants", "pos": [1140, 500], "size": [210, 64], "tag": "Cloudflare Images" },
     { "id": "r2", "type": "cloud", "label": "R2 object storage", "sublabel": "Masters + public snapshots + backups", "pos": [1140, 660], "size": [210, 64] },
-    { "id": "operator", "type": "external", "label": "Approved operator", "sublabel": "Exact plan approval", "pos": [390, 720], "size": [190, 64] },
+    { "id": "operator", "type": "external", "label": "Approved operator", "sublabel": "Exact plan approval", "pos": [390, 730], "size": [190, 64] },
     { "id": "operationGate", "type": "backend", "label": "Operation gate", "sublabel": "inspect → plan → apply", "pos": [650, 720], "size": [190, 64], "tag": "provider-neutral" },
     { "id": "cloudDriver", "type": "backend", "label": "Cloudflare driver", "sublabel": "Validated config / Wrangler", "pos": [930, 720], "size": [190, 64], "tag": "replaceable" }
   ],
   "boundaries": [
-    { "kind": "security-group", "label": "Private device boundary", "wraps": ["extensionUi", "extensionWorker", "appCore", "indexedDb", "browserAdapter", "bootstrapStore", "remotePorts"] },
+    { "kind": "security-group", "label": "Private device boundary", "wraps": ["extensionUi", "extensionWorker", "appCore", "indexedDb", "browserAdapter", "bootstrapStore", "remotePorts", "radioPort", "radioAdapter"] },
+    { "kind": "security-group", "label": "Site bridge boundary", "wraps": ["site", "webBridge"] },
     { "kind": "region", "label": "Optional Cloudflare boundary", "wraps": ["workerApi", "cloudGateways", "cloudDriver", "d1", "imageGateway", "r2"] },
     { "kind": "security-group", "label": "Approved operations boundary", "wraps": ["operator", "operationGate", "cloudDriver"] }
   ],
   "connections": [
     { "id": "readerUi", "from": "reader", "to": "extensionUi", "label": "interacts", "variant": "emphasis", "labelAt": [158, 408] },
     { "id": "uiCore", "from": "extensionUi", "to": "appCore", "label": "commands / queries", "variant": "emphasis", "labelAt": [360, 408] },
+    { "id": "coreBridge", "from": "appCore", "to": "webBridge", "label": "validated local projections", "variant": "security", "labelAt": [850, 220] },
+    { "id": "bridgeSite", "from": "webBridge", "to": "site", "variant": "security", "fromSide": "right", "toSide": "left" },
     { "id": "uiWorker", "from": "extensionUi", "to": "extensionWorker", "label": "local reads / organizer preview", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [265, 435] },
     { "id": "workerCore", "from": "extensionWorker", "to": "appCore", "label": "validated commands", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[370, 502], [370, 430], [485, 430]], "labelAt": [385, 450] },
     { "id": "coreIndexedDb", "from": "appCore", "to": "indexedDb", "label": "bounded search / atomic Review", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [360, 215] },
@@ -75,13 +82,14 @@
     { "id": "bookmarkProjection", "from": "browserAdapter", "to": "bookmarks", "label": "confirmed move / restore", "variant": "dashed", "fromSide": "top", "toSide": "top", "via": [[745, 65], [1025, 65]] },
     { "id": "coreBrowser", "from": "appCore", "to": "browserAdapter", "label": "active page / cache commands", "fromSide": "right", "toSide": "bottom", "via": [[620, 362], [620, 230], [745, 230]], "labelAt": [645, 245] },
     { "id": "bootstrapCore", "from": "bootstrapStore", "to": "appCore", "label": "prefs / public cache / recovery", "variant": "dashed", "labelAt": [725, 345] },
+    { "id": "radioProvider", "from": "radioPort", "to": "radioAdapter", "label": "catalogue / audio commands", "variant": "dashed", "fromSide": "right", "toSide": "left", "labelAt": [240, 590] },
     { "id": "coreRemote", "from": "appCore", "to": "remotePorts", "label": "optional typed capabilities", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[485, 512]] },
     { "id": "portsWorker", "from": "remotePorts", "to": "workerApi", "label": "injected origin / owned GET paths", "variant": "dashed", "labelAt": [885, 468] },
     { "id": "workerComposition", "from": "workerApi", "to": "cloudGateways", "label": "resolve injected services", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [1022, 468] },
     { "id": "workerD1", "from": "cloudGateways", "to": "d1", "label": "bounded indexed reads / consent", "fromSide": "right", "toSide": "left", "labelAt": [1130, 468] },
     { "id": "workerImages", "from": "cloudGateways", "to": "imageGateway", "fromSide": "right", "toSide": "left" },
     { "id": "workerR2", "from": "cloudGateways", "to": "r2", "label": "object storage ports", "variant": "security", "fromSide": "right", "toSide": "left" },
-    { "id": "operatorApproval", "from": "operator", "to": "operationGate", "label": "approve exact digest", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [615, 706] },
+    { "id": "operatorApproval", "from": "operator", "to": "operationGate", "label": "approve exact digest", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [615, 670] },
     { "id": "gateDriver", "from": "operationGate", "to": "cloudDriver", "label": "validated operation", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [885, 706] }
   ]
 }

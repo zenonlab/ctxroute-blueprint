@@ -16,6 +16,9 @@ import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
+const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
+import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
+import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -32,6 +35,8 @@ export default defineBackground({
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
+    const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     browser.runtime.onInstalled.addListener(async () => {
       await privateStorage.ensureReady();
@@ -58,6 +63,12 @@ export default defineBackground({
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
       const parsed = extensionMessageSchema.safeParse(value);
       if (!parsed.success) return { error: 'invalid-message', ok: false };
+      if (parsed.data.type === 'webbridge.handshake') {
+        return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
+      }
+      if (parsed.data.type === 'webbridge.request') {
+        return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
+      }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
       if (parsed.data.type === 'review.queue.read') {
         try {
