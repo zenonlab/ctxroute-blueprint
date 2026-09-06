@@ -1,3 +1,5 @@
+const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
+
 export default {
   testDir: './e2e',
   fullyParallel: false,
@@ -6,14 +8,16 @@ export default {
   retries: 0,
   reporter: 'line',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: externalBaseUrl ?? 'http://127.0.0.1:4173',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run serve:test',
-    port: 4173,
-    reuseExistingServer: false,
-    timeout: 10_000,
-  },
+  webServer: externalBaseUrl
+    ? undefined
+    : {
+        command: 'npm run serve:test',
+        port: 4173,
+        reuseExistingServer: false,
+        timeout: 10_000,
+      },
 };

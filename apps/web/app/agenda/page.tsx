@@ -34,7 +34,7 @@ function AgendaSurface() {
     void readAgenda(from, to).then(setSnapshot).catch(() => setFailed(true));
   }, [from, readAgenda, status, to]);
 
-  if (status !== 'connected') return <WebMemberShell><main className="member-page"><header className="member-hero compact"><p className="eyebrow">Calendrier local</p><h1>Agenda</h1></header><BridgeState /></main></WebMemberShell>;
+  if (status !== 'connected') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const items: AgendaPeriodItem[] = snapshot?.entries.map((entry) => ({
     availability: entry.availability,
     id: `${entry.workId}_${entry.occursAt}`,

@@ -1,6 +1,6 @@
 'use client';
 
-import { MemberNavigation } from '@tobirink/ui';
+import { Button, FeedbackState, MemberNavigation, Status } from '@tobirink/ui';
 import type { MemberNavigationConfig, ReviewDecision, ReviewResolverProps } from '@tobirink/ui';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -73,21 +73,12 @@ export function SiteShell({ children }: Readonly<{ children: ReactNode }>) {
 
 export function BridgeState() {
   const { retry, status } = useWebBridge();
-  const labels = {
-    connected: 'Extension connectée · vue locale disponible.',
-    'extension-missing': 'Extension absente · installez-la pour ouvrir vos vues privées.',
-    incompatible: 'Extension incompatible · installez la version actuelle de TobiRink.',
-    loading: 'Connexion à l’extension…',
-    reconnecting: 'Reconnexion à l’extension…',
-    error: 'Connexion interrompue · vos données locales restent intactes.',
-  } as const;
-  return (
-    <div className="bridge-state" data-bridge-state={status} role="status">
-      <span aria-hidden="true" className={`bridge-dot${status === 'connected' ? ' ready' : ''}`} />
-      <span>{labels[status]}</span>
-      {status === 'error' || status === 'extension-missing' || status === 'incompatible'
-        ? <button className="bridge-retry" onClick={retry} type="button">Réessayer</button>
-        : null}
-    </div>
-  );
+  if (status === 'connected') return <Status tone="success">Extension connectée · vue locale disponible</Status>;
+  if (status === 'loading' || status === 'reconnecting') {
+    return <FeedbackState description="Vos données restent dans l’extension pendant cette vérification." kind="loading" layout="centered" title={status === 'loading' ? 'Connexion à l’extension…' : 'Reconnexion à l’extension…'} />;
+  }
+  if (status === 'extension-missing') {
+    return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description="Installez TobiRink pour ouvrir vos vues privées sur cet appareil." icon="puzzle" kind="empty" layout="centered" title="Extension absente" />;
+  }
+  return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Installez la version actuelle de TobiRink.' : 'Vos données locales restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
 }

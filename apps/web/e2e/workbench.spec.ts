@@ -7,7 +7,7 @@ interface BridgeFixture {
 }
 
 declare global {
-  interface Window { __agendaReads?: number }
+  interface Window { __agendaReads?: number; __libraryReads?: number }
 }
 
 const fixture: BridgeFixture = {
@@ -26,6 +26,7 @@ const fixture: BridgeFixture = {
 async function installBridge(page: Page) {
   await page.addInitScript((bridgeFixture: BridgeFixture) => {
     window.__agendaReads = 0;
+    window.__libraryReads = 0;
     window.addEventListener('message', (event) => {
       const message = event.data;
       if (message?.type === 'webbridge.handshake') {
@@ -38,7 +39,10 @@ async function installBridge(page: Page) {
       let value;
       if (request.type === 'bootstrap.read') value = { availability: 'connected', generation: 1, libraryCount: bridgeFixture.library.length, pendingReviewCount: 0, protocolVersion: 2 };
       if (request.type === 'review.read') value = { candidates: [], context: 'local' };
-      if (request.type === 'library.read') value = { hasMore: false, items: bridgeFixture.library.filter((item) => request.query.facet === 'all' || item.mediaKind === request.query.facet).slice(0, request.query.limit), query: request.query };
+      if (request.type === 'library.read') {
+        window.__libraryReads = (window.__libraryReads ?? 0) + 1;
+        value = { hasMore: false, items: bridgeFixture.library.filter((item) => request.query.facet === 'all' || item.mediaKind === request.query.facet).slice(0, request.query.limit), query: request.query };
+      }
       if (request.type === 'agenda.read') {
         window.__agendaReads = (window.__agendaReads ?? 0) + 1;
         value = { entries: bridgeFixture.agenda.map((entry, index) => ({ ...entry, occursAt: `${request.from}T${index === 0 ? '18:30:00+02:00' : '20:00:00+02:00'}` })), from: request.from, to: request.to };
@@ -56,7 +60,9 @@ test('desktop Workbench renders real bridge projections and navigation', async (
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Reprendre le fil.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '4 œuvres' })).toBeVisible();
-  await expect(page.locator('[data-variant="library"]')).toHaveCount(4);
+  await expect(page.locator('a[data-variant="library"]')).toHaveCount(4);
+  await expect(page.getByRole('heading', { name: 'Reprendre le fil.' })).toHaveCSS('font-size', '32px');
+  await expect(page.locator('a[data-variant="library"]').first()).toHaveCSS('width', '196px');
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
   expect(await page.locator('header img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
@@ -68,9 +74,10 @@ test('Library keeps filters in the URL and remains bounded on mobile', async ({ 
   await installBridge(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/library?search=%C5%93uvre&facet=anime');
-  await expect(page.getByRole('heading', { exact: true, name: 'Bibliothèque' })).toBeVisible();
+  await expect(page.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__libraryReads)).toBe(1);
   await expect(page.getByLabel('Rechercher dans la bibliothèque')).toHaveValue('œuvre');
-  await expect(page.locator('[data-variant="library"]')).toHaveCount(1);
+  await expect(page.locator('a[data-variant="library"]')).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
@@ -91,10 +98,16 @@ test('Agenda keeps seven horizontal days and emits one read per week', async ({ 
 test('missing extension exposes no private cards while verified downloads stay public', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.getByText(/Extension absente/u)).toBeVisible({ timeout: 3_000 });
-  await expect(page.locator('[data-variant="library"]')).toHaveCount(0);
+  await expect(page.locator('a[data-variant="library"]')).toHaveCount(0);
+  await expect(page.locator('[data-layout="centered"] > span svg')).toHaveCSS('width', '48px');
   await page.goto('/download');
   await expect(page.getByRole('heading', { name: 'Choisir votre navigateur' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Installer, puis importer.' })).toHaveCSS('font-size', '32px');
   await expect(page.getByRole('link', { name: /Télécharger pour Chrome|Télécharger pour Firefox/u })).toHaveCount(2);
+  await expect(page.locator('[data-variant="outlined"]')).toHaveCount(2);
+  await expect(page.locator('.download-link svg')).toHaveCount(2);
+  await page.goto('/privacy');
+  await expect(page.locator('[data-variant="outlined"]')).toHaveCount(3);
   for (const route of ['/', '/library', '/agenda', '/privacy', '/download']) {
     expect((await request.get(route)).status(), route).toBe(200);
   }

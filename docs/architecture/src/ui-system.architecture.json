@@ -18,7 +18,7 @@
         "id": "product-reuse",
         "label": "Réutilisation produit",
         "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "sharedSurfaces", "extension"],
-        "note": "Extension et web consomment l’API publique: tokens, navigation routable, filtres et Agenda horizontal."
+        "note": "Extension et web consomment l’API publique: tokens, navigation routable, Library et Agenda horizontal."
       }
     ]
   },
@@ -32,7 +32,7 @@
     { "id": "uiPackage", "type": "frontend", "label": "Package UI", "sublabel": "tokens + composants + marque", "pos": [210, 80], "size": [170, 64] },
     { "id": "reviewResolver", "type": "frontend", "label": "ReviewResolver", "sublabel": "choix + navigation différée", "pos": [460, 80], "size": [180, 64] },
     { "id": "memberNavigation", "type": "frontend", "label": "Shell membre", "sublabel": "recherche + cloche + bulle", "pos": [730, 80], "size": [180, 64] },
-    { "id": "sharedSurfaces", "type": "frontend", "label": "Compositions membre", "sublabel": "Agenda + LibraryFilters", "pos": [730, 190], "size": [180, 64], "tag": "API publique" },
+    { "id": "sharedSurfaces", "type": "frontend", "label": "Compositions membre", "sublabel": "Library + Agenda", "pos": [730, 190], "size": [180, 64], "tag": "API publique" },
     { "id": "extension", "type": "frontend", "label": "Surfaces Tobirink", "sublabel": "extension + web statique", "pos": [1030, 80], "size": [180, 64] }
   ],
   "boundaries": [
@@ -49,7 +49,7 @@
     { "id": "uiReviewResolver", "from": "uiPackage", "to": "reviewResolver", "label": "API publique", "variant": "default" },
     { "id": "resolverNavigation", "from": "reviewResolver", "to": "memberNavigation", "label": "bulle de la cloche", "variant": "emphasis", "labelAt": [685, 158] },
     { "id": "uiSharedSurfaces", "from": "uiPackage", "to": "sharedSurfaces", "label": "tokens + primitives", "variant": "default", "fromSide": "bottom", "toSide": "left" },
-    { "id": "sharedSurfacesConsumer", "from": "sharedSurfaces", "to": "extension", "label": "Agenda + filtres", "variant": "emphasis", "fromSide": "top", "toSide": "left" },
+    { "id": "sharedSurfacesConsumer", "from": "sharedSurfaces", "to": "extension", "label": "Library + Agenda", "variant": "emphasis", "fromSide": "top", "toSide": "left" },
     { "id": "navigationExtension", "from": "extension", "to": "memberNavigation", "label": "routes + file locale", "variant": "default" }
   ],
   "cards": [
@@ -67,7 +67,7 @@
       "items": [
         "La cloche du header est l’unique entrée Review visible",
         "MemberNavigation conserve les fragments Extension par défaut et accepte les routes web",
-        "Agenda, son modèle de semaine et LibraryFilters sont exportés par le package UI",
+        "Library, Agenda, leur composition et leurs modèles sont exportés par le package UI",
         "La bulle Review compose le resolver partagé sans modaliser la page",
         "L’empty Review compact garde seulement Inbox et un libellé",
         "Les flèches parcourent la file sans soumettre de décision",
