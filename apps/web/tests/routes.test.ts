@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { webLibraryQuerySchema, webRequestSchema } from '@tobirink/contracts/web-bridge';
 import { createLocalAgendaPeriod } from '@tobirink/ui';
+import { publicDownloads } from '../app/download/page';
 
 describe('Workbench web routes', () => {
   it('bounds the home preview to four local works', () => {
@@ -16,5 +17,12 @@ describe('Workbench web routes', () => {
     expect(period.days).toHaveLength(7);
     expect(period.days[0]?.date.getDay()).toBe(1);
     expect(period.days[6]?.date.getDay()).toBe(0);
+  });
+
+  it('exposes only the two published versioned archives', () => {
+    expect(publicDownloads('1.0.0')).toEqual([
+      { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.0.zip' },
+      { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.0.zip' },
+    ]);
   });
 });

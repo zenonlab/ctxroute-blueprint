@@ -4737,7 +4737,7 @@
         {
           "id": "step-1",
           "title": "Versionner la surface de publication reproductible",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "origin/main contains the exact Worker custom route, static assets binding, versioned download handler, R2 artifact adapter and bounded r2-publish gate",
             "No FavLib resource, environment file, delete operation, secret or Cloudflare mutation is read or performed",
@@ -4778,12 +4778,16 @@
             "gh pr checks --watch",
             "gh pr merge --merge"
           ],
-          "evidence": []
+          "evidence": [
+            "PR #7 merged to origin/main at 1b8a16c after all seven GitHub checks passed, including Windows and Worker contracts.",
+            "npm run verify passed: 270/270 tests plus one intentional skip, audit 0 vulnerabilities, integration and Archify build.",
+            "Web export and 1.0.0 packages built; static scan found no sample-work, Exemple public or 0.0.0; Archify showcase passed 9/9."
+          ]
         },
         {
           "id": "step-2",
           "title": "Appliquer le plan Cloudflare exact et vérifier la production",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "The reviewed plan mutates only the two versioned R2 object keys and worker:tobirink-public-api in account 6aef9b2e29d0671c8b5dd36b0b660f4b",
             "No D1 data, FavLib resource, unrelated R2 object, secret, store listing or browser extension store is mutated",

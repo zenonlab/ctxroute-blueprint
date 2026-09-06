@@ -4,7 +4,7 @@
 
 The current candidate is `1.0.0`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
-names, and the download page reads it without exposing links.
+names, and the download page derives its two public links from it.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:
@@ -45,9 +45,9 @@ For `1.0.0`, the local publication candidates are exactly:
 - `tobirink-firefox-mv3-1.0.0.zip`
 - `release-manifest.json`
 
-Publication remains a later, separately approved provider step. After replacing
-the placeholders with the reviewed account, plan path and digest, its exact
-repository-owned command sequence is:
+The `1.0.0` publication was applied through the separately approved provider
+gate. Future publications replace the placeholders with their reviewed account,
+plan path and digest in this exact repository-owned command sequence:
 
 ```sh
 npm run infra:inspect -- --account <cloudflare-account-id>
@@ -55,8 +55,7 @@ npm run infra:plan -- --account <cloudflare-account-id> --operation r2-publish:t
 npm run infra:apply -- --plan <reviewed-plan.json> --approve <plan-sha256> --account <cloudflare-account-id> --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api
 ```
 
-These commands are documentation, not authorization. This preparation step
-does not run inspection, planning, apply, upload, deploy or publish.
+These commands are documentation, not authorization.
 The plan preview binds the two ZIP byte hashes and the Worker dry-run output to
 its digest; the apply gate repeats both checks immediately before mutation.
 

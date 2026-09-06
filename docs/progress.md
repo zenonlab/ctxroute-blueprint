@@ -248,5 +248,5 @@
 
 ## Publier TobiRink 1.0.0 sur Cloudflare — ACTIVE
 
-- [ ] **Versionner la surface de publication reproductible** — IN_PROGRESS
-- [ ] **Appliquer le plan Cloudflare exact et vérifier la production** — PENDING
+- [x] **Versionner la surface de publication reproductible** — DONE _(evidence: PR #7 merged to origin/main at 1b8a16c after all seven GitHub checks passed, including Windows and Worker contracts., npm run verify passed: 270/270 tests plus one intentional skip, audit 0 vulnerabilities, integration and Archify build., Web export and 1.0.0 packages built; static scan found no sample-work, Exemple public or 0.0.0; Archify showcase passed 9/9.)_
+- [ ] **Appliquer le plan Cloudflare exact et vérifier la production** — IN_PROGRESS

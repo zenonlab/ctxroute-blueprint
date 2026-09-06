@@ -29,7 +29,7 @@ function routeServices(context: { get(key: 'services'): WorkerServices }, inject
 export function createCollectiveReviewApp(injected?: CollectiveServices) {
   const app = new Hono<WorkerRuntime>();
 
-  app.use('*', async (context, next) => {
+  app.use('/v1/collective/*', async (context, next) => {
     await next();
     context.header('Cache-Control', 'no-store');
     context.header('X-Content-Type-Options', 'nosniff');
