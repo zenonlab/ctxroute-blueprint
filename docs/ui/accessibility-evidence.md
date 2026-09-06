@@ -53,9 +53,13 @@ popup previews remain bounded and horizontally scrollable at the simulated
 the Dialog starts closed and opens from its labelled trigger, and no nested
 `main` landmark is produced. The Workbench favicon uses the existing Tobirink
 asset, leaving the browser console free of missing-resource errors.
-At a native 390 px browser width, the Workbench control bar itself still exceeds
-the host viewport and clips the inspected canvas; this is a Workbench-shell
-defect, not a production Settings overflow, and needs a separate responsive fix.
+The Workbench narrow-shell fix stacks the preview heading and all controls below
+820 px, expands both selectors to the available width, and confines explicit
+390/768 px canvases to the preview's own horizontal scroller. The responsive
+Workbench test covers the explicit 390 px canvas. A Chromium layout measurement
+at its 500 px headless minimum reports matching 500 px document, body, preview
+and control widths, with no document-level horizontal overflow; direct CSS
+inspection confirms that the compact breakpoint applies through 390 px.
 Firefox, 200% zoom and forced-colour behaviour still require a dedicated run.
 
 When a browser is available, record these checks for the extension menu (360 px

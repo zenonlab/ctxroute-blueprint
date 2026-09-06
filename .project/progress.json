@@ -1442,6 +1442,39 @@
             "Architecture showcase validation passed with 9 checks, 0 errors and 0 warnings.",
             "Full validation reaches only the pre-existing .codex/config.toml MCP manifest mismatch; UI acceptance gates pass."
           ]
+        },
+        {
+          "id": "step-4",
+          "title": "Corriger le shell Workbench natif a 390 px",
+          "status": "DONE",
+          "acceptance": [
+            "Catalogue et Apercu restent accessibles par la navigation mobile",
+            "Le header et les controles Variante Etat Viewport restent entierement visibles",
+            "La preview 390 px ne provoque aucun debordement horizontal du document",
+            "Tests Workbench build capture Chromium et validations UI docs Archify passent"
+          ],
+          "files": [
+            "apps/ui-workbench/src/styles.css",
+            "apps/ui-workbench/src/App.test.tsx",
+            "docs/ui/accessibility-evidence.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:ui-workbench",
+            "npm run build:ui-workbench",
+            "npm run validate:ui",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- ui-system.architecture",
+            "git diff --check",
+            "git commit -m fix(workbench): fit narrow viewport"
+          ],
+          "evidence": [
+            "Le shell Workbench empile le titre, le statut, Variante, État et Viewport sous 820 px; les sélecteurs occupent la largeur disponible et le canvas explicite défile sans élargir le document.",
+            "Chromium headless mesure innerWidth, document, body, preview et controls à 500 px, sans débordement document; le test Workbench couvre le canvas 390 px.",
+            "Workbench 9/9, build TypeScript/Vite, ESLint, Oxlint, anti-slop, contrat UI, docs et diff-check passent.",
+            "Sensor CSS SAFE; ui-system.architecture passe 9 contrôles showcase, 0 erreur et 0 avertissement."
+          ]
         }
       ]
     },
