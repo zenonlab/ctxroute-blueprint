@@ -88,6 +88,14 @@
       "narrative": "docs/orchestration.md",
       "requiredKeys": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "limits"],
       "validator": "npm run blueprint:review"
+    },
+    {
+      "id": "crg-risk-acceptance-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".github/schemas/crg-risk-acceptance.schema.json",
+      "narrative": "docs/ci.md",
+      "requiredKeys": ["$schema", "$id", "additionalProperties"]
     }
   ]
 }

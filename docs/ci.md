@@ -34,17 +34,23 @@ Codex, l'approbation des
 neuf définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
 les réglages globaux Codex ou Claude.
 
-Deux workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié
+Trois workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié
 checkout le code PR avec `contents: read`, exécute l'Action officielle épinglée
 au commit v2.3.8 avec une contrainte pip versionnée, applique le seuil `high`
 (0,70) et publie le rapport même si le gate échoue. Le workflow `workflow_run`
 de confiance ne checkout aucun code PR : il télécharge un unique artefact
 borné, vérifie fichiers, tailles, encodage, numéro, SHA et format, neutralise les
 mentions, puis met à jour le commentaire sticky avec seulement `actions: read`
-et `pull-requests: write`.
+et `pull-requests: write`. Le workflow privilégié `CRG disposition` ne checkout
+que la branche par défaut de confiance. Il revalide l’artefact, le numéro de PR,
+le SHA, le score et le digest. Un risque inférieur à `high` passe directement.
+Un risque `high` ou `critical` exige une review `APPROVED` sur ce SHA par un
+administrateur distinct de l’auteur, avec une ligne `Justification:` de 32 à 512
+caractères, une issue de suivi et `CRG-report-sha256:<digest>`. L’acceptation
+produit un artefact `CrgRiskAcceptance`; tout nouveau SHA ou rapport l’invalide.
 
-Après le premier run distant réussi, rendre le check **CRG risk gate**
-obligatoire sur `main`, en le conservant avec les quatre checks déjà requis,
+Après le premier run distant réussi, rendre le check **CRG disposition**
+obligatoire sur `main` à la place du check brut, en le conservant avec tous les checks déjà requis,
 `strict: true`. Le workflow de commentaire ne doit pas être obligatoire.
 Les Actions internes à l'Action composite CRG sont des dépendances transitives
 du commit officiel et sont réévaluées lors de toute mise à jour du pin.
