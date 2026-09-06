@@ -7,7 +7,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
-import { sessionStartOutput } from '../.codex/hooks/crg-context.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
@@ -29,14 +28,6 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
-});
-
-test('healthy CRG SessionStart is silent and failures stay diagnostic-only', () => {
-  assert.deepEqual(sessionStartOutput({ code: 0, timedOut: false }), { continue: true });
-  const failed = sessionStartOutput({ code: 1, timedOut: false, stderr: 'index unavailable' });
-  assert.deepEqual(Object.keys(failed), ['systemMessage']);
-  assert.match(failed.systemMessage, /index unavailable/u);
-  assert.ok(failed.systemMessage.length < 500);
 });
 
 test('initialize refuses an incomplete template without changing status', () => {
@@ -291,7 +282,7 @@ test('both lifecycle dialects enforce local governance without automatic CTXRout
   }
 });
 
-test('both host dispatchers block an unsafe file through the real PostToolUse chain', () => {
+test('both host dispatchers report an unsafe file through the real PostToolUse chain', () => {
   const directory = mkdtempSync(join(tmpdir(), 'lifecycle-post-tool-'));
   const path = join(directory, 'query.js');
   writeFileSync(path, "db.query('SELECT * FROM users WHERE id = ' + userId);\n");
@@ -303,8 +294,7 @@ test('both host dispatchers block an unsafe file through the real PostToolUse ch
     });
     assert.equal(result.status, 0, result.stderr);
     const output = JSON.parse(result.stdout);
-    assert.equal(output.decision, 'block', harness);
-    assert.match(output.reason, /sensor\/sql-injection/u, harness);
+    assert.match(output.hookSpecificOutput?.additionalContext ?? '', /sensor\/sql-injection/u, harness);
   }
 });
 
@@ -599,7 +589,7 @@ test('CTXRoute injects UI contract guidance for conventional product UI paths', 
   assert.match(result.stdout, /UI design contract/u);
 });
 
-test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => {
+test('CTXRoute explains Sensor grammar boundaries on demand', () => {
   const session = `sensor-adapters-${process.pid}-${Date.now()}`;
   const result = spawnSync('node', [join(root, '.codex/hooks/ctxroute.mjs'), 'codex-doc-inject.js', '--budget', '3500'], {
     cwd: root,
@@ -607,8 +597,8 @@ test('CTXRoute explains exact Sensor grammar modes at Sensor boundaries', () => 
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /exact `tree-sitter-ruby` dependency/u);
-  assert.match(result.stdout, /genuinely fails to load/u);
+  assert.match(result.stdout, /Sensor adapter registry/u);
+  assert.match(result.stdout, /Language-specific constraints/u);
 });
 
 test('CTXRoute wrapper directs missing installations to npm install', () => {

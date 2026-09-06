@@ -33,15 +33,8 @@ pretend to parse every frontend ecosystem.
 
 ## Blueprint tooling adapter
 
-The local Progress dashboard reuses the action, field, surface, and dialog
-roles without changing the product framework policy. Its machine-readable
-`toolingEvidence.progressDashboard` entry records the token and accessibility
-mapping. Native buttons, selects, switch-backed checkbox, details, dialog,
-forms, headings, and live status preserve keyboard and assistive-technology
-behavior. Step cards start collapsed; their handles support pointer drag and
-Alt + arrow movement, and list fields pair textareas with scroll-synchronized
-line-number gutters. Responsive CSS collapses fields to one column and keeps
-controls at least 44 px high. Deletion uses a focus-managed dialog; validated
-plan creation saves directly, while manual mode requires a focused reason
-dialog before saving. Inline errors and save
-states are announced without a native prompt.
+The local orchestrator surfaces reuse the action, field, surface, and dialog
+roles without changing the product framework policy. Their machine-readable
+`toolingEvidence.orchestrator` entry records the token and accessibility
+mapping. Mission preparation, state transitions, validation errors, and audit
+decisions are represented with native controls and announced status text.
