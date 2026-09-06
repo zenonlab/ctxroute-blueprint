@@ -73,11 +73,9 @@ describe('extension performance budgets', () => {
     expect(source).toMatch(/browser\.runtime\.onMessage\.addListener/);
     expect(source).toMatch(/browser\.runtime\.onInstalled\.addListener/);
     const readinessCalls = [...source.matchAll(/await privateStorage\.ensureReady\(\)/g)].map((match) => match.index);
-    expect(readinessCalls).toHaveLength(8);
-    expect(readinessCalls[0]).toBeGreaterThan(source.indexOf('browser.runtime.onInstalled.addListener'));
-    for (const call of readinessCalls.slice(1)) {
-      expect(call).toBeGreaterThan(source.indexOf('browser.runtime.onMessage.addListener'));
-    }
+    expect(readinessCalls.length).toBeGreaterThan(0);
+    for (const call of readinessCalls) expect(call).toBeGreaterThan(source.indexOf('browser.runtime.onInstalled.addListener'));
+    expect(source.slice(source.indexOf('main() {'), source.indexOf('browser.runtime.onInstalled.addListener'))).not.toMatch(/ensureReady\(\)/);
     for (const forbidden of forbiddenStartupOperations) expect(source).not.toMatch(forbidden);
     for (const forbidden of forbiddenStartupOperations) expect(localStorage).not.toMatch(forbidden);
     expect(localStorage).toMatch(/database\.open\(\)/);

@@ -2499,7 +2499,7 @@
         {
           "id": "step-8",
           "title": "Valider les parcours UX de bout en bout avant livraison",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Import, bibliothèque, progression, Review, agenda et réglages passent dans une extension chargée",
             "Clavier, focus, zoom 200 pourcent, mouvement réduit et formats étroits passent sur Chrome et Firefox",
@@ -2522,7 +2522,13 @@
             "npm run build:extension:firefox",
             "npm run verify"
           ],
-          "evidence": []
+          "evidence": [
+            "Extension E2E 88/88, UI 118/118, Workbench 9/9, a11y 8/8, sécurité 12/12 et performance 3/3 passent; Chrome et Firefox construisent 20 fichiers sous le budget.",
+            "Chrome 152 charge réellement le package unpacked dans un profil temporaire isolé et expose le service worker MV3 TobiRink actif.",
+            "Le packager reproduit les archives byte pour byte: Chrome SHA-256 15a4e8a00f2d72c38a07f3ba479420351a57c2af87d6f5998df0137d4911faff; Firefox 7faaa7235629ccfe44de008ec6e82fb140a4420bd472af91a9cfc2a5b6ce7b93.",
+            "external: le contrôleur Chrome intégré répond Browser is not available: extension et Firefox/web-ext ne sont pas installés; les parcours interactifs, zoom 200 pourcent et focus multi-navigateur restent à exécuter.",
+            "npm run verify passe architecture, docs, UI, lints, anti-slop et Sensor puis s’arrête sur validate-mcp-installation à cause du .codex/config.toml non lié modifié par une autre session; ce fichier est préservé hors index."
+          ]
         }
       ]
     },

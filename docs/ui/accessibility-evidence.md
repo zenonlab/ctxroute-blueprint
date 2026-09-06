@@ -25,6 +25,9 @@ component catalogue and is not part of the extension package.
 - The organizer exposes labelled folder-name fields, named icon actions, an
   explicit configuration/preview sequence, and a table whose headers identify
   bookmark, destination and action columns.
+- Apply and Restore each use a named confirmation dialog. Apply stays disabled
+  without a fresh preview; Restore is omitted until a verified IndexedDB
+  snapshot exists.
 - The agenda exposes one focusable horizontal week containing seven named day
   sections; the same direction is preserved at 390 px.
 - CSS contracts keep the 360 × 540 px extension menu, 320 px minimum runtime canvas,

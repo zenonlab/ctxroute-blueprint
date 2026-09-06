@@ -29,12 +29,19 @@ components do not branch on a browser name.
   CSP, permission allowlist, empty host permissions and Firefox metadata.
 - `npm run test:e2e` passes the 53 shared extension contract and vertical-flow
   tests.
+- Google Chrome 152 loaded the unpacked Chromium output in an isolated temporary
+  profile and exposed the Tobirink MV3 service worker as an active
+  `chrome-extension://` target. This proves manifest loading and background
+  startup, but not the interactive journeys below.
+- `npm run package:extension` reproduced both 20-file archives byte-for-byte;
+  the local release manifest records their SHA-256 values.
 
 ## External browser pass still required
 
-No manual compatibility claim is made for this session. Google Chrome is
-installed, but the connected browser controller reports `No browser is
-available`. Firefox and the optional `web-ext` validator are not installed.
+No complete manual compatibility claim is made for this session. Google Chrome
+is installed and accepts the unpacked package, but the connected browser
+controller reports `Browser is not available: extension`. Firefox and the
+optional `web-ext` validator are not installed.
 Adding that dependency was not part of the approved step, so the repository
 was not expanded silently.
 
