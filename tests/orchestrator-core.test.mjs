@@ -40,6 +40,16 @@ test('SWARM_OFF prepares no ticket or worktree', async () => {
   assert.equal(existsSync(join(root, '.ctxroute/worktrees/mission-one')), false);
 });
 
+test('SWARM_ON bypasses the swarm for a single-scope mission', async () => {
+  const root = fixture(true);
+  await transactOrchestrator({ operation_id: 'goal-create', expected_revision: 0, action: 'goal.create', payload: { id: 'goal-one', title: 'Simple goal' } }, root);
+  const command = missionCommand(1);
+  command.payload.mission.file_scope = ['src/'];
+  const result = await prepareMission(command, root);
+  assert.equal(result.bypassed, true);
+  assert.equal(existsSync(join(root, '.ctxroute/worktrees/mission-one')), false);
+});
+
 test('SWARM_ON isolates a mission, verifies its diff, and records a complete report', async () => {
   const root = fixture(true);
   await transactOrchestrator({ operation_id: 'goal-create', expected_revision: 0, action: 'goal.create', payload: { id: 'goal-one', title: 'Parallel goal' } }, root);
@@ -116,7 +126,7 @@ test('concurrent missions receive distinct worktrees and overlapping write scope
   const second = missionCommand(2);
   second.operation_id = 'mission-two';
   second.payload.mission.mission_id = 'mission-two';
-  second.payload.mission.file_scope = ['tests/'];
+  second.payload.mission.file_scope = ['tests/', 'docs/'];
   const prepared = await prepareMission(second, root);
   const missions = prepared.state.goals[0].missions;
   assert.notEqual(missions[0].worktree, missions[1].worktree);
@@ -127,7 +137,7 @@ test('concurrent missions receive distinct worktrees and overlapping write scope
 function missionCommand(revision) {
   return {
     operation_id: 'mission-prepare-one', expected_revision: revision, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: {
-      mission_id: 'mission-one', skill_id: 'blueprint-audit', skill_version: '1.0.0', file_scope: ['src/'], acceptance: ['Scoped file is valid'], validation_commands: ['node --check src/change.mjs'], response_format: 'worker-report-v1',
+      mission_id: 'mission-one', skill_id: 'blueprint-audit', skill_version: '1.0.0', file_scope: ['src/', 'lib/'], acceptance: ['Scoped file is valid'], validation_commands: ['node --check src/change.mjs'], response_format: 'worker-report-v1',
     } },
   };
 }

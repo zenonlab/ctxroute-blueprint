@@ -24,6 +24,9 @@ export async function prepareMission(command, root = process.cwd(), environment 
   const requestedMission = command.payload?.mission;
   if (!requestedMission) throw new Error('mission.prepare requires payload.mission');
   const mission = routeMissingSkill(requestedMission, root);
+  if (state.mode === 'SWARM_ON' && !mission.requested_skill_id && mission.file_scope.length < 2) {
+    return { bypassed: true, mode: state.mode, reason: 'Single-scope mission is executed directly; swarm worktrees require at least two disjoint scopes.', mission };
+  }
   if (state.transactions.some(item => item.operation_id === command.operation_id)) {
     const existing = state.goals.flatMap(goal => goal.missions).find(item => item.mission_id === mission.mission_id);
     if (!existing || !sameRequestedMission(existing, mission)) throw new Error(`operation_id reused with different payload: ${command.operation_id}`);
