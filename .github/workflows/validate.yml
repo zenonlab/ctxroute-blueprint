@@ -144,7 +144,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Audit high-severity production and development dependencies
-        run: node scripts/dependency-audit.mjs --required
+        run: npm exec -- node scripts/dependency-audit.mjs --required
 
   smoke-install:
     name: Clean installation smoke test
