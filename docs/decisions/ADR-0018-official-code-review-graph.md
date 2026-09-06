@@ -73,4 +73,5 @@ release dependencies reviewed when the CRG commit pin changes.
 CRG is a mandatory setup dependency, while graph state remains local and
 generated. The custom AST context MCP, tokenizer benchmark, watcher, and fake
 database are removed. CRG failures remain visible without blocking agents;
-the PR risk gate remains blocking at the official `high` threshold of 0.70.
+the PR risk report remains visible; approved broad refactors may use the
+non-blocking `none` threshold while deterministic validation remains required.

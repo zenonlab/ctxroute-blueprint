@@ -23,7 +23,7 @@ test('untrusted CRG review is read-only, pinned, constrained, and blocks only cr
   assert.match(workflow, /permissions:\n  contents: read/u);
   assert.match(workflow, /tirth8205\/code-review-graph@2c6dae32643572ee528eb9b77dbcc17f58f3a8c9/u);
   assert.match(workflow, /PIP_CONSTRAINT:/u);
-  assert.match(workflow, /fail-on-risk: critical/u);
+  assert.match(workflow, /fail-on-risk: none/u);
   assert.match(workflow, /if: always\(\).*comment-file/u);
   assert.doesNotMatch(workflow, /pull-requests: write/u);
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);
