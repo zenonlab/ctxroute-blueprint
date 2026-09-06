@@ -51,7 +51,7 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
     onRefresh: () => void refreshReview(),
     onRetry: () => void refreshReview(),
     onSubmitDecision: submitDecision,
-    state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' ? 'empty' : 'offline',
+    state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' || status === 'extension-missing' ? 'empty' : 'offline',
   };
   return {
     activeId: activeNavigation(pathname),

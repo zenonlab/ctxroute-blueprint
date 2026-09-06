@@ -112,6 +112,8 @@ test('missing extension keeps the Workbench empty surfaces while verified downlo
   await expect(page.getByRole('heading', { name: 'Semaine vide' })).toBeVisible();
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(0);
   await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
+  await page.getByRole('button', { name: /Correspondances à vérifier/u }).click();
+  await expect(page.getByRole('heading', { name: 'Aucune correspondance à vérifier' })).toBeVisible();
   await page.goto('/download');
   await expect(page.getByRole('heading', { name: 'Choisir votre navigateur' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Installer, puis importer.' })).toHaveCSS('font-size', '32px');

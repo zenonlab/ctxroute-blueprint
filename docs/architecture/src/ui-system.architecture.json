@@ -95,6 +95,7 @@
         "Le viewport contient seulement catalogue et aperçu, sans hero parasite sur l’accueil",
         "Agenda aligne ses états vide, chargement et erreur sur le FeedbackState centré de Library",
         "Review aligne aussi ses états vide, chargement et erreur sur la même composition centrée",
+        "Le shell membre expose Review vide même sans extension, sans créer de candidat",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }
