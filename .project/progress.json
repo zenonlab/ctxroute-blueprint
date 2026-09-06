@@ -1288,6 +1288,62 @@
             "Chromium valide le StoragePort IndexedDB et les migrations v1 v2 v3 v4 vers Dexie v5; Work Review et FavoriteSource sont conserves et le nouveau store reste vide sans configuration.",
             "Recovery 7/7 et backup chiffre 3/3 preservent export prive v3 et organizer tout en important v1 v2 sans invention; typecheck 8 workspaces, lints, Sensor SAFE, docs et Archify 9/9 passent."
           ]
+        },
+        {
+          "id": "step-15",
+          "title": "Raccorder Reglages et l apercu organisateur au runtime local",
+          "status": "DONE",
+          "acceptance": [
+            "La page Reglages charge une configuration IndexedDB ou un arbre racine vide sans donnees de demonstration",
+            "Les editions utilisent un message strict et enregistrent une configuration revalidee avant de publier le nouvel etat",
+            "L apercu joint au plus 500 FavoriteSource Review et Work locaux et echoue ferme pour les metadonnees absentes",
+            "Le runtime ne propose que les filtres alimentes par le modele local et ne rend ni Appliquer ni Restaurer sans callback reel",
+            "Aucun appel D1 aucun acces direct UI a Dexie et aucune creation modification suppression ou deplacement de favori ne sont ajoutes",
+            "Tests UI extension application accessibilite securite builds docs et deux architectures Archify passent"
+          ],
+          "files": [
+            "packages/application/src/organizer/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/recovery/**",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/**",
+            "apps/extension/security/**",
+            "packages/ui/**",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/ui/**",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/ui-system.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:a11y",
+            "npm run test:security",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:ui",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- ui-system.architecture",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):connect-local-settings"
+          ],
+          "evidence": [
+            "Application 37/37, contrats 9/9 et stockage IndexedDB 2/2 plus contrat Chromium passent; l apercu joint au plus 500 FavoriteSource Review Work et echoue ferme si le contexte manque.",
+            "Extension 80/80, UI 118/118, Workbench 9/9, accessibilite 8/8 et securite 12/12 passent; Reglages lit et serialise les ecritures par messages stricts sans Dexie navigateur reseau ni action Apply Restore fictive.",
+            "Typecheck 8 workspaces, performance 3/3, builds Chrome 613.91 kB et Firefox 614.03 kB, lints, anti-slop, Sensor SAFE, docs, decisions, diff-check et deux Archify 9/9 passent; audit Chromium desktop corrige l espace etire, shell Workbench natif 390 px reste un correctif distinct."
+          ]
         }
       ]
     },

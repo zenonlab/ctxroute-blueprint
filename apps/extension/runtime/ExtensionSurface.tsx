@@ -12,6 +12,7 @@ import type { NavigationTarget } from './messages';
 import { readLibraryPageMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
 import type { LibraryPageResponse } from './messages';
 import { useLocalAgenda } from './use-local-agenda';
+import { useLocalOrganizerSettings } from './use-local-organizer-settings';
 import { useLocalReviewNavigation } from './use-local-review-navigation';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
@@ -111,12 +112,8 @@ function AgendaSurface() {
 }
 
 function OptionsSurface() {
-  return (
-    <Settings
-      onRetry={() => undefined}
-      state="blocked"
-    />
-  );
+  const settings = useLocalOrganizerSettings();
+  return <Settings {...settings} />;
 }
 
 function PopupSurface() {

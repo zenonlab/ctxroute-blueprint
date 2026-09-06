@@ -6,6 +6,7 @@ import { ExtensionSurface } from '../runtime/ExtensionSurface';
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 const extensionSurface = read('../runtime/ExtensionSurface.tsx');
 const reviewNavigationHook = read('../runtime/use-local-review-navigation.ts');
+const organizerSettingsHook = read('../runtime/use-local-organizer-settings.ts');
 
 const styles = {
   button: read('../../../packages/ui/src/components/button/Button.module.css'),
@@ -82,6 +83,15 @@ describe('extension accessibility contract', () => {
     expect(markup).toContain('Analyse de la page…');
     expect(markup).toContain('Continuer mes œuvres');
     expect(markup).not.toContain('Les Carnets de l’Apothicaire');
+  });
+
+  it('keeps organizer storage and preview behind serialized local messages', () => {
+    expect(extensionSurface).toContain('useLocalOrganizerSettings()');
+    expect(extensionSurface).not.toContain('state="blocked"');
+    expect(organizerSettingsHook).toContain('readOrganizerConfigurationMessage()');
+    expect(organizerSettingsHook).toContain('writeOrganizerConfigurationMessage(configuration)');
+    expect(organizerSettingsHook).toContain('readOrganizerPreviewMessage(configuration)');
+    expect(organizerSettingsHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\.|fetch\(/);
   });
 
   it('meets WCAG AA contrast for the production text, muted text, accent and focus pairs', () => {

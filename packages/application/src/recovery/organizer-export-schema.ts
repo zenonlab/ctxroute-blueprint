@@ -1,18 +1,24 @@
-import { createOrganizerConfiguration } from '@tobirink/domain';
+import { createOrganizerConfiguration, organizerTreeLimits } from '@tobirink/domain';
 import type { OrganizerConfiguration, OrganizerConditionsInput, OrganizerFolderInput } from '@tobirink/domain';
 import { z } from 'zod';
 
 interface OrganizerFolderWire {
-  children: OrganizerFolderWire[];
+  readonly children: readonly OrganizerFolderWire[];
   conditions?: {
-    editorialStatuses: Array<'Ongoing' | 'Completed' | 'Hiatus' | 'Cancelled'>;
-    mediaTypes: Array<'ANIME' | 'MANGA' | 'MANHUA' | 'MANHWA'>;
+    readonly editorialStatuses: readonly ('Ongoing' | 'Completed' | 'Hiatus' | 'Cancelled')[];
+    readonly mediaTypes: readonly ('ANIME' | 'MANGA' | 'MANHUA' | 'MANHWA')[];
     minimumStoppedProgress?: number | undefined;
-    progressStates: Array<'active' | 'finished' | 'stopped'>;
+    readonly progressStates: readonly ('active' | 'finished' | 'stopped')[];
   } | undefined;
-  enabled: boolean;
-  id: string;
-  name: string;
+  readonly enabled: boolean;
+  readonly id: string;
+  readonly name: string;
+}
+
+interface OrganizerConfigurationWire {
+  readonly folders: readonly OrganizerFolderWire[];
+  readonly id: 'organizer';
+  readonly updatedAt: string;
 }
 
 const organizerConditionsSchema = z.strictObject({
@@ -23,17 +29,30 @@ const organizerConditionsSchema = z.strictObject({
 });
 
 const organizerFolderSchema: z.ZodType<OrganizerFolderWire> = z.lazy(() => z.strictObject({
-  children: z.array(organizerFolderSchema),
+  children: z.array(organizerFolderSchema).max(organizerTreeLimits.maxNodes),
   conditions: organizerConditionsSchema.optional(),
   enabled: z.boolean(),
   id: z.string(),
   name: z.string(),
 }));
 
-export const organizerConfigurationSchema = z.strictObject({
-  folders: z.array(organizerFolderSchema),
+export const organizerConfigurationSchema: z.ZodType<OrganizerConfigurationWire> = z.strictObject({
+  folders: z.array(organizerFolderSchema).max(organizerTreeLimits.maxNodes),
   id: z.literal('organizer'),
   updatedAt: z.string(),
+}).superRefine((configuration, context) => {
+  let nodes = 0;
+  const visit = (folders: readonly OrganizerFolderWire[], depth: number) => {
+    for (const folder of folders) {
+      nodes += 1;
+      if (nodes > organizerTreeLimits.maxNodes || depth > organizerTreeLimits.maxDepth) {
+        context.addIssue({ code: 'custom', message: 'Organizer tree exceeds its local bounds.' });
+        return;
+      }
+      visit(folder.children, depth + 1);
+    }
+  };
+  visit(configuration.folders, 1);
 });
 
 function materializeConditions(input: NonNullable<OrganizerFolderWire['conditions']>): OrganizerConditionsInput {

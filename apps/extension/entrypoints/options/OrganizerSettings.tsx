@@ -56,8 +56,7 @@ export function Settings(props: SettingsProps) {
     });
   };
   const requestPreview = () => {
-    props.onRequestPreview();
-    setView('preview');
+    if (props.onRequestPreview() !== false) setView('preview');
   };
 
   return (
@@ -66,7 +65,7 @@ export function Settings(props: SettingsProps) {
         <section aria-labelledby="settings-title" className={styles.settingsPage}>
           <Header onRestore={() => setConfirmRestore(true)} />
           <div className={styles.body}>
-            {props.state === 'partial' ? <Status tone="accent">Certains filtres distants sont indisponibles</Status> : null}
+            {props.state === 'partial' ? <Status tone="accent">Aperçu partiel · certaines données locales manquent</Status> : null}
             {props.state === 'offline' ? <Status tone="warning">Hors ligne · organisation locale disponible</Status> : null}
             <p className={styles.intro}>Créez vos dossiers dans l’ordre souhaité. Dans chaque niveau, la première règle compatible gagne. Aucun favori ne bouge avant validation de l’aperçu.</p>
             <div aria-label="Arbre des dossiers" className={styles.tree} role="tree">
@@ -93,7 +92,7 @@ export function Settings(props: SettingsProps) {
           </div>
           <footer className={styles.footer}>
             <span>{folderCount} dossier{folderCount === 1 ? '' : 's'} configuré{folderCount === 1 ? '' : 's'} · {props.previewFresh ? 'aperçu à jour' : 'aperçu requis'}</span>
-            <Button disabled={folderCount === 0} icon="arrow-right" iconPosition="end" onClick={requestPreview} variant="primary">Vérifier le tri</Button>
+            <Button disabled={folderCount === 0 || !props.configurationValid} icon="arrow-right" iconPosition="end" onClick={requestPreview} variant="primary">Vérifier le tri</Button>
           </footer>
         </section>
       ) : (
@@ -124,13 +123,13 @@ export function Settings(props: SettingsProps) {
           </div>
           <footer className={styles.footer}>
             <Button icon="refresh-cw" onClick={props.onRequestPreview}>Recalculer</Button>
-            <Button disabled={!props.previewFresh || moveCount === 0} icon="check" onClick={props.onApplyPreview} variant="primary">Appliquer le tri</Button>
+            {props.onApplyPreview ? <Button disabled={!props.previewFresh || moveCount === 0} icon="check" onClick={props.onApplyPreview} variant="primary">Appliquer le tri</Button> : null}
           </footer>
         </section>
       )}
 
-      <Dialog
-        actions={<><Button icon="x" onClick={() => setConfirmRestore(false)}>Annuler</Button><Button icon="rotate-ccw" onClick={() => { setConfirmRestore(false); props.onRestore(); }} variant="danger">Restaurer</Button></>}
+      {props.onRestore ? <Dialog
+        actions={<><Button icon="x" onClick={() => setConfirmRestore(false)}>Annuler</Button><Button icon="rotate-ccw" onClick={() => { setConfirmRestore(false); props.onRestore?.(); }} variant="danger">Restaurer</Button></>}
         description="Les dossiers retrouveront leur état précédant la dernière application."
         onOpenChange={setConfirmRestore}
         open={confirmRestore}
@@ -138,7 +137,7 @@ export function Settings(props: SettingsProps) {
         variant="alert"
       >
         <p>Les favoris ajoutés depuis seront conservés.</p>
-      </Dialog>
+      </Dialog> : null}
     </main>
   );
 }

@@ -18,7 +18,7 @@
         "id": "product-reuse",
         "label": "Réutilisation produit",
         "focus": ["lucide", "uiPackage", "reviewResolver", "memberNavigation", "extension"],
-        "note": "Les pages injectent à la cloche une file Review sérialisable; le resolver masque les décisions tant que les candidats manquent."
+        "note": "Les surfaces reçoivent des modèles locaux sérialisables; Review et l’organisateur masquent les actions sans callback réel."
       }
     ]
   },
@@ -73,12 +73,12 @@
         "Une sortie ouvre sa source favorite locale ou reste non interactive",
         "Cette œuvre est en 3:2; ses cinq reprises restent en 2:3",
         "Le popup garde trois préférences rapides et ouvre l’organisateur complet",
-        "L’organisateur édite un arbre ordonné puis ouvre un aperçu pleine page",
+        "L’organisateur édite l’arbre IndexedDB puis calcule un aperçu local borné en pleine page",
         "Chaque règle ouvre ses filtres et affiche son rang contrasté dans le SVG dossier rempli",
         "Réglages complets ne regroupe ni préparation, notifications, exports ni diagnostics",
         "Le logo PNG FavLib officiel est partagé par les shells",
         "Ses modèles sérialisables et callbacks séparés viennent de l’hôte",
-        "Un panneau sans port de lecture annonce une indisponibilité explicite",
+        "Une action sans port réel reste absente de la surface",
         "FeedbackState centre SVG gris, texte et action sans coque visuelle",
         "Tokens et comportements restent colocalisés"
       ]

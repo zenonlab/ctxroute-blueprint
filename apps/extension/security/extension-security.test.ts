@@ -59,6 +59,7 @@ describe('extension security boundary', () => {
     expect(extensionMessageSchema.safeParse({ target: 'library', type: 'navigation.open', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ type: 'popup.context.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ type: 'review.queue.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ type: 'organizer.configuration.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ target: 'tabs', type: 'navigation.open', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ target: 'library', token: 'extra', type: 'navigation.open', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 2 }).success).toBe(false);
@@ -86,6 +87,9 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/normalizeBookmarks\(await bookmarks\.importBookmarks\(\)\)/);
     expect(background).toMatch(/importFavoriteSources\(favorites, privateStorage\.storage/);
     expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
+    expect(background).toMatch(/saveOrganizerConfiguration\(privateStorage\.storage/);
+    expect(background).toMatch(/readOrganizerPreview\(privateStorage\.storage/);
+    expect(background).not.toMatch(/bookmarks\.(?:create|move|remove|update)\s*\(/);
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
   });

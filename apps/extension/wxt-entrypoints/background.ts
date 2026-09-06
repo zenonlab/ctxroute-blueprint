@@ -1,4 +1,4 @@
-import { importFavoriteSources, readAgendaPeriod, readLibraryPage, readPopupContext, readReviewQueue } from '@tobirink/application';
+import { importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, saveOrganizerConfiguration } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
@@ -85,6 +85,32 @@ export default defineBackground({
           };
         } catch {
           return { error: 'agenda-period-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'organizer.configuration.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { configuration: await privateStorage.storage.getOrganizerConfiguration(), ok: true };
+        } catch {
+          return { error: 'organizer-configuration-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'organizer.configuration.write') {
+        try {
+          await privateStorage.ensureReady();
+          const configuration = await saveOrganizerConfiguration(privateStorage.storage, parseOrganizerConfiguration(parsed.data.configuration));
+          return { configuration, ok: true };
+        } catch {
+          return { error: 'organizer-configuration-invalid', ok: false };
+        }
+      }
+      if (parsed.data.type === 'organizer.preview.read') {
+        try {
+          await privateStorage.ensureReady();
+          const snapshot = await readOrganizerPreview(privateStorage.storage, parseOrganizerConfiguration(parsed.data.configuration));
+          return { ok: true, snapshot };
+        } catch {
+          return { error: 'organizer-preview-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'popup.context.read') {

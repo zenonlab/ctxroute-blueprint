@@ -1,6 +1,6 @@
 # Accessibility and responsive evidence
 
-Date: 2026-09-05
+Date: 2026-09-06
 
 ## Scope
 
@@ -39,10 +39,11 @@ component catalogue and is not part of the extension package.
 
 ## Manual review record
 
-A targeted Chromium pass covers the organizer in the Workbench at 1440 × 900
-and 390 × 844. Configuration and preview render without an error overlay;
-the narrow layout has zero horizontal overflow, three labelled text fields,
-no unnamed button, and a full-width 278 × 44 px Restore action. The preview
+A targeted Chromium pass covers the organizer in the Workbench at 1440 × 1000
+and in its simulated 390 px canvas. Configuration and preview render without an
+error overlay; the product surface has labelled text fields, no unnamed button,
+and a full-width narrow Restore action. The 2026-09-06 pass also removed an
+unintended stretched gap between the introduction and folder tree. The preview
 shows three rows and keeps Apply unavailable until a fresh preview exists.
 The complete Workbench pass opens all 23 deep-linked previews and renders 154
 variant/state combinations without an application error or Vite overlay. Page
@@ -52,6 +53,9 @@ popup previews remain bounded and horizontally scrollable at the simulated
 the Dialog starts closed and opens from its labelled trigger, and no nested
 `main` landmark is produced. The Workbench favicon uses the existing Tobirink
 asset, leaving the browser console free of missing-resource errors.
+At a native 390 px browser width, the Workbench control bar itself still exceeds
+the host viewport and clips the inspected canvas; this is a Workbench-shell
+defect, not a production Settings overflow, and needs a separate responsive fix.
 Firefox, 200% zoom and forced-colour behaviour still require a dedicated run.
 
 When a browser is available, record these checks for the extension menu (360 px

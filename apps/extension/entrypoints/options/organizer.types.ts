@@ -22,6 +22,7 @@ export interface OrganizerFilterOptions {
 export interface OrganizerFolder {
   children: readonly OrganizerFolder[];
   conditions: OrganizerConditions;
+  enabled?: boolean;
   id: string;
   name: string;
 }
@@ -34,16 +35,17 @@ export interface OrganizerMove {
 }
 
 export interface AvailableSettingsProps {
+  configurationValid: boolean;
   filterOptions: OrganizerFilterOptions;
   onAddFolder: (parentId: string) => string | void;
-  onApplyPreview: () => void;
+  onApplyPreview?: () => void;
   onConditionsChange: (id: string, conditions: OrganizerConditions) => void;
   onFolderNameChange: (id: string, name: string) => void;
   onMoveFolder: (id: string, direction: 'down' | 'up') => void;
   onRemoveFolder: (id: string) => void;
   onReorderFolder: (sourceId: string, targetId: string) => void;
-  onRequestPreview: () => void;
-  onRestore: () => void;
+  onRequestPreview: () => boolean | void;
+  onRestore?: () => void;
   previewFresh: boolean;
   previewItems: readonly OrganizerMove[];
   state: Exclude<SettingsState, 'blocked' | 'error' | 'loading'>;

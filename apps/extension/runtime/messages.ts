@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { popupContinuationRecordSchema } from '@tobirink/application';
+import { organizerConfigurationSchema, popupContinuationRecordSchema } from '@tobirink/application';
 
 export const extensionMessageVersion = 1 as const;
 export const navigationTargets = ['library', 'review', 'agenda', 'settings'] as const;
@@ -38,7 +38,24 @@ const agendaPeriodMessageSchema = z.strictObject({
   version: z.literal(extensionMessageVersion),
 });
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, libraryPageMessageSchema, agendaPeriodMessageSchema]);
+const organizerConfigurationReadMessageSchema = z.strictObject({
+  type: z.literal('organizer.configuration.read'),
+  version: z.literal(extensionMessageVersion),
+});
+
+const organizerConfigurationWriteMessageSchema = z.strictObject({
+  configuration: organizerConfigurationSchema,
+  type: z.literal('organizer.configuration.write'),
+  version: z.literal(extensionMessageVersion),
+});
+
+const organizerPreviewReadMessageSchema = z.strictObject({
+  configuration: organizerConfigurationSchema,
+  type: z.literal('organizer.preview.read'),
+  version: z.literal(extensionMessageVersion),
+});
+
+export const extensionMessageSchema = z.discriminatedUnion('type', [navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, libraryPageMessageSchema, agendaPeriodMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema]);
 export const popupContextResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(true),
@@ -99,12 +116,38 @@ export const agendaPeriodResponseSchema = z.discriminatedUnion('ok', [
   }),
   z.strictObject({ error: z.string(), ok: z.literal(false) }),
 ]);
+const organizerPreviewItemSchema = z.strictObject({
+  action: z.enum(['keep', 'move']),
+  bookmarkId: z.string().min(1),
+  destination: z.array(z.string().min(1)).max(8).optional(),
+  reason: z.enum(['already-in-destination', 'insufficient-context', 'no-match', 'unrecognized']).optional(),
+  ruleId: z.string().optional(),
+  title: z.string().min(1),
+});
+export const organizerConfigurationResponseSchema = z.discriminatedUnion('ok', [
+  z.strictObject({ configuration: organizerConfigurationSchema.optional(), ok: z.literal(true) }),
+  z.strictObject({ error: z.string(), ok: z.literal(false) }),
+]);
+export const organizerPreviewResponseSchema = z.discriminatedUnion('ok', [
+  z.strictObject({
+    ok: z.literal(true),
+    snapshot: z.strictObject({
+      inspectedCount: z.number().int().min(0).max(500),
+      items: z.array(organizerPreviewItemSchema).max(500),
+      state: z.enum(['partial', 'ready']),
+      truncated: z.boolean(),
+    }),
+  }),
+  z.strictObject({ error: z.string(), ok: z.literal(false) }),
+]);
 export type ExtensionMessage = z.infer<typeof extensionMessageSchema>;
 export type NavigationTarget = (typeof navigationTargets)[number];
 export type PopupContextResponse = z.infer<typeof popupContextResponseSchema>;
 export type ReviewQueueResponse = z.infer<typeof reviewQueueResponseSchema>;
 export type LibraryPageResponse = z.infer<typeof libraryPageResponseSchema>;
 export type AgendaPeriodResponse = z.infer<typeof agendaPeriodResponseSchema>;
+export type OrganizerConfigurationResponse = z.infer<typeof organizerConfigurationResponseSchema>;
+export type OrganizerPreviewResponse = z.infer<typeof organizerPreviewResponseSchema>;
 
 export async function sendExtensionMessage(message: ExtensionMessage): Promise<void> {
   await browser.runtime.sendMessage(message);
@@ -133,6 +176,24 @@ export async function readLibraryPageMessage(afterId?: string): Promise<Extract<
 
 export async function readAgendaPeriodMessage(from: string, to: string): Promise<Extract<AgendaPeriodResponse, { ok: true }>['snapshot']> {
   const response = agendaPeriodResponseSchema.parse(await browser.runtime.sendMessage({ from, to, type: 'agenda.period.read', version: extensionMessageVersion }));
+  if (!response.ok) throw new Error(response.error);
+  return response.snapshot;
+}
+
+export async function readOrganizerConfigurationMessage(): Promise<Extract<OrganizerConfigurationResponse, { ok: true }>['configuration']> {
+  const response = organizerConfigurationResponseSchema.parse(await browser.runtime.sendMessage({ type: 'organizer.configuration.read', version: extensionMessageVersion }));
+  if (!response.ok) throw new Error(response.error);
+  return response.configuration;
+}
+
+export async function writeOrganizerConfigurationMessage(configuration: z.infer<typeof organizerConfigurationSchema>): Promise<z.infer<typeof organizerConfigurationSchema>> {
+  const response = organizerConfigurationResponseSchema.parse(await browser.runtime.sendMessage({ configuration, type: 'organizer.configuration.write', version: extensionMessageVersion }));
+  if (!response.ok || response.configuration === undefined) throw new Error(response.ok ? 'Organizer configuration was not returned.' : response.error);
+  return response.configuration;
+}
+
+export async function readOrganizerPreviewMessage(configuration: z.infer<typeof organizerConfigurationSchema>): Promise<Extract<OrganizerPreviewResponse, { ok: true }>['snapshot']> {
+  const response = organizerPreviewResponseSchema.parse(await browser.runtime.sendMessage({ configuration, type: 'organizer.preview.read', version: extensionMessageVersion }));
   if (!response.ok) throw new Error(response.error);
   return response.snapshot;
 }

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, reviewQueueResponseSchema } from './messages';
+import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, reviewQueueResponseSchema } from './messages';
+
+const organizerConfiguration = {
+  folders: [{
+    children: [],
+    conditions: { editorialStatuses: [], mediaTypes: ['MANGA'], progressStates: [] },
+    enabled: true,
+    id: 'manga',
+    name: 'Manga',
+  }],
+  id: 'organizer',
+  updatedAt: '2026-09-06T00:00:00.000Z',
+};
 
 describe('extension Review messages', () => {
   it('accepts only the exact versioned queue read command', () => {
@@ -57,6 +69,37 @@ describe('extension Library messages', () => {
     expect(libraryPageResponseSchema.safeParse({
       ok: true,
       snapshot: { items: Array.from({ length: 25 }, () => ({ id: 'work_library-one', mediaType: 'manga', source: 'local', title: 'Titre' })), missingWorkIds: [] },
+    }).success).toBe(false);
+  });
+});
+
+describe('extension Organizer messages', () => {
+  it('validates local read, write and preview commands', () => {
+    expect(extensionMessageSchema.safeParse({ type: 'organizer.configuration.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ configuration: organizerConfiguration, type: 'organizer.configuration.write', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ configuration: organizerConfiguration, type: 'organizer.preview.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ configuration: { ...organizerConfiguration, id: 'other' }, type: 'organizer.configuration.write', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({
+      configuration: { ...organizerConfiguration, folders: Array.from({ length: 101 }, (_, index) => ({ children: [], enabled: true, id: `folder-${index}`, name: 'Folder' })) },
+      type: 'organizer.configuration.write',
+      version: 1,
+    }).success).toBe(false);
+  });
+
+  it('bounds serialized configuration and preview responses', () => {
+    expect(organizerConfigurationResponseSchema.safeParse({ configuration: organizerConfiguration, ok: true }).success).toBe(true);
+    expect(organizerPreviewResponseSchema.safeParse({
+      ok: true,
+      snapshot: {
+        inspectedCount: 1,
+        items: [{ action: 'move', bookmarkId: 'bookmark-1', destination: ['Manga'], ruleId: 'manga', title: 'Frieren' }],
+        state: 'ready',
+        truncated: false,
+      },
+    }).success).toBe(true);
+    expect(organizerPreviewResponseSchema.safeParse({
+      ok: true,
+      snapshot: { inspectedCount: 501, items: [], state: 'ready', truncated: false },
     }).success).toBe(false);
   });
 });

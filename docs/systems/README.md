@@ -24,8 +24,11 @@ case. Rules run in pre-order, the first complete match wins, and their selected
 conditions use AND semantics. Missing context fails closed and never moves an
 item. The pure calculation has no storage, browser or network dependency. Its
 single configuration is private IndexedDB state behind `StoragePort`, included
-in private export v3; runtime composition, fresh-preview confirmation, snapshot
-and bookmark projection remain separate adapter steps.
+in private export v3. The options runtime reads, validates and saves it through
+strict background messages, then joins at most 500 local favorite sources,
+Reviews and Works for its full-page preview. It offers only filters backed by
+current local metadata. Snapshot and bookmark projection remain separate
+adapter steps, so apply and restore actions are not exposed yet.
 
 ## Local persistence
 

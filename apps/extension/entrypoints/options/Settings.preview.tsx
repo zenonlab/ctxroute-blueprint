@@ -156,6 +156,7 @@ function SettingsDemo({ state }: { state: SettingsState }) {
   return (
     <>
       <Settings
+        configurationValid
         filterOptions={filterOptions}
         onAddFolder={addFolder}
         onApplyPreview={() => setMessage('Tri demandé')}

@@ -10,7 +10,7 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 | Bibliothèque | état central illustré avec invitation à importer | état central illustré sans contrôles inactifs | filtres et œuvres locales visibles, métadonnées manquantes signalées | recherche, filtres et progression restent actifs | état central avec nouvelle tentative ciblée | état central expliquant la reprise de migration |
 | Panneau Review | bulle compacte avec Inbox et un seul libellé | état central pendant la lecture locale | contexte local et navigation conservés ; aucune décision sans candidat | état central confirmant la disponibilité locale ; choix dans la cloche | état central avec relecture ciblée | état central demandant de rouvrir la cloche après conflit |
 | Agenda | aucune sortie connue pour la période | squelette de groupes temporels | dates estimées séparées des dates confirmées | dernier agenda local daté et consultable | actualiser la période concernée | permission de notification refusée pour un rappel |
-| Réglages complets | arbre racine visible, invitation à créer un premier dossier | calcul de l’aperçu annoncé sans masquer l’arbre | règles locales visibles, enrichissement distant absent | édition, aperçu local et restauration restent disponibles | recalculer uniquement l’aperçu | organisateur indisponible si le port local n’est pas raccordé |
+| Réglages complets | arbre racine visible, invitation à créer un premier dossier | calcul de l’aperçu annoncé sans masquer l’arbre | règles locales visibles, métadonnées nécessaires absentes | édition et aperçu local restent disponibles | relire la configuration ou recalculer uniquement l’aperçu | organisateur indisponible si le message local ou IndexedDB échoue |
 | Workbench local | aucun résultat pour le filtre ou aucun composant découvert | chargement du module de preview sélectionné | preview disponible, fichier source facultatif absent | identique : aucune dépendance réseau nécessaire | recharger la preview isolée | erreur de compilation localisée avec chemin du fichier |
 
 ## Règles communes
@@ -33,8 +33,9 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   IndexedDB possède déjà toutes les données nécessaires.
 - Une erreur récupérable agit sur la plus petite opération concernée et ne
   réinitialise pas la surface entière.
-- L’organisateur conserve l’arbre pendant le calcul de l’aperçu ; appliquer reste
-  impossible avant un aperçu frais fourni par l’hôte.
+- L’organisateur conserve l’arbre pendant le calcul de l’aperçu. Une action
+  d’application ou de restauration n’existe dans la surface que si l’hôte fournit
+  son callback réel ; l’application exige en plus un aperçu frais.
 - Sa configuration et son aperçu remplacent toute la surface : aucune bordure,
   ombre ou coque centrée ne doit les faire percevoir comme un dialogue.
 - Les paramètres avancés appartiennent au dossier développé, restent opérables au

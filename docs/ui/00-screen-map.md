@@ -12,7 +12,7 @@ qu'un résumé ou un raccourci vers celle-ci.
 | Bibliothèque | Parcourir et maintenir les œuvres suivies | filtres puis cartes directement, ou un état central illustré si aucun contenu n'est utilisable | un miroir de favoris navigateur ou un second titre sous la navigation |
 | Panneau Review | Résoudre les correspondances ambiguës depuis le header | contexte condensé, candidats, preuve de source, saisie manuelle AniList/MangaUpdates, absence de correspondance, conflit de révision | une page autonome, une carte mère ou un avis utilisateur |
 | Agenda | Comprendre les prochaines sorties | semaine de sept jours, lecture horizontale, dates officielles, confirmées ou estimées | une liste verticale infinie ou une date présentée comme certaine sans provenance |
-| Réglages complets de l’extension | Organiser les favoris depuis l’extension | arbre de dossiers ordonné, filtres facultatifs, aperçu des déplacements, application et restauration | une page générale de préférences, de diagnostic ou d’export |
+| Réglages complets de l’extension | Organiser les favoris depuis l’extension | arbre de dossiers ordonné, filtres réellement disponibles et aperçu local des déplacements | une page générale de préférences, de diagnostic ou d’export |
 
 Les pages complètes Bibliothèque et Agenda partagent une shell membre
 unique. Il reprend le logo, les trois destinations principales de
@@ -43,12 +43,14 @@ trente jours, n’est ni exporté ni autoritaire et peut disparaître avec les
 données de l’extension. Les Réglages complets reprennent l’organisateur FavLib en page entière,
 sans recherche globale ni navigation du site. La première vue édite l’arbre de
 dossiers et ses filtres dans l’ordre de priorité ; la seconde devient une page
-d’aperçu complète, sans coque de dialogue, avant application. Les préférences
+d’aperçu complète, sans coque de dialogue. L’application et la restauration
+restent absentes tant que leurs callbacks navigateur et snapshot n’existent pas. Les préférences
 rapides restent dans le popup.
 L’arbre est récursif : un dossier peut créer ses propres enfants. Le rang est
 affiché en contraste au centre du pictogramme de dossier rempli et correspond
-uniquement à sa place parmi ses frères. Le bouton Filtres développe sous le dossier les choix Type,
-statut éditorial et progression personnelle ; « Arrêté » peut recevoir un seuil.
+uniquement à sa place parmi ses frères. Le bouton Filtres développe sous le dossier
+les groupes réellement fournis par l’hôte. Le runtime actuel propose Manga et
+Anime ; les statuts éditoriaux et la progression restent absents faute de données locales fiables.
 Renommer, filtrer, créer, supprimer ou réordonner invalide immédiatement l’aperçu.
 Chaque règle, aperçu et action provient de l’hôte sous forme sérialisable ou de
 callback ; la surface ne lit aucune API navigateur, aucun stockage et aucun réseau.
@@ -81,7 +83,7 @@ résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
 
 | Parcours | Entrée | Surface de travail | Résultat visible |
 | --- | --- | --- | --- |
-| Organisation des favoris | Réglages complets | Arbre puis aperçu | déplacements explicitement prévisualisés avant application |
+| Organisation des favoris | Réglages complets | Arbre puis aperçu | règles enregistrées localement et déplacements explicitement prévisualisés |
 | Résolution | Cloche du header | Panneau Review | décision atomique locale puis candidat suivant |
 | Observation de progression | Page compatible | contexte de lecture transmis au cas d’usage applicatif | hausse enregistrée automatiquement dans IndexedDB et affichée par WorkCard ; valeur égale inchangée, baisse ignorée |
 | Consultation d'une sortie | Bibliothèque ou onglet Sorties du menu d’extension | Agenda | date qualifiée par son niveau de confiance |

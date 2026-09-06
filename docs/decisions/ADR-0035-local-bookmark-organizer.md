@@ -43,7 +43,16 @@ work context and performs no IndexedDB read, browser call, network request or
 bookmark mutation. One `organizer` configuration is persisted as private state
 through `StoragePort`; Dexie v5 validates it on every read and write. Private
 export v3 preserves it, while v1 and v2 remain importable without inventing a
-configuration. The options runtime is not yet wired to fixture data.
+configuration.
+
+The options runtime reads and writes this configuration through strict local
+messages handled by the background composition root. Its preview joins at most
+500 local favorite sources, Reviews and Works through `StoragePort`. It offers
+only the `MANGA` and `ANIME` filters supported by current Work metadata;
+conditions requiring unavailable editorial status or personal progress fail
+closed and make the preview partial. React receives serializable models and
+callbacks only. An invalid draft remains visible but cannot be persisted or
+previewed.
 
 A later apply flow must add a browser projection port, fresh preview
 confirmation and a local snapshot before using
@@ -56,6 +65,6 @@ title or URL.
 Rule semantics can be tested independently and reused across extension
 surfaces without hardcoded folders. IndexedDB remains the authority for the
 configuration and other private Tobirink data, while the browser bookmark tree
-remains a replaceable connector. Until the runtime and guarded projection
-adapter are delivered, the organizer remains a durable preview capability
-rather than an active bookmark editor.
+remains a replaceable connector. The runtime is a durable local preview
+capability. Apply and restore controls stay absent until a guarded browser
+projection adapter and snapshot flow provide their real callbacks.

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDatabaseReadiness, extensionDatabaseName } from './local-storage';
 
-function adapter(open: () => Promise<void>, schemaVersion = 3) {
+function adapter(open: () => Promise<void>, schemaVersion = 5) {
   return { database: { open, verno: schemaVersion } };
 }
 
@@ -15,8 +15,8 @@ describe('extension local storage composition', () => {
     expect(createStorage).toHaveBeenCalledOnce();
     expect(open).not.toHaveBeenCalled();
     await expect(Promise.all([ensureReady(), ensureReady()])).resolves.toEqual([
-      { schemaVersion: 3 },
-      { schemaVersion: 3 },
+      { schemaVersion: 5 },
+      { schemaVersion: 5 },
     ]);
     expect(open).toHaveBeenCalledOnce();
   });
@@ -28,7 +28,7 @@ describe('extension local storage composition', () => {
     const ensureReady = createDatabaseReadiness(adapter(open).database);
 
     await expect(ensureReady()).rejects.toThrow('Extension IndexedDB failed to open');
-    await expect(ensureReady()).resolves.toEqual({ schemaVersion: 3 });
+    await expect(ensureReady()).resolves.toEqual({ schemaVersion: 5 });
     expect(open).toHaveBeenCalledTimes(2);
   });
 
