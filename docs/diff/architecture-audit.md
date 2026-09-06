@@ -2,6 +2,10 @@
 
 Audit date: 2026-09-06. Scope: the checked-out `main` tree at `eb4b822`; repository runtime was not modified. This blueprint is local agent-orchestration tooling, not an HTTP application framework.
 
+This document preserves the observations at that audited revision. The V2
+remediation addendum below records their disposition; it does not rewrite the
+historical evidence as though the defects had never existed.
+
 ## Evidence labels
 
 - **Repository fact**: directly observed in a versioned file.
@@ -101,5 +105,20 @@ Actions are SHA-pinned and permissions are narrow (`.github/workflows/validate.y
 4. **P1 — structured telemetry:** append bounded redacted events with IDs, revisions, transition/mode/skill, validation result, duration, exit status, Git revisions and categorical cause.
 5. **P2 — artifact generation:** progressively validate skill-produced artifacts and the evidence chain before transactional registration.
 6. **P3 — heavy industrial mechanisms:** no resident controller, hardware simulation, application canary, Kubernetes dependency, or HTTP framework unless a measured operational need appears.
+
+## V2 remediation addendum
+
+The accepted remediation moves persistence and public messages directly to
+schema V2, consolidates full-payload transaction replay, adds orchestrator-owned
+validation, recoverable two-phase worktree operations, bounded decision
+telemetry, and a deterministic network-free HOOTL bench. Documentation and CI
+now describe only stdio/CLI/local-file interfaces and the actual Linux-full,
+macOS/Windows-smoke matrix. CRG `high` is blocking.
+
+P3 remains deliberately unimplemented. ADR-0027 defines the evidence that must
+exist before considering hostile-agent isolation, remote multi-tenancy,
+production SLA machinery, an external API, or application workload delivery.
+Risk-by-risk implementation and test evidence is maintained in
+[remediation-closure.md](remediation-closure.md).
 
 Unverified hypotheses retained: behavior under power loss, Windows case/path collisions, symlink scope escapes, disk exhaustion, hostile worker processes, and real simultaneous writers. They are not claimed as defects until a deterministic fixture proves them.

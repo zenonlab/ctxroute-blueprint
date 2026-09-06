@@ -38,6 +38,6 @@ export function handlerContextBudget(event, root = projectRoot) {
   const hostLimit = portableContextLimit(event, root);
   // CTXRoute uses its budget to rank/pack documents before the dispatcher
   // enforces the final host envelope. PreToolUse needs a little selection
-  // headroom; session context intentionally leaves room for Progress.
+  // headroom; session context intentionally leaves room for bounded mission context.
   return Math.max(256, Math.floor(hostLimit * (event === 'PreToolUse' ? 1.5 : 0.75)));
 }

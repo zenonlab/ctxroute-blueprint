@@ -29,8 +29,8 @@ both lockfiles, installs the exact CRG environment, builds the initial graph,
 enables repository-local Git hooks, and runs the full validation suite.
 
 During `template` status, PreToolUse allows the blueprint's read-only and
-validation commands, including workspace, governance, progress-read,
-progress-validate, Sensor checklist checks, and CRG commands whose writes are
+validation commands, including workspace, governance, orchestrator reads and
+contract validation, Sensor checklist checks, and CRG commands whose writes are
 confined to ignored `.code-review-graph/`. Direct global-state writes and unrelated
 long-lived or direct mutation commands remain blocked.
 
@@ -50,7 +50,7 @@ direct edits to the status field are rejected by PreToolUse.
 Initialization recognizes unresolved square-bracket placeholders while allowing
 ordinary Markdown links. Repository tests derive lifecycle expectations from
 the current project configuration or isolated fixtures, so adding a product
-diagram or progress checklist cannot make the pre-transition validation
+diagram or local orchestrator state cannot make the pre-transition validation
 impossible.
 The transition invokes the exact npm CLI supplied by `npm run` through the
 current Node executable, avoiding direct `.cmd` execution on Windows.

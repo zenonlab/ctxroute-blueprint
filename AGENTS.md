@@ -26,17 +26,14 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Give one next action.
 - Briefly state the current status.
 
-## Progress
+## Milestones and delegation
 
-- Progress is a compact, ordered memory of intent and outcomes, never a prerequisite, taskmaster, or global implementation lock.
-- Skip Progress for small, reversible, or single-agent changes. For a substantial chantier, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.
-- Preserve milestone order. Mark `claimable: true` only on genuinely independent work packages that can run in parallel; explicit agents may claim those packages once and report once after verification.
-- For substantial work with at least two genuinely independent claimable milestones, start the matching `progress-worker` subagents without asking for another `go`. Otherwise stay single-agent and skip automatic claims. A plan records intent and order; it never creates a conversational permission gate or requires repeated approval.
-- Only a subagent explicitly started as `progress-worker` may be auto-assigned a claimable `automatic` milestone. `SubagentStop` may settle its owned milestone from a valid `PROGRESS_RESULT` footer, and `SessionEnd` may release remaining session claims. No `PostToolUse` hook changes Progress.
-- Report `DONE` or `BLOCKED` with short evidence after the work. If Progress is busy or unavailable, continue safe in-scope work and reconcile the ticket afterward.
-- Use `manual` only with reason `visual-review` or `important-decision` for an important undecided product/change/design choice. All other tickets remain `automatic` and never block Stop.
-- MCP is the optional rich interface for inspecting or editing the memory. Use the matching `npm run progress:*` command as an equivalent local fallback when MCP is unavailable or urgency favors the CLI.
-- Session and post-compaction hooks may inject only a bounded active-goal reminder. Continue from that reminder directly; query MCP or CLI only when the task actually needs details or a Progress mutation.
+- Skip milestone bookkeeping for small, reversible, or single-agent changes. For substantial work, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.
+- Preserve milestone order. Delegate only genuinely independent work packages with non-overlapping ownership, and require one bounded result with verification evidence from each worker.
+- A plan records intent and order; it never creates a conversational permission gate or requires repeated approval.
+- Report `DONE` or `BLOCKED` with short evidence after the work. An unavailable coordination interface does not block safe in-scope work.
+- Reserve manual pauses for visual review or an important undecided product, change, or design choice. Routine verification never requires a conversational checkpoint.
+- Session and post-compaction hooks may inject only bounded current-goal or mission context. Continue from that context directly and query the orchestrator only when the task needs authoritative state or mutation.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
 ## Development
@@ -47,12 +44,12 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Reuse existing functions, components, and patterns.
 - Define success criteria before coding.
 - Make the smallest viable change.
-- For a localized edit, send a narrow patch containing only changed fields or diff hunks; never resend or rewrite an entire file, document, ticket, or Progress state when a delta is sufficient.
+- For a localized edit, send a narrow patch containing only changed fields or diff hunks; never resend or rewrite an entire file, document, ticket, or orchestrator state when a delta is sufficient.
 - Touch only necessary files.
 - Avoid speculative abstractions and refactors.
 - Verify each coherent change in proportion to its risk; use targeted checks while iterating and the release gate only before push or handoff.
 - Review the accumulated diff at coherent boundaries, not after every small write.
-- Complete one coherent claimed work package before taking another; ordinary work need not be claimed or mirrored in Progress.
+- Complete one coherent delegated work package before taking another; ordinary work need not be mirrored in orchestrator state.
 
 ## Audit
 
@@ -74,7 +71,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 
 ## Git
 
-- One coherent verified outcome per commit; do not create micro-commits merely to mirror Progress milestones.
+- One coherent verified outcome per commit; do not create micro-commits merely to mirror milestones.
 - Branches: `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/`, `perf/`.
 - Commits: `type(scope): short description`.
 - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.

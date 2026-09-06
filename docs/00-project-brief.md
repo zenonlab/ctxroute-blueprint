@@ -44,30 +44,20 @@ These are template constraints, not product architecture choices. A derived
 project may adapt them only through the approved initialization and cleanup
 process.
 
-### Local Progress dashboard
+### Local orchestration boundary
 
-The blueprint control plane includes an optional local dashboard for the
-versioned Progress checklist. Its users are the developer and coding agent in
-one workspace; it serves every approved goal, hides completed goals by default,
-and permits only the mutations already authorized by `progress-core`. It is not
-a product frontend or a hosted service.
+The blueprint control plane is a local Node.js tool exposed through stdio MCP,
+CLI commands, Git worktrees, and ignored files under `.ctxroute/`. It has no
+HTTP endpoint, dashboard, hosted runtime, account system, remote deployment, or
+application availability target. The orchestrator owns revisioned goals,
+missions, validation receipts, audit records, and recoverable worktree
+operations; workers receive only the bounded mission projection they need.
 
-The implementation is dependency-free JavaScript on Node.js 22.13+, with a
-responsive HTML/CSS/JavaScript interface and a local HTTP server addressed by
-the `localhost` hostname on an ephemeral port. `.project/progress.json` remains
-the only durable data source. Ephemeral PID, instance, URL, session marker, and
-token state stays ignored under `.ctxroute/state/`.
-
-The server accepts only local Host and Origin values, requires a random bearer
-token for every API request, limits JSON bodies, emits no request log, serves
-only bundled resources under a restrictive CSP, and starts only on an explicit
-dashboard request.
-Optimistic revisions reject stale mutations with HTTP 409. There is no remote
-deployment, account, telemetry, cloud synchronization, or availability target;
-recovery is a safe local restart through the Progress MCP.
-Startup also self-repairs the generated Markdown view from the JSON revision;
-stale lock and recovery-marker owners are reclaimed only when their process is
-dead, with bounded retries and token-checked release.
+Git worktrees isolate checkout and index state, not hostile processes. The
+security boundary assumes cooperative local agents. Any future remote,
+multi-tenant, adversarial, externally served, or production-SLA requirement
+must reopen the architecture and threat model before adding a service plane or
+stronger sandbox.
 
 ## Decisions
 
@@ -91,9 +81,10 @@ questions, trade-offs, and research anchors used to make these decisions.
 - `[operational readiness and recovery criteria]`
 - `[architecture, tests, and cross-platform CI evidence]`
 
-For the blueprint control plane, the Progress dashboard succeeds when its real
-HTTP and MCP tests cover local access controls, plan validation and creation,
-immutable plan identity, mutable status/evidence/mode, revision conflicts,
-classified manual reasons, generated-view crash recovery, lock recovery, idle
-expiry, instance reuse and Stop session deduplication. The complete
-repository validation, internal Archify validation, and CRG gate must pass.
+For the blueprint control plane, success requires schema-validated V2 state and
+messages, deterministic crash/replay and multi-process coverage, orchestrator-
+owned validation receipts, non-destructive worktree reconciliation, bounded
+redacted telemetry, internal Archify validation, and a blocking CRG `high`
+risk gate. The complete repository validation must pass without introducing an
+HTTP, daemon, Kubernetes, GitOps-runtime, hardware-simulation, LLM, or network
+dependency into orchestration tests.

@@ -13,7 +13,11 @@ revised: true
 superseded-by: ADR-0022-universal-ctxroute-orchestration.md
 ---
 
-# ADR-0014 — Explicit agent progress checklist
+# Archived ADR-0014 — Explicit agent progress checklist
+
+- Status: superseded by `ADR-0022-universal-ctxroute-orchestration.md`
+
+This file is historical evidence only and is outside the active ADR corpus.
 
 ## Context
 

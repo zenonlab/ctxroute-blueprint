@@ -1,6 +1,9 @@
 # Validation evidence
 
-This record separates executed commands from code inspection and external analogy. Final commands were run against the documentation-only diff; no runtime file was modified.
+This record separates executed commands from code inspection and external
+analogy. The first table preserves the 2026-09-06 pre-remediation audit. V2
+handoff evidence is appended separately so historical observations are not
+silently rewritten.
 
 ## Environment
 
@@ -11,6 +14,8 @@ This record separates executed commands from code inspection and external analog
 - Project support contract remains Node `>=22.13.0`, npm `>=10` (`package.json:15-18`); local versions are not a substitute for the CI Node 22 matrix.
 
 ## Commands and results
+
+### Pre-remediation audit
 
 | Command | Result | What it proves |
 | --- | --- | --- |
@@ -24,12 +29,25 @@ This record separates executed commands from code inspection and external analog
 
 External discovery used official-source web searches and direct reads for JSON Schema, OpenAPI, Kubernetes, Flux/OpenGitOps, Git, Node, GitHub Actions, Bazel/Google testing and Epsilon3. The source ledger and access limitations are in [external-research.md](external-research.md).
 
+### V2 governance remediation
+
+| Command | Result | What it proves |
+| --- | --- | --- |
+| `node --test tests/decision-memory.test.mjs tests/ci-security.test.mjs` | PASS: 11 tests, 0 failures | Duplicate ADR numbers and missing supersession targets reject; CRG is pinned, read-only, and blocking at `high`. |
+| `npm run validate:decisions` | PASS: 25 active decisions, 163 scopes at this checkpoint | The active ADR corpus has unique numeric identifiers and valid supersession references; retired ADRs are outside that corpus. |
+| `npm run validate:docs -- --all` | PASS | Updated active documentation and local links satisfy the document-contract checks. |
+
+The full V2 command set and final counts belong to the release handoff after all
+implementation milestones converge. The closure matrix in
+[remediation-closure.md](remediation-closure.md) defines that gate.
+
 ## Proof limits
 
 - Passing fixtures prove only their assertions and environment. They do not prove absence of other failure modes.
 - The targeted orchestration suite uses real temporary Git repositories and predetermined reports, but does not inject network calls, LLM calls, timeouts, kill signals or multi-process races (`tests/orchestrator-core.test.mjs:145-161`).
 - Atomic rename behavior is code-observed; abrupt power-loss durability was not tested.
-- “No runtime modification” is established by the final Git diff path list, not by intent.
+- The original “no runtime modification” result applies only to the audited
+  `eb4b822` diff. V2 remediation intentionally changes runtime and governance.
 - No remote GitHub Actions run was triggered. Local validation cannot prove repository settings, branch protection, hosted-runner behavior or secrets configuration.
 - No Epsilon3 product instance was accessed. Publisher claims remain analogies.
 - No HTTP application flow was found in the current orchestrator. Historical Progress/dashboard documentation is explicitly classified as stale documentation, not implementation.

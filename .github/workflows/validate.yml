@@ -63,7 +63,7 @@ jobs:
           npm run crg:version
           npm run mcp:validate
 
-      - name: Smoke-test Progress MCP transport
+      - name: Smoke-test orchestrator MCP transport
         if: runner.os == 'Linux'
         run: npm run mcp:smoke
 
