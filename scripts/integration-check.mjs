@@ -7,7 +7,7 @@ if (!npmCli) {
   process.exit(1);
 }
 run('setup prerequisites', ['run', 'setup:check']);
-run('Progress MCP stdio smoke transport', ['run', 'mcp:smoke']);
+run('orchestrator MCP stdio smoke transport', ['run', 'mcp:smoke']);
 
 function run(label, args) {
   const result = spawnSync(process.execPath, [npmCli, ...args], { cwd: process.cwd(), stdio: 'inherit' });

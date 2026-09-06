@@ -31,7 +31,7 @@ enables repository-local Git hooks, and runs the full validation suite.
 During `template` status, PreToolUse allows the blueprint's read-only and
 validation commands, including workspace, governance, progress-read,
 progress-validate, Sensor checklist checks, and CRG commands whose writes are
-confined to ignored `.code-review-graph/`. Progress approval and unrelated
+confined to ignored `.code-review-graph/`. Direct global-state writes and unrelated
 long-lived or direct mutation commands remain blocked.
 
 Before initialization, traceable editing tools may also create documentation

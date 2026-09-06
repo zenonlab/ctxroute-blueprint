@@ -41,7 +41,7 @@ export function productDiagramViolations(document) {
   const source = JSON.stringify(document);
   const forbidden = [
     ['CTXRoute', /ctxroute/iu],
-    ['Progress MCP', /progress\s+mcp/iu],
+    ['Orchestrator', /orchestrat(?:or|ion)/iu],
     ['code-review-graph / CRG', /code-review-graph|\bcrg(?:\s+risk\s+gate)?\b/iu],
     ['Archify checker', /archify(?:\s+checker)?/iu],
     ['Sensor gate', /\bsensor\s+(?:gate|check|scanner)/iu],

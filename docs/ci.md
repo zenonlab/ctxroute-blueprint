@@ -7,7 +7,7 @@ manuel.
 
 Le pipeline installe les dépendances depuis `package-lock.json`, synchronise
 CRG avec `uv sync --frozen`, vérifie sa version et les manifestes MCP, puis
-teste le transport Progress sur les trois systèmes. Le transport CRG officiel
+teste le transport de l'orchestrateur CTXRoute sur les trois systèmes. Le transport CRG officiel
 est testé sur Linux et macOS ; Windows conserve la validation de sa version,
 de son manifeste et de son allowlist. Le pipeline exécute ensuite le gate
 `npm run validate`, audite les dépendances et génère la documentation. Le

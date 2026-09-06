@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "defaultMode": "SWARM_ON",
+  "statePath": ".ctxroute/orchestrator/state.json",
+  "worktreeRoot": ".ctxroute/worktrees",
+  "limits": {
+    "stateBytes": 524288,
+    "reportBytes": 65536,
+    "contextBytes": 16384,
+    "transactionTimeoutMs": 2000,
+    "subprocessTimeoutMs": 30000,
+    "parallelWorktrees": 8
+  }
+}

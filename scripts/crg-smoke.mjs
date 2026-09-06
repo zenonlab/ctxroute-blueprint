@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { CRG_VERSION, CRG_MCP_TOOLS, crgInvocation, runCrgCommand } from './crg-runner.mjs';
+import { ORCHESTRATOR_TOOL_NAMES } from './orchestrator-mcp.mjs';
 
 const root = process.cwd();
 const fixture = mkdtempSync(join(tmpdir(), 'ctxroute-crg-smoke-'));
@@ -50,18 +51,21 @@ try {
   await client.close();
 }
 
-const progressClient = new Client({ name: 'ctxroute-progress-budget-smoke', version: '1.0.0' });
-const progressTransport = new StdioClientTransport({ command: process.execPath, args: [resolve(root, 'scripts/progress-mcp.mjs')], cwd: fixture, stderr: 'pipe' });
-let progressSchemaCharacters;
+const orchestratorClient = new Client({ name: 'ctxroute-orchestrator-budget-smoke', version: '1.0.0' });
+const orchestratorTransport = new StdioClientTransport({ command: process.execPath, args: [resolve(root, 'scripts/orchestrator-mcp.mjs')], cwd: fixture, stderr: 'pipe' });
+let orchestratorSchemaCharacters;
 try {
-  await progressClient.connect(progressTransport);
-  progressSchemaCharacters = JSON.stringify((await progressClient.listTools()).tools).length;
-  if (progressSchemaCharacters >= 6000) throw new Error(`Progress MCP schemas exceed 6,000 characters: ${progressSchemaCharacters}`);
-  if (schemaCharacters + progressSchemaCharacters >= 14000) throw new Error(`Combined MCP schemas exceed 14,000 characters: ${schemaCharacters + progressSchemaCharacters}`);
+  await orchestratorClient.connect(orchestratorTransport);
+  const orchestratorTools = (await orchestratorClient.listTools()).tools;
+  orchestratorSchemaCharacters = JSON.stringify(orchestratorTools).length;
+  const orchestratorNames = orchestratorTools.map(tool => tool.name).sort();
+  if (JSON.stringify(orchestratorNames) !== JSON.stringify([...ORCHESTRATOR_TOOL_NAMES].sort())) throw new Error(`unexpected orchestrator tool allowlist: ${orchestratorNames.join(', ')}`);
+  if (orchestratorSchemaCharacters >= 8000) throw new Error(`Orchestrator MCP schemas exceed 8,000 characters: ${orchestratorSchemaCharacters}`);
+  if (schemaCharacters + orchestratorSchemaCharacters >= 16000) throw new Error(`Combined MCP schemas exceed 16,000 characters: ${schemaCharacters + orchestratorSchemaCharacters}`);
 } finally {
-  await progressClient.close();
+  await orchestratorClient.close();
 }
-console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, schemaCharacters, progressSchemaCharacters, combinedSchemaCharacters: schemaCharacters + progressSchemaCharacters, readTool: 'list_graph_stats_tool' }));
+console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, schemaCharacters, orchestratorSchemaCharacters, combinedSchemaCharacters: schemaCharacters + orchestratorSchemaCharacters, readTool: 'list_graph_stats_tool' }));
 
 async function expectSuccess(args, predicate, label) {
   const result = await runCrgCommand({ root, args, timeoutMs: 30_000 });

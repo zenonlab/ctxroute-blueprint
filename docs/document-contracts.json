@@ -81,15 +81,13 @@
       "requiredKeys": ["schemaVersion", "policy", "tokens", "components", "rules", "adapters"]
     },
     {
-      "id": "progress-checklist",
-      "kind": "progress-contract",
+      "id": "orchestrator-configuration",
+      "kind": "orchestrator-contract",
       "format": "json",
-      "source": ".project/progress.json",
-      "narrative": "docs/progress.md",
-      "derivedRevision": "sha256-normalized-json",
-      "mcpResource": "ctxroute://progress/full",
-      "requiredKeys": ["schemaVersion", "goals"],
-      "validator": "npm run progress:validate"
+      "source": ".project/orchestrator-config.json",
+      "narrative": "docs/orchestration.md",
+      "requiredKeys": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "limits"],
+      "validator": "npm run blueprint:review"
     }
   ]
 }

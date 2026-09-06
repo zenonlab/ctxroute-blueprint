@@ -1,128 +1,19 @@
 # Workflows
 
-## Progress and Stop
+## Orchestrator and Stop
 
-Progress is an ordered, durable memory of goals, coherent milestones, evidence,
-and the active per-goal mode. It is not a task scheduler. Goals are `automatic`
-by default, so Stop stays silent and never prevents the agent from ending its turn.
-`manual` is a targeted pause classified as `visual-review` or
-`important-decision` for a consequential choice not already made by the user. Routine feature
-implementation, tests, and documentation remain automatic. In either mode, a
-goal whose unfinished steps are all `BLOCKED` produces a non-blocking handoff
-only when `external:` evidence qualifies a genuine outside dependency.
-`stop_hook_active` prevents recursive continuation loops.
-
-Prefer two to six outcome-sized milestones in their logical order. Files,
-commands, commits, and routine edits are not milestones. Only genuinely
-parallel milestones carry `claimable: true`; an explicit agent can call
-`progress_claim_ticket`, work without intermediate tracking writes, and call
-`progress_update_step` once with its final status and evidence. `progress_next`
-preserves plan order and returns blocked context separately.
-Claims and all other mutations use the same short filesystem lock, so parallel
-agents cannot overwrite one another. Contenders retry with bounded jitter for
-up to three seconds to absorb a full local process burst without forming a
-retry convoy. Session cleanup uses a two-second lock budget within Codex's
-three-second `SessionEnd` limit, and a busy stop never performs a second wait.
-Work may continue after a busy failure and the agent reconciles its ticket
-afterward. Mutation replies are compact.
-
-Two to six milestones is advice, not a schema limit. Progress accepts longer
-ordered plans unchanged while the complete checklist remains below 64 KiB.
-Validation returns a non-blocking warning, and compact consumers expose only
-the first three actionable or blocked milestones. Progress never auto-splits or
-rewrites the user's plan.
-
-Subagents use this specialization only when started with the explicit
-`progress-worker` agent type. `SubagentStart` hashes the harness, parent session,
-and agent identities, then claims the first claimable `TODO` milestone from an
-`automatic` goal and injects its contract. Other subagents remain untouched.
-`SubagentStop`
-requires a final, unfenced `PROGRESS_RESULT` JSON line with `DONE` or `BLOCKED`
-and bounded non-empty evidence. A missing, malformed, oversized, secret-bearing,
-or empty-evidence result returns only that owned ticket to `TODO`. `SessionEnd`
-releases only `IN_PROGRESS` claims carrying its session prefix. Replays are
-idempotent, and all mutations use the existing lock. Main-agent sessions do not
-claim automatically; MCP is their rich optional interface and the matching
-`npm run progress:*` command is an equivalent emergency/local fallback.
-For two or more genuinely independent claimable milestones, the main agent
-starts `progress-worker` subagents without another conversational approval.
-Sequential or small work remains direct. `SessionStart`, including its
-`source=compact` invocation, provides a bounded active-goal reminder so
-resumption does not require a routine MCP read.
-The full checklist is available only through the voluntary JSON resource
-`ctxroute://progress/full`; it is not an automatically selectable tool.
-`npm run progress:read` remains the human diagnostic path.
-`npm run progress:archive` explicitly moves completed goals into immutable,
-replay-safe segments under `.project/progress-archive/`. The legacy
-`.project/progress-archive.json` remains readable and empty in the distributable
-template; no hook archives or deletes goals.
-
-Stop mentions Archify only when an Archify source is already part of the
-change. A diagram is needed only when a material boundary, public contract,
-dependency, or cross-component flow changes; ordinary feature code does not
-trigger one by filename heuristic.
-
-Stop checks syntax within byte and time budgets and reports checked and deferred
-paths. Full syntax coverage remains part of normal validation. The lifecycle
-performance gate covers all nine events, both harness plans, maintenance, and
-reports maximum observed latency and context.
-
-When multiple runnable goals coexist, Stop requires an unambiguous goal or
-step-title reference before applying manual policy. Ambiguity stays silent so
-an old goal cannot interrupt unrelated work. A `visual-review` pause asks for a
-visual verdict; an `important-decision` pause asks for the unresolved choice.
-Neither is phrased as a generic request for `go`.
-
-`progress_open_dashboard` voluntarily starts or reuses a durable local dashboard without
-launching a browser. The default server has no idle expiration. Its fragment
-token moves into tab-scoped `sessionStorage`, so reloading the same tab remains
-authenticated after the fragment is removed. Stop never starts or advertises
-the dashboard. `npm run progress:close` stops the current repository's instance
-and is safe to replay.
-
-`npm run blueprint:sync -- --target <repo>` previews only Git-tracked files in
-the explicit control-plane allowlist. Ignored caches, generated decision memory,
-Progress state, and product files never enter the preview. `npm run
-blueprint:version:check` verifies the allowlist digest and requires a marker
-version bump whenever that control plane changes.
-
-The browser loads all goals from `.project/progress.json` through
-`progress-core`, with completed goals hidden by default. Plan creation validates
-before writing. Switching to manual opens a reason dialog and persists either
-`visual-review` or `important-decision`; automatic mode clears that reason.
-Step status, claimability, short evidence, approved titles, criteria, files,
-and commands remain explicitly mutable. Every response includes
-an optimistic revision, and HTTP 409 requires the browser to reload before
-retrying.
-
-`docs/progress.md` is a derived view carrying the JSON revision. CLI, MCP, and
-dashboard startup repair it atomically when it is missing or stale. Both the
-main lock and its recovery marker identify their owner by PID and token so a
-dead stale owner can be reclaimed without disturbing a live or recent one.
+The orchestrator is the sole writer for global goals and worker missions.
+`SWARM_ON` prepares minimal contracts and isolated worktrees; `SWARM_OFF`
+executes directly without coordination artifacts. Stop is always fail-open,
+honors `stop_hook_active`, may record an explicitly supplied worker report,
+cleans CTXRoute session state, and never requests automatic continuation.
 
 ## File change to CRG update
 
-CTXRoute's asynchronous PostToolUse maintenance lane calls CRG only after a
-successful structured file edit, never after a shell read or test command. A
-shared quiet-period marker coalesces rapid edits; only the newest request
-continues to problem memory and Archify preview. The handler then acquires an atomic lock and runs
-`update --skip-flows`; if `graph.db` is absent it performs the initial build.
-Concurrent calls skip while one update is active. The hook runs in the
-background; a 30-second timeout, bounded output, and fail-open diagnostics keep
-the agent's tool path responsive. Archify preview and problem memory share that
-non-blocking maintenance lane.
-
-SessionStart checks existing graph status but does not synchronously build
-missing state. The first structured edit or explicit `npm run crg:build` creates
-it instead, keeping startup responsive. A healthy or absent graph adds no
-context; only a bounded diagnostic is emitted when a real status check fails.
-PreToolUse permits generated graph maintenance and
+CRG updates are explicit or asynchronous rather than a synchronous per-tool
+context injection. PreToolUse permits generated graph maintenance and
 `apply_refactor_tool` only with `dry_run: true`; real changes continue through
-normal editing tools and all CTXRoute/Sensor controls.
-
-CTXRoute project guidance reads product diagrams only from
-`architecture.documents`. Internal blueprint diagrams never satisfy product
-architecture evidence. Sensor adapter details are separate per ecosystem, so a
-package or source change does not receive unrelated language guidance.
+normal editing tools and Sensor controls. CTXRoute context lookup is available
+on demand through MCP and CLI.
 
 The architecture JSON IR is the executable diagram source for this flow.

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "skillId": "skill-creator",
+  "version": "1.0.0",
+  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "mutationAuthority": "orchestrator",
+  "researchLabels": ["official-documentation", "implementation", "recommendation", "hypothesis"],
+  "validation": ["node scripts/validate-blueprint-skills.mjs", "npm run blueprint:review"]
+}
