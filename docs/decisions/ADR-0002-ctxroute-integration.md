@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-08-24
-- Last reviewed: 2026-09-03
+- Last reviewed: 2026-09-06
 
 ## Context
 
@@ -26,48 +26,36 @@ Install CTXRoute from the official `zenonlab/ctxroute` HTTPS archive, pinned to
 a reviewed commit. Keep CTXRoute configuration and rule documents in the derived
 project under the canonical `.claude/hooks/docs/` path.
 
-Expose one project-local lifecycle dispatcher for each of the nine supported
+Expose one project-local lifecycle dispatcher for each of the six supported
 events: `SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`,
-`PreCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and `SessionEnd`. The dispatcher invokes the existing governance hooks
-and CTXRoute shells sequentially, merges non-blocking output, and immediately
-returns a refusal without changing its reason. The dispatcher resolves both
-Codex and Claude entry points directly from the project-local CTXRoute package,
-avoiding a nested wrapper process. Both agents load the same tracked rule
-corpus.
+`PreCompact`, and `Stop`. The dispatcher invokes only minimal mission,
+governance, security, passive observation, restitution, and cleanup handlers.
+CTXRoute document lookup is explicit through the orchestrator MCP or mirror
+CLI; it is not injected automatically on tool events. Both agents query the
+same tracked rule corpus.
 
 Keep exactly one configured handler per event in both `.codex/hooks.json` and
-`.claude/settings.json`. Run governance before context injection on
-`PreToolUse`, CTXRoute validation before the local audit on `PostToolUse`, and
-the turn counter before the canary on `UserPromptSubmit`.
+`.claude/settings.json`. Run governance for mutation-capable `PreToolUse`
+events, Sensor and passive audit after writes, and CTXRoute reset during
+`PreCompact` and Stop.
 
 Add a lightweight `postinstall` check. It verifies the installed CTXRoute
-package, the required CTXRoute entry points, both hook configurations, and the
+package, the on-demand query and reset entry points, both hook configurations, and the
 Claude doctrine import. It reports one manual Codex action: open `/hooks` and
-approve the nine workspace definitions. It never changes Codex trust settings,
+approve the six workspace definitions. It never changes Codex trust settings,
 which are stored outside the repository.
 
-Do not configure custom lifecycle status messages. Restrict `PreToolUse` and
-`PostToolUse` to mutation-capable tools; ordinary reads do not start the
-dispatcher. Diagnose legacy global
+Do not configure custom lifecycle status messages. Restrict `PostToolUse` to
+mutation-capable tools, and skip the architecture subprocess on read-only
+`PreToolUse` events. Diagnose legacy global
 CTXRoute commands during `postinstall`: global and project hooks are additive,
-so keeping both causes duplicate progress output and avoidable process startup.
+so keeping both causes duplicate output and avoidable process startup.
 The diagnostic is read-only and never rewrites user configuration.
 
 Use `mode: once` as the project default and on every tracked guidance document.
-ADR mirrors are inactive routing indexes rather than copies of full decision
-bodies. The architecture guard names only applicable ADR files and directs the
-agent to read them when a mutation materially changes a boundary or contract.
-Project-governance guidance resolves product architecture from
-`.project/project-config.json`; it never treats the blueprint's internal
-architecture as product evidence. Ecosystem-specific Sensor guidance is split
-by path substring, so JavaScript package work does not receive Ruby or PHP
-adapter details and each derived stack receives only relevant context.
-CTXRoute receives a 1,800-character producer budget below the dispatcher's
-4,096-character cap. Normal guidance is delivered in one compact frame rather
-than a multi-call remainder queue. A matching rule completes delivery once per session, then becomes
-eligible again only after the existing `PreCompact` reset. Blocking governance still
-runs on every applicable mutation; the cadence change only removes repeated
-informational context during reading and implementation loops.
+An explicit query may deliver a matching rule once per query session, and the
+existing reset clears that local session state. Blocking governance remains a
+separate local hook and does not depend on context lookup.
 
 ## Alternatives
 
@@ -90,5 +78,5 @@ Dependency updates require an explicit commit review and ADR update.
 
 The reviewed CTXRoute pin is
 `76b45a57543c940c51e382a41adb749faa44bbc4`. It preserves version 2.0.0 and
-the CTXRoute hook entry points used by the template while incorporating the current
+the six hook entry points used by the template while incorporating the current
 upstream address-consistency and mutation-runner fixes.

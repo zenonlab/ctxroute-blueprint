@@ -35,7 +35,7 @@ deliberately and verify the result.
 | --- | --- |
 | Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
-| Persistent execution | Progress MCP tracks goals and evidence with automatic execution and targeted manual pauses. |
+| Universal execution | `SWARM_ON` delegates minimal missions through the orchestrator; `SWARM_OFF` executes directly without tickets or worktrees. |
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
@@ -53,7 +53,7 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the nine workspace definitions. Claude
+3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
@@ -94,75 +94,39 @@ rules. The reusable control plane lives in `.codex/`, `.claude/`, `.githooks/`,
 `.project/`, and the documentation tree; product directories are created only
 after discovery.
 
-### Progress checklist
+### Orchestration modes
 
-Tracked plans are stored in [`.project/progress.json`](.project/progress.json).
-The generated [short view](docs/progress.md) is informational and must not be
-edited directly. Validation is read-only; materialization requires short
-validation evidence. `approved: true` is the write flag; a matching explicit
-user request is sufficient unless the plan introduces a consequential choice.
+[`docs/orchestration.md`](docs/orchestration.md) defines the transaction,
+mission, report, worktree, audit, and recovery contracts. `SWARM_ON` is the
+default. `SWARM_OFF` lets the primary agent perform ordinary tasks directly
+without a ticket, worktree, or MCP call; skills remain unchanged in both modes.
 
 ```sh
-npm run progress:read
-npm run progress:status
-npm run progress:next -- goal-id
-npm run progress:claim -- agent-id goal-id
-npm run progress:update -- update.json
-npm run progress:mode -- goal-id automatic
-npm run progress:mode -- goal-id manual visual-review
-npm run progress:validate -- plan.json
-npm run progress:approve -- plan.json
+npm run orchestrator:read
+npm run orchestrator:cli -- mutate transaction.json
+npm run orchestrator:cli -- prepare-mission transaction.json
+npm run orchestrator:cli -- submit-report transaction.json
+npm run ctxroute:query -- query.json
 ```
 
-Progress supports multiple goals, atomic idempotent writes, bounded step
-evidence, compact CLI/MCP acknowledgements, and exactly two execution modes:
-
-- `automatic` is the default for requested implementation and verification.
-- `manual` is a targeted pause for a visual review or an important product,
-  change, or design decision that the user has not already made.
-
-Legacy `autonomous` and `collaborative` values remain readable and normalize to
-`automatic` and `manual` respectively.
-
-Progress is optional for small or single-agent changes. For substantial
-parallel work, agents atomically claim distinct tickets, work independently,
-then report the final status and evidence once. A short, jittered, bounded lock
-wait prevents concurrent writes from overwriting another agent while absorbing
-local claim bursts, and mutation tools return compact replies.
-Automatic goals are advisory at Stop and never force a continuation loop.
-For subagents, `SubagentStart` atomically claims the next `automatic` ticket and
-injects its criteria, files, commands, and required final `PROGRESS_RESULT`
-footer inside the portable 2,500-character hook envelope. `SubagentStop`
-settles only that opaque session/agent claim; malformed
-results return it to `TODO`, and `SessionEnd` releases only that session's
-remaining `IN_PROGRESS` claims. Main agents continue to use the explicit MCP
-flow. The eight MCP tools and voluntary full resource are unchanged.
-
-The CLI and the `ctxroute-progress` MCP server use the same progress core.
-Codex and Claude Code discover it from their project manifests. Any other local
-MCP client with stdio support can connect by launching `npm run progress:mcp`
-from the repository root; remote-only clients require an explicit transport
-adapter and do not discover this local server automatically.
+Only the orchestrator mutates global goals. Transactions are revisioned,
+idempotent, atomically persisted, and bounded by bytes and time rather than an
+arbitrary number of workflow steps.
 
 ### Local MCP servers
 
 The repository exposes two independent stdio servers:
 
-- `ctxroute-progress` runs `npm run progress:mcp` and exposes checklist,
-  atomic ticket claim, compact result reporting, next-step, and mode tools.
+- `ctxroute-orchestrator` runs `npm run orchestrator:mcp` and exposes global
+  coordination plus explicit bounded CTXRoute lookup.
 - `code-review-graph` runs `npm run crg:mcp` and exposes six bounded read and
   context tools from official CRG v2.3.8 against the ignored local graph.
 
 Codex reads [`.codex/config.toml`](.codex/config.toml); Claude reads
 [`.mcp.json`](.mcp.json). These project manifests never alter user-global
-configuration. Start Codex from the repository root (`codex -C /path/to/project`)
-so it discovers the local manifest; opening it from a parent directory and
-changing directories later does not load project MCP servers. A trusted client
-must approve project MCP servers. Restart the client after manifest changes,
-then use `/mcp` or `codex mcp list` from the repository root to confirm that
-both servers are enabled. Codex gives optional project MCP servers a bounded
-three-second grace while building its initial tool catalog, which accommodates
-CRG's frozen Python startup without turning a CRG failure into a session failure.
+configuration. A trusted client must approve project MCP servers. Restart the
+client if it has cached an older manifest, and use `/mcp` to inspect the loaded
+servers.
 
 ```sh
 npm run mcp:validate
@@ -177,53 +141,22 @@ or provider configuration.
 
 ### CTXRoute lifecycle
 
-[CTXRoute](https://github.com/zenonlab/ctxroute) routes relevant project
-guidance to agent actions through one project-local dispatcher. Rules live in
-[`.claude/hooks/docs/`](.claude/hooks/docs/) and remain available to Codex and
-Claude-compatible tooling.
+[CTXRoute](https://github.com/zenonlab/ctxroute) resolves relevant project
+guidance on demand through the local orchestrator MCP or mirror CLI. Rules live
+in [`.claude/hooks/docs/`](.claude/hooks/docs/) and remain available to Codex
+and Claude-compatible tooling without automatic per-tool injection.
 
 The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
-`UserPromptSubmit`, `PreCompact`, `Stop`, `SubagentStart`, `SubagentStop`, and
-`SessionEnd`. Healthy CRG startup adds no
-context. Targeted documentation is injected before relevant tool calls, and
-only the minimum required context is restored after compaction.
-The existing `SessionStart(source=compact)` path restores that context; no
-redundant `PostCompact` process is needed.
-
-Tracked guidance uses `mode: once`: a matching document is injected once per
-session and may be delivered again after `PreCompact`, without repeating every
-few turns while an agent is only exploring the project.
-
-`PostToolUse` runs write guards and the blocking Sensor. Its asynchronous
-maintenance lane coalesces an edit burst, then runs one bounded CRG update,
-problem-memory pass, documentation audit, and Archify preview pass.
-It does not start MCP servers; the clients own their stdio transports. CRG
-failures and its 30-second timeout fail open with a short visible diagnostic.
-No `PostToolUse` handler changes Progress status.
+`UserPromptSubmit`, `PreCompact`, and `Stop`. Session start injects only an
+explicit worker mission. `PostToolUse` runs the blocking Sensor, opportunistic
+problem memory, and the local documentation audit. CRG maintenance is explicit
+or asynchronous. `PreCompact` and Stop clean CTXRoute session state; Stop is
+fail-open and never schedules continuation.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process
 startup. Local state and recurring problem memory live in ignored `.ctxroute/`;
 removing that directory clears local history and it is recreated on demand.
-
-Projects already created from the blueprint are intentionally not rewritten in
-the background. From a trusted current blueprint checkout, preview the bounded
-control-plane update and inspect the file list before applying it:
-
-```sh
-npm run blueprint:sync -- --target ../derived-project
-npm run blueprint:check -- --target ../derived-project
-npm run blueprint:sync -- --target ../derived-project --apply
-```
-
-The target must be a clean Git repository. Only Git-tracked source files from
-the control-plane allowlist are considered, so ignored caches and generated ADR
-memory cannot leak between checkouts. Updated files are backed up under its
-ignored `.ctxroute/blueprint-backups/`; product source, project decisions,
-Progress data, and product documentation remain outside the allowlist. The
-versioned `.project/blueprint-version.json`, its control digest, and
-`blueprint:check` make drift visible in automation; synchronization is still an
-explicit operator action.
 
 Codex Cloud may run `npm install` before the agent starts, but hook activation
 still depends on workspace trust and cannot be bypassed by installation.
@@ -281,14 +214,14 @@ the full verification suite, then confirm a clean Git state. Use
 
 Run the deterministic repository gate during development:
 
-Use the cheapest gate that matches the risk: targeted `node --test` or a
-specific `validate:*` command while iterating; `npm run validate` at the end of
-a coherent chantier; and `npm run verify` once before push or handoff.
-`validate` includes the isolated hook latency/context budget, configuration,
-decisions, architecture and document contracts, CTXRoute, lint, workspace
-coherence, the Sensor baseline, and coverage. The release gate additionally
-checks CRG and Progress MCP transports, integration, dependencies, and generated
-documentation:
+```sh
+npm run validate
+```
+
+It covers configuration, decisions, architecture and document contracts,
+CTXRoute, lint, workspace coherence, the Sensor baseline, and test coverage.
+For final verification, including CRG and orchestrator MCP smoke tests, integration,
+dependency audit, and generated documentation, run:
 
 ```sh
 npm run verify
@@ -374,7 +307,7 @@ package behavior, whole-program flows, or runtime enforcement.
 ### CI and repository protection
 
 The tracked workflow validates Node.js 22 on Linux, macOS, and Windows, including
-the real Progress MCP transport. Linux and macOS additionally smoke-test the
+the real orchestrator MCP transport. Linux and macOS additionally smoke-test the
 official CRG transport. Pull requests receive a fork-safe `CRG risk gate`, while
 unexpected Sensor diagnostics are uploaded as SARIF when permissions allow.
 

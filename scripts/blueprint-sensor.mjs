@@ -36,7 +36,9 @@ export function trackedBlueprintSources() {
 }
 
 function main() {
-  const baseline = JSON.parse(readFileSync('.project/sensor-baseline.json', 'utf8'));
+  const baseline = existsSync('.project/sensor-baseline.json')
+    ? JSON.parse(readFileSync('.project/sensor-baseline.json', 'utf8'))
+    : { exceptions: [] };
   const paths = trackedBlueprintSources();
   const result = analyzePaths(paths);
   const baselineResult = evaluateBaseline(result.diagnostics, baseline);

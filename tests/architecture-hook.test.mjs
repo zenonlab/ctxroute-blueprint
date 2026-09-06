@@ -114,8 +114,10 @@ test('allows blueprint validation commands during discovery', () => {
   for (const cmd of [
     'npm run workspace:check',
     'npm run governance:check',
-    'npm run progress:read',
-    'npm run progress:validate -- plan.json',
+    'npm run orchestrator:read',
+    'npm run skills:validate',
+    'npm run blueprint:review',
+    'npm run mcp:validate',
     'npm run sensor -- --checklist',
     'npm run sensor -- --checklist --json',
     'node .githooks/sensor --checklist --json',
@@ -141,11 +143,11 @@ test('allows CRG refactor previews and blocks real refactors', () => {
   assert.match(mutation.stdout, /dry_run: true/u);
 });
 
-test('keeps blueprint state mutations blocked during discovery', () => {
-  for (const cmd of ['npm run progress:approve', 'npm run progress:mcp']) {
-    const result = run({ cmd }, { toolName: 'exec_command' });
-    assert.match(result.stdout, /read and validation commands/u, cmd);
-  }
+test('allows global mutations only through the orchestrator CLI boundary', () => {
+  const allowed = run({ cmd: 'npm run orchestrator:cli -- mutate transaction.json' }, { toolName: 'exec_command' });
+  assert.doesNotMatch(allowed.stdout, /decision":"block/u);
+  const direct = run({ cmd: 'node scripts/orchestrator-core.mjs transaction.json' }, { toolName: 'exec_command' });
+  assert.match(direct.stdout, /read and validation commands/u);
 });
 
 test('blocks dependency refreshes that can execute lifecycle scripts', () => {

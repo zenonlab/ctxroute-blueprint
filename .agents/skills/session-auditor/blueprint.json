@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "skillId": "session-auditor",
+  "version": "1.0.0",
+  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "mutationAuthority": "orchestrator",
+  "validation": ["node scripts/validate-blueprint-skills.mjs", "npm run blueprint:review"]
+}

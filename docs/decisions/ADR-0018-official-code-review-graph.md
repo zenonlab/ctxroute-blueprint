@@ -38,26 +38,18 @@ local invocation uses `uv run --project packages/code-review-graph --frozen`.
 The official graph at `.code-review-graph/graph.db` and the project virtual
 environment are ignored.
 
-CTXRoute remains the sole lifecycle dispatcher. SessionStart checks an existing
-graph without building missing state; the first structured edit or explicit
-command performs that initial build. The lifecycle stays silent when healthy
-and emits only a bounded fail-open
-diagnostic on failure. Successful structured file edits request an asynchronous,
-quiet-period-coalesced `update --skip-flows` behind a cross-process single-flight
-lock, a 30-second timeout, bounded output, and fail-open diagnostics. A burst of
-edits produces one graph update after the last edit. Shell reads, status commands,
-and test runs never trigger graph maintenance. No CRG daemon,
-watcher, generated CRG hooks, or synthetic update database is used.
+The project lifecycle remains local and minimal. CRG builds and updates are
+explicit or asynchronously scheduled outside the synchronous per-tool path,
+behind a cross-process single-flight lock, a 30-second timeout, bounded output,
+and fail-open diagnostics. No CRG daemon, watcher, generated CRG hooks, or
+synthetic update database is used.
 
-The only project MCP servers are Progress and official code-review-graph. The
+The only project MCP servers are the CTXRoute orchestrator and official code-review-graph. The
 CRG MCP default exposure is an exact six-tool allowlist: minimal context,
 impact radius, graph query, review context, graph stats, and architecture
 overview. Build, refactor, embedding, wiki, and secondary exploration remain
 available through controlled CLI commands when needed. The MCP schema budget
-is kept below 8,000 characters for CRG and 14,000 characters combined with
-Progress. Codex waits the official bounded one-second default for optional MCP startup while
-building its initial tool catalog. CRG stays optional so a failed graph service
-remains visible and fail-open instead of preventing the session from starting.
+is kept below 8,000 characters for each server and 16,000 characters combined.
 The Sensor keeps its own pinned Tree-sitter registry solely for security
 checks. `apply_refactor_tool` is allowed only with `dry_run: true`; accepted
 changes use normal editors so architecture, Sensor, and audit hooks remain in
@@ -81,4 +73,5 @@ release dependencies reviewed when the CRG commit pin changes.
 CRG is a mandatory setup dependency, while graph state remains local and
 generated. The custom AST context MCP, tokenizer benchmark, watcher, and fake
 database are removed. CRG failures remain visible without blocking agents;
-the PR risk gate remains blocking at the official `high` threshold of 0.70.
+the PR risk report remains visible; approved broad refactors may use the
+non-blocking `none` threshold while deterministic validation remains required.

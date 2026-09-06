@@ -14,6 +14,7 @@ scope:
   - README.md
   - package.json
 review: on-change
+revised: true
 ---
 # ADR-0020 — Archify audience isolation
 
@@ -24,7 +25,7 @@ review: on-change
 
 The blueprint needs typed diagrams for its own governance while generated
 projects need diagrams that describe only the product. Discovering every JSON
-source as publishable could expose CTXRoute, Progress MCP, CRG, Sensor, Archify,
+source as publishable could expose CTXRoute, the orchestrator, CRG, Sensor, Archify,
 or lifecycle-hook implementation details in user-facing HTML and previews.
 
 ## Decision

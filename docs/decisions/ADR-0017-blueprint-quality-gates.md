@@ -6,8 +6,6 @@ scope:
   - .project/sensor-baseline.json
   - scripts/blueprint-sensor.mjs
   - scripts/integration-check.mjs
-  - scripts/hook-performance.mjs
-  - scripts/blueprint-version.mjs
   - .github/workflows/validate.yml
   - docs/02-quality-strategy.md
   - docs/architecture/src/blueprint.architecture.json
@@ -42,28 +40,14 @@ for a new diagnostic, malformed exception, excess occurrence, or stale
 exception. Informational `WARN` diagnostics remain visible without blocking.
 SARIF contains only unexpected blocking diagnostics.
 
-Add `npm run hooks:performance`, an isolated lifecycle benchmark whose cases
-are derived from the shared harness contract. It checks maximum observed
-latency and configured context size across all nine events, both harness plans,
-the asynchronous maintenance lane, real Sensor diagnostics, and Stop against a
-bounded dirty-worktree fixture. Stop uses time and byte budgets, reports any
-deferred syntax coverage, and leaves exhaustive syntax validation to the
-repository gate. Keep the official CRG smoke test to
-prove the exact version, fixture build, incremental update, MCP startup, tool
-listing, and one read call. `npm run integration` smoke-tests the Progress
-MCP stdio transport on supported local
+Replace the retired internal context benchmark with an official CRG smoke test
+that proves the exact version, fixture build, incremental update, MCP startup,
+tool listing, and one read call. `npm run integration` smoke-tests the
+orchestrator MCP stdio transport on supported local
 platforms and validates manifests on Windows, where the GitHub runner transport
-is not reliable. `npm run verify` adds the network dependency audit and the
+is not reliable. `npm run verify` adds the network dependency audit via
+`npm run audit:dependencies` and the
 generated documentation build to the deterministic validation gate.
-Dependency-audit infrastructure failure is advisory for an explicit local
-diagnostic but fails `verify` and the dedicated release check because a green
-release must prove that the audit actually ran.
-
-The blueprint version marker also stores a deterministic digest of the tracked
-control-plane allowlist. Validation recomputes that digest and requires the
-version to change whenever a covered working-tree or committed change differs
-from its Git baseline. This turns missed distribution-version updates into a
-mechanical failure.
 
 Pin ESLint to the latest compatible major and declare its Node.js 22.13+ floor.
 The blueprint remains JavaScript-only, so static lint and runtime contract tests
