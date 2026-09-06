@@ -14,7 +14,9 @@ skills, the session auditor, the skill creator, and this blueprint skill
 itself.
 
 Run `npm run blueprint:review`, inspect the actual Git diff, and execute the
-validation commands appropriate to the changed files. Require evidence that
+structured validation commands appropriate to the changed files. Confirm that
+the blueprint synchronization allowlist contains every local runtime dependency
+reported by its transitive closure. Require evidence that
 Progress is absent from runtime wiring, Stop is fail-open, CTXRoute queries are
 explicit and bounded, workers cannot mutate global state directly, report
 schemas match their contracts, worktree changes remain in scope, both swarm

@@ -22,7 +22,7 @@ contracts:
 
 ## Decision
 
-The Sensor v2 catalogue classifies all 115 extensions and 9 filenames,
+The Sensor catalogue classifies all 115 extensions and 9 filenames,
 including Astro and Jupyter notebooks, but separates recognition from syntax
 support. `PASS` requires a grammar or a real
 structured parser loaded on Node 22. Extractors and lexical checks report
@@ -32,7 +32,7 @@ capabilities report `N/A`. A lexical fallback can never become syntax-aware.
 Projects declare required languages under `quality.sensor.languages`. A missing
 required parser is an `ERROR` with the exact pack command. Ad hoc recognized
 files may receive a clearly labelled lexical fallback and warning. Sensor JSON
-schema 2 retains the verdict and diagnostics contracts and adds per-file
+retains the verdict and diagnostics contracts and includes per-file
 language, parser, syntax-awareness, and capability evidence.
 
 Language packs are managed only by `sensor:languages`. Identifiers and package

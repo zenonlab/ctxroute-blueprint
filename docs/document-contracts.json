@@ -86,8 +86,99 @@
       "format": "json",
       "source": ".project/orchestrator-config.json",
       "narrative": "docs/orchestration.md",
-      "requiredKeys": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "limits"],
-      "validator": "npm run blueprint:review"
+      "requiredKeys": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+      "validator": "npm run orchestrator:contracts"
+    },
+    {
+      "id": "orchestrator-common-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/common.schema.json",
+      "requiredKeys": ["$schema", "$id", "$defs"]
+    },
+    {
+      "id": "orchestrator-config-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/config.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-state-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/state.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-transaction-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/transaction.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-mission-request-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/mission-request.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-mission-record-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/mission-record.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-mission-view-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/mission-view.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-worker-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/worker-report.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-audit-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/audit-report.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-validation-receipt-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/validation-receipt.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-worktree-operation-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/worktree-operation.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-decision-event-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/decision-event.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-bootstrap-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/bootstrap-report.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "crg-risk-acceptance-schema",
@@ -96,6 +187,41 @@
       "source": ".github/schemas/crg-risk-acceptance.schema.json",
       "narrative": "docs/ci.md",
       "requiredKeys": ["$schema", "$id", "additionalProperties"]
+    },
+    {
+      "id": "architecture-audit",
+      "kind": "architecture-audit",
+      "format": "markdown",
+      "source": "docs/diff/architecture-audit.md",
+      "requiredSections": ["Architecture audit", "Evidence labels", "Audited architecture", "Execution flows", "Findings and priorities"]
+    },
+    {
+      "id": "target-comparison",
+      "kind": "architecture-comparison",
+      "format": "markdown",
+      "source": "docs/diff/target-comparison.md",
+      "requiredSections": ["Current-to-target comparison", "Comparison matrix", "Proposed contracts", "Priority order"]
+    },
+    {
+      "id": "external-research",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/diff/external-research.md",
+      "requiredSections": ["External research", "Evidence scale", "Sources", "Research limits"]
+    },
+    {
+      "id": "risk-register",
+      "kind": "risk-register",
+      "format": "markdown",
+      "source": "docs/diff/risk-register.md",
+      "requiredSections": ["Risk register", "Scoring", "Risks", "Acceptance boundary"]
+    },
+    {
+      "id": "validation-evidence",
+      "kind": "validation-evidence",
+      "format": "markdown",
+      "source": "docs/diff/validation-evidence.md",
+      "requiredSections": ["Validation evidence", "Environment", "Commands and results", "Proof limits"]
     }
   ]
 }

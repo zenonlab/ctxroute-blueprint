@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json",
+  "type": "object",
+  "required": ["status", "inventory_digest", "classifications", "causes", "recovery_actions", "changed"],
+  "properties": {
+    "status": { "enum": ["READY", "DEGRADED", "BLOCKED"] },
+    "inventory_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "classifications": {
+      "type": "array", "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "required": ["path", "classification", "action", "head", "base_revision", "dirty", "index_lock"],
+        "properties": {
+          "path": { "$ref": "common.schema.json#/$defs/relativePath" },
+          "classification": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "action": { "enum": ["PRESERVED", "REMOVED", "PRUNE_METADATA", "NEEDS_ATTENTION"] },
+          "head": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] },
+          "base_revision": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] },
+          "dirty": { "type": ["boolean", "null"] },
+          "index_lock": { "type": "boolean" }
+        },
+        "unevaluatedProperties": false
+      }
+    },
+    "causes": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Z][A-Z0-9_]*$" } },
+    "recovery_actions": { "type": "array", "maxItems": 5, "uniqueItems": true, "items": { "enum": ["doctor", "reconcile-worktrees", "rollback-mission", "purge-worktree"] } },
+    "changed": { "type": "boolean" }
+  },
+  "unevaluatedProperties": false
+}

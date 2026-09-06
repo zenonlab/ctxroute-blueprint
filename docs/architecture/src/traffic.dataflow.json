@@ -11,7 +11,7 @@
     "viewBox": [1068, 780],
     "views": [
       { "id": "context-route", "label": "Context routing", "focus": ["request", "agent", "orchestrator", "ctxroute"], "note": "Follow a request into a minimal mission and optional on-demand context." },
-      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "worker", "orchestrator", "stop", "archify"], "note": "Follow implementation evidence through the orchestrator and deterministic checks." },
+      { "id": "verification", "label": "Verification traffic", "focus": ["agent", "worker", "orchestrator", "stop", "archify"], "note": "Follow a validated request through pending intent, worktree effects, orchestrator validation, and a receipt." },
       { "id": "review-evidence", "label": "Review evidence", "focus": ["archify", "stop", "artifacts"], "note": "Follow the checked diagram into local evidence." }
     ]
   },
@@ -26,25 +26,25 @@
     { "id": "request", "type": "external", "label": "User request", "sublabel": "intent", "stage": 0, "row": 0, "tag": "source" },
     { "id": "agent", "type": "frontend", "label": "Codex / Claude", "sublabel": "agent", "stage": 0, "row": 2, "tag": "consumer" },
     { "id": "ctxroute", "type": "backend", "label": "CTXRoute", "sublabel": "on-demand references", "stage": 1, "row": 0, "tag": "bounded query" },
-    { "id": "orchestrator", "type": "messagebus", "label": "Orchestrator + CRG", "sublabel": "MCP or mirror CLI", "stage": 1, "row": 2, "tag": "transactional" },
-    { "id": "worker", "type": "backend", "label": "Worker", "sublabel": "isolated worktree", "stage": 2, "row": 0, "tag": "minimal mission" },
+    { "id": "orchestrator", "type": "messagebus", "label": "Orchestrator", "sublabel": "bootstrap + pending state", "stage": 1, "row": 2, "tag": "fail closed" },
+    { "id": "worker", "type": "backend", "label": "Worker", "sublabel": "mission view + worktree", "stage": 2, "row": 0, "tag": "minimal mission" },
     { "id": "archify", "type": "backend", "label": "Archify checker", "sublabel": "traffic target", "stage": 3, "row": 0, "tag": "dataflow" },
     { "id": "stop", "type": "security", "label": "Stop hook", "sublabel": "fail-open", "stage": 3, "row": 2, "tag": "final guard" },
-    { "id": "artifacts", "type": "database", "label": "Local evidence", "sublabel": "HTML + receipt", "stage": 4, "row": 0, "tag": "bounded output" }
+    { "id": "artifacts", "type": "database", "label": "Local evidence", "sublabel": "receipt + rotated events", "stage": 4, "row": 0, "tag": "bounded output" }
   ],
   "flows": [
     { "from": "request", "to": "agent", "label": "intent", "classification": "user input", "variant": "emphasis", "route": "straight", "labelAt": [100, 210] },
     { "from": "agent", "to": "ctxroute", "label": "explicit query", "classification": "on demand", "variant": "emphasis", "route": "vertical-channel" },
     { "from": "ctxroute", "to": "orchestrator", "label": "bounded references", "classification": "local context", "variant": "default", "route": "straight", "labelDy": 35 },
-    { "from": "orchestrator", "to": "worker", "label": "mission contract", "classification": "no global history", "variant": "emphasis", "route": "vertical-channel" },
-    { "from": "worker", "to": "archify", "label": "validated changes", "classification": "traffic check", "variant": "emphasis", "route": "straight" },
+    { "from": "orchestrator", "to": "worker", "label": "MissionView", "classification": "no global history", "variant": "emphasis", "route": "vertical-channel" },
+    { "from": "worker", "to": "archify", "label": "validation receipt", "classification": "orchestrator result", "variant": "emphasis", "route": "straight", "labelDy": 53 },
     { "from": "archify", "to": "artifacts", "label": "HTML receipt", "classification": "rendered evidence", "variant": "default", "route": "straight" },
     { "from": "agent", "to": "stop", "label": "stop", "classification": "completion attempt", "variant": "security", "route": "bottom-channel" },
     { "from": "stop", "to": "archify", "label": "product view hint", "classification": "diagram handoff", "variant": "emphasis", "route": "straight", "labelDy": 85 }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Routing contract", "items": ["SWARM_ON is the default and SWARM_OFF needs no coordination call", "Workers receive only the mission contract", "CTXRoute context is queried explicitly and remains byte-bounded"] },
-    { "dot": "emerald", "title": "Traffic verification", "items": ["The orchestrator alone mutates goals", "Workers return commands, exit codes, touched files, and material evidence", "Archify validates both internal maps without publishing them as product diagrams"] },
-    { "dot": "rose", "title": "Review boundary", "items": ["Session traces are streamed and redacted outside interactive context", "Stop is fail-open and never schedules continuation", "GitHub receives the risk-gate result for human review"] }
+    { "dot": "cyan", "title": "Routing contract", "items": ["Environment, persisted state, then default determine mode", "Workers receive a positive MissionView without conversation", "CTXRoute context is queried explicitly and remains byte-bounded"] },
+    { "dot": "emerald", "title": "Transactional verification", "items": ["Bootstrap holds one global lock through every Git effect", "Pending intents resume from desired and physical state", "Worker declarations never replace orchestrator validation replay"] },
+    { "dot": "rose", "title": "Recovery boundary", "items": ["Dirty or ambiguous worktrees require attention", "Rollback captures bounded restorable proof before removal", "Telemetry is redacted, rotated, and secondary to state"] }
   ]
 }

@@ -29,12 +29,13 @@
     "governanceCheck": "npm run governance:check",
     "orchestratorRead": "npm run orchestrator:read",
     "orchestratorMcp": "npm run orchestrator:mcp",
+    "orchestratorContracts": "npm run orchestrator:contracts",
     "ctxrouteQuery": "npm run ctxroute:query",
     "blueprintReview": "npm run blueprint:review",
     "astCheck": "npm run ast:check",
     "crgMcp": "npm run crg:mcp",
     "crgSmoke": "npm run crg:smoke",
-    "performance": "npm run crg:smoke",
+    "performance": "npm run hooks:performance",
     "sensorBlueprint": "npm run sensor:blueprint",
     "mermaid": null
   },
@@ -127,7 +128,8 @@
       "**/openapi*.yml",
       "**/openapi*.json",
       "**/*.graphql",
-      "**/*.gql"
+      "**/*.gql",
+      "**/*.schema.json"
     ]
   },
   "starter": {

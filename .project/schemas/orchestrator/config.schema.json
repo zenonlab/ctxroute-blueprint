@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/config.schema.json",
+  "type": "object",
+  "required": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+  "properties": {
+    "defaultMode": { "enum": ["SWARM_ON", "SWARM_OFF"] },
+    "statePath": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "worktreeRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "recoveryRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "telemetryPath": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "limits": {
+      "type": "object",
+      "required": ["stateBytes", "reportBytes", "contextBytes", "lockTimeoutMs", "subprocessTimeoutMs", "parallelWorktrees", "minimumFreeBytes", "telemetryBytes", "recoveryBytes", "auditTraceBytes", "auditTraceFiles"],
+      "properties": {
+        "stateBytes": { "type": "integer", "minimum": 65536, "maximum": 4194304 },
+        "reportBytes": { "type": "integer", "minimum": 4096, "maximum": 1048576 },
+        "contextBytes": { "type": "integer", "minimum": 1024, "maximum": 262144 },
+        "lockTimeoutMs": { "type": "integer", "minimum": 100, "maximum": 30000 },
+        "subprocessTimeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 },
+        "parallelWorktrees": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "minimumFreeBytes": { "type": "integer", "minimum": 16777216, "maximum": 17179869184 },
+        "telemetryBytes": { "type": "integer", "minimum": 65536, "maximum": 16777216 },
+        "recoveryBytes": { "type": "integer", "minimum": 1048576, "maximum": 268435456 },
+        "auditTraceBytes": { "type": "integer", "minimum": 65536, "maximum": 16777216 },
+        "auditTraceFiles": { "type": "integer", "minimum": 1, "maximum": 256 }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

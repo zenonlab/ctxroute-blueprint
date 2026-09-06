@@ -21,11 +21,11 @@
   "nodes": [
     { "id": "config", "type": "database", "label": "Project config", "sublabel": "required languages", "stage": 0, "row": 0, "tag": "versioned" },
     { "id": "packs", "type": "backend", "label": "Pack resolver", "sublabel": "exact dependencies", "stage": 1, "row": 0, "tag": "allowlist" },
-    { "id": "catalog", "type": "database", "label": "Catalogue v2", "sublabel": "evidence matrix", "stage": 1, "row": 2, "tag": "115 + 9" },
+    { "id": "catalog", "type": "database", "label": "Language catalogue", "sublabel": "evidence matrix", "stage": 1, "row": 2, "tag": "115 + 9" },
     { "id": "parser", "type": "backend", "label": "Parser / extractor", "sublabel": "fixtures + offsets", "stage": 2, "row": 0, "tag": "Node 22" },
     { "id": "ir", "type": "messagebus", "label": "Normalized evidence", "sublabel": "calls, imports, literals", "stage": 3, "row": 0, "tag": "bounded" },
     { "id": "rules", "type": "security", "label": "Rule engine", "sublabel": "quality + security", "stage": 3, "row": 2, "tag": "stable IDs" },
-    { "id": "outputs", "type": "database", "label": "Evidence outputs", "sublabel": "JSON + SARIF + hooks", "stage": 4, "row": 0, "tag": "schema 2" }
+    { "id": "outputs", "type": "database", "label": "Evidence outputs", "sublabel": "JSON + SARIF + hooks", "stage": 4, "row": 0, "tag": "current contract" }
   ],
   "flows": [
     { "from": "config", "to": "packs", "label": "declares", "classification": "project policy", "variant": "emphasis", "route": "straight" },

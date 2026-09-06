@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { hookContract } from './lifecycle-contract.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -33,7 +34,7 @@ export function handlerPlan(harness, event, root = projectRoot) {
   }[event] ?? [];
 }
 
-export function mergeOutputs(event, outputs, notices = []) {
+export function mergeOutputs(event, outputs, notices = [], contextMaximum = MAX_CONTEXT_LENGTH) {
   const merged = {};
   const hookSpecificOutput = {};
   const contexts = [];
@@ -57,7 +58,7 @@ export function mergeOutputs(event, outputs, notices = []) {
     }
   }
 
-  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), MAX_CONTEXT_LENGTH);
+  if (contexts.length) hookSpecificOutput.additionalContext = limit(contexts.join('\n\n'), Math.min(contextMaximum, MAX_CONTEXT_LENGTH));
   if (Object.keys(hookSpecificOutput).length) {
     hookSpecificOutput.hookEventName ??= event;
     merged.hookSpecificOutput = hookSpecificOutput;
@@ -98,7 +99,7 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
       outputs.push(output);
     }
   }
-  return mergeOutputs(event, outputs, notices);
+  return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
 }
 
 export function applicableHandlers(plan, event, input) {

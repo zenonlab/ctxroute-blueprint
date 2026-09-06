@@ -11,12 +11,12 @@ proportionate level of verification.
 | Unit | required | Governance, Sensor, orchestration, reports, audits, and recovery | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
 | Static lint | required | JavaScript tooling and tests | `npm run lint` and the vendored official anti-slop batch must pass |
 | Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
-| End-to-end | required for local tooling | The orchestrator crosses MCP, detached worktree, and filesystem boundaries | `node --test tests/orchestrator-core.test.mjs tests/mcp-stdio.test.mjs tests/hooks.test.mjs` |
-| Contract | required | Nine lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run validate` |
+| End-to-end | required for local tooling | The orchestrator crosses MCP, detached worktree, and filesystem boundaries | Orchestrator HOOTL, multi-process, MCP, and hook tests run through `npm run test:coverage` |
+| Contract | required | Orchestrator JSON Schema 2020-12 contracts, lifecycle events, project config, Archify IR, docs, hooks, and Sensor JSON/SARIF | `npm run orchestrator:contracts` and `npm run validate` |
 | Property / fuzz | recommended | Path guards, command parsing, MCP input, and Sensor source parsing | Keep adversarial fixtures deterministic; add generated properties when an input grammar expands |
 | Performance | required | Median lifecycle latency and context stay bounded under real Sensor and dirty-Stop fixtures; CRG bursts coalesce | `npm run hooks:performance`, runner unit tests, and `npm run crg:smoke` |
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
-| Accessibility | required for local tooling | Orchestrator and generated Archify surfaces remain keyboard-operable, labelled, responsive, and status-announced | Hook/MCP contract tests plus 9/9 Archify showcase checks and `npm run archify:visual-check` |
+| Accessibility | required when a product UI exists | Generated product and Archify surfaces remain keyboard-operable, labelled, responsive, and status-announced | Product UI tests plus Archify showcase checks and `npm run archify:visual-check`; the orchestrator itself has no UI or HTTP surface |
 | Migration / recovery | required for local tooling | Can the orchestrator recover atomic state and reclaim dead worktrees without disturbing live locks? | Orchestrator crash-window, reconciliation, and multi-process tests |
 
 ## Template baseline
@@ -38,9 +38,13 @@ owner, and an acceptance threshold.
 The project brief records the chosen strategy. Durable security, dependency,
 contract, or major quality constraints belong in an ADR.
 
+The dedicated pull-request CRG workflow blocks findings at level `high` or
+above. This risk gate supplements deterministic tests and never proves runtime
+correctness by itself.
+
 ## Sensor and CRG boundary
 
-The Sensor v2 catalogue classifies recognition, parsing, common rules, and
+The Sensor catalogue classifies recognition, parsing, common rules, and
 ecosystem rules separately. JavaScript, TypeScript/TSX, Python, Ruby/ERB, and
 JSON have verified syntax parsing. Other formats are `PARTIAL` or `MISSING`
 until their Node 22 parser and valid/invalid fixture matrix are verified. Astro

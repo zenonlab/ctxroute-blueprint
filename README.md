@@ -39,7 +39,7 @@ deliberately and verify the result.
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
-| Portable validation | Node.js 22 CI runs the same repository gate on Linux, macOS, and Windows. |
+| Portable validation | Node.js 22 CI runs the complete gate on Linux and bounded hook/orchestrator MCP smokes on macOS and Windows. |
 
 ## Quick start
 
@@ -106,6 +106,8 @@ npm run orchestrator:read
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
+npm run orchestrator:cli -- reconcile-worktrees transaction.json
+npm run orchestrator:cli -- rollback-mission transaction.json
 npm run ctxroute:query -- query.json
 ```
 
@@ -306,9 +308,10 @@ package behavior, whole-program flows, or runtime enforcement.
 
 ### CI and repository protection
 
-The tracked workflow validates Node.js 22 on Linux, macOS, and Windows, including
-the real orchestrator MCP transport. Linux and macOS additionally smoke-test the
-official CRG transport. Pull requests receive a fork-safe `CRG risk gate`, while
+The tracked workflow runs the complete Node.js 22 gate on Linux and bounded
+hook/orchestrator MCP smokes on macOS and Windows. Linux additionally smoke-tests
+the official CRG transport. Pull requests receive a fork-safe blocking `CRG
+risk gate` at level `high`, while
 unexpected Sensor diagnostics are uploaded as SARIF when permissions allow.
 
 GitHub templates copy files and branches, not the source repository's security

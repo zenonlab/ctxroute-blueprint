@@ -20,11 +20,12 @@ scope:
   - tests/hooks.test.mjs
 review: on-change
 revised: true
+superseded-by: ADR-0022-universal-ctxroute-orchestration.md
 ---
 
-# ADR-0022 — Authenticated local Progress dashboard
+# Archived: ADR-0022 — Authenticated local Progress dashboard
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-09-02
 
 ## Context

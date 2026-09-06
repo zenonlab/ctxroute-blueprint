@@ -1,14 +1,20 @@
 {
-  "schemaVersion": 1,
   "defaultMode": "SWARM_ON",
   "statePath": ".ctxroute/orchestrator/state.json",
   "worktreeRoot": ".ctxroute/worktrees",
+  "recoveryRoot": ".ctxroute/recovery",
+  "telemetryPath": ".ctxroute/orchestrator/events.jsonl",
   "limits": {
     "stateBytes": 524288,
     "reportBytes": 65536,
     "contextBytes": 16384,
-    "transactionTimeoutMs": 2000,
+    "lockTimeoutMs": 2000,
     "subprocessTimeoutMs": 30000,
-    "parallelWorktrees": 8
+    "parallelWorktrees": 8,
+    "minimumFreeBytes": 268435456,
+    "telemetryBytes": 1048576,
+    "recoveryBytes": 16777216,
+    "auditTraceBytes": 2097152,
+    "auditTraceFiles": 32
   }
 }

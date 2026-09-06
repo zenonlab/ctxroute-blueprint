@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/validation-receipt.schema.json",
+  "type": "object",
+  "required": ["receipt_id", "mission_id", "status", "results", "completed_at"],
+  "properties": {
+    "receipt_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "status": { "enum": ["PASSED", "FAILED", "TIMED_OUT", "BLOCKED"] },
+    "results": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/validationResult" } },
+    "completed_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "unevaluatedProperties": false
+}

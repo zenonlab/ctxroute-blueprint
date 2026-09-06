@@ -8,7 +8,11 @@ review: on-change
 revised: true
 superseded-by: ADR-0022-universal-ctxroute-orchestration.md
 ---
-# ADR-0019 — Collaborative and autonomous progress execution
+# Archived ADR-0019 — Collaborative and autonomous progress execution
+
+- Status: superseded by `ADR-0022-universal-ctxroute-orchestration.md`
+
+This file is historical evidence only and is outside the active ADR corpus.
 
 ## Decision
 

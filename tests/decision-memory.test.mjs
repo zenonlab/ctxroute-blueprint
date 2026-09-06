@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { applicableAdrs, decisionDiagnostics, matchScope, parseAdr, syncAdrRules } from '../.codex/hooks/decision-memory.mjs';
 
 test('matches exact paths and single or recursive globs', () => {
@@ -27,6 +28,20 @@ test('rejects ADRs without valid metadata', () => {
   const adr = parseAdr('# ADR\n', 'docs/decisions/ADR-0009-bad.md');
   assert.match(adr.errors.join('\n'), /front matter/u);
   assert.equal(parseAdr('---\nscope:\n  - scripts/**\nreview: on-change\n---\nbody', 'x').errors.length, 0);
+});
+
+test('decision validator rejects duplicate numeric IDs and missing supersession targets', () => {
+  const root = mkdtempSync(join(tmpdir(), 'decision-validation-'));
+  mkdirSync(join(root, 'docs/decisions'), { recursive: true });
+  const metadata = '---\nscope:\n  - src/**\nreview: on-change\n---\n';
+  writeFileSync(join(root, 'docs/decisions/ADR-0042-one.md'), `${metadata}one\n`);
+  writeFileSync(join(root, 'docs/decisions/ADR-0042-two.md'), `${metadata}two\n`);
+  writeFileSync(join(root, 'docs/decisions/ADR-0043-old.md'), '---\nscope:\n  - src/**\nreview: on-change\nsuperseded-by: ADR-0044-missing.md\n---\nold\n');
+  const validator = fileURLToPath(new URL('../.githooks/validate-decisions.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [validator], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /ADR number 0042 is already used/u);
+  assert.match(result.stderr, /superseded-by target does not exist/u);
 });
 
 test('diagnoses invalid and replaced ADRs as non-usable decisions', () => {
