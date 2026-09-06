@@ -50,6 +50,8 @@ button, input { font: inherit; }
 .info-grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
 .info-panel { background: var(--color-surface); border: var(--size-border) solid var(--color-border); display: grid; gap: var(--space-3); padding: var(--space-6); }
 .release-pending { max-width: calc(var(--size-column-min) * 3); }
+.download-link { align-items: center; background: var(--color-primary); color: var(--color-text-on-accent); display: inline-flex; font-size: var(--font-size-label); font-weight: var(--font-weight-strong); justify-content: center; min-height: var(--size-control-default); padding: 0 var(--space-4); text-decoration: none; width: fit-content; }
+.download-link:focus-visible { outline: calc(var(--size-border) * 2) solid var(--color-focus); outline-offset: var(--space-1); }
 
 @media (max-width: 48rem) {
   .member-page { gap: var(--space-6); padding: var(--space-6) var(--space-4) calc(var(--size-control-touch) + var(--space-8) * 2); }

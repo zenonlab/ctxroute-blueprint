@@ -88,13 +88,13 @@ test('Agenda keeps seven horizontal days and emits one read per week', async ({ 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test('missing extension exposes no private cards and download links stay hidden', async ({ page, request }) => {
+test('missing extension exposes no private cards while verified downloads stay public', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.getByText(/Extension absente/u)).toBeVisible({ timeout: 3_000 });
   await expect(page.locator('[data-variant="library"]')).toHaveCount(0);
   await page.goto('/download');
-  await expect(page.getByRole('heading', { name: 'Les paquets ne sont pas encore publics.' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Chrome|Firefox/u })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Choisir votre navigateur' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Télécharger pour Chrome|Télécharger pour Firefox/u })).toHaveCount(2);
   for (const route of ['/', '/library', '/agenda', '/privacy', '/download']) {
     expect((await request.get(route)).status(), route).toBe(200);
   }

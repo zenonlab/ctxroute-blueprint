@@ -32,6 +32,11 @@ contracts, browser builds and reproducible packages to the release gate. It
 keeps the remaining interactive Chrome and Firefox checks explicit instead of
 presenting an incomplete browser pass as a finished delivery.
 
+[`src/production-publication.dataflow.json`](src/production-publication.dataflow.json)
+records the approved production path from the static export and two versioned
+archives through the exact allowlist to the public Worker and R2 bucket, then
+to the HTTP and SHA-256 verification evidence observed on `tobirink.com`.
+
 The extension build uses a dedicated WXT entrypoint directory so its generated
 Manifest V3 shell remains separate from reusable React surfaces and previews.
 The generated manifest carries only documented browser permissions, local-only

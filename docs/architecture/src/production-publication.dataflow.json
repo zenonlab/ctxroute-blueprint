@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Publication production TobiRink 1.0.0",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 760],
+    "views": [
+      {
+        "id": "publication",
+        "label": "Publication bornée",
+        "focus": ["releasePackages", "approvalGate", "releaseBucket", "publicWorker"],
+        "note": "Le digest approuvé autorise uniquement deux archives 1.0.0 et le Worker public."
+      },
+      {
+        "id": "verification",
+        "label": "Preuve en production",
+        "focus": ["publicWorker", "memberPages", "publicDownloads", "productionEvidence"],
+        "note": "Les pages publiques et les téléchargements sont relus depuis tobirink.com après déploiement."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Construire" },
+    { "label": "Autoriser" },
+    { "label": "Publier" },
+    { "label": "Servir" },
+    { "label": "Vérifier" }
+  ],
+  "nodes": [
+    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "5 routes publiques", "stage": 0, "row": 0, "tag": "Next statique" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.0", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
+    { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + 3 cibles", "stage": 1, "row": 2, "tag": "approuvée" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "2 objets versionnés", "stage": 2, "row": 3, "tag": "R2" },
+    { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "production" },
+    { "id": "memberPages", "type": "frontend", "label": "Pages Workbench", "sublabel": "accueil / biblio / agenda", "stage": 3, "row": 0, "tag": "HTTP 200" },
+    { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
+    { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 2, "tag": "concordants" }
+  ],
+  "flows": [
+    { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "66 assets", "classification": "prévisualisé", "variant": "default" },
+    { "id": "packagesToGate", "from": "releasePackages", "to": "approvalGate", "label": "tailles + SHA-256", "classification": "lié au digest", "variant": "security" },
+    { "id": "gateToWorker", "from": "approvalGate", "to": "publicWorker", "label": "déploiement", "classification": "cible autorisée", "variant": "emphasis" },
+    { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "2 uploads", "classification": "clés autorisées", "variant": "security" },
+    { "id": "workerToPages", "from": "publicWorker", "to": "memberPages", "label": "assets statiques", "classification": "public", "variant": "default" },
+    { "id": "bucketToDownloads", "from": "releaseBucket", "to": "publicDownloads", "label": "via Worker", "classification": "route bornée", "variant": "security" },
+    { "id": "pagesToEvidence", "from": "memberPages", "to": "productionEvidence", "label": "5 × HTTP 200", "classification": "vérifié", "variant": "default" },
+    { "id": "downloadsToEvidence", "from": "publicDownloads", "to": "productionEvidence", "label": "2 hashes identiques", "classification": "vérifié", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Résultat",
+      "items": [
+        "Le Worker public sert la surface Workbench sur tobirink.com",
+        "Les deux archives 1.0.0 sont disponibles avec leurs hashes locaux",
+        "Les routes inconnues restent en 404"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Limites conservées",
+      "items": [
+        "Aucune migration D1 ni suppression distante",
+        "Aucun secret ou objet non listé n’est modifié",
+        "La version Worker précédente reste disponible pour rollback"
+      ]
+    }
+  ]
+}
