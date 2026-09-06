@@ -224,7 +224,7 @@
 ## Refaire les surfaces web Workbench jusqu’au production-ready — ACTIVE
 
 - [x] **Matérialiser et sécuriser le chantier** — DONE _(evidence: WebBridge v2 issues 60-second extension nonces and enforces exact origin, expiry equality, anti-replay and request correlation, 64 KiB UTF-8 checks cover inbound messages and outbound responses; Review remains the only write command, Contracts 18/18 and bridge runtime 4/4 passed; full typecheck, ESLint, decisions and Archify showcase 9/9 passed)_
-- [ ] **Corriger les projections privées** — PENDING
+- [x] **Corriger les projections privées** — DONE _(evidence: Library applies accent-insensitive search, facet, cursor and limit 24 after scanning at most 500 local works, Agenda accepts only Monday-to-Monday date-only weeks, forwards exact local-midnight [from,to), and reads at most 100 dated entries, Progress, favorite source URL, release label, availability and exact timestamps are projected only when locally available; oversized arrays shrink below 60 KiB)_
 - [ ] **Partager les compositions Workbench** — PENDING
 - [ ] **Construire le runtime web privé** — PENDING
 - [ ] **Refaire toutes les routes web** — PENDING

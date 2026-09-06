@@ -4287,7 +4287,7 @@
         {
           "id": "step-2",
           "title": "Corriger les projections privées",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "bootstrap.read ne lit ni ne retourne Agenda",
             "agenda.read exige une semaine date-only lundi [from,to) et borne 100 entrées",
@@ -4311,7 +4311,12 @@
             "git diff --check",
             "git commit -m \"fix(web-bridge): bound library and agenda projections\""
           ],
-          "evidence": []
+          "evidence": [
+            "Library applies accent-insensitive search, facet, cursor and limit 24 after scanning at most 500 local works",
+            "Agenda accepts only Monday-to-Monday date-only weeks, forwards exact local-midnight [from,to), and reads at most 100 dated entries",
+            "Progress, favorite source URL, release label, availability and exact timestamps are projected only when locally available; oversized arrays shrink below 60 KiB",
+            "Contracts 19/19, WebBridge projections/runtime 8/8 and IndexedDB 3/3 plus Chromium contract passed; typecheck, ESLint and Archify showcase 9/9 passed"
+          ]
         },
         {
           "id": "step-3",

@@ -27,4 +27,12 @@ describe('WebBridgePort transport contract', () => {
   it('measures the serialized UTF-8 envelope, not JavaScript code units', () => {
     expect(() => parseWebMessage({ type: 'bootstrap.read', requestId: 'é'.repeat(40_000) })).toThrow('webbridge-message-too-large');
   });
+
+  it('bounds library pages to 24 and agenda reads to one Monday-to-Monday week', () => {
+    expect(webRequestSchema.parse({ type: 'library.read', requestId: 'req_5', query: { facet: 'anime', limit: 24, search: 'étoile' } })).toBeTruthy();
+    expect(() => webRequestSchema.parse({ type: 'library.read', requestId: 'req_6', query: { limit: 25 } })).toThrow();
+    expect(webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_7', from: '2026-09-07', to: '2026-09-14' })).toBeTruthy();
+    expect(() => webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_8', from: '2026-09-08', to: '2026-09-15' })).toThrow(/Monday-to-Monday/u);
+    expect(() => webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_9', from: '2026-09-07', to: '2026-09-15' })).toThrow(/Monday-to-Monday/u);
+  });
 });

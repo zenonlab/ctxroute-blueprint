@@ -18,7 +18,7 @@ export const webBootstrapSnapshotSchema = z.object({
 export const webLibraryQuerySchema = z.object({
   cursor: boundedText(128).optional(),
   facet: z.enum(['all', 'anime', 'manga']).default('all'),
-  limit: z.number().int().min(1).max(50),
+  limit: z.number().int().min(1).max(24),
   search: z.string().trim().max(120).optional(),
 }).strict();
 
@@ -26,6 +26,7 @@ export const webLibraryItemSchema = z.object({
   coverUrl: z.string().url().max(2048).optional(),
   mediaKind: z.enum(['anime', 'manga']),
   progressLabel: boundedText(80).optional(),
+  sourceUrl: z.string().url().max(2048).optional(),
   title: boundedText(240),
   workId: workIdSchema,
 }).strict();
@@ -33,22 +34,38 @@ export const webLibraryItemSchema = z.object({
 export const webLibraryPageSchema = z.object({
   cursor: boundedText(128).optional(),
   hasMore: z.boolean(),
-  items: z.array(webLibraryItemSchema).max(50),
+  items: z.array(webLibraryItemSchema).max(24),
   query: webLibraryQuerySchema,
 }).strict();
 
 export const webAgendaPeriodSchema = z.object({
-  certainty: z.enum(['confirmed', 'estimated', 'unknown']),
   entries: z.array(z.object({
-    date: z.string().date().optional(),
+    availability: z.enum(['official', 'confirmed', 'estimated']),
     kind: z.enum(['anime', 'manga']),
+    occursAt: z.string().datetime({ offset: true }),
+    releaseLabel: boundedText(240),
+    sourceLabel: boundedText(240).optional(),
+    sourceUrl: z.string().url().max(2048).optional(),
     title: boundedText(240),
     workId: workIdSchema,
   }).strict()).max(100),
   from: z.string().date(),
-  provenance: z.enum(['local', 'public-catalogue', 'mixed']),
   to: z.string().date(),
 }).strict();
+
+const webAgendaReadRequestSchema = z.object({
+  type: z.literal('agenda.read'),
+  requestId: boundedText(128),
+  from: z.string().date(),
+  to: z.string().date(),
+}).strict().superRefine(({ from, to }, context) => {
+  const start = new Date(`${from}T00:00:00.000Z`);
+  const expectedEnd = new Date(start);
+  expectedEnd.setUTCDate(expectedEnd.getUTCDate() + 7);
+  if (start.getUTCDay() !== 1 || expectedEnd.toISOString().slice(0, 10) !== to) {
+    context.addIssue({ code: 'custom', message: 'Agenda period must be one Monday-to-Monday week.' });
+  }
+});
 
 export const webReviewSnapshotSchema = z.object({
   candidates: z.array(z.object({
@@ -84,7 +101,7 @@ export const webHandshakeSchema = z.object({
 export const webRequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('bootstrap.read'), requestId: boundedText(128) }).strict(),
   z.object({ type: z.literal('library.read'), requestId: boundedText(128), query: webLibraryQuerySchema }).strict(),
-  z.object({ type: z.literal('agenda.read'), requestId: boundedText(128), from: z.string().date(), to: z.string().date() }).strict(),
+  webAgendaReadRequestSchema,
   z.object({ type: z.literal('review.read'), requestId: boundedText(128) }).strict(),
   z.object({ type: z.literal('review.decision.write'), requestId: boundedText(128), command: webReviewDecisionCommandSchema }).strict(),
 ]);

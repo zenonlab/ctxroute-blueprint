@@ -28,21 +28,24 @@ export interface WebLibraryItem {
   coverUrl?: string;
   mediaKind: 'anime' | 'manga';
   progressLabel?: string;
+  sourceUrl?: string;
   title: string;
   workId: WorkId;
 }
 
 export interface WebAgendaPeriod {
-  certainty: 'confirmed' | 'estimated' | 'unknown';
   entries: readonly WebAgendaEntry[];
   from: string;
-  provenance: 'local' | 'public-catalogue' | 'mixed';
   to: string;
 }
 
 export interface WebAgendaEntry {
-  date?: string;
+  availability: 'official' | 'confirmed' | 'estimated';
   kind: 'anime' | 'manga';
+  occursAt: string;
+  releaseLabel: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
   title: string;
   workId: WorkId;
 }
