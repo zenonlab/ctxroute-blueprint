@@ -27,7 +27,7 @@ if (installedPackage?.version !== '2.0.0') failures.push('CTXRoute 2.0.0 is not 
 
 if (config?.enabled !== true || config?.frames !== 1) failures.push('ctxroute-config.json must enable CTXRoute with one Codex frame');
 
-const requiredHooks = ['session-inject.js', 'codex-doc-inject.js', 'codex-doc-write-guard.js', 'turn-count.js', 'canary-check.js', 'ctxroute-reset.js'];
+const requiredHooks = ['codex-doc-inject.js', 'doc-inject.js', 'ctxroute-reset.js'];
 for (const name of requiredHooks) {
   if (!existsSync(resolve('node_modules', 'ctxroute', 'src', 'hooks', name))) failures.push(`Installed CTXRoute hook is missing: ${name}`);
 }

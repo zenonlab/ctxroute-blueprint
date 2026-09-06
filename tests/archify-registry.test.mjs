@@ -23,7 +23,7 @@ test('Archify registry discovers every typed source in stable order', () => {
 
 test('product diagrams reject blueprint control-plane names', () => {
   assert.deepEqual(productDiagramViolations({ label: 'Customer API' }), []);
-  assert.deepEqual(productDiagramViolations({ nodes: ['CTXRoute', 'Progress MCP', 'Stop hook'] }), ['CTXRoute', 'Progress MCP', 'agent hooks']);
+  assert.deepEqual(productDiagramViolations({ nodes: ['CTXRoute', 'Orchestrator', 'Stop hook'] }), ['CTXRoute', 'Orchestrator', 'agent hooks']);
 });
 
 test('Archify selector keeps internal sources out of every product selection', () => {

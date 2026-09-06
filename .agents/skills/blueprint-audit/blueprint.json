@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "skillId": "blueprint-audit",
+  "version": "1.0.0",
+  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "mutationAuthority": "orchestrator",
+  "validation": ["npm run blueprint:review", "npm run verify"]
+}

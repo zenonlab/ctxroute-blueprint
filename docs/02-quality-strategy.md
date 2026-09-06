@@ -8,7 +8,7 @@ proportionate level of verification.
 
 | Type | Project choice | Questions to answer | Evidence |
 | --- | --- | --- | --- |
-| Unit | required | Governance, Sensor, and progress rules | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
+| Unit | required | Governance, Sensor, orchestration, reports, audits, and recovery | `npm run test:coverage` passes 85% lines, 70% branches, and 85% functions |
 | Static lint | required | JavaScript tooling and tests | `npm run lint` and the vendored official anti-slop batch must pass |
 | Integration | required | npm install, frozen CRG sync/MCP, CTXRoute, Archify restore, hooks, and workspace boundaries | `npm run setup`, `npm run crg:smoke`, and `npm run integration` |
 | End-to-end | required for local tooling | The Progress dashboard crosses browser-style HTTP, MCP, detached-process, and filesystem boundaries | `node --test tests/progress-dashboard.test.mjs tests/mcp-stdio.test.mjs tests/hooks.test.mjs` |

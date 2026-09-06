@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "ctxroute-progress": {
+    "ctxroute-orchestrator": {
       "type": "stdio",
       "command": "npm",
-      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "progress:mcp"]
+      "args": ["--prefix", "${CLAUDE_PROJECT_DIR:-.}", "run", "orchestrator:mcp"]
     },
     "code-review-graph": {
       "type": "stdio",

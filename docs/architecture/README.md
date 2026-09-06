@@ -9,7 +9,7 @@ undeclared source fails validation instead of becoming public implicitly.
 The blueprint control-plane sources are declared in
 `architecture.internalDocuments`. They are maintainer-only validation inputs:
 the product registry, preview, `build:docs`, `visual-check`, and selector `all`
-exclude them. A product diagram must never contain CTXRoute, Progress MCP, CRG,
+exclude them. A product diagram must never contain CTXRoute, the orchestrator, CRG,
 Sensor, Archify, hook, or other blueprint implementation components.
 
 Validate all product diagrams with `npm run archify:validate -- all`, or select

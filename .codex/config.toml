@@ -1,8 +1,6 @@
-mcp_optional_startup_grace_ms = 1000
-
-[mcp_servers.ctxroute-progress]
+[mcp_servers.ctxroute-orchestrator]
 command = "npm"
-args = ["run", "progress:mcp"]
+args = ["run", "orchestrator:mcp"]
 cwd = "."
 
 [mcp_servers.code-review-graph]

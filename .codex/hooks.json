@@ -1,13 +1,12 @@
 {
-  "description": "Nine portable lifecycle dispatchers for CTXRoute, Progress, and architecture-first governance.",
+  "description": "Six minimal lifecycle dispatchers with targeted missions, security checks, cleanup, and passive observability.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex SessionStart",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex SessionStart\"",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex SessionStart",
             "timeout": 30,
             "additionalContextLimit": 1200
           }
@@ -16,12 +15,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex PreToolUse",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex PreToolUse\"",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PreToolUse",
             "timeout": 45,
             "additionalContextLimit": 1200
           }
@@ -30,21 +28,12 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "apply_patch|Edit|Write",
+        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex PostToolUse",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex PostToolUse\"",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PostToolUse",
             "timeout": 45,
-            "additionalContextLimit": 1200
-          },
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex PostToolUse maintenance",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex PostToolUse maintenance\"",
-            "timeout": 45,
-            "async": true,
             "additionalContextLimit": 1200
           }
         ]
@@ -55,9 +44,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex Stop",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex Stop\"",
-            "timeout": 30
+            "command": "node ./.codex/hooks/lifecycle.mjs codex Stop",
+            "timeout": 120,
+            "additionalContextLimit": 1200
           }
         ]
       }
@@ -67,8 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex UserPromptSubmit",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex UserPromptSubmit\"",
+            "command": "node ./.codex/hooks/lifecycle.mjs codex UserPromptSubmit",
             "timeout": 30,
             "additionalContextLimit": 1200
           }
@@ -80,48 +68,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex PreCompact",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex PreCompact\"",
-            "timeout": 15
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "matcher": "^progress[-_]worker$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex SubagentStart",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex SubagentStart\"",
-            "timeout": 5,
-            "additionalContextLimit": 2500
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "^progress[-_]worker$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex SubagentStop",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex SubagentStop\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" codex SessionEnd",
-            "commandWindows": "powershell.exe -NoProfile -Command \"$root = git rev-parse --show-toplevel; node (Join-Path $root '.codex/hooks/lifecycle.mjs') codex SessionEnd\"",
-            "timeout": 3
+            "command": "node ./.codex/hooks/lifecycle.mjs codex PreCompact",
+            "timeout": 15,
+            "additionalContextLimit": 1200
           }
         ]
       }

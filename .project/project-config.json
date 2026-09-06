@@ -27,19 +27,14 @@
     "workspaceCheck": "npm run workspace:check",
     "crgUpdate": "npm run crg:update",
     "governanceCheck": "npm run governance:check",
-    "progressRead": "npm run progress:read",
-    "progressClaim": "npm run progress:claim",
-    "progressValidate": "npm run progress:validate",
-    "progressApprove": "npm run progress:approve",
-    "progressMcp": "npm run progress:mcp",
-    "progressClose": "npm run progress:close",
-    "blueprintSync": "npm run blueprint:sync",
-    "blueprintVersionCheck": "npm run blueprint:version:check",
-    "dependencyAudit": "npm run audit:dependencies",
+    "orchestratorRead": "npm run orchestrator:read",
+    "orchestratorMcp": "npm run orchestrator:mcp",
+    "ctxrouteQuery": "npm run ctxroute:query",
+    "blueprintReview": "npm run blueprint:review",
     "astCheck": "npm run ast:check",
     "crgMcp": "npm run crg:mcp",
     "crgSmoke": "npm run crg:smoke",
-    "performance": "npm run hooks:performance",
+    "performance": "npm run crg:smoke",
     "sensorBlueprint": "npm run sensor:blueprint",
     "mermaid": null
   },
@@ -119,24 +114,9 @@
       "**/*.gql"
     ]
   },
-  "documentation": {
-    "roots": [
-      "docs/",
-      "documentation/",
-      "specs/"
-    ],
-    "extensions": [
-      ".md",
-      ".markdown",
-      ".rst",
-      ".adoc",
-      ".asciidoc",
-      ".txt",
-      ".mmd"
-    ]
-  },
   "starter": {
     "infrastructureRoots": [
+      ".agents/",
       ".codex/",
       ".claude/",
       ".githooks/",
