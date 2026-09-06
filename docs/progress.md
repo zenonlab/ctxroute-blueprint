@@ -112,11 +112,16 @@
 - [x] **Implémenter export et import** — DONE _(evidence: L’enveloppe tobirink-private-export v1 est sérialisée, validée par Zod 4.5.4 puis rematérialisée avec tous les invariants domaine et références croisées., L’import invalide et l’absence de jeton explicite échouent avant replaceSnapshot; le fake prouve le rollback d’un remplacement en erreur., 3 tests recovery ciblés et 9 tests application/contrats passent avec typecheck strict, lint, Sensor SAFE, décisions, docs, diff-check et Archify showcase.)_
 - [x] **Implémenter la file durable MV3** — DONE _(evidence: READY, CLAIMED, EFFECT_RECORDED, COMMITTED, RETRY_AT et BLOCKED survivent à une fermeture/réouverture IndexedDB réelle dans Chromium., La clé d’idempotence unique empêche un second enqueue et un claim expiré est repris transactionnellement avec la même clé., Les transitions n’utilisent ni timer ni tableau comme autorité; tests tâches/stockage, typecheck, lint, Sensor SAFE, docs, diff-check et deux Archify showcase passent.)_
 
-## Livrer les parcours fonctionnels verticaux — DONE
+## Livrer les parcours fonctionnels verticaux — ACTIVE
 
 - [x] **Livrer import, résolution et Review** — DONE _(evidence: review-flow: 1/1 passing; Review surface: 7/7 passing, contracts: application 5/5 and contracts 6/6 passing; typecheck, lint and anti-slop passing, Workbench production build passes; tobirink.architecture validates 9/9 with 0 warnings)_
 - [x] **Livrer bibliothèque et progression** — DONE _(evidence: library-progress: 2/2 passing; offline snapshot and bookmark-removal preservation proven, observed progress remains unpersisted until confirmation; regression rejected unless explicitly allowed, domain: 7/7; typecheck, lint, anti-slop and Sensor SAFE; architecture 9/9 with 0 warnings)_
 - [x] **Livrer agenda, rappels et notifications** — DONE _(evidence: agenda-notifications: 2/2; estimates schedule no native task and official reminders publish once, durable tasks: application 2/2 plus IndexedDB Chromium contract; expired work survives worker restart, Agenda surface: 8/8 and uses WorkCard, never AgendaItem; Workbench build passes)_
+- [ ] **Raccorder la page active et la progression automatique** — PENDING
+- [ ] **Raccorder Review et la recherche globale** — PENDING
+- [ ] **Raccorder agenda, rappels, notifications et réglages rapides** — PENDING
+- [ ] **Finaliser application, restauration et sauvegarde des réglages** — PENDING
+- [ ] **Valider les parcours UX de bout en bout avant livraison** — PENDING
 
 ## Durcir et livrer l’extension — BLOCKED
 

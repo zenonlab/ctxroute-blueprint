@@ -2247,7 +2247,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-vertical-flows",
       "title": "Livrer les parcours fonctionnels verticaux",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -2323,6 +2323,147 @@
             "Agenda surface: 8/8 and uses WorkCard, never AgendaItem; Workbench build passes",
             "typecheck, lint, anti-slop, Sensor SAFE; decisions/workspace/diff pass; architecture 9/9 with 0 warnings"
           ]
+        },
+        {
+          "id": "step-4",
+          "title": "Raccorder la page active et la progression automatique",
+          "status": "TODO",
+          "acceptance": [
+            "Le contexte compatible de l’onglet devient un modèle sérialisable sans API navigateur dans React",
+            "La progression observée est enregistrée automatiquement; une valeur égale n’écrit rien et une baisse est ignorée",
+            "Cette œuvre et les reprises utilisent la dernière URL utile sans commande manuelle de progression",
+            "Toute nouvelle permission est décidée explicitement avant implémentation"
+          ],
+          "files": [
+            "apps/extension/wxt-entrypoints",
+            "apps/extension/runtime",
+            "packages/application/src/progress",
+            "packages/application/src/popup",
+            "packages/adapters-browser/src",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:e2e -- library-progress",
+            "npm run test:security",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Raccorder Review et la recherche globale",
+          "status": "TODO",
+          "acceptance": [
+            "La cloche lit les candidats vérifiables et enregistre chaque décision atomique locale",
+            "Précédent et suivant parcourent la file sans écrire et la décision avance vers le prochain élément",
+            "La recherche globale retourne des résultats locaux et aucun callback ignoreSearch ne subsiste",
+            "Les fournisseurs distants restent derrière les ports et la gate opérationnelle"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/entrypoints/review",
+            "packages/application/src/use-cases",
+            "packages/application/src/ports",
+            "packages/adapters-browser/src",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:e2e -- review-flow",
+            "npm run test:contracts",
+            "npm run test:security",
+            "npm run test:a11y",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-6",
+          "title": "Raccorder agenda, rappels, notifications et réglages rapides",
+          "status": "TODO",
+          "acceptance": [
+            "Agenda et Sorties consomment le snapshot public via un port caché et restent utilisables hors ligne",
+            "Seules les dates officielles ou confirmées peuvent programmer un rappel natif dédupliqué",
+            "Alarmes et notifications reprennent les échéances manquées après redémarrage",
+            "Les préférences rapides viennent du stockage local et ne restent plus bloquées par défaut"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints",
+            "packages/application/src/agenda",
+            "packages/application/src/tasks",
+            "packages/adapters-browser/src/notifications",
+            "packages/adapters-cloudflare/src/releases",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test:e2e -- agenda-notifications",
+            "npm run test:tasks",
+            "npm run test:security",
+            "npm run test:a11y",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-7",
+          "title": "Finaliser application, restauration et sauvegarde des réglages",
+          "status": "TODO",
+          "acceptance": [
+            "Appliquer exige un aperçu frais et une confirmation explicite avant tout déplacement",
+            "Un snapshot local précède chaque projection et Restaurer remet ce snapshot sans supprimer de favori",
+            "Les contrôles n’existent que lorsque leurs callbacks réels sont disponibles",
+            "Export local et sauvegarde chiffrée opt-in restent séparés et ne remplacent jamais IndexedDB"
+          ],
+          "files": [
+            "apps/extension/entrypoints/options",
+            "apps/extension/runtime",
+            "packages/application/src/organizer",
+            "packages/application/src/recovery",
+            "packages/adapters-browser/src",
+            "docs/ui",
+            "docs/architecture/src/tobirink.architecture.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application",
+            "npm run test --workspace @tobirink/extension",
+            "npm run test:recovery",
+            "npm run test:security",
+            "npm run archify:validate -- tobirink.architecture"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-8",
+          "title": "Valider les parcours UX de bout en bout avant livraison",
+          "status": "TODO",
+          "acceptance": [
+            "Import, bibliothèque, progression, Review, agenda et réglages passent dans une extension chargée",
+            "Clavier, focus, zoom 200 pourcent, mouvement réduit et formats étroits passent sur Chrome et Firefox",
+            "Les états vide, chargement, partiel, hors ligne, erreur, conflit et blocage sont vérifiés sans contenu inventé",
+            "Le package final reste déterministe et aucune publication ni aucun déploiement n’est automatique"
+          ],
+          "files": [
+            "tests/e2e",
+            "apps/extension",
+            "docs/ui/accessibility-evidence.md",
+            "docs/browser-support.md",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run test:e2e",
+            "npm run test:a11y",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run verify"
+          ],
+          "evidence": []
         }
       ]
     },
