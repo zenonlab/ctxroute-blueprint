@@ -58,6 +58,8 @@
     "orchestrator:contracts": "node scripts/validate-orchestrator-contracts.mjs",
     "ctxroute:query": "node scripts/orchestrator-cli.mjs context",
     "skills:validate": "node scripts/validate-blueprint-skills.mjs",
+    "skills:verify": "node scripts/verify-blueprint-skills.mjs",
+    "hooks:performance": "node scripts/hook-performance.mjs",
     "blueprint:review": "node scripts/blueprint-review.mjs",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
@@ -69,7 +71,7 @@
     "validate:decisions": "node .githooks/validate-decisions.mjs",
     "integration": "node scripts/integration-check.mjs",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
-    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run orchestrator:contracts && npm run skills:validate && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run blueprint:review && npm run sensor:blueprint && npm run test:coverage",
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:decisions && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:ui && npm run orchestrator:contracts && npm run skills:validate && npm run skills:verify && npm run hooks:performance && npm run lint && npm run lint:anti-slop && npm run anti-slop:verify && npm run sensor:languages -- status && npm run sensor:checklist && npm run ast:check && npm run mcp:validate && npm run workspace:check && npm run governance:check && npm run check:coherence && npm run blueprint:review && npm run sensor:blueprint && npm run test:coverage",
     "verify": "npm run validate && npm run crg:smoke && npm run integration && npm audit --audit-level=high && npm run build:docs"
   },
   "devDependencies": {

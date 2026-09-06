@@ -8,7 +8,7 @@
     "mission_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
     "kind": { "enum": ["ALLOCATE", "RECONCILE", "ROLLBACK", "PURGE"] },
     "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
-    "classification": { "enum": ["ACTIVE_COHERENT", "TERMINAL_CLEAN", "TERMINAL_DIRTY", "REGISTERED_ORPHAN", "UNREGISTERED_DIRECTORY", "BROKEN_METADATA", "LOW_DISK", "NEEDS_ATTENTION"] },
+    "classification": { "enum": ["ACTIVE_COHERENT", "TERMINAL_CLEAN", "TERMINAL_DIRTY", "REGISTERED_ORPHAN", "UNREGISTERED_DIRECTORY", "BROKEN_METADATA", "LOW_DISK", "NEEDS_ATTENTION", "ROLLED_BACK", "PURGED"] },
     "path": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
     "base_revision": { "oneOf": [{ "$ref": "common-v2.schema.json#/$defs/gitOid" }, { "type": "null" }] },
     "dirty": { "type": ["boolean", "null"] },

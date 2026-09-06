@@ -1,311 +1,306 @@
-import { createHash } from 'node:crypto';
-import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { constants } from 'node:fs';
+import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
+import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
 
 export const MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
 export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'COMPLETED', 'CANCELLED']);
-export const MISSION_STATUSES = Object.freeze(['ASSIGNED', 'RUNNING', 'COMPLETED', 'BLOCKED', 'CANCELLED']);
-const SECRET = /(?:api[_-]?key|authorization|cookie|password|private[_-]?key|secret|token)\s*[:=]/iu;
+export const MISSION_STATUSES = Object.freeze(['PREPARING', 'ASSIGNED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['COMPLETED', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)/iu;
+const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[:=]\s*\S+)/iu;
 const DEFAULTS = Object.freeze({
+  schemaVersion: 2,
+  defaultMode: 'SWARM_ON',
   statePath: '.ctxroute/orchestrator/state.json',
+  worktreeRoot: '.ctxroute/worktrees',
+  recoveryRoot: '.ctxroute/recovery',
+  telemetryPath: '.ctxroute/orchestrator/events.jsonl',
   stateBytes: 512 * 1024,
   reportBytes: 64 * 1024,
-  transactionTimeoutMs: 2000,
+  contextBytes: 16 * 1024,
+  lockTimeoutMs: 2000,
+  subprocessTimeoutMs: 30_000,
+  parallelWorktrees: 8,
+  minFreeBytes: 256 * 1024 * 1024,
+  telemetryBytes: 1024 * 1024,
+  rollbackBytes: 16 * 1024 * 1024,
+  auditTraceBytes: 2 * 1024 * 1024,
+  auditTraceFiles: 32,
 });
 
+export function createOrchestratorDependencies(overrides = {}) {
+  return {
+    now: () => new Date(),
+    id: () => randomUUID(),
+    processAlive: pid => { try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; } },
+    wait: milliseconds => new Promise(resolveWait => { setTimeout(resolveWait, milliseconds); }),
+    ...overrides,
+  };
+}
+
 export function emptyOrchestratorState(mode = 'SWARM_ON') {
-  return { schemaVersion: 1, revision: 0, mode, goals: [], skills: [], audits: [], transactions: [] };
+  const state = { schemaVersion: 2, revision: 0, mode, telemetry_sequence: 0, goals: [], skills: [], audits: [], transactions: [], worktree_operations: [] };
+  assertOrchestratorContract('state-v2', state);
+  return state;
 }
 
 export async function loadOrchestratorConfig(root = process.cwd()) {
   try {
-    const config = JSON.parse(await readFile(resolve(root, '.project/orchestrator-config.json'), 'utf8'));
-    if (config.schemaVersion !== 1 || !MODES.includes(config.defaultMode)) throw new Error('invalid schema or defaultMode');
-    return { ...DEFAULTS, ...config.limits, statePath: config.statePath ?? DEFAULTS.statePath, worktreeRoot: config.worktreeRoot ?? '.ctxroute/worktrees' };
+    const source = await readFile(resolve(root, '.project/orchestrator-config.json'), 'utf8');
+    const config = JSON.parse(source);
+    assertOrchestratorContract('config-v2', config);
+    return {
+      ...DEFAULTS,
+      ...config,
+      ...config.limits,
+      minFreeBytes: config.limits.minimumFreeBytes,
+      rollbackBytes: config.limits.recoveryBytes,
+    };
   } catch (error) {
-    if (error.code === 'ENOENT') return { ...DEFAULTS, defaultMode: 'SWARM_ON', worktreeRoot: '.ctxroute/worktrees' };
+    if (error.code === 'ENOENT') return { ...DEFAULTS };
     throw new Error(`Cannot load orchestrator config: ${error.message}`);
   }
 }
 
-export async function readOrchestratorState(root = process.cwd()) {
+export async function readOrchestratorState(root = process.cwd(), dependencies = {}) {
+  const deps = createOrchestratorDependencies(dependencies);
   const config = await loadOrchestratorConfig(root);
-  try {
-    const source = await readFile(resolve(root, config.statePath), 'utf8');
-    if (Buffer.byteLength(source) > config.stateBytes) throw new Error('state exceeds its byte budget');
-    const state = JSON.parse(source);
-    const errors = validateState(state);
-    if (errors.length) throw new Error(errors.join('; '));
-    return state;
-  } catch (error) {
-    if (error.code === 'ENOENT') return emptyOrchestratorState(config.defaultMode);
-    throw new Error(`Cannot read orchestrator state: ${error.message}`);
+  const path = resolve(root, config.statePath);
+  let source;
+  try { source = await readFile(path, 'utf8'); }
+  catch (error) {
+    if (error.code !== 'ENOENT') throw new Error(`Cannot read orchestrator state: ${error.message}`);
+    const initial = emptyOrchestratorState(config.defaultMode);
+    await atomicWriteState(path, initial, config.stateBytes, deps);
+    return initial;
   }
+  if (Buffer.byteLength(source) > config.stateBytes) throw new Error('Cannot read orchestrator state: state exceeds its byte budget');
+  let state;
+  try { state = JSON.parse(source); } catch (error) { throw new Error(`Cannot read orchestrator state: corrupt JSON (${error.message})`); }
+  if (state?.schemaVersion === 1) return resetKnownV1(root, path, state, config, deps);
+  if (state?.schemaVersion !== 2) throw new Error(`Cannot read orchestrator state: unsupported schemaVersion ${String(state?.schemaVersion)}`);
+  try { assertNoSecrets(state); assertOrchestratorContract('state-v2', state); }
+  catch (error) { throw new Error(`Cannot read orchestrator state: ${error.message}`); }
+  return state;
 }
 
 export async function currentSwarmMode(root = process.cwd(), environment = process.env) {
   const override = environment.CTXROUTE_SWARM_MODE;
   if (override !== undefined) {
     if (!MODES.includes(override)) throw new Error(`CTXROUTE_SWARM_MODE must be one of: ${MODES.join(', ')}`);
-    return override;
+    return { mode: override, mode_source: 'environment' };
   }
-  return (await readOrchestratorState(root)).mode;
+  const config = await loadOrchestratorConfig(root);
+  const state = await readOrchestratorState(root);
+  if (state.revision > 0 || state.mode !== config.defaultMode) return { mode: state.mode, mode_source: 'state' };
+  return { mode: config.defaultMode, mode_source: 'default' };
 }
 
-export async function transactOrchestrator(command, root = process.cwd()) {
-  validateCommandEnvelope(command);
+export async function beginOrchestratorTransaction(command, root = process.cwd(), dependencies = {}, intentMutation = null) {
+  assertNoSecrets(command);
+  assertOrchestratorContract('transaction-v2', command);
   const config = await loadOrchestratorConfig(root);
   const path = resolve(root, config.statePath);
-  return withLock(`${path}.lock`, config.transactionTimeoutMs, async () => {
-    const current = await readOrchestratorState(root);
+  const deps = createOrchestratorDependencies(dependencies);
+  await readOrchestratorState(root, deps);
+  return withLock(`${path}.lock`, config.lockTimeoutMs, deps, async () => {
+    const state = await readOrchestratorState(root, deps);
     const digest = transactionDigest(command);
-    const prior = current.transactions.find(item => item.operation_id === command.operation_id);
+    const prior = state.transactions.find(item => item.operation_id === command.operation_id);
     if (prior) {
-      if (prior.digest !== digest) throw new Error(`operation_id reused with different payload: ${command.operation_id}`);
-      return { replayed: true, state: current };
+      if (prior.digest !== digest || prior.action !== command.action) throw new Error(`operation_id reused with different payload: ${command.operation_id}`);
+      return { replayed: true, pending: prior.status === 'PENDING', receipt: prior, state };
     }
-    if (command.expected_revision !== current.revision) throw new Error(`revision conflict: expected ${command.expected_revision}, actual ${current.revision}`);
-    const mutated = applyOperation(current, command);
-    const next = {
-      ...mutated,
-      revision: current.revision + 1,
-      transactions: [...current.transactions, { operation_id: command.operation_id, digest, revision: current.revision + 1 }],
-    };
-    await atomicWriteState(path, next, config.stateBytes);
-    return { replayed: false, state: next };
+    if (command.expected_revision !== state.revision) throw new Error(`revision conflict: expected ${command.expected_revision}, actual ${state.revision}`);
+    const receipt = { operation_id: command.operation_id, digest, action: command.action, status: 'PENDING', start_revision: state.revision, end_revision: null, result: null, cause: null };
+    const intended = intentMutation ? await intentMutation(state) : state;
+    const next = { ...intended, revision: state.revision + 1, telemetry_sequence: state.telemetry_sequence + 1, transactions: [...intended.transactions, receipt] };
+    assertOrchestratorContract('state-v2', next);
+    await atomicWriteState(path, next, config.stateBytes, deps);
+    await emitSafely(root, config, { sequence: next.telemetry_sequence, event_type: 'TRANSACTION', operation_id: command.operation_id, revision_before: state.revision, revision_after: next.revision, entity_type: 'transaction', entity_id: command.operation_id }, deps);
+    return { replayed: false, pending: true, receipt, state: next };
   });
 }
 
-export function validateWorkerReport(report, maximumBytes = DEFAULTS.reportBytes) {
-  const errors = validateBoundedObject(report, maximumBytes, 'worker report');
-  for (const field of ['mission_id', 'skill_id', 'skill_version', 'summary']) requireText(report?.[field], field, errors);
-  for (const field of ['files_touched', 'material_evidence', 'blockers']) requireTextArray(report?.[field], field, errors, field === 'files_touched');
-  if (!Array.isArray(report?.commands)) errors.push('commands must be an array');
-  for (const item of report?.commands ?? []) {
-    if (!item || item !== Object(item) || !safeText(item.command) || !Number.isInteger(item.exit_code)) errors.push('each command needs safe command text and integer exit_code');
-  }
-  return [...new Set(errors)];
+export async function completeOrchestratorTransaction(command, mutation, result = 'UPDATED', root = process.cwd(), dependencies = {}) {
+  const config = await loadOrchestratorConfig(root);
+  const path = resolve(root, config.statePath);
+  const deps = createOrchestratorDependencies(dependencies);
+  return withLock(`${path}.lock`, config.lockTimeoutMs, deps, async () => {
+    const state = await readOrchestratorState(root, deps);
+    const index = state.transactions.findIndex(item => item.operation_id === command.operation_id);
+    if (index < 0) throw new Error(`transaction intent is missing: ${command.operation_id}`);
+    const prior = state.transactions[index];
+    if (prior.digest !== transactionDigest(command)) throw new Error(`operation_id reused with different payload: ${command.operation_id}`);
+    if (prior.status === 'COMPLETED') return { replayed: true, pending: false, receipt: prior, state };
+    if (prior.status === 'BLOCKED') return { replayed: true, blocked: true, receipt: prior, state };
+    const mutated = mutation ? await mutation(state) : applyOperation(state, command);
+    const revision = state.revision + 1;
+    const receipt = { ...prior, status: 'COMPLETED', end_revision: revision, result, cause: null };
+    const transactions = [...mutated.transactions];
+    transactions[index] = receipt;
+    const next = { ...mutated, revision, telemetry_sequence: state.telemetry_sequence + 1, transactions };
+    assertNoSecrets(next);
+    assertOrchestratorContract('state-v2', next);
+    await atomicWriteState(path, next, config.stateBytes, deps);
+    await emitSafely(root, config, { sequence: next.telemetry_sequence, event_type: eventType(command.action), operation_id: command.operation_id, revision_before: state.revision, revision_after: next.revision, entity_type: entityType(command.action), entity_id: entityId(command), result: result === 'UNCHANGED' ? 'NO_CHANGE' : 'SUCCESS', ...eventDetails(command, next) }, deps);
+    return { replayed: false, pending: false, receipt, state: next };
+  });
 }
 
-export function validateAuditReport(report, maximumBytes = DEFAULTS.reportBytes) {
-  const errors = validateBoundedObject(report, maximumBytes, 'audit report');
-  for (const field of ['decision', 'patch_applied', 'rollback']) requireText(report?.[field], field, errors);
-  for (const field of ['sessions_examined', 'signals_detected', 'validations']) requireTextArray(report?.[field], field, errors);
-  if (!report?.subject || !['skill', 'goal', 'mission', 'blueprint'].includes(report.subject.type) || !safeText(report.subject.id)) errors.push('subject must identify a skill, goal, mission, or blueprint');
-  return [...new Set(errors)];
+export async function blockOrchestratorTransaction(command, cause, root = process.cwd(), dependencies = {}, mutation = null) {
+  if (!/^[A-Z][A-Z0-9_]{0,63}$/u.test(cause)) cause = 'UNCLASSIFIED_FAILURE';
+  const config = await loadOrchestratorConfig(root);
+  const path = resolve(root, config.statePath);
+  const deps = createOrchestratorDependencies(dependencies);
+  return withLock(`${path}.lock`, config.lockTimeoutMs, deps, async () => {
+    const state = await readOrchestratorState(root, deps);
+    const index = state.transactions.findIndex(item => item.operation_id === command.operation_id);
+    if (index < 0) throw new Error(`transaction intent is missing: ${command.operation_id}`);
+    const prior = state.transactions[index];
+    if (prior.digest !== transactionDigest(command)) throw new Error(`operation_id reused with different payload: ${command.operation_id}`);
+    if (prior.status !== 'PENDING') return { replayed: true, blocked: prior.status === 'BLOCKED', receipt: prior, state };
+    const blockedState = mutation ? await mutation(state) : state;
+    const revision = state.revision + 1;
+    const receipt = { ...prior, status: 'BLOCKED', end_revision: revision, result: null, cause };
+    const transactions = [...blockedState.transactions]; transactions[index] = receipt;
+    const next = { ...blockedState, revision, telemetry_sequence: state.telemetry_sequence + 1, transactions };
+    assertOrchestratorContract('state-v2', next);
+    await atomicWriteState(path, next, config.stateBytes, deps);
+    await emitSafely(root, config, { sequence: next.telemetry_sequence, event_type: 'BLOCKED', operation_id: command.operation_id, revision_before: state.revision, revision_after: next.revision, entity_type: entityType(command.action), entity_id: entityId(command), result: 'BLOCKED', cause }, deps);
+    return { replayed: false, blocked: true, receipt, state: next };
+  });
 }
 
-export function validateState(state) {
-  const errors = [];
-  if (!state || state.schemaVersion !== 1 || !Number.isInteger(state.revision) || state.revision < 0 || !MODES.includes(state.mode)) return ['invalid orchestrator root state'];
-  if (!Array.isArray(state.goals) || !Array.isArray(state.skills) || !Array.isArray(state.audits) || !Array.isArray(state.transactions)) return ['goals, skills, audits, and transactions must be arrays'];
-  if (state.skills.some(skill => !safeId(skill?.skill_id) || !safeText(skill?.version) || !safeRelativePath(skill?.path)) || new Set(state.skills.map(skill => skill.skill_id)).size !== state.skills.length) errors.push('skills must contain unique safe registrations');
-  const goalIds = new Set();
-  const missionIds = new Set();
-  for (const goal of state.goals) {
-    if (!safeId(goal?.id) || goalIds.has(goal.id)) errors.push('goal ids must be unique safe identifiers');
-    goalIds.add(goal?.id);
-    if (!safeText(goal?.title) || !GOAL_STATUSES.includes(goal?.status) || !Array.isArray(goal?.missions)) errors.push(`invalid goal: ${goal?.id ?? '(missing)'}`);
-    for (const mission of goal?.missions ?? []) {
-      if (!safeId(mission?.mission_id) || missionIds.has(mission.mission_id)) errors.push('mission ids must be globally unique safe identifiers');
-      missionIds.add(mission?.mission_id);
-      errors.push(...validateMission(mission));
-    }
+export async function transactOrchestrator(command, root = process.cwd(), dependencies = {}) {
+  const begun = await beginOrchestratorTransaction(command, root, dependencies);
+  if (begun.replayed && !begun.pending) return begun;
+  try { return await completeOrchestratorTransaction(command, null, operationResult(command.action), root, dependencies); }
+  catch (error) {
+    await blockOrchestratorTransaction(command, error.causeCode ?? 'OPERATION_REJECTED', root, dependencies).catch(() => {});
+    throw error;
   }
-  return [...new Set(errors)];
 }
+
+export function validateWorkerReport(report, maximumBytes = DEFAULTS.reportBytes) { return validateContract('worker-report-v2', report, maximumBytes, 'worker report'); }
+export function validateAuditReport(report, maximumBytes = DEFAULTS.reportBytes) { return validateContract('audit-report-v2', report, maximumBytes, 'audit report'); }
+export function validateState(state) { try { assertNoSecrets(state); assertOrchestratorContract('state-v2', state); return []; } catch (error) { return [error.message]; } }
+export function transactionDigest(command) { return createHash('sha256').update(stableJson({ action: command.action, payload: command.payload })).digest('hex'); }
 
 function applyOperation(state, command) {
-  const payload = command.payload ?? {};
-  if (command.action === 'mode.set') {
-    if (!MODES.includes(payload.mode)) throw new Error(`mode must be one of: ${MODES.join(', ')}`);
-    return { ...state, mode: payload.mode };
-  }
+  const payload = command.payload;
+  if (command.action === 'mode.set') return { ...state, mode: payload.mode };
   if (command.action === 'goal.create') {
-    if (!safeId(payload.id) || !safeText(payload.title)) throw new Error('goal.create requires a safe id and title');
-    if (state.goals.some(goal => goal.id === payload.id)) throw new Error(`goal already exists: ${payload.id}`);
-    return { ...state, goals: [...state.goals, { id: payload.id, title: payload.title.trim(), status: 'ACTIVE', missions: [] }] };
+    if (state.goals.some(goal => goal.goal_id === payload.goal_id)) throw new Error(`goal already exists: ${payload.goal_id}`);
+    return { ...state, goals: [...state.goals, { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] }] };
   }
-  if (command.action === 'goal.update') {
-    return updateGoal(state, payload.goal_id, goal => {
-      if (!safeText(payload.title)) throw new Error('goal.update requires a title');
-      return { ...goal, title: payload.title.trim() };
-    });
+  if (command.action === 'goal.transition') return updateGoal(state, payload.goal_id, goal => {
+    assertTransition(GOAL_TRANSITIONS, goal.status, payload.status, 'goal');
+    return { ...goal, status: payload.status };
+  });
+  if (command.action === 'mission.prepare') {
+    const request = payload.mission;
+    if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
+    const record = { ...request, response_format: 'worker-report-v2', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
+    assertOrchestratorContract('mission-record-v2', record);
+    return addMission(state, payload.goal_id, record);
   }
-  if (command.action === 'goal.transition') {
-    return updateGoal(state, payload.goal_id, goal => {
-      if (!GOAL_STATUSES.includes(payload.status)) throw new Error(`invalid goal status: ${payload.status}`);
-      return { ...goal, status: payload.status };
-    });
-  }
-  if (command.action === 'goal.reorder') {
-    if (!Array.isArray(payload.goal_ids) || payload.goal_ids.length !== state.goals.length || new Set(payload.goal_ids).size !== state.goals.length || payload.goal_ids.some(id => !state.goals.some(goal => goal.id === id))) throw new Error('goal.reorder must contain every goal id exactly once');
-    return { ...state, goals: payload.goal_ids.map(id => state.goals.find(goal => goal.id === id)) };
+  if (command.action === 'mission.transition') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
+    assertTransition(MISSION_TRANSITIONS, mission.status, payload.status, 'mission');
+    if (payload.status === 'COMPLETED' && mission.validation_receipt?.status !== 'PASSED') throw new Error('mission completion requires an orchestrator PASSED receipt');
+    return { ...mission, status: payload.status };
+  });
+  if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));
+  if (command.action === 'audit.apply') {
+    if (state.audits.some(audit => audit.audit_id === payload.report.audit_id)) throw new Error(`audit already exists: ${payload.report.audit_id}`);
+    return { ...state, audits: [...state.audits, payload.report] };
   }
   if (command.action === 'skill.register') {
-    if (!safeId(payload.skill_id) || !safeText(payload.version) || !safeRelativePath(payload.path)) throw new Error('skill.register requires skill_id, version, and repository-relative path');
-    const existing = state.skills.find(skill => skill.skill_id === payload.skill_id);
-    if (existing && (existing.version !== payload.version || existing.path !== payload.path)) throw new Error(`skill already registered with different identity: ${payload.skill_id}`);
-    return existing ? state : { ...state, skills: [...state.skills, { skill_id: payload.skill_id, version: payload.version, path: payload.path }] };
+    if (state.skills.some(skill => skill.skill_id === payload.skill_id)) throw new Error(`skill already registered: ${payload.skill_id}`);
+    return { ...state, skills: [...state.skills, { skill_id: payload.skill_id, version: payload.version, path: payload.path, artifact_digest: payload.artifact_digest, validation_receipt: payload.validation_receipt, audit_id: payload.audit_id, registered_revision: state.revision + 1 }] };
   }
-  if (command.action === 'mission.prepare') {
-    if (state.mode === 'SWARM_OFF') throw new Error('SWARM_OFF executes directly and does not create missions');
-    const errors = validateMission({ ...payload.mission, status: payload.mission?.status ?? 'ASSIGNED' });
-    if (errors.length) throw new Error(errors.join('; '));
-    if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === payload.mission.mission_id))) throw new Error(`mission already exists: ${payload.mission.mission_id}`);
-    const activeMissions = state.goals.flatMap(goal => goal.missions).filter(mission => !['COMPLETED', 'CANCELLED'].includes(mission.status));
-    if (activeMissions.some(mission => mission.file_scope.some(left => payload.mission.file_scope.some(right => scopesOverlap(left, right))))) throw new Error('mission file_scope overlaps an active worker');
-    return updateGoal(state, payload.goal_id, goal => ({ ...goal, missions: [...goal.missions, { ...payload.mission, status: payload.mission.status ?? 'ASSIGNED', report: null }] }));
-  }
-  if (command.action === 'mission.transition') {
-    if (!MISSION_STATUSES.includes(payload.status)) throw new Error(`invalid mission status: ${payload.status}`);
-    return updateMission(state, payload.mission_id, mission => ({ ...mission, status: payload.status }));
-  }
-  if (command.action === 'mission.report') {
-    const errors = validateWorkerReport(payload.report);
-    if (errors.length) throw new Error(errors.join('; '));
-    if (payload.report.mission_id !== payload.mission_id) throw new Error('worker report mission_id mismatch');
-    return updateMission(state, payload.mission_id, mission => {
-      if (mission.skill_id !== payload.report.skill_id || mission.skill_version !== payload.report.skill_version) throw new Error('worker report skill identity mismatch');
-      if (payload.report.files_touched.some(path => !mission.file_scope.some(scope => path === scope || path.startsWith(scope.endsWith('/') ? scope : `${scope}/`)))) throw new Error('worker report contains files outside mission scope');
-      const reportedCommands = payload.report.commands.map(item => item.command);
-      if (mission.validation_commands.some(commandText => !reportedCommands.includes(commandText))) throw new Error('worker report omits a required validation command');
-      const status = payload.report.blockers.length ? 'BLOCKED' : payload.report.commands.some(item => item.exit_code !== 0) ? 'BLOCKED' : 'COMPLETED';
-      return { ...mission, status, report: payload.report };
-    });
-  }
-  if (command.action === 'audit.apply') {
-    const errors = validateAuditReport(payload.report);
-    if (errors.length) throw new Error(errors.join('; '));
-    let next = { ...state, audits: [...state.audits, payload.report] };
-    if (payload.goal_adjustment) {
-      const adjustment = payload.goal_adjustment;
-      next = updateGoal(next, adjustment.goal_id, goal => {
-        if (adjustment.title !== undefined && !safeText(adjustment.title)) throw new Error('audit goal title is invalid');
-        if (adjustment.status !== undefined && !GOAL_STATUSES.includes(adjustment.status)) throw new Error('audit goal status is invalid');
-        const updated = { ...goal };
-        if (adjustment.title !== undefined) updated.title = adjustment.title.trim();
-        if (adjustment.status !== undefined) updated.status = adjustment.status;
-        return updated;
-      });
-    }
-    return next;
-  }
+  if (['worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} requires the orchestrator service effect handler`);
   throw new Error(`unsupported orchestrator action: ${command.action}`);
 }
 
-function validateMission(mission) {
-  const errors = [];
-  for (const field of ['mission_id', 'skill_id', 'skill_version', 'response_format']) requireText(mission?.[field], field, errors);
-  for (const field of ['file_scope', 'acceptance', 'validation_commands']) requireTextArray(mission?.[field], field, errors, field === 'file_scope', true);
-  if (!MISSION_STATUSES.includes(mission?.status)) errors.push('mission has invalid status');
-  if (Object.hasOwn(mission ?? {}, 'history') || Object.hasOwn(mission ?? {}, 'conversation')) errors.push('mission must not contain conversation history');
-  if (mission?.worktree !== null && mission?.worktree !== undefined && !safeRelativePath(mission.worktree)) errors.push('mission worktree must be repository-relative');
-  return errors;
-}
+function addMission(state, goalId, mission) { return updateGoal(state, goalId, goal => ({ ...goal, missions: [...goal.missions, mission] })); }
+export function updateGoal(state, goalId, operation) { const index = state.goals.findIndex(goal => goal.goal_id === goalId); if (index < 0) throw new Error(`unknown goal: ${goalId}`); const goals = [...state.goals]; goals[index] = operation(goals[index]); return { ...state, goals }; }
+export function updateMission(state, goalId, missionId, operation) { return updateGoal(state, goalId, goal => { const index = goal.missions.findIndex(mission => mission.mission_id === missionId); if (index < 0) throw new Error(`unknown mission: ${missionId}`); const missions = [...goal.missions]; missions[index] = operation(missions[index]); return { ...goal, missions }; }); }
+export function findMission(state, missionId) { return state.goals.flatMap(goal => goal.missions.map(mission => ({ goal, mission }))).find(item => item.mission.mission_id === missionId) ?? null; }
 
-function updateGoal(state, goalId, operation) {
-  const index = state.goals.findIndex(goal => goal.id === goalId);
-  if (index < 0) throw new Error(`unknown goal: ${goalId}`);
-  const goals = [...state.goals];
-  goals[index] = operation(goals[index]);
-  return { ...state, goals };
+async function resetKnownV1(root, path, state, config, deps) {
+  if (!knownV1(state)) throw new Error('Cannot read orchestrator state: unrecognized V1 state');
+  const directory = dirname(path);
+  const base = path.split('/').at(-1);
+  const known = (await readdir(directory).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error))).filter(name => name === `${base}.lock` || (name.startsWith(`${base}.`) && name.endsWith('.tmp')));
+  await Promise.all([unlink(path), ...known.map(name => unlink(resolve(directory, name)).catch(() => {}))]);
+  const fresh = { ...emptyOrchestratorState(config.defaultMode), telemetry_sequence: 1 };
+  await atomicWriteState(path, fresh, config.stateBytes, deps);
+  await emitSafely(root, config, { sequence: 1, event_type: 'STATE_RESET', revision_before: state.revision, revision_after: 0, entity_type: 'state', result: 'SUCCESS' }, deps);
+  return fresh;
 }
+function knownV1(state) { if (!state || state.schemaVersion !== 1 || !Number.isInteger(state.revision) || !MODES.includes(state.mode)) return false; const allowed = new Set(['schemaVersion', 'revision', 'mode', 'goals', 'skills', 'audits', 'transactions']); return Object.keys(state).every(key => allowed.has(key)) && ['goals', 'skills', 'audits', 'transactions'].every(key => Array.isArray(state[key])); }
 
-function scopesOverlap(left, right) {
-  const leftPath = left.endsWith('/') ? left : `${left}/`;
-  const rightPath = right.endsWith('/') ? right : `${right}/`;
-  return left === right || leftPath.startsWith(rightPath) || rightPath.startsWith(leftPath);
-}
-
-function updateMission(state, missionId, operation) {
-  const goal = state.goals.find(item => item.missions.some(mission => mission.mission_id === missionId));
-  if (!goal) throw new Error(`unknown mission: ${missionId}`);
-  return updateGoal(state, goal.id, item => ({ ...item, missions: item.missions.map(mission => mission.mission_id === missionId ? operation(mission) : mission) }));
-}
-
-function validateCommandEnvelope(command) {
-  if (!command || command !== Object(command) || !safeId(command.operation_id)) throw new Error('transaction requires a safe operation_id');
-  if (!Number.isInteger(command.expected_revision) || command.expected_revision < 0) throw new Error('transaction requires a non-negative expected_revision');
-  if (!safeText(command.action)) throw new Error('transaction requires an action');
-  if (command.payload !== undefined && (!command.payload || command.payload !== Object(command.payload) || Array.isArray(command.payload))) throw new Error('transaction payload must be an object');
-  if (containsSecret(command)) throw new Error('transaction contains secret-like material');
-}
-
-function validateBoundedObject(value, maximumBytes, label) {
-  const errors = [];
-  if (!value || value !== Object(value) || Array.isArray(value)) return [`${label} must be an object`];
-  let serialized;
-  try { serialized = JSON.stringify(value); } catch { return [`${label} must be serializable`]; }
-  if (Buffer.byteLength(serialized) > maximumBytes) errors.push(`${label} exceeds ${maximumBytes} bytes`);
-  if (containsSecret(value)) errors.push(`${label} contains secret-like material`);
-  return errors;
-}
-
-function requireText(value, name, errors) {
-  if (!safeText(value)) errors.push(`${name} must be safe non-empty text`);
-}
-
-function requireTextArray(value, name, errors, paths = false, nonEmpty = false) {
-  if (!Array.isArray(value) || (nonEmpty && value.length === 0)) return errors.push(`${name} must be${nonEmpty ? ' a non-empty' : ' an'} array`);
-  if (value.some(item => paths ? !safeRelativePath(item) : !safeText(item))) errors.push(`${name} contains an invalid value`);
-}
-
-function safeId(value) {
-  return value === String(value) && /^[a-z][a-z0-9-]{0,127}$/u.test(value);
-}
-
-function safeText(value) {
-  return value === String(value) && value.trim().length > 0 && value.length <= 4096 && !SECRET.test(value) && ![...value].some(character => character.codePointAt(0) < 9);
-}
-
-export function safeRelativePath(value) {
-  if (!safeText(value) || isAbsolute(value) || value.startsWith('~')) return false;
-  const normalized = value.replaceAll('\\', '/');
-  const comparable = normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  return Boolean(comparable) && !normalized.split('/').includes('..') && relative('.', comparable).replaceAll('\\', '/') === comparable;
-}
-
-function containsSecret(value, key = '', depth = 0) {
-  if (depth > 12) return true;
-  if (/(?:authorization|cookie|password|private[_-]?key|secret|token|api[_-]?key)/iu.test(key)) return true;
-  if (value === String(value)) return SECRET.test(value);
-  if (Array.isArray(value)) return value.some(item => containsSecret(item, key, depth + 1));
-  return Boolean(value && value === Object(value) && Object.entries(value).some(([name, item]) => containsSecret(item, name, depth + 1)));
-}
-
-function transactionDigest(command) {
-  return `sha256:${createHash('sha256').update(stableJson({ action: command.action, payload: command.payload ?? {} })).digest('hex')}`;
-}
-
-function stableJson(value) {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && value === Object(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
-  return JSON.stringify(value);
-}
-
-async function atomicWriteState(path, state, maximumBytes) {
+async function atomicWriteState(path, state, maximumBytes, deps) {
   const source = `${JSON.stringify(state, null, 2)}\n`;
   if (Buffer.byteLength(source) > maximumBytes) throw new Error(`orchestrator state exceeds ${maximumBytes} bytes`);
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${process.pid}.${deps.id()}.tmp`;
   const handle = await open(temporary, 'wx', 0o600);
-  try { await handle.writeFile(source, 'utf8'); await handle.sync(); } finally { await handle.close(); }
+  try { await handle.writeFile(source, 'utf8'); await handle.sync(); } catch (error) { await unlink(temporary).catch(() => {}); throw error; } finally { await handle.close(); }
+  await deps.fault?.('beforeStateRename');
   await rename(temporary, path);
+  await deps.fault?.('afterStateRename');
+  const directory = await open(dirname(path), constants.O_RDONLY).catch(() => null);
+  try { await directory?.sync(); } catch (error) { if (!['EINVAL', 'ENOTSUP', 'EBADF'].includes(error.code)) throw error; } finally { await directory?.close(); }
 }
 
-async function withLock(path, timeoutMs, operation) {
-  await mkdir(dirname(path), { recursive: true });
-  const started = Date.now();
+async function withLock(path, timeoutMs, deps, operation) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const started = deps.now().getTime();
+  const token = deps.id();
   let handle;
   while (!handle) {
-    try { handle = await open(path, 'wx', 0o600); }
-    catch (error) {
+    try {
+      handle = await open(path, 'wx', 0o600);
+      await handle.writeFile(`${JSON.stringify({ token, pid: process.pid, created_at: deps.now().toISOString() })}\n`);
+      await handle.sync();
+    } catch (error) {
+      await handle?.close().catch(() => {}); handle = null;
       if (error.code !== 'EEXIST') throw error;
-      if (Date.now() - started >= timeoutMs) throw new Error('orchestrator transaction lock timeout');
-      await new Promise(resolveWait => { setTimeout(resolveWait, 25); });
+      await recoverStaleLock(path, timeoutMs, deps);
+      if (deps.now().getTime() - started >= timeoutMs) throw new Error('orchestrator transaction lock timeout');
+      await deps.wait(25);
     }
   }
   try { return await operation(); }
-  finally { await handle.close(); await unlink(path).catch(() => {}); }
+  finally {
+    await handle.close();
+    const current = await readFile(path, 'utf8').then(JSON.parse).catch(() => null);
+    if (current?.token === token) await unlink(path).catch(() => {});
+  }
 }
+async function recoverStaleLock(path, timeoutMs, deps) {
+  let first;
+  try { first = JSON.parse(await readFile(path, 'utf8')); } catch { return; }
+  if (!first?.token || !Number.isInteger(first.pid) || Number.isNaN(Date.parse(first.created_at))) return;
+  if (deps.now().getTime() - Date.parse(first.created_at) <= timeoutMs || deps.processAlive(first.pid)) return;
+  const second = await readFile(path, 'utf8').then(JSON.parse).catch(() => null);
+  if (second?.token === first.token) await unlink(path).catch(() => {});
+}
+
+function validateContract(name, value, maximumBytes, label) { try { const source = JSON.stringify(value); if (Buffer.byteLength(source) > maximumBytes) throw new Error(`${label} exceeds ${maximumBytes} bytes`); assertNoSecrets(value); assertOrchestratorContract(name, value); return []; } catch (error) { return [error.message]; } }
+export function assertNoSecrets(value, key = '', depth = 0) { if (depth > 16) throw new Error('object exceeds safe inspection depth'); if (SECRET_KEY.test(key)) throw new Error('secret-like key is forbidden'); if (value === String(value) && SECRET_VALUE.test(value)) throw new Error('secret-like material is forbidden'); if (Array.isArray(value)) value.forEach(item => assertNoSecrets(item, key, depth + 1)); else if (value && value === Object(value)) Object.entries(value).forEach(([name, item]) => assertNoSecrets(item, name, depth + 1)); }
+export function safeRelativePath(value) { if (value !== String(value) || value.length === 0 || value.length > 1024 || isAbsolute(value) || value.startsWith('~') || [...value].some(character => character.codePointAt(0) < 32)) return false; const normalized = value.replaceAll('\\', '/').replace(/\/$/u, ''); if (normalized === '.') return true; return Boolean(normalized) && !normalized.split('/').includes('..') && relative('.', normalized).replaceAll('\\', '/') === normalized; }
+function assertTransition(graph, before, after, label) { if (before === after) return; if (!graph[before]?.includes(after)) throw new Error(`illegal ${label} transition: ${before} -> ${after}`); }
+function stableJson(value) { if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`; if (value && value === Object(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`; return JSON.stringify(value); }
+function operationResult(action) { if (action.endsWith('.create') || action === 'mission.prepare' || action === 'skill.register') return 'CREATED'; if (action === 'worktree.reconcile') return 'RECONCILED'; if (action === 'mission.rollback') return 'ROLLED_BACK'; if (action === 'worktree.purge') return 'PURGED'; return 'UPDATED'; }
+async function emitSafely(root, config, event, deps) { try { if (deps.emitTelemetry) await deps.emitTelemetry(root, config, event); else await emitDecisionEvent(root, config, event, deps); } catch { /* State remains authoritative when telemetry is unavailable. */ } }
+function eventType(action) { if (action === 'report.submit') return 'VALIDATION'; if (action === 'audit.apply') return 'AUDIT'; if (action === 'skill.register') return 'SKILL_REGISTRATION'; if (action === 'worktree.reconcile') return 'RECONCILIATION'; if (action === 'mission.rollback') return 'ROLLBACK'; if (action === 'worktree.purge') return 'PURGE'; if (action.includes('transition')) return 'TRANSITION'; return 'TRANSACTION'; }
+function entityType(action) { if (action === 'report.submit') return 'validation'; if (action.startsWith('goal.')) return 'goal'; if (action.startsWith('mission.')) return 'mission'; if (action.startsWith('worktree.')) return 'worktree'; if (action.startsWith('audit.')) return 'audit'; if (action.startsWith('skill.')) return 'skill'; if (action.startsWith('mode.')) return 'mode'; return 'transaction'; }
+function entityId(command) { return command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.goal_id ?? command.payload?.audit_id ?? command.payload?.skill_id ?? null; }
+function eventDetails(command, state) { if (command.action !== 'report.submit') return {}; const found = findMission(state, command.payload.report.mission_id); const item = found?.mission.validation_receipt?.results?.[0]; return item ? { validation_id: item.id, duration_ms: item.duration_ms, exit_code: item.exit_code } : {}; }
