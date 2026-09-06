@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Surface de production TobiRink",
+    "subtitle": "Workbench public, données locales et artefacts 1.0.0",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [1320, 760],
+    "views": [
+      {
+        "id": "publicSurface",
+        "label": "Surface publique",
+        "focus": ["browser", "edge", "worker", "staticAssets"],
+        "note": "Le domaine public termine sur le Worker qui sert l’export Workbench."
+      },
+      {
+        "id": "localPrivacy",
+        "label": "Données privées locales",
+        "focus": ["browser", "webBridge", "extensionStore", "worker"],
+        "note": "Les projections privées restent entre le site et l’extension; elles ne traversent jamais le Worker."
+      },
+      {
+        "id": "releaseDelivery",
+        "label": "Livraison 1.0.0",
+        "focus": ["browser", "worker", "releaseBucket"],
+        "note": "Deux routes versionnées diffusent les ZIP Chrome et Firefox vérifiés depuis R2."
+      }
+    ]
+  },
+  "components": [
+    { "id": "browser", "type": "external", "label": "Navigateur membre", "sublabel": "tobirink.com", "pos": [40, 300], "size": [150, 64], "tag": "utilisateur" },
+    { "id": "webBridge", "type": "security", "label": "WebBridge v2", "sublabel": "session privée bornée", "pos": [260, 120], "size": [150, 64], "tag": "local" },
+    { "id": "extensionStore", "type": "database", "label": "IndexedDB extension", "sublabel": "autorité privée", "pos": [480, 120], "size": [160, 64], "tag": "appareil" },
+    { "id": "edge", "type": "cloud", "label": "Edge TobiRink", "sublabel": "HTTPS + domaine", "pos": [260, 300], "size": [150, 64], "tag": "Cloudflare" },
+    { "id": "worker", "type": "backend", "label": "Worker public", "sublabel": "routes + politiques", "pos": [480, 300], "size": [160, 64], "tag": "tobirink-public-api" },
+    { "id": "staticAssets", "type": "frontend", "label": "Assets Workbench", "sublabel": "export statique", "pos": [740, 90], "size": [158, 64], "tag": "66 fichiers" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases R2", "sublabel": "2 ZIP versionnés", "pos": [740, 245], "size": [158, 64], "tag": "1.0.0" },
+    { "id": "publicCatalogue", "type": "database", "label": "Catalogue D1", "sublabel": "références publiques", "pos": [740, 400], "size": [158, 64], "tag": "aucune migration" },
+    { "id": "coverMedia", "type": "cloud", "label": "Médias couvertures", "sublabel": "R2 + Images", "pos": [740, 555], "size": [158, 64], "tag": "public" },
+    { "id": "verification", "type": "security", "label": "Preuves production", "sublabel": "HTTP + SHA-256", "pos": [1040, 300], "size": [170, 64], "tag": "concordantes" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Cloudflare — compte TobiRink", "wraps": ["edge", "worker", "staticAssets", "releaseBucket", "publicCatalogue", "coverMedia"], "pad": 22 },
+    { "kind": "security-group", "label": "Autorité privée locale", "wraps": ["webBridge", "extensionStore"], "pad": 18 }
+  ],
+  "connections": [
+    { "id": "browserToEdge", "from": "browser", "to": "edge", "variant": "emphasis", "route": "straight" },
+    { "id": "browserToBridge", "from": "browser", "to": "webBridge", "variant": "security", "route": "orthogonal-h" },
+    { "id": "bridgeToStore", "from": "webBridge", "to": "extensionStore", "variant": "security", "route": "straight" },
+    { "id": "edgeToWorker", "from": "edge", "to": "worker", "variant": "emphasis", "route": "straight" },
+    { "id": "workerToAssets", "from": "worker", "to": "staticAssets", "route": "orthogonal-h" },
+    { "id": "workerToReleases", "from": "worker", "to": "releaseBucket", "variant": "security", "route": "orthogonal-h" },
+    { "id": "workerToCatalogue", "from": "worker", "to": "publicCatalogue", "route": "orthogonal-h" },
+    { "id": "workerToMedia", "from": "worker", "to": "coverMedia", "route": "orthogonal-h" },
+    { "id": "assetsToVerification", "from": "staticAssets", "to": "verification", "variant": "dashed", "route": "orthogonal-h" },
+    { "id": "releasesToVerification", "from": "releaseBucket", "to": "verification", "variant": "security", "route": "orthogonal-h" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Production active", "items": ["Le Worker sert les cinq routes publiques", "Les deux ZIP 1.0.0 répondent avec les hashes attendus", "Les routes inconnues restent en 404"] },
+    { "dot": "cyan", "title": "Propriété des données", "items": ["IndexedDB demeure l’autorité des données membres", "Le site ne possède aucun accès direct au stockage navigateur", "D1, R2 et Images contiennent uniquement des ressources publiques"] },
+    { "dot": "amber", "title": "Rollback", "items": ["Les versions Worker précédentes restent adressables", "Aucune migration D1 n’accompagne cette publication", "Les objets R2 sont versionnés et ne sont pas supprimés automatiquement"] }
+  ]
+}

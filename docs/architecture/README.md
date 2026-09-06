@@ -37,6 +37,11 @@ records the approved production path from the static export and two versioned
 archives through the exact allowlist to the public Worker and R2 bucket, then
 to the HTTP and SHA-256 verification evidence observed on `tobirink.com`.
 
+[`src/production-surface.architecture.json`](src/production-surface.architecture.json)
+shows the deployed ownership boundaries: private member state remains local to
+the extension, while the public Worker owns the static surface and reads only
+public catalogue, media and versioned release resources.
+
 The extension build uses a dedicated WXT entrypoint directory so its generated
 Manifest V3 shell remains separate from reusable React surfaces and previews.
 The generated manifest carries only documented browser permissions, local-only

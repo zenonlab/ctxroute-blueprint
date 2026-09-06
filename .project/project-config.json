@@ -81,6 +81,7 @@
   "architecture": {
     "documents": [
       "docs/architecture/src/tobirink.architecture.json",
+      "docs/architecture/src/production-surface.architecture.json",
       "docs/architecture/src/ui-system.architecture.json",
       "docs/architecture/src/active-page-progress.dataflow.json",
       "docs/architecture/src/extension-delivery-validation.dataflow.json",
