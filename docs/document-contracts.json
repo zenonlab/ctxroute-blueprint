@@ -193,7 +193,7 @@
       "kind": "architecture-audit",
       "format": "markdown",
       "source": "docs/diff/architecture-audit.md",
-      "requiredSections": ["Architecture audit", "Evidence labels", "Current architecture", "Execution flows", "Findings and priorities"]
+      "requiredSections": ["Architecture audit", "Evidence labels", "Audited architecture", "Execution flows", "Findings and priorities"]
     },
     {
       "id": "target-comparison",

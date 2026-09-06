@@ -32,7 +32,7 @@ directly when an audit signal exists.
 5. Run the changed skill's validation and `npm run blueprint:review`. The
    blueprint audit must inspect this skill's own patch before it is accepted.
 
-Return only the V2 audit contract: categorical signals, typed subject,
+Return only the current audit contract: categorical signals, typed subject,
 decision, bounded evidence references, distinct proposed/applied action,
 structured validations, and rollback reference. Do not
 schedule recurring audits without a concrete failure or review signal.

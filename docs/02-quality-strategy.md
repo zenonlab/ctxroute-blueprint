@@ -44,7 +44,7 @@ correctness by itself.
 
 ## Sensor and CRG boundary
 
-The Sensor v2 catalogue classifies recognition, parsing, common rules, and
+The Sensor catalogue classifies recognition, parsing, common rules, and
 ecosystem rules separately. JavaScript, TypeScript/TSX, Python, Ruby/ERB, and
 JSON have verified syntax parsing. Other formats are `PARTIAL` or `MISSING`
 until their Node 22 parser and valid/invalid fixture matrix are verified. Astro

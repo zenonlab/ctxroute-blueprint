@@ -165,7 +165,8 @@ export async function recoverRollbackProof(missionId, root = process.cwd()) {
     let header;
     try { header = JSON.parse(bytes.subarray(0, newline).toString('utf8')); } catch { continue; }
     const patch = bytes.subarray(newline + 1);
-    if (header?.mission_id !== missionId || header.digest !== `sha256:${createHash('sha256').update(patch).digest('hex')}`) continue;
+    const patchDigest = `sha256:${createHash('sha256').update(patch).digest('hex')}`;
+    if (!validRollbackHeader(header, missionId, patchDigest)) continue;
     return { mission_id: missionId, status: 'ROLLED_BACK', proof: relativePath, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
   }
   throw categorized('ROLLBACK_PROOF_MISSING', 'pending rollback removed its worktree without a valid recovery proof');
@@ -184,6 +185,14 @@ export async function purgeMissionWorktree({ mission_id, worktree, confirmation,
 async function inspectRollbackState(worktree, config, deps) {
   const status = await worktreeStatus(worktree, config, deps);
   return { ...status, head: (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim() };
+}
+function validRollbackHeader(value, missionId, patchDigest) {
+  if (!value || value !== Object(value) || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  if (keys.join('\0') !== ['digest', 'files', 'head', 'mission_id'].join('\0')) return false;
+  if (value.mission_id !== missionId || value.digest !== patchDigest || !/^[0-9a-f]{40,64}$/u.test(value.head)) return false;
+  return Array.isArray(value.files) && value.files.length <= 4096
+    && new Set(value.files).size === value.files.length && value.files.every(safeRelativePath);
 }
 async function capturePatch(worktree, files, config, deps) {
   let source = (await git(worktree, ['diff', '--binary', '--no-ext-diff', 'HEAD'], config, deps)).stdout;

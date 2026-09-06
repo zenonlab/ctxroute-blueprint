@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,7 @@ import {
 } from '../scripts/orchestrator-core.mjs';
 import { bootstrapOrchestrator } from '../scripts/orchestrator-bootstrap.mjs';
 import { prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
+import { recoverRollbackProof } from '../scripts/worktree-manager.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -183,6 +185,24 @@ test('rollback captures a bounded recovery proof before force removal', async ()
   assert.equal(allocation.status, 'ROLLED_BACK');
   assert.equal(existsSync(join(root, allocation.recovery_proof)), true);
   assert.equal(existsSync(join(root, allocation.path)), false);
+});
+
+test('rollback recovery accepts only the exact current proof header', async () => {
+  const root = fixture();
+  const recovery = join(root, '.ctxroute/recovery');
+  mkdirSync(recovery, { recursive: true });
+  const patch = Buffer.from('bounded recovery evidence\n');
+  const header = {
+    mission_id: 'mission-one',
+    head: 'a'.repeat(40),
+    files: ['src/change.mjs'],
+    digest: `sha256:${createHash('sha256').update(patch).digest('hex')}`,
+  };
+  const proof = join(recovery, 'mission-one-proof.patch');
+  writeFileSync(proof, Buffer.concat([Buffer.from(`${JSON.stringify({ ...header, obsolete_marker: 1 })}\n`), patch]));
+  await assert.rejects(() => recoverRollbackProof('mission-one', root), /without a valid recovery proof/u);
+  writeFileSync(proof, Buffer.concat([Buffer.from(`${JSON.stringify(header)}\n`), patch]));
+  assert.equal((await recoverRollbackProof('mission-one', root)).proof, '.ctxroute/recovery/mission-one-proof.patch');
 });
 
 test('worker authority and symlinked worktrees fail closed', async () => {

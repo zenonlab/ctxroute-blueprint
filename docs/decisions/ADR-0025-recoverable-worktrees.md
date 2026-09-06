@@ -50,8 +50,9 @@ categorical outcome, including `ROLLED_BACK` and `PURGED`, independently from
 the mission allocation status.
 
 Rollback first captures bounded Git state, file inventory, digest, and a binary
-restorable patch under `.ctxroute/recovery/`. Failed or oversized capture blocks
-removal. A CLI-only purge is the sole no-proof path and requires orchestrator
+restorable patch under `.ctxroute/recovery/`. Its header has one exact closed
+shape; unknown fields or malformed Git and path evidence invalidate recovery.
+Failed or oversized capture blocks removal. A CLI-only purge is the sole no-proof path and requires orchestrator
 authority, unique operation ID, reason, exact mission confirmation, and a
 canonical target within the managed root.
 

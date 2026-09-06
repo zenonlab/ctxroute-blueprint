@@ -16,11 +16,11 @@ historical evidence as though the defects had never existed.
 
 Line references identify the audited revision and can move after later edits.
 
-## Current architecture
+## Audited architecture
 
 | Responsibility | Actual authority and implementation | Evidence class |
 | --- | --- | --- |
-| Global state | `scripts/orchestrator-core.mjs` is the mutation core. State v1 contains revision, mode, goals/missions, skills, audits, and transaction receipts (`:16-18`, `:55-76`). | Repository fact |
+| Global state | `scripts/orchestrator-core.mjs` is the mutation core. The audited state contains revision, mode, goals/missions, skills, audits, and transaction receipts (`:16-18`, `:55-76`). | Repository fact |
 | Interfaces | MCP and CLI call the same service; transport is stdio/local files, not HTTP (`scripts/orchestrator-mcp.mjs:7-17`, `scripts/orchestrator-cli.mjs:4-20`). | Repository fact; MCP path test-proved by `tests/mcp-stdio.test.mjs:24-38` |
 | Worker view | A worker read is reduced to mission ID, scope, skill/version, acceptance, validation commands, response format, and worktree (`scripts/orchestrator-service.mjs:6-13`). Mission injection omits global history (`.codex/hooks/mission-context.mjs:7-25`). | Repository fact; absence is structural, not a process sandbox guarantee |
 | Git isolation | A detached linked worktree is created at current `HEAD`; changed paths are compared with declared scopes (`scripts/worktree-manager.mjs:7-30`). | Repository fact; happy path test-proved at `tests/orchestrator-core.test.mjs:53-70` |
@@ -84,7 +84,7 @@ Configured limits are 512 KiB state, 64 KiB report, 16 KiB context, 2 s lock wai
 
 The existing orchestration tests already use temporary real Git repositories and predetermined reports, with no LLM or application network call (`tests/orchestrator-core.test.mjs:137-161`). This is a useful HOOTL seed, not a complete bench. Missing deterministic fixtures include injected Git failure/timeout, malformed report variants, actual out-of-scope diff, multi-process revision conflict, crash at each worktree/state-write boundary, stale lock, dirty cleanup, rollback/resume, and idempotent repeated reconciliation.
 
-Current decision telemetry is fragmented: state receipts store operation ID, digest and revision; missions/reports store mode indirectly, skill/version, command names and exit codes; session audit stores categorical signals; hook performance separately measures durations (`scripts/orchestrator-core.mjs:69-73`; `scripts/hook-performance.mjs:36-59`). There is no single structured event with transition, execution mode, duration, Git before/after, block cause, and audit decision. No private reasoning should be added.
+At the audited revision, decision telemetry was fragmented: state receipts stored operation ID, digest and revision; missions/reports stored mode indirectly, skill/version, command names and exit codes; session audit stored categorical signals; hook performance separately measured durations (`scripts/orchestrator-core.mjs:69-73`; `scripts/hook-performance.mjs:36-59`). There was no single structured event with transition, execution mode, duration, Git before/after, block cause, and audit decision. No private reasoning should be added.
 
 ### CI and governance coherence
 
@@ -99,7 +99,7 @@ Actions are SHA-pinned and permissions are narrow (`.github/workflows/validate.y
 
 ## Findings and priorities
 
-1. **P0 — formal contracts:** publish JSON Schema 2020-12 for state/envelope/mission/worker/audit v1, align Zod and imperative validation, and test unknown fields, replay equality, transitions, secrets and loaded-state integrity.
+1. **P0 — formal contracts:** publish JSON Schema 2020-12 for state/envelope/mission/worker/audit, align Zod and imperative validation, and test unknown fields, replay equality, transitions, secrets and loaded-state integrity.
 2. **P0 — deterministic HOOTL:** turn the existing temp-Git fixture into a fault-injectable, network-free bench covering the failure matrix above.
 3. **P1 — reconciliation/rollback:** inventory before action; make automatic cleanup non-destructive; expose separately authorized rollback and forced deletion; record outcomes; make every transition retry-safe.
 4. **P1 — structured telemetry:** append bounded redacted events with IDs, revisions, transition/mode/skill, validation result, duration, exit status, Git revisions and categorical cause.
@@ -121,4 +121,6 @@ production SLA machinery, an external API, or application workload delivery.
 Risk-by-risk implementation and test evidence is maintained in
 [remediation-closure.md](remediation-closure.md).
 
-Unverified hypotheses retained: behavior under power loss, Windows case/path collisions, symlink scope escapes, disk exhaustion, hostile worker processes, and real simultaneous writers. They are not claimed as defects until a deterministic fixture proves them.
+Remaining unverified boundaries are arbitrary-filesystem behavior under power
+loss and containment of a hostile worker process. They are not claimed as
+solved by local deterministic fixtures.
