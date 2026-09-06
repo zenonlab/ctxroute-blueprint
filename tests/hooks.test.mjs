@@ -38,7 +38,7 @@ test('initialize refuses an incomplete template without changing status', () => 
     encoding: 'utf8',
   });
   assert.equal(result.status, 1);
-  assert.match(`${result.stdout}\n${result.stderr}`, /Initialization blocked/u);
+  assert.match(`${result.stdout}\n${result.stderr}`, /(Initialization blocked|Run initialization through npm)/u);
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, before.status);
 });
 

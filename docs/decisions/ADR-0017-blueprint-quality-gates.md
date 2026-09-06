@@ -45,7 +45,8 @@ that proves the exact version, fixture build, incremental update, MCP startup,
 tool listing, and one read call. `npm run integration` smoke-tests the
 orchestrator MCP stdio transport on supported local
 platforms and validates manifests on Windows, where the GitHub runner transport
-is not reliable. `npm run verify` adds the network dependency audit and the
+is not reliable. `npm run verify` adds the network dependency audit via
+`npm run audit:dependencies` and the
 generated documentation build to the deterministic validation gate.
 
 Pin ESLint to the latest compatible major and declare its Node.js 22.13+ floor.
