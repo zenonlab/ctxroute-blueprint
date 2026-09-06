@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseOrganizerConfiguration } from '@tobirink/application';
-import type { OrganizerFolder, OrganizerMove, SettingsProps } from '../entrypoints/options';
+import type { AvailableSettingsProps, OrganizerFolder, OrganizerMove, SettingsProps } from '../entrypoints/options';
 import {
+  applyOrganizerPreviewMessage,
   readOrganizerConfigurationMessage,
   readOrganizerPreviewMessage,
+  restoreOrganizerSnapshotMessage,
   writeOrganizerConfigurationMessage,
 } from './messages';
+import type { OrganizerPreviewSnapshot } from './messages';
 import {
   createEmptyOrganizerRoot,
   moveOrganizerFolder,
@@ -19,6 +22,7 @@ import {
 } from './organizer-settings-model';
 
 interface OrganizerRuntimeState {
+  canRestore: boolean;
   configurationValid: boolean;
   previewFresh: boolean;
   previewItems: readonly OrganizerMove[];
@@ -27,6 +31,7 @@ interface OrganizerRuntimeState {
 }
 
 const initialState = (): OrganizerRuntimeState => ({
+  canRestore: false,
   configurationValid: true,
   previewFresh: false,
   previewItems: [],
@@ -40,15 +45,16 @@ export function useLocalOrganizerSettings(): SettingsProps {
   const treeRef = useRef(model.tree);
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
   const writeRevision = useRef(0);
+  const previewSnapshot = useRef<OrganizerPreviewSnapshot | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
     setModel(initialState());
-    void readOrganizerConfigurationMessage().then((wire) => {
+    void readOrganizerConfigurationMessage().then(({ canRestore, configuration }) => {
       if (!active) return;
-      const tree = organizerConfigurationToSurface(wire === undefined ? undefined : parseOrganizerConfiguration(wire));
+      const tree = organizerConfigurationToSurface(configuration === undefined ? undefined : parseOrganizerConfiguration(configuration));
       treeRef.current = tree;
-      setModel({ configurationValid: true, previewFresh: false, previewItems: [], state: 'ready', tree });
+      setModel({ canRestore, configurationValid: true, previewFresh: false, previewItems: [], state: 'ready', tree });
     }).catch(() => {
       if (active) setModel((current) => ({ ...current, state: 'error' }));
     });
@@ -57,6 +63,7 @@ export function useLocalOrganizerSettings(): SettingsProps {
 
   const changeTree = useCallback((update: (tree: OrganizerFolder) => OrganizerFolder) => {
     const tree = update(treeRef.current);
+    previewSnapshot.current = undefined;
     treeRef.current = tree;
     setModel((current) => ({ ...current, previewFresh: false, state: 'ready', tree }));
     let configuration: ReturnType<typeof organizerSurfaceToConfiguration>;
@@ -91,6 +98,7 @@ export function useLocalOrganizerSettings(): SettingsProps {
     }
     setModel((current) => ({ ...current, configurationValid: true }));
     void readOrganizerPreviewMessage(configuration).then((snapshot) => {
+      previewSnapshot.current = snapshot;
       setModel((current) => ({
         ...current,
         previewFresh: true,
@@ -102,9 +110,21 @@ export function useLocalOrganizerSettings(): SettingsProps {
   }, []);
 
   const retry = useCallback(() => setLoadKey((key) => key + 1), []);
+  const applyPreview = useCallback(() => {
+    const expected = previewSnapshot.current;
+    if (!expected) return;
+    const configuration = organizerSurfaceToConfiguration(treeRef.current, new Date().toISOString());
+    void applyOrganizerPreviewMessage(configuration, expected).then(() => {
+      previewSnapshot.current = undefined;
+      setModel((current) => ({ ...current, canRestore: true, previewFresh: false, state: 'ready' }));
+    }).catch(() => setModel((current) => ({ ...current, previewFresh: false, state: 'partial' })));
+  }, []);
+  const restore = useCallback(() => {
+    void restoreOrganizerSnapshotMessage().then(() => setLoadKey((key) => key + 1)).catch(() => setModel((current) => ({ ...current, state: 'partial' })));
+  }, []);
   if (model.state === 'loading' || model.state === 'error') return { onRetry: retry, state: model.state };
 
-  return {
+  const settings: Omit<AvailableSettingsProps, 'onRestore'> = {
     configurationValid: model.configurationValid,
     filterOptions: runtimeOrganizerFilterOptions,
     onAddFolder: (parentId) => {
@@ -115,6 +135,7 @@ export function useLocalOrganizerSettings(): SettingsProps {
       })));
       return id;
     },
+    onApplyPreview: applyPreview,
     onConditionsChange: (id, conditions) => changeTree((tree) => updateOrganizerFolder(tree, id, (folder) => ({ ...folder, conditions }))),
     onFolderNameChange: (id, name) => changeTree((tree) => updateOrganizerFolder(tree, id, (folder) => ({ ...folder, name }))),
     onMoveFolder: (id, direction) => changeTree((tree) => moveOrganizerFolder(tree, id, direction)),
@@ -126,4 +147,5 @@ export function useLocalOrganizerSettings(): SettingsProps {
     state: model.state,
     tree: model.tree,
   };
+  return model.canRestore ? { ...settings, onRestore: restore } : settings;
 }

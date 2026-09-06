@@ -27,15 +27,20 @@ single configuration is private IndexedDB state behind `StoragePort`, included
 in private export v3. The options runtime reads, validates and saves it through
 strict background messages, then joins at most 500 local favorite sources,
 Reviews and Works for its full-page preview. It offers only filters backed by
-current local metadata. Snapshot and bookmark projection remain separate
-adapter steps, so apply and restore actions are not exposed yet.
+current local metadata. Apply sends the exact serialized preview back with an
+explicit confirmation; the application recalculates it and rejects partial,
+truncated, or changed input. Before the first browser move, a complete minimal
+bookmark-tree snapshot is written and verified through a dedicated IndexedDB
+port. Restore moves only bookmarks that still exist back to a surviving saved
+parent and index. It creates no missing bookmark and deletes nothing.
 
 ## Local persistence
 
 The storage package defines `StoragePort`, versioned records, migrations,
 export, import, and recovery contracts. The first adapter uses Dexie and
 IndexedDB, which is the sole active authority for favorite sources, Reviews,
-the private library, progress, agenda, organizer rules, and durable task queue. `storage.local` is limited to
+the private library, progress, agenda, organizer rules and verified organizer
+snapshot, and durable task queue. `storage.local` is limited to
 technical preferences and bootstrap state. `storage.sync` may hold only a
 small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend

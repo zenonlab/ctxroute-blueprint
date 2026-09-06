@@ -1,14 +1,15 @@
-import { hydrateAgendaFromPublicReleaseCache, importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   normalizeBookmarks,
   WebExtensionBookmarkImportAdapter,
+  WebExtensionOrganizerAdapter,
   WebExtensionPageContextAdapter,
   WebExtensionPopupContinuationCacheAdapter,
   WebExtensionNotificationAdapter,
   WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
 } from '@tobirink/adapters-browser';
-import { DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieOrganizerSnapshotStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -28,6 +29,8 @@ export default defineBackground({
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
     const bookmarks = new WebExtensionBookmarkImportAdapter(browser.bookmarks);
+    const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
+    const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     browser.runtime.onInstalled.addListener(async () => {
@@ -178,7 +181,7 @@ export default defineBackground({
       if (parsed.data.type === 'organizer.configuration.read') {
         try {
           await privateStorage.ensureReady();
-          return { configuration: await privateStorage.storage.getOrganizerConfiguration(), ok: true };
+          return { canRestore: (await organizerSnapshots.load()) !== undefined, configuration: await privateStorage.storage.getOrganizerConfiguration(), ok: true };
         } catch {
           return { error: 'organizer-configuration-unavailable', ok: false };
         }
@@ -187,7 +190,7 @@ export default defineBackground({
         try {
           await privateStorage.ensureReady();
           const configuration = await saveOrganizerConfiguration(privateStorage.storage, parseOrganizerConfiguration(parsed.data.configuration));
-          return { configuration, ok: true };
+          return { canRestore: (await organizerSnapshots.load()) !== undefined, configuration, ok: true };
         } catch {
           return { error: 'organizer-configuration-invalid', ok: false };
         }
@@ -199,6 +202,29 @@ export default defineBackground({
           return { ok: true, snapshot };
         } catch {
           return { error: 'organizer-preview-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'organizer.preview.apply') {
+        try {
+          await privateStorage.ensureReady();
+          const result = await applyConfirmedOrganizerPreview(
+            { bookmarks: bookmarkOrganizer, snapshots: organizerSnapshots, storage: privateStorage.storage },
+            { configuration: parseOrganizerConfiguration(parsed.data.configuration), confirmation: parsed.data.confirmation, expected: parsed.data.expected, now: new Date().toISOString() },
+          );
+          await importFavoriteSources(normalizeBookmarks(await bookmarks.importBookmarks()), privateStorage.storage, new Date().toISOString());
+          return { ...result, ok: true };
+        } catch {
+          return { error: 'organizer-preview-stale-or-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'organizer.snapshot.restore') {
+        try {
+          const result = await restoreConfirmedOrganizerSnapshot({ bookmarks: bookmarkOrganizer, snapshots: organizerSnapshots }, parsed.data.confirmation);
+          await privateStorage.ensureReady();
+          await importFavoriteSources(normalizeBookmarks(await bookmarks.importBookmarks()), privateStorage.storage, new Date().toISOString());
+          return { ...result, ok: true };
+        } catch {
+          return { error: 'organizer-snapshot-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'popup.context.read') {

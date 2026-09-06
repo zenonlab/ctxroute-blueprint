@@ -2464,7 +2464,7 @@
         {
           "id": "step-7",
           "title": "Finaliser application, restauration et sauvegarde des réglages",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Appliquer exige un aperçu frais et une confirmation explicite avant tout déplacement",
             "Un snapshot local précède chaque projection et Restaurer remet ce snapshot sans supprimer de favori",
@@ -2487,7 +2487,14 @@
             "npm run test:security",
             "npm run archify:validate -- tobirink.architecture"
           ],
-          "evidence": []
+          "evidence": [
+            "Appliquer exige la confirmation littérale et recalcule exactement l aperçu attendu; aperçu partiel, tronqué ou modifié est rejeté avant toute capture ou mutation.",
+            "Un snapshot minimal complet de l arbre navigateur est capturé puis relu via DexieOrganizerSnapshotStore avant le premier move; le contrat IndexedDB Chromium prouve sa persistance locale.",
+            "Le navigateur est isolé derrière WebExtensionOrganizerAdapter; restore déplace uniquement les favoris encore présents vers un parent sauvegardé existant et ne crée ni ne supprime aucun favori.",
+            "Le bouton Restaurer reste absent sans snapshot réel; Appliquer et Restaurer utilisent deux Dialog de confirmation et seulement des callbacks runtime sérialisés.",
+            "Export privé v3 avec règles organisateur et backup AES-GCM opt-in restent séparés: recovery 7/7, contrat export 1/1 et adaptateur backup 3/3 passent.",
+            "Application 53/53, navigateur 8/8, extension 88/88, sécurité 12/12, a11y 8/8, typecheck, lints, anti-slop, Sensor SAFE et builds Chrome 641.68 kB / Firefox 641.80 kB passent; Archify 9/9 sans avertissement."
+          ]
         },
         {
           "id": "step-8",

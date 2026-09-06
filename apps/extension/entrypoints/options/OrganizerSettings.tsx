@@ -30,6 +30,7 @@ function countFolders(folder: OrganizerFolder): number {
 export function Settings(props: SettingsProps) {
   const [view, setView] = useState<'config' | 'preview'>('config');
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmApply, setConfirmApply] = useState(false);
   const [draggedId, setDraggedId] = useState<string>();
   const [openFilters, setOpenFilters] = useState<ReadonlySet<string>>(() => new Set());
   const variant = props.variant ?? 'organizer';
@@ -123,7 +124,7 @@ export function Settings(props: SettingsProps) {
           </div>
           <footer className={styles.footer}>
             <Button icon="refresh-cw" onClick={props.onRequestPreview}>Recalculer</Button>
-            {props.onApplyPreview ? <Button disabled={!props.previewFresh || moveCount === 0} icon="check" onClick={props.onApplyPreview} variant="primary">Appliquer le tri</Button> : null}
+            {props.onApplyPreview ? <Button disabled={!props.previewFresh || moveCount === 0} icon="check" onClick={() => setConfirmApply(true)} variant="primary">Appliquer le tri</Button> : null}
           </footer>
         </section>
       )}
@@ -137,6 +138,16 @@ export function Settings(props: SettingsProps) {
         variant="alert"
       >
         <p>Les favoris ajoutés depuis seront conservés.</p>
+      </Dialog> : null}
+      {props.onApplyPreview ? <Dialog
+        actions={<><Button icon="x" onClick={() => setConfirmApply(false)}>Annuler</Button><Button icon="check" onClick={() => { setConfirmApply(false); props.onApplyPreview?.(); }} variant="primary">Appliquer</Button></>}
+        description={`${moveCount} favori${moveCount === 1 ? '' : 's'} sera${moveCount === 1 ? '' : 'ont'} déplacé${moveCount === 1 ? '' : 's'} selon cet aperçu.`}
+        onOpenChange={setConfirmApply}
+        open={confirmApply}
+        title="Appliquer ce tri ?"
+        variant="alert"
+      >
+        <p>Un snapshot local vérifié sera enregistré avant le premier déplacement.</p>
       </Dialog> : null}
     </main>
   );

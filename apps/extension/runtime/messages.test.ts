@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, librarySearchResponseSchema, organizerConfigurationResponseSchema, organizerPreviewResponseSchema, quickPreferencesResponseSchema, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema } from './messages';
+import { agendaPeriodResponseSchema, extensionMessageSchema, libraryPageResponseSchema, librarySearchResponseSchema, organizerConfigurationResponseSchema, organizerMutationResponseSchema, organizerPreviewResponseSchema, quickPreferencesResponseSchema, reviewCandidatesResponseSchema, reviewDecisionResponseSchema, reviewQueueResponseSchema } from './messages';
 
 const organizerConfiguration = {
   folders: [{
@@ -121,7 +121,7 @@ describe('extension Organizer messages', () => {
   });
 
   it('bounds serialized configuration and preview responses', () => {
-    expect(organizerConfigurationResponseSchema.safeParse({ configuration: organizerConfiguration, ok: true }).success).toBe(true);
+    expect(organizerConfigurationResponseSchema.safeParse({ canRestore: false, configuration: organizerConfiguration, ok: true }).success).toBe(true);
     expect(organizerPreviewResponseSchema.safeParse({
       ok: true,
       snapshot: {
@@ -135,5 +135,13 @@ describe('extension Organizer messages', () => {
       ok: true,
       snapshot: { inspectedCount: 501, items: [], state: 'ready', truncated: false },
     }).success).toBe(false);
+  });
+
+  it('requires exact confirmations for apply and restore', () => {
+    const expected = { inspectedCount: 1, items: [{ action: 'move', bookmarkId: 'bookmark-1', destination: ['Manga'], ruleId: 'manga', title: 'Frieren' }], state: 'ready', truncated: false };
+    expect(extensionMessageSchema.safeParse({ configuration: organizerConfiguration, confirmation: 'apply-organizer-preview', expected, type: 'organizer.preview.apply', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ configuration: organizerConfiguration, confirmation: 'yes', expected, type: 'organizer.preview.apply', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ confirmation: 'restore-organizer-snapshot', type: 'organizer.snapshot.restore', version: 1 }).success).toBe(true);
+    expect(organizerMutationResponseSchema.safeParse({ moved: 1, ok: true, skipped: 0 }).success).toBe(true);
   });
 });

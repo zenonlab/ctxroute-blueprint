@@ -44,9 +44,12 @@ trente jours, n’est ni exporté ni autoritaire et peut disparaître avec les
 données de l’extension. Les Réglages complets reprennent l’organisateur FavLib en page entière,
 sans recherche globale ni navigation du site. La première vue édite l’arbre de
 dossiers et ses filtres dans l’ordre de priorité ; la seconde devient une page
-d’aperçu complète, sans coque de dialogue. L’application et la restauration
-restent absentes tant que leurs callbacks navigateur et snapshot n’existent pas. Les préférences
-rapides restent dans le popup.
+d’aperçu complète, sans coque de dialogue. L’application apparaît seulement
+après un aperçu frais et ouvre une confirmation courte; le background recalcule
+le même aperçu avant de capturer l’arbre complet dans IndexedDB puis de déplacer
+les favoris. Restaurer exige sa propre confirmation et remet uniquement les
+favoris encore présents à leur parent et rang sauvegardés, sans suppression.
+Les préférences rapides restent dans le popup.
 L’arbre est récursif : un dossier peut créer ses propres enfants. Le rang est
 affiché en contraste au centre du pictogramme de dossier rempli et correspond
 uniquement à sa place parmi ses frères. Le bouton Filtres développe sous le dossier

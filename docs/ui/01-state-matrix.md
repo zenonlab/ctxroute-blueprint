@@ -38,7 +38,11 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
   réinitialise pas la surface entière.
 - L’organisateur conserve l’arbre pendant le calcul de l’aperçu. Une action
   d’application ou de restauration n’existe dans la surface que si l’hôte fournit
-  son callback réel ; l’application exige en plus un aperçu frais.
+  son callback réel ; l’application exige en plus un aperçu frais, complet et
+  explicitement confirmé. Une modification concurrente rend l’aperçu caduc.
+- Le snapshot complet de l’arbre est vérifié dans IndexedDB avant le premier
+  déplacement. Restaurer ne recrée ni ne supprime un favori; les nouveaux favoris
+  restent en place et les parents disparus sont signalés comme ignorés.
 - Sa configuration et son aperçu remplacent toute la surface : aucune bordure,
   ombre ou coque centrée ne doit les faire percevoir comme un dialogue.
 - Les paramètres avancés appartiennent au dossier développé, restent opérables au

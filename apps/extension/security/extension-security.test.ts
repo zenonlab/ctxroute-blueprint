@@ -97,6 +97,8 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).toMatch(/saveOrganizerConfiguration\(privateStorage\.storage/);
     expect(background).toMatch(/readOrganizerPreview\(privateStorage\.storage/);
+    expect(background).toMatch(/applyConfirmedOrganizerPreview/);
+    expect(background).toMatch(/DexieOrganizerSnapshotStore/);
     expect(background).not.toMatch(/bookmarks\.(?:create|move|remove|update)\s*\(/);
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);

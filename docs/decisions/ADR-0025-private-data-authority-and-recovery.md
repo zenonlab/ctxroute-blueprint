@@ -74,6 +74,15 @@ confirmed entries; disabling them leaves durable tasks intact but prevents
 publication. The estimated-release preference filters delivery projections,
 not the cached or authoritative records.
 
+Organizer projection is a confirmed outward side effect, never a second
+authority. The application accepts only the exact complete preview it can
+recalculate from current private state. It captures and verifies one complete
+minimal bookmark-tree snapshot through a dedicated IndexedDB port before the
+first move. Restore moves only surviving bookmark nodes to surviving saved
+parents and indexes; it never recreates or deletes a bookmark. Local private
+export v3 already includes organizer rules, while encrypted backup remains a
+separate explicit opt-in flow and cannot replace IndexedDB silently.
+
 ## Consequences
 
 Clearing a disposable cache can be repaired from stable catalogue IDs. Losing

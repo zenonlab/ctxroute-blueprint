@@ -97,6 +97,8 @@ describe('extension accessibility contract', () => {
     expect(organizerSettingsHook).toContain('readOrganizerConfigurationMessage()');
     expect(organizerSettingsHook).toContain('writeOrganizerConfigurationMessage(configuration)');
     expect(organizerSettingsHook).toContain('readOrganizerPreviewMessage(configuration)');
+    expect(organizerSettingsHook).toContain('applyOrganizerPreviewMessage(configuration, expected)');
+    expect(organizerSettingsHook).toContain('restoreOrganizerSnapshotMessage()');
     expect(organizerSettingsHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\.|fetch\(/);
   });
 
