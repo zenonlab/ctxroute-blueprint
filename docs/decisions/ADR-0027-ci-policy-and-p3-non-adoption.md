@@ -6,6 +6,7 @@ scope:
   - docs/02-quality-strategy.md
   - docs/orchestration.md
 review: on-change
+revised: true
 contracts:
   - .project/orchestrator-config.json
 ---
@@ -32,4 +33,4 @@ an application workload rather than blueprint-local tooling.
 
 The blueprint keeps deterministic local process and filesystem boundaries.
 Platform smokes must not be described as complete gates, and historical
-Progress runtime capabilities must not appear in active operational guidance.
+Retired dashboard/runtime capabilities must not appear in active operational guidance.

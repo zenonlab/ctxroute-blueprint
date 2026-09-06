@@ -22,7 +22,7 @@ intersected with Git-tracked source files and mechanically rejects an allowlist
 whose relative runtime imports are not closed. Ignored caches and generated ADR
 memory can never leak from one checkout into another. The synchronizer defaults
 to a dry run, refuses dirty targets, creates a recoverable backup, and
-never overwrites project decisions, Progress data, product documentation, or
+never overwrites project decisions, local orchestrator state, product documentation, or
 source code. A versioned marker travels with that allowlist so automation can
 fail visibly when a derived control plane is stale without rewriting it. The
 marker carries the allowlist digest, and the quality gate requires an explicit
@@ -48,5 +48,5 @@ Routine tool calls create fewer processes and external service instability does
 not hide local verification. Control-plane updates remain an explicit operator action because silently
 rewriting an already-derived project would destroy local policy.
 
-The superseded Progress worker and dashboard runtime remains historical only;
-ADR-0022 universal orchestration owns the current execution boundary.
+Superseded planning-worker and dashboard experiments remain archived historical
+material only; ADR-0022 universal orchestration owns the current execution boundary.

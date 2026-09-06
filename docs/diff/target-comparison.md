@@ -6,10 +6,10 @@ The target preserves the local Node.js/stdin/filesystem design. It adds explicit
 
 | Area | Current, evidenced state | Proposed target | Priority / compatibility |
 | --- | --- | --- | --- |
-| State contract | Imperative partial `validateState`; audits/receipts and unknown fields are weakly checked. | Canonical JSON Schema 2020-12 plus a single runtime adapter; validate on read and before write. | P0; accept current v1 instances first, then warn before forbidding unknown fields. |
+| State contract | Imperative partial `validateState`; audits/receipts and unknown fields are weakly checked. | Canonical JSON Schema 2020-12 plus a single strict Ajv 8 adapter; validate on read and before write. | P0; write only V2. Reset recognized V1 state without touching worktrees; reject corrupt or unknown versions. |
 | Transaction envelope | Revision CAS and digest replay in core; weaker special replay in mission service. | One envelope validator and one digest/replay path over the complete canonical payload. | P0; retain operation IDs and revision semantics. |
-| Mission | Minimal worker projection exists; implicit status/report/worktree/base revision/requested skill. | Separate `MissionRequestV1`, orchestrator-owned `MissionRecordV1`, and worker-visible `MissionViewV1`. | P0; additive split, no field rename required. |
-| Worker report | Bounded shape, diff/scope and command-name checks; result is self-reported. | Formal enum/status, bounded arrays, evidence references, timestamps/duration optional; orchestrator records independently observed diff and Git revision. | P0; new optional observation fields first. |
+| Mission | Minimal worker projection exists; implicit status/report/worktree/base revision/requested skill. | Separate `MissionRequestV2`, orchestrator-owned `MissionRecordV2`, and worker-visible `MissionViewV2`. | P0; closed V2 state machine and `worker-report-v2`. |
+| Worker report | Bounded shape, diff/scope and command-name checks; result is self-reported. | Formal enum/status, bounded arrays and evidence references; orchestrator reruns structured validations without a shell and records its own receipt. | P0; only an orchestrator receipt can complete a mission. |
 | Audit report | Bounded free-text decision and subject. | Decision enum, categorical signals, evidence refs, explicit proposed/applied action, validation result and rollback reference. | P0; map existing strings to `other` during migration. |
 | Worker authority | Enforced at service/environment boundary. | Keep API authority wording; add capability-limited process sandbox only if threat model requires it. | P0 documentation correction; no sandbox claim. |
 | Simple bypass | Scope-count heuristic. | Explicit `execution: direct|coordinated` decision plus recorded reason; heuristic may remain a default. | P1; additive. |
@@ -25,35 +25,44 @@ The target preserves the local Node.js/stdin/filesystem design. It adds explicit
 
 ## Proposed contract version
 
-Recommendation: keep persisted `schemaVersion: 1` initially and publish `$id`-stable schemas named `*-v1.schema.json`. The first release should describe accepted reality, close security/integrity gaps with runtime checks, and add explicit optional fields. Increment to state schema v2 only when a stored representation cannot be read safely as v1.
+The accepted target writes `schemaVersion: 2` directly and publishes stable
+`$id` contracts for every produced object. On first access, the orchestrator
+deletes only a recognized valid V1 `state.json`, its lock, and known temporary
+state files before atomically creating empty V2 state. It neither migrates nor
+backs up V1 and never removes associated worktrees, reports, or recovery
+evidence. Corrupt JSON and unknown or higher versions fail without deletion.
 
 Suggested definitions:
 
 ```text
-TransactionEnvelopeV1
+TransactionEnvelopeV2
   operation_id, expected_revision, action, payload
 
-MissionRequestV1
+MissionRequestV2
   mission_id, skill_id, skill_version, file_scope,
   acceptance, validation_commands, response_format
 
-MissionRecordV1 (orchestrator-owned)
-  MissionRequestV1 + status, worktree, base_revision,
+MissionRecordV2 (orchestrator-owned)
+  MissionRequestV2 + status, worktree, base_revision,
   requested_skill_id?, report?, allocation_state?
 
-MissionViewV1 (worker-visible)
+MissionViewV2 (worker-visible)
   explicit allowlist projection; never conversation/history fields
 
-WorkerReportV1
+WorkerReportV2
   mission_id, skill_id, skill_version, files_touched,
   commands[{command, exit_code}], summary, material_evidence, blockers
 
-AuditReportV1
+AuditReportV2
   sessions_examined, signals_detected, subject,
   decision, patch_applied, validations, rollback
 ```
 
-Use `$schema` and `$id`, explicit `required`, array/item bounds, enums, path patterns and `unevaluatedProperties: false` for newly produced objects. For compatibility, validate old persisted objects with a legacy profile, migrate in memory, and write only the canonical profile. `readOnly` annotations must not substitute for service authorization.
+Use `$schema` and `$id`, explicit `required`, array/item bounds, enums, path
+patterns and `unevaluatedProperties: false` for every V2 object. The only V1
+reader recognizes the exact disposable local state eligible for reset; it is
+not a migration profile. `readOnly` annotations never substitute for service
+authorization.
 
 OpenAPI is not proposed: its defined scope is HTTP APIs, while this blueprint exposes stdio MCP, CLI and local files. If an HTTP surface is deliberately added later, it requires a separate decision and threat model.
 

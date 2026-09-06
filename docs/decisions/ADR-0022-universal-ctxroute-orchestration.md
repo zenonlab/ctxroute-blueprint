@@ -25,8 +25,8 @@ contracts:
 
 ## Decision
 
-Keep CTXRoute as the on-demand context engine and remove Progress from the
-execution path. A project-local orchestrator is the sole authority for global
+Keep CTXRoute as the on-demand context engine and use no separate checklist
+runtime in the execution path. A project-local orchestrator is the sole authority for global
 goal and mission state. Its MCP server and mirror CLI call the same
 transactional core. Mutations carry an operation identifier and an expected
 revision so retries are idempotent and concurrent writes fail explicitly.
@@ -77,8 +77,8 @@ it.
 
 ## Consequences
 
-`ctxroute-progress`, its checklist, its automatic mutations, and its Stop
-handoff are removed. Codex and Claude declare the same `ctxroute-orchestrator`
+The superseded checklist, its automatic mutations, and its Stop handoff are not
+part of the active control plane. Codex and Claude declare the same `ctxroute-orchestrator`
 and official code-review-graph servers. Simple direct work remains possible
 without either MCP server in `SWARM_OFF`; coordinated work has durable,
 auditable ownership in `SWARM_ON`.

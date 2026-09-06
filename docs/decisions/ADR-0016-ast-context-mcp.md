@@ -16,7 +16,7 @@ superseded-by: ADR-0018-official-code-review-graph.md
 
 The Sensor and context MCP are separate pipelines. Sensor remains the
 PostToolUse/pre-commit blocking boundary; the context MCP is read-only and
-does not replace Sensor or Progress MCP.
+does not replace Sensor or the current orchestrator MCP.
 
 The single executable registry declares every Sensor adapter and the
 JavaScript, TypeScript/TSX, Python and Ruby grammars (including `.rb`, `.rake`,

@@ -4,9 +4,17 @@ import { loadAdrs, normalizePath } from '../.codex/hooks/decision-memory.mjs';
 const adrs = loadAdrs(process.cwd());
 const failures = adrs.flatMap(adr => adr.errors);
 const names = new Set(adrs.map(adr => adr.file));
+const numericIds = new Map();
 for (const adr of adrs) {
+  const numericId = adr.file.match(/\/ADR-(\d{4})-/u)?.[1];
+  if (numericId) {
+    const previous = numericIds.get(numericId);
+    if (previous) failures.push(`${adr.file}: ADR number ${numericId} is already used by ${previous}`);
+    else numericIds.set(numericId, adr.file);
+  }
   const replacement = adr.metadata?.['superseded-by'];
   if (replacement && !names.has(`docs/decisions/${replacement}`)) failures.push(`${adr.file}: superseded-by target does not exist: ${replacement}`);
+  if (replacement && adr.file.endsWith(`/${replacement}`)) failures.push(`${adr.file}: ADR cannot supersede itself`);
   for (const scope of adr.metadata?.scope ?? []) if (scope.startsWith('/') || scope.includes('..')) failures.push(`${adr.file}: scope contains an invalid path: ${scope}`);
 }
 if (process.argv.includes('--staged')) {

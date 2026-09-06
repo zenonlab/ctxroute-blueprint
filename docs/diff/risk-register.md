@@ -31,4 +31,12 @@ Severity: Critical, High, Medium, Low. Probability: High, Medium, Low. Impact de
 
 ## Acceptance boundary
 
-The current green gate is sufficient evidence for audited happy paths, not for hostile-process security, power-loss durability, disk exhaustion or concurrent crash recovery. Risks R-01 through R-06 and R-14 should block stronger production-readiness claims. They do not require an HTTP service, Kubernetes, a daemon, hardware simulation or canary deployment; those remain out of scope until an operational requirement is demonstrated.
+The original observations and scores above remain the historical baseline. V2
+may close an implementation defect only when the matching contract and test in
+[remediation-closure.md](remediation-closure.md) pass. Local tests do not prove
+hostile-process isolation, arbitrary-filesystem power-loss durability, hosted
+branch protection, or a production SLA.
+
+No risk requires an HTTP service, Kubernetes, GitOps runtime, daemon, hardware
+simulation, or canary deployment. Those mechanisms remain explicitly not
+adopted under ADR-0027 until its reopening criteria are met.
