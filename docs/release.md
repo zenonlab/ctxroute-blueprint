@@ -51,12 +51,14 @@ repository-owned command sequence is:
 
 ```sh
 npm run infra:inspect -- --account <cloudflare-account-id>
-npm run infra:plan -- --account <cloudflare-account-id> --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip
-npm run infra:apply -- --plan <reviewed-plan.json> --approve <plan-sha256> --account <cloudflare-account-id> --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip
+npm run infra:plan -- --account <cloudflare-account-id> --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip --operation worker-deploy
+npm run infra:apply -- --plan <reviewed-plan.json> --approve <plan-sha256> --account <cloudflare-account-id> --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api
 ```
 
 These commands are documentation, not authorization. This preparation step
 does not run inspection, planning, apply, upload, deploy or publish.
+The plan preview binds the two ZIP byte hashes and the Worker dry-run output to
+its digest; the apply gate repeats both checks immediately before mutation.
 
 ## Rollback
 

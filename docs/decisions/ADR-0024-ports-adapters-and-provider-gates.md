@@ -44,11 +44,15 @@ to Wrangler. It derives Worker, D1, and R2 resource names from the checked-in
 Worker configuration; product use cases and runtime adapters never import the
 operational driver.
 
-The initial driver permits only D1 migration application and Worker deployment.
-It inspects authentication, current deployment, pending migrations, and every
-configured R2 bucket. D1 migrations always run before a Worker deployment.
-Adding an R2 mutation or another provider requires an explicit driver operation
-and its contract tests; it does not expand the generic gate implicitly.
+The driver permits D1 migration application, Worker deployment, and publication
+of the two version-derived Chrome/Firefox archives to the configured release
+bucket. It inspects authentication, current deployment, pending migrations, and
+every configured R2 bucket. Before approval, each release archive is read and
+its size and SHA-256 enter the preview digest; apply rejects changed bytes.
+D1 migrations run first, release objects second, and the Worker deployment
+last. No generic R2 key, bucket deletion, or arbitrary local path is accepted.
+Adding another R2 mutation or provider still requires an explicit driver
+operation and its contract tests; it does not expand the generic gate.
 
 ## Consequences
 

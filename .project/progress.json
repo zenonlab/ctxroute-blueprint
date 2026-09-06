@@ -4725,6 +4725,90 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-production-publication",
+      "title": "Publier TobiRink 1.0.0 sur Cloudflare",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Versionner la surface de publication reproductible",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "origin/main contains the exact Worker custom route, static assets binding, versioned download handler, R2 artifact adapter and bounded r2-publish gate",
+            "No FavLib resource, environment file, delete operation, secret or Cloudflare mutation is read or performed",
+            "Tests, full verification, static export, package hashes, Archify showcase, PR checks and merge all pass"
+          ],
+          "files": [
+            ".gitignore",
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/worker-configuration.d.ts",
+            "apps/worker/src/index.ts",
+            "apps/worker/src/index.test.ts",
+            "apps/worker/src/releases/public-release-routes.ts",
+            "apps/worker/src/releases/public-release-routes.test.ts",
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/application/src/index.ts",
+            "packages/adapters-cloudflare/src/releases/r2-release-snapshot-store.ts",
+            "packages/adapters-cloudflare/src/releases/r2-release-snapshot-store.test.ts",
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/release.md",
+            "docs/architecture/src/extension-delivery-validation.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git switch -c fix/tobirink-production-publication origin/main",
+            "npm run test:infra",
+            "npm run test:worker",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "npm run archify:validate -- extension-delivery-validation.dataflow",
+            "git diff --check",
+            "git commit -m \"feat(release): gate cloudflare production publication\"",
+            "git push -u origin fix/tobirink-production-publication",
+            "gh pr create --base main --head fix/tobirink-production-publication",
+            "gh pr checks --watch",
+            "gh pr merge --merge"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-2",
+          "title": "Appliquer le plan Cloudflare exact et vérifier la production",
+          "status": "TODO",
+          "acceptance": [
+            "The reviewed plan mutates only the two versioned R2 object keys and worker:tobirink-public-api in account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "No D1 data, FavLib resource, unrelated R2 object, secret, store listing or browser extension store is mutated",
+            "All public pages return 200 and both downloads return 200 with the locally verified SHA-256 hashes",
+            "The deployed Worker version and previous rollback version are recorded"
+          ],
+          "files": [
+            "apps/web/out/**",
+            "apps/extension/.output/packages/tobirink-chrome-mv3-1.0.0.zip",
+            "apps/extension/.output/packages/tobirink-firefox-mv3-1.0.0.zip",
+            "apps/extension/.output/packages/release-manifest.json",
+            ".ctxroute/state/tobirink-production-plan.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip --operation worker-deploy",
+            "npm run infra:apply -- --plan .ctxroute/state/tobirink-production-plan.json --approve <reviewed-digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api",
+            "curl production routes and downloads",
+            "shasum -a 256 downloaded artifacts"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

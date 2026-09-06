@@ -245,3 +245,8 @@
 - [x] **Stabiliser le démarrage du dashboard sur Windows** — DONE _(evidence: Dashboard startup remains bounded at 3 seconds on POSIX and uses a tested 10-second allowance on Windows., Spawn errors and early child exits now fail explicitly; 10/10 dashboard tests pass, including detached reuse/replacement and launch failure., Internal blueprint architecture validates at showcase quality: 9/9 checks, 0 errors, 0 warnings.)_
 - [x] **Nettoyer les artefacts obsolètes et auditer les sorties** — DONE _(evidence: The two obsolete 0.0.0 ZIPs were removed from the workspace into a dedicated recoverable stash; only 1.0.0 packages and the manifest remain., The release manifest is version 1.0.0 with exactly two artifacts and contains no 0.0.0 reference., Preserved 1.0.0 SHA-256 values match the audited release: Chrome b8506278…a9da8d; Firefox 2af60f3d…17d730.)_
 - [x] **Vérifier et livrer le correctif post-fusion** — DONE _(evidence: npm run verify passed end to end: 270/270 repository tests plus one intentional skip, CRG smoke, integration, audit at 0 vulnerabilities and docs build., Next 16.3.4 static export passed for all eight routes; output scan found no sample-work, Exemple public or 0.0.0., Final diff is limited to Progress evidence, dashboard manager/test, ADR-0028 and the internal Archify source; git diff --check passes.)_
+
+## Publier TobiRink 1.0.0 sur Cloudflare — ACTIVE
+
+- [ ] **Versionner la surface de publication reproductible** — IN_PROGRESS
+- [ ] **Appliquer le plan Cloudflare exact et vérifier la production** — PENDING

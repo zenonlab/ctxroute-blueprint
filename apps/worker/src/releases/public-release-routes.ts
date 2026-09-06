@@ -60,5 +60,23 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
     }
   });
 
+  app.get('/downloads/:artifact', async (context) => {
+    const artifact = context.req.param('artifact');
+    if (!/^tobirink-(?:chrome|firefox)-mv3-\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\.zip$/u.test(artifact)) {
+      return noStoreJson(context, 'invalid-release-artifact', 400);
+    }
+    const object = await routeServices(context, injected).releases.readArtifact(`downloads/${artifact}`);
+    if (!object) return noStoreJson(context, 'release-artifact-unavailable', 503);
+    return new Response(object.body, {
+      headers: {
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Disposition': `attachment; filename="${artifact}"`,
+        'Content-Type': object.contentType,
+        ETag: object.etag,
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  });
+
   return app;
 }

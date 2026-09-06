@@ -25,6 +25,21 @@ npm run infra:plan -- \
   --operation worker-deploy
 ```
 
+Publishing the fixed extension candidates and the matching static Worker uses
+only the version-derived operations exposed by the driver:
+
+```sh
+npm run infra:plan -- \
+  --account <cloudflare-account-id> \
+  --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip \
+  --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip \
+  --operation worker-deploy
+```
+
+The preview hashes the exact local bytes of both ZIPs and includes those hashes
+in the plan digest. The driver cannot accept another bucket, object key, local
+file, or version through command-line input.
+
 `plan` repeats inspection and runs `wrangler deploy --dry-run` when deployment
 is selected. It prints a strict JSON plan to stdout; it does not write a plan
 file or mutate Cloudflare. The plan contains only hashes of inspection and
@@ -45,11 +60,25 @@ npm run infra:apply -- \
   --allow worker:tobirink-public-api
 ```
 
+For the `1.0.0` publication plan, replace the D1 allowlist with exactly:
+
+```text
+r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip
+r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip
+worker:tobirink-public-api
+```
+
 Before the first mutation, the gate verifies the plan schema and digest,
 freshness, account, resource allowlist, driver identity, current provider state,
 and a repeated dry-run. Any mismatch fails closed. When both operations are
-approved, D1 migrations run before the Worker deployment. No CI workflow calls
-`infra:apply`.
+approved, D1 migrations run before release uploads, and the Worker deployment
+runs last. No CI workflow calls `infra:apply`.
+
+The Worker serves the static export through its `ASSETS` binding on
+`tobirink.com/*`. Only declared member routes fall back to the export; API and
+unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
+from `tobirink-public-releases` with immutable caching, attachment disposition,
+ETag, and content-type metadata.
 
 ## Replacing the provider
 

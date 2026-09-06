@@ -22,7 +22,7 @@
         "id": "release-artifacts",
         "label": "Artefacts de livraison",
         "focus": ["browserBuilds", "packageManifest", "releaseEvidence", "releaseGate"],
-        "note": "Les archives 1.0.0 reproductibles, l’origine exacte et leurs SHA-256 alimentent la décision sans publier automatiquement."
+        "note": "Les archives 1.0.0 et leurs SHA-256 traversent un plan borné par digest et allowlist avant publication dans R2."
       }
     ]
   },
@@ -41,9 +41,9 @@
     { "id": "securityEvidence", "type": "security", "label": "Sécurité + perf", "sublabel": "CSP / permissions", "stage": 2, "row": 4, "tag": "sans host permission" },
     { "id": "chromeRuntime", "type": "external", "label": "Runtime Chrome", "sublabel": "worker MV3 chargé", "stage": 3, "row": 0, "tag": "partiel" },
     { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "en attente" },
-    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.0 / SHA-256", "stage": 3, "row": 4, "tag": "local uniquement" },
+    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.0 / SHA-256", "stage": 3, "row": 4, "tag": "sources vérifiées" },
     { "id": "releaseEvidence", "type": "backend", "label": "Preuves versionnées", "sublabel": "support / a11y / release", "stage": 4, "row": 4, "tag": "auditables" },
-    { "id": "releaseGate", "type": "security", "label": "Gate de livraison", "sublabel": "tous les parcours requis", "stage": 4, "row": 1, "tag": "aucune publication auto" }
+    { "id": "releaseGate", "type": "security", "label": "Gate de livraison", "sublabel": "digest + allowlist exacte", "stage": 4, "row": 1, "tag": "apply explicite" }
   ],
   "flows": [
     { "id": "sourcesToBuilds", "from": "repository", "to": "browserBuilds", "label": "sources uniques", "classification": "versionné", "variant": "emphasis" },
@@ -56,7 +56,7 @@
     { "id": "packagesToEvidence", "from": "packageManifest", "to": "releaseEvidence", "label": "hashes et tailles", "classification": "preuve locale", "variant": "default" },
     { "id": "chromeToGate", "from": "chromeRuntime", "to": "releaseGate", "label": "chargement prouvé", "classification": "partiel", "variant": "emphasis" },
     { "id": "firefoxToGate", "from": "firefoxRuntime", "to": "releaseGate", "label": "parcours à accepter", "classification": "bloquant", "variant": "dashed" },
-    { "id": "evidenceToGate", "from": "releaseEvidence", "to": "releaseGate", "label": "dossier de preuve", "classification": "auditable", "variant": "security", "labelAt": [960, 656] }
+    { "id": "evidenceToGate", "from": "releaseEvidence", "to": "releaseGate", "label": "plan R2 + Worker", "classification": "digest borné", "variant": "security", "labelAt": [960, 656] }
   ],
   "cards": [
     {
@@ -74,7 +74,7 @@
       "items": [
         "Exécuter les parcours interactifs dans Chrome et Firefox",
         "Vérifier clavier, focus, zoom 200 %, mouvement réduit et formats étroits",
-        "La gate interdit toute déclaration de livraison avant cette preuve"
+        "La gate limite l’apply aux deux objets R2 versionnés et au Worker"
       ]
     }
   ]

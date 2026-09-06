@@ -93,4 +93,22 @@ describe('public release routes', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'release-snapshot-unavailable' });
   });
+
+  it('serves only versioned public extension artifacts', async () => {
+    const fixture = releaseBindings();
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([1, 2])); controller.close(); } });
+    const app = createPublicReleaseApp({
+      ...fixture.services,
+      releases: {
+        readPointer: (...args) => fixture.services.releases.readPointer(...args),
+        readSnapshot: (...args) => fixture.services.releases.readSnapshot(...args),
+        async readArtifact() { return { body, contentType: 'application/zip', etag: '"zip-1"' }; },
+      },
+    });
+    const response = await app.request('https://api.example/downloads/tobirink-chrome-mv3-1.0.0.zip');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/zip');
+    expect(response.headers.get('Content-Disposition')).toContain('tobirink-chrome-mv3-1.0.0.zip');
+    await expect(app.request('https://api.example/downloads/private.zip')).resolves.toMatchObject({ status: 400 });
+  });
 });
