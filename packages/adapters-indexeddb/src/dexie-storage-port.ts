@@ -4,6 +4,7 @@ import {
   createAgendaEntry,
   createFavoriteSource,
   createLibrary,
+  createOrganizerConfiguration,
   createProgress,
   createReminder,
   createReview,
@@ -16,6 +17,7 @@ import type {
   FavoriteSourceId,
   Library,
   LibraryId,
+  OrganizerConfiguration,
   Progress,
   ProgressId,
   Reminder,
@@ -40,6 +42,7 @@ export class DexieStoragePort implements StoragePort {
       agenda: this.database.agenda,
       favoriteSources: this.database.favoriteSources,
       libraries: this.database.libraries,
+      organizer: this.database.organizer,
       progress: this.database.progress,
       reminders: this.database.reminders,
       reviews: this.database.reviews,
@@ -62,6 +65,7 @@ export class DexieStoragePort implements StoragePort {
         return matches[0] && createFavoriteSource(matches[0]);
       },
       getLibrary: async (id: LibraryId) => { requireStore('libraries'); const library = await this.database.libraries.get(id); return library && createLibrary(library.id, library.workIds); },
+      getOrganizerConfiguration: async () => { requireStore('organizer'); const configuration = await this.database.organizer.get('organizer'); return configuration && createOrganizerConfiguration(configuration); },
       getProgress: async (id: ProgressId) => { requireStore('progress'); const progress = await this.database.progress.get(id); return progress && createProgress(progress); },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
@@ -103,6 +107,7 @@ export class DexieStoragePort implements StoragePort {
         await this.database.favoriteSources.put(createFavoriteSource(source));
       },
       putLibrary: async (library: Library) => { requireStore('libraries'); await this.database.libraries.put(createLibrary(library.id, library.workIds)); },
+      putOrganizerConfiguration: async (configuration: OrganizerConfiguration) => { requireStore('organizer'); await this.database.organizer.put(createOrganizerConfiguration(configuration)); },
       putProgress: async (progress: Progress) => { requireStore('progress'); await this.database.progress.put(createProgress(progress)); },
       putReminder: async (reminder: Reminder) => { requireStore('reminders'); await this.database.reminders.put(createReminder(reminder)); },
       putReview: async (review: Review) => { requireStore('reviews'); await this.database.reviews.put(createReview(review)); },
@@ -114,6 +119,7 @@ export class DexieStoragePort implements StoragePort {
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
+  getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
@@ -125,6 +131,7 @@ export class DexieStoragePort implements StoragePort {
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
+  putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);
   putProgress: StoragePort['putProgress'] = (progress) => this.session().putProgress(progress);
   putReminder: StoragePort['putReminder'] = (reminder) => this.session().putReminder(reminder);
   putReview: StoragePort['putReview'] = (review) => this.session().putReview(review);

@@ -31,6 +31,19 @@ try {
   if (!(await storage.getReview(review.id)) || !(await storage.getAgendaEntry(agenda.id)) || !(await storage.getReminder(reminder.id))) {
     throw new Error('Review, agenda or reminder did not round-trip through IndexedDB.');
   }
+  await storage.database.table('organizer').put({
+    folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],
+    id: 'organizer',
+    updatedAt: '2026-09-06T00:00:00.000Z',
+  });
+  let invalidOrganizerRejected = false;
+  try {
+    await storage.getOrganizerConfiguration();
+  } catch {
+    invalidOrganizerRejected = true;
+  }
+  if (!invalidOrganizerRejected) throw new Error('IndexedDB adapter returned an invalid organizer configuration.');
+  await storage.database.organizer.clear();
   await storage.putFavoriteSource(createFavoriteSource({
     bookmarkId: 'bookmark_orphan',
     folderPath: ['Mangas'],

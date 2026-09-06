@@ -7,11 +7,13 @@ scope:
   - docs/architecture/**
   - docs/systems/**
 review: on-change
+revised: true
 ---
 # ADR-0035 — Local bookmark organizer
 
 - Status: accepted
 - Date: 2026-09-06
+- Revised: 2026-09-06
 
 ## Context
 
@@ -36,11 +38,15 @@ Disabled parents disable their descendants. The preview reports the complete
 destination path and distinguishes no match, insufficient context and an item
 already in its destination.
 
-The initial core is pure. It receives serializable bookmark facts and local
+The preview core is pure. It receives serializable bookmark facts and local
 work context and performs no IndexedDB read, browser call, network request or
-bookmark mutation. Rules are not yet persisted and the options runtime is not
-wired to fixture data. A later apply flow must add a browser projection port,
-fresh preview confirmation and a local snapshot before using
+bookmark mutation. One `organizer` configuration is persisted as private state
+through `StoragePort`; Dexie v5 validates it on every read and write. Private
+export v3 preserves it, while v1 and v2 remain importable without inventing a
+configuration. The options runtime is not yet wired to fixture data.
+
+A later apply flow must add a browser projection port, fresh preview
+confirmation and a local snapshot before using
 `bookmarks.create` or `bookmarks.move`. That operation requires the separately
 approved bookmarks permission and must never delete a bookmark or change its
 title or URL.
@@ -48,8 +54,8 @@ title or URL.
 ## Consequences
 
 Rule semantics can be tested independently and reused across extension
-surfaces without hardcoded folders. IndexedDB remains the authority for
-private Tobirink data, while the browser bookmark tree remains a replaceable
-connector. Until persistence and the guarded projection adapter are delivered,
-the organizer remains a validated preview capability rather than an active
-bookmark editor.
+surfaces without hardcoded folders. IndexedDB remains the authority for the
+configuration and other private Tobirink data, while the browser bookmark tree
+remains a replaceable connector. Until the runtime and guarded projection
+adapter are delivered, the organizer remains a durable preview capability
+rather than an active bookmark editor.

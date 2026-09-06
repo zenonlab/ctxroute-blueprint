@@ -13,7 +13,7 @@
         "id": "local-authority",
         "label": "Private local authority",
         "focus": ["reader", "extensionUi", "extensionWorker", "appCore", "indexedDb", "bootstrapStore"],
-        "note": "Dexie v4 owns private state; indexed resolved Reviews join works to ordered favorite sources without a scan."
+        "note": "Dexie v5 owns private state and the organizer singleton; indexed Reviews join works to favorite sources without a scan."
       },
       {
         "id": "extension-security",
@@ -46,7 +46,7 @@
     { "id": "extensionUi", "type": "frontend", "label": "Extension UI", "sublabel": "Popup / pages / options", "pos": [180, 330], "size": [150, 64], "tag": "local-only CSP" },
     { "id": "appCore", "type": "backend", "label": "Application + domain", "sublabel": "Local flows / Organizer", "pos": [390, 330], "size": [190, 64], "tag": "owned contracts" },
     { "id": "extensionWorker", "type": "backend", "label": "MV3 background", "sublabel": "router + local composition", "pos": [180, 470], "size": [170, 64], "tag": "bounded handlers" },
-    { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "favorite sources / domain state", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
+    { "id": "indexedDb", "type": "database", "label": "IndexedDB", "sublabel": "domain state / organizer rules", "pos": [390, 100], "size": [190, 64], "tag": "sole private authority" },
     { "id": "browserAdapter", "type": "backend", "label": "Browser adapter", "sublabel": "activeTab / cache / notifications", "pos": [650, 100], "size": [190, 64] },
     { "id": "bookmarks", "type": "external", "label": "Browser bookmarks", "sublabel": "Import / optional projection", "pos": [930, 100], "size": [190, 64] },
     { "id": "bootstrapStore", "type": "database", "label": "Browser storage", "sublabel": "Prefs + reprise cache + recovery", "pos": [650, 250], "size": [190, 64] },

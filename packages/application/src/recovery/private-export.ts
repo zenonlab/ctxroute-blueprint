@@ -14,29 +14,37 @@ import {
   reviewId,
   workId,
 } from '@tobirink/domain';
-import type { AgendaEntry, FavoriteSource, Library, Progress, Reminder, Review, Work } from '@tobirink/domain';
+import type { AgendaEntry, FavoriteSource, Library, OrganizerConfiguration, Progress, Reminder, Review, Work } from '@tobirink/domain';
 import { z } from 'zod';
+import { organizerConfigurationSchema, parseOrganizerConfiguration } from './organizer-export-schema';
 
 export interface PrivateSnapshot {
   agenda: readonly AgendaEntry[];
   favoriteSources: readonly FavoriteSource[];
   libraries: readonly Library[];
+  organizer?: OrganizerConfiguration;
   progress: readonly Progress[];
   reminders: readonly Reminder[];
   reviews: readonly Review[];
   works: readonly Work[];
 }
 
-export type PrivateExportV1 = Omit<PrivateSnapshot, 'favoriteSources'> & {
+export type PrivateExportV1 = Omit<PrivateSnapshot, 'favoriteSources' | 'organizer'> & {
   exportedAt: string;
   format: 'tobirink-private-export';
   version: 1;
 };
 
-export interface PrivateExportV2 extends PrivateSnapshot {
+export type PrivateExportV2 = Omit<PrivateSnapshot, 'organizer'> & {
   exportedAt: string;
   format: 'tobirink-private-export';
   version: 2;
+};
+
+export interface PrivateExportV3 extends PrivateSnapshot {
+  exportedAt: string;
+  format: 'tobirink-private-export';
+  version: 3;
 }
 
 export interface RecoveryStorePort {
@@ -61,10 +69,12 @@ const legacySnapshotSchema = z.strictObject({
   agenda: z.array(agendaSchema), libraries: z.array(librarySchema), progress: z.array(progressSchema),
   reminders: z.array(reminderSchema), reviews: z.array(reviewSchema), works: z.array(workSchema),
 });
-const snapshotSchema = legacySnapshotSchema.extend({ favoriteSources: z.array(favoriteSourceSchema) });
+const versionTwoSnapshotSchema = legacySnapshotSchema.extend({ favoriteSources: z.array(favoriteSourceSchema) });
+const snapshotSchema = versionTwoSnapshotSchema.extend({ organizer: organizerConfigurationSchema.optional() });
 const exportV1Schema = legacySnapshotSchema.extend({ exportedAt: z.string(), format: z.literal('tobirink-private-export'), version: z.literal(1) });
-const exportV2Schema = snapshotSchema.extend({ exportedAt: z.string(), format: z.literal('tobirink-private-export'), version: z.literal(2) });
-const exportSchema = z.discriminatedUnion('version', [exportV1Schema, exportV2Schema]);
+const exportV2Schema = versionTwoSnapshotSchema.extend({ exportedAt: z.string(), format: z.literal('tobirink-private-export'), version: z.literal(2) });
+const exportV3Schema = snapshotSchema.extend({ exportedAt: z.string(), format: z.literal('tobirink-private-export'), version: z.literal(3) });
+const exportSchema = z.discriminatedUnion('version', [exportV1Schema, exportV2Schema, exportV3Schema]);
 
 function canonicalDateTime(value: string, label: string): void {
   const parsed = new Date(value);
@@ -72,7 +82,7 @@ function canonicalDateTime(value: string, label: string): void {
 }
 
 function materializeSnapshot(input: z.infer<typeof snapshotSchema>): PrivateSnapshot {
-  const snapshot = {
+  const base: Omit<PrivateSnapshot, 'organizer'> = {
     agenda: input.agenda.map((item) => {
       const entry: AgendaEntry = { availability: item.availability, id: agendaEntryId(item.id), releaseLabel: item.releaseLabel, workId: workId(item.workId) };
       if (item.occursAt !== undefined) entry.occursAt = item.occursAt;
@@ -96,7 +106,9 @@ function materializeSnapshot(input: z.infer<typeof snapshotSchema>): PrivateSnap
       return createReview(review);
     }),
     works: input.works.map((item) => createWork({ ...item, id: workId(item.id) })),
-  } satisfies PrivateSnapshot;
+  };
+  const organizer = input.organizer === undefined ? undefined : parseOrganizerConfiguration(input.organizer);
+  const snapshot: PrivateSnapshot = organizer === undefined ? base : { ...base, organizer };
   const works = new Set(snapshot.works.map((work) => work.id));
   const agenda = new Set(snapshot.agenda.map((entry) => entry.id));
   const reviews = new Set(snapshot.reviews.map((review) => review.id));
@@ -112,22 +124,26 @@ export function validatePrivateSnapshot(value: PrivateSnapshot): PrivateSnapshot
   return materializeSnapshot(snapshotSchema.parse(value));
 }
 
-export function validatePrivateExport(serialized: string): PrivateExportV2 {
+export function validatePrivateExport(serialized: string): PrivateExportV3 {
   const input = exportSchema.parse(JSON.parse(serialized));
   canonicalDateTime(input.exportedAt, 'export.exportedAt');
-  const snapshotInput = input.version === 1 ? { ...input, favoriteSources: [] } : input;
-  return Object.freeze({ ...materializeSnapshot(snapshotInput), exportedAt: input.exportedAt, format: input.format, version: 2 });
+  const snapshotInput = {
+    ...input,
+    favoriteSources: input.version === 1 ? [] : input.favoriteSources,
+    organizer: input.version === 3 ? input.organizer : undefined,
+  };
+  return Object.freeze({ ...materializeSnapshot(snapshotInput), exportedAt: input.exportedAt, format: input.format, version: 3 });
 }
 
-export async function createPrivateExport(storage: RecoveryStorePort, exportedAt: string): Promise<PrivateExportV2> {
+export async function createPrivateExport(storage: RecoveryStorePort, exportedAt: string): Promise<PrivateExportV3> {
   canonicalDateTime(exportedAt, 'exportedAt');
-  return Object.freeze({ ...validatePrivateSnapshot(await storage.readSnapshot()), exportedAt, format: 'tobirink-private-export', version: 2 });
+  return Object.freeze({ ...validatePrivateSnapshot(await storage.readSnapshot()), exportedAt, format: 'tobirink-private-export', version: 3 });
 }
 
 export async function importPrivateExport(serialized: string, storage: RecoveryStorePort, confirmation: string): Promise<void> {
   const validated = validatePrivateExport(serialized);
   if (confirmation !== 'replace-private-state') throw new Error('Replacing private state requires explicit confirmation.');
-  await storage.replaceSnapshot({
+  const base: Omit<PrivateSnapshot, 'organizer'> = {
     agenda: validated.agenda,
     favoriteSources: validated.favoriteSources,
     libraries: validated.libraries,
@@ -135,5 +151,6 @@ export async function importPrivateExport(serialized: string, storage: RecoveryS
     reminders: validated.reminders,
     reviews: validated.reviews,
     works: validated.works,
-  });
+  };
+  await storage.replaceSnapshot(validated.organizer === undefined ? base : { ...base, organizer: validated.organizer });
 }

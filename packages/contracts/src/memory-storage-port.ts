@@ -1,5 +1,6 @@
 import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
+import { createOrganizerConfiguration } from '@tobirink/domain';
 import type {
   AgendaEntry,
   AgendaEntryId,
@@ -7,6 +8,7 @@ import type {
   FavoriteSourceId,
   Library,
   LibraryId,
+  OrganizerConfiguration,
   Progress,
   ProgressId,
   Reminder,
@@ -23,6 +25,7 @@ interface MemoryState {
   agenda: RecordMap<AgendaEntry>;
   favoriteSources: RecordMap<FavoriteSource>;
   libraries: RecordMap<Library>;
+  organizer?: OrganizerConfiguration;
   progress: RecordMap<Progress>;
   reminders: RecordMap<Reminder>;
   reviews: RecordMap<Review>;
@@ -34,7 +37,7 @@ function emptyState(): MemoryState {
 }
 
 function cloneState(state: MemoryState): MemoryState {
-  return {
+  const cloned: MemoryState = {
     agenda: new Map(state.agenda),
     favoriteSources: new Map(state.favoriteSources),
     libraries: new Map(state.libraries),
@@ -43,6 +46,8 @@ function cloneState(state: MemoryState): MemoryState {
     reviews: new Map(state.reviews),
     works: new Map(state.works),
   };
+  if (state.organizer !== undefined) cloned.organizer = state.organizer;
+  return cloned;
 }
 
 function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreName>): StorageSession {
@@ -59,6 +64,7 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
       return matches[0];
     },
     getLibrary: async (id: LibraryId) => { requireStore('libraries'); return state.libraries.get(id); },
+    getOrganizerConfiguration: async () => { requireStore('organizer'); return state.organizer; },
     getProgress: async (id: ProgressId) => { requireStore('progress'); return state.progress.get(id); },
     getReminder: async (id: ReminderId) => { requireStore('reminders'); return state.reminders.get(id); },
     getReview: async (id: ReviewId) => { requireStore('reviews'); return state.reviews.get(id); },
@@ -105,6 +111,7 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
       state.favoriteSources.set(source.id, source);
     },
     putLibrary: async (library: Library) => { requireStore('libraries'); state.libraries.set(library.id, library); },
+    putOrganizerConfiguration: async (configuration: OrganizerConfiguration) => { requireStore('organizer'); state.organizer = createOrganizerConfiguration(configuration); },
     putProgress: async (progress: Progress) => { requireStore('progress'); state.progress.set(progress.id, progress); },
     putReminder: async (reminder: Reminder) => { requireStore('reminders'); state.reminders.set(reminder.id, reminder); },
     putReview: async (review: Review) => { requireStore('reviews'); state.reviews.set(review.id, review); },
@@ -123,6 +130,7 @@ export class MemoryStoragePort implements StoragePort {
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
+  getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
@@ -134,6 +142,7 @@ export class MemoryStoragePort implements StoragePort {
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
+  putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);
   putProgress: StoragePort['putProgress'] = (progress) => this.session().putProgress(progress);
   putReminder: StoragePort['putReminder'] = (reminder) => this.session().putReminder(reminder);
   putReview: StoragePort['putReview'] = (review) => this.session().putReview(review);

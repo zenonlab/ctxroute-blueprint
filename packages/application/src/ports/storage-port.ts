@@ -5,6 +5,7 @@ import type {
   FavoriteSourceId,
   Library,
   LibraryId,
+  OrganizerConfiguration,
   Progress,
   ProgressId,
   Reminder,
@@ -16,7 +17,7 @@ import type {
   WorkId,
 } from '@tobirink/domain';
 
-export const privateStoreNames = ['agenda', 'favoriteSources', 'libraries', 'progress', 'reminders', 'reviews', 'works'] as const;
+export const privateStoreNames = ['agenda', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
 export type PrivateStoreName = (typeof privateStoreNames)[number];
 
 export interface FavoriteSourcePageQuery {
@@ -66,6 +67,7 @@ export interface StorageReadPort {
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   findFavoriteSourceByReviewId(reviewId: ReviewId): Promise<FavoriteSource | undefined>;
   getLibrary(id: LibraryId): Promise<Library | undefined>;
+  getOrganizerConfiguration(): Promise<OrganizerConfiguration | undefined>;
   getProgress(id: ProgressId): Promise<Progress | undefined>;
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
@@ -80,6 +82,7 @@ export interface StorageWritePort {
   putAgendaEntry(entry: AgendaEntry): Promise<void>;
   putFavoriteSource(source: FavoriteSource): Promise<void>;
   putLibrary(library: Library): Promise<void>;
+  putOrganizerConfiguration(configuration: OrganizerConfiguration): Promise<void>;
   putProgress(progress: Progress): Promise<void>;
   putReminder(reminder: Reminder): Promise<void>;
   putReview(review: Review): Promise<void>;

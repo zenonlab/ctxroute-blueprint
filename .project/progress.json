@@ -1236,6 +1236,58 @@
             "Contexte absent duplique incomplet ou non reconnu produit keep; le noyau pur ne depend ni d IndexedDB ni du navigateur ni du reseau et ne modifie aucun favori.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs/35 ADR, diff-check et Archify Tobirink 9/9 sans erreur ni avertissement passent."
           ]
+        },
+        {
+          "id": "step-14",
+          "title": "Persister la configuration de l organisateur dans IndexedDB",
+          "status": "DONE",
+          "acceptance": [
+            "Une configuration organizer singleton validee contient l arbre local et une revision temporelle canonique",
+            "StoragePort fakes et Dexie relisent et ecrivent la configuration avec le meme contrat transactionnel",
+            "Dexie v5 ajoute le store organizer sans perte depuis les schemas v1 a v4 et le controle d integrite couvre le singleton",
+            "L export prive v3 preserve organizer et importe v1 v2 avec une configuration absente sans en inventer",
+            "Aucune API navigateur aucun reseau et aucun deplacement de favori ne sont ajoutes; tests docs architecture et gates passent"
+          ],
+          "files": [
+            "packages/domain/src/organizer/**",
+            "packages/domain/src/index.ts",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/recovery/**",
+            "packages/application/src/index.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/contracts/src/export/**",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+            "packages/adapters-indexeddb/src/migrations/**",
+            "packages/adapters-indexeddb/test/**",
+            "docs/decisions/ADR-0035-local-bookmark-organizer.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/README.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test --workspace @tobirink/application",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run anti-slop:verify",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check",
+            "git commit -m feat(organizer):persist-local-configuration"
+          ],
+          "evidence": [
+            "Domaine 12/12, application 34/34 et contrats 9/9 passent; le singleton organizer est revalide sur ecriture et lecture dans les fakes et Dexie.",
+            "Chromium valide le StoragePort IndexedDB et les migrations v1 v2 v3 v4 vers Dexie v5; Work Review et FavoriteSource sont conserves et le nouveau store reste vide sans configuration.",
+            "Recovery 7/7 et backup chiffre 3/3 preservent export prive v3 et organizer tout en important v1 v2 sans invention; typecheck 8 workspaces, lints, Sensor SAFE, docs et Archify 9/9 passent."
+          ]
         }
       ]
     },

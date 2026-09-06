@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createOrganizerTree, organizerTreeLimits } from './organizer';
+import { createOrganizerConfiguration, createOrganizerTree, organizerTreeLimits } from './organizer';
 
 describe('organizer tree invariants', () => {
+  it('creates one canonical durable configuration', () => {
+    const configuration = createOrganizerConfiguration({
+      folders: [{ conditions: { mediaTypes: ['ANIME'] }, id: 'anime', name: 'Anime' }],
+      updatedAt: '2026-09-06T00:00:00.000Z',
+    });
+    expect(configuration.id).toBe('organizer');
+    expect(Object.isFrozen(configuration.folders)).toBe(true);
+    expect(() => createOrganizerConfiguration({ ...configuration, updatedAt: 'yesterday' })).toThrowError(/canonical/);
+  });
+
   it('normalizes and freezes a bounded local rule tree', () => {
     const tree = createOrganizerTree([{
       children: [{

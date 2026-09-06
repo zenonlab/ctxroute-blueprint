@@ -1,4 +1,4 @@
-import { invariant, nonNegativeNumber, requiredText } from '../invariant';
+import { canonicalDateTime, invariant, nonNegativeNumber, requiredText } from '../invariant';
 
 export const organizerTreeLimits = Object.freeze({ maxDepth: 8, maxNodes: 100 });
 
@@ -39,6 +39,20 @@ export interface OrganizerFolderInput {
   readonly enabled?: boolean;
   readonly id: string;
   readonly name: string;
+}
+
+export const organizerConfigurationId = 'organizer' as const;
+
+export interface OrganizerConfiguration {
+  readonly folders: readonly OrganizerFolder[];
+  readonly id: typeof organizerConfigurationId;
+  readonly updatedAt: string;
+}
+
+export interface OrganizerConfigurationInput {
+  readonly folders: readonly OrganizerFolderInput[];
+  readonly id?: typeof organizerConfigurationId;
+  readonly updatedAt: string;
 }
 
 const organizerIdPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
@@ -102,4 +116,13 @@ export function createOrganizerTree(inputs: readonly OrganizerFolderInput[]): re
   };
 
   return Object.freeze(inputs.map((input) => visit(input, 1)));
+}
+
+export function createOrganizerConfiguration(input: OrganizerConfigurationInput): OrganizerConfiguration {
+  invariant(input.id === undefined || input.id === organizerConfigurationId, 'invalid-id', 'Organizer configuration uses the singleton id.');
+  return Object.freeze({
+    folders: createOrganizerTree(input.folders),
+    id: organizerConfigurationId,
+    updatedAt: canonicalDateTime(input.updatedAt, 'Organizer configuration updatedAt'),
+  });
 }

@@ -22,16 +22,17 @@ a domain identifier or an authority for membership and progress.
 The local organizer owns a bounded folder-rule tree and a pure preview use
 case. Rules run in pre-order, the first complete match wins, and their selected
 conditions use AND semantics. Missing context fails closed and never moves an
-item. This core has no storage, browser or network dependency; persistence,
-fresh-preview confirmation, snapshot and bookmark projection remain separate
-adapter steps requiring the bookmarks permission before activation.
+item. The pure calculation has no storage, browser or network dependency. Its
+single configuration is private IndexedDB state behind `StoragePort`, included
+in private export v3; runtime composition, fresh-preview confirmation, snapshot
+and bookmark projection remain separate adapter steps.
 
 ## Local persistence
 
 The storage package defines `StoragePort`, versioned records, migrations,
 export, import, and recovery contracts. The first adapter uses Dexie and
 IndexedDB, which is the sole active authority for favorite sources, Reviews,
-the private library, progress, agenda, and durable task queue. `storage.local` is limited to
+the private library, progress, agenda, organizer rules, and durable task queue. `storage.local` is limited to
 technical preferences and bootstrap state. `storage.sync` may hold only a
 small, quota-checked, non-secret recovery envelope; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
