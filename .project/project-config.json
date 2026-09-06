@@ -29,6 +29,7 @@
     "governanceCheck": "npm run governance:check",
     "orchestratorRead": "npm run orchestrator:read",
     "orchestratorMcp": "npm run orchestrator:mcp",
+    "orchestratorContracts": "npm run orchestrator:contracts",
     "ctxrouteQuery": "npm run ctxroute:query",
     "blueprintReview": "npm run blueprint:review",
     "astCheck": "npm run ast:check",
@@ -127,7 +128,8 @@
       "**/openapi*.yml",
       "**/openapi*.json",
       "**/*.graphql",
-      "**/*.gql"
+      "**/*.gql",
+      "**/*.schema.json"
     ]
   },
   "starter": {

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/state-v2.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "revision", "mode", "telemetry_sequence", "goals", "skills", "audits", "transactions", "worktree_operations"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "mode": { "enum": ["SWARM_ON", "SWARM_OFF"] },
+    "telemetry_sequence": { "type": "integer", "minimum": 0 },
+    "goals": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/goal" } },
+    "skills": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/skill" } },
+    "audits": { "type": "array", "maxItems": 1024, "items": { "$ref": "audit-report-v2.schema.json" } },
+    "transactions": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/transactionReceipt" } },
+    "worktree_operations": { "type": "array", "maxItems": 4096, "items": { "$ref": "worktree-operation-v2.schema.json" } }
+  },
+  "$defs": {
+    "goal": {
+      "type": "object",
+      "required": ["goal_id", "title", "status", "missions"],
+      "properties": {
+        "goal_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+        "title": { "$ref": "common-v2.schema.json#/$defs/text" },
+        "status": { "enum": ["ACTIVE", "COMPLETED", "CANCELLED"] },
+        "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record-v2.schema.json" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "skill": {
+      "type": "object",
+      "required": ["skill_id", "version", "path", "artifact_digest", "validation_receipt", "audit_id", "registered_revision"],
+      "properties": {
+        "skill_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32 },
+        "path": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
+        "artifact_digest": { "$ref": "common-v2.schema.json#/$defs/digest" },
+        "validation_receipt": { "$ref": "validation-receipt-v2.schema.json" },
+        "audit_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+        "registered_revision": { "type": "integer", "minimum": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+    "transactionReceipt": {
+      "type": "object",
+      "required": ["operation_id", "digest", "action", "status", "start_revision", "end_revision", "result", "cause"],
+      "properties": {
+        "operation_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+        "digest": { "$ref": "common-v2.schema.json#/$defs/digest" },
+        "action": { "enum": ["mode.set", "goal.create", "goal.transition", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+        "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
+        "start_revision": { "type": "integer", "minimum": 0 },
+        "end_revision": { "type": ["integer", "null"], "minimum": 0 },
+        "result": { "type": ["string", "null"], "enum": ["CREATED", "UPDATED", "UNCHANGED", "BYPASSED", "RECONCILED", "ROLLED_BACK", "PURGED", null] },
+        "cause": { "$ref": "common-v2.schema.json#/$defs/nullableCause" }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

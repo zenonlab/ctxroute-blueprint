@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/worktree-operation-v2.schema.json",
+  "type": "object",
+  "required": ["operation_id", "mission_id", "kind", "status", "classification", "path", "base_revision", "dirty", "proof_ref", "cause"],
+  "properties": {
+    "operation_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "mission_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "kind": { "enum": ["ALLOCATE", "RECONCILE", "ROLLBACK", "PURGE"] },
+    "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
+    "classification": { "enum": ["ACTIVE_COHERENT", "TERMINAL_CLEAN", "TERMINAL_DIRTY", "REGISTERED_ORPHAN", "UNREGISTERED_DIRECTORY", "BROKEN_METADATA", "LOW_DISK", "NEEDS_ATTENTION"] },
+    "path": { "$ref": "common-v2.schema.json#/$defs/relativePath" },
+    "base_revision": { "oneOf": [{ "$ref": "common-v2.schema.json#/$defs/gitOid" }, { "type": "null" }] },
+    "dirty": { "type": ["boolean", "null"] },
+    "proof_ref": { "oneOf": [{ "$ref": "common-v2.schema.json#/$defs/relativePath" }, { "type": "null" }] },
+    "cause": { "$ref": "common-v2.schema.json#/$defs/nullableCause" }
+  },
+  "unevaluatedProperties": false
+}

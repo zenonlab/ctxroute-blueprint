@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/worker-report-v2.schema.json",
+  "type": "object",
+  "required": ["schemaVersion", "mission_id", "status", "files_touched", "validation_results", "summary"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "mission_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "status": { "enum": ["READY_FOR_VALIDATION", "BLOCKED"] },
+    "files_touched": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/relativePath" } },
+    "validation_results": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/validationResult" } },
+    "summary": { "$ref": "common-v2.schema.json#/$defs/text" }
+  },
+  "unevaluatedProperties": false
+}

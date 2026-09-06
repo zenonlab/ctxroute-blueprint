@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/mission-view-v2.schema.json",
+  "type": "object",
+  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree"],
+  "properties": {
+    "mission_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "skill_id": { "$ref": "common-v2.schema.json#/$defs/identifier" },
+    "skill_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32 },
+    "file_scope": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/relativePath" } },
+    "acceptance": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/text" } },
+    "validations": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common-v2.schema.json#/$defs/validation" } },
+    "response_format": { "const": "worker-report-v2" },
+    "worktree": { "$ref": "common-v2.schema.json#/$defs/relativePath" }
+  },
+  "unevaluatedProperties": false
+}
