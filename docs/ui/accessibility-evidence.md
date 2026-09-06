@@ -10,6 +10,9 @@ component catalogue and is not part of the extension package.
 
 ## Automated evidence
 
+- The root `test:e2e` script currently runs 88 Vitest integration, contract and
+  vertical-flow tests. It does not start Chrome or Firefox; all browser-specific
+  accessibility observations remain part of the manual record below.
 - `npm run test:a11y` renders all five product surfaces and verifies named landmarks,
   the search-then-Review-bell header order, non-modal popover semantics, touch target
   tokens, narrow viewport constraints, persistent focus styles and reduced
