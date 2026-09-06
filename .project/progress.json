@@ -4506,6 +4506,51 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-playwright-audit",
+      "title": "Corriger l’audit Playwright du Workbench web",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Mettre à niveau le harnais Playwright et rétablir le gate sécurité",
+          "status": "DONE",
+          "acceptance": [
+            "Le web et ses scripts utilisent exactement Playwright 1.63.0",
+            "Chromium Playwright est installé sans supprimer les anciens navigateurs",
+            "Les tests web, E2E et le build statique passent",
+            "npm audit et npm run verify passent sans vulnérabilité haute"
+          ],
+          "files": [
+            "apps/web/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --workspace @tobirink/web --save-dev --save-exact @playwright/test@1.63.0 --ignore-scripts",
+            "npm run setup:browser --workspace @tobirink/web",
+            "npm run test --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web",
+            "npm run build --workspace @tobirink/web",
+            "npm audit --audit-level=high",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m \"chore(web): upgrade Playwright test harness\""
+          ],
+          "evidence": [
+            "@playwright/test, playwright et playwright-core sont tous résolus en 1.63.0; Chromium 153 build 1243 est installé",
+            "npm audit --audit-level=high passe avec 0 vulnérabilité",
+            "Web 8/8, Playwright 4/4 et export Next passent",
+            "npm run verify passe intégralement: validation 269/269 plus un skip intentionnel, CRG, intégration, audit et Archify showcase"
+          ]
+        }
+      ]
     }
   ]
 }

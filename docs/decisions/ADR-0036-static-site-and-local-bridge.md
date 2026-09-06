@@ -65,15 +65,13 @@ search navigates to the URL-addressable Library query, while the bounded Review
 snapshot feeds the Workbench bell and its existing decision command.
 
 The web workspace pins Vitest 4.1.11, Testing Library 16.3.3, jsdom 30.0.1
-and Playwright 1.51.1 as development-only verification dependencies. Vitest
+and Playwright 1.63.0 as development-only verification dependencies. Vitest
 checks schema-gated bridge states; Playwright drives the exported site at the
 desktop and mobile reference viewports through a bounded local static server.
 Chromium is installed explicitly and is never part of the release artifact.
-The exact requested Playwright version carries GHSA-7mvr-c777-76hp in its
-browser downloader, so the complete development graph does not claim a clean
-audit. The shipped dependency graph must remain clean with development and
-optional packages omitted; upgrading the pinned browser harness is a separate
-dependency decision.
+This version is newer than the fixed boundary for GHSA-7mvr-c777-76hp; both
+the complete development graph and the shipped dependency graph must pass the
+repository audit without a high-severity finding.
 
 Extension release version `1.0.0` is owned by the extension package manifest.
 WXT and the web download surface read that source, while the deterministic
