@@ -234,3 +234,7 @@
 ## Corriger l’audit Playwright du Workbench web — DONE
 
 - [x] **Mettre à niveau le harnais Playwright et rétablir le gate sécurité** — DONE _(evidence: @playwright/test, playwright et playwright-core sont tous résolus en 1.63.0; Chromium 153 build 1243 est installé, npm audit --audit-level=high passe avec 0 vulnérabilité, Web 8/8, Playwright 4/4 et export Next passent)_
+
+## Rétablir les prérequis CI du Workbench sur checkout propre — DONE
+
+- [x] **Versionner les limites Progress et déclarations Archify requises** — DONE _(evidence: Progress 40/256 Kio: 40 tests ciblés passent, Configuration, MCP et Archify showcase 9/9 passent, npm run verify passe: 269 tests, 1 skip, audit 0)_

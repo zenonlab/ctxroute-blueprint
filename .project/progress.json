@@ -4551,6 +4551,49 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-pr-ci-prerequisites",
+      "title": "Rétablir les prérequis CI du Workbench sur checkout propre",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Versionner les limites Progress et déclarations Archify requises",
+          "status": "DONE",
+          "acceptance": [
+            "Progress accepte le fichier versionné sous la limite documentée de 256 Kio et 40 goals",
+            "tobirink-ux.dataflow est déclaré comme IR produit",
+            "Les tests ciblés et npm run verify passent",
+            "Le commit est poussé sur la Pull Request"
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs",
+            "npm run validate:config",
+            "npm run validate:architecture",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m \"fix(ci): restore clean-checkout prerequisites\"",
+            "git push origin fix/tobirink-workflows"
+          ],
+          "evidence": [
+            "Progress 40/256 Kio: 40 tests ciblés passent",
+            "Configuration, MCP et Archify showcase 9/9 passent",
+            "npm run verify passe: 269 tests, 1 skip, audit 0"
+          ]
+        }
+      ]
     }
   ]
 }
