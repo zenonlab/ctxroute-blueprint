@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 2,
   "defaultMode": "SWARM_ON",
   "statePath": ".ctxroute/orchestrator/state.json",
   "worktreeRoot": ".ctxroute/worktrees",

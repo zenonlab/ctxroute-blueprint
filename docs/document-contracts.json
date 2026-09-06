@@ -86,112 +86,105 @@
       "format": "json",
       "source": ".project/orchestrator-config.json",
       "narrative": "docs/orchestration.md",
-      "requiredKeys": ["schemaVersion", "defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+      "requiredKeys": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
       "validator": "npm run orchestrator:contracts"
     },
     {
       "id": "orchestrator-common-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/common-v2.schema.json",
+      "source": ".project/schemas/orchestrator/common.schema.json",
       "requiredKeys": ["$schema", "$id", "$defs"]
     },
     {
       "id": "orchestrator-config-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/config-v2.schema.json",
+      "source": ".project/schemas/orchestrator/config.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-state-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/state-v2.schema.json",
+      "source": ".project/schemas/orchestrator/state.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-transaction-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/transaction-v2.schema.json",
+      "source": ".project/schemas/orchestrator/transaction.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-mission-request-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/mission-request-v2.schema.json",
+      "source": ".project/schemas/orchestrator/mission-request.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-mission-record-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/mission-record-v2.schema.json",
+      "source": ".project/schemas/orchestrator/mission-record.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-mission-view-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/mission-view-v2.schema.json",
+      "source": ".project/schemas/orchestrator/mission-view.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-worker-report-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/worker-report-v2.schema.json",
+      "source": ".project/schemas/orchestrator/worker-report.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-audit-report-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/audit-report-v2.schema.json",
+      "source": ".project/schemas/orchestrator/audit-report.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-validation-receipt-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/validation-receipt-v2.schema.json",
+      "source": ".project/schemas/orchestrator/validation-receipt.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-worktree-operation-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/worktree-operation-v2.schema.json",
+      "source": ".project/schemas/orchestrator/worktree-operation.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-decision-event-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/decision-event-v1.schema.json",
-      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
-    },
-    {
-      "id": "orchestrator-decision-event-v2-schema",
-      "kind": "json-schema",
-      "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/decision-event-v2.schema.json",
+      "source": ".project/schemas/orchestrator/decision-event.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "orchestrator-bootstrap-report-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".project/schemas/orchestrator/bootstrap-report-v2.schema.json",
+      "source": ".project/schemas/orchestrator/bootstrap-report.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
       "id": "crg-risk-acceptance-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",
-      "source": ".github/schemas/crg-risk-acceptance-v1.schema.json",
+      "source": ".github/schemas/crg-risk-acceptance.schema.json",
       "narrative": "docs/ci.md",
       "requiredKeys": ["$schema", "$id", "additionalProperties"]
     },
@@ -207,7 +200,7 @@
       "kind": "architecture-comparison",
       "format": "markdown",
       "source": "docs/diff/target-comparison.md",
-      "requiredSections": ["Current-to-target comparison", "Comparison matrix", "Proposed contract version", "Priority order"]
+      "requiredSections": ["Current-to-target comparison", "Comparison matrix", "Proposed contracts", "Priority order"]
     },
     {
       "id": "external-research",

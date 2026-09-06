@@ -21,7 +21,7 @@ test('session audit streams bounded traces, redacts secrets, and detects defecti
   assert.ok(report.signals.includes('secret-fields-redacted'));
   assert.doesNotMatch(JSON.stringify(report), /must-not-leak/u);
   assert.equal(report.decision, 'repair');
-  assert.equal(validateOrchestratorContract('auditReportV2', report).valid, true);
+  assert.equal(validateOrchestratorContract('auditReport', report).valid, true);
 });
 
 test('session audit stops at byte limits without returning raw content', async () => {

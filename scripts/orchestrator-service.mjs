@@ -22,7 +22,7 @@ export async function readCoordination(root = process.cwd(), environment = proce
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
   const mission = found.mission;
   const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
-  assertOrchestratorContract('mission-view-v2', view);
+  assertOrchestratorContract('mission-view', view);
   return view;
 }
 
@@ -39,7 +39,7 @@ export async function prepareMission(command, root = process.cwd(), environment 
   if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => prepareMission(command, root, environment, locked));
   const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment);
-  assertOrchestratorContract('transaction-v2', command);
+  assertOrchestratorContract('transaction', command);
   if (command.action !== 'mission.prepare') throw new Error('prepare-mission requires action mission.prepare');
   const effective = await currentSwarmMode(root, environment);
   const request = routeMissingSkill(command.payload.mission, root);
@@ -82,7 +82,7 @@ export async function prepareMission(command, root = process.cwd(), environment 
 export async function submitWorkerReport(command, root = process.cwd(), environment = process.env, dependencies = {}) {
   if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => submitWorkerReport(command, root, environment, locked));
   const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
-  assertOrchestratorContract('transaction-v2', command);
+  assertOrchestratorContract('transaction', command);
   if (command.action !== 'report.submit') throw new Error('submit-report requires action report.submit');
   const report = command.payload.report;
   if (environment.CTXROUTE_AGENT_ROLE === 'worker' && environment.CTXROUTE_MISSION_ID !== report.mission_id) throw new Error('worker may submit only its assigned mission report');
@@ -169,7 +169,7 @@ export async function purgeWorktree(command, root = process.cwd(), environment =
 
 export async function contextQuery(input, root = process.cwd()) { return queryCtxroute(input, root); }
 
-function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report-v2', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null }; assertOrchestratorContract('mission-record-v2', record); return record; }
+function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null }; assertOrchestratorContract('mission-record', record); return record; }
 function addPreparingMission(state, goalId, record, worktreeOperation) {
   const goalIndex = state.goals.findIndex(goal => goal.goal_id === goalId);
   if (goalIndex < 0 || state.goals[goalIndex].status !== 'ACTIVE') throw new Error(`unknown or terminal goal: ${goalId}`);
@@ -185,7 +185,7 @@ function executionDecision(effective, request) {
   return request.file_scope.length === 1 ? { coordinated: false, reason: 'AUTO_SINGLE_SCOPE' } : { coordinated: true, reason: 'AUTO_COORDINATED' };
 }
 function routeMissingSkill(mission, root) {
-  assertOrchestratorContract('mission-request-v2', mission);
+  assertOrchestratorContract('mission-request', mission);
   if (existsSync(resolve(root, `.agents/skills/${mission.skill_id}/SKILL.md`))) return mission;
   if (!existsSync(resolve(root, '.agents/skills/skill-creator/SKILL.md'))) throw new Error(`selected skill is missing and skill-creator is unavailable: ${mission.skill_id}`);
   return { ...mission, requested_skill_id: mission.skill_id, skill_id: 'skill-creator', skill_version: '1.0.0', file_scope: [`.agents/skills/${mission.skill_id}/`], acceptance: [`Create and validate the missing ${mission.skill_id} skill`, 'Obtain blueprint-audit review'], validations: [{ id: 'skills-validate', executable: 'node', args: ['scripts/validate-blueprint-skills.mjs'], cwd: '.', timeout_ms: 30_000 }, { id: 'blueprint-review', executable: 'node', args: ['scripts/blueprint-review.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' };
@@ -217,6 +217,6 @@ function applyReconciliation(state, operationId, reconciliation) {
 function reconciliationOperations(state, operationId, reconciliation, status) { return reconciliation.results.flatMap(item => { const found = state.goals.flatMap(goal => goal.missions).find(mission => mission.worktree_allocation?.path === item.path); return found ? [{ operation_id: operationId, mission_id: found.mission_id, kind: 'RECONCILE', status, classification: mapClassification(item.classification), path: item.path, base_revision: found.worktree_allocation.base_revision, dirty: item.dirty, proof_ref: null, cause: null }] : []; }); }
 function mapClassification(value) { if (value === 'ACTIVE_COHERENT') return value; if (value === 'TERMINAL_CLEAN') return value; if (value === 'TERMINAL_DIRTY') return value; if (value.startsWith('ORPHAN_REGISTERED')) return 'REGISTERED_ORPHAN'; if (value === 'DIRECTORY_NOT_REGISTERED') return 'UNREGISTERED_DIRECTORY'; if (value.includes('METADATA') || value.includes('MISSING')) return 'BROKEN_METADATA'; return 'NEEDS_ATTENTION'; }
 function scopesOverlap(left, right) { const a = left.replace(/\/$/u, '').toLocaleLowerCase('en-US'); const b = right.replace(/\/$/u, '').toLocaleLowerCase('en-US'); return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`); }
-function assertAction(command, action) { assertOrchestratorContract('transaction-v2', command); if (command.action !== action) throw new Error(`expected action ${action}`); }
+function assertAction(command, action) { assertOrchestratorContract('transaction', command); if (command.action !== action) throw new Error(`expected action ${action}`); }
 function assertOrchestratorRole(environment) { if (environment.CTXROUTE_AGENT_ROLE === 'worker') throw new Error('workers cannot mutate global orchestrator state'); }
 function categorized(code, message) { const error = new Error(message); error.causeCode = code; return error; }

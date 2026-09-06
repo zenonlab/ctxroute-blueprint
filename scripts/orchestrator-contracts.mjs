@@ -10,19 +10,18 @@ const schemaDocuments = readdirSync(schemaDirectory)
   .map(name => JSON.parse(readFileSync(join(schemaDirectory, name), 'utf8')));
 
 export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
-  configV2: 'https://ctxroute.dev/schemas/orchestrator/config-v2.schema.json',
-  stateV2: 'https://ctxroute.dev/schemas/orchestrator/state-v2.schema.json',
-  transactionV2: 'https://ctxroute.dev/schemas/orchestrator/transaction-v2.schema.json',
-  missionRequestV2: 'https://ctxroute.dev/schemas/orchestrator/mission-request-v2.schema.json',
-  missionRecordV2: 'https://ctxroute.dev/schemas/orchestrator/mission-record-v2.schema.json',
-  missionViewV2: 'https://ctxroute.dev/schemas/orchestrator/mission-view-v2.schema.json',
-  workerReportV2: 'https://ctxroute.dev/schemas/orchestrator/worker-report-v2.schema.json',
-  auditReportV2: 'https://ctxroute.dev/schemas/orchestrator/audit-report-v2.schema.json',
-  validationReceiptV2: 'https://ctxroute.dev/schemas/orchestrator/validation-receipt-v2.schema.json',
-  worktreeOperationV2: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation-v2.schema.json',
-  decisionEventV1: 'https://ctxroute.dev/schemas/orchestrator/decision-event-v1.schema.json',
-  decisionEventV2: 'https://ctxroute.dev/schemas/orchestrator/decision-event-v2.schema.json',
-  bootstrapReportV2: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report-v2.schema.json',
+  config: 'https://ctxroute.dev/schemas/orchestrator/config.schema.json',
+  state: 'https://ctxroute.dev/schemas/orchestrator/state.schema.json',
+  transaction: 'https://ctxroute.dev/schemas/orchestrator/transaction.schema.json',
+  missionRequest: 'https://ctxroute.dev/schemas/orchestrator/mission-request.schema.json',
+  missionRecord: 'https://ctxroute.dev/schemas/orchestrator/mission-record.schema.json',
+  missionView: 'https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json',
+  workerReport: 'https://ctxroute.dev/schemas/orchestrator/worker-report.schema.json',
+  auditReport: 'https://ctxroute.dev/schemas/orchestrator/audit-report.schema.json',
+  validationReceipt: 'https://ctxroute.dev/schemas/orchestrator/validation-receipt.schema.json',
+  worktreeOperation: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation.schema.json',
+  decisionEvent: 'https://ctxroute.dev/schemas/orchestrator/decision-event.schema.json',
+  bootstrapReport: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [

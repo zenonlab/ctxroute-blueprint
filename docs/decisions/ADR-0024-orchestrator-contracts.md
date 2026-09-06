@@ -15,7 +15,7 @@ contracts:
   - docs/document-contracts.json
   - package.json
 ---
-# ADR-0024 — Canonical orchestrator V2 contracts
+# ADR-0024 — Canonical orchestrator contracts
 
 - Status: accepted
 - Date: 2026-09-06
@@ -28,8 +28,8 @@ worker reports, audit reports, validation receipts, worktree operations, and
 decision events. Ajv 8.20.0 compiles the registered schemas once in strict mode.
 Core, service, stdio MCP, CLI, and tests use the same adapter.
 
-Persisted orchestrator state moves directly to `schemaVersion: 2`. Produced
-objects have stable `$id` values, explicit required properties, closed enums,
+Persisted orchestrator state uses one unversioned current contract. Produced
+objects have stable unversioned `$id` values, explicit required properties, closed enums,
 bounded strings and arrays, safe repository-relative paths, and
 `unevaluatedProperties: false`. Conversation, prompts, reasoning, raw
 environment, and raw subprocess output are outside every contract. Imperative
@@ -53,6 +53,6 @@ payload difference is rejected before physical effects.
 
 ## Consequences
 
-Contract drift becomes a deterministic local failure. The V2 state format is a
-deliberate compatibility break, and `worker-report-v2` is the only worker
-response format accepted by new missions.
+Contract drift becomes a deterministic local failure. There is no compatibility
+layer or version negotiation, and `worker-report` is the only worker response
+format accepted by missions.

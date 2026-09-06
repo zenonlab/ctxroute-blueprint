@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The V2 orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
       { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
@@ -26,8 +26,8 @@
     { "id": "jsonIr", "type": "database", "label": "Architecture JSON IR", "sublabel": "Versioned source", "pos": [1060, 230], "size": [170, 60] },
     { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Matrix + fork-safe review", "pos": [1060, 410], "size": [190, 60] },
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
-    ,{ "id": "contracts", "type": "security", "label": "V2 contract registry", "sublabel": "JSON Schema 2020-12 + Ajv", "pos": [280, 410], "size": [210, 60] }
-    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "V2 intent + receipts", "pos": [540, 410], "size": [190, 60] }
+    ,{ "id": "contracts", "type": "security", "label": "Contract registry", "sublabel": "JSON Schema 2020-12 + Ajv", "pos": [280, 410], "size": [210, 60] }
+    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "Intent + receipts", "pos": [540, 410], "size": [190, 60] }
     ,{ "id": "validation", "type": "backend", "label": "Validation runner", "sublabel": "execFile / no shell", "pos": [30, 580], "size": [190, 60] }
     ,{ "id": "worktrees", "type": "database", "label": "Managed worktrees", "sublabel": "reconciled Git state", "pos": [280, 580], "size": [210, 60] }
     ,{ "id": "recovery", "type": "database", "label": "Recovery proofs", "sublabel": "bounded restorable patch", "pos": [540, 580], "size": [190, 60] }

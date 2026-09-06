@@ -57,8 +57,8 @@ test('decision telemetry rotates by bytes and stores only its closed event contr
   assert.doesNotMatch(combined, /environment|stdout|conversation|prompt/u);
   assert.match(combined, /"sequence":1/u);
   assert.match(combined, /"sequence":2/u);
-  assert.match(combined, /"schemaVersion":2/u);
-  assert.match(combined, /"policy_id":"orchestrator-v2"/u);
+  assert.doesNotMatch(combined, /schemaVersion/u);
+  assert.match(combined, /"policy_id":"orchestrator"/u);
 });
 
 test('bootstrap is idempotent and resumes a real SIGKILL after durable state intent', { skip: process.platform === 'win32' }, async () => {

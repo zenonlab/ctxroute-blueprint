@@ -81,7 +81,7 @@ questions, trade-offs, and research anchors used to make these decisions.
 - `[operational readiness and recovery criteria]`
 - `[architecture, tests, and cross-platform CI evidence]`
 
-For the blueprint control plane, success requires schema-validated V2 state and
+For the blueprint control plane, success requires schema-validated state and
 messages, deterministic crash/replay and multi-process coverage, orchestrator-
 owned validation receipts, non-destructive worktree reconciliation, bounded
 redacted telemetry, internal Archify validation, and a blocking CRG `high`

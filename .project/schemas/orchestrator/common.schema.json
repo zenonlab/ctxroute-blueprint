@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ctxroute.dev/schemas/orchestrator/common-v2.schema.json",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/common.schema.json",
   "$defs": {
     "identifier": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]{0,126}[a-z0-9])?$" },
     "relativePath": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)(?!.*[\\u0000-\\u001f])[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*/?$" },

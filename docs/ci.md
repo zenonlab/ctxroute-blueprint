@@ -49,7 +49,7 @@ le SHA, le score et le digest. Un risque inférieur à `high` passe directement.
 Un risque `high` ou `critical` exige une review `APPROVED` sur ce SHA par un
 administrateur distinct de l’auteur, avec une ligne `Justification:` de 32 à 512
 caractères, une issue de suivi et `CRG-report-sha256:<digest>`. L’acceptation
-produit un artefact `CrgRiskAcceptanceV1`; tout nouveau SHA ou rapport l’invalide.
+produit un artefact `CrgRiskAcceptance`; tout nouveau SHA ou rapport l’invalide.
 
 Après le premier run distant réussi, rendre le check **CRG disposition**
 obligatoire sur `main` à la place du check brut, en le conservant avec les checks existants,

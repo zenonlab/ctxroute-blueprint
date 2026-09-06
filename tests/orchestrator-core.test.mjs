@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,13 +14,14 @@ import { prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
-test('V2 state is created atomically and mode reports its source', async () => {
+test('state is created atomically and mode reports its source', async () => {
   const root = fixture();
   assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM_ON', mode_source: 'default' });
   assert.deepEqual(await currentSwarmMode(root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' }), { mode: 'SWARM_OFF', mode_source: 'environment' });
   await bootstrapOrchestrator(root);
   const state = await readOrchestratorState(root);
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.revision, 0);
+  assert.equal('schemaVersion' in state, false);
   assert.equal(existsSync(join(root, '.ctxroute/orchestrator/state.json')), true);
 });
 
@@ -39,7 +40,7 @@ test('transactions persist PENDING before completion and replay the full canonic
   await assert.rejects(() => transactOrchestrator({ ...command, operation_id: 'secret-op', expected_revision: 2, payload: { ...command.payload, title: 'token=unsafe' } }, root), /secret-like/u);
 });
 
-test('known V1 state resets without touching worktrees, while corrupt and unknown states fail closed', async () => {
+test('invalid state fails closed without touching managed evidence', async () => {
   const root = fixture();
   const statePath = join(root, '.ctxroute/orchestrator/state.json');
   mkdirSync(join(root, '.ctxroute/orchestrator'), { recursive: true });
@@ -49,42 +50,14 @@ test('known V1 state resets without touching worktrees, while corrupt and unknow
   writeFileSync(join(root, '.ctxroute/worktrees/legacy/evidence.txt'), 'preserve');
   writeFileSync(join(root, '.ctxroute/recovery/proof.patch'), 'proof');
   writeFileSync(join(root, '.ctxroute/reports/report.json'), 'report');
-  writeFileSync(statePath, JSON.stringify({ schemaVersion: 1, revision: 3, mode: 'SWARM_ON', goals: [], skills: [], audits: [], transactions: [] }));
-  writeFileSync(`${statePath}.lock`, JSON.stringify({ token: 'legacy-dead', pid: 999999, created_at: '2020-01-01T00:00:00.000Z' }));
-  writeFileSync(`${statePath}.999999.deadbeef.tmp`, 'partial');
-  await assert.rejects(() => readOrchestratorState(root), /requires bootstrap/u);
-  const reset = await bootstrapOrchestrator(root, { processAlive: () => false });
-  assert.equal(reset.changed, true);
-  assert.equal((await readOrchestratorState(root)).schemaVersion, 2);
-  assert.equal((await readOrchestratorState(root)).migration_receipt.from_revision, 3);
+  writeFileSync(statePath, JSON.stringify({ revision: 3, mode: 'SWARM_ON' }));
+  await assert.rejects(() => bootstrapOrchestrator(root), /Invalid state contract/u);
   assert.equal(readFileSync(join(root, '.ctxroute/worktrees/legacy/evidence.txt'), 'utf8'), 'preserve');
   assert.equal(readFileSync(join(root, '.ctxroute/recovery/proof.patch'), 'utf8'), 'proof');
   assert.equal(readFileSync(join(root, '.ctxroute/reports/report.json'), 'utf8'), 'report');
-  assert.equal(existsSync(`${statePath}.lock`), false);
   writeFileSync(statePath, '{bad');
   await assert.rejects(() => bootstrapOrchestrator(root), /corrupt JSON/u);
   assert.equal(readFileSync(statePath, 'utf8'), '{bad');
-  writeFileSync(statePath, JSON.stringify({ schemaVersion: 99 }));
-  await assert.rejects(() => bootstrapOrchestrator(root), /unsupported schemaVersion 99/u);
-  assert.equal(JSON.parse(readFileSync(statePath)).schemaVersion, 99);
-});
-
-test('V1 reset refuses live, malformed, and symlinked state evidence without deletion', async () => {
-  const root = fixture();
-  const directory = join(root, '.ctxroute/orchestrator');
-  const statePath = join(directory, 'state.json');
-  const v1 = JSON.stringify({ schemaVersion: 1, revision: 3, mode: 'SWARM_ON', goals: [], skills: [], audits: [], transactions: [] });
-  mkdirSync(directory, { recursive: true }); writeFileSync(statePath, v1);
-  writeFileSync(`${statePath}.lock`, JSON.stringify({ token: 'live', pid: process.pid, created_at: new Date().toISOString() }));
-  await assert.rejects(() => bootstrapOrchestrator(root), /owner is alive/u);
-  assert.equal(readFileSync(statePath, 'utf8'), v1);
-  writeFileSync(`${statePath}.lock`, 'unrecognized');
-  await assert.rejects(() => bootstrapOrchestrator(root), /not recognized/u);
-  assert.equal(readFileSync(statePath, 'utf8'), v1);
-  const target = join(directory, 'actual-v1.json'); writeFileSync(target, v1);
-  unlinkSync(`${statePath}.lock`); unlinkSync(statePath); symlinkSync(target, statePath);
-  await assert.rejects(() => bootstrapOrchestrator(root), /regular file/u);
-  assert.equal(readFileSync(target, 'utf8'), v1);
 });
 
 test('stale dead locks recover but a live lock times out', async () => {
@@ -120,7 +93,7 @@ test('coordinated mission is isolated and completes only after orchestrator vali
   const prepared = await prepareMission(prepareCommand, root);
   let mission = prepared.state.goals[0].missions[0];
   assert.equal(mission.status, 'ASSIGNED');
-  assert.equal(mission.response_format, 'worker-report-v2');
+  assert.equal(mission.response_format, 'worker-report');
   const overlap = missionCommand(prepared.state.revision, 'mission-overlap');
   overlap.payload.mission.mission_id = 'mission-overlap';
   overlap.payload.mission.file_scope = ['SRC/', 'other/'];
@@ -226,16 +199,16 @@ test('worker authority and symlinked worktrees fail closed', async () => {
 test('formal report and audit contracts reject unknown fields and conversational content', () => {
   assert.deepEqual(validateWorkerReport(workerReport([])), []);
   assert.match(validateWorkerReport({ ...workerReport([]), conversation_history: [] }).join(' '), /contract/u);
-  const audit = { schemaVersion: 2, audit_id: 'audit-one', audit_type: 'blueprint-audit', subject: { type: 'blueprint', id: 'blueprint' }, signals: ['no-defect'], decision: 'accept', evidence_refs: [], proposed_action: null, applied_action: null, validations: [], rollback_ref: null };
+  const audit = { audit_id: 'audit-one', audit_type: 'blueprint-audit', subject: { type: 'blueprint', id: 'blueprint' }, signals: ['no-defect'], decision: 'accept', evidence_refs: [], proposed_action: null, applied_action: null, validations: [], rollback_ref: null };
   assert.deepEqual(validateAuditReport(audit), []);
   assert.match(validateAuditReport({ ...audit, prompt: 'private' }).join(' '), /contract/u);
 });
 
 function goalCommand() { return { operation_id: 'goal-create-one', expected_revision: 0, action: 'goal.create', payload: { goal_id: 'goal-one', title: 'Ship one goal' } }; }
 function missionCommand(revision, operation_id = 'mission-prepare-one') { return { operation_id, expected_revision: revision, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: { mission_id: 'mission-one', skill_id: 'blueprint-audit', requested_skill_id: null, skill_version: '1.0.0', file_scope: ['src/', 'lib/'], acceptance: ['Scoped file is valid'], validations: [{ id: 'syntax', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' } } }; }
-function workerReport(files) { return { schemaVersion: 2, mission_id: 'mission-one', status: 'READY_FOR_VALIDATION', files_touched: files, validation_results: [{ id: 'syntax', status: 'PASSED', exit_code: 0, duration_ms: 1, timed_out: false, cause: null, diagnostic: null }], summary: 'Worker reports readiness; orchestrator must verify.' }; }
+function workerReport(files) { return { mission_id: 'mission-one', status: 'READY_FOR_VALIDATION', files_touched: files, validation_results: [{ id: 'syntax', status: 'PASSED', exit_code: 0, duration_ms: 1, timed_out: false, cause: null, diagnostic: null }], summary: 'Worker reports readiness; orchestrator must verify.' }; }
 function fixture(gitRepository = false) {
-  const root = mkdtempSync(join(tmpdir(), 'orchestrator-v2-'));
+  const root = mkdtempSync(join(tmpdir(), 'orchestrator-'));
   mkdirSync(join(root, '.project'), { recursive: true });
   writeFileSync(join(root, '.project/orchestrator-config.json'), readFileSync(join(repositoryRoot, '.project/orchestrator-config.json')));
   for (const skill of ['blueprint-audit', 'skill-creator']) { mkdirSync(join(root, '.agents/skills', skill), { recursive: true }); writeFileSync(join(root, '.agents/skills', skill, 'SKILL.md'), `---\nname: ${skill}\n---\n`); }

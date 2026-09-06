@@ -7,7 +7,6 @@ export async function emitDecisionEvent(root, config, event, dependencies = {}) 
   const now = dependencies.now ?? (() => new Date());
   const id = dependencies.id ?? (() => randomUUID());
   const complete = {
-    schemaVersion: 2,
     sequence: event.sequence,
     event_id: `event-${id()}`.toLowerCase().replace(/[^a-z0-9._-]/gu, '-').slice(0, 128),
     event_type: event.event_type,
@@ -28,14 +27,14 @@ export async function emitDecisionEvent(root, config, event, dependencies = {}) 
     git_oid_after: event.git_oid_after ?? null,
     result: event.result ?? 'SUCCESS',
     cause: event.cause ?? null,
-    policy_id: event.policy_id ?? 'orchestrator-v2',
+    policy_id: event.policy_id ?? 'orchestrator',
     schema_id: event.schema_id ?? null,
     schema_path: sanitizeSchemaPath(event.schema_path),
     keyword: sanitizeKeyword(event.keyword),
     evidence_digest: event.evidence_digest ?? null,
     timestamp: now().toISOString(),
   };
-  assertOrchestratorContract('decision-event-v2', complete);
+  assertOrchestratorContract('decision-event', complete);
   const path = resolve(root, config.telemetryPath);
   const source = `${JSON.stringify(complete)}\n`;
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });

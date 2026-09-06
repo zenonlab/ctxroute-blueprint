@@ -4,5 +4,5 @@ import { assertOrchestratorContract, listOrchestratorContracts } from './orchest
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(resolve(root, '.project/orchestrator-config.json'), 'utf8'));
-assertOrchestratorContract('config-v2', config);
-console.log(JSON.stringify({ schemaVersion: 2, valid: true, contracts: listOrchestratorContracts().length }));
+assertOrchestratorContract('config', config);
+console.log(JSON.stringify({ valid: true, contracts: listOrchestratorContracts().length }));

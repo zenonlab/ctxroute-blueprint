@@ -13,7 +13,7 @@ export async function evaluateCrgDisposition({ artifactDirectory, context, now =
   const acceptance = selectRiskAcceptance(context, now, report.digest);
   if (!acceptance) return { conclusion: 'failure', reason: 'ADMIN_ACCEPTANCE_REQUIRED', report, attestation: null };
   const attestation = {
-    schemaVersion: 1, pr: context.pr, sha: context.sha, score: report.score, risk: report.risk,
+    pr: context.pr, sha: context.sha, score: report.score, risk: report.risk,
     threshold: 'high', report_digest: report.digest, approver: acceptance.approver,
     justification: acceptance.justification, tracking_issue: acceptance.tracking_issue,
     approved_at: acceptance.approved_at,
@@ -68,7 +68,7 @@ export function selectRiskAcceptance(context, now = new Date(), reportDigest = c
 }
 
 function assertAttestation(value) {
-  if (value.schemaVersion !== 1 || !Number.isInteger(value.pr) || !/^[0-9a-f]{40}$/u.test(value.sha) || !['HIGH', 'CRITICAL'].includes(value.risk) || value.threshold !== 'high' || !/^[a-f0-9]{64}$/u.test(value.report_digest)) throw new Error('invalid CRG attestation');
+  if (!Number.isInteger(value.pr) || !/^[0-9a-f]{40}$/u.test(value.sha) || !['HIGH', 'CRITICAL'].includes(value.risk) || value.threshold !== 'high' || !/^[a-f0-9]{64}$/u.test(value.report_digest)) throw new Error('invalid CRG attestation');
   if (!/^[A-Za-z0-9-]{1,128}$/u.test(value.approver) || value.justification.length < 32 || value.justification.length > 512 || !ISSUE.test(` ${value.tracking_issue}`)) throw new Error('invalid CRG acceptance evidence');
 }
 async function boundedRead(path, maximum, encoding) { const bytes = await readFile(path); if (bytes.length === 0 || bytes.length > maximum) throw new Error('CRG metadata size is invalid'); return bytes.toString(encoding); }
