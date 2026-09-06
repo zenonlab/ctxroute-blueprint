@@ -9,7 +9,7 @@ export const CONTROL_FILES = Object.freeze([
   'AGENTS.md', 'CLAUDE.md', '.gitignore', '.codex/hooks.json', '.claude/settings.json',
   '.github/workflows/validate.yml', '.github/workflows/code-review-graph.yml',
   '.github/workflows/code-review-graph-disposition.yml',
-  '.github/schemas/crg-risk-acceptance-v1.schema.json', 'eslint.config.mjs',
+  '.github/schemas/crg-risk-acceptance.schema.json', 'eslint.config.mjs',
   '.project/blueprint-version.json',
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/worktree-manager.mjs',
