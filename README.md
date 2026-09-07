@@ -1,5 +1,10 @@
 # Wallpaper — bureau et terminal ludiques
 
+Le livrable est un **thème pour wallpaper et terminal personnalisé** : notre
+logique et nos créations, séparées des éventuelles dépendances de jeu locales.
+L'IA peut rechercher et préparer ces dépendances à la demande ; aucun inventaire
+exhaustif ni décompilation complète d'un jeu n'est requis pour créer un thème.
+
 Le projet vise un bureau interactif et un terminal personnalisé, utilisables
 séparément ou ensemble sur Linux, macOS et Windows. Les sessions de terminaux
 et d'agents peuvent être représentées par des personnages interchangeables.
@@ -10,7 +15,7 @@ Commencer par la [note de reprise](docs/session-handoff.md), la
 Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
 La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise
 les modules et composants à éprouver ; la [cartographie des consoles](docs/research/console-coverage.md)
-sépare émulation existante et conversion réellement validée.
+reste une recherche exploratoire, pas une liste fermée de jeux autorisés.
 
 La documentation amont du template est conservée ci-dessous pour son installation
 et son fonctionnement. Elle décrit l'outillage, pas l'application à construire.

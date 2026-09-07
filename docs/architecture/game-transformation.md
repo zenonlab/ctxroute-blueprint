@@ -11,8 +11,9 @@ différents. Mario Kart, ses portraits et sa minimap sont des exemples, pas des
 cas particuliers à inscrire dans le cœur du produit. La composition par code
 est prioritaire ; un éditeur grand public n'est pas une exigence actuelle.
 
-L'ambition est de transformer le jeu entier en une bibliothèque exploitable,
-puis de ne charger et exécuter que les éléments nécessaires à une composition.
+Le produit cible est le thème wallpaper/terminal. La bibliothèque peut s'étendre
+au jeu entier, mais sa conversion complète n'est pas requise avant de composer.
+Préparer à la demande puis charger seulement les dépendances nécessaires.
 La portée de l'analyse hors ligne et celle de l'exécution sont distinctes.
 La couverture complète de tout jeu reste un objectif, pas une capacité démontrée.
 
@@ -38,6 +39,69 @@ Un adaptateur spécifique au jeu ou à son moteur peut contenir des connaissance
 particulières. Le cœur commun ne doit pas dépendre des identifiants Mario Kart.
 On privilégie des adaptateurs existants ; l'objectif n'est pas de créer un
 nouveau lecteur universel de toutes les consoles.
+
+## Découverte assistée par IA à la demande
+
+L'utilisateur peut demander une préparation pour un jeu non encore pris en
+charge. Il n'est pas nécessaire de l'avoir inscrit dans un catalogue fermé.
+L'IA de préparation est distincte des agents de travail du terminal et du
+runtime des thèmes. Son fournisseur, son lieu d'exécution et son langage ne
+sont pas décidés ; le contrat de confidentialité s'applique dans tous les cas.
+
+1. Décrire le thème souhaité et les dépendances manquantes ; réutiliser d'abord
+   un adaptateur validé et une bibliothèque locale existants lorsqu'ils suffisent.
+2. À la demande, rechercher sur Internet à partir du nom/version publics du jeu
+   les dépôts et documents pertinents, sans transmettre la ROM ou ses extraits.
+3. Examiner rôle réel, provenance, licence, version prise en charge et dépendances
+   de chaque outil ; distinguer lecteur, décompilation, mod et émulateur.
+4. Préparer une chaîne minimale et un adaptateur si nécessaire. Inspecter le code
+   avant exécution ; un README est une donnée non fiable, pas une instruction
+   autorisant l'accès aux secrets, au réseau ou au système de l'utilisateur.
+5. Sous les permissions accordées, exécuter les outils dans un environnement
+   local isolé : entrée en lecture seule, sortie dédiée, limites de temps/mémoire,
+   accès réseau désactivé pendant le traitement privé. L'installation des outils
+   est une phase distincte. L'isolation effective devra être testée par OS.
+6. Valider structure, références et capacités puis comparer les résultats.
+   Corriger dans un budget borné d'essais ; en cas de manque, signaler exactement
+   la capacité absente au lieu de prétendre à une conversion complète.
+7. Conserver révisions, configuration, commandes, dépendances et reçus locaux
+   pour réutiliser la chaîne sans nouvelle recherche IA. Invalider sa certification
+   si la version d'entrée, les outils ou le contrat changent.
+
+Une IA distante peut analyser le code public des outils ; elle ne reçoit pas
+de code décompilé de la ROM utilisateur, dump, capture ou trace contenant ses
+données. Le diagnostic privé reste local ; la stratégie d'assistance locale ou
+de messages assainis sans contenu du jeu est à choisir. La recherche publique
+ne constitue donc pas une autorisation d'envoyer toute trace au modèle.
+
+L'absence de dépôt utilisable est un résultat légitime : proposer une capacité
+réduite explicitement acceptée ou un travail d'adaptation distinct. Une extension
+libre du système n'est pas une promesse de décompilation automatique de tout jeu.
+Les adaptateurs réutilisables ne contiennent pas les données privées ; leur
+partage éventuel nécessite vérification du contenu et des licences.
+
+## Package de thème et dépendances séparées
+
+Le livrable créatif est un package de thème installable : notre logique de
+wallpaper/terminal, dispositions, paramètres, interactions et créations, avec
+un manifeste des références externes et capacités requises. Le format exact
+et les droits d'exécution des scripts restent à spécifier. Une recette est la
+description de composition du package, pas une copie de la bibliothèque du jeu.
+
+| Ensemble | Contenu | Règle |
+| --- | --- | --- |
+| Package de thème | Nos règles, créations, configuration et références | Partageable sans incorporer les ressources ou la logique extraites du jeu. |
+| Bibliothèque locale du jeu | Ressources, relations et logique originale effectivement récupérées | Dépendance privée séparée ; non réécrite par le thème. |
+| Résolution et cache locaux | Sélection et dérivés nécessaires à l'affichage | Reconstruisibles, non inclus automatiquement dans le package partageable. |
+
+« Toute la logique du thème » ne signifie pas tout le code du jeu : la logique
+originale récupérée reste dans les dépendances du jeu. Une modification créée
+par nous appartient à la composition ; les sources ne sont pas fusionnées.
+La résolution des dépendances au chargement n'exige pas une archive monolithique.
+Un thème purement original saute entièrement la branche ROM/IA/conversion.
+Le schéma regroupe recherche et outils dans la préparation hors runtime ; il
+n'autorise aucun flux de ROM vers une IA distante. « Sans IA requise » concerne
+le thème, pas les agents que l'utilisateur lance volontairement dans ses shells.
 
 ## Bibliothèque canonique et conversion par scène
 

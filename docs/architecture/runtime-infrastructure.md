@@ -1,11 +1,15 @@
 # Infrastructure locale et organisation du produit
 
 État : architecture de référence proposée le 7 septembre 2026 ; responsabilités
-formalisées, technologies recommandées pour les preuves, aucune dépendance
+formalisées, hypothèses techniques à comparer, aucune dépendance
 produit installée. Le dépôt reste `template` jusqu'aux choix exécutables.
 Voir [ADR-0033](../decisions/ADR-0033-runtime-boundaries-and-evaluation.md),
 le [schéma runtime](src/runtime-infrastructure.architecture.json) et le
 [pipeline de conversion séparé](game-transformation.md).
+Le recadrage [ADR-0034](../decisions/ADR-0034-theme-first-and-on-demand-discovery.md)
+prime : créer des thèmes, préparer les dépendances par découverte IA à la demande,
+puis comparer les technologies. L'assemblage ci-dessous est une hypothèse
+antérieure conservée, sans priorité actuelle ni adoption.
 
 ## Découpage des responsabilités
 
@@ -31,15 +35,15 @@ Le schéma regroupe les détails par responsabilité ; les liens nommant des
 commandes et événements représentent un échange dans les deux sens, pas une
 promesse de protocole réseau ni un diagramme de séquence.
 
-## Infrastructure recommandée pour le premier banc d'essai
+## Hypothèse technique antérieure à comparer
 
-Recommandation, pas adoption définitive : **contrôle Rust, terminal Tauri/xterm.js
+Hypothèse, sans préférence figée : **contrôle Rust, terminal Tauri/xterm.js
 avec portable-pty, hôte de scène Godot et adaptateurs desktop par environnement**.
 La motivation est de réutiliser un terminal et un moteur de scène au lieu de
 réécrire les deux. Cette combinaison peut être moins économe qu'une intégration
 native spécialisée ; elle doit passer les preuves ci-dessous avant engagement.
 
-| Brique | Premier candidat | Ce que nous devons encore écrire ou vérifier |
+| Brique | Candidat évoqué | Ce que nous devons encore écrire ou vérifier |
 | --- | --- | --- |
 | Contrôle local | Rust, partagé avec le backend Tauri | Associations, permissions, messages et cycle de vie ; pas un framework générique d'agents. |
 | Interface terminal | Tauri 2, TypeScript et xterm.js | HUD de sessions et configuration ; aucune nécessité de Next.js, serveur web ou framework UI supplémentaire à ce stade. |
@@ -182,8 +186,8 @@ captures vidéo, et ne pas rendre à 144 Hz par défaut. En terminal seul, ne pa
 démarrer le moteur ; en bureau seul, ne pas créer de PTY ou interface terminal
 inutile. Les budgets numériques seront fixés sur le matériel sélectionné.
 
-Prochaine action : établir le banc d'essai terminal + surface synthétique et
-choisir l'environnement hôte initial. Aucune installation de dépendances ou
+Prochaine action : comparer l'existant pour créer et activer un package de thème
+wallpaper/terminal, puis choisir la stack et le banc d'essai. Aucune installation de dépendances ou
 implémentation n'a été effectuée dans cette phase documentaire.
 
 ## Sources et consultation

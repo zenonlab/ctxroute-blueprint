@@ -2,8 +2,11 @@
 
 Aucune stack produit n'est sélectionnée au 7 septembre 2026.
 Une [architecture de référence à éprouver](architecture/runtime-infrastructure.md)
-est maintenant proposée : responsabilités, assemblage prioritaire et alternatives.
+est documentée : responsabilités, hypothèses d'assemblage et alternatives.
 Voir [ADR-0033](decisions/ADR-0033-runtime-boundaries-and-evaluation.md).
+Le recadrage [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md)
+retire toute priorité à cet assemblage et à l'inventaire exhaustif : le produit
+est le thème, l'IA prépare les dépendances manquantes à la demande.
 La [vision produit](00-project-brief.md) prime sur les propositions techniques
 de la [recherche initiale](research/initial-research.md).
 
@@ -47,21 +50,24 @@ La séparation locale est acquise dans
 
 La [transformation du jeu](architecture/game-transformation.md) retient désormais
 la bibliothèque canonique, la conversion par scène et le diorama ambiant adapté.
-La prochaine preuve est un PoC d'extraction OoT, candidat prioritaire : pièce,
+Une preuve d'ingestion possible reste le PoC OoT précédemment proposé : pièce,
 acteur animé, collision, musique et placements avec références conservées.
 Comparer les outils sur cette chaîne avant de choisir formats et stack.
+Ce PoC n'est pas une condition pour commencer un thème original ni pour comparer
+les technologies du terminal et du wallpaper.
 La récupération par décompilation/recompilation reste une piste à évaluer.
 
-1. Choisir l'environnement et le matériel du banc d'essai terminal/surface synthétique ; aucune ROM nécessaire pour cette preuve.
-2. Éprouver l'assemblage proposé et ses frontières OS, sécurité et énergie avant de verrouiller les dépendances.
-3. Identifier l'entrée OoT et la scène de test pour la chaîne d'extraction ; SM64 et Sunshine restent des alternatives.
-4. Élargir ensuite à un second lecteur et un exemple 2D selon la cartographie des consoles.
-5. Finaliser la stack minimale, les versions, le packaging et les budgets sur ces preuves.
+1. Partir du package de thème : créer, installer, personnaliser et activer wallpaper et terminal séparément ou ensemble.
+2. Comparer les solutions existantes sur ce parcours, puis les langages, formats et intégrations OS ; ne pas privilégier automatiquement l'assemblage antérieur.
+3. Définir l'assistance IA de préparation : recherche publique, exécution locale isolée et chaîne reproductible, sans choisir un fournisseur prématurément.
+4. Choisir le thème de preuve, le matériel et les budgets ; un thème original sans ROM suffit pour commencer la comparaison.
+5. Éprouver les choix ; préparer un jeu à la demande si le thème en dépend, sans inventorier toutes les consoles ni décompiler un jeu complet au préalable.
 
 Rust, wgpu, winit, parry3d, cpal, symphonia, glTF et un bundle `.scene`
 sont des pistes héritées, pas des dépendances autorisées pour le produit.
-La génération d'adaptateurs par IA est une piste ultérieure, pas un prérequis
-pour commencer.
+La découverte et préparation assistées par IA font partie du parcours optionnel
+des thèmes dépendant d'un jeu ; elles ne sont pas requises pour afficher un thème
+déjà préparé. Une génération de code n'est nécessaire que si l'existant ne suffit pas.
 
 ## Candidats évoqués, non adoptés
 

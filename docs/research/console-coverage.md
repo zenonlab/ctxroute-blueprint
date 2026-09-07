@@ -1,5 +1,10 @@
 # Cartographie des consoles et couverture de conversion
 
+Recherche exploratoire conservée, non liste obligatoire à compléter : depuis
+[ADR-0034](../decisions/ADR-0034-theme-first-and-on-demand-discovery.md), la
+préparation d'un thème peut découvrir ses outils par IA à la demande. Un jeu
+absent de cette page n'est pas interdit ; aucun inventaire exhaustif n'est requis.
+
 État au 7 septembre 2026 : recherche documentaire, aucun adaptateur exécuté dans
 ce dépôt. Cette cartographie remplace l'échantillon de consoles de la discussion.
 Elle couvre les grandes familles, extensions et plusieurs systèmes spécialisés ;

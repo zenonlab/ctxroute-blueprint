@@ -6,6 +6,13 @@ Le statut du dépôt reste `template` jusqu'à la session de décisions techniqu
 
 ## Synthèse
 
+Le produit est un système de **thèmes pour wallpapers et terminaux personnalisés**.
+Un thème peut être original ou réutiliser des ressources de jeu préparées
+localement. Nous ne construisons ni catalogue exhaustif de consoles, ni émulateur,
+ni service de décompilation universelle. La découverte assistée par IA intervient
+à la demande pour préparer une dépendance manquante, pas pour afficher le thème.
+Voir [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
+
 Créer un environnement de travail personnel inspiré des jeux vidéo, dans lequel
 un décor interactif et un terminal personnalisé forment une expérience cohérente.
 L'objectif est de rendre le travail agréable et personnalisable, avec de vrais
@@ -50,8 +57,9 @@ copier-coller, défilement, raccourcis et navigation clavier priment sur le déc
 
 ## Données de jeu et personnalisation
 
-Précision du 7 septembre : l'objectif est de transformer le jeu entier hors ligne
-en bibliothèque, puis de programmer une composition qui ne charge et n'exécute
+L'extension à une bibliothèque couvrant le jeu entier reste possible, mais n'est
+pas un préalable à la création d'un thème : préparer les dépendances nécessaires
+à la demande, conserver les données récupérées, puis ne charger et exécuter
 que le nécessaire. Le cœur doit être extensible à différents jeux ; les exemples
 ne définissent pas ses règles. La composition par code prime sur un éditeur
 grand public. Voir [transformation du jeu](architecture/game-transformation.md)
@@ -64,7 +72,7 @@ dépend des formats et du code du jeu. La bibliothèque conserve les information
 récupérées ; le mode nominal diorama peut adapter les comportements. La fidélité
 sensorielle recherchée et chaque approximation doivent être vérifiées et signalées.
 
-La dernière décision retient l'indexation globale, les exports progressifs par
+La décision antérieure sur l'ingestion retient l'indexation globale, les exports progressifs par
 scène, les capacités explicites et les profils énergétiques mesurables.
 OoT est candidat prioritaire pour une preuve d'extraction, pas encore un jeu
 pilote validé. Voir [ADR-0031](decisions/ADR-0031-canonical-library-and-capabilities.md).
@@ -114,6 +122,10 @@ desktop, terminal/PTY, gestion des agents, stockage, format d'assets, packaging,
 observabilité, sécurité détaillée et budgets de performance.
 Aucun backend distant, compte utilisateur ou service cloud n'est demandé.
 L'utilisateur fournit sa ROM et lance lui-même la conversion locale séparée.
+Il peut demander à une IA de découvrir les outils publics pertinents, préparer
+un adaptateur et piloter sa validation locale dans les permissions accordées.
+Un thème déjà préparé fonctionne sans cette assistance ; les agents exécutés
+dans les sessions de travail restent une fonction distincte.
 Nous distribuons outils et recettes sans ROM ni assets extraits ; aucune donnée
 de jeu n'est envoyée à nos services ou à une IA distante dans ce parcours.
 Une bibliothèque persistante uniquement sur son disque reste l'hypothèse de

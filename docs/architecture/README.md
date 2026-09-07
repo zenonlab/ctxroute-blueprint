@@ -6,9 +6,9 @@ It documents desired capabilities only; product technologies remain undecided.
 ## Parcours de lecture produit
 
 1. [Vision](product-vision.md) : expérience et sessions indépendantes des thèmes.
-2. [Transformation](game-transformation.md) : ROM locale, conversion séparée et bibliothèque.
+2. [Préparation des thèmes](game-transformation.md) : découverte IA à la demande, conversion locale et package séparé.
 3. [Infrastructure](runtime-infrastructure.md) : modules, frontières, candidats et organisation cible.
-4. [Consoles](../research/console-coverage.md) : inventaire élargi, capacités et preuves de support.
+4. [Consoles](../research/console-coverage.md) : recherche exploratoire, non inventaire à compléter.
 
 Les trois schémas sont complémentaires ; l'infrastructure contient une proposition
 de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,

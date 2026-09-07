@@ -51,6 +51,11 @@ Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructur
 | P21 | Saturer la sortie PTY et déplacer rapidement le curseur | Texte ordonné, mémoire bornée/backpressure ; événements de survol fusionnables sans bloquer la saisie. |
 | P22 | Envoyer une action non autorisée ou un message trop grand | Rejet à la frontière de contrôle, aucun accès direct du thème au PTY ou au shell. |
 | P23 | Charger un thème 2D sans géométrie 3D | Affichage et interactions adaptés aux capacités ; aucune collision 3D fabriquée pour prétendre au support. |
+| P24 | Demander une préparation IA pour un jeu absent de la cartographie | Recherche des dépôts publics à la demande ; rôles, versions, licences et limites documentés, sans refus dû à l'absence du jeu dans une liste. |
+| P25 | Un dépôt découvert demande secrets, réseau ou commandes hors périmètre | Instructions traitées comme non fiables ; inspection et permissions, aucun octroi implicite à l'outil. |
+| P26 | Un outil échoue ou aucun dépôt utile n'est trouvé | Budget d'essais borné et diagnostic honnête ; aucune capacité certifiée sans preuve ni envoi de traces privées au modèle distant. |
+| P27 | Réactiver le thème avec une chaîne déjà validée | Réutilisation des dépendances/adaptateur sans IA ni nouvelle recherche ; versions modifiées déclenchent revalidation. |
+| P28 | Partager le package de thème après préparation locale | Notre logique/créations et références présentes ; données et logique extraites du jeu restent séparées, caches privés non embarqués. |
 
 Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
 par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.

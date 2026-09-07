@@ -5,22 +5,32 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
-Dernière étape : [infrastructure locale](architecture/runtime-infrastructure.md)
+Décision actuelle : [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
+Nous créons des packages de thèmes pour wallpapers et terminaux custom.
+Nos créations et notre logique restent séparées de la bibliothèque locale du jeu.
+À la demande, l'IA recherche les dépôts publics utiles, inspecte et prépare une
+chaîne isolée, puis conserve l'adaptateur et ses preuves pour réutilisation.
+Pas de catalogue exhaustif à remplir, pas de jeu complet à décompiler avant
+chaque thème, pas d'IA requise pour l'affichage. ROM et diagnostics privés restent
+locaux. La stack et le fournisseur IA sont à discuter ensuite, sans priorité
+figée à Rust/Tauri/Godot. Aucun outil découvert n'a été exécuté dans ce dépôt.
+
+Étape antérieure : [infrastructure locale](architecture/runtime-infrastructure.md)
 et [cartographie élargie des consoles](research/console-coverage.md), avec
 [ADR-0033](decisions/ADR-0033-runtime-boundaries-and-evaluation.md).
 Responsabilités séparées sans multiplier les démons ; organisation future des
 sources et données documentée sans dossiers vides ni déplacement du blueprint.
-Assemblage prioritaire à éprouver : Rust/Tauri/xterm.js/portable-pty pour le
+Assemblage antérieurement proposé, désormais sans priorité : Rust/Tauri/xterm.js/portable-pty pour le
 terminal et contrôle, Godot pour la scène ; intégration OS et énergie non prouvées.
 Ce ne sont pas des dépendances adoptées. Aucune console n'est encore certifiée
 convertible dans notre produit ; les émulateurs servent de références hors ligne.
 
-Dernière précision : lire aussi [la transformation du jeu](architecture/game-transformation.md)
+Historique : lire aussi [la transformation du jeu](architecture/game-transformation.md)
 et [ADR-0030](decisions/ADR-0030-game-transformation.md). L'utilisateur veut
 programmer des compositions à partir d'une bibliothèque couvrant le jeu entier,
 avec ressources, relations, collisions et comportements compris, tout en
 n'exécutant que la sélection nécessaire. Mario Kart reste un exemple.
-La composition par code est prioritaire. La dernière décision est
+La composition par code est prioritaire. Une décision antérieure est
 [ADR-0031](decisions/ADR-0031-canonical-library-and-capabilities.md) : bibliothèque
 canonique préservée, indexation globale et exports progressifs par scène,
 comportements ambiants adaptés, clics et réactivité système, capacités explicites,
@@ -77,6 +87,20 @@ les six définitions locales dans `/hooks` si Codex le demande, conformément
 au [guide amont conservé](../README.md). Aucune configuration globale modifiée.
 
 ## Vérification finale
+
+Recadrage thèmes/IA : schéma de préparation actualisé, livré avec Archify,
+`npm run verify` réussi : 261 tests réussis, un ignoré, aucun échec ; trois
+tests d'intégration réussis et audit npm sans vulnérabilité signalée.
+Ces contrôles vérifient le dépôt ; aucun runtime ni assistant IA produit testé.
+Le statut reste `template`, sans dépendance produit ni modification des hooks.
+Validation du schéma :
+9/9 contrôles showcase réussis, zéro erreur/avertissement. Contenance validée
+aux quatre tailles desktop ; capture sombre 2048×1320 inspectée par l'agent.
+Revue humaine du reçu `pending`, interface fixe du visualiseur en anglais.
+Artefact : `dist/architecture/game-transformation.architecture.html`.
+SHA-256 source : `7dedaf23ac97af4b8c843b6da0d40fc7513342ab1518d02857532786f7677636`.
+SHA-256 HTML : `5857b34a999c8dd5af767bfa9c99cd3b03c9be92ea95316b016e9690bc61592b`.
+Les empreintes suivantes décrivent les versions antérieures, pas cet artefact.
 
 Étude infrastructure/consoles : troisième schéma produit livré et validé par
 Archify (architecture, 9/9 contrôles showcase, zéro erreur/avertissement).
@@ -143,6 +167,12 @@ non verbatim du texte initial ; ses chiffres et références restent à vérifie
 
 ## Prochaine conversation
 
+Priorité actuelle : comparer les solutions existantes pour créer, installer et
+activer un package de thème wallpaper/terminal, puis choisir langages, composants
+et preuves minimales. La préparation IA à la demande est une capacité séparée,
+pas un service à maintenir dans la boucle d'affichage. Les propositions de banc
+d'essai ci-dessous restent des possibilités et non un ordre déjà adopté.
+
 Prochaine étape demandée : travailler sur l'architecture et l'infrastructure,
 en comparant l'existant avec les frontières maintenant documentées. La discussion
 peut commencer sans ROM ; ne pas adopter une stack à partir des seuls exemples.
@@ -163,6 +193,13 @@ Prompt de reprise possible :
 > Compare d'abord les bases possibles pour un terminal et un bureau ludiques
 > modulaires sur Linux, macOS et Windows. Ne considère pas la stack de la
 > recherche initiale comme déjà décidée.
+
+Précision au prompt :
+
+> Commence par ADR-0034. Le produit est le package de thème, pas un catalogue de
+> consoles. L'IA peut découvrir et préparer les outils à la demande, avec validation
+> locale et dépendances séparées. Compare la stack sans privilégier automatiquement
+> Rust/Tauri/Godot ; ne lance pas de conversion ni d'installation pour cette discussion.
 
 Prompt complémentaire pour poursuivre la réflexion :
 
