@@ -132,6 +132,12 @@ Leur existence ne prouve pas la faisabilité de notre assemblage.
 
 ## Intégration desktop par OS
 
+La [fiche de faisabilité OS](../research/os-feasibility.md) détaille désormais les
+preuves amont et le préflight matériel MAC-01. Elle signale notamment le marshalling
+de LVM_HITTEST interprocessus, les contraintes DPI de SetParent et le rôle des
+surfaces Wayland. La [revue de stack](../research/stack-preflight.md) précise les
+briques candidates sans changer C0–C6 ni adopter de backend.
+
 | Environnement | Piste | Preuve bloquante avant support annoncé |
 | --- | --- | --- |
 | Windows | Réutilisation Lively ou adaptateur natif inspiré de ses mécanismes | Explorer redémarré, icônes et clics, DPI, multi-écrans ; WorkerW non traité comme API stable garantie. |

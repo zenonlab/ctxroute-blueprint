@@ -15,6 +15,7 @@ Ordre d'exécution : [feuille de route E1–E6](../03-product-roadmap.md) et
 4. [Consoles](../research/console-coverage.md) : recherche exploratoire, non inventaire à compléter.
 5. [Synthèse des audits](../research/architecture-audit-synthesis.md) : corrections sourcées, candidats et limites.
 6. [Protocole expérimental](../04-experimental-protocol.md) : banc E1, mesures et preuves avant adoption.
+7. [Faisabilité OS](../research/os-feasibility.md) puis [préflight de stack](../research/stack-preflight.md) : MAC-01 observé, contraintes natives et composants à éprouver.
 
 Les schémas produit sont complémentaires ; l'infrastructure contient une proposition
 de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,

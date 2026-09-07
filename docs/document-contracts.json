@@ -3,6 +3,20 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "os-feasibility",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/research/os-feasibility.md",
+      "requiredSections": ["Verdict et niveaux de preuve", "Premier banc observé : MAC-01", "Sortie de cette étude et prochaine preuve"]
+    },
+    {
+      "id": "stack-preflight",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/research/stack-preflight.md",
+      "requiredSections": ["Répartition du travail", "Révisions repérées et portée de la recherche", "Conditions avant adoption"]
+    },
+    {
       "id": "architecture-audit-synthesis",
       "kind": "research-evidence",
       "format": "markdown",

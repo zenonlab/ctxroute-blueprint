@@ -17,6 +17,11 @@ de la [recherche initiale](research/initial-research.md).
 
 ## Principe de sélection
 
+Le [préflight OS](research/os-feasibility.md) relève MAC-01 et les obstacles natifs
+avant sélection du moteur. La [revue de stack](research/stack-preflight.md) sépare
+notre intégration des bibliothèques réutilisées, avec révisions repérées et limites.
+Les branches de développement observées ne sont pas des versions adoptées.
+
 La [synthèse contradictoire](research/architecture-audit-synthesis.md) référence
 les dépôts candidats, leurs rôles réels et les conclusions non retenues des audits.
 Le [protocole expérimental](04-experimental-protocol.md), adopté par

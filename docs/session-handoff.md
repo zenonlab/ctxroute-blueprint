@@ -5,7 +5,24 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
-Vérification de cette consolidation documentaire : `npm run verify` réussi
+Dernier travail : [faisabilité OS](research/os-feasibility.md) et
+[préflight de stack](research/stack-preflight.md). MAC-01 observé en lecture seule :
+M1 Pro, 16 Go, macOS 26.2 ARM64, écran principal 3024×1964 ; SDK 26.5 et outillage
+Apple accessibles. Aucun ancrage ni mesure énergie exécuté ; pas de demande de
+permission, dépendance installée ou donnée matérielle identifiante conservée.
+Les révisions amont sont des repères de recherche, pas une stack verrouillée.
+Prochaine action : compléter fréquence/profil/instruments et budgets E1, définir
+les cibles de première livraison puis préparer la sonde native macOS.
+Contrats et schéma runtime inchangés : cette étude ne modifie aucune frontière
+ni dépendance adoptée et ne nécessite pas de nouveau diagramme ou ADR d'adoption.
+
+Vérification du préflight : `npm run verify` réussi (262 tests réussis, 1 ignoré,
+0 échec ; 3 intégrations réussies ; 0 vulnérabilité npm). Les 83 liens locaux
+des huit documents parcourus existent ; `git diff --check` propre. Les schémas
+produit existants sont revalidés par le build, sans nouvelle revue visuelle puisque
+leurs sources ne changent pas. AGENTS.md, CLAUDE.md et les hooks sont inchangés.
+
+Vérification de la consolidation précédente (ba72b4f) : `npm run verify` réussi
 (263 tests : 262 réussis, 1 ignoré, 0 échec ; 3 tests d'intégration réussis ;
 audit npm : 0 vulnérabilité). Aucun test produit ni mesure énergétique exécuté.
 AGENTS.md, CLAUDE.md et les hooks restent inchangés ; aucune suppression de fichier.

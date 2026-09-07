@@ -12,6 +12,10 @@ et tester le remplacement des modules, sans promettre une migration gratuite.
 
 ## Règles de progression
 
+Avancement documentaire E1 : [MAC-01 et faisabilité OS](research/os-feasibility.md)
+relevés ; [préflight de stack](research/stack-preflight.md) préparé. Budgets,
+instruments de mesure et autres bancs restent à qualifier. Aucun prototype exécuté.
+
 Le [protocole expérimental E1](04-experimental-protocol.md) précise les mesures
 et les preuves à produire sans modifier cet ordre. Étude courte des candidats,
 puis au plus deux finalistes par question ; pas de construction simultanée de

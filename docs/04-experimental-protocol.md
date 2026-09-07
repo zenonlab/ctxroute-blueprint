@@ -9,8 +9,10 @@ faits sourcés, les hypothèses et les propositions non retenues.
 ## Préparation E1 et ordre d'exécution
 
 E1 doit enregistrer les machines effectivement disponibles, versions OS/compositeur,
-GPU/pilotes, écrans, instruments et périmètre fonctionnel de référence. Ces données
-ne sont pas encore collectées ; la présence de ce document ne clôt pas E1.
+GPU/pilotes, écrans, instruments et périmètre fonctionnel de référence. Un premier
+[préflight MAC-01](research/os-feasibility.md#premier-banc-observé--mac-01) relève
+matériel et outillage en lecture seule ; fréquence écran, profil de mesure et
+qualification des instruments restent à compléter. Ce relevé ne clôt pas E1.
 Définir avant les mesures les budgets par scénario (énergie, mémoire, latence),
 les marges d'incertitude admissibles et la capacité de maintenance de l'équipe.
 Ne pas transformer les chiffres des audits en seuils de production.
