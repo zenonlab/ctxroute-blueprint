@@ -15,6 +15,14 @@ sh pocs/macos-surface/probe.sh desktop --duration 60
 Le fond demande maintenant l'animation ; il reste transparent aux clics.
 Le menu **WP** dans la barre macOS donne Pause/Reprendre, Animation, Halo et Arrêter.
 Les clics sur l'objet du fond ne sont pas activés : ils restent à qualifier face à Finder.
+Variante d'essai uniquement : `desktop --split-input --export-still --duration 180`.
+Elle place un objet cliquable fixe à gauche et son panneau au-dessus des icônes,
+sous les applications. Une icône superposée n'a PAS la priorité : ce n'est pas
+le comportement produit validé. Le premier clic est accepté sans activation de
+fenêtre ; son routage réel reste à éprouver. `split_mouse_downs` distingue les
+événements souris reçus des actions programmatiques du smoke.
+`--export-still` crée notre image PNG à côté de la .app, sans changer le fond système.
+Ces deux options exigent le mode desktop ; l'export exige le lancement en .app.
 La fenêtre et sa couche de dessin sont conservées aux changements de Space/réveil.
 L'absence de blanc pendant les transitions n'est pas encore démontrée.
 Pour la fenêtre de diagnostic uniquement : `run --duration 60`.
@@ -52,7 +60,8 @@ La dernière image reste conservée pendant la suspension ; la phase n'est pas r
 
 Le lanceur sélectionne le SDK Xcode local sans modifier `SDKROOT` globalement.
 Builds et caches SwiftPM sont dirigés sous `dist/pocs/macos-surface/`. Le runtime
-ne crée un fichier que pour la capture demandée : nom UUID dans son répertoire
+ne crée un fichier que pour une capture demandée : export still près de la .app,
+ou snapshot de fenêtre avec nom UUID dans son répertoire
 courant, que le lanceur fixe à ce même dossier. Un lancement direct du binaire
 ne garantit pas ce répertoire. Les caches système du compilateur ne sont pas
 une frontière de sécurité. Aucun nettoyage automatique n'est effectué.

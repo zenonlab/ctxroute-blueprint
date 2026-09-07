@@ -9,12 +9,16 @@ public struct ProbeOptions: Sendable {
     public let duration: TimeInterval
     public let smoke: Bool
     public let snapshot: Bool
+    public let splitInput: Bool
+    public let exportStill: Bool
 
     public static let usage = """
     SurfaceProbe [--mode window|desktop] [--duration 1...600] [--smoke] [--snapshot]
     Défaut : fenêtre statique, arrêt après 60 s. Smoke : durée minimale 4 s.
     --snapshot : capture de notre vue seule, uniquement avec --smoke.
     Mode desktop : animé selon activité, clics via menu WP uniquement, sans focus du fond.
+    --split-input : essai desktop avec objet cliquable AU-DESSUS des icônes.
+    --export-still : export PNG local via la .app desktop, sans changer le fond système.
     """
 
     public static func parse(_ arguments: [String]) throws -> Self {
@@ -27,7 +31,7 @@ public struct ProbeOptions: Sendable {
                 throw OptionError.invalid("Option répétée : \(key)")
             }
             switch key {
-            case "--smoke", "--snapshot":
+            case "--smoke", "--snapshot", "--split-input", "--export-still":
                 flags.insert(key)
             case "--mode", "--duration":
                 index += 1
@@ -53,7 +57,13 @@ public struct ProbeOptions: Sendable {
         guard !snapshot || (smoke && mode == .window) else {
             throw OptionError.invalid("Snapshot réservé au smoke en fenêtre")
         }
-        return Self(mode: mode, duration: duration, smoke: smoke, snapshot: snapshot)
+        let splitInput = flags.contains("--split-input")
+        let exportStill = flags.contains("--export-still")
+        guard mode == .desktop || (!splitInput && !exportStill) else {
+            throw OptionError.invalid("Split input et export still sont réservés au bureau")
+        }
+        return Self(mode: mode, duration: duration, smoke: smoke, snapshot: snapshot,
+                    splitInput: splitInput, exportStill: exportStill)
     }
 }
 

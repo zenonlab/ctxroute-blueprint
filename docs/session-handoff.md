@@ -4,6 +4,16 @@ Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolémen
 
 ## Reprise actuelle — L1
 
+ADR-0046 ajoute `desktop --split-input --export-still --duration 180` : deux plans
+de rendu/interaction inspirés d'Übersicht et export PNG préparatoire à la continuité.
+Le fond système reste inchangé. 12 assertions smoke passent avec zéro mouseDown.
+Le test prolongé séparé enregistre ensuite 40 mouseDown/40 actions et 403 ticks ;
+Computer Use n'a cependant pas pu cibler le panneau ni qualifier le premier clic.
+Priorité des icônes superposées
+explicitement NON supportée par ce mode optionnel. Ne pas annoncer le défaut résolu.
+Prochaine preuve : clic réel sur l'objet dégagé ; application du PNG seulement avec
+accord pour le changement de fond système. Voir la section ADR-0046 de la fiche L1.
+
 Version ADR-0045 : animation demandée en bureau, contrôles via menu **WP**, même
 fenêtre conservée au retour Spaces/réveil. Les tests d'état et handlers passent,
 pas encore la fluidité réelle des transitions. La sonde peut suspendre l'animation

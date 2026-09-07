@@ -8,12 +8,12 @@
   "decisions": {
     "language": "L1: Swift 6, observed compiler 6.3.2; later L2-L3: Rust candidate, not installed by L1. Node.js is governance tooling only.",
     "runtime": "L1: standalone macOS AppKit process, local SDK 26.5; deployment target macOS 14, qualified only on MAC-01 macOS 26.2.",
-    "frontend": "L1: native AppKit controls and CoreGraphics test drawing; ordinary interactive window or separately selected passive desktop surface.",
+    "frontend": "L1: native AppKit and CoreGraphics; interactive diagnostic window or passive desktop. Optional --split-input tests separate widget panels above icons, not product-qualified.",
     "backend": "None for L1: no service, IPC, PTY, game reader or LLM runtime.",
     "storage": "L1: memory-only scene; build artifacts and optional own-view snapshots in ignored dist/pocs/macos-surface; bounded stdout summary.",
     "deployment": "L1: manual local SwiftPM build and launch; no installer, autostart, shell settings or wallpaper preference writes.",
     "observability": "L1: bounded diagnostic summary with draw/tick/action counters and monotonic durations, no private terminal or desktop capture.",
-    "security": "L1: reviewed compiled code, no external input files, commands or network; passive desktop never accepts input. Process separation is not a hostile-code sandbox. Swift compiler/tests complement lexical-only Sensor coverage.",
+    "security": "L1: no external input files, commands, network or global hooks; wallpaper surface remains passive. Optional split-input panels accept local clicks above icons. Optional still export writes only own-view PNG; no system wallpaper changes. Swift compiler/tests complement lexical-only Sensor coverage.",
     "performance": "L1: no animation timer at rest or paused, 30 Hz maximum requested animation rate, finite lifetime up to 600 seconds; energy verdict deferred to measured baseline."
   },
   "commands": {

@@ -5,6 +5,71 @@ Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
 montre uniquement cette sonde ; aucun lien au terminal ou à l'ingestion.
 
+## Essai actuel — deux plans (ADR-0046)
+
+Le retour utilisateur invalide l'expérience de la version ADR-0045 : apparence
+superposée, disparition aux transitions et absence de clics sur le décor.
+Les tests internes antérieurs ne contredisent pas cette observation.
+
+[ADR-0046](../decisions/ADR-0046-split-input-experiment.md) introduit une variante
+optionnelle, inspirée des responsabilités observées dans Übersicht, sans copie
+de son code : fond passif et petites fenêtres NSPanel non activantes à normal − 1.
+Objet fixe à gauche → panneau → Halo/Pause/Fermer, sur le même état de sonde.
+Un marqueur séparé montre la phase d'animation sans déplacer la cible de clic.
+Les fenêtres de contrôle sont **au-dessus des icônes Finder** : priorité des icônes
+superposées NON supportée, mode non conforme au produit, jamais activé par défaut.
+Hors de leurs rectangles, ces fenêtres ne couvrent pas le bureau.
+
+```sh
+sh pocs/macos-surface/probe.sh desktop --split-input --export-still --duration 180
+sh pocs/macos-surface/probe.sh desktop --split-input --export-still --smoke --duration 6
+```
+
+L'export capture seulement notre vue dans `desktop.*/continuity-UUID.png`, à côté
+de la .app. Il n'applique aucun réglage macOS. Il exclut les panneaux interactifs,
+les fenêtres tierces et les icônes Finder. Il prépare une image de transition,
+sans résoudre les transitions tant que l'image n'est pas appliquée et éprouvée.
+Une future application doit obtenir l'accord utilisateur et prévoir une restauration
+qui ne prétende pas restaurer une configuration dynamique à partir d'une simple URL.
+
+Preuves locales : compilation release et 11 tests XCTest passent. Le smoke split
+réussit ses 12 assertions ; 6 actions programmatiques, `split_mouse_downs: 0`,
+`simulation_ticks: 0`, `system_wallpaper_modified: false`. PNG exporté 3024×1964.
+Le compteur de vrais `mouseDown` n'est pas incrémenté par `performClick`.
+Computer Use capture la surface de fond, mais le clic ciblé échoue avec
+`noWindowsAvailable`. Une seconde lecture retrouve uniquement la surface de fond.
+Ce contrôle à distance ne valide ni premier clic réel, ni continuité Spaces/Mission Control.
+Le test prolongé est borné à 180 s et ne doit pas être confondu avec un service.
+
+Reçu du test prolongé `desktop.Gq0jnR`, arrivé après l'échec du contrôle distant :
+40 `mouseDown` et 40 actions locales, 403 ticks, 4 notifications de Space, code 0
+après 180 s. `application_active: false` à la fin, panneau ouvert. Il prouve des
+entrées reçues pendant cette exécution sans smoke, pas leur provenance précise,
+la latence du premier clic, l'absence de vol de focus sur toute la durée ou la
+continuité visuelle. Aucun test d'icône superposée n'est déclaré réussi.
+Cette exécution précède seulement l'ajout du marqueur animé distinct et du libellé
+d'avertissement ; le smoke de la version finale reste la preuve structurelle.
+
+Sources examinées :
+
+- [Übersicht, séparation des fenêtres](https://github.com/felixhageloh/uebersicht/blob/master/Uebersicht/UBWindowGroup.m),
+  [niveaux et focus](https://github.com/felixhageloh/uebersicht/blob/master/Uebersicht/UBWindow.m),
+  [entrée/sortie de widget](https://github.com/felixhageloh/uebersicht/blob/master/Uebersicht/UBWebViewController.m).
+- [Wallnetic, synchronisation du fond système](https://github.com/fatihkan/wallnetic/blob/main/src/Wallnetic/Services/SystemWallpaperSync.swift) :
+  mécanisme de repli fixe, pas preuve que nos blancs ont cette seule cause.
+- [Apple, acceptsFirstMouse](https://developer.apple.com/documentation/appkit/nsview/acceptsfirstmouse(for:)) :
+  accepter le clic initial ne suffit pas si le système ne route pas ce clic vers la fenêtre.
+
+Archify : architecture showcase 9/9, zéro erreur/avertissement.
+Source SHA-256 `0f3d06717d523f553a7f80d0b87af918dcc37e87a40e65be3add223873eaa3c5`.
+HTML SHA-256 `a072e37a3faa21e15c1d044c71e70cf75e4cac04fbc1560901974e7175ff2965`.
+Libellés français, interface fixe anglaise. Les sections suivantes sont historiques.
+Visual-check réussi sur quatre tailles ; capture sombre 2048×1320 inspectée,
+revue humaine du reçu `pending`. `npm run verify` passe (262 tests, 1 ignoré,
+3 intégrations, zéro échec). Le Sensor Swift reste lexical (`WARN`), compensé
+par compilation native/XCTest, pas par une prétendue analyse syntaxique complète.
+AGENTS.md, CLAUDE.md et hooks inspectés, inchangés.
+
 ## Version actuelle — animation et transitions (ADR-0045)
 
 [ADR-0045](../decisions/ADR-0045-desktop-motion-and-transitions.md) sépare animation

@@ -7,6 +7,8 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertEqual(options.mode, .window)
         XCTAssertEqual(options.duration, 60)
         XCTAssertFalse(options.smoke)
+        XCTAssertFalse(options.splitInput)
+        XCTAssertFalse(options.exportStill)
         XCTAssertFalse(ProbeState(interactive: true).shouldAnimate)
     }
 
@@ -16,7 +18,8 @@ final class ProbeCoreTests: XCTestCase {
             ["--duration", "601"], ["--duration"], ["--mode", "other"],
             ["--exec", "anything"], ["--mode", "window", "--mode", "desktop"],
             ["--smoke", "--smoke"], ["--snapshot"], ["--mode", "desktop", "--smoke", "--snapshot"],
-            ["--smoke", "--duration", "3"]
+            ["--smoke", "--duration", "3"], ["--split-input"], ["--export-still"],
+            ["--mode", "desktop", "--split-input", "--split-input"]
         ] {
             XCTAssertThrowsError(try ProbeOptions.parse(arguments), "\(arguments)")
         }
@@ -27,6 +30,9 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertEqual(try ProbeOptions.parse(["--duration", "600"]).duration, 600)
         XCTAssertTrue(try ProbeOptions.parse(["--smoke", "--snapshot", "--duration", "4"]).snapshot)
         XCTAssertTrue(try ProbeOptions.parse(["--mode", "desktop", "--smoke"]).smoke)
+        let split = try ProbeOptions.parse(["--mode", "desktop", "--split-input", "--export-still"])
+        XCTAssertTrue(split.splitInput)
+        XCTAssertTrue(split.exportStill)
     }
 
     func testPassiveStateRejectsEveryLocalAction() {

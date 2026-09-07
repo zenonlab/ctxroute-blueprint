@@ -6,11 +6,14 @@ final class SceneView: NSView {
     var state = ProbeState(interactive: false)
     var selectObject: (() -> Void)?
     var isDesktop = false
+    var usesFixedAnchor = false
+    var fixedAnchor: NSRect { NSRect(x: 80, y: bounds.midY, width: 180, height: 64) }
     private(set) var drawCount = 0
 
     override var isOpaque: Bool { true }
 
     private var objectRect: NSRect {
+        if usesFixedAnchor { return fixedAnchor }
         let travel = max(0, bounds.width - 4 * ProbeStyle.margin)
         let fraction = (sin(state.phaseSeconds * .pi / 2) + 1) / 2
         return NSRect(x: ProbeStyle.margin + travel * fraction, y: bounds.midY - 20, width: 40, height: 40)
@@ -31,7 +34,12 @@ final class SceneView: NSView {
         }
         ProbeStyle.accent.setFill()
         NSBezierPath(roundedRect: objectRect, xRadius: ProbeStyle.radius, yRadius: ProbeStyle.radius).fill()
-        let label = isDesktop ? "Fond animé · contrôles dans le menu WP" : "Objet de test · clic ou bouton ci-dessous"
+        if usesFixedAnchor {
+            let x = bounds.midX + sin(state.phaseSeconds * .pi / 2) * 100
+            NSBezierPath(ovalIn: NSRect(x: x, y: bounds.midY, width: 24, height: 24)).fill()
+        }
+        let label = usesFixedAnchor ? "Essai widgets · objet à gauche · priorité des icônes NON garantie"
+            : (isDesktop ? "Fond animé · contrôles dans le menu WP" : "Objet de test · clic ou bouton ci-dessous")
         (label as NSString).draw(at: NSPoint(x: ProbeStyle.margin, y: ProbeStyle.margin),
                                 withAttributes: [.font: ProbeStyle.body, .foregroundColor: ProbeStyle.text])
     }

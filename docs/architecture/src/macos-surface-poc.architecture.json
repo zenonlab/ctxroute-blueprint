@@ -4,9 +4,9 @@
   "meta": { "title": "PoC macOS — sonde autonome", "quality_profile": "showcase", "viewBox": [1280, 760] },
   "components": [
     { "id": "operator", "type": "external", "label": "Lancement manuel", "sublabel": "CLI ou .app via macOS", "pos": [40, 110], "size": [230, 80] },
-    { "id": "surface", "type": "frontend", "label": "Surface AppKit", "sublabel": "Fenêtre ou bureau passif", "pos": [520, 110], "size": [240, 80] },
+    { "id": "surface", "type": "frontend", "label": "Surface AppKit", "sublabel": "Fond et export image", "pos": [520, 110], "size": [240, 80] },
     { "id": "native", "type": "external", "label": "Bureau macOS", "sublabel": "Finder et compositeur", "pos": [1010, 110], "size": [230, 80] },
-    { "id": "controls", "type": "frontend", "label": "Contrôles explicites", "sublabel": "Menu macOS ou fenêtre", "pos": [40, 530], "size": [230, 80] },
+    { "id": "controls", "type": "frontend", "label": "Contrôles explicites", "sublabel": "Zone de clic optionnelle", "pos": [40, 530], "size": [230, 80] },
     { "id": "state", "type": "backend", "label": "État de sonde", "sublabel": "Pause, animation et dessin", "pos": [520, 530], "size": [240, 80] },
     { "id": "receipt", "type": "database", "label": "Reçu de diagnostic", "sublabel": "Compteurs, pas de watts", "pos": [1010, 530], "size": [230, 80] }
   ],

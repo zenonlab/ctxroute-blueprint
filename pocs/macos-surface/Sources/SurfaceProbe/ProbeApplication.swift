@@ -45,6 +45,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var snapshotName: String?
     var finishing = false
     var desktopMenu: DesktopMenu?
+    var splitControls: SplitDesktopControls?
+    var stillName: String?
     var displaysAwake = true
     var sessionActive = true
     var desktopRestorations = 0
@@ -79,6 +81,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         updateVisibility()
         refreshUI()
+        if options.exportStill { exportContinuityImage() }
         schedule(after: options.duration, selector: #selector(deadlineReached))
         if options.smoke {
             for (index, delay) in [0.25, 0.5, 1.2, 1.6, 2.2, 2.5, 3.2].enumerated() {
@@ -102,12 +105,19 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.isExcludedFromWindowsMenu = true
             window.isOpaque = true
             scene.isDesktop = true
+            scene.usesFixedAnchor = options.splitInput
             scene.wantsLayer = true
             scene.layerContentsRedrawPolicy = .onSetNeedsDisplay
             window.contentView = scene
             // Front of the desktop level, not front of normal applications.
             // This does not activate the app or change the key window.
             window.orderFrontRegardless()
+            if options.splitInput {
+                splitControls = SplitDesktopControls(target: self, open: #selector(openObject),
+                    effect: #selector(toggleEffect), pause: #selector(togglePause), close: #selector(closePanel))
+                splitControls?.place(relativeTo: window, anchor: scene.fixedAnchor)
+                splitControls?.show()
+            }
         } else {
             NSApp.setActivationPolicy(.regular)
             window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 580),
@@ -196,6 +206,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         desktopRestorations += 1
         // Reorder the retained window; never replace the scene or reset its phase.
         window.orderFrontRegardless()
+        splitControls?.place(relativeTo: window, anchor: scene.fixedAnchor)
+        splitControls?.show()
         updateVisibility()
         refreshUI()
     }
@@ -222,6 +234,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         renderedScene.needsDisplay = true
         invalidations += 1
         ui?.panel.isHidden = !state.panelOpen
+        splitControls?.refresh(state)
         ui?.animationButton.title = state.animationRequested ? "Arrêter l’animation" : "Animer"
         ui?.effectButton.title = state.effectEnabled ? "Retirer le halo" : "Activer le halo"
         ui?.pauseButton.title = state.paused ? "Reprendre" : "Pause"
@@ -309,6 +322,14 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             smokeChecks["menu_available"] = menu.numberOfItems == 6
         case 1:
             smokeChecks["animation_requested"] = state.animationRequested
+            if let splitControls {
+                splitControls.objectButton.performClick(nil)
+                smokeChecks["split_opens_panel"] = state.panelOpen && splitControls.controlsWindow.isVisible
+                splitControls.closeButton.performClick(nil)
+                smokeChecks["split_closes_panel"] = !state.panelOpen && !splitControls.controlsWindow.isVisible
+                smokeChecks["split_first_click_policy"] = splitControls.objectButton.acceptsFirstMouse(for: nil)
+                    && !splitControls.objectWindow.canBecomeKey && splitControls.mouseDowns == 0
+            }
         case 2:
             menu.performActionForItem(at: 2)
             phaseAtPause = state.phaseSeconds
@@ -331,7 +352,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             menu.performActionForItem(at: 3)
             smokeChecks["menu_animation_stop"] = !state.animationRequested && animationTimer == nil
         default:
-            let passed = smokeChecks.count == 9 && smokeChecks.values.allSatisfy { $0 }
+            let passed = smokeChecks.count == (options.splitInput ? 12 : 9) && smokeChecks.values.allSatisfy { $0 }
             finish(reason: "desktop-handler-smoke", code: passed ? 0 : 1)
         }
     }
@@ -356,6 +377,23 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         } catch { smokeChecks["own_view_snapshot"] = false }
     }
 
+    private func exportContinuityImage() {
+        guard Bundle.main.bundleIdentifier == "com.wallpaper.poc.desktop",
+              let bitmap = scene.bitmapImageRepForCachingDisplay(in: scene.bounds) else {
+            finish(reason: "still-export-unavailable", code: 1)
+        }
+        scene.cacheDisplay(in: scene.bounds, to: bitmap)
+        guard let data = bitmap.representation(using: .png, properties: [:]) else {
+            finish(reason: "still-encoding-failed", code: 1)
+        }
+        let name = "continuity-\(UUID().uuidString).png"
+        do {
+            try data.write(to: Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(name),
+                           options: .withoutOverwriting)
+            stillName = name
+        } catch { finish(reason: "still-write-failed", code: 1) }
+    }
+
     private func finish(reason: String, code: Int32) -> Never {
         finishing = true
         let timerActiveBeforeCleanup = animationTimer != nil
@@ -365,6 +403,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         desktopMenu?.remove()
+        splitControls?.hide()
         let receipt: [String: Any] = [
             "schema_version": 1, "poc": "macos-surface-l1", "mode": options.mode.rawValue,
             "reason": reason, "exit_code": code,
@@ -379,7 +418,11 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "spaces_notifications": spacesNotifications, "desktop_restorations": desktopRestorations,
             "hides_on_deactivate": window?.hidesOnDeactivate ?? false,
             "layer_backed": renderedScene.wantsLayer,
-            "input_policy": options.mode == .desktop ? "explicit-menu-only" : "window",
+            "input_policy": options.splitInput ? "split-widget-experiment" : (options.mode == .desktop ? "explicit-menu-only" : "window"),
+            "split_mouse_downs": splitControls?.mouseDowns ?? 0,
+            "split_panel_open": state.panelOpen,
+            "continuity_image": stillName ?? "not-requested",
+            "system_wallpaper_modified": false,
             "motion_observed_in_ticks": state.ticks > 0,
             "transitions_evidence": options.smoke && options.mode == .desktop ? "synthetic-handlers-only" : "not-qualified",
             "timer_active_before_cleanup": timerActiveBeforeCleanup,
@@ -395,7 +438,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "below_desktop_icons": (window?.level.rawValue ?? 0) < Int(CGWindowLevelForKey(.desktopIconWindow)),
             "backing_scale": window?.backingScaleFactor ?? 0,
             "smoke_checks": smokeChecks, "snapshot": snapshotName ?? "not-requested",
-            "energy_verdict": "not-measured", "finder_input_verdict": "not-tested",
+            "energy_verdict": "not-measured",
+            "finder_input_verdict": options.splitInput ? "icon-overlap-not-supported" : "not-tested",
             "desktop_visibility_verdict": "requires-manual-observation"
         ]
         window?.orderOut(nil)
