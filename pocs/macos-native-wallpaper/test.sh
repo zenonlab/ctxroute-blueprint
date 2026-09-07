@@ -21,6 +21,10 @@ xcrun swiftc -swift-version 6 -parse-as-library \
   "$probe_source/DiagnosticHitTesting.swift" "$probe_source/HitTestingTests.swift" \
   -o "$probe_tests/hit-testing"
 "$probe_tests/hit-testing" "$probe_source/interactive-theme.json"
+xcrun swiftc -swift-version 6 -parse-as-library \
+  "$probe_source/MacDesktopPriority.swift" "$probe_source/MacDesktopPriorityTests.swift" \
+  -o "$probe_tests/macos-priority"
+"$probe_tests/macos-priority"
 # Force only the diagnostic toggle in this isolated fixture; no file in the
 # extension container is created and no notification is posted by these tests.
 patch --batch -p1 -d "$probe_tests" -i "$probe_source/diagnostic.patch"

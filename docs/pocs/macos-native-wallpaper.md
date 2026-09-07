@@ -2,9 +2,9 @@
 
 ## Build interactif séparé — 8 septembre 2026
 
-L'utilisateur confirme l'animation du build 3. Son processus PID 12860 et son
-enregistrement restent intacts. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.13L9I5/Native Wallpaper Probe.app`.
+L'utilisateur confirme l'animation du build 3. Son processus PID 12860 reste
+intact. Le dernier paquet préparé est
+`dist/pocs/macos-native-wallpaper/compile.g74ecK/Native Wallpaper Probe.app`.
 Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
 `org.wallpaperthemes.nativeprobe.interactive.extension`, version 6. Signature et
 plist validées. Hôte enregistré par
@@ -15,7 +15,7 @@ cette mise à jour ; il ne lit pas le dernier manifeste.
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin 13L9I5** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin g74ecK** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -37,6 +37,23 @@ asynchrones incapable de modifier la livraison originale. Le prochain adaptateur
 macOS devra donc combiner observation et classification sûre de la cible Finder ;
 en l'absence de preuve ou d'autorisation requise, il devra refuser l'intention.
 
+Le paquet compile maintenant un premier classificateur macOS en lecture seule.
+Il ne demande pas l'autorisation Accessibilité et n'installe aucun moniteur global.
+Lorsque l'autorisation existe déjà, sa sonde peut utiliser
+[`AXUIElementCopyElementAtPosition`](https://developer.apple.com/documentation/applicationservices/1462077-axuielementcopyelementatposition)
+pour décrire l'élément supérieur. Seule une signature de fond Finder mesurée puis
+ajoutée à une liste explicite peut rendre l'emplacement admissible au wallpaper.
+Cette liste est vide dans le paquet : absence de permission, échec de sonde,
+application tierce, icône Finder et signature inconnue refusent tous l'intention.
+Le classificateur n'est pas encore relié au hit-tester ni exécuté au démarrage.
+Dans le contexte de développement déjà autorisé, une sonde ponctuelle sans noms
+de fichiers observe le fond Finder comme
+`AXGroup → AXScrollArea → AXApplication` et les icônes comme
+`AXImage → AXGroup → AXScrollArea → AXApplication`. Cette mesure prouve que les
+deux cibles sont distinguables sur cette session macOS 26.2 ; elle ne qualifie
+pas encore le binaire g74ecK, dont la confiance AX propre reste inconnue tant
+qu'il n'est pas lancé. Aucune signature n'est donc promue en production.
+
 `interactive-theme.json` constitue le premier asset de composition partagé par
 l'hôte et l'extension. Son schéma compagnon fixe l'identité, les couleurs, la
 cinématique, le panneau, les actions et trois ancres de décor avec leurs cadres
@@ -54,14 +71,22 @@ dans son conteneur propre à réception ; aucune boucle de polling supplémentai
 L'absence de récepteur doit laisser le compagnon utilisable sans attendre.
 
 Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 22
-assertions commandes/états, 14 assertions d'asset, 6 assertions de hit-testing
-et 15 assertions sur les calques (pause idempotente, reprise, effet, reset,
-panneau unique, contrôles et ancres bornés, taille réduite), soit 57 contrôles.
+assertions commandes/états, 14 assertions d'asset, 6 assertions de hit-testing,
+8 assertions de priorité macOS et 15 assertions sur les calques (pause
+idempotente, reprise, effet, reset, panneau unique, contrôles et ancres bornés,
+taille réduite), soit 65 contrôles.
 Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.13L9I5`
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.g74ecK`
 réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
+Son hôte porte le SHA-256
+`0068aa701bfd9a1413c7d8ca87fbd66cef2426bcc6bd22e1fd83a00dbf5b8026` et son
+extension `0270cf904ee579f4084d7fdd92861eb9f18763adb40fe2b59c76b8d4ffb4bfd5`.
+LaunchServices et pluginkit référencent ce chemin unique pour l'identité
+interactive ; l'ancien enregistrement 13L9I5 a été retiré sans supprimer son
+paquet. Aucun processus g74ecK n'est observé après l'enregistrement : il n'a pas
+été lancé et le fond actif n'a pas été modifié.
 Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
 états interactifs : transitions, mise en veille et énergie restent à qualifier.
 Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle
@@ -71,8 +96,8 @@ AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
 
 Archify architecture : 9/9 showcase, zéro erreur/avertissement, deux corrections
 ciblées de placement/routage. Source SHA-256
-`2d25f6a8e9d9168560d0aae55b042619bec12a083b3ff77c5b5e01fe58014845` ; HTML
-`0b9cc597d1cff67b2d61331bbb15496da33ff6e7cb1bf19dd9ab9a22381f05a4`.
+`7ac456574735d2555813aaa730b431195afd4858250fe76fa3ad6672ed928bb5` ; HTML
+`01e57a6233792ea317f732d7bf9d69073de65b62ae3b386d160d0c9e402167d7`.
 Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
 tailles sans débordement, capture sombre 2048×1320 inspectée : hiérarchie,
 relations et libellés lisibles, sans collision visible. Revue visuelle réussie

@@ -78,6 +78,7 @@ if [[ "${1:-}" == --package ]]; then
     "$probe_root/pocs/macos-native-wallpaper/HostControls.swift" \
     "$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift" \
     "$probe_root/pocs/macos-native-wallpaper/DiagnosticTheme.swift" \
+    "$probe_root/pocs/macos-native-wallpaper/MacDesktopPriority.swift" \
     -o "$probe_app/Contents/MacOS/NativeWallpaperProbeHost"
   "$probe_app/Contents/MacOS/NativeWallpaperProbeHost" --thumbnail "$probe_extension/Contents/Resources/diagnostic.png"
   plutil -lint "$probe_app/Contents/Info.plist" "$probe_extension/Contents/Info.plist"
