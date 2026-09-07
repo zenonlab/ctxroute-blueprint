@@ -69,11 +69,23 @@ Après confirmation utilisateur de l'animation du build 3, conserver ce paquet
 en cours. Le build interactif utilise une identité différente
 `org.wallpaperthemes.nativeprobe.interactive` et `.extension` : sa compilation
 ne remplace ni l'enregistrement ni le processus déjà qualifié.
+Sa scène emploie aussi un UUID distinct du diagnostic animé précédent : les
+descripteurs de choix de WallpaperAgent ne doivent jamais partager l'identité
+de contenu entre deux fournisseurs.
 
 Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
 dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.
 Le panneau de commande est une fenêtre ordinaire, pas une imitation de wallpaper.
 Le panneau du décor est, lui, dessiné dans le contexte natif de l'extension.
+
+La scène interactive est un asset versionné `interactive-theme.json`, validé à
+la fois par `interactive-theme.schema.json` et par le décodeur Swift avant usage.
+Il porte l'identité de scène, les couleurs, la durée du balayage, le panneau et
+les sept actions avec leurs cadres normalisés. L'hôte et l'extension consomment
+le même asset ; les contrôles visuels du décor ne sont donc pas codés deux fois.
+Une erreur de manifeste échoue fermée : aucune entrée de scène ni commande n'est
+exposée. Ces calques nommés préparent le futur hit-testing, mais ne revendiquent
+encore aucune réception de clic par WallpaperAgent.
 
 Pour ce seul diagnostic, réutiliser les notifications Darwin déjà employées
 par l'amont : noms fixes sans charge utile et actions idempotentes, traitées

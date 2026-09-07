@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "themeID": "org.wallpaperthemes.diagnostic.interactive",
+  "sceneID": "22222222-2222-4222-8222-222222222222",
+  "displayName": "Balayage interactif",
+  "background": { "red": 0.0, "green": 0.55, "blue": 0.25, "alpha": 1.0 },
+  "sweep": {
+    "color": { "red": 0.9, "green": 0.1, "blue": 0.6, "alpha": 1.0 },
+    "durationSeconds": 2.5,
+    "effectColor": { "red": 1.0, "green": 0.85, "blue": 0.1, "alpha": 1.0 },
+    "effectWidth": 12.0
+  },
+  "panel": {
+    "title": "Panneau du décor",
+    "normalizedFrame": { "x": 0.32, "y": 0.38, "width": 0.36, "height": 0.24 },
+    "color": { "red": 0.04, "green": 0.07, "blue": 0.12, "alpha": 0.95 }
+  },
+  "actions": [
+    { "id": "panel-open", "label": "Ouvrir", "command": "showPanel", "normalizedFrame": { "x": 0.04, "y": 0.54, "width": 0.44, "height": 0.16 } },
+    { "id": "panel-close", "label": "Fermer", "command": "hidePanel", "normalizedFrame": { "x": 0.52, "y": 0.54, "width": 0.44, "height": 0.16 } },
+    { "id": "animation-pause", "label": "Pause", "command": "pause", "normalizedFrame": { "x": 0.04, "y": 0.34, "width": 0.44, "height": 0.16 } },
+    { "id": "animation-resume", "label": "Reprendre", "command": "resume", "normalizedFrame": { "x": 0.52, "y": 0.34, "width": 0.44, "height": 0.16 } },
+    { "id": "effect-on", "label": "Effet actif", "command": "effectOn", "normalizedFrame": { "x": 0.04, "y": 0.14, "width": 0.44, "height": 0.16 } },
+    { "id": "effect-off", "label": "Effet coupé", "command": "effectOff", "normalizedFrame": { "x": 0.52, "y": 0.14, "width": 0.44, "height": 0.16 } },
+    { "id": "reset", "label": "Réinitialiser", "command": "reset", "normalizedFrame": { "x": 0.28, "y": 0.01, "width": 0.44, "height": 0.11 } }
+  ]
+}

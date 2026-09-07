@@ -15,10 +15,17 @@ struct VideoEntry: Codable {
 
 final class VideoLibrary: Sendable {
     static let shared = VideoLibrary()
-    let entries = [VideoEntry(id: "11111111-1111-4111-8111-111111111111",
-        name: "Balayage diagnostic", filename: "diagnostic.png", duration: 5,
-        fps: 0, resolution: CGSize(width: 480, height: 270),
-        dateAdded: Date(timeIntervalSince1970: 0), variants: nil)]
+    let entries: [VideoEntry]
+    private init() {
+        if let theme = try? DiagnosticTheme.load() {
+            entries = [VideoEntry(id: theme.sceneID.uuidString.lowercased(),
+                name: theme.displayName, filename: "diagnostic.png", duration: 5,
+                fps: 0, resolution: CGSize(width: 480, height: 270),
+                dateAdded: Date(timeIntervalSince1970: 0), variants: nil)]
+        } else {
+            entries = []
+        }
+    }
     func scan() {}
     func entry(for id: String) -> VideoEntry? { entries.first { $0.id == id } }
     func videoURL(for entry: VideoEntry) -> URL {

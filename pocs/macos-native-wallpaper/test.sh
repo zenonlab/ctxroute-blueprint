@@ -12,12 +12,17 @@ xcrun swiftc -swift-version 6 -parse-as-library \
   "$probe_source/DiagnosticCommand.swift" "$probe_source/CommandTests.swift" \
   -o "$probe_tests/commands"
 "$probe_tests/commands"
+xcrun swiftc -swift-version 6 -parse-as-library \
+  "$probe_source/DiagnosticCommand.swift" "$probe_source/DiagnosticTheme.swift" \
+  "$probe_source/ThemeTests.swift" -o "$probe_tests/theme"
+"$probe_tests/theme" "$probe_source/interactive-theme.json"
 # Force only the diagnostic toggle in this isolated fixture; no file in the
 # extension container is created and no notification is posted by these tests.
 patch --batch -p1 -d "$probe_tests" -i "$probe_source/diagnostic.patch"
 xcrun swiftc -swift-version 6 -parse-as-library -D WALLPAPER_NATIVE_DIAGNOSTIC \
   "$probe_source/DiagnosticCommand.swift" "$probe_source/InteractiveDiagnostic.swift" \
-  "$probe_source/RenderTests.swift" "$probe_tests/PhospheneExtension/ColorDiag.swift" \
+  "$probe_source/DiagnosticTheme.swift" "$probe_source/RenderTests.swift" \
+  "$probe_tests/PhospheneExtension/ColorDiag.swift" \
   -o "$probe_tests/layers"
-"$probe_tests/layers"
+"$probe_tests/layers" "$probe_source/interactive-theme.json"
 echo "Isolated test artifacts retained: $probe_tests"

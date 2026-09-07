@@ -13,14 +13,14 @@ final class HostControls: NSObject, NSApplicationDelegate {
         let heading = NSTextField(wrappingLabelWithString:
             "Compagnon de contrôle — ce panneau n’est pas le fond d’écran.\nLes clics directement dans le décor ne sont pas encore activés.")
         var views: [NSView] = [heading]
-        let titles: [(DiagnosticCommand, String)] = [(.showPanel, "Ouvrir le panneau dans le décor"),
-            (.hidePanel, "Fermer le panneau du décor"), (.pause, "Mettre l’animation en pause"),
-            (.resume, "Reprendre l’animation"), (.effectOn, "Activer l’effet lumineux"),
-            (.effectOff, "Désactiver l’effet"), (.reset, "Réinitialiser les états visuels")]
-        for (command, title) in titles {
-            let button = NSButton(title: title, target: self, action: #selector(send(_:)))
-            button.identifier = NSUserInterfaceItemIdentifier(command.rawValue)
-            views.append(button)
+        do {
+            for action in try DiagnosticTheme.load().actions {
+                let button = NSButton(title: action.label, target: self, action: #selector(send(_:)))
+                button.identifier = NSUserInterfaceItemIdentifier(action.command.rawValue)
+                views.append(button)
+            }
+        } catch {
+            status.stringValue = "Asset de thème invalide : \(error). Aucune commande disponible."
         }
         let settings = NSButton(title: "Ouvrir les réglages du fond", target: self, action: #selector(openSettings))
         views += [settings, status]
