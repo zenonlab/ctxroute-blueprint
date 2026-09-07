@@ -5,7 +5,10 @@ import ProbeCore
 enum ProbeApplication {
     @MainActor
     static func main() {
-        let arguments = Array(CommandLine.arguments.dropFirst())
+        var arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments.isEmpty && Bundle.main.bundleIdentifier == "com.wallpaper.poc.desktop" {
+            arguments = ["--mode", "desktop"]
+        }
         if arguments == ["--help"] {
             print(ProbeOptions.usage)
             return
@@ -80,7 +83,9 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.hasShadow = false
             window.isOpaque = true
             window.contentView = scene
-            window.orderBack(nil)
+            // Front of the desktop level, not front of normal applications.
+            // This does not activate the app or change the key window.
+            window.orderFrontRegardless()
         } else {
             NSApp.setActivationPolicy(.regular)
             window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 580),
@@ -268,6 +273,12 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "ignores_mouse_events": window?.ignoresMouseEvents ?? true,
             "is_key_window": window?.isKeyWindow ?? false,
             "window_level": window?.level.rawValue ?? 0,
+            "window_ordered_visible": window?.isVisible ?? false,
+            "window_width": window?.frame.width ?? 0,
+            "window_height": window?.frame.height ?? 0,
+            "bundle_id": Bundle.main.bundleIdentifier ?? "unbundled",
+            "application_active": NSApp.isActive,
+            "below_desktop_icons": (window?.level.rawValue ?? 0) < Int(CGWindowLevelForKey(.desktopIconWindow)),
             "backing_scale": window?.backingScaleFactor ?? 0,
             "smoke_checks": smokeChecks, "snapshot": snapshotName ?? "not-requested",
             "energy_verdict": "not-measured", "finder_input_verdict": "not-tested",

@@ -8,9 +8,12 @@ Depuis la racine du dépôt, avec Xcode et une session macOS graphique :
 
 ```sh
 sh pocs/macos-surface/probe.sh test
-sh pocs/macos-surface/probe.sh run --duration 60
+sh pocs/macos-surface/probe.sh desktop --duration 60
 ```
 
+`desktop` lance réellement la surface de bureau, pas la fenêtre de contrôles.
+Le dessin de test reste statique et passif, sans interface de terminal ni jeu.
+Pour la fenêtre de diagnostic uniquement : `run --duration 60`.
 En fenêtre : cliquer l'objet ou « Ouvrir l’objet », puis animer, activer le halo,
 mettre en pause et reprendre. Fermer la fenêtre ou « Quitter la sonde » termine
 le processus. La durée est bornée à 1–600 secondes, 60 par défaut.
@@ -41,8 +44,17 @@ ne garantit pas ce répertoire. Les caches système du compilateur ne sont pas
 une frontière de sécurité. Aucun nettoyage automatique n'est effectué.
 
 Le reçu JSON final va sur stdout ; les logs de build vont sur stderr.
+Avec `desktop`, une application locale est assemblée dans un dossier `desktop.*`
+unique sous `dist/pocs/macos-surface/`, puis lancée en arrière-plan par macOS.
+Ce dossier conserve `receipt.json` et `stderr.log`. Le lanceur attend sa fin et
+reprend le code du reçu ; l'absence de reçu échoue. Un Ctrl-C du lanceur `open`
+ne garantit pas l'arrêt de l'application : elle garde sa durée limite propre.
+Le bundle est de développement, non notarié, jamais installé dans Applications.
+Le double-clic de ce bundle, sans argument, sélectionne aussi le bureau passif.
 Codes : 0 fin normale/tests smoke réussis, 1 smoke incomplet/échec interne,
-2 arguments refusés. Un arrêt forcé peut empêcher l'émission du reçu.
+2 arguments refusés en lancement direct. En `.app`, un refus avant émission du
+reçu donne 1 côté lanceur ; le détail reste dans `stderr.log`.
+Un arrêt forcé peut empêcher l'émission du reçu.
 Les compteurs ne mesurent pas des watts. Aucun réseau, PTY, ROM, plugin ou IA.
 
 Preuves et limites : [fiche L1](../../docs/pocs/macos-surface.md).

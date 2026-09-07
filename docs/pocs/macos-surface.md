@@ -5,6 +5,52 @@ Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
 montre uniquement cette sonde ; aucun lien au terminal ou à l'ingestion.
 
+## Correction du lancement bureau — ADR-0044
+
+`sh pocs/macos-surface/probe.sh desktop --duration 60` lance désormais une `.app`
+via LaunchServices en arrière-plan. `run` reste la fenêtre de diagnostic et ne
+doit plus être présenté comme la démonstration du wallpaper. Le bundle local est
+construit sans installation, dans `dist/pocs/macos-surface/desktop.*/` ; ses reçus
+restent dans ce même dossier. Le lanceur attend la fin et vérifie le code du reçu.
+Sans reçu valide, il échoue. Voir [ADR-0044](../decisions/ADR-0044-desktop-launch-services.md).
+
+L'ordre change de `orderBack` à `orderFrontRegardless`, toujours dans le niveau
+desktop + 1, sous desktopIcon. Selon la [documentation Apple](https://developer.apple.com/documentation/appkit/nswindow/orderfrontregardless()),
+cette méthode n'active pas la fenêtre clé et ne la déplace pas hors de son niveau.
+La correction de lancement ne prouve pas que l'ancien ordre était la seule cause
+de l'invisibilité ; `notVisible` reste observé au reçu de fin.
+
+Preuves du 7 septembre 2026, MAC-01 :
+
+- Compilation release et 8 tests Swift réussis ; `plutil -lint` et `sh -n` réussis.
+- Lancement `.app` de 60 s terminé, reçu code 0 : bundle identifié,
+  1512 × 982 points, `window_ordered_visible: true`, `below_desktop_icons: true`,
+  `application_active: false`, `is_key_window: false`, `ignores_mouse_events: true`.
+- Un callback de dessin, aucun tick et aucun timer d'animation : contenu statique.
+- Computer Use reconnaît cette fois `com.wallpaper.poc.desktop` et obtient une
+  capture de sa surface sans bordure, inspectée. Cela prouve le rendu de la surface,
+  pas une capture composée avec les icônes Finder ni un verdict énergétique.
+- Une fenêtre Finder a été minimisée pour l'observation ; le contrôle GUI du
+  Finder/Dock a ensuite échoué (`cgWindowNotFound`, timeout). Sa restauration
+  n'a pas été confirmée. Aucun fichier du Finder n'a été déplacé ou supprimé.
+- Superposition des icônes, clics, Spaces, écrans multiples et arrêt forcé du
+  lanceur restent non qualifiés. Le runtime lui-même ne capture pas le bureau.
+
+Le fond conserve volontairement le dessin de test. Aucun jeu, animation de course,
+terminal, interactivité bureau ou rendu 3D n'est ajouté par cette correction.
+
+Schéma actualisé avec Archify : `architecture`, showcase 9/9, zéro erreur et
+avertissement. Source SHA-256 : `eab35cdf902bdb4e35e5d2f091de8c14ba3353e3115232fd218b5bf132760163`.
+HTML SHA-256 : `0c28f7a83c722384696013bb1e80480b1727fbef20408b05deb10d94feb8540b`.
+Interface fixe en anglais, labels français ; HTML sous `dist/architecture/`.
+Le visual-check actualisé passe sur quatre tailles ; capture sombre 2048×1320
+inspectée, revue humaine toujours `pending` dans le reçu automatique.
+Un second lancement de 2 s reproduit le reçu nominal et termine avec code 0.
+Le cas invalide `desktop --duration 0` termine avec code 1, sans reçu de succès ;
+l'erreur d'arguments du binaire est conservée dans `stderr.log`.
+`npm run verify` repasse : 262 tests réussis, 1 ignoré, 3 intégrations réussies,
+aucun échec et aucune vulnérabilité npm. AGENTS.md, CLAUDE.md et hooks inchangés.
+
 ## Isolation
 
 Un package SwiftPM autonome sous `pocs/macos-surface/`, zéro dépendance tierce.
@@ -47,7 +93,7 @@ Guide de lancement : [README du package](../../pocs/macos-surface/README.md).
 
 ```sh
 sh pocs/macos-surface/probe.sh test
-sh pocs/macos-surface/probe.sh run --duration 60
+sh pocs/macos-surface/probe.sh desktop --duration 60
 ```
 
 Machine : MAC-01, macOS 26.2 build 25C56, arm64, Apple M1 Pro, 16 Go.
@@ -82,9 +128,8 @@ nécessiterait un arrêt externe et n'est pas couvert par cette minuterie.
 
 ## Reprise et limites de validation
 
-Prochaine action : lancer la fenêtre pendant 60 secondes depuis le bureau visible.
-Vérifier l'objet et les boutons, la lisibilité du panneau, l'animation puis pause/
-reprise ; lancer ensuite le mode bureau séparément. Consigner clic/double-clic/
+Prochaine action : vérifier le bureau via `desktop`, sans le confondre avec `run`
+qui lance une fenêtre de diagnostic. Consigner clic/double-clic/
 glisser/sélection Finder, Spaces et changement d'écran sans capturer de données
 privées. Ne pas activer d'interaction desktop avant ces preuves.
 
@@ -100,6 +145,8 @@ vulnérabilité. `npm run blueprint:review` réussi. Ce résultat ne transforme 
 le smoke graphique en succès et ne remplace pas les 8 tests Swift indépendants.
 
 ## Diagramme livré
+
+Le reçu ci-dessous correspond à la version initiale du schéma, avant ADR-0044.
 
 Archify `architecture`, showcase 9/9, zéro erreur et avertissement ; quatre tailles
 1440×900 à 2048×1320 sans débordement. Capture sombre 2048×1320 inspectée ; le reçu

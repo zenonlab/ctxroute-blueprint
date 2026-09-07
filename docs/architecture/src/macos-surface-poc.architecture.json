@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": { "title": "PoC macOS — sonde autonome", "quality_profile": "showcase", "viewBox": [1280, 760] },
   "components": [
-    { "id": "operator", "type": "external", "label": "Lancement manuel", "sublabel": "Mode et durée bornés", "pos": [40, 110], "size": [230, 80] },
+    { "id": "operator", "type": "external", "label": "Lancement manuel", "sublabel": "CLI ou .app via macOS", "pos": [40, 110], "size": [230, 80] },
     { "id": "surface", "type": "frontend", "label": "Surface AppKit", "sublabel": "Fenêtre ou bureau passif", "pos": [520, 110], "size": [240, 80] },
     { "id": "native", "type": "external", "label": "Bureau macOS", "sublabel": "Finder et compositeur", "pos": [1010, 110], "size": [230, 80] },
     { "id": "controls", "type": "frontend", "label": "Objet et panneau", "sublabel": "Actions locales en fenêtre", "pos": [40, 530], "size": [230, 80] },

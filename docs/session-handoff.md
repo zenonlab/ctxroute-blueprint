@@ -9,8 +9,12 @@ Lire [la fiche d'essai](pocs/macos-surface.md) et
 Source autonome : `pocs/macos-surface/`, aucun lien au futur moteur ou au terminal.
 Les tests Swift passent ; le smoke AppKit ne valide pas l'animation dans cette
 session où la fenêtre est signalée invisible. Ne pas forcer son exécution masquée.
-Prochaine action : lancer la sonde depuis une session graphique visible et vérifier
-les gestes réels. L2/L3, consommation électrique et compatibilité OS restent ouverts.
+ADR-0044 ajoute le vrai lancement de bureau par `.app` :
+`sh pocs/macos-surface/probe.sh desktop --duration 60`.
+La surface est reconnue et capturée par le contrôle macOS ; sa composition avec
+les icônes Finder reste à qualifier. `run` reste uniquement le diagnostic en fenêtre.
+Prochaine action : vérifier les gestes Finder. L2/L3, consommation électrique et
+compatibilité OS restent ouverts. Voir la fiche pour les limites du contrôle GUI.
 
 Les sections suivantes conservent les relevés documentaires antérieurs.
 
