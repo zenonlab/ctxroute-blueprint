@@ -1,6 +1,8 @@
-import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, importFavoriteSources, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
-  normalizeBookmarks,
+  anilistSourceAdapter,
+  mangaUpdatesSourceAdapter,
+  WebExtensionBookmarkEventAdapter,
   WebExtensionBookmarkImportAdapter,
   WebExtensionOrganizerAdapter,
   WebExtensionPageContextAdapter,
@@ -9,7 +11,7 @@ import {
   WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
 } from '@tobirink/adapters-browser';
-import { DexieOrganizerSnapshotStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -19,6 +21,8 @@ import { extensionMessageSchema } from '../runtime/messages';
 const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
+import { createFavoriteResolutionRuntime } from '../runtime/favorite-resolution-runtime';
+import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -32,16 +36,32 @@ export default defineBackground({
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
     const bookmarks = new WebExtensionBookmarkImportAdapter(browser.bookmarks);
+    const bookmarkEvents = new WebExtensionBookmarkEventAdapter(browser.bookmarks);
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
+    const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
+    const { anilist, mangaupdates: mangaUpdates } = createFavoriteProviderPorts(browser.storage.local);
+    const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
+    const reconcileFavorites = createFavoriteResolutionRuntime({
+      bookmarks,
+      candidates: { anilist, mangaupdates: mangaUpdates },
+      ensureReady: privateStorage.ensureReady,
+      hydration: { anilist, mangaupdates: mangaUpdates },
+      libraryId: primaryLibraryId,
+      now: () => new Date().toISOString(),
+      outbox: resolutionOutbox,
+      sourceAdapters: favoriteSourceAdapters,
+      storage: privateStorage.storage,
+      token: () => crypto.randomUUID(),
+    });
+    bookmarkEvents.subscribe(() => { void reconcileFavorites(true).catch(() => undefined); });
     browser.runtime.onInstalled.addListener(async () => {
       await privateStorage.ensureReady();
-      const favorites = normalizeBookmarks(await bookmarks.importBookmarks());
-      await importFavoriteSources(favorites, privateStorage.storage, new Date().toISOString());
+      await reconcileFavorites();
       await ensureReminderAlarm();
       await resumeNotifications();
     });
@@ -54,10 +74,10 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void ensureReminderAlarm().then(resumeNotifications).catch(() => undefined);
+      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === reminderAlarmName) void resumeNotifications().catch(() => undefined);
+      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
@@ -222,7 +242,7 @@ export default defineBackground({
             { bookmarks: bookmarkOrganizer, snapshots: organizerSnapshots, storage: privateStorage.storage },
             { configuration: parseOrganizerConfiguration(parsed.data.configuration), confirmation: parsed.data.confirmation, expected: parsed.data.expected, now: new Date().toISOString() },
           );
-          await importFavoriteSources(normalizeBookmarks(await bookmarks.importBookmarks()), privateStorage.storage, new Date().toISOString());
+          await reconcileFavorites();
           return { ...result, ok: true };
         } catch {
           return { error: 'organizer-preview-stale-or-unavailable', ok: false };
@@ -232,7 +252,7 @@ export default defineBackground({
         try {
           const result = await restoreConfirmedOrganizerSnapshot({ bookmarks: bookmarkOrganizer, snapshots: organizerSnapshots }, parsed.data.confirmation);
           await privateStorage.ensureReady();
-          await importFavoriteSources(normalizeBookmarks(await bookmarks.importBookmarks()), privateStorage.storage, new Date().toISOString());
+          await reconcileFavorites();
           return { ...result, ok: true };
         } catch {
           return { error: 'organizer-snapshot-unavailable', ok: false };

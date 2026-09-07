@@ -554,7 +554,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-review-resolution",
       "title": "Documenter l’inventaire, la résolution et la Review locale",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -1785,6 +1785,121 @@
             "IndexedDB Chromium, stockage, tâches et migrations v1-v5 vers v6 passent; deux stores privés additifs et index de disponibilité validés.",
             "Typecheck de tous les workspaces, Sensor SAFE, validate global, git diff --check et Archify favorite-resolution showcase passent."
           ]
+        },
+        {
+          "id": "step-28",
+          "title": "Composer le runner durable et les événements favoris",
+          "status": "DONE",
+          "acceptance": [
+            "Le runner réclame des tâches bornées, applique recherche, décision et hydratation via des ports injectés, puis persiste un effet idempotent.",
+            "Les adaptateurs AniList et MangaUpdates valident des réponses bornées avec timeout sans appel réseau dans les tests.",
+            "Les événements create/change/move/remove convergent sans supprimer Work, progression ou Agenda."
+          ],
+          "files": [
+            "packages/domain/src/favorite-source.ts",
+            "packages/domain/src/index.ts",
+            "packages/application/src/favorites/**",
+            "packages/application/src/tasks/**",
+            "packages/application/src/use-cases/**",
+            "packages/application/src/recovery/**",
+            "packages/adapters-browser/src/**",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/wxt.config.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/security/**",
+            "apps/extension/**/*.test.ts",
+            "package-lock.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --workspace @tobirink/adapters-browser --save-exact zod@4.5.4",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run build:extension",
+            "npm run typecheck",
+            "npm run sensor -- packages/application/src/favorites packages/application/src/tasks packages/adapters-browser/src apps/extension/wxt-entrypoints/background.ts",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate",
+            "git diff --check",
+            "git commit -m \"feat(parser): compose durable favorite resolution\""
+          ],
+          "evidence": [
+            "174 tests application, 30 adaptateurs navigateur, 2 IndexedDB avec contrat Chromium et 94 extension passent.",
+            "Build Chrome MV3, typecheck complet, Sensor SAFE et git diff --check passent.",
+            "Archify dataflow showcase passe sans erreur ni avertissement; npm run validate passe."
+          ]
+        },
+        {
+          "id": "step-29",
+          "title": "Remplacer l'oracle factice et mesurer les bornes",
+          "status": "TODO",
+          "acceptance": [
+            "Les 82 cas exécutent réellement le parser, le matcher et la projection puis comparent des résultats métier profonds.",
+            "Les benchmarks publient p95 typique et maximal avec les budgets documentés.",
+            "Le harnais Chromium et la commande verify exécutent de façon stable tous les tests produit requis."
+          ],
+          "files": [
+            "packages/application/src/favorites/**",
+            "packages/application/package.json",
+            "packages/adapters-indexeddb/test/**",
+            "package.json",
+            "scripts/**",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm run test:performance",
+            "npm run verify",
+            "npm run typecheck",
+            "npm run sensor -- packages/application/src/favorites packages/adapters-indexeddb/test scripts",
+            "git diff --check",
+            "git commit -m \"test(parser): verify behavioral equivalence\""
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-30",
+          "title": "Auditer et valider la pipeline complète",
+          "status": "TODO",
+          "acceptance": [
+            "Architecture, modularité, scalabilité locale, sécurité, migrations et absence de données fictives sont auditées sans écart critique.",
+            "Tous les tests, builds, lints, Sensor, npm audit, Archify showcase, stack-audit et diff-check passent.",
+            "Le dépôt termine propre avec des preuves reproductibles et aucun déploiement."
+          ],
+          "files": [
+            "docs/architecture/src/**",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favorite-*.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm audit --audit-level=high",
+            "npm run archify:validate -- all",
+            "npm run crg:review",
+            "git diff --check",
+            "git status --short",
+            "git commit -m \"docs(parser): record production audit evidence\""
+          ],
+          "evidence": []
         }
       ]
     },

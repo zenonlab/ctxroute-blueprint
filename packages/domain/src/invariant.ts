@@ -3,6 +3,7 @@ export type DomainInvariantCode =
   | 'duplicate-work'
   | 'invalid-agenda-date'
   | 'invalid-datetime'
+  | 'invalid-favorite-presence'
   | 'invalid-id'
   | 'invalid-number'
   | 'invalid-review-resolution'

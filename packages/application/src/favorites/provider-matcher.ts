@@ -33,7 +33,7 @@ function normalizedTaxonomy(value: string): string {
   return normalizeFavoriteTitle(value).normalized;
 }
 
-function hasExactBlockedTaxonomy(candidate: ProviderCandidate, additions: readonly string[]): boolean {
+export function hasExactBlockedProviderTaxonomy(candidate: ProviderCandidate, additions: readonly string[] = []): boolean {
   const genres = new Set([...blockedGenres, ...additions].map(normalizedTaxonomy));
   const categories = new Set([...blockedCategories, ...additions].map(normalizedTaxonomy));
   return candidate.genres?.some((value) => genres.has(normalizedTaxonomy(value))) === true
@@ -48,7 +48,7 @@ export function isProviderCandidateCompatible(query: FavoriteTitleMatchQuery, ca
   if (query.mediaKind !== undefined && query.mediaKind !== candidate.mediaKind) return false;
   if (query.sourceFormat !== undefined && isOva(query.sourceFormat) !== isOva(candidate.format)) return false;
   if (query.preSerialization !== undefined && query.preSerialization !== candidate.preSerialization) return false;
-  return !hasExactBlockedTaxonomy(candidate, query.blockedTaxonomy ?? []);
+  return true;
 }
 
 function prepare(value: string): PreparedTitle {

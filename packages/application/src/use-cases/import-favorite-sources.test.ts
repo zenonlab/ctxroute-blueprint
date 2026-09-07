@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
+import { claimTask, commitTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
@@ -44,6 +45,7 @@ describe('importFavoriteSources', () => {
     const [updated] = await storage.listFavoriteSources({ limit: 1 });
     expect(updated).toMatchObject({ folderPath: ['À lire'], importedAt, order: 0, title: 'Frieren' });
     expect(updated && await storage.getReview(updated.reviewId)).toMatchObject({ matchedWorkId: work.id, status: 'resolved', title: 'Frieren' });
+    await expect(storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).resolves.toMatchObject({ state: 'READY' });
   });
 
   it('rolls back a batch when one source is invalid', async () => {
@@ -53,5 +55,19 @@ describe('importFavoriteSources', () => {
     await expect(storage.listFavoriteSources({ limit: 10 })).resolves.toEqual([]);
     await expect(storage.getReview(reviewId('review_4_3432'))).resolves.toBeUndefined();
     await expect(storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).resolves.toBeUndefined();
+  });
+
+  it('does not reopen a committed resolution after a placement-only move', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const taskId = 'favorite-resolution_4_3432';
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    if (task === undefined) throw new Error('Expected resolution task.');
+    const claimed = claimTask(task, 'claim', importedAt, '2026-09-06T00:01:00.000Z');
+    await storage.putFavoriteResolutionTask(commitTask(recordTaskEffect(claimed, 'claim', 'resolved:test'), 'claim'));
+
+    await importFavoriteSources([{ ...favorite, folderPath: ['Moved'], order: 0 }], storage, '2026-09-06T01:00:00.000Z');
+
+    await expect(storage.getFavoriteResolutionTask(taskId)).resolves.toMatchObject({ state: 'COMMITTED' });
   });
 });

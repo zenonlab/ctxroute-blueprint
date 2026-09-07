@@ -56,6 +56,7 @@ export async function importFavoriteSources(
       for (const favorite of batch) {
         const id = sourceIdentity(favorite.bookmarkId);
         const existingSource = await session.getFavoriteSource(id);
+        const existingArtifact = existingSource === undefined ? undefined : await session.getFavoriteParseArtifact(id);
         const linkedReviewId = existingSource?.reviewId ?? reviewIdentity(favorite.bookmarkId);
         const existingReview = await session.getReview(linkedReviewId);
         const review = createReview(existingReview
@@ -87,7 +88,7 @@ export async function importFavoriteSources(
         await session.putReview(review);
         await session.putFavoriteSource(source);
         await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord({ artifact, recordedAt: importedAt, reviewId: review.id, sourceId: source.id }));
-        if (existingSource === undefined) {
+        if (existingArtifact?.artifact.semanticFingerprint !== artifact.semanticFingerprint) {
           await session.putFavoriteResolutionTask(createDurableTask({
             id: resolutionTaskIdentity(favorite.bookmarkId),
             idempotencyKey: `favorite-resolution:${source.id}:${artifact.semanticFingerprint}`,

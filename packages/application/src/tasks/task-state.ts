@@ -41,7 +41,7 @@ export function isTaskAvailable(task: DurableTask, now: string): boolean {
 export function claimTask(task: DurableTask, claimToken: string, claimedAt: string, claimExpiresAt: string): DurableTask {
   if (!isTaskAvailable(task, claimedAt)) throw new Error('Task is not available.');
   if (instant(claimExpiresAt, 'claimExpiresAt') <= instant(claimedAt, 'claimedAt')) throw new Error('Claim expiry must follow claim time.');
-  return Object.freeze({ attempt: task.attempt + 1, availableAt: task.availableAt, claimedAt, claimExpiresAt, claimToken: required(claimToken, 'claimToken'), id: task.id, idempotencyKey: task.idempotencyKey, kind: task.kind, lane: task.lane, payload: task.payload, state: 'CLAIMED' });
+  return Object.freeze({ attempt: task.attempt + 1, availableAt: claimExpiresAt, claimedAt, claimExpiresAt, claimToken: required(claimToken, 'claimToken'), id: task.id, idempotencyKey: task.idempotencyKey, kind: task.kind, lane: task.lane, payload: task.payload, state: 'CLAIMED' });
 }
 
 function requireClaim(task: DurableTask, token: string, state: DurableTaskState): void {

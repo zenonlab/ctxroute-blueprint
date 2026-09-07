@@ -33,14 +33,14 @@ export async function readLocalReviewCandidates(
     review: await session.getReview(input.reviewId),
     source: await session.findFavoriteSourceByReviewId(input.reviewId),
   }));
-  if (!context.review || !context.source || context.review.status !== 'pending') throw new Error('Review candidate context is stale.');
+  if (!context.review || !context.source || context.source.presence !== 'observed' || context.review.status !== 'pending') throw new Error('Review candidate context is stale.');
 
   const found = await searchLocalLibrary(storage, { libraryId: input.libraryId, limit: 6, query: context.review.title });
   const candidates = (await Promise.all(found.items.map(async (work) => {
     const matches = await storage.listReviewsByWorkId({ limit: 100, workId: work.id });
     for (const match of matches) {
       const source = await storage.findFavoriteSourceByReviewId(match.id);
-      if (source && isHttpUrl(source.url)) return Object.freeze({ sourceUrl: source.url, work });
+      if (source?.presence === 'observed' && isHttpUrl(source.url)) return Object.freeze({ sourceUrl: source.url, work });
     }
     return undefined;
   }))).flatMap((candidate) => candidate ? [candidate] : []);

@@ -23,7 +23,7 @@
         "id": "bounded-convergence",
         "label": "Convergence bornée",
         "focus": ["bookmarkEvents", "sourceEvidence", "durableQueue", "providerAdapters", "privateStore"],
-        "note": "Curseurs, tranches et checkpoints font converger chaque favori sans parcours global ni attente en mémoire."
+        "note": "Outbox et lectures locales sont bornées; le rescan navigateur global doit encore devenir un checkpoint durable."
       }
     ]
   },
@@ -35,12 +35,12 @@
     { "label": "Autorité locale" }
   ],
   "nodes": [
-    { "id": "browserFavorites", "type": "external", "label": "Favoris navigateur", "stage": 0, "row": 1, "width": 150, "tag": "entrée brute" },
-    { "id": "bookmarkEvents", "type": "messagebus", "label": "Événements favoris", "stage": 0, "row": 4, "width": 150, "tag": "reprise" },
+    { "id": "browserFavorites", "type": "external", "label": "Favoris navigateur", "stage": 0, "row": 1, "width": 150, "tag": "rescan getTree actuel" },
+    { "id": "bookmarkEvents", "type": "messagebus", "label": "Événements favoris", "stage": 0, "row": 4, "width": 150, "tag": "coalescé + seconde passe" },
     { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "U-08…U-10" },
     { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "générique + AniList" },
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "T · I · S · R modulaires" },
-    { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "tobirink-private v6" },
+    { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "port + runner borné" },
     { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "ports search/hydrate" },
     { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "6 niveaux · F/C exacts" },
     { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "décision humaine" },
@@ -83,7 +83,7 @@
       "title": "Convergence MV3 bornée",
       "items": [
         "Source, Review et tâche rejoignent la même transaction",
-        "Les claims sont indexés par type, fournisseur, état et échéance",
+        "Les claims sont indexés par type, lane, état et échéance",
         "Un ensemble fournisseur incomplet interdit toute résolution automatique"
       ]
     }

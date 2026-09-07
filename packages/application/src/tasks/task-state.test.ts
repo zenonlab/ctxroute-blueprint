@@ -7,6 +7,7 @@ describe('durable tasks', () => {
     const ready = createDurableTask({ id: 'task-1', idempotencyKey: 'key-1', kind: 'fixture', payload: '{}' });
     expect(ready.availableAt).toBe('1970-01-01T00:00:00.000Z');
     const claimed = claimTask(ready, 'token', '2026-09-04T10:00:00.000Z', '2026-09-04T10:01:00.000Z');
+    expect(claimed.availableAt).toBe('2026-09-04T10:01:00.000Z');
     expect(() => commitTask(claimed, 'token')).toThrow('EFFECT_RECORDED');
     expect(commitTask(recordTaskEffect(claimed, 'token', 'effect'), 'token').state).toBe('COMMITTED');
   });

@@ -1,7 +1,7 @@
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteProvider, ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
-import { isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 
 function candidate(externalId: string, title: string, provider: FavoriteProvider = 'anilist'): ProviderCandidate {
   return { externalId, mediaKind: provider === 'anilist' ? 'ANIME' : 'MANGA', preSerialization: false, provider, titles: [title] };
@@ -80,8 +80,8 @@ describe('deterministic favorite title matcher P-01…P-08', () => {
   it('C-01 blocks exact normalized taxonomy and C-02 never blocks substrings', () => {
     const exact = { ...candidate('1', 'Fixture'), categories: ['Explicit-Séx'] };
     const substring = { ...candidate('2', 'Fixture'), categories: ['Discussion of explicit sex in literature'] };
-    expect(isProviderCandidateCompatible({ sourceTitles: ['Fixture'] }, exact)).toBe(false);
-    expect(isProviderCandidateCompatible({ sourceTitles: ['Fixture'] }, substring)).toBe(true);
+    expect(hasExactBlockedProviderTaxonomy(exact)).toBe(true);
+    expect(hasExactBlockedProviderTaxonomy(substring)).toBe(false);
   });
 
   it('fails closed before matching an incomplete response', () => {

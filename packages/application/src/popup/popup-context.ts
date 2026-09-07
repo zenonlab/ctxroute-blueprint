@@ -150,7 +150,7 @@ async function matchLocalPage(session: StorageSession, page: { title: string; ur
   const sources = await readBoundedFavoriteSources(session);
   if (!sources) return undefined;
   const titleKey = normalise(titleFromPage(page.title, page.url));
-  const matchingSources = sources.filter((source) => normalise(titleFromPage(source.title, source.url)) === titleKey);
+  const matchingSources = sources.filter((source) => source.presence === 'observed' && normalise(titleFromPage(source.title, source.url)) === titleKey);
   const workIds = new Set<Work['id']>();
   for (const source of matchingSources) {
     const review = await session.getReview(source.reviewId);

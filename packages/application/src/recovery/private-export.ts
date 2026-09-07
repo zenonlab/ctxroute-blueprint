@@ -63,6 +63,7 @@ const agendaSchema = z.strictObject({ availability: z.enum(['confirmed', 'estima
 const reminderSchema = z.strictObject({ agendaEntryId: z.string(), channel: z.enum(['badge', 'native']), enabled: z.boolean(), id: z.string(), leadMinutes: z.number() });
 const favoriteSourceSchema = z.strictObject({
   bookmarkId: z.string(), folderPath: z.array(z.string()), id: z.string(), importedAt: z.string(), order: z.number(),
+  presence: z.enum(['observed', 'detached']).optional().default('observed'),
   reviewId: z.string(), title: z.string(), url: z.url().refine((value) => /^https?:\/\//iu.test(value)),
 });
 const legacySnapshotSchema = z.strictObject({

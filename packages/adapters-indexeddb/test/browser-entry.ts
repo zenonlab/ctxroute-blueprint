@@ -12,7 +12,7 @@ import {
   reviewId,
   workId,
 } from '@tobirink/domain';
-import { DexieOrganizerSnapshotStore, DexieStoragePort, verifyDatabaseIntegrity } from '../src';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieStoragePort, verifyDatabaseIntegrity } from '../src';
 
 const storage = new DexieStoragePort(`tobirink-contract-${Date.now()}`);
 const organizerSnapshots = new DexieOrganizerSnapshotStore(`tobirink-organizer-contract-${Date.now()}`);
@@ -38,6 +38,9 @@ try {
   if (imported === undefined || await storage.getFavoriteParseArtifact(imported.id) === undefined) throw new Error('Favorite artifact did not share the import transaction.');
   const tasks = await storage.database.favoriteResolutionTasks.toArray();
   if (tasks.length !== 1 || tasks[0]?.state !== 'READY' || tasks[0].lane !== 'routing') throw new Error('Favorite resolution outbox did not share the import transaction.');
+  const resolutionOutbox = new DexieFavoriteResolutionOutbox(storage.database);
+  const claimed = await resolutionOutbox.claimNext({ claimedAt: '2026-09-07T12:01:00.000Z', claimExpiresAt: '2026-09-07T12:02:00.000Z', claimToken: 'browser-claim', kind: 'favorite-resolution', lane: 'routing' });
+  if (claimed?.state !== 'CLAIMED' || claimed.availableAt !== '2026-09-07T12:02:00.000Z') throw new Error('Favorite resolution outbox did not claim through its compound due index.');
   await storage.database.table('organizer').put({
     folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],
     id: 'organizer',

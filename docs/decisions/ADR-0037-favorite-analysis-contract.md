@@ -28,9 +28,9 @@ monolithique, une file locale et un background MV3. Certaines règles se
 chevauchaient et l’architecture laissait les favoris navigateur concurrencer la
 base locale.
 
-Le TobiRink actuel importe bien les favoris HTTP(S) en `FavoriteSource` et
-`Review`, mais ne possède pas encore un chemin de résolution neuf complet et
-composé. Réécrire sans contrat ferait perdre des cas qui protègent notamment
+TobiRink importe les favoris HTTP(S) en `FavoriteSource` et `Review`; la
+résolution composée est désormais portée par une outbox locale et des ports
+fournisseur séparés. Réécrire sans contrat ferait perdre des cas qui protègent notamment
 les saisons, les nombres intrinsèques aux titres, les slugs techniques et les
 ambiguïtés fournisseur.
 
@@ -58,8 +58,8 @@ peut contenir aucun champ d’identité actionnable. Une URL canonique éventuel
 doit conserver l’origine explicitement déclarée.
 
 Conserver la reprise MV3 dans une file IndexedDB durable dont l’entrée est
-écrite avant le réseau. Résolution, hydratation exacte et contribution Review
-sont des opérations séparées. Les effets sont idempotents et les attentes
+écrite avant le réseau. Recherche, hydratation exacte et contribution Review
+sont des étapes et ports séparés d’une même tâche durable de résolution. Les effets sont idempotents et les attentes
 longues sont persistées plutôt que gardées en mémoire.
 
 Implémenter les tâches de résolution comme une outbox du même schéma
@@ -81,8 +81,13 @@ correspondance automatique, même si un seul candidat visible correspond. Les
 lanes AniList et MangaUpdates appliquent séparément leurs cadences; l’ordre de
 leurs réponses ne modifie pas le résultat du matcher.
 Les recherches de candidats et l’hydratation par identifiant utilisent deux
-ports applicatifs distincts. Le routage pur réserve AniList à l’anime,
-MangaUpdates aux mangas, manhwa et manhua, et dédouble seulement le type inconnu.
+ports applicatifs distincts. Le routage par titre réserve AniList à l’anime,
+MangaUpdates aux mangas, manhwa et manhua, et dédouble seulement le type inconnu;
+une référence AniList explicite peut toutefois hydrater exactement un manga
+AniList sans recherche de titre.
+Les adaptateurs HTTP valident leurs DTO externes avec les schémas Zod déjà
+retenus par le projet avant toute conversion en candidats du domaine; leurs
+réponses et délais restent bornés au point d’entrée réseau.
 
 Maintenir ADR-0025 : IndexedDB est la seule autorité privée. Les favoris sont
 des commandes d’import et leur suppression ne supprime pas une œuvre ou une
@@ -115,8 +120,10 @@ une Review `no-match` et ne crée pas de `Work`. Les artefacts et tâches
 techniques sont compactés selon une politique bornée sans supprimer les sources,
 Reviews, œuvres ou progressions autoritaires.
 
-Le premier chantier de code devra composer le pipeline complet depuis les
-événements favoris jusqu’aux écritures `FavoriteSource`, `Review` et `Work`.
-Il devra aussi remplacer le scan et le traitement monolithiques par des tranches
-durables bornées. Cette ADR n’active aucun réseau, permission MV3, fournisseur,
-déploiement ou migration de données.
+Le runtime compose désormais les événements favoris, l’import atomique, les
+adaptateurs AniList/MangaUpdates, le runner borné et les écritures
+`FavoriteSource`, `Review`, `Work` et Bibliothèque. Les suppressions deviennent
+une présence `detached` et ne cascadent jamais. L’inventaire navigateur reste
+un rescan `getTree()` coalescé; son remplacement par des tranches durables est
+requis avant de déclarer la scalabilité locale complète. Cette révision
+n’ajoute aucune permission hôte, contribution cloud ou opération de déploiement.

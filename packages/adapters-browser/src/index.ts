@@ -1,8 +1,18 @@
 export { normalizeBookmarks } from './bookmarks/normalize-bookmarks';
 export { anilistSourceAdapter } from './favorites/anilist-source-adapter';
 export { mangaUpdatesSourceAdapter } from './favorites/mangaupdates-source-adapter';
+export { AniListFavoriteProviderAdapter, anilistGraphqlEndpoint } from './favorites/anilist-provider-adapter';
+export { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './favorites/mangaupdates-provider-adapter';
+export { FavoriteProviderRateGate } from './favorites/provider-http';
+export type { FavoriteProviderRateCheckpointPort } from './favorites/provider-http';
+export { WebExtensionProviderRateCheckpointAdapter } from './favorites/web-extension-provider-rate-checkpoint-adapter';
+export type { FavoriteProviderCheckpointStorageArea } from './favorites/web-extension-provider-rate-checkpoint-adapter';
+export { favoriteProviderResponseByteLimit } from './favorites/provider-http';
+export type { FavoriteProviderFetch } from './favorites/provider-http';
 export { WebExtensionBookmarkImportAdapter } from './bookmarks/web-extension-bookmark-adapter';
 export type { WebExtensionBookmarkNode } from './bookmarks/web-extension-bookmark-adapter';
+export { WebExtensionBookmarkEventAdapter } from './bookmarks/web-extension-bookmark-event-adapter';
+export type { BookmarkMutation, WebExtensionBookmarkEventsApi } from './bookmarks/web-extension-bookmark-event-adapter';
 export * from './bookmarks/web-extension-organizer-adapter';
 export { HttpReviewCandidateAdapter, reviewCandidateResponseByteLimit } from './catalogue/http-review-candidate-adapter';
 export type { ReviewCandidateFetch } from './catalogue/http-review-candidate-adapter';

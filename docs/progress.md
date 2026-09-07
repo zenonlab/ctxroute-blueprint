@@ -40,7 +40,7 @@
 
 - [x] **Renuméroter l’ADR dashboard et réaligner les références** — DONE _(evidence: ADR dashboard renumbered from 0022 to unique 0028 without content loss., Component-boundaries goal now reserves ADR-0029 through the authenticated Progress API., ADR-0021 now documents the two exact reviewed Sensor exceptions.)_
 
-## Documenter l’inventaire, la résolution et la Review locale — DONE
+## Documenter l’inventaire, la résolution et la Review locale — ACTIVE
 
 - [x] **Preserver les sources favorites locales comme donnees privees autoritaires** — DONE _(evidence: Domaine 8/8, application 15/15, contrats 9/9 et recovery 10/10 passent; export prive v2 preserve FavoriteSource et importe v1 vide., IndexedDB 2/2 + contrat Chromium passent; migrations Chromium v1/v2 vers v3 passent et integrite refuse une FavoriteSource orpheline., Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, docs, 34 ADR, infrastructure 16/16 et Archify Tobirink 9/9 passent; validate global est uniquement interrompu par .codex/config.toml modifie hors scope dans une autre session.)_
 - [x] **Composer Dexie dans le background sans confondre cache et autorite** — DONE _(evidence: Extension 60/60: composition Dexie construite une fois, ouverture lazy coalescee, reprise apres echec et nom stable tobirink-private., IndexedDB 2/2 + contrat Chromium; builds Chrome/Firefox ~584 kB; securite 12/12 et performance 3/3 passent sans scan, timer, reseau ni nouvelle permission., Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR, lockfile coherent et Archify Tobirink 9/9 passent; navigateur integre indisponible, donc aucun smoke UI manuel revendique.)_
@@ -69,6 +69,9 @@
 - [x] **Compléter la décision fournisseur pure** — DONE _(evidence: domain 23/23; application 151/151, six ordered levels + F/C cases, typecheck, Sensor SAFE, validate, Archify 9/9)_
 - [x] **Composer les frontières fournisseur locales** — DONE _(evidence: application 161/161; browser adapters 22/22, MangaUpdates exact route + five-kind routing, all-workspace typecheck, Sensor SAFE, validate, Archify showcase)_
 - [x] **Rendre import et outbox atomiques** — DONE _(evidence: Application 164/164, domaine 23/23 et contrats 16/16 passent; import, artefact et tâche READY sont atomiques avec rollback testé., IndexedDB Chromium, stockage, tâches et migrations v1-v5 vers v6 passent; deux stores privés additifs et index de disponibilité validés., Typecheck de tous les workspaces, Sensor SAFE, validate global, git diff --check et Archify favorite-resolution showcase passent.)_
+- [x] **Composer le runner durable et les événements favoris** — DONE _(evidence: 174 tests application, 30 adaptateurs navigateur, 2 IndexedDB avec contrat Chromium et 94 extension passent., Build Chrome MV3, typecheck complet, Sensor SAFE et git diff --check passent., Archify dataflow showcase passe sans erreur ni avertissement; npm run validate passe.)_
+- [ ] **Remplacer l'oracle factice et mesurer les bornes** — PENDING
+- [ ] **Auditer et valider la pipeline complète** — PENDING
 
 ## Concevoir l’architecture UI et le catalogue visuel — DONE
 

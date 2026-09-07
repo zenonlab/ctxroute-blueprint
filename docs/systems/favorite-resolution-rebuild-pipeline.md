@@ -19,7 +19,7 @@ publics. IndexedDB est la seule autorité privée. Le favori navigateur est une
 observation et une commande d’import, jamais l’identité d’une œuvre ni une
 autorité sur la bibliothèque ou la progression.
 
-## État de départ vérifié
+## État implémenté vérifié
 
 Le runtime actuel possède déjà des fondations réutilisables :
 
@@ -36,22 +36,26 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
-- le background compose les ports locaux et lance l’import à l’installation ou
-  à la mise à jour.
-- un noyau générique de tâches durables existe déjà, mais son adaptateur utilise
-  la base séparée `tobirink-durable-tasks` et charge tous les états disponibles
-  avant de choisir une tâche; il convient aux notifications actuelles, pas à
-  l’outbox atomique et indexée de la résolution.
+- le background compose les ports locaux, les adaptateurs AniList et
+  MangaUpdates, puis lance la convergence à l’installation, au démarrage, sur
+  alarme et sur les quatre mutations de favoris;
+- l’import persiste atomiquement `FavoriteSource`, `Review`, artefact et tâche;
+- l’outbox IndexedDB v6 réclame les tâches dues par index composé sans
+  `toArray()` global, huit au plus par tranche;
+- le runner recherche, décide, hydrate par ID exact, puis écrit `Work`,
+  Bibliothèque, Review et reçu de tâche dans une transaction;
+- les cadences fournisseur sont sérialisées et leur `nextAllowedAt` est écrit
+  dans `browser.storage.local` avant chaque effet HTTP;
+- une source absente est marquée `detached`; elle reste sauvegardable mais ne
+  fournit plus de lien à Review, Agenda, Organisateur ou popup.
 
-Ce chemin n’est pas encore une pipeline de résolution complète : l’inventaire
-est aplati en mémoire, les événements `bookmarks.onCreated`, `onChanged`,
-`onMoved` et `onRemoved` ne convergent pas individuellement, aucun artefact de
-parsing n’est persisté et aucun runner durable ne compose parsing, recherche,
-décision puis hydratation. `resolveFavorite` existe comme cas d’usage isolé,
-mais ne constitue pas encore le chemin du background installé. Il dérive aussi
-un identifiant Review différemment de l’import : la reconstruction doit toujours
-réutiliser le `reviewId` porté par `FavoriteSource` et supprimer cette seconde
-source d’identité.
+Un écart de scalabilité reste explicitement ouvert :
+`WebExtensionBookmarkImportAdapter` lit encore `bookmarks.getTree()` et le
+runtime reconstruit l’inventaire complet avant de le traiter par transactions
+de 100. Les événements concurrents sont coalescés et provoquent une seconde
+passe bornée, mais ils ne sont pas encore persistés individuellement. Les
+sections « Capturer » et « Inventorier » ci-dessous décrivent donc la cible du
+prochain durcissement, pas un comportement déjà livré.
 
 ## Résultat attendu
 
@@ -262,7 +266,8 @@ ici et ne peut donc pas fabriquer une identité.
 
 ### 8. Persister la décision
 
-`CERTAIN` enregistre la référence exacte et planifie une `HydrationTask`.
+`CERTAIN` conserve la référence exacte dans la tâche de résolution déjà
+réclamée et passe directement à son étape d’hydratation.
 `AMBIGUOUS` met la Review en attente avec sa révision et les motifs.
 `NO_MATCH` conserve la source et l’artefact, maintient une Review
 `status = no-match` avec ses motifs et ne crée aucune `Work`.
@@ -337,8 +342,8 @@ requête composée reste indexable sans branche de scan.
 | `ResolutionTask` | ID, artefact, état, tentative, échéance, claim, clé idempotente | import/réconciliation | runner |
 | `ResolutionDecision` | `CERTAIN`, `AMBIGUOUS` ou `NO_MATCH`, niveau, références, motifs | matcher pur | persistance/Review |
 | `ProviderCandidateEnvelope` | candidats normalisés, fournisseur, curseur, `complete`, `truncated`, digest | adaptateur fournisseur | matcher pur |
-| `ProviderRateCheckpoint` | fournisseur, `nextAllowedAt`, dernière réservation | scheduler | lane fournisseur |
-| `HydrationTask` | fournisseur, ID exact, révision, état de reprise | décision certaine | adaptateur fournisseur |
+| `ProviderRateCheckpoint` | fournisseur et `nextAllowedAt` | rate gate | lane fournisseur |
+| Étape d’hydratation | fournisseur et ID exact issus de la décision | runner réclamé | adaptateur fournisseur |
 | `LocalLanguageEvidence` | déclarations bornées, statistique, conflits et provenance | analyseur local facultatif | enrichissement local |
 | `FavoriteProjection` | IDs locaux, statut, données locales disponibles, état partiel | application | extension et WebBridge |
 
@@ -352,7 +357,7 @@ contiennent pas `Response`, `browser.*`, `Dexie`, temporisateur ou variable WXT.
 | `packages/domain` | artefacts, preuves, décisions et invariants purs | aucune infrastructure |
 | `packages/application` | qualification, parsing, matching, import, runner, réconciliation et ports | domaine et contrats possédés |
 | `packages/adapters-browser` | événements favoris, preuves URL, transports publics injectés | ports application et API injectées |
-| `packages/adapters-indexeddb` | transactions, stores, index, claims, checkpoints et migrations | ports application et Dexie |
+| `packages/adapters-indexeddb` | transactions, stores, index, claims et migrations | ports application et Dexie |
 | `apps/extension/wxt-entrypoints/background.ts` | composition et routage de messages uniquement | cas d’usage et adaptateurs |
 | `packages/ui`, surfaces extension et web | rendu de projections et commandes explicites | contrats sérialisés, jamais le stockage |
 
@@ -472,7 +477,7 @@ stack, ni titre privé, ni URL privée.
 
 ## Scénarios opérationnels
 
-### Première installation
+### Première installation — cible après durcissement d’inventaire
 
 Le background ouvre Dexie, crée une session d’inventaire par dossiers, traite
 les tranches, importe chaque source et laisse la file reprendre la résolution. L’UI peut
@@ -480,7 +485,7 @@ afficher séparément import en cours, bibliothèque vide réelle et Review en
 attente. Elle ne prétend pas que l’analyse est terminée avant le dernier
 checkpoint.
 
-### Modification ou déplacement
+### Modification ou déplacement — cible après durcissement d’inventaire
 
 L’événement relit seulement le favori concerné. Un titre, une URL, un chemin ou
 un ordre modifié met à jour la source. Seule une modification qui change
