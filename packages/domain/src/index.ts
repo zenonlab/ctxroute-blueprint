@@ -17,3 +17,4 @@ export type { Review, ReviewStatus } from './review';
 export { createWork } from './work';
 export type { ExternalReference, MediaKind, Work } from './work';
 export * from './organizer';
+export * from './favorites';

@@ -1,0 +1,13 @@
+export type FavoriteMediaKind = 'ANIME' | 'MANGA' | 'UNKNOWN';
+export type FavoritePresence = 'observed' | 'detached';
+export type FavoriteProvider = 'anilist' | 'mangaupdates' | 'mangadex';
+export type FavoriteMatchMethod = 'bounded-edit-distance' | 'explicit-season' | 'ordered-exact' | 'reordered-significant-words' | 'source-id' | 'source-url';
+export type FavoriteProgressionProof = 'bare-number-after-validated-identity' | 'explicit-marker' | 'labelled-url-path' | 'numeric-url-segment-after-source-identity' | 'season-divergence' | 'separated-release';
+export type FavoriteProgressionRejection = 'EARLIER_SAME_QUALITY_EVIDENCE' | 'EXPLICIT_EVIDENCE_PRESENT' | 'INCOMPATIBLE_KIND' | 'LOWER_QUALITY_EVIDENCE';
+export type FavoriteIdentityTransformation = 'language-marker' | 'numeric-routing-prefix' | 'opaque-url-slug-replaced' | 'reader-brand-suffix' | 'repeated-human-title';
+export type FavoriteSegmentTransformation = 'cleaned_generic_suffix' | 'excluded_numeric' | 'excluded_observed_hostname' | 'excluded_progression' | 'excluded_release_marker';
+export type FavoriteTransformation = FavoriteIdentityTransformation | FavoriteSegmentTransformation;
+export type FavoriteAliasProvenance = 'aligned-bookmark-segment' | 'stable-url-slug';
+export type FavoriteRouteProof = 'CATEGORY_PATH' | 'EXPLICIT_URL_SEASON' | 'RELEASE_PATH' | 'RELEASE_SUFFIX' | 'TITLE_SLUG';
+export type FavoriteUrlDisposition = 'INVALID_URL' | 'NON_WEB_URL' | 'ROOT_PAGE' | 'UTILITY_PAGE' | 'URL_IDENTITY_UNRESOLVED';
+export type FavoritePipelineDiagnostic = 'BLOCKED_CONTENT_TAXONOMY' | 'INCOMPLETE_CANDIDATE_SET' | 'INPUT_LIMIT_EXCEEDED' | 'OPAQUE_IDENTITY_UNCORROBORATED' | 'SOURCE_ADAPTER_CONFLICT' | 'URL_IDENTITY_MISSING';

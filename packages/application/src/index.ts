@@ -72,3 +72,4 @@ export * from './popup';
 export * from './collective-index';
 export * from './recovery';
 export * from './organizer';
+export * from './favorites';

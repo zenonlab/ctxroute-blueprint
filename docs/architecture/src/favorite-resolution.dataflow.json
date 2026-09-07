@@ -62,11 +62,11 @@
   "cards": [
     {
       "dot": "emerald",
-      "title": "Preuves séparées",
+      "title": "Contrats et oracle",
       "items": [
-        "Le titre brut et l’URL brute restent inchangés",
-        "Identité, saison et progression ont leurs propres provenances",
-        "Les fragments rejetés restent auditables"
+        "Le domaine possède les contrats immuables et bornés du pipeline",
+        "L’application possède le corpus synthétique et l’oracle profond",
+        "Le gate couvre 82 cas sans réseau ni donnée privée"
       ]
     },
     {

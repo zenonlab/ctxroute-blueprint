@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createFavoriteObservation,
+  createFavoriteParseArtifact,
+  createProviderCandidateEnvelope,
+  createResolutionDecision,
+  favoriteObservationByteLimit,
+  utf8ByteLength,
+} from './contracts';
+
+const observation = () => createFavoriteObservation({
+  bookmarkId: 'bookmark-contract',
+  folderPath: ['Lectures'],
+  observationRevision: 'revision-1',
+  observationSequence: 1,
+  observedAt: '2026-09-07T10:00:00.000Z',
+  presence: 'observed',
+  siblingOrder: 0,
+  title: 'Œuvre synthétique',
+  url: 'https://fixtures.tobirink.invalid/work',
+});
+
+describe('favorite pipeline contracts', () => {
+  it('preserves raw strings, freezes nested values and counts UTF-8 bytes', () => {
+    const value = observation();
+    expect(value.title).toBe('Œuvre synthétique');
+    expect(Object.isFrozen(value)).toBe(true);
+    expect(Object.isFrozen(value.folderPath)).toBe(true);
+    expect(utf8ByteLength('é🙂')).toBe(6);
+  });
+
+  it('fails closed when observation limits are exceeded', () => {
+    expect(() => observation() && createFavoriteObservation({ ...observation(), title: 'a'.repeat(8 * 1024 + 1) })).toThrow(/title exceeds/u);
+    expect(() => createFavoriteObservation({ ...observation(), folderPath: Array.from({ length: 33 }, () => 'folder') })).toThrow(/32 segments/u);
+    expect(utf8ByteLength(JSON.stringify(observation()))).toBeLessThan(favoriteObservationByteLimit);
+  });
+
+  it('rejects decisions from incomplete or truncated provider sets', () => {
+    const incomplete = createProviderCandidateEnvelope({ candidates: [], complete: false, digest: 'digest-1', provider: 'anilist', truncated: true });
+    expect(() => createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'ordered-exact', reasons: ['none'] }, [incomplete])).toThrow(/INCOMPLETE_CANDIDATE_SET/u);
+  });
+
+  it('rejects contradictory and oversized provider envelopes', () => {
+    expect(() => createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'digest-contradictory', provider: 'anilist', truncated: true })).toThrow(/cannot be truncated/u);
+    const candidate = { externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Fixture'] };
+    expect(() => createProviderCandidateEnvelope({ candidates: Array.from({ length: 21 }, () => candidate), complete: true, digest: 'digest-oversized', provider: 'anilist', truncated: false })).toThrow(/20 entries/u);
+  });
+
+  it('validates a complete artifact and unique matching decision', () => {
+    const artifact = createFavoriteParseArtifact({
+      contractVersion: 2,
+      diagnostics: [],
+      identityKey: 'oeuvre synthetique',
+      mediaKind: 'ANIME',
+      parserVersion: 'favorite-parser-v2',
+      raw: { title: observation().title, url: observation().url },
+      semanticFingerprint: 'sha256:fixture',
+      sourceAdapterVersion: 'source-adapter-v1',
+      sourceEvidence: { aliases: [{ provenance: 'stable-url-slug', value: 'oeuvre synthetique' }], diagnostics: [], mediaKind: 'ANIME', proofs: ['TITLE_SLUG'], sourceAdapter: 'generic' },
+      transformations: ['opaque-url-slug-replaced'],
+    });
+    const envelope = createProviderCandidateEnvelope({ candidates: [{ externalId: '1', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Œuvre synthétique'] }], complete: true, digest: 'digest-2', provider: 'anilist', truncated: false });
+    const reference = { externalId: '1', provider: 'anilist' as const };
+    const decision = createResolutionDecision({ candidateReferences: [reference], kind: 'MATCH', level: 'ordered-exact', matchedReference: reference, reasons: ['unique'] }, [envelope]);
+    expect(artifact.raw).toEqual({ title: observation().title, url: observation().url });
+    expect(decision.kind).toBe('MATCH');
+  });
+
+  it('keeps provider identity when external IDs collide across complete lanes', () => {
+    const anilist = createProviderCandidateEnvelope({ candidates: [{ externalId: '1', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Anime'] }], complete: true, digest: 'digest-anilist', provider: 'anilist', truncated: false });
+    const mangaUpdates = createProviderCandidateEnvelope({ candidates: [{ externalId: '1', mediaKind: 'MANGA', preSerialization: false, provider: 'mangaupdates', titles: ['Manga'] }], complete: true, digest: 'digest-manga', provider: 'mangaupdates', truncated: false });
+    const references = [{ externalId: '1', provider: 'anilist' as const }, { externalId: '1', provider: 'mangaupdates' as const }];
+    const decision = createResolutionDecision({ candidateReferences: references, kind: 'AMBIGUOUS', level: 'source-id', reasons: ['provider collision'] }, [anilist, mangaUpdates]);
+    expect(decision.candidateReferences).toEqual(references);
+    expect(() => createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'source-id', reasons: ['duplicate lane'] }, [anilist, anilist])).toThrow(/one envelope per provider/u);
+  });
+});

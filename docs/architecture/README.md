@@ -37,7 +37,11 @@ delivered without moving private authority out of IndexedDB. Resolution uses
 an outbox in the same private schema as each source and Review; indexed
 provider lanes claim bounded work, and incomplete candidate sets fail closed.
 The separate durable-task database remains the notification adapter and is not
-presented as an atomic resolution outbox.
+presented as an atomic resolution outbox. The first implementation wave places
+the immutable bounded contracts in `packages/domain/src/favorites` and the
+synthetic 82-case manifest plus deep oracle in
+`packages/application/src/favorites`; neither module activates a provider or
+the extension background.
 
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated

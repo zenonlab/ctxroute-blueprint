@@ -1446,6 +1446,54 @@
             "Outbox atomique dans tobirink-private, claims indexés par lane, empreinte et rétention bornées documentés",
             "Documentation, décisions, cohérence, 51 tests Progress, Sensor SAFE et Archify showcase all passent"
           ]
+        },
+        {
+          "id": "step-19",
+          "title": "Matérialiser les contrats, le corpus synthétique et l’oracle",
+          "status": "DONE",
+          "acceptance": [
+            "Les contrats de FavoriteObservation, SourceEvidence, FavoriteParseArtifact, ProviderCandidateEnvelope et ResolutionDecision sont immuables, validés et bornés",
+            "Le corpus synthétique contient exactement 82 identifiants uniques, 77 conservations, quatre corrections et X-01 futur sans donnée privée",
+            "L’oracle profond réutilisable compare artefact, décision et projection et échoue sur toute divergence ou réponse fournisseur tronquée",
+            "Aucun réseau, adaptateur fournisseur, stockage ou background n’est activé",
+            "Tests, typecheck, lints, Sensor, documentation, Progress et Archify showcase passent"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/favorites/vocabularies.ts",
+            "packages/domain/src/favorites/index.ts",
+            "packages/domain/src/index.ts",
+            "packages/application/src/favorites/equivalence-corpus.ts",
+            "packages/application/src/favorites/equivalence-oracle.ts",
+            "packages/application/src/favorites/equivalence-oracle.test.ts",
+            "packages/application/src/favorites/index.ts",
+            "packages/application/src/index.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add favorite equivalence contracts\""
+          ],
+          "evidence": [
+            "Domain 18/18 et Application 65/65: contrats bornés, identité provider+externalId, corpus 82/77/4/1 et oracle profond fail-closed",
+            "Typecheck de tous les workspaces, ESLint, Oxlint et Sensor SAFE passent sans réseau, stockage ni background activé",
+            "Décisions, docs, cohérence, 51 tests Progress, Archify dataflow/all showcase et diff-check passent"
+          ]
         }
       ]
     },
