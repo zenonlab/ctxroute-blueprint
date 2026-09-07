@@ -1,6 +1,19 @@
 import { canonicalDateTime } from '../invariant';
+import { createSourceEvidence } from './source-evidence-contract';
+import type { SourceEvidence } from './source-evidence-contract';
+import {
+  favoriteAliasLimit,
+  favoriteDiagnosticLimit,
+  favoriteFolderSegmentByteLimit,
+  favoriteFolderSegmentLimit,
+  favoriteObservationByteLimit,
+  favoriteTitleByteLimit,
+  favoriteTransformationLimit,
+  favoriteUrlByteLimit,
+  providerCandidateLimit,
+  utf8ByteLength,
+} from './limits';
 import type {
-  FavoriteAliasProvenance,
   FavoriteMatchMethod,
   FavoriteMediaKind,
   FavoritePipelineDiagnostic,
@@ -8,22 +21,14 @@ import type {
   FavoriteProgressionProof,
   FavoriteProgressionRejection,
   FavoriteProvider,
-  FavoriteRouteProof,
   FavoriteTransformation,
-  FavoriteUrlDisposition,
 } from './vocabularies';
 
+export * from './limits';
+export { createSourceEvidence };
+export type { SourceEvidence } from './source-evidence-contract';
+
 export const favoriteContractVersion = 2 as const;
-export const favoriteObservationByteLimit = 64 * 1024;
-export const favoriteTitleByteLimit = 8 * 1024;
-export const favoriteUrlByteLimit = 32 * 1024;
-export const favoriteFolderSegmentLimit = 32;
-export const favoriteFolderSegmentByteLimit = 512;
-export const favoriteEvidenceLimit = 32;
-export const favoriteAliasLimit = 16;
-export const favoriteTransformationLimit = 64;
-export const favoriteDiagnosticLimit = 32;
-export const providerCandidateLimit = 20;
 
 export interface FavoriteObservation {
   readonly bookmarkId: string;
@@ -35,15 +40,6 @@ export interface FavoriteObservation {
   readonly siblingOrder: number;
   readonly title: string;
   readonly url: string;
-}
-
-export interface SourceEvidence {
-  readonly aliases: readonly Readonly<{ provenance: FavoriteAliasProvenance; value: string }>[];
-  readonly diagnostics: readonly FavoritePipelineDiagnostic[];
-  readonly disposition?: FavoriteUrlDisposition;
-  readonly mediaKind: FavoriteMediaKind;
-  readonly proofs: readonly FavoriteRouteProof[];
-  readonly sourceAdapter: string;
 }
 
 export interface FavoriteParseArtifact {
@@ -98,20 +94,6 @@ function nonEmpty(value: string, field: string): string {
   return value;
 }
 
-export function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code < 0x80) bytes += 1;
-    else if (code < 0x800) bytes += 2;
-    else if (code >= 0xd800 && code <= 0xdbff && index + 1 < value.length && value.charCodeAt(index + 1) >= 0xdc00 && value.charCodeAt(index + 1) <= 0xdfff) {
-      bytes += 4;
-      index += 1;
-    } else bytes += 3;
-  }
-  return bytes;
-}
-
 function boundedText(value: string, field: string, limit: number): string {
   nonEmpty(value, field);
   contract(utf8ByteLength(value) <= limit, `${field} exceeds ${limit} UTF-8 bytes.`);
@@ -140,19 +122,6 @@ export function createFavoriteObservation(input: FavoriteObservation): FavoriteO
   contract(/^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/iu.test(observation.url), 'url must use HTTP(S).');
   contract(utf8ByteLength(JSON.stringify(observation)) <= favoriteObservationByteLimit, `observation exceeds ${favoriteObservationByteLimit} UTF-8 bytes.`);
   return observation;
-}
-
-export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
-  contract(input.aliases.length <= favoriteAliasLimit, `aliases exceeds ${favoriteAliasLimit} entries.`);
-  contract(input.diagnostics.length <= favoriteDiagnosticLimit, `diagnostics exceeds ${favoriteDiagnosticLimit} entries.`);
-  contract(input.proofs.length <= favoriteEvidenceLimit, `proofs exceeds ${favoriteEvidenceLimit} entries.`);
-  return Object.freeze({
-    ...input,
-    aliases: Object.freeze(input.aliases.map((alias, index) => Object.freeze({ ...alias, value: nonEmpty(alias.value, `aliases[${index}].value`) }))),
-    diagnostics: Object.freeze([...input.diagnostics]),
-    proofs: Object.freeze([...input.proofs]),
-    sourceAdapter: nonEmpty(input.sourceAdapter, 'sourceAdapter'),
-  });
 }
 
 export function createFavoriteParseArtifact(input: FavoriteParseArtifact): FavoriteParseArtifact {

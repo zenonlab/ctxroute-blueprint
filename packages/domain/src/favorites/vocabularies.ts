@@ -10,4 +10,6 @@ export type FavoriteTransformation = FavoriteIdentityTransformation | FavoriteSe
 export type FavoriteAliasProvenance = 'aligned-bookmark-segment' | 'stable-url-slug';
 export type FavoriteRouteProof = 'CATEGORY_PATH' | 'EXPLICIT_URL_SEASON' | 'RELEASE_PATH' | 'RELEASE_SUFFIX' | 'TITLE_SLUG';
 export type FavoriteUrlDisposition = 'INVALID_URL' | 'NON_WEB_URL' | 'ROOT_PAGE' | 'UTILITY_PAGE' | 'URL_IDENTITY_UNRESOLVED';
+export type FavoriteSourceStrategy = 'exact-origin' | 'generic';
+export type FavoriteReleaseProvenance = 'URL_PATH' | 'URL_SLUG_SUFFIX';
 export type FavoritePipelineDiagnostic = 'BLOCKED_CONTENT_TAXONOMY' | 'INCOMPLETE_CANDIDATE_SET' | 'INPUT_LIMIT_EXCEEDED' | 'OPAQUE_IDENTITY_UNCORROBORATED' | 'SOURCE_ADAPTER_CONFLICT' | 'URL_IDENTITY_MISSING';

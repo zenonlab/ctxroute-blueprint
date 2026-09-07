@@ -4,6 +4,7 @@ import {
   createFavoriteParseArtifact,
   createProviderCandidateEnvelope,
   createResolutionDecision,
+  createSourceEvidence,
   favoriteObservationByteLimit,
   utf8ByteLength,
 } from './contracts';
@@ -57,7 +58,7 @@ describe('favorite pipeline contracts', () => {
       raw: { title: observation().title, url: observation().url },
       semanticFingerprint: 'sha256:fixture',
       sourceAdapterVersion: 'source-adapter-v1',
-      sourceEvidence: { aliases: [{ provenance: 'stable-url-slug', value: 'oeuvre synthetique' }], diagnostics: [], mediaKind: 'ANIME', proofs: ['TITLE_SLUG'], sourceAdapter: 'generic' },
+      sourceEvidence: { aliases: [{ provenance: 'stable-url-slug', value: 'oeuvre synthetique' }], diagnostics: [], key: 'bookmark-1', mediaKind: 'ANIME', proofs: ['TITLE_SLUG'], sourceAdapter: 'generic', strategy: 'generic' },
       transformations: ['opaque-url-slug-replaced'],
     });
     const envelope = createProviderCandidateEnvelope({ candidates: [{ externalId: '1', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Œuvre synthétique'] }], complete: true, digest: 'digest-2', provider: 'anilist', truncated: false });
@@ -65,6 +66,16 @@ describe('favorite pipeline contracts', () => {
     const decision = createResolutionDecision({ candidateReferences: [reference], kind: 'MATCH', level: 'ordered-exact', matchedReference: reference, reasons: ['unique'] }, [envelope]);
     expect(artifact.raw).toEqual({ title: observation().title, url: observation().url });
     expect(decision.kind).toBe('MATCH');
+  });
+
+  it('bounds and validates structured source evidence', () => {
+    const base = { aliases: [], diagnostics: [], key: 'bookmark-source', mediaKind: 'UNKNOWN' as const, proofs: [], sourceAdapter: 'generic-url', strategy: 'generic' as const };
+    expect(() => createSourceEvidence({ ...base, origin: 'https://fixtures.tobirink.invalid/path' })).toThrow(/origin/u);
+    expect(() => createSourceEvidence({ ...base, explicitProviderReference: { externalId: '', provider: 'anilist' } })).toThrow(/externalId/u);
+    expect(() => createSourceEvidence({ ...base, stableSlug: 'a'.repeat(32 * 1024 + 1) })).toThrow(/stableSlug/u);
+    const evidence = createSourceEvidence({ ...base, explicitProviderReference: { externalId: '1', provider: 'anilist' }, release: { kind: 'episode', provenance: 'URL_PATH', raw: 'episode-1', value: 1 } });
+    expect(Object.isFrozen(evidence.explicitProviderReference)).toBe(true);
+    expect(Object.isFrozen(evidence.release)).toBe(true);
   });
 
   it('keeps provider identity when external IDs collide across complete lanes', () => {

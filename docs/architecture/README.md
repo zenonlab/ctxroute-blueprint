@@ -49,6 +49,11 @@ only normalized identity evidence, stops at the first matching level, preserves
 provider-qualified references, and fails closed before consuming an incomplete
 candidate set.
 
+The URL evidence slice keeps qualification and source analysis as pure
+application modules. Exact-origin adapters may emit provider IDs, while one
+generic fallback derives only structural evidence; utility pages and adapter
+conflicts fail closed, and a valid observed HTTP origin is never rewritten.
+
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
 contracts, browser builds and reproducible packages to the release gate. It

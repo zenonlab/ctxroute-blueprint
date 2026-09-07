@@ -37,8 +37,8 @@
   "nodes": [
     { "id": "browserFavorites", "type": "external", "label": "Favoris navigateur", "stage": 0, "row": 1, "width": 150, "tag": "entrée brute" },
     { "id": "bookmarkEvents", "type": "messagebus", "label": "Événements favoris", "stage": 0, "row": 4, "width": 150, "tag": "reprise" },
-    { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "fail-closed" },
-    { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "adaptateur URL" },
+    { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "U-08…U-10" },
+    { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "U-01…U-07" },
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "versionné" },
     { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "même IndexedDB" },
     { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "cadence indexée" },
