@@ -39,7 +39,7 @@ les matrices sont :
 | `PT` | transport direct AniList/MangaUpdates et tests associés |
 | `DQ` | `apps/extension/src/browser-resolution-queue.ts` et task runner durable |
 | `BG` | événements et coordinateur du background MV3 |
-| `OR` | `scripts/verify-parser-oracle.mjs` et son corpus synthétique |
+| `OR` | `canonical-equivalence-runner.ts` et le snapshot synthétique versionné |
 | `A87` | ADR FavLib 0087 et wave du resolver local |
 
 Ces chemins sont des preuves d’audit historiques. TobiRink ne dépendra pas du
@@ -718,7 +718,7 @@ un futur adaptateur (`X-01`). « Même résultat » signifie la même dispositio
 identité, saison, progression, décision de matching et classe de diagnostic ;
 cela ne signifie pas un JSON identique à l’ancien artefact FavLib.
 
-L’oracle TobiRink est obligatoire avant toute composition runtime :
+L’oracle TobiRink est exécuté par Vitest avec un snapshot profond versionné :
 
 1. une fixture synthétique fournit l’observation et les réponses fournisseur
    normalisées, jamais un appel réseau vivant ;

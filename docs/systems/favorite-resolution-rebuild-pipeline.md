@@ -46,6 +46,9 @@ Le runtime actuel possède déjà des fondations réutilisables :
   Bibliothèque, Review et reçu de tâche dans une transaction;
 - les cadences fournisseur sont sérialisées et leur `nextAllowedAt` est écrit
   dans `browser.storage.local` avant chaque effet HTTP;
+- l’oracle canonique exécute réellement qualification, parser, matcher et
+  projection sur les 82 identifiants synthétiques et compare leur snapshot
+  profond versionné;
 - une source absente est marquée `detached`; elle reste sauvegardable mais ne
   fournit plus de lien à Review, Agenda, Organisateur ou popup.
 

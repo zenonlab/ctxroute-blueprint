@@ -103,6 +103,9 @@ Définir l’équivalence sur le résultat métier, pas sur la forme JSON histor
 77 cas sont conservés, `U-02`, `U-10`, `B-03` et `O-02` sont corrigés, et
 `X-01` reste exclu tant que MangaDex n’est pas activé. Un oracle synthétique
 compare artefact, décision et projection sans appeler un fournisseur vivant.
+La commande racine `npm run verify` exécute cet oracle avec tous les tests de
+workspaces, le typecheck et les budgets de performance avant les gates de
+livraison documentaire.
 Le module de langue de document reste un enrichissement local facultatif,
 séparé du parser de favoris; OVA et pré-sérialisation appartiennent à la
 compatibilité candidat, et la taxonomie éditoriale s’applique après hydratation.

@@ -1842,7 +1842,7 @@
         {
           "id": "step-29",
           "title": "Remplacer l'oracle factice et mesurer les bornes",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les 82 cas exécutent réellement le parser, le matcher et la projection puis comparent des résultats métier profonds.",
             "Les benchmarks publient p95 typique et maximal avec les budgets documentés.",
@@ -1869,7 +1869,11 @@
             "git diff --check",
             "git commit -m \"test(parser): verify behavioral equivalence\""
           ],
-          "evidence": []
+          "evidence": [
+            "82 cas canoniques exécutent qualification, parser, matcher et projection; snapshot profond versionné; application 174/174.",
+            "p95 parser mesuré à 0,124 ms typique et 0,852 ms maximal, sous budgets 10/50 ms; builds Chrome/Firefox 802,31/802,42 kB.",
+            "npm run verify passe: typecheck, tous tests workspace, Chromium IndexedDB, performance, audit 0 vulnérabilité et docs."
+          ]
         },
         {
           "id": "step-30",

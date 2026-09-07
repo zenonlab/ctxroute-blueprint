@@ -70,7 +70,7 @@
 - [x] **Composer les frontières fournisseur locales** — DONE _(evidence: application 161/161; browser adapters 22/22, MangaUpdates exact route + five-kind routing, all-workspace typecheck, Sensor SAFE, validate, Archify showcase)_
 - [x] **Rendre import et outbox atomiques** — DONE _(evidence: Application 164/164, domaine 23/23 et contrats 16/16 passent; import, artefact et tâche READY sont atomiques avec rollback testé., IndexedDB Chromium, stockage, tâches et migrations v1-v5 vers v6 passent; deux stores privés additifs et index de disponibilité validés., Typecheck de tous les workspaces, Sensor SAFE, validate global, git diff --check et Archify favorite-resolution showcase passent.)_
 - [x] **Composer le runner durable et les événements favoris** — DONE _(evidence: 174 tests application, 30 adaptateurs navigateur, 2 IndexedDB avec contrat Chromium et 94 extension passent., Build Chrome MV3, typecheck complet, Sensor SAFE et git diff --check passent., Archify dataflow showcase passe sans erreur ni avertissement; npm run validate passe.)_
-- [ ] **Remplacer l'oracle factice et mesurer les bornes** — PENDING
+- [x] **Remplacer l'oracle factice et mesurer les bornes** — DONE _(evidence: 82 cas canoniques exécutent qualification, parser, matcher et projection; snapshot profond versionné; application 174/174., p95 parser mesuré à 0,124 ms typique et 0,852 ms maximal, sous budgets 10/50 ms; builds Chrome/Firefox 802,31/802,42 kB., npm run verify passe: typecheck, tous tests workspace, Chromium IndexedDB, performance, audit 0 vulnérabilité et docs.)_
 - [ ] **Auditer et valider la pipeline complète** — PENDING
 
 ## Concevoir l’architecture UI et le catalogue visuel — DONE

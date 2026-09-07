@@ -1,8 +1,9 @@
 import { createFavoriteObservation, createProviderCandidateEnvelope } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 import { auditFavoriteEquivalenceCorpus, favoriteEquivalenceCorpus } from './equivalence-corpus';
-import { assertFavoriteOracleCoverage, runCanonicalFavoriteEquivalenceOracle, runFavoriteEquivalenceOracle } from './equivalence-oracle';
+import { assertFavoriteOracleCoverage, runFavoriteEquivalenceOracle } from './equivalence-oracle';
 import type { FavoriteEquivalenceFixture, FavoriteOracleSnapshot } from './equivalence-oracle';
+import { runCanonicalFavoritePipeline } from './canonical-equivalence-runner';
 
 const observation = createFavoriteObservation({
   bookmarkId: 'bookmark-oracle',
@@ -77,9 +78,10 @@ describe('favorite equivalence oracle', () => {
     expect(() => assertFavoriteOracleCoverage([fixture()])).toThrow(/every canonical corpus case/u);
   });
 
-  it('runs the canonical gate only with every audited case exactly once', async () => {
-    const fixtures = favoriteEquivalenceCorpus.map((item) => fixture({ caseId: item.id }));
-    await expect(runCanonicalFavoriteEquivalenceOracle(fixtures, async (item) => item.expected)).resolves.toMatchObject({ passed: 82 });
-    await expect(runCanonicalFavoriteEquivalenceOracle(fixtures.slice(1), async (item) => item.expected)).rejects.toThrow(/every canonical corpus case/u);
+  it('runs parser, matcher and projection for every canonical case', () => {
+    const results = runCanonicalFavoritePipeline();
+    expect(results).toHaveLength(82);
+    expect(results.map(({ caseId }) => caseId)).toEqual(favoriteEquivalenceCorpus.map(({ id }) => id));
+    expect(results).toMatchSnapshot();
   });
 });

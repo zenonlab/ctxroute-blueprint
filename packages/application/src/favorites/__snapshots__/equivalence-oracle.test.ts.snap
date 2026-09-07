@@ -1,0 +1,6890 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`favorite equivalence oracle > runs parser, matcher and projection for every canonical case 1`] = `
+[
+  {
+    "caseId": "P-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "l epopee",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "l epopee",
+        "identityKey": "l epopee",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "  L’Épopée!!  ",
+          "url": "https://fixtures.tobirink.invalid/anime/l-epopee",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "L’Épopée!!",
+            "excluded": false,
+            "kind": "human",
+            "raw": "  L’Épopée!!  ",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:9cb00ff3",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "l epopee",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/l-epopee",
+          "diagnostics": [],
+          "key": "oracle-P-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/l-epopee",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "l-epopee",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "l-epopee",
+          "strategy": "generic",
+          "title": "l epopee",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-p-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-p-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "P-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "space work",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "space work",
+        "identityKey": "space work",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Space   Work",
+          "url": "https://fixtures.tobirink.invalid/anime/space-work",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Space Work",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Space   Work",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:64698d33",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "space work",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/space-work",
+          "diagnostics": [],
+          "key": "oracle-P-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/space-work",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "space-work",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "space-work",
+          "strategy": "generic",
+          "title": "space work",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-p-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-p-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "P-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "journey great",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "journey great",
+        "identityKey": "journey great",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Journey Great",
+          "url": "https://fixtures.tobirink.invalid/anime/journey-great",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Journey Great",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Journey Great",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:f88b0531",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "journey great",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/journey-great",
+          "diagnostics": [],
+          "key": "oracle-P-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/journey-great",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "journey-great",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "journey-great",
+          "strategy": "generic",
+          "title": "journey great",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-p-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "reordered-significant-words",
+        "matchedReference": {
+          "externalId": "candidate-p-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "P-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "frieran",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "frieran",
+        "identityKey": "frieran",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Frieran",
+          "url": "https://fixtures.tobirink.invalid/anime/frieran",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Frieran",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Frieran",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:2ec9a016",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "frieran",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/frieran",
+          "diagnostics": [],
+          "key": "oracle-P-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/frieran",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "frieran",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "frieran",
+          "strategy": "generic",
+          "title": "frieran",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-p-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-p-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "P-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture p 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture p 05",
+        "identityKey": "fixture p 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture P-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-p-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture P-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture P-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:fa7d81c5",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture p 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-p-05",
+          "diagnostics": [],
+          "key": "oracle-P-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-p-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-p-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-p-05",
+          "strategy": "generic",
+          "title": "fixture p 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "one",
+            "provider": "anilist",
+          },
+          {
+            "externalId": "two",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "AMBIGUOUS",
+        "level": "ordered-exact",
+        "reasons": [
+          "multiple-candidates-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "pending",
+      },
+    },
+  },
+  {
+    "caseId": "P-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture p 06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture p 06",
+        "identityKey": "fixture p 06",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture P-06",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-p-06",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture P-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture P-06",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:3edd4be1",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture p 06",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-p-06",
+          "diagnostics": [],
+          "key": "oracle-P-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-p-06",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-p-06",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-p-06",
+          "strategy": "generic",
+          "title": "fixture p 06",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-p-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-p-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "P-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "long work subtitle",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "long work subtitle",
+        "identityKey": "long work subtitle",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Long Work Subtitle",
+          "url": "https://fixtures.tobirink.invalid/anime/long-work-subtitle",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Long Work Subtitle",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Long Work Subtitle",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:498011d6",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "long work subtitle",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/long-work-subtitle",
+          "diagnostics": [],
+          "key": "oracle-P-07",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/long-work-subtitle",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "long-work-subtitle",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "long-work-subtitle",
+          "strategy": "generic",
+          "title": "long work subtitle",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [],
+        "kind": "NO_MATCH",
+        "level": "bounded-edit-distance",
+        "reasons": [
+          "no-candidate-at-any-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "no-match",
+      },
+    },
+  },
+  {
+    "caseId": "P-08",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "running heroes",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "running heroes",
+        "identityKey": "running heroes",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Running Heroes",
+          "url": "https://fixtures.tobirink.invalid/anime/running-heroes",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Running Heroes",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Running Heroes",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:f8fd0001",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "running heroes",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/running-heroes",
+          "diagnostics": [],
+          "key": "oracle-P-08",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/running-heroes",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "running-heroes",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "running-heroes",
+          "strategy": "generic",
+          "title": "running heroes",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [],
+        "kind": "NO_MATCH",
+        "level": "bounded-edit-distance",
+        "reasons": [
+          "no-candidate-at-any-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "no-match",
+      },
+    },
+  },
+  {
+    "caseId": "L-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture l 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture l 01",
+        "identityKey": "fixture l 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture L-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-l-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture L-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture L-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:4306fcfd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture l 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-l-01",
+          "diagnostics": [],
+          "key": "oracle-L-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-l-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-l-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-l-01",
+          "strategy": "generic",
+          "title": "fixture l 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-l-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-l-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "L-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture l 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture l 02",
+        "identityKey": "fixture l 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture L-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-l-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture L-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture L-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:fe9513b1",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture l 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-l-02",
+          "diagnostics": [],
+          "key": "oracle-L-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-l-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-l-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-l-02",
+          "strategy": "generic",
+          "title": "fixture l 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-l-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-l-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "L-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture l 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture l 03",
+        "identityKey": "fixture l 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture L-03",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-l-03",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture L-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture L-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:99f297fd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture l 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-l-03",
+          "diagnostics": [],
+          "key": "oracle-L-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-l-03",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-l-03",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-l-03",
+          "strategy": "generic",
+          "title": "fixture l 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-l-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-l-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "L-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture l 04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture l 04",
+        "identityKey": "fixture l 04",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture L-04",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-l-04",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture L-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture L-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5a61edd9",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture l 04",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-l-04",
+          "diagnostics": [],
+          "key": "oracle-L-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-l-04",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-l-04",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-l-04",
+          "strategy": "generic",
+          "title": "fixture l 04",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-l-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-l-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "L-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture l 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture l 05",
+        "identityKey": "fixture l 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture L-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-l-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture L-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture L-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:103a2895",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture l 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-l-05",
+          "diagnostics": [],
+          "key": "oracle-L-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-l-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-l-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-l-05",
+          "strategy": "generic",
+          "title": "fixture l 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-l-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-l-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "F-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture f 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture f 01",
+        "identityKey": "fixture f 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture F-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-f-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture F-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture F-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:78a25951",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture f 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-f-01",
+          "diagnostics": [],
+          "key": "oracle-F-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-f-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-f-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-f-01",
+          "strategy": "generic",
+          "title": "fixture f 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-f-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-f-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "F-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture f 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture f 02",
+        "identityKey": "fixture f 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture F-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-f-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture F-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture F-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:930b7b99",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture f 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-f-02",
+          "diagnostics": [],
+          "key": "oracle-F-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-f-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-f-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-f-02",
+          "strategy": "generic",
+          "title": "fixture f 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-f-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-f-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "C-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture c 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture c 01",
+        "identityKey": "fixture c 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture C-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-c-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture C-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture C-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:ba93590d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture c 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-c-01",
+          "diagnostics": [],
+          "key": "oracle-C-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-c-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-c-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-c-01",
+          "strategy": "generic",
+          "title": "fixture c 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-c-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-c-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "C-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture c 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture c 02",
+        "identityKey": "fixture c 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture C-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-c-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture C-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture C-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:ff9c4685",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture c 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-c-02",
+          "diagnostics": [],
+          "key": "oracle-C-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-c-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-c-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-c-02",
+          "strategy": "generic",
+          "title": "fixture c 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-c-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-c-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "X-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture x 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture x 01",
+        "identityKey": "fixture x 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture X-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-x-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture X-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture X-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:65143b3d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture x 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-x-01",
+          "diagnostics": [],
+          "key": "oracle-X-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-x-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-x-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-x-01",
+          "strategy": "generic",
+          "title": "fixture x 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-x-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-x-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "X-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture x 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture x 02",
+        "identityKey": "fixture x 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture X-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-x-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture X-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture X-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:9981c391",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture x 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-x-02",
+          "diagnostics": [],
+          "key": "oracle-X-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-x-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-x-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-x-02",
+          "strategy": "generic",
+          "title": "fixture x 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-x-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-x-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 01",
+        "identityKey": "fixture u 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-u-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:3fd81001",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-u-01",
+          "diagnostics": [],
+          "key": "oracle-U-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-u-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-u-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-01",
+          "strategy": "generic",
+          "title": "fixture u 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 02",
+        "identityKey": "fixture u 02",
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 13,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "labelled-url-path",
+          "raw": "chapter-12",
+          "rejections": [],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture U-02",
+          "url": "https://fixtures.tobirink.invalid/read/fixture-u-02/chapter-12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:06da912e",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/read/fixture-u-02",
+          "diagnostics": [],
+          "key": "oracle-U-02",
+          "mediaKind": "UNKNOWN",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/read/fixture-u-02/chapter-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_PATH",
+          ],
+          "rawSlug": "fixture-u-02",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_PATH",
+            "raw": "chapter-12",
+            "value": 12,
+          },
+          "releaseSuffix": "chapter-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-02",
+          "strategy": "generic",
+          "title": "fixture u 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-03",
+          "url": "https://fixtures.tobirink.invalid/manga/12345",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:92f2c7eb",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "URL_IDENTITY_UNRESOLVED",
+          "key": "oracle-U-03",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 04",
+        "identityKey": "fixture u 04",
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-04",
+          "url": "https://anilist.co/anime/154587/fixture-u-04",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:f2dac9a8",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 04",
+            },
+          ],
+          "canonicalUrl": "https://anilist.co/anime/154587/fixture-u-04",
+          "diagnostics": [],
+          "key": "oracle-U-04",
+          "mediaKind": "UNKNOWN",
+          "origin": "https://anilist.co",
+          "path": "/anime/154587/fixture-u-04",
+          "proofs": [
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-u-04",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-04",
+          "strategy": "generic",
+          "title": "fixture u 04",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 05",
+        "identityKey": "fixture u 05",
+        "mediaKind": "MANGA",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 13,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "labelled-url-path",
+          "raw": "chapter-12",
+          "rejections": [],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture U-05",
+          "url": "https://fixtures.tobirink.invalid/manga/fixture-u-05/chapter-12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:44381457",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/manga/fixture-u-05",
+          "diagnostics": [],
+          "key": "oracle-U-05",
+          "mediaKind": "MANGA",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/manga/fixture-u-05/chapter-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_PATH",
+          ],
+          "rawSlug": "fixture-u-05",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_PATH",
+            "raw": "chapter-12",
+            "value": 12,
+          },
+          "releaseSuffix": "chapter-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-05",
+          "strategy": "generic",
+          "title": "fixture u 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 06",
+        "identityKey": "fixture u 06",
+        "mediaKind": "MANGA",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 13,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "labelled-url-path",
+          "raw": "chapter-12",
+          "rejections": [],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture U-06",
+          "url": "https://fixtures.tobirink.invalid/manga/fixture-u-06-chapter-12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-06",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:02a39aad",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 06",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/manga/fixture-u-06",
+          "diagnostics": [],
+          "key": "oracle-U-06",
+          "mediaKind": "MANGA",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/manga/fixture-u-06-chapter-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_SUFFIX",
+          ],
+          "rawSlug": "fixture-u-06-chapter-12",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_SLUG_SUFFIX",
+            "raw": "chapter-12",
+            "value": 12,
+          },
+          "releaseSuffix": "chapter-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-06",
+          "strategy": "generic",
+          "title": "fixture u 06",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 07",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 07",
+        "identityKey": "fixture u 07",
+        "mediaKind": "MANGA",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-07",
+          "url": "https://anime-fixtures.tobirink.invalid/scan/fixture-u-07",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-07",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:8d623cd6",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 07",
+            },
+          ],
+          "canonicalUrl": "https://anime-fixtures.tobirink.invalid/scan/fixture-u-07",
+          "diagnostics": [],
+          "key": "oracle-U-07",
+          "mediaKind": "MANGA",
+          "origin": "https://anime-fixtures.tobirink.invalid",
+          "path": "/scan/fixture-u-07",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-u-07",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-07",
+          "strategy": "generic",
+          "title": "fixture u 07",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-08",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-08",
+          "url": "https://fixtures.tobirink.invalid/catalogue/",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-08",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-08",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:d55a75d1",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "UTILITY_PAGE",
+          "key": "oracle-U-08",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-08",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-08",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-09",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-09",
+          "url": "https://fixtures.tobirink.invalid/drama/fixture-u-09",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-09",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-09",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:8d3bb656",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "URL_IDENTITY_UNRESOLVED",
+          "key": "oracle-U-09",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-09",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-09",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "U-10",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture u 10",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture u 10",
+        "identityKey": "fixture u 10",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture U-10",
+          "url": "http://fixtures.tobirink.invalid/anime/fixture-u-10",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture U-10",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture U-10",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:9161528d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture u 10",
+            },
+          ],
+          "canonicalUrl": "http://fixtures.tobirink.invalid/anime/fixture-u-10",
+          "diagnostics": [],
+          "key": "oracle-U-10",
+          "mediaKind": "ANIME",
+          "origin": "http://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-u-10",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-u-10",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-u-10",
+          "strategy": "generic",
+          "title": "fixture u 10",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-u-10",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-u-10",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "watch fixture t 01",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture T-01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "watch fixture t 01",
+        "identityKey": "watch fixture t 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Watch Fixture T-01",
+          "url": "https://fixtures.tobirink.invalid/anime/watch-fixture-t-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Watch Fixture T-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Watch Fixture T-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:cc6f434c",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "watch fixture t 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/watch-fixture-t-01",
+          "diagnostics": [],
+          "key": "oracle-T-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/watch-fixture-t-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "watch-fixture-t-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "watch-fixture-t-01",
+          "strategy": "generic",
+          "title": "watch fixture t 01",
+        },
+        "status": "parsed",
+        "transformations": [
+          "cleaned_generic_suffix",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "oav vostfr fixture t 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "oav vostfr fixture t 02",
+        "identityKey": "oav vostfr fixture t 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "[OAV VOSTFR] Fixture T-02",
+          "url": "https://fixtures.tobirink.invalid/anime/oav-vostfr-fixture-t-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "[OAV VOSTFR] Fixture T-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "[OAV VOSTFR] Fixture T-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:a8a9a4cb",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "oav vostfr fixture t 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/oav-vostfr-fixture-t-02",
+          "diagnostics": [],
+          "key": "oracle-T-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/oav-vostfr-fixture-t-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "oav-vostfr-fixture-t-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "oav-vostfr-fixture-t-02",
+          "strategy": "generic",
+          "title": "oav vostfr fixture t 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture t 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 03",
+        "identityKey": "fixture t 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "episode",
+              "position": 12,
+              "proof": "explicit-marker",
+              "quality": 5,
+              "raw": "12",
+              "value": 12,
+            },
+            {
+              "kind": "episode",
+              "position": 24,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "episode-12",
+              "value": 12,
+            },
+          ],
+          "kind": "episode",
+          "proof": "explicit-marker",
+          "raw": "12",
+          "rejections": [
+            "EXPLICIT_EVIDENCE_PRESENT",
+          ],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture T-03 Episode 12",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-03-episode-12",
+        },
+        "seasonEvidence": {
+          "bareTrailingNumber": 12,
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-03 Episode 12",
+            "excluded": true,
+            "kind": "progression",
+            "raw": "Fixture T-03 Episode 12",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:382c888f",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-03",
+          "diagnostics": [],
+          "key": "oracle-T-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-03-episode-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_SUFFIX",
+          ],
+          "rawSlug": "fixture-t-03-episode-12",
+          "release": {
+            "kind": "episode",
+            "provenance": "URL_SLUG_SUFFIX",
+            "raw": "episode-12",
+            "value": 12,
+          },
+          "releaseSuffix": "episode-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-03",
+          "strategy": "generic",
+          "title": "fixture t 03",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_progression",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture T-04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 04 12 vostfr",
+        "identityKey": "fixture t 04 12 vostfr",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "episode",
+              "position": 13,
+              "proof": "separated-release",
+              "quality": 3,
+              "raw": "12",
+              "value": 12,
+            },
+          ],
+          "kind": "episode",
+          "proof": "separated-release",
+          "raw": "12",
+          "rejections": [],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture T-04 12 VOSTFR",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-04-12-vostfr",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-04 12 VOSTFR",
+            "excluded": true,
+            "kind": "progression",
+            "raw": "Fixture T-04 12 VOSTFR",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:43f2763b",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 04 12 vostfr",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-04-12-vostfr",
+          "diagnostics": [],
+          "key": "oracle-T-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-04-12-vostfr",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-t-04-12-vostfr",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-04-12-vostfr",
+          "strategy": "generic",
+          "title": "fixture t 04 12 vostfr",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_progression",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture t 05 lecture en ligne",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 05 lecture en ligne",
+        "identityKey": "fixture t 05 lecture en ligne",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture T-05 - Lecture en ligne",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-05-lecture-en-ligne",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture T-05",
+          },
+          {
+            "cleaned": "Lecture en ligne",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Lecture en ligne",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:739ee7e0",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 05 lecture en ligne",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-05-lecture-en-ligne",
+          "diagnostics": [],
+          "key": "oracle-T-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-05-lecture-en-ligne",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-t-05-lecture-en-ligne",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-05-lecture-en-ligne",
+          "strategy": "generic",
+          "title": "fixture t 05 lecture en ligne",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture t 06 fixtures",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture T-06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 06 fixtures",
+        "identityKey": "fixture t 06 fixtures",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture T-06 - fixtures",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-06-fixtures",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture T-06",
+          },
+          {
+            "cleaned": "fixtures",
+            "excluded": true,
+            "kind": "hostname",
+            "raw": "fixtures",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:62cc9967",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 06 fixtures",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-06-fixtures",
+          "diagnostics": [],
+          "key": "oracle-T-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-06-fixtures",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-t-06-fixtures",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-06-fixtures",
+          "strategy": "generic",
+          "title": "fixture t 06 fixtures",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_observed_hostname",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture t 07 fixture t 07",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture T-07",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 07 fixture t 07",
+        "identityKey": "fixture t 07 fixture t 07",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture T-07 | Fixture T-07",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-07-fixture-t-07",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture T-07",
+          },
+          {
+            "cleaned": "Fixture T-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture T-07",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:3e357c8f",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 07 fixture t 07",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-07-fixture-t-07",
+          "diagnostics": [],
+          "key": "oracle-T-07",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-07-fixture-t-07",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-t-07-fixture-t-07",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-07-fixture-t-07",
+          "strategy": "generic",
+          "title": "fixture t 07 fixture t 07",
+        },
+        "status": "parsed",
+        "transformations": [
+          "repeated-human-title",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-08",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "scan hero",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "scan hero",
+        "identityKey": "scan hero",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Scan Hero",
+          "url": "https://fixtures.tobirink.invalid/anime/scan-hero",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Scan Hero",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Scan Hero",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5bb1563f",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "scan hero",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/scan-hero",
+          "diagnostics": [],
+          "key": "oracle-T-08",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/scan-hero",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "scan-hero",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "scan-hero",
+          "strategy": "generic",
+          "title": "scan hero",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-08",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-08",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-09",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "alice s fixture",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "alice s fixture",
+        "identityKey": "alice s fixture",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Alice’s Fixture!",
+          "url": "https://fixtures.tobirink.invalid/anime/alice-s-fixture",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Alice’s Fixture!",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Alice’s Fixture!",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:6b3d64cd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "alice s fixture",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/alice-s-fixture",
+          "diagnostics": [],
+          "key": "oracle-T-09",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/alice-s-fixture",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "alice-s-fixture",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "alice-s-fixture",
+          "strategy": "generic",
+          "title": "alice s fixture",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-09",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-09",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "T-10",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture t 10 2024",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture t 10 2024",
+        "identityKey": "fixture t 10 2024",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture T-10 2024",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-t-10-2024",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture T-10 2024",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture T-10 2024",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:ae0dc7c8",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture t 10 2024",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-t-10-2024",
+          "diagnostics": [],
+          "key": "oracle-T-10",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-t-10-2024",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-t-10-2024",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-t-10-2024",
+          "strategy": "generic",
+          "title": "fixture t 10 2024",
+        },
+        "status": "parsed",
+        "transformations": [],
+        "year": 2024,
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-t-10",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-t-10",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 01",
+        "identityKey": "fixture i 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:b9b2d039",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-01",
+          "diagnostics": [],
+          "key": "oracle-I-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-01",
+          "strategy": "generic",
+          "title": "fixture i 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 02",
+        "identityKey": "fixture i 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:0364a7ed",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-02",
+          "diagnostics": [],
+          "key": "oracle-I-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-02",
+          "strategy": "generic",
+          "title": "fixture i 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 03",
+        "identityKey": "fixture i 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-03",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-03",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:fed1bc9d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-03",
+          "diagnostics": [],
+          "key": "oracle-I-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-03",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-03",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-03",
+          "strategy": "generic",
+          "title": "fixture i 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 04",
+        "identityKey": "fixture i 04",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-04",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-04",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:45704111",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 04",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-04",
+          "diagnostics": [],
+          "key": "oracle-I-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-04",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-04",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-04",
+          "strategy": "generic",
+          "title": "fixture i 04",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 05",
+        "identityKey": "fixture i 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:a9173991",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-05",
+          "diagnostics": [],
+          "key": "oracle-I-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-05",
+          "strategy": "generic",
+          "title": "fixture i 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 06",
+        "identityKey": "fixture i 06",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-06",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-06",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-06",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:9b18c93d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 06",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-06",
+          "diagnostics": [],
+          "key": "oracle-I-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-06",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-06",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-06",
+          "strategy": "generic",
+          "title": "fixture i 06",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "I-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture i 07",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture i 07",
+        "identityKey": "fixture i 07",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture I-07",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-i-07",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture I-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture I-07",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:c842423d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture i 07",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-i-07",
+          "diagnostics": [],
+          "key": "oracle-I-07",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-i-07",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-i-07",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-i-07",
+          "strategy": "generic",
+          "title": "fixture i 07",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-i-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-i-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 01 season 4",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 01 season 4",
+        "identityKey": "fixture s 01 season 4",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-01 Season 4",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-01-season-4",
+        },
+        "season": 4,
+        "seasonEvidence": {
+          "canonicalSeason": 4,
+          "conflict": false,
+          "titleSeason": 4,
+          "urlSeason": 4,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-01 Season 4",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-01 Season 4",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5328f7f9",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 01 season 4",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-01-season-4",
+          "diagnostics": [],
+          "key": "oracle-S-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-01-season-4",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-01-season-4",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-01-season-4",
+          "strategy": "generic",
+          "title": "fixture s 01 season 4",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 02 4th season",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 02 4th season",
+        "identityKey": "fixture s 02 4th season",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-02 4th Season",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-02-4th-season",
+        },
+        "season": 4,
+        "seasonEvidence": {
+          "canonicalSeason": 4,
+          "conflict": false,
+          "titleSeason": 4,
+          "urlSeason": 4,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-02 4th Season",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-02 4th Season",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:190cb211",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 02 4th season",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-02-4th-season",
+          "diagnostics": [],
+          "key": "oracle-S-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-02-4th-season",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-02-4th-season",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-02-4th-season",
+          "strategy": "generic",
+          "title": "fixture s 02 4th season",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 03",
+        "identityKey": "fixture s 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-03",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-03",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5a51bc21",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-03",
+          "diagnostics": [],
+          "key": "oracle-S-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-03",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-03",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-03",
+          "strategy": "generic",
+          "title": "fixture s 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "season4",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture S-04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "season4",
+        "identityKey": "season4",
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-04",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-04/season4",
+        },
+        "season": 4,
+        "seasonEvidence": {
+          "canonicalSeason": 4,
+          "conflict": false,
+          "urlSeason": 4,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:741c2fc8",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "season4",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-04/season4",
+          "diagnostics": [],
+          "key": "oracle-S-04",
+          "mediaKind": "UNKNOWN",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-04/season4",
+          "proofs": [
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "season4",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "season4",
+          "strategy": "generic",
+          "title": "season4",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 05 season 2",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture S-05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 05 season 2",
+        "identityKey": "fixture s 05 season 2",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-05-season-2",
+        },
+        "season": 2,
+        "seasonEvidence": {
+          "canonicalSeason": 2,
+          "conflict": false,
+          "urlSeason": 2,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:7ef73264",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 05 season 2",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-05-season-2",
+          "diagnostics": [],
+          "key": "oracle-S-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-05-season-2",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-05-season-2",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-05-season-2",
+          "strategy": "generic",
+          "title": "fixture s 05 season 2",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 06 season 3",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture S-06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 06 season 3",
+        "identityKey": "fixture s 06 season 3",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-06",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-06-season-3",
+        },
+        "season": 3,
+        "seasonEvidence": {
+          "canonicalSeason": 3,
+          "conflict": false,
+          "urlSeason": 3,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-06",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:09bd4125",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 06 season 3",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-06-season-3",
+          "diagnostics": [],
+          "key": "oracle-S-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-06-season-3",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-06-season-3",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-06-season-3",
+          "strategy": "generic",
+          "title": "fixture s 06 season 3",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "S-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture s 07 saison 2",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture s 07 saison 2",
+        "identityKey": "fixture s 07 saison 2",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture S-07 Saison 2",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-s-07-saison-2",
+        },
+        "season": 2,
+        "seasonEvidence": {
+          "canonicalSeason": 2,
+          "conflict": false,
+          "titleSeason": 2,
+          "urlSeason": 2,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture S-07 Saison 2",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture S-07 Saison 2",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:c9810a71",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture s 07 saison 2",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-s-07-saison-2",
+          "diagnostics": [],
+          "key": "oracle-S-07",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-s-07-saison-2",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-s-07-saison-2",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-s-07-saison-2",
+          "strategy": "generic",
+          "title": "fixture s 07 saison 2",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-s-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-s-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 01",
+        "identityKey": "fixture r 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 12,
+              "proof": "explicit-marker",
+              "quality": 5,
+              "raw": "12",
+              "value": 12,
+            },
+            {
+              "kind": "chapter",
+              "position": 24,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "explicit-marker",
+          "raw": "12",
+          "rejections": [
+            "EXPLICIT_EVIDENCE_PRESENT",
+          ],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture R-01 Chapter 12",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-01-chapter-12",
+        },
+        "seasonEvidence": {
+          "bareTrailingNumber": 12,
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-01 Chapter 12",
+            "excluded": true,
+            "kind": "progression",
+            "raw": "Fixture R-01 Chapter 12",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:6d976113",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-01",
+          "diagnostics": [],
+          "key": "oracle-R-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-01-chapter-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_SUFFIX",
+          ],
+          "rawSlug": "fixture-r-01-chapter-12",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_SLUG_SUFFIX",
+            "raw": "chapter-12",
+            "value": 12,
+          },
+          "releaseSuffix": "chapter-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-01",
+          "strategy": "generic",
+          "title": "fixture r 01",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_progression",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture R-02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 02 episode 12 5",
+        "identityKey": "fixture r 02 episode 12 5",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "episode",
+              "position": 12,
+              "proof": "explicit-marker",
+              "quality": 5,
+              "raw": "12,5",
+              "value": 12.5,
+            },
+          ],
+          "kind": "episode",
+          "proof": "explicit-marker",
+          "raw": "12,5",
+          "rejections": [],
+          "value": 12.5,
+        },
+        "raw": {
+          "title": "Fixture R-02 épisode 12,5",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-02-episode-12-5",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-02 épisode 12,5",
+            "excluded": true,
+            "kind": "progression",
+            "raw": "Fixture R-02 épisode 12,5",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5af47bee",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 02 episode 12 5",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-02-episode-12-5",
+          "diagnostics": [],
+          "key": "oracle-R-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-02-episode-12-5",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-02-episode-12-5",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-02-episode-12-5",
+          "strategy": "generic",
+          "title": "fixture r 02 episode 12 5",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_progression",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 03",
+        "identityKey": "fixture r 03",
+        "mediaKind": "MANGA",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 13,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12.5",
+              "value": 12.5,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "labelled-url-path",
+          "raw": "chapter-12.5",
+          "rejections": [],
+          "value": 12.5,
+        },
+        "raw": {
+          "title": "Fixture R-03",
+          "url": "https://fixtures.tobirink.invalid/manga/fixture-r-03/chapter-12.5",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:176cfdde",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/manga/fixture-r-03",
+          "diagnostics": [],
+          "key": "oracle-R-03",
+          "mediaKind": "MANGA",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/manga/fixture-r-03/chapter-12.5",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_PATH",
+          ],
+          "rawSlug": "fixture-r-03",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_PATH",
+            "raw": "chapter-12.5",
+            "value": 12.5,
+          },
+          "releaseSuffix": "chapter-12.5",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-03",
+          "strategy": "generic",
+          "title": "fixture r 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture R-04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 04 chapter 20",
+        "identityKey": "fixture r 04 chapter 20",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 12,
+              "proof": "explicit-marker",
+              "quality": 5,
+              "raw": "20",
+              "value": 20,
+            },
+            {
+              "kind": "chapter",
+              "position": 23,
+              "proof": "explicit-marker",
+              "quality": 5,
+              "raw": "12",
+              "value": 12,
+            },
+            {
+              "kind": "chapter",
+              "position": 35,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "chapter-12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "explicit-marker",
+          "raw": "12",
+          "rejections": [
+            "EARLIER_SAME_QUALITY_EVIDENCE",
+            "EXPLICIT_EVIDENCE_PRESENT",
+          ],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture R-04 Chapter 20 Chapter 12",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-04-chapter-20-chapter-12",
+        },
+        "seasonEvidence": {
+          "bareTrailingNumber": 12,
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-04 Chapter 20 Chapter 12",
+            "excluded": true,
+            "kind": "progression",
+            "raw": "Fixture R-04 Chapter 20 Chapter 12",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:c3072661",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 04 chapter 20",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-04-chapter-20",
+          "diagnostics": [],
+          "key": "oracle-R-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-04-chapter-20-chapter-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_SUFFIX",
+          ],
+          "rawSlug": "fixture-r-04-chapter-20-chapter-12",
+          "release": {
+            "kind": "chapter",
+            "provenance": "URL_SLUG_SUFFIX",
+            "raw": "chapter-12",
+            "value": 12,
+          },
+          "releaseSuffix": "chapter-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-04-chapter-20",
+          "strategy": "generic",
+          "title": "fixture r 04 chapter 20",
+        },
+        "status": "parsed",
+        "transformations": [
+          "excluded_progression",
+          "excluded_progression",
+        ],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 05",
+        "identityKey": "fixture r 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:86311d29",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-05",
+          "diagnostics": [],
+          "key": "oracle-R-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-05",
+          "strategy": "generic",
+          "title": "fixture r 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 06 2024",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 06 2024",
+        "identityKey": "fixture r 06 2024",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-06 2024",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-06-2024",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-06 2024",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-06 2024",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:29f36b2a",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 06 2024",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-06-2024",
+          "diagnostics": [],
+          "key": "oracle-R-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-06-2024",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-06-2024",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-06-2024",
+          "strategy": "generic",
+          "title": "fixture r 06 2024",
+        },
+        "status": "parsed",
+        "transformations": [],
+        "year": 2024,
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-07",
+          "url": "https://fixtures.tobirink.invalid/manga/12345/12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-07",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:87a4e0f3",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "URL_IDENTITY_UNRESOLVED",
+          "key": "oracle-R-07",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-08",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-08",
+          "url": "https://fixtures.tobirink.invalid/manga/fixture-r-08/12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-08",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-08",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5b020ec8",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "URL_IDENTITY_UNRESOLVED",
+          "key": "oracle-R-08",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-08",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-08",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-09",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 09",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 09",
+        "identityKey": "fixture r 09",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-09",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-09",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-09",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-09",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:44c30f29",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 09",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-09",
+          "diagnostics": [],
+          "key": "oracle-R-09",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-09",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-09",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-09",
+          "strategy": "generic",
+          "title": "fixture r 09",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-09",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-09",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-10",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "area 51",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "area 51",
+        "identityKey": "area 51",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Area 51",
+          "url": "https://fixtures.tobirink.invalid/anime/area-51",
+        },
+        "seasonEvidence": {
+          "bareTrailingNumber": 51,
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Area 51",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Area 51",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:a6c64683",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "area 51",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/area-51",
+          "diagnostics": [],
+          "key": "oracle-R-10",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/area-51",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "area-51",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "area-51",
+          "strategy": "generic",
+          "title": "area 51",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-10",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-10",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-11",
+    "snapshot": {
+      "artifact": {
+        "aliases": [],
+        "contractVersion": 2,
+        "diagnostics": [
+          "URL_IDENTITY_MISSING",
+        ],
+        "mediaKind": "UNKNOWN",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-11",
+          "url": "https://fixtures.tobirink.invalid/manga/12345/12",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-11",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-11",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:91046a66",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [],
+          "diagnostics": [],
+          "disposition": "URL_IDENTITY_UNRESOLVED",
+          "key": "oracle-R-11",
+          "mediaKind": "UNKNOWN",
+          "proofs": [],
+          "sourceAdapter": "generic-url",
+          "strategy": "generic",
+        },
+        "status": "identity-missing",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-11",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-11",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-12",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture 2nd",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture 2nd",
+        "identityKey": "fixture 2nd",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture 2nd",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-2nd",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture 2nd",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture 2nd",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:b42b6629",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture 2nd",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-2nd",
+          "diagnostics": [],
+          "key": "oracle-R-12",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-2nd",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-2nd",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-2nd",
+          "strategy": "generic",
+          "title": "fixture 2nd",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-12",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-12",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-13",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 13 season 2",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 13 season 2",
+        "identityKey": "fixture r 13 season 2",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture R-13 Season 2",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-13-season-2",
+        },
+        "season": 2,
+        "seasonEvidence": {
+          "canonicalSeason": 2,
+          "conflict": false,
+          "titleSeason": 2,
+          "urlSeason": 2,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-13 Season 2",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-13 Season 2",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:efbcc831",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 13 season 2",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-13-season-2",
+          "diagnostics": [],
+          "key": "oracle-R-13",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-13-season-2",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-13-season-2",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-13-season-2",
+          "strategy": "generic",
+          "title": "fixture r 13 season 2",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-13",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-13",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "R-14",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 14 season 3",
+          },
+          {
+            "provenance": "aligned-bookmark-segment",
+            "value": "Fixture R-14",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 14 season 3",
+        "identityKey": "fixture r 14 season 3",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "episode",
+              "position": 13,
+              "proof": "labelled-url-path",
+              "quality": 4,
+              "raw": "episode-12",
+              "value": 12,
+            },
+          ],
+          "kind": "episode",
+          "proof": "labelled-url-path",
+          "raw": "episode-12",
+          "rejections": [],
+          "value": 12,
+        },
+        "raw": {
+          "title": "Fixture R-14",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-r-14-season-3/episode-12",
+        },
+        "season": 3,
+        "seasonEvidence": {
+          "canonicalSeason": 3,
+          "conflict": false,
+          "urlSeason": 3,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture R-14",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture R-14",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:a668d4d3",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 14 season 3",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-r-14-season-3",
+          "diagnostics": [],
+          "key": "oracle-R-14",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-r-14-season-3/episode-12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+            "RELEASE_PATH",
+          ],
+          "rawSlug": "fixture-r-14-season-3",
+          "release": {
+            "kind": "episode",
+            "provenance": "URL_PATH",
+            "raw": "episode-12",
+            "value": 12,
+          },
+          "releaseSuffix": "episode-12",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-r-14-season-3",
+          "strategy": "generic",
+          "title": "fixture r 14 season 3",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-r-14",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-r-14",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 01",
+        "identityKey": "fixture q 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:5a141c79",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-01",
+          "diagnostics": [],
+          "key": "oracle-Q-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-01",
+          "strategy": "generic",
+          "title": "fixture q 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 02",
+        "identityKey": "fixture q 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:80fdd20d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-02",
+          "diagnostics": [],
+          "key": "oracle-Q-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-02",
+          "strategy": "generic",
+          "title": "fixture q 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 03",
+        "identityKey": "fixture q 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-03",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-03",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:6db869bd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-03",
+          "diagnostics": [],
+          "key": "oracle-Q-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-03",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-03",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-03",
+          "strategy": "generic",
+          "title": "fixture q 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 04",
+        "identityKey": "fixture q 04",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-04",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-04",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:3a8ddb81",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 04",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-04",
+          "diagnostics": [],
+          "key": "oracle-Q-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-04",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-04",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-04",
+          "strategy": "generic",
+          "title": "fixture q 04",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 05",
+        "identityKey": "fixture q 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:47cba1c1",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-05",
+          "diagnostics": [],
+          "key": "oracle-Q-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-05",
+          "strategy": "generic",
+          "title": "fixture q 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-06",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 06",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 06",
+        "identityKey": "fixture q 06",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-06",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-06",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-06",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-06",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:0480eead",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 06",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-06",
+          "diagnostics": [],
+          "key": "oracle-Q-06",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-06",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-06",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-06",
+          "strategy": "generic",
+          "title": "fixture q 06",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-06",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-06",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-07",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 07",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 07",
+        "identityKey": "fixture q 07",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-07",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-07",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-07",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-07",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:d05d45cd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 07",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-07",
+          "diagnostics": [],
+          "key": "oracle-Q-07",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-07",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-07",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-07",
+          "strategy": "generic",
+          "title": "fixture q 07",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-07",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-07",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "Q-08",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture q 08",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture q 08",
+        "identityKey": "fixture q 08",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture Q-08",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-q-08",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture Q-08",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture Q-08",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:26586ce9",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture q 08",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-q-08",
+          "diagnostics": [],
+          "key": "oracle-Q-08",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-q-08",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-q-08",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-q-08",
+          "strategy": "generic",
+          "title": "fixture q 08",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-q-08",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-q-08",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "B-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture b 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture b 01",
+        "identityKey": "fixture b 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture B-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-b-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture B-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture B-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:173b94d9",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture b 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-b-01",
+          "diagnostics": [],
+          "key": "oracle-B-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-b-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-b-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-b-01",
+          "strategy": "generic",
+          "title": "fixture b 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-b-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-b-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "B-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture b 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture b 02",
+        "identityKey": "fixture b 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture B-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-b-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture B-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture B-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:4b692709",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture b 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-b-02",
+          "diagnostics": [],
+          "key": "oracle-B-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-b-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-b-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-b-02",
+          "strategy": "generic",
+          "title": "fixture b 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-b-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-b-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "B-03",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture b 03",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture b 03",
+        "identityKey": "fixture b 03",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture B-03",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-b-03",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture B-03",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture B-03",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:409ad809",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture b 03",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-b-03",
+          "diagnostics": [],
+          "key": "oracle-B-03",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-b-03",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-b-03",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-b-03",
+          "strategy": "generic",
+          "title": "fixture b 03",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-b-03",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-b-03",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "B-04",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture b 04",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture b 04",
+        "identityKey": "fixture b 04",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture B-04",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-b-04",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture B-04",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture B-04",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:ee0547f1",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture b 04",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-b-04",
+          "diagnostics": [],
+          "key": "oracle-B-04",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-b-04",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-b-04",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-b-04",
+          "strategy": "generic",
+          "title": "fixture b 04",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-b-04",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-b-04",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "B-05",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture b 05",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture b 05",
+        "identityKey": "fixture b 05",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture B-05",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-b-05",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture B-05",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture B-05",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:014d4a89",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture b 05",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-b-05",
+          "diagnostics": [],
+          "key": "oracle-B-05",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-b-05",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-b-05",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-b-05",
+          "strategy": "generic",
+          "title": "fixture b 05",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-b-05",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-b-05",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "O-01",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture o 01",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture o 01",
+        "identityKey": "fixture o 01",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture O-01",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-o-01",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture O-01",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture O-01",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:08f725cd",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture o 01",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-o-01",
+          "diagnostics": [],
+          "key": "oracle-O-01",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-o-01",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-o-01",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-o-01",
+          "strategy": "generic",
+          "title": "fixture o 01",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-o-01",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-o-01",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+  {
+    "caseId": "O-02",
+    "snapshot": {
+      "artifact": {
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture o 02",
+          },
+        ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture o 02",
+        "identityKey": "fixture o 02",
+        "mediaKind": "ANIME",
+        "parserVersion": "favorite-parser-v2.1",
+        "raw": {
+          "title": "Fixture O-02",
+          "url": "https://fixtures.tobirink.invalid/anime/fixture-o-02",
+        },
+        "seasonEvidence": {
+          "conflict": false,
+        },
+        "segments": [
+          {
+            "cleaned": "Fixture O-02",
+            "excluded": false,
+            "kind": "human",
+            "raw": "Fixture O-02",
+          },
+        ],
+        "semanticFingerprint": "fnv1a32:c099817d",
+        "sourceAdapterVersion": "source-adapter-v1",
+        "sourceEvidence": {
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture o 02",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/anime/fixture-o-02",
+          "diagnostics": [],
+          "key": "oracle-O-02",
+          "mediaKind": "ANIME",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/anime/fixture-o-02",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-o-02",
+          "sourceAdapter": "generic-url",
+          "stableSlug": "fixture-o-02",
+          "strategy": "generic",
+          "title": "fixture o 02",
+        },
+        "status": "parsed",
+        "transformations": [],
+      },
+      "decision": {
+        "candidateReferences": [
+          {
+            "externalId": "candidate-o-02",
+            "provider": "anilist",
+          },
+        ],
+        "kind": "MATCH",
+        "level": "ordered-exact",
+        "matchedReference": {
+          "externalId": "candidate-o-02",
+          "provider": "anilist",
+        },
+        "reasons": [
+          "unique-candidate-at-level",
+        ],
+      },
+      "projection": {
+        "reviewStatus": "resolved",
+      },
+    },
+  },
+]
+`;
