@@ -1,5 +1,6 @@
 export { normalizeBookmarks } from './bookmarks/normalize-bookmarks';
 export { anilistSourceAdapter } from './favorites/anilist-source-adapter';
+export { mangaUpdatesSourceAdapter } from './favorites/mangaupdates-source-adapter';
 export { WebExtensionBookmarkImportAdapter } from './bookmarks/web-extension-bookmark-adapter';
 export type { WebExtensionBookmarkNode } from './bookmarks/web-extension-bookmark-adapter';
 export * from './bookmarks/web-extension-organizer-adapter';

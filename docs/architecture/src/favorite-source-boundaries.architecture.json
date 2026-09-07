@@ -18,6 +18,12 @@
         "label": "Chemin AniList",
         "focus": ["favoriteObservation", "eligibility", "sourceRegistry", "anilistAdapter", "sourceContract"],
         "note": "Seules les origines exactes déclarées peuvent produire un identifiant public AniList."
+      },
+      {
+        "id": "mangaupdates-path",
+        "label": "Chemin MangaUpdates",
+        "focus": ["favoriteObservation", "eligibility", "sourceRegistry", "mangaUpdatesAdapter", "sourceContract"],
+        "note": "Seule une route /series/{id} sur une origine exacte peut produire un identifiant MangaUpdates."
       }
     ]
   },
@@ -27,19 +33,22 @@
     { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "conflit fail-closed" },
     { "id": "genericEvidence", "type": "backend", "label": "Preuve générique", "sublabel": "structure de route", "pos": [710, 120], "size": [160, 68], "tag": "type UNKNOWN permis" },
     { "id": "anilistAdapter", "type": "backend", "label": "Adaptateur AniList", "sublabel": "packages/adapters-browser", "pos": [710, 420], "size": [160, 68], "tag": "origine exacte" },
+    { "id": "mangaUpdatesAdapter", "type": "backend", "label": "Adaptateur MangaUpdates", "sublabel": "packages/adapters-browser", "pos": [710, 520], "size": [160, 68], "tag": "/series/{id}" },
     { "id": "sourceContract", "type": "security", "label": "SourceEvidence", "sublabel": "packages/domain", "pos": [930, 270], "size": [140, 68], "tag": "immuable" }
   ],
   "boundaries": [
     { "kind": "region", "label": "Cœur pur", "wraps": ["eligibility", "sourceRegistry", "genericEvidence", "sourceContract"], "pad": 22 },
-    { "kind": "region", "label": "Adaptateurs navigateur", "wraps": ["anilistAdapter"], "pad": 18 }
+    { "kind": "region", "label": "Adaptateurs navigateur", "wraps": ["anilistAdapter", "mangaUpdatesAdapter"], "pad": 18 }
   ],
   "connections": [
     { "id": "observationQualification", "from": "favoriteObservation", "to": "eligibility", "label": "qualifie sans réécrire", "variant": "security", "labelAt": [220, 352] },
     { "id": "qualificationRegistry", "from": "eligibility", "to": "sourceRegistry", "label": "URL admissible", "variant": "emphasis", "labelAt": [445, 352] },
     { "id": "registryGeneric", "from": "sourceRegistry", "to": "genericEvidence", "label": "aucune origine exacte", "variant": "dashed" },
-    { "id": "registryAniList", "from": "sourceRegistry", "to": "anilistAdapter", "label": "origine exacte", "variant": "security" },
+    { "id": "registryAniList", "from": "sourceRegistry", "to": "anilistAdapter", "label": "route AniList", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[650, 304], [650, 454]], "labelAt": [610, 380] },
+    { "id": "registryMangaUpdates", "from": "sourceRegistry", "to": "mangaUpdatesAdapter", "label": "route MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[680, 304], [680, 554]], "labelAt": [645, 520] },
     { "id": "genericContract", "from": "genericEvidence", "to": "sourceContract", "label": "preuves de route" },
-    { "id": "anilistContract", "from": "anilistAdapter", "to": "sourceContract", "label": "ID public exact", "variant": "security" }
+    { "id": "anilistContract", "from": "anilistAdapter", "to": "sourceContract", "label": "ID AniList", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[880, 454], [880, 304]], "labelAt": [870, 380] },
+    { "id": "mangaUpdatesContract", "from": "mangaUpdatesAdapter", "to": "sourceContract", "label": "ID MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[920, 554], [920, 304]], "labelAt": [955, 520] }
   ],
   "cards": [
     { "dot": "emerald", "title": "Autorité", "items": ["Le favori reste une observation", "SourceEvidence ne devient jamais un identifiant de Work"] },

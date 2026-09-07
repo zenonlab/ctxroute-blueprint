@@ -41,7 +41,7 @@
     { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "générique + AniList" },
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "T · I · S · R modulaires" },
     { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "même IndexedDB" },
-    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "cadence indexée" },
+    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "ports search/hydrate" },
     { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "6 niveaux · F/C exacts" },
     { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "décision humaine" },
     { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "seule autorité" }

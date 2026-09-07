@@ -16,7 +16,7 @@ export interface FavoriteSourceAdapter {
 }
 
 const categoryKinds: Readonly<Record<string, FavoriteMediaKind>> = Object.freeze({
-  anime: 'ANIME', comic: 'MANGA', manga: 'MANGA', manhua: 'MANGA', manhwa: 'MANGA', scan: 'MANGA', webtoon: 'MANGA',
+  anime: 'ANIME', comic: 'MANGA', manga: 'MANGA', manhua: 'MANHUA', manhwa: 'MANHWA', scan: 'MANGA', webtoon: 'MANHWA',
 });
 const routeCategorySegments = new Set([...Object.keys(categoryKinds), 'read', 'series', 'title']);
 const structuralSegments = new Set([

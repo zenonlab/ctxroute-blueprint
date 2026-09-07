@@ -58,6 +58,14 @@ describe('favorite source evidence U-01…U-10', () => {
   });
 
   it.each([
+    ['manhwa', 'MANHWA'],
+    ['webtoon', 'MANHWA'],
+    ['manhua', 'MANHUA'],
+  ] as const)('preserves the exact illustrated-work kind for %s routes', (segment, mediaKind) => {
+    expect(extractFavoriteSourceEvidence(input('kind', `https://fixtures.tobirink.invalid/${segment}/fixture`))).toMatchObject({ mediaKind });
+  });
+
+  it.each([
     ['https://fixtures.tobirink.invalid/', 'ROOT_PAGE'],
     ['https://fixtures.tobirink.invalid/catalogue/', 'UTILITY_PAGE'],
     ['https://fixtures.tobirink.invalid/index.html', 'UTILITY_PAGE'],

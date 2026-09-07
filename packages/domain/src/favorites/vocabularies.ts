@@ -1,4 +1,4 @@
-export type FavoriteMediaKind = 'ANIME' | 'MANGA' | 'UNKNOWN';
+export type FavoriteMediaKind = 'ANIME' | 'MANGA' | 'MANHUA' | 'MANHWA' | 'UNKNOWN';
 export type FavoritePresence = 'observed' | 'detached';
 export type FavoriteProvider = 'anilist' | 'mangaupdates' | 'mangadex';
 export type FavoriteMatchMethod = 'bounded-edit-distance' | 'explicit-season' | 'ordered-exact' | 'reordered-significant-words' | 'source-id' | 'source-url';

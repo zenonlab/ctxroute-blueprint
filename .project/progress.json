@@ -1715,6 +1715,40 @@
             "six ordered levels + F/C cases",
             "typecheck, Sensor SAFE, validate, Archify 9/9"
           ]
+        },
+        {
+          "id": "step-26",
+          "title": "Composer les frontières fournisseur locales",
+          "status": "DONE",
+          "acceptance": [
+            "MangaUpdates extrait uniquement /series/{id} exact et le routage respecte ANIME/MANGA/MANHWA/MANHUA/UNKNOWN.",
+            "Les ports de recherche et hydratation sont bornés, distincts et testables sans réseau; AniList reste compatible."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-browser/src/index.ts",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "npm run archify:validate -- favorite-source-boundaries.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "application 161/161; browser adapters 22/22",
+            "MangaUpdates exact route + five-kind routing",
+            "all-workspace typecheck, Sensor SAFE, validate, Archify showcase"
+          ]
         }
       ]
     },

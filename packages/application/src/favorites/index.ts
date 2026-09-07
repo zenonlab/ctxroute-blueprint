@@ -4,6 +4,7 @@ export * from './eligibility';
 export * from './favorite-parser';
 export * from './progression-extraction';
 export * from './provider-matcher';
+export * from './provider-ports';
 export * from './season-extraction';
 export * from './source-evidence';
 export * from './title-segmentation';

@@ -75,6 +75,9 @@ complet ou tronqué. Un ensemble incomplet ne peut jamais produire une
 correspondance automatique, même si un seul candidat visible correspond. Les
 lanes AniList et MangaUpdates appliquent séparément leurs cadences; l’ordre de
 leurs réponses ne modifie pas le résultat du matcher.
+Les recherches de candidats et l’hydratation par identifiant utilisent deux
+ports applicatifs distincts. Le routage pur réserve AniList à l’anime,
+MangaUpdates aux mangas, manhwa et manhua, et dédouble seulement le type inconnu.
 
 Maintenir ADR-0025 : IndexedDB est la seule autorité privée. Les favoris sont
 des commandes d’import et leur suppression ne supprime pas une œuvre ou une

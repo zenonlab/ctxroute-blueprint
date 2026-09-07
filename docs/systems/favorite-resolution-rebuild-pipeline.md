@@ -226,6 +226,10 @@ AniList couvre l’anime et MangaUpdates les formats manga retenus par le contra
 La décision fournisseur pure exécute désormais les six niveaux documentés,
 après les gardes symétriques de nature, OVA, pré-sérialisation et taxonomie
 exacte. Elle n'observe ni popularité, ni rang, ni ordre de réponse.
+Les ports `FavoriteProviderCandidatePort` et `FavoriteProviderHydrationPort`
+séparent désormais la recherche bornée de l’hydratation par référence exacte.
+Leur politique versionne 20 candidats, 8 secondes de timeout, les intervalles
+de 2 200/3 000 ms et les TTL 24 h/15 min sans effectuer de réseau elle-même.
 Un adaptateur legacy, par exemple MangaDex, reste hors du chemin principal et
 ne devient actif qu’après une décision dédiée.
 
