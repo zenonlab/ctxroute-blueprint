@@ -5,6 +5,11 @@ ci-dessous préparent la prochaine session ; ils ne sont pas encore automatisés
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces
 scénarios à E2–E6. E1 fixe le banc et les seuils avant expérimentation ; E2 mesure
 le wallpaper seul avant ajout du terminal personnalisé ou de l'ingestion IA.
+Les [contrats et tests de remplacement](architecture/module-contracts.md)
+ajoutent R01–R08 : cœur sans moteur, surfaces remplaçables, scène représentative,
+relations synthétiques, caches reconstruisibles, versions/actions refusées,
+sessions indépendantes et flux bornés. E1 examine les contraintes terminal/import ;
+E2 les sonde avec des doubles sans construire les fonctions complètes.
 
 ## Vérification du socle
 

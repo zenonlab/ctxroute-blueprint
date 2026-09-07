@@ -6,6 +6,9 @@ référence unique pour l'ordre d'exécution ; les anciens ordres de discussion 
 la roadmap de recherche sont historiques, sans engagement de calendrier.
 Voir [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md) et le
 [workflow produit](architecture/src/product-roadmap.workflow.json).
+La review de modularité est précisée par [ADR-0037](decisions/ADR-0037-replaceable-module-contracts.md)
+et les [contrats C0–C6](architecture/module-contracts.md) : préserver les données
+et tester le remplacement des modules, sans promettre une migration gratuite.
 
 ## Règles de progression
 
@@ -25,7 +28,7 @@ Les vérifications ordinaires ne créent pas de pauses conversationnelles.
 | Étape | Entrée / dépendance | Travail et livrable borné | Critère de sortie |
 | --- | --- | --- | --- |
 | E1 — Banc et décisions initiales | Cadrage et matrice OS existants | Identifier premier OS/build, CPU/GPU/pilote, écran, accès aux autres machines ; thème synthétique statique et animé ; protocole, budgets et candidats versionnés. Renseigner les décisions initiales obligatoires du brief. | Fiche de banc reproductible, seuils et conditions de mesure fixés avant comparaison, licences examinées, stack expérimentale et limites de sécurité documentées. Aucun code produit avant la clôture des prérequis d'initialisation. |
-| E2 — Wallpaper natif et énergie | E1 et initialisation vérifiée | Surface synthétique sous le bureau, pause/reprise, destruction/recréation et un clic autorisé si possible. Aucun terminal custom, ROM, IA, physique ou audio nécessaire. | Ancrage, focus/icônes et états statique/animé/masqué testés ; budget tenu sur la machine de référence ; capacités absentes signalées. Preuve native minimale sur les environnements de la première livraison avant adoption durable du moteur. |
+| E2 — Wallpaper natif et énergie | E1 et initialisation vérifiée | Petite scène originale avec image 2D, objet 3D animé, transparence, clic et variante visuelle ; surface en fenêtre puis sous le bureau, pause/reprise et recréation. Aucun terminal custom, ROM, IA, physique ou audio nécessaire. | Ancrage, focus/icônes et états statique/animé/masqué testés ; budget tenu ; R01–R04 réussis, capacités absentes signalées. Preuve native minimale sur les environnements de la première livraison avant adoption durable du moteur ; pas d'adoption sur un triangle seul. |
 | E3 — Package de thème et sécurité | E2 réussi | Contrat versionné, création par code, installation/activation, références et cache séparés ; actions typées et permissions. Deux thèmes originaux distincts, dont un 2D, sans exceptions par jeu dans le cœur. | Changement de thème, référence manquante et import malveillant testés ; aucune commande implicite, aucun parcours de chemin hors périmètre ; export sans données privées ; budget E2 recontrôlé. |
 | E4 — Terminal et sessions | E3 réussi | Réutiliser terminal/PTY, ajouter portraits et associations ; définir fermeture, reprise et paramètres sauvegardés. Vérifier terminal seul, wallpaper seul et ensemble. | Deux sessions stables lors d'un changement/arrêt du décor ; TUI, Unicode/IME, resize et backpressure corrects ; actions explicitement autorisées ; surcoût terminal et IPC mesuré séparément. |
 | E5 — Qualification et distribution | E4 réussi | Installation, désinstallation, versions/migrations, politique de mise à jour et reprise après échec ; licences et diagnostics locaux. Rejouer le banc complet par configuration OS annoncée. | Parcours d'installation et trois modes réussis, limites publiées, régressions énergie/sécurité absentes sur le périmètre retenu. Une plateforme non testée reste non testée. Premier thème original livrable sans convertisseur. |
@@ -36,6 +39,10 @@ extension indépendante de l'affichage, pas une condition pour publier des thèm
 originaux. Une preuve isolée réussie à E2 n'est pas encore ce produit complet.
 L'étude documentaire d'un lecteur reste possible en amont ; son implémentation
 et l'automatisation IA ne prennent pas la priorité sur les preuves énergétiques.
+E1 examine néanmoins les contraintes des futurs terminal et import sur les
+contrats communs. E2 utilise doubles et relations synthétiques scène/minimap/portrait
+pour les éprouver avant leur stabilisation en E3. Cela n'avance ni le terminal
+complet ni l'ingestion IA ; le package public reste à spécifier après le prototype.
 
 ## Décisions à fermer au bon moment
 
@@ -68,7 +75,7 @@ Chaque option rejetée a un motif concret. Les fixtures publiques restent
 originales/synthétiques ; les preuves contenant des ressources de jeu restent
 locales. La [stratégie qualité](02-quality-strategy.md) détaille les scénarios.
 
-- E2 : P02, P06–P07, P10–P11, plus les essais de la matrice OS.
+- E2 : P02, P06–P07, P10–P11, plus les essais de la matrice OS et R01–R04.
 - E3 : P08–P09, P12–P14, P17–P19, P22–P23, P28 avec fixtures synthétiques.
 - E4 : P01–P07, P20–P21 et E2 rejoué dans les trois modes.
 - E5 : tous les scénarios applicables sans ROM, installation et refus de permissions,
@@ -76,6 +83,8 @@ locales. La [stratégie qualité](02-quality-strategy.md) détaille les scénari
 - E6 : P08–P09, P14–P19, P24–P28, plus la tranche d'extraction choisie.
 
 Un seuil dépassé reste un échec même si les tests fonctionnels passent.
+Les [tests de remplacement R01–R08](architecture/module-contracts.md#tests-de-remplacement)
+complètent ces scénarios aux échéances indiquées ; ils ne sont pas exécutés ici.
 Un module optionnel ajouté après qualification exige de rejouer les mesures
 impactées. Les tests du dépôt actuel prouvent seulement le socle documentaire.
 

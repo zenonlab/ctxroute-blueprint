@@ -3,6 +3,13 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "module-contracts",
+      "kind": "product-contract-design",
+      "format": "markdown",
+      "source": "docs/architecture/module-contracts.md",
+      "requiredSections": ["Règles de dépendance", "Catalogue des contrats", "Identités, versions et migration", "Tests de remplacement"]
+    },
+    {
       "id": "product-roadmap",
       "kind": "workflow-ir",
       "audience": "product",

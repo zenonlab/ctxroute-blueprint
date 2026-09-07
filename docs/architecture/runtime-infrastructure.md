@@ -21,6 +21,11 @@ desktop ni un moteur de scènes complet. Aucun gain énergétique n'est encore m
 
 ## Découpage des responsabilités
 
+Les [contrats C0–C6](module-contracts.md) précisent propriétaires, données,
+erreurs, versions et tests de remplacement. C1–C5 sont nommés sur le schéma.
+La séparation reste à démontrer par le code ; surface et moteur peuvent avoir
+une intégration privée commune, sans faire fuiter leurs types dans les thèmes.
+
 | Module | Possède | Ne doit pas posséder |
 | --- | --- | --- |
 | Convertisseur local | Identification, lecteurs, extraction, normalisation, validation et provenance | Sessions terminal, hooks desktop, rendu permanent |
@@ -258,7 +263,7 @@ La politique de conservation locale reste à confirmer selon ADR-0032.
 | --- | --- |
 | Terminal | Shell + TUI + Unicode/IME, clavier, sélection, resize et forte sortie sans blocage ; deux sessions stables pendant changement de thème. |
 | Surface native | Scène synthétique ancrée sans vol de focus ; occlusion et multi-écrans testés sur chaque environnement annoncé. |
-| Moteur | Comparer Godot aux exigences sur une même scène 2D puis 3D, sans implémenter un second moteur complet. |
+| Moteur | Éprouver le candidat sur image 2D, objet 3D animé, transparence et interaction ; comparer aux alternatives existantes sans implémenter deux moteurs complets. |
 | Énergie | Mesurer mémoire, CPU/GPU et énergie en terminal seul, scène seule, intégré, animé et masqué ; inclure coût WebView et IPC. |
 | Import | PoC OoT : géométrie, acteur, collision, audio et placements ; aucune ROM requise pour les premières preuves terminal/surface. |
 | Sécurité | Recette malveillante, accès fichier hors périmètre, commande non autorisée, message surdimensionné, processus scène interrompu. |

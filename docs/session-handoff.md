@@ -5,19 +5,25 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernière review : [ADR-0037](decisions/ADR-0037-replaceable-module-contracts.md) et
+[contrats C0–C6](architecture/module-contracts.md). Propriétaires et échanges
+documentés sans figer les codecs/API. E2 doit éprouver une scène représentative
+et R01–R04, pas seulement un triangle. Contraintes terminal/import examinées dès
+E1 par fixtures/doubles, implémentations complètes toujours en E4/E6.
+
 Ordre de réalisation actuel : [feuille de route E1–E6](03-product-roadmap.md),
 selon [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md). E1 à préparer,
 aucune étape produit exécutée. Cette feuille de route remplace les anciens ordres
 de discussion ci-dessous, qui restent historiques.
 
-Dernière décision : [ADR-0035](decisions/ADR-0035-platform-capabilities-and-energy.md),
+Décision de compatibilité : [ADR-0035](decisions/ADR-0035-platform-capabilities-and-energy.md),
 énergie prioritaire et [matrice OS par fonctionnalité](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité).
 Aucun OS certifié. Rust/wgpu/WGSL pour le wallpaper natif devient la recommandation
 à éprouver, terminal Tauri/xterm.js séparé ; aucune dépendance adoptée ou installée.
 Prochaine action : choisir les machines/versions de référence et le premier PoC
 surface native + mesure énergétique, avant de figer la stack.
 
-Décision actuelle : [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
+Décision de périmètre : [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
 Nous créons des packages de thèmes pour wallpapers et terminaux custom.
 Nos créations et notre logique restent séparées de la bibliothèque locale du jeu.
 À la demande, l'IA recherche les dépôts publics utiles, inspecte et prépare une
@@ -99,6 +105,21 @@ les six définitions locales dans `/hooks` si Codex le demande, conformément
 au [guide amont conservé](../README.md). Aucune configuration globale modifiée.
 
 ## Vérification finale
+
+Étape contrats : source runtime C1–C5 et document C0–C6 alignés ; huit tests de
+remplacement R01–R08 spécifiés, aucun exécuté en produit. Schéma architecture
+Archify livré, 9 contrôles showcase réussis, 0 erreur/avertissement. Contenance
+réussie aux quatre tailles desktop ; capture sombre 2048×1320 inspectée par l'agent.
+Reçu automatique `visualReview: pending`, interface fixe en anglais.
+Source SHA-256 `d3b3a6a10781bd3a016ec75f51c26bec3280ad7dd9713f21b13cd1e7d024d6e2`
+(1783 octets), HTML SHA-256
+`eeddaba389fd7bca1c00d502fd586d1444c212baa083a8ec1586b1313134428c`
+(706087 octets), artefact `dist/architecture/runtime-infrastructure.architecture.html`.
+Audit du diff : AGENTS.md, CLAUDE.md, .codex/hooks.json, hooks et configuration
+produit inchangés ; uniquement documentation, registre documentaire et schéma.
+`npm run verify` réussi : 263 tests (262 réussis, 1 ignoré, 0 échec), 3 tests
+d'intégration réussis et audit npm sans vulnérabilité. Ces contrôles valident
+le socle et les documents, pas la remplaçabilité effective des futurs modules.
 
 Étape feuille de route : workflow E1–E6 validé avec Archify, 9 contrôles showcase
 réussis, 0 erreur et 0 avertissement. Contenance vérifiée aux quatre tailles

@@ -15,10 +15,10 @@
     { "id": "desktop", "type": "backend", "label": "Adaptateur de bureau", "sublabel": "Capacités OS et replis explicites", "pos": [1040, 460], "size": [260, 80] }
   ],
   "connections": [
-    { "id": "load", "from": "prepared", "to": "control", "label": "résoudre la sélection" },
-    { "id": "scene-command", "from": "control", "to": "scene", "label": "configurer et recevoir les clics" },
-    { "id": "session-command", "from": "control", "to": "sessions", "label": "actions autorisées et états", "labelAt": [665, 320] },
-    { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "flux terminal et saisie" },
-    { "id": "surface", "from": "scene", "to": "desktop", "label": "ancrage et événements OS", "labelAt": [1170, 320] }
+    { "id": "load", "from": "prepared", "to": "control", "label": "C1 · sélection résolue" },
+    { "id": "scene-command", "from": "control", "to": "scene", "label": "C2 · scène et intentions" },
+    { "id": "session-command", "from": "control", "to": "sessions", "label": "C3 · actions et états", "labelAt": [665, 320] },
+    { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "C4 · flux et saisie" },
+    { "id": "surface", "from": "scene", "to": "desktop", "label": "C5 · surface et capacités", "labelAt": [1170, 320] }
   ]
 }
