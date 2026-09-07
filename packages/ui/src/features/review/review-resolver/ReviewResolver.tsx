@@ -98,7 +98,7 @@ export function ReviewResolver({
       <FeedbackState
         action={<Button disabled={busy} icon="refresh-cw" onClick={onRetry}>Recharger les candidats</Button>}
         className={styles.centeredState}
-        description="La file locale est conservée. Seuls les candidats seront relus."
+        description="La file est conservée. Seuls les candidats seront relus."
         kind="error"
         layout="centered"
         recoverable
@@ -132,7 +132,7 @@ export function ReviewResolver({
 
   return (
     <section aria-busy={busy || undefined} className={styles.resolver}>
-      {state === 'partial' ? <Status tone="accent">Un fournisseur est indisponible · décision locale conservée</Status> : null}
+      {state === 'partial' ? <Status tone="accent">Un fournisseur est indisponible · décision conservée</Status> : null}
       {state === 'offline' ? <Status tone="warning">Hors ligne · hydratation différée après décision</Status> : null}
 
       <section aria-label="Contexte du favori" className={styles.sourceContext}>

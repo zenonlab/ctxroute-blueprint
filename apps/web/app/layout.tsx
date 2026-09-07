@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TobiRink — votre Workbench local',
+  title: 'TobiRink — votre Workbench privé',
   description: 'Bibliothèque, progression et agenda projetés localement par l’extension TobiRink.',
 };
 

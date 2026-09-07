@@ -41,7 +41,7 @@ function AgendaSurface() {
     id: `${entry.workId}_${entry.occursAt}`,
     occursAt: entry.occursAt,
     release: entry.releaseLabel,
-    source: entry.sourceLabel ?? 'Source locale',
+    source: entry.sourceLabel ?? 'Source enregistrée',
     sourceUrl: entry.sourceUrl,
     title: entry.title,
   })) ?? [];

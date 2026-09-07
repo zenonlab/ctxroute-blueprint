@@ -19,7 +19,7 @@ const preview = definePreview({
   presentation: 'page',
   variants: ['overview'],
   states: [...states],
-  fixtures: ['Aperçu borné à quatre œuvres · semaine locale complète'],
+  fixtures: ['Aperçu borné à quatre œuvres · semaine complète'],
   sources: [
     { label: 'API publique', path: 'features/member-overview/index.ts' },
     { label: 'Composition', path: 'features/member-overview/MemberOverview.tsx' },

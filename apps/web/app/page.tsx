@@ -19,7 +19,7 @@ function agendaDays(period: ReturnType<typeof createLocalAgendaPeriod>, agenda?:
     id: `${entry.workId}_${entry.occursAt}`,
     occursAt: entry.occursAt,
     release: entry.releaseLabel,
-    source: entry.sourceLabel ?? 'Source locale',
+    source: entry.sourceLabel ?? 'Source enregistrée',
     sourceUrl: entry.sourceUrl,
     title: entry.title,
   })) ?? [] });
@@ -45,7 +45,7 @@ function HomePrivateOverview() {
   const loading = status === 'loading' || status === 'reconnecting' || status === 'connected' && (!library || !agenda);
   const empty = status === 'extension-missing';
   const days = agendaDays(period, agenda);
-  const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga', progress: item.progressLabel, source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale', title: item.title })) ?? [];
+  const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga', progress: item.progressLabel, source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source enregistrée', title: item.title })) ?? [];
   return <MemberOverview agendaDays={days} agendaHref="/agenda" agendaState={failed ? 'error' : loading ? 'loading' : empty || agenda?.entries.length === 0 ? 'empty' : 'ready'} libraryCount={bootstrap?.libraryCount ?? libraryItems.length} libraryHref="/library" libraryItems={libraryItems} libraryState={failed ? 'error' : loading ? 'loading' : empty || libraryItems.length === 0 ? 'empty' : 'ready'} onRetry={() => setRetryCount((count) => count + 1)} periodLabel={period.label} />;
 }
 

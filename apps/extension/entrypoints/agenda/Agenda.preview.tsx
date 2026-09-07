@@ -9,7 +9,7 @@ import styles from './Agenda.module.css';
 const releases: readonly AgendaRelease[] = [
   { availability: 'official', displayDate: '5 sept.', href: '#frieren-141', id: 'frieren-141', occursAt: '2026-09-05', precision: 'Jour officiel', release: 'Chapitre 141', source: 'Éditeur', title: 'Frieren' },
   { availability: 'confirmed', displayDate: '7 sept.', href: '#apothecary-19', id: 'apothecary-19', occursAt: '2026-09-07T20:00:00+02:00', precision: '20:00 · Europe/Paris', release: 'Épisode 19', source: 'Diffuseur', title: 'Les Carnets de l’apothicaire' },
-  { availability: 'estimated', displayDate: 'vers le 12 sept.', href: '#witch-hat-15', id: 'witch-hat-15', precision: 'Fenêtre estimée', release: 'Chapitre 15', source: 'Historique local', title: 'L’Atelier des sorciers' },
+  { availability: 'estimated', displayDate: 'vers le 12 sept.', href: '#witch-hat-15', id: 'witch-hat-15', precision: 'Fenêtre estimée', release: 'Chapitre 15', source: 'Historique', title: 'L’Atelier des sorciers' },
   { availability: 'unavailable', displayDate: 'Date inconnue', href: '#dandadan-187', id: 'dandadan-187', precision: 'Aucune précision', release: 'Chapitre 187', source: 'Indisponible', title: 'Dandadan' },
 ];
 

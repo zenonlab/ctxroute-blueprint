@@ -96,6 +96,7 @@
         "Agenda aligne ses états vide, chargement et erreur sur le FeedbackState centré de Library",
         "Review aligne aussi ses états vide, chargement et erreur sur la même composition centrée",
         "Le shell membre expose Review vide même sans extension, sans créer de candidat",
+        "Les libellés visibles évitent le qualificatif local et privilégient les noms produit directs",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }

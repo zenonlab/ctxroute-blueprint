@@ -87,7 +87,7 @@ const reviewPreview = definePreview({
   presentation: 'page',
   variants: [...reviewVariants],
   states: [...reviewStates],
-  fixtures: ['2 Reviews locales · 2 fournisseurs · révision protégée'],
+  fixtures: ['2 Reviews enregistrées · 2 fournisseurs · révision protégée'],
   sources: [
     { label: 'API publique', path: 'entrypoints/review/index.ts' },
     { label: 'Contrat', path: 'entrypoints/review/review.contract.ts' },

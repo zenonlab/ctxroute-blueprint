@@ -19,7 +19,7 @@ describe('ReviewResolver', () => {
     expect(component).not.toMatch(/ReviewCandidateCard|ReviewDecisionForm/);
   });
 
-  it('keeps local context navigable without rendering fake decisions', () => {
+  it('keeps stored context navigable without rendering fake decisions', () => {
     expect(component).toMatch(/candidatesDeferred = state === 'partial'/);
     expect(component).toMatch(/Les candidats ne sont pas encore disponibles/);
     expect(component).toMatch(/!candidatesDeferred && manualOpen/);
@@ -31,7 +31,7 @@ describe('ReviewResolver', () => {
     expect(component).toMatch(/icon="inbox"/);
     expect(component).toMatch(/layout="centered"/);
     expect(component).toMatch(/title="Aucune correspondance à vérifier"/);
-    expect(component).not.toMatch(/Aucune Review en attente|Toutes les correspondances ambiguës ont une décision locale/);
+    expect(component).not.toMatch(/Aucune Review en attente|Toutes les correspondances ambiguës ont une décision enregistrée/);
     expect(css).toMatch(/\.empty[\s\S]*min-height: calc\(var\(--size-control-touch\) \* 3\)/);
   });
 

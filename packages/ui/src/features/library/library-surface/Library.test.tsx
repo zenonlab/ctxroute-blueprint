@@ -20,7 +20,7 @@ describe('shared Library surface', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
   });
 
-  it('accepts a real local source without changing the Extension fallback', () => {
+  it('accepts a real stored source without changing the Extension fallback', () => {
     expect(component).toContain('item.href ?? `#work-${item.id}`');
   });
 });

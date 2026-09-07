@@ -39,9 +39,9 @@ export function Settings(props: SettingsProps) {
     return (
       <main aria-labelledby="settings-title" className={styles.settings} data-state={props.state} data-variant={variant} data-view="config">
         <Header />
-        {props.state === 'loading' ? <FeedbackState description="Lecture de l’arbre local." kind="loading" layout="centered" title="Ouverture de l’organisateur…" /> : null}
+        {props.state === 'loading' ? <FeedbackState description="Lecture de l’arbre enregistré." kind="loading" layout="centered" title="Ouverture de l’organisateur…" /> : null}
         {props.state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={props.onRetry}>Réessayer</Button>} description="Les dossiers et favoris restent inchangés." kind="error" layout="centered" recoverable title="Organisateur indisponible" /> : null}
-        {props.state === 'blocked' ? <FeedbackState description="L’extension doit fournir l’arbre local avant toute modification." icon="folder-tree" kind="error" layout="centered" recoverable={false} title="Organisateur non raccordé" /> : null}
+        {props.state === 'blocked' ? <FeedbackState description="L’extension doit fournir l’arbre avant toute modification." icon="folder-tree" kind="error" layout="centered" recoverable={false} title="Organisateur non raccordé" /> : null}
       </main>
     );
   }
@@ -66,8 +66,8 @@ export function Settings(props: SettingsProps) {
         <section aria-labelledby="settings-title" className={styles.settingsPage}>
           <Header onRestore={() => setConfirmRestore(true)} />
           <div className={styles.body}>
-            {props.state === 'partial' ? <Status tone="accent">Aperçu partiel · certaines données locales manquent</Status> : null}
-            {props.state === 'offline' ? <Status tone="warning">Hors ligne · organisation locale disponible</Status> : null}
+            {props.state === 'partial' ? <Status tone="accent">Aperçu partiel · certaines données manquent</Status> : null}
+            {props.state === 'offline' ? <Status tone="warning">Hors ligne · organisation disponible</Status> : null}
             <p className={styles.intro}>Créez vos dossiers dans l’ordre souhaité. Dans chaque niveau, la première règle compatible gagne. Aucun favori ne bouge avant validation de l’aperçu.</p>
             <div aria-label="Arbre des dossiers" className={styles.tree} role="tree">
               <OrganizerFolderEditor
@@ -147,7 +147,7 @@ export function Settings(props: SettingsProps) {
         title="Appliquer ce tri ?"
         variant="alert"
       >
-        <p>Un snapshot local vérifié sera enregistré avant le premier déplacement.</p>
+        <p>Un snapshot vérifié sera enregistré avant le premier déplacement.</p>
       </Dialog> : null}
     </main>
   );

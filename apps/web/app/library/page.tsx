@@ -54,7 +54,7 @@ function LibrarySurface() {
     id: item.workId,
     mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga',
     progress: item.progressLabel,
-    source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale',
+    source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source enregistrée',
     title: item.title,
   })) ?? [];
 

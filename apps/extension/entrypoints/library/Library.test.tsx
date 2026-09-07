@@ -6,7 +6,7 @@ const component = readFileSync(new URL('./Library.tsx', import.meta.url), 'utf8'
 const preview = readFileSync(new URL('./Library.preview.tsx', import.meta.url), 'utf8');
 
 describe('Library', () => {
-  it('publishes the local surface states', () => {
+  it('publishes the stored surface states', () => {
     expect(libraryVariants).toEqual(['library']);
     expect(libraryStates).toEqual(['ready', 'loading', 'empty', 'review', 'partial', 'offline', 'error', 'blocked']);
   });
@@ -16,7 +16,7 @@ describe('Library', () => {
     expect(component).toContain("export type { LibraryProps } from '@tobirink/ui'");
   });
 
-  it('implements local filtering and pagination in the fixture', () => {
+  it('implements stored filtering and pagination in the fixture', () => {
     expect(preview).toMatch(/useMemo/);
     expect(preview).toMatch(/setLimit\(\(current\) => current \+ 2\)/);
     expect(preview).toMatch(/setFilters/);

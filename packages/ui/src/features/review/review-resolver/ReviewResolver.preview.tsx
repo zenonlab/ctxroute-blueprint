@@ -56,7 +56,7 @@ const reviewResolverPreview = definePreview({
   purpose: 'Résoudre un favori ambigu sans transformer la source en carte candidate.',
   variants: ['candidate-only'],
   states: [...reviewResolverStates],
-  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file locale sans candidats en état partiel'],
+  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file sans candidats en état partiel'],
   sources: [
     { label: 'API publique', path: 'features/review/review-resolver/index.ts' },
     { label: 'Contrat', path: 'features/review/review-resolver/review-resolver.contract.ts' },

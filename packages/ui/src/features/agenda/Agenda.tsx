@@ -21,7 +21,7 @@ export function Agenda({ canNext, canPrevious, days, navigation, onNext, onPrevi
       {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable title="Actualisation interrompue" /> : null}
       {usable ? <>
         {state === 'partial' ? <Status tone="accent">Dates estimées séparées · certaines sources manquent</Status> : null}
-        {state === 'offline' ? <Status tone="warning">{`Cache local du ${updatedAt} · hors ligne`}</Status> : null}
+        {state === 'offline' ? <Status tone="warning">{`Cache du ${updatedAt} · hors ligne`}</Status> : null}
         {state === 'blocked' ? <Status tone="danger">Notifications refusées · configurez-les dans Réglages</Status> : null}
         <section aria-labelledby="agenda-period" className={styles.period}>
           <div className={styles.periodTitle}><Button aria-label="Semaine précédente" disabled={!canPrevious} icon="arrow-left" onClick={onPrevious}>Précédente</Button><h2 id="agenda-period">{periodLabel}</h2><Button aria-label="Semaine suivante" disabled={!canNext} icon="arrow-right" iconPosition="end" onClick={onNext}>Suivante</Button></div>

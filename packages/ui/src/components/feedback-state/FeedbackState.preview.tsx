@@ -25,11 +25,11 @@ const content = {
     title: 'Bibliothèque vide',
   },
   error: {
-    description: 'Les données locales n’ont pas pu être relues.',
+    description: 'Les données n’ont pas pu être relues.',
     title: 'Chargement impossible',
   },
   loading: {
-    description: 'Lecture de votre bibliothèque locale.',
+    description: 'Lecture de votre bibliothèque.',
     title: 'Chargement…',
   },
 } satisfies Record<FeedbackStateVariant, { description: string; title: string }>;
@@ -42,7 +42,7 @@ const feedbackStatePreview = definePreview({
   purpose: 'Expliquer un état non nominal dans une présentation inline ou centrée.',
   variants: [...feedbackStateVariants],
   states: [...feedbackStateStates],
-  fixtures: ['Bibliothèque locale'],
+  fixtures: ['Bibliothèque'],
   sources: [
     { label: 'API publique', path: 'components/feedback-state/index.ts' },
     { label: 'Contrat', path: 'components/feedback-state/feedback-state.contract.ts' },

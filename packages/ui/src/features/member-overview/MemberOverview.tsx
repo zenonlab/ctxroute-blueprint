@@ -18,14 +18,14 @@ export function MemberOverview({ agendaDays, agendaHref, agendaState, libraryCou
     : <FeedbackState className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable={false} title="Actualisation interrompue" />;
   return <main aria-label="Accueil" className={styles.overview}>
     <section className={styles.section} aria-labelledby="library-overview-title">
-      <header className={styles.heading}><div><p className={styles.eyebrow}>Bibliothèque locale</p><h1 id="library-overview-title">{libraryCount} œuvres</h1></div><a className={styles.link} href={libraryHref}>Tout voir</a></header>
+      <header className={styles.heading}><div><p className={styles.eyebrow}>Bibliothèque</p><h1 id="library-overview-title">{libraryCount} œuvres</h1></div><a className={styles.link} href={libraryHref}>Tout voir</a></header>
       {libraryState === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des œuvres enregistrées sur cet appareil." kind="loading" layout="centered" title="Préparation de la bibliothèque…" /> : null}
       {libraryState === 'empty' ? <FeedbackState className={styles.centeredState} description="Importez vos favoris ou ajoutez une première œuvre." icon="library-big" kind="empty" layout="centered" title="Votre bibliothèque est vide" /> : null}
       {libraryState === 'error' ? libraryError : null}
       {libraryState === 'ready' ? <div className={styles.grid}>{libraryItems.map((item) => <WorkCard coverAlt={item.coverAlt} coverSrc={item.coverSrc} context={item.mediaType} detail={item.source} href={item.href} indicator={item.progress} key={item.id} title={item.title} variant="library" />)}</div> : null}
     </section>
     <section className={styles.section} aria-labelledby="agenda-overview-title">
-      <header className={styles.heading}><div><p className={styles.eyebrow}>Semaine locale</p><h2 id="agenda-overview-title">{periodLabel}</h2></div><a className={styles.link} href={agendaHref}>Ouvrir l’agenda</a></header>
+      <header className={styles.heading}><div><p className={styles.eyebrow}>Semaine</p><h2 id="agenda-overview-title">{periodLabel}</h2></div><a className={styles.link} href={agendaHref}>Ouvrir l’agenda</a></header>
       {agendaState === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des sorties enregistrées pour la période." kind="loading" layout="centered" title="Préparation de l’agenda…" /> : null}
       {agendaState === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucune sortie datée n’est enregistrée entre ces deux lundis." icon="calendar-days" kind="empty" layout="centered" title="Semaine vide" /> : null}
       {agendaState === 'error' ? agendaError : null}

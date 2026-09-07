@@ -19,12 +19,12 @@ describe('shared Agenda surface', () => {
     expect(css).toMatch(/overflow-x: auto/);
   });
 
-  it('builds Monday-first complete weeks and local-time releases', () => {
+  it('builds Monday-first complete weeks and zoned releases', () => {
     const period = createLocalAgendaPeriod(new Date(2026, 8, 9, 12), 0);
     expect(period.days).toHaveLength(7);
     expect(period.days[0]?.date.getDay()).toBe(1);
     const occursAt = new Date(2026, 8, 9, 18).toISOString();
-    const days = createAgendaDays(period, { items: [{ availability: 'estimated', id: 'agenda_release', occursAt, release: 'Épisode 1', source: 'Source locale', title: 'Frieren' }] });
+    const days = createAgendaDays(period, { items: [{ availability: 'estimated', id: 'agenda_release', occursAt, release: 'Épisode 1', source: 'Source enregistrée', title: 'Frieren' }] });
     expect(days.flatMap((day) => day.releases)[0]).toMatchObject({ precision: 'Horaire estimé', title: 'Frieren' });
   });
 

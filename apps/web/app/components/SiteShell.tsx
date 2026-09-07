@@ -30,7 +30,7 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
     })),
     id: review.reviewId,
     revision: review.revision,
-    sourceLabel: 'Favori local',
+    sourceLabel: 'Favori enregistré',
     title: review.title ?? 'Correspondance à vérifier',
   } : undefined;
   const submitDecision = (decision: ReviewDecision) => {
@@ -73,12 +73,12 @@ export function SiteShell({ children }: Readonly<{ children: ReactNode }>) {
 
 export function BridgeState() {
   const { retry, status } = useWebBridge();
-  if (status === 'connected') return <Status tone="success">Extension connectée · vue locale disponible</Status>;
+  if (status === 'connected') return <Status tone="success">Extension connectée · vue privée disponible</Status>;
   if (status === 'loading' || status === 'reconnecting') {
     return <FeedbackState description="Vos données restent dans l’extension pendant cette vérification." kind="loading" layout="centered" title={status === 'loading' ? 'Connexion à l’extension…' : 'Reconnexion à l’extension…'} />;
   }
   if (status === 'extension-missing') {
     return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description="Installez TobiRink pour ouvrir vos vues privées sur cet appareil." icon="puzzle" kind="empty" layout="centered" title="Extension absente" />;
   }
-  return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Installez la version actuelle de TobiRink.' : 'Vos données locales restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
+  return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Installez la version actuelle de TobiRink.' : 'Vos données privées restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
 }

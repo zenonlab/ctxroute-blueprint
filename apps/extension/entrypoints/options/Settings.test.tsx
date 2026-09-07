@@ -105,7 +105,7 @@ describe('Settings organizer surface', () => {
   });
 
   it('removes the generic dashboard and remains inside the extension shell', () => {
-    for (const stale of ['Bibliothèque locale', 'Navigation et favoris', 'Projection navigateur', 'Review collective', 'Agenda et notifications', 'Données locales', 'Télécharger le calendrier', 'Diagnostic technique']) {
+    for (const stale of ['Navigation et favoris', 'Projection navigateur', 'Review collective', 'Agenda et notifications', 'Télécharger le calendrier', 'Diagnostic technique']) {
       expect(shell).not.toContain(stale);
     }
     expect(shell).toContain('Extension Tobirink');

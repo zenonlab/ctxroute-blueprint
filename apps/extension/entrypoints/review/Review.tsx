@@ -20,7 +20,7 @@ const reviewCopy = {
     title: 'Aucune correspondance à vérifier',
   },
   partial: {
-    description: 'Le contexte local reste accessible dans la cloche en attendant les candidats.',
+    description: 'Le contexte enregistré reste accessible dans la cloche en attendant les candidats.',
     title: 'Certaines métadonnées manquent',
   },
   offline: {
@@ -54,7 +54,7 @@ export function Review({
           <FeedbackState
             action={<Button icon="refresh-cw" onClick={onRetry}>Réessayer</Button>}
             className={styles.centeredState}
-            description="Les données locales sont conservées."
+            description="Les données sont conservées."
             kind="error"
             layout="centered"
             recoverable
