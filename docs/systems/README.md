@@ -7,6 +7,12 @@ It preserves raw inputs, parsing provenance, season and progression evidence,
 deterministic matching, Review ambiguity, and MV3 recovery while keeping
 IndexedDB as the sole private authority.
 
+The target implementation path is specified in
+[`favorite-resolution-rebuild-pipeline.md`](favorite-resolution-rebuild-pipeline.md).
+It maps browser triggers to bounded inventory slices, versioned parse
+artifacts, durable provider work, Review, exact-ID hydration, local projections,
+additive migrations, and measurable delivery gates.
+
 ## Domain and application
 
 The domain owns library entries, reading progress, agenda rules, and invariants.

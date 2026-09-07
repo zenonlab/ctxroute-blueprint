@@ -1379,6 +1379,38 @@
             "ADR-0037, validate:decisions, validate:docs et Sensor JSON SAFE passent; aucun code, asset, secret ou donnée FavLib copié",
             "favorite-resolution et toute l’architecture produit passent Archify showcase 9/9 avec 0 erreur et 0 avertissement"
           ]
+        },
+        {
+          "id": "step-17",
+          "title": "Définir la pipeline améliorée de reconstruction des favoris",
+          "status": "DONE",
+          "acceptance": [
+            "La pipeline relie chaque événement navigateur aux écritures locales et aux projections sans étape implicite",
+            "Chaque composant cible possède entrée, sortie, limite, erreur, idempotence et preuve de test",
+            "Une matrice relie les défauts FavLib aux améliorations et critères mesurables TobiRink",
+            "Les migrations, la compatibilité des artefacts et l’ordre de livraison sont explicitement bornés",
+            "Documentation, architecture Archify showcase, Progress, Sensor et diff-check passent"
+          ],
+          "files": [
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- favorite-resolution",
+            "npm run validate:architecture",
+            "npm run sensor -- docs/architecture/src/favorite-resolution.dataflow.json",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Pipeline cible de 471 lignes: 11 étapes, 13 composants bornés, erreurs, migration v5 et 8 vagues",
+            "validate:docs et 51 tests Progress passent; Sensor JSON SAFE sur Progress et le dataflow",
+            "Archify dataflow et all passent showcase 9/9, 0 erreur et 0 avertissement"
+          ]
         }
       ]
     },

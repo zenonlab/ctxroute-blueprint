@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Tobirink — analyse et résolution locale des favoris",
+    "title": "Tobirink — pipeline améliorée de résolution des favoris",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [1180, 800],
@@ -18,6 +18,12 @@
         "label": "Résolution durable",
         "focus": ["parseArtifact", "durableQueue", "providerAdapters", "titleMatcher", "reviewGate", "privateStore"],
         "note": "Chaque effet fournisseur reprend depuis IndexedDB et toute ambiguïté rejoint Review sans sélection implicite."
+      },
+      {
+        "id": "bounded-convergence",
+        "label": "Convergence bornée",
+        "focus": ["bookmarkEvents", "sourceEvidence", "durableQueue", "providerAdapters", "privateStore"],
+        "note": "Curseurs, tranches et checkpoints font converger chaque favori sans parcours global ni attente en mémoire."
       }
     ]
   },
@@ -74,11 +80,11 @@
     },
     {
       "dot": "cyan",
-      "title": "Reprise MV3",
+      "title": "Convergence MV3 bornée",
       "items": [
-        "L’entrée est persistée avant tout effet fournisseur",
-        "Les délais longs et Retry-After restent durables",
-        "IndexedDB demeure la seule autorité privée"
+        "Curseurs et tranches évitent les parcours globaux",
+        "Les effets, délais et Retry-After ont un checkpoint durable",
+        "Les migrations additives préservent l’autorité IndexedDB"
       ]
     }
   ]
