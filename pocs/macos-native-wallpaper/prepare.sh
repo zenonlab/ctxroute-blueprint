@@ -44,6 +44,7 @@ if [[ "${1:-}" == --package ]]; then
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticTheme.swift")
+  probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticHitTesting.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/InteractiveDiagnostic.swift")
 fi
 env -u SDKROOT xcrun swiftc \

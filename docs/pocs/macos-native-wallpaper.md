@@ -4,9 +4,10 @@
 
 L'utilisateur confirme l'animation du build 3. Son processus PID 12860 et son
 enregistrement restent intacts. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.sUbL4U/Native Wallpaper Probe.app`.
+`dist/pocs/macos-native-wallpaper/compile.13L9I5/Native Wallpaper Probe.app`.
 Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
-.extension`, version 6. Signature et plist validées. Hôte enregistré par
+`org.wallpaperthemes.nativeprobe.interactive.extension`, version 6. Signature et
+plist validées. Hôte enregistré par
 `lsregister -f`, extension par `pluginkit -a` ; le fond actif n'a pas été changé
 et ce nouveau binaire n'a pas encore été lancé. L'ancien compagnon build 5
 `compile.Bbw4WZ` reste le seul processus hôte interactif observé au moment de
@@ -14,7 +15,7 @@ cette mise à jour ; il ne lit pas le dernier manifeste.
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin sUbL4U** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin 13L9I5** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -32,9 +33,11 @@ restent une preuve séparée, non implémentée dans ce build.
 
 `interactive-theme.json` constitue le premier asset de composition partagé par
 l'hôte et l'extension. Son schéma compagnon fixe l'identité, les couleurs, la
-cinématique, le panneau et les actions avec leurs cadres normalisés. Le chargeur
-Swift applique en plus les invariants croisés que JSON Schema ne garantit pas ici :
-cadres entièrement contenus, sept commandes exactes et unicité des identifiants.
+cinématique, le panneau, les actions et trois ancres de décor avec leurs cadres
+normalisés. Le chargeur Swift applique en plus les invariants croisés que JSON
+Schema ne garantit pas ici :
+cadres entièrement contenus et non superposés, références d'actions valides,
+sept commandes exactes et unicité des identifiants.
 Un asset invalide n'est ni rendu ni présenté comme choix utilisable.
 
 La transmission utilise sept notifications Darwin nommées sans payload,
@@ -45,28 +48,29 @@ dans son conteneur propre à réception ; aucune boucle de polling supplémentai
 L'absence de récepteur doit laisser le compagnon utilisable sans attendre.
 
 Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 22
-assertions commandes/états, 12 assertions d'asset et 13 assertions sur les
-calques (pause idempotente, reprise, effet, reset, panneau unique, sept objets
-bornés, taille réduite), soit 47 contrôles. Le manifeste passe aussi son JSON
-Schema Draft 2020-12. Dispatch direct de test,
+assertions commandes/états, 14 assertions d'asset, 6 assertions de hit-testing
+et 15 assertions sur les calques (pause idempotente, reprise, effet, reset,
+panneau unique, contrôles et ancres bornés, taille réduite), soit 57 contrôles.
+Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.sUbL4U`
-réussit avec
-deux avertissements amont déjà présents ; aucune notarisation revendiquée.
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.13L9I5`
+réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
 Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
 états interactifs : transitions, mise en veille et énergie restent à qualifier.
+Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle
+confirme le panneau, les sept contrôles et les trois ancres sans troncature.
 `npm run verify` réussit également ; syntaxes Bash/Node et diff vérifiés.
 AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
 
-Archify architecture : 9/9 showcase, zéro erreur/avertissement, une correction
-de placement de libellé. Source SHA-256
-`cec9533e264459e59efc5f29b2e831a6a880806707dbcfc2e1bb6d9f3a431e30` ; HTML
-`186a395cf19121e510ca30014cab8839d8f8a6d6de9f1b5abc59d015237b1b33`.
+Archify architecture : 9/9 showcase, zéro erreur/avertissement, deux corrections
+ciblées de placement/routage. Source SHA-256
+`2d25f6a8e9d9168560d0aae55b042619bec12a083b3ff77c5b5e01fe58014845` ; HTML
+`0b9cc597d1cff67b2d61331bbb15496da33ff6e7cb1bf19dd9ab9a22381f05a4`.
 Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
 tailles sans débordement, capture sombre 2048×1320 inspectée : hiérarchie,
 relations et libellés lisibles, sans collision visible. Revue visuelle réussie
-après une correction de placement. Libellés français, interface fixe du
+après deux corrections ciblées de placement/routage. Libellés français, interface fixe du
 visualiseur en anglais.
 
 ## Paquet animé précédent conservé

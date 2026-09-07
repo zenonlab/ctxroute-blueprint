@@ -31,6 +31,12 @@ struct DiagnosticTheme: Decodable, Sendable {
         let command: DiagnosticCommand
         let normalizedFrame: NormalizedFrame
     }
+    struct Anchor: Decodable, Sendable {
+        let id: String
+        let label: String
+        let actionID: String
+        let normalizedFrame: NormalizedFrame
+    }
 
     let schemaVersion: Int
     let themeID: String
@@ -40,6 +46,7 @@ struct DiagnosticTheme: Decodable, Sendable {
     let sweep: Sweep
     let panel: Panel
     let actions: [Action]
+    let anchors: [Anchor]
 
     static func load(bundle: Bundle = .main) throws -> DiagnosticTheme {
         guard let url = bundle.url(forResource: "interactive-theme", withExtension: "json") else {
@@ -79,6 +86,19 @@ struct DiagnosticTheme: Decodable, Sendable {
                 }
             }
         }
+        let actionIDs = Set(actions.map(\.id))
+        guard !anchors.isEmpty, Set(anchors.map(\.id)).count == anchors.count,
+              anchors.allSatisfy({ !$0.id.isEmpty && !$0.label.isEmpty
+                  && actionIDs.contains($0.actionID) && Self.isValid($0.normalizedFrame) }) else {
+            throw ThemeError.invalidAnchors
+        }
+        for first in anchors.indices {
+            for second in anchors.indices where second > first {
+                guard !Self.intersects(anchors[first].normalizedFrame, anchors[second].normalizedFrame) else {
+                    throw ThemeError.invalidAnchors
+                }
+            }
+        }
     }
 
     private static func isValid(_ frame: NormalizedFrame) -> Bool {
@@ -92,7 +112,11 @@ struct DiagnosticTheme: Decodable, Sendable {
             && left.y < right.y + right.height && right.y < left.y + left.height
     }
 
-    enum ThemeError: Error { case missingAsset, invalidIdentity, invalidColor, invalidFrame, invalidSweep, invalidActions }
+    func action(id: String) -> Action? { actions.first { $0.id == id } }
+
+    enum ThemeError: Error {
+        case missingAsset, invalidIdentity, invalidColor, invalidFrame, invalidSweep, invalidActions, invalidAnchors
+    }
 }
 
 extension DiagnosticCommand: Codable {

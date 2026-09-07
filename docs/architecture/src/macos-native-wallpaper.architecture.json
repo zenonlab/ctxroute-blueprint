@@ -10,6 +10,7 @@
     { "id": "controls", "type": "frontend", "label": "Compagnon local", "sublabel": "Boutons AppKit explicites", "pos": [40, 320], "size": [230, 80] },
     { "id": "commands", "type": "messagebus", "label": "Commandes bornées", "sublabel": "Notifications Darwin · essai", "pos": [520, 320], "size": [240, 80] },
     { "id": "theme", "type": "database", "label": "Asset de thème", "sublabel": "JSON · objets · actions", "pos": [800, 320], "size": [190, 80] },
+    { "id": "hit-testing", "type": "backend", "label": "Hit-testing préparé", "sublabel": "Pur · adaptateur OS absent", "pos": [280, 440], "size": [190, 70] },
     { "id": "context", "type": "frontend", "label": "Surfaces système", "sublabel": "CAContext · IOSurface", "pos": [520, 530], "size": [240, 80] },
     { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "Bureau et transitions", "pos": [40, 530], "size": [230, 80] }
   ],
@@ -21,6 +22,7 @@
     { "from": "controls", "to": "commands", "label": "action explicite" },
     { "from": "commands", "to": "animation", "label": "état visuel local" },
     { "from": "theme", "to": "animation", "label": "composition déclarative" },
+    { "from": "hit-testing", "to": "commands" },
     { "from": "animation", "to": "context", "label": "calques / image fixe", "labelDy": 30 },
     { "from": "context", "to": "desktop", "label": "rendu hébergé" }
   ]

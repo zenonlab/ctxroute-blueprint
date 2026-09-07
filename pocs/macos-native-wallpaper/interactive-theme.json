@@ -23,5 +23,10 @@
     { "id": "effect-on", "label": "Effet actif", "command": "effectOn", "normalizedFrame": { "x": 0.04, "y": 0.14, "width": 0.44, "height": 0.16 } },
     { "id": "effect-off", "label": "Effet coupé", "command": "effectOff", "normalizedFrame": { "x": 0.52, "y": 0.14, "width": 0.44, "height": 0.16 } },
     { "id": "reset", "label": "Réinitialiser", "command": "reset", "normalizedFrame": { "x": 0.28, "y": 0.01, "width": 0.44, "height": 0.11 } }
+  ],
+  "anchors": [
+    { "id": "terminal-object", "label": "Objet terminal", "actionID": "panel-open", "normalizedFrame": { "x": 0.04, "y": 0.08, "width": 0.18, "height": 0.12 } },
+    { "id": "effect-object", "label": "Orbe lumineux", "actionID": "effect-on", "normalizedFrame": { "x": 0.78, "y": 0.10, "width": 0.16, "height": 0.14 } },
+    { "id": "reset-object", "label": "Borne reset", "actionID": "reset", "normalizedFrame": { "x": 0.78, "y": 0.74, "width": 0.16, "height": 0.14 } }
   ]
 }

@@ -81,11 +81,17 @@ Le panneau du décor est, lui, dessiné dans le contexte natif de l'extension.
 La scène interactive est un asset versionné `interactive-theme.json`, validé à
 la fois par `interactive-theme.schema.json` et par le décodeur Swift avant usage.
 Il porte l'identité de scène, les couleurs, la durée du balayage, le panneau et
-les sept actions avec leurs cadres normalisés. L'hôte et l'extension consomment
+les sept actions avec leurs cadres normalisés. Trois ancres de décor distinctes
+référencent ces actions sans les dupliquer. L'hôte et l'extension consomment
 le même asset ; les contrôles visuels du décor ne sont donc pas codés deux fois.
 Une erreur de manifeste échoue fermée : aucune entrée de scène ni commande n'est
 exposée. Ces calques nommés préparent le futur hit-testing, mais ne revendiquent
 encore aucune réception de clic par WallpaperAgent.
+
+Le hit-tester pur traduit déjà les coordonnées écran vers les ancres et contrôles
+du panneau. Son contrat refuse toute intention quand l'adaptateur OS signale du
+contenu natif prioritaire à cet emplacement. Cette règle est testée sans installer
+de moniteur global ; l'identification réelle des icônes Finder reste non prouvée.
 
 Pour ce seul diagnostic, réutiliser les notifications Darwin déjà employées
 par l'amont : noms fixes sans charge utile et actions idempotentes, traitées

@@ -77,7 +77,8 @@ enum InteractiveDiagnostic {
             panel.backgroundColor = color(theme.panel.color)
             let text = CATextLayer()
             text.name = "interactive.text"
-            text.fontSize = 20
+            text.fontSize = 16
+            text.alignmentMode = .center
             text.contentsScale = 2
             text.foregroundColor = CGColor(gray: 1, alpha: 1)
             text.isWrapped = true
@@ -97,6 +98,23 @@ enum InteractiveDiagnostic {
                 button.addSublayer(label)
                 panel.addSublayer(button)
             }
+            for anchor in theme.anchors {
+                let object = CALayer()
+                object.name = "interactive.anchor.\(anchor.id)"
+                object.cornerRadius = 14
+                object.borderWidth = 2
+                object.borderColor = CGColor(red: 0.3, green: 0.95, blue: 1, alpha: 1)
+                object.backgroundColor = CGColor(red: 0.03, green: 0.12, blue: 0.2, alpha: 0.9)
+                let label = CATextLayer()
+                label.name = "interactive.anchor.label.\(anchor.id)"
+                label.alignmentMode = .center
+                label.fontSize = 16
+                label.contentsScale = 2
+                label.foregroundColor = CGColor(gray: 1, alpha: 1)
+                label.string = anchor.label
+                object.addSublayer(label)
+                root.addSublayer(object)
+            }
             root.addSublayer(panel)
         }
         let frame = theme.panel.normalizedFrame
@@ -106,7 +124,7 @@ enum InteractiveDiagnostic {
         if let text = panel.sublayers?.first(where: { $0.name == "interactive.text" }) as? CATextLayer {
             text.frame = CGRect(x: 20, y: panel.bounds.height * 0.72,
                 width: max(0, panel.bounds.width - 40), height: panel.bounds.height * 0.24)
-            text.string = "\(theme.panel.title) · animation \(state.paused ? "en pause" : "active") · effet \(state.effectEnabled ? "actif" : "inactif")"
+            text.string = "\(theme.panel.title)\nAnimation \(state.paused ? "en pause" : "active") · effet \(state.effectEnabled ? "actif" : "inactif")"
         }
         for action in theme.actions {
             guard let button = panel.sublayers?.first(where: { $0.name == "interactive.action.\(action.id)" }) else { continue }
@@ -114,7 +132,21 @@ enum InteractiveDiagnostic {
             button.frame = CGRect(x: panel.bounds.width * actionFrame.x, y: panel.bounds.height * actionFrame.y,
                 width: panel.bounds.width * actionFrame.width, height: panel.bounds.height * actionFrame.height)
             button.opacity = isSelected(action.command) ? 1 : 0.72
-            if let label = button.sublayers?.first as? CATextLayer { label.frame = button.bounds.insetBy(dx: 4, dy: 2) }
+            if let label = button.sublayers?.first as? CATextLayer {
+                label.frame = CGRect(x: 4, y: max(0, (button.bounds.height - 18) / 2),
+                    width: max(0, button.bounds.width - 8), height: 18)
+            }
+        }
+        for anchor in theme.anchors {
+            guard let object = root.sublayers?.first(where: { $0.name == "interactive.anchor.\(anchor.id)" }) else { continue }
+            let anchorFrame = anchor.normalizedFrame
+            object.frame = CGRect(x: root.bounds.width * anchorFrame.x, y: root.bounds.height * anchorFrame.y,
+                width: root.bounds.width * anchorFrame.width, height: root.bounds.height * anchorFrame.height)
+            if let action = theme.action(id: anchor.actionID) { object.opacity = isSelected(action.command) ? 1 : 0.78 }
+            if let label = object.sublayers?.first as? CATextLayer {
+                label.frame = CGRect(x: 6, y: max(0, (object.bounds.height - 22) / 2),
+                    width: max(0, object.bounds.width - 12), height: 22)
+            }
         }
         CATransaction.commit()
         CATransaction.flush()
