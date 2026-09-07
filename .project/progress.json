@@ -1617,6 +1617,41 @@
             "Archify architecture showcase 9/9, 0 erreur/avertissement.",
             "Config, docs et Progress 51/51 passent; aucun réseau activé."
           ]
+        },
+        {
+          "id": "step-23",
+          "title": "Préserver les observations URL rejetées",
+          "status": "DONE",
+          "acceptance": [
+            "Le brut URL borné est conservé avant qualification et les rejets restent fail-closed.",
+            "Origin et canonicalUrl sont cohérents; tests et validations passent."
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/favorites/source-evidence-contract.ts",
+            "packages/domain/tsconfig.json",
+            "packages/application/src/favorites/source-evidence.test.ts",
+            "packages/application/src/favorites/eligibility.test.ts",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Domaine 23/23 et application 105/105 passent; les rejets URL restent bruts et non actionnables.",
+            "Typecheck, ESLint, Oxlint, Sensor ciblé SAFE et validate complet passent.",
+            "Favorite-resolution Archify passe showcase 9/9; diff-check passe."
+          ]
         }
       ]
     },

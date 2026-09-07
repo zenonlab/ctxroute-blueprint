@@ -48,6 +48,11 @@ le titre exact, la saison explicitement corroborée, les mots significatifs
 réordonnés et la distance d’édition bornée. Popularité, rang, ordre, date,
 image, inclusion partielle et richesse de fiche ne sont jamais des preuves.
 
+La capture borne mais ne qualifie pas la chaîne URL. La qualification possède
+seule les dispositions `INVALID_URL` et `NON_WEB_URL`; une preuve rejetée ne
+peut contenir aucun champ d’identité actionnable. Une URL canonique éventuelle
+doit conserver l’origine explicitement déclarée.
+
 Conserver la reprise MV3 dans une file IndexedDB durable dont l’entrée est
 écrite avant le réseau. Résolution, hydratation exacte et contribution Review
 sont des opérations séparées. Les effets sont idempotents et les attentes

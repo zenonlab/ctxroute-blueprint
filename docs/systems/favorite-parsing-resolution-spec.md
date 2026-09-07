@@ -94,6 +94,12 @@ parler d’une conservation « octet pour octet » serait donc une promesse
 incorrecte. Toute empreinte encode explicitement les chaînes en UTF-8 avec leur
 longueur avant concaténation.
 
+Le contrat d’observation borne la chaîne URL mais ne valide ni sa syntaxe ni son
+schéma. Cette responsabilité appartient exclusivement à la qualification afin
+que `INVALID_URL` et `NON_WEB_URL` restent représentables. Un artefact portant
+un tel brut exige la disposition correspondante et aucune preuve d’identité
+actionnable.
+
 ### Qualification
 
 | Règle | Disposition | Preuve |
@@ -133,6 +139,11 @@ La preuve de source est un objet séparé et versionné :
 | `strategy` | adaptateur structurel ou extraction générique |
 | `evidence` | codes de preuve tels que route de catégorie, route de sortie, suffixe ou saison explicite |
 | `aliases` | aliases déjà établis avec leur provenance |
+
+Lorsque `origin` et `canonicalUrl` existent ensemble, leurs origines URL
+normalisées doivent être égales. Une preuve rejetée conserve sa disposition et
+ses diagnostics, mais aucun type média, alias, identifiant, chemin canonique,
+saison ou sortie exploitable.
 
 Règles de route à conserver :
 

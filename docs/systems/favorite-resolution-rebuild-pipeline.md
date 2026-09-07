@@ -138,6 +138,11 @@ Le filtre d’éligibilité refuse les dossiers, schémas non HTTP(S), pages uti
 et entrées invalides avec un motif fermé. Les adaptateurs de source extraient
 seulement les preuves propres à une origine ou une forme d’URL connue.
 
+L’observation accepte d’abord toute chaîne URL dans ses bornes. La qualification
+produit ensuite `INVALID_URL` ou `NON_WEB_URL` sans perdre ce brut; ces rejets ne
+portent aucune preuve actionnable et ne peuvent donc jamais atteindre une lane
+fournisseur.
+
 La sortie `SourceEvidence` garde séparément origine, chemin, slug, identifiant
 fournisseur explicite, langue, saison et indice de sortie. Une origine inconnue
 reste analysable par les règles génériques sans acquérir un type média fictif.

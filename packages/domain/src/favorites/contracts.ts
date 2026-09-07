@@ -119,9 +119,14 @@ export function createFavoriteObservation(input: FavoriteObservation): FavoriteO
     title: boundedText(input.title, 'title', favoriteTitleByteLimit),
     url: boundedText(input.url, 'url', favoriteUrlByteLimit),
   });
-  contract(/^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/iu.test(observation.url), 'url must use HTTP(S).');
   contract(utf8ByteLength(JSON.stringify(observation)) <= favoriteObservationByteLimit, `observation exceeds ${favoriteObservationByteLimit} UTF-8 bytes.`);
   return observation;
+}
+
+function rawUrlDisposition(value: string): 'INVALID_URL' | 'NON_WEB_URL' | undefined {
+  let parsed: URL;
+  try { parsed = new URL(value); } catch { return 'INVALID_URL'; }
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? undefined : 'NON_WEB_URL';
 }
 
 export function createFavoriteParseArtifact(input: FavoriteParseArtifact): FavoriteParseArtifact {
@@ -133,7 +138,9 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
   const { progress, ...rest } = input;
   const rawTitle = boundedText(input.raw.title, 'raw.title', favoriteTitleByteLimit);
   const rawUrl = boundedText(input.raw.url, 'raw.url', favoriteUrlByteLimit);
-  contract(/^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/iu.test(rawUrl), 'raw.url must use HTTP(S).');
+  const sourceEvidence = createSourceEvidence(input.sourceEvidence);
+  const requiredDisposition = rawUrlDisposition(rawUrl);
+  if (requiredDisposition !== undefined) contract(sourceEvidence.disposition === requiredDisposition, `raw.url requires ${requiredDisposition} source evidence.`);
   const artifact = {
     ...rest,
     diagnostics: Object.freeze([...input.diagnostics]),
@@ -141,7 +148,7 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
     raw: Object.freeze({ title: rawTitle, url: rawUrl }),
     semanticFingerprint: nonEmpty(input.semanticFingerprint, 'semanticFingerprint'),
     sourceAdapterVersion: nonEmpty(input.sourceAdapterVersion, 'sourceAdapterVersion'),
-    sourceEvidence: createSourceEvidence(input.sourceEvidence),
+    sourceEvidence,
     transformations: Object.freeze([...input.transformations]),
   };
   if (progress === undefined) return Object.freeze(artifact);

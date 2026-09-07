@@ -49,7 +49,7 @@
   "flows": [
     { "from": "browserFavorites", "to": "eligibility", "label": "inventaire brut", "classification": "privé local", "variant": "security", "route": "straight", "labelAt": [208, 320] },
     { "from": "bookmarkEvents", "to": "sourceEvidence", "label": "déclenche une convergence", "classification": "idempotent", "variant": "dashed", "labelAt": [208, 660] },
-    { "from": "eligibility", "to": "parseArtifact", "label": "titre + URL admissibles", "classification": "sans perte", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
+    { "from": "eligibility", "to": "parseArtifact", "label": "brut + disposition URL", "classification": "fail-closed", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
     { "from": "sourceEvidence", "to": "parseArtifact", "label": "indices structurés", "classification": "provenance locale", "variant": "default" },
     { "from": "parseArtifact", "to": "durableQueue", "label": "source + Review + tâche", "classification": "transaction atomique", "variant": "security", "labelAt": [575, 440] },
     { "from": "durableQueue", "to": "providerAdapters", "label": "requête réservée", "classification": "au moins une fois", "variant": "dashed", "route": "straight", "labelAt": [638, 660] },

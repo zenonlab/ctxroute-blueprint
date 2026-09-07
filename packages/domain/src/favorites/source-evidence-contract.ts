@@ -28,14 +28,24 @@ function requireValue(value: string, field: string, limit = favoriteTitleByteLim
   return value;
 }
 
+function requireWebUrl(value: string, field: string): { readonly origin: string } {
+  const bounded = requireValue(value, field, favoriteUrlByteLimit);
+  let parsed: URL;
+  try { parsed = new URL(bounded); } catch { throw new TypeError(`${field} must use HTTP(S).`); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new TypeError(`${field} must use HTTP(S).`);
+  return parsed;
+}
+
 export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
   if (input.aliases.length > favoriteAliasLimit) throw new TypeError(`aliases exceeds ${favoriteAliasLimit} entries.`);
   if (input.diagnostics.length > favoriteDiagnosticLimit) throw new TypeError(`diagnostics exceeds ${favoriteDiagnosticLimit} entries.`);
   if (input.proofs.length > favoriteEvidenceLimit) throw new TypeError(`proofs exceeds ${favoriteEvidenceLimit} entries.`);
   if (input.season !== undefined && (!Number.isSafeInteger(input.season) || input.season <= 0)) throw new TypeError('source season must be a positive safe integer.');
   if (input.release?.value !== undefined && (!Number.isFinite(input.release.value) || input.release.value < 0)) throw new TypeError('release value must be finite and non-negative.');
-  if (input.canonicalUrl !== undefined && !/^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/iu.test(requireValue(input.canonicalUrl, 'canonicalUrl', favoriteUrlByteLimit))) throw new TypeError('canonicalUrl must use HTTP(S).');
-  if (input.origin !== undefined && !/^https?:\/\/[^/]+$/iu.test(requireValue(input.origin, 'origin', favoriteUrlByteLimit))) throw new TypeError('origin must be an HTTP(S) origin.');
+  const canonicalUrl = input.canonicalUrl === undefined ? undefined : requireWebUrl(input.canonicalUrl, 'canonicalUrl');
+  const origin = input.origin === undefined ? undefined : requireWebUrl(input.origin, 'origin');
+  if (origin !== undefined && origin.origin !== input.origin) throw new TypeError('origin must be an HTTP(S) origin.');
+  if (canonicalUrl !== undefined && origin !== undefined && canonicalUrl.origin !== origin.origin) throw new TypeError('canonicalUrl must use the declared origin.');
   if (input.explicitProviderReference !== undefined) requireValue(input.explicitProviderReference.externalId, 'explicitProviderReference.externalId');
   if (input.path !== undefined) requireValue(input.path, 'path', favoriteUrlByteLimit);
   if (input.rawSlug !== undefined) requireValue(input.rawSlug, 'rawSlug', favoriteUrlByteLimit);
@@ -43,6 +53,12 @@ export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
   if (input.releaseSuffix !== undefined) requireValue(input.releaseSuffix, 'releaseSuffix');
   if (input.stableSlug !== undefined) requireValue(input.stableSlug, 'stableSlug', favoriteUrlByteLimit);
   if (input.title !== undefined) requireValue(input.title, 'title');
+  if (input.disposition !== undefined) {
+    const hasActionableEvidence = input.aliases.length > 0
+      || input.proofs.length > 0
+      || [input.canonicalUrl, input.explicitProviderReference, input.origin, input.path, input.rawSlug, input.release, input.releaseSuffix, input.season, input.stableSlug, input.title].some((value) => value !== undefined);
+    if (input.mediaKind !== 'UNKNOWN' || hasActionableEvidence) throw new TypeError('rejected source evidence must not contain actionable identity evidence.');
+  }
   const { explicitProviderReference, release, ...values } = input;
   const evidence = {
     ...values,

@@ -36,6 +36,10 @@ describe('favorite pipeline contracts', () => {
     expect(utf8ByteLength(JSON.stringify(observation()))).toBeLessThan(favoriteObservationByteLimit);
   });
 
+  it.each(['not a URL', 'ftp://fixtures.tobirink.invalid/work'])('preserves a bounded raw URL before qualification: %s', (url) => {
+    expect(createFavoriteObservation({ ...observation(), url }).url).toBe(url);
+  });
+
   it('rejects decisions from incomplete or truncated provider sets', () => {
     const incomplete = createProviderCandidateEnvelope({ candidates: [], complete: false, digest: 'digest-1', provider: 'anilist', truncated: true });
     expect(() => createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'ordered-exact', reasons: ['none'] }, [incomplete])).toThrow(/INCOMPLETE_CANDIDATE_SET/u);
@@ -73,9 +77,30 @@ describe('favorite pipeline contracts', () => {
     expect(() => createSourceEvidence({ ...base, origin: 'https://fixtures.tobirink.invalid/path' })).toThrow(/origin/u);
     expect(() => createSourceEvidence({ ...base, explicitProviderReference: { externalId: '', provider: 'anilist' } })).toThrow(/externalId/u);
     expect(() => createSourceEvidence({ ...base, stableSlug: 'a'.repeat(32 * 1024 + 1) })).toThrow(/stableSlug/u);
+    expect(() => createSourceEvidence({ ...base, canonicalUrl: 'https://other.tobirink.invalid/work', origin: 'https://fixtures.tobirink.invalid' })).toThrow(/declared origin/u);
+    expect(() => createSourceEvidence({ ...base, disposition: 'INVALID_URL', title: 'invented identity' })).toThrow(/actionable identity/u);
     const evidence = createSourceEvidence({ ...base, explicitProviderReference: { externalId: '1', provider: 'anilist' }, release: { kind: 'episode', provenance: 'URL_PATH', raw: 'episode-1', value: 1 } });
     expect(Object.isFrozen(evidence.explicitProviderReference)).toBe(true);
     expect(Object.isFrozen(evidence.release)).toBe(true);
+  });
+
+  it.each([
+    ['not a URL', 'INVALID_URL'],
+    ['ftp://fixtures.tobirink.invalid/work', 'NON_WEB_URL'],
+  ] as const)('requires fail-closed evidence for rejected raw URL %s', (url, disposition) => {
+    const base = {
+      contractVersion: 2 as const,
+      diagnostics: [],
+      mediaKind: 'UNKNOWN' as const,
+      parserVersion: 'favorite-parser-v2',
+      raw: { title: observation().title, url },
+      semanticFingerprint: 'sha256:fixture-rejected',
+      sourceAdapterVersion: 'source-adapter-v1',
+      sourceEvidence: { aliases: [], diagnostics: [], disposition, key: 'bookmark-rejected', mediaKind: 'UNKNOWN' as const, proofs: [], sourceAdapter: 'generic-url', strategy: 'generic' as const },
+      transformations: [],
+    };
+    expect(createFavoriteParseArtifact(base).raw.url).toBe(url);
+    expect(() => createFavoriteParseArtifact({ ...base, sourceEvidence: { ...base.sourceEvidence, disposition: 'ROOT_PAGE' as const } })).toThrow(/requires INVALID_URL|requires NON_WEB_URL/u);
   });
 
   it('keeps provider identity when external IDs collide across complete lanes', () => {

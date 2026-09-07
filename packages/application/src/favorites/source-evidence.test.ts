@@ -20,6 +20,15 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
+  it.each([
+    ['not a URL', 'INVALID_URL'],
+    ['ftp://fixtures.tobirink.invalid/anime/frieren', 'NON_WEB_URL'],
+  ] as const)('keeps rejected raw URL %s non-actionable', (url, disposition) => {
+    expect(extractFavoriteSourceEvidence(input('rejected', url))).toEqual({
+      aliases: [], diagnostics: [], disposition, key: 'bookmark-rejected', mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'generic-url', strategy: 'generic',
+    });
+  });
+
   it('U-01 derives identity and CATEGORY_PATH from a category route', () => {
     expect(extractFavoriteSourceEvidence(input('U-01', 'https://fixtures.tobirink.invalid/anime/frieren'))).toMatchObject({ mediaKind: 'ANIME', proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], stableSlug: 'frieren', strategy: 'generic' });
   });
