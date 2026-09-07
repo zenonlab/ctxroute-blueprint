@@ -5358,7 +5358,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5522,7 +5522,7 @@
         {
           "id": "step-6",
           "title": "Fusionner, publier et vérifier la résolution vivante",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "La branche intègre origin/main sans perte et la CI de la PR passe avant fusion",
             "Le plan Cloudflare cible uniquement les deux ZIP 1.0.0 et worker:tobirink-public-api",
@@ -5546,7 +5546,11 @@
             "curl production routes and shasum downloaded artifacts",
             "git commit -m chore(release): publish live favorite resolution"
           ],
-          "evidence": []
+          "evidence": [
+            "PR #17 merged as 9d1a4dc after all seven CI checks passed; local verify, web export, 1.0.0 packaging and Playwright 7/7 passed.",
+            "Approved plan 18461a6c… changed only both versioned R2 objects and worker:tobirink-public-api; Worker version 9598799c-a59a-4ac8-b288-13f88a3b9484 is live and rollback 2ca7a811-a224-443a-951b-30d293b7dd9b is preserved.",
+            "Production routes return expected 200/404 statuses; remote hashes match Chrome 7bffcd89…bde0 and Firefox b4650e5c…8fe; immutable headers and the real packaged-extension WebBridge test pass."
+          ]
         }
       ]
     },
