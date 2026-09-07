@@ -1,9 +1,9 @@
 #!/bin/bash
-# Compile-only probe: never install or execute the upstream extension.
+# Build-only probe: never install or execute the upstream extension.
 set -euo pipefail
 
-if [[ $# -ne 0 ]]; then
-  echo 'Usage: bash pocs/macos-native-wallpaper/prepare.sh (compile only)' >&2
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --package ) ]]; then
+  echo 'Usage: bash pocs/macos-native-wallpaper/prepare.sh [--package]' >&2
   exit 64
 fi
 if [[ "$(uname -s)" != Darwin ]]; then
@@ -27,16 +27,47 @@ git -C "$probe_stage" apply --check "$probe_root/pocs/macos-native-wallpaper/dia
 git -C "$probe_stage" apply "$probe_root/pocs/macos-native-wallpaper/diagnostic.patch"
 probe_sdk="$(env -u SDKROOT xcrun --sdk macosx --show-sdk-path)"
 probe_arch="$(uname -m)"
+probe_sources=()
+for probe_source in "$probe_stage"/PhospheneExtension/*.swift; do
+  if [[ "${1:-}" == --package && ( "$probe_source" == */VideoLibrary.swift || "$probe_source" == */SpiralRecovery.swift ) ]]; then
+    continue
+  fi
+  probe_sources+=("$probe_source")
+done
+if [[ "${1:-}" == --package ]]; then
+  (cd "$probe_root" && node pocs/macos-native-wallpaper/package.mjs "$probe_stage")
+  probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
+fi
 env -u SDKROOT xcrun swiftc \
   -sdk "$probe_sdk" -target "$probe_arch-apple-macos26.0" \
   -swift-version 6 -parse-as-library -D WALLPAPER_NATIVE_DIAGNOSTIC \
   -module-name NativeWallpaperProbe \
   -module-cache-path "$probe_stage/module-cache" \
   -import-objc-header "$probe_stage/PhospheneExtension/WallpaperExtension-Bridging-Header.h" \
-  "$probe_stage"/PhospheneExtension/*.swift \
+  "${probe_sources[@]}" \
   -o "$probe_stage/NativeWallpaperProbe"
 file "$probe_stage/NativeWallpaperProbe"
 shasum -a 256 "$probe_stage/NativeWallpaperProbe"
 echo "Compile-only artifact: $probe_stage/NativeWallpaperProbe"
 echo 'NOT installed, registered, launched, or qualified as an Apple wallpaper extension.'
 echo 'Keep the adjacent upstream LICENSE with this diagnostic artifact.'
+if [[ "${1:-}" == --package ]]; then
+  probe_app="$probe_stage/Native Wallpaper Probe.app"
+  probe_extension="$probe_app/Contents/Extensions/NativeWallpaperProbe.appex"
+  mkdir -p "$probe_app/Contents/MacOS" "$probe_app/Contents/Resources" \
+    "$probe_extension/Contents/MacOS" "$probe_extension/Contents/Resources"
+  cp "$probe_root/pocs/macos-native-wallpaper/Host-Info.plist" "$probe_app/Contents/Info.plist"
+  cp "$probe_root/pocs/macos-native-wallpaper/Extension-Info.plist" "$probe_extension/Contents/Info.plist"
+  cp "$probe_stage/NativeWallpaperProbe" "$probe_extension/Contents/MacOS/NativeWallpaperProbe"
+  cp "$probe_stage/LICENSE" "$probe_app/Contents/Resources/Phosphene-LICENSE"
+  env -u SDKROOT xcrun swiftc -sdk "$probe_sdk" -target "$probe_arch-apple-macos26.0" \
+    -swift-version 6 -parse-as-library "$probe_root/pocs/macos-native-wallpaper/Host.swift" \
+    -o "$probe_app/Contents/MacOS/NativeWallpaperProbeHost"
+  "$probe_app/Contents/MacOS/NativeWallpaperProbeHost" --thumbnail "$probe_extension/Contents/Resources/diagnostic.png"
+  plutil -lint "$probe_app/Contents/Info.plist" "$probe_extension/Contents/Info.plist"
+  codesign --force --sign - --entitlements "$probe_root/pocs/macos-native-wallpaper/Extension.entitlements" "$probe_extension"
+  codesign --force --sign - "$probe_app"
+  codesign --verify --strict --verbose=2 "$probe_extension"
+  codesign --verify --deep --strict --verbose=2 "$probe_app"
+  echo "Package (ad hoc signature; OS admission untested): $probe_app"
+fi

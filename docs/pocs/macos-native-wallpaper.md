@@ -1,4 +1,71 @@
-# Sonde native macOS — préparation, pas installation
+# Sonde native macOS — paquet local de test
+
+## Tester le paquet préparé
+
+Le build courant est dans
+`dist/pocs/macos-native-wallpaper/compile.YbX8ea/Native Wallpaper Probe.app`.
+Ouvrir cette application dans Finder, puis cliquer « Ouvrir les réglages ».
+Elle n'affiche pas de fenêtre wallpaper : sa boîte de dialogue explique le test.
+Dans Réglages > Fond d'écran, rechercher **Native Wallpaper Probe**, puis
+**Balayage diagnostic**. Noter le fond actuel avant toute sélection.
+
+Le résultat attendu est une surface verte avec une largeur magenta animée,
+hébergée par le système. Tester le retour au bureau et deux changements de Spaces.
+Les boutons dans le décor et le terminal ne font pas partie de cet essai.
+Si l'entrée est absente, ou si la surface reste noire/statique, l'essai a échoué :
+ne pas présenter la signature ou l'enregistrement comme une réussite visuelle.
+Ne pas désactiver les protections macOS ni tuer WallpaperAgent pour forcer le test.
+Pour arrêter, sélectionner son ancien fond dans Réglages ; fermer l'hôte seul
+n'arrête pas nécessairement une extension hébergée par macOS.
+
+Pour reconstruire un paquet indépendant :
+
+```sh
+bash pocs/macos-native-wallpaper/prepare.sh --package
+```
+
+Le script affiche le nouveau chemin ; il ne l'enregistre pas automatiquement.
+Le paquet courant a été enregistré explicitement avec `pluginkit -a` sur son
+`.appex`. La requête `pluginkit -m -A -D -v -i org.wallpaperthemes.nativeprobe.extension`
+renvoie **1 plug-in** à ce chemin. Ceci valide sa présence au registre, pas son
+affichage dans les réglages, son lancement XPC ou l'animation réelle.
+Ne pas déplacer le build courant avant le test. Aucune sélection de fond n'a été faite.
+
+## Isolation et contrôles du paquet
+
+L'hôte est original ; l'extension réutilise Phosphene MIT à la révision ci-dessous.
+Le paquet conserve la licence. Identités propres `org.wallpaperthemes.nativeprobe`
+et `.extension`. Signature locale ad hoc validée par `codesign --verify --strict`
+sur l'extension et `--deep --strict` sur l'application ; aucune notarisation revendiquée.
+Les deux plist passent `plutil -lint`. Le code hôte a été exécuté seulement dans
+son mode de génération de miniature, sans interface ni modification du fond.
+
+Le build `--package` exclut VideoLibrary et SpiralRecovery amont. Leur remplacement
+ne scanne, n'importe, ne migre et ne supprime aucun média ; la miniature est une
+ressource originale du paquet. Aucun signal de récupération ne redémarre l'agent.
+Les ouvertures d'applications externes de l'extension sont neutralisées, les
+notifications sont renommées, les contrôles XPC échouent fermés. L'extension reste
+sandboxée, sans entitlement réseau. Des préférences/caches/logs propres peuvent
+être créés par le reste du code amont dans son conteneur, pas dans celui de Phosphene.
+La sandbox, la sélection et les transitions restent à observer au lancement réel.
+
+Validation de cette étape : deux builds de paquet réussis (le dernier inclut
+les refus XPC), signatures vérifiées, sandbox présente dans la signature et
+miniature PNG générée. `npm run verify` réussi : 262 tests du socle réussis,
+un ignoré, zéro échec ; trois tests MCP réussis ; audit npm sans vulnérabilité.
+Syntaxes Bash/Node vérifiées et argument inconnu refusé avant build (code 64).
+Le clone amont, AGENTS.md, CLAUDE.md et hooks Codex restent inchangés.
+Ces vérifications ne sont pas un test visuel de l'extension.
+
+Archify documente la frontière `.app`/`.appex` : architecture showcase 9/9,
+zéro erreur/avertissement, aucune correction géométrique pour cette mise à jour.
+Source SHA-256 `bf8fba72d829337de3a0288f7dda17c1820285a491c8719fb36b7ecbf16ae0aa` ;
+HTML SHA-256 `6c00b3d74673a99936f13a9ccd368bc75de02effc9c04b7f8ce8225dc343629e`.
+Quatre tailles desktop sans débordement ; capture sombre 2048×1320 inspectée
+par l'agent. Revue humaine du reçu automatique `pending`, interface fixe anglaise.
+
+Les sections suivantes archivent l'étape de compilation simple, qui reste disponible
+sans argument et ne doit pas être lancée directement comme extension.
 
 ## Objectif et succès attendu
 
@@ -80,7 +147,7 @@ Archify sépare ce chemin de l'ancien PoC :
 HTML local `dist/architecture/macos-native-wallpaper.architecture.html`.
 Libellés français, interface fixe du visualiseur en anglais.
 
-Reçu du schéma : architecture showcase 9/9, zéro erreur/avertissement,
+Reçu historique du schéma avant packaging : architecture showcase 9/9, zéro erreur/avertissement,
 une correction de placement. Source SHA-256
 `2817cba332d4b3fc79bdee7b0dd406644cb60df0882b3fc470bf263a6beb7039` ;
 HTML SHA-256 `643ee8b89027b776fae9f58aa2f138ac0821816552ddc952abf4dee2fe9414f3`.

@@ -5,6 +5,7 @@ scope:
   - docs/architecture/src/macos-native-wallpaper.architecture.json
   - .project/project-config.json
 review: on-change
+revised: true
 ---
 # ADR-0047 — Qualification isolée du wallpaper natif Apple
 
@@ -42,5 +43,22 @@ inspecté ; aucune conclusion universelle d'impossibilité n'en découle.
 Le build natif et sa validation sont séparés de la CI documentaire Node.
 Un éventuel lancement exige revue du code exécuté, identité de bundle isolée,
 signature admissible et procédure de retour au fond antérieur.
+
+## Extension du test — paquet local
+
+Après demande utilisateur de préparer un test, `prepare.sh --package` assemble
+une application hôte AppKit minimale et son extension dans `Contents/Extensions`.
+Identités `org.wallpaperthemes.nativeprobe` et `.extension`, signature ad hoc
+locale vérifiée, sandbox activée pour l'extension sans droit réseau ajouté.
+L'enregistrement explicite par `pluginkit -a` est autorisé pour cette qualification ;
+il ne vaut pas sélection d'un fond ni admission effective par WallpaperAgent.
+Le fond est sélectionné manuellement par l'utilisateur, qui revient à son ancien
+fond dans Réglages pour arrêter l'essai. Pas de désactivation SIP/Gatekeeper.
+
+Le build exclut VideoLibrary et SpiralRecovery amont, remplacés par une seule
+entrée diagnostic en mémoire et des opérations inertes. Le patch de copie retire
+l'ouverture de l'application amont et remplace les noms de notifications par
+l'espace de nom propre. Les échecs d'identification des appelants XPC deviennent
+des refus. Les échanges privés et leur rendu restent des hypothèses à tester.
 
 Source : [Phosphene épinglé](https://github.com/kageroumado/phosphene/tree/8b5bd57c1450eda74cf2ec6ceaae2e586cfdfcd6).

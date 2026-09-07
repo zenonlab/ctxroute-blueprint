@@ -9,7 +9,11 @@ comme s'il répondait au besoin. [ADR-0047](decisions/ADR-0047-native-wallpaper-
 isole une préparation native Phosphene/ColorDiag, sans installer ni lancer l'extension.
 Lire [la fiche native](pocs/macos-native-wallpaper.md) et utiliser son script compile-only.
 Compilation directe possible ; Xcodebuild local échoue sur un plugin incompatible.
-Signature, bundle hôte, admission par macOS et transitions restent à qualifier.
+`prepare.sh --package` construit maintenant l'hôte et son `.appex` sandboxé avec
+signature ad hoc vérifiée. Le build `compile.YbX8ea` est enregistré (1 plug-in).
+L'utilisateur peut ouvrir Native Wallpaper Probe.app et tester la sélection.
+Affichage dans Réglages, lancement XPC et transitions restent à qualifier ;
+ne pas confondre présence au registre et wallpaper fonctionnel.
 Le fond de l'utilisateur n'a pas été changé. Les paragraphes suivants sont historiques.
 
 ## Historique — L1 en fenêtre
