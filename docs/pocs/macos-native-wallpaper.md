@@ -31,6 +31,12 @@ ni le wallpaper lui-même. L'observation globale souris/clavier n'est pas ajout�
 Les objets du panneau sont visuels : les clics directs et le filtrage Finder
 restent une preuve séparée, non implémentée dans ce build.
 
+L'interface XPC de Phosphene épinglée ne contient aucun callback de pointeur.
+Apple documente le moniteur global `NSEvent` comme un observateur de copies
+asynchrones incapable de modifier la livraison originale. Le prochain adaptateur
+macOS devra donc combiner observation et classification sûre de la cible Finder ;
+en l'absence de preuve ou d'autorisation requise, il devra refuser l'intention.
+
 `interactive-theme.json` constitue le premier asset de composition partagé par
 l'hôte et l'extension. Son schéma compagnon fixe l'identité, les couleurs, la
 cinématique, le panneau, les actions et trois ancres de décor avec leurs cadres

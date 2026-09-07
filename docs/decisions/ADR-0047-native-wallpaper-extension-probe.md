@@ -93,6 +93,16 @@ du panneau. Son contrat refuse toute intention quand l'adaptateur OS signale du
 contenu natif prioritaire à cet emplacement. Cette règle est testée sans installer
 de moniteur global ; l'identification réelle des icônes Finder reste non prouvée.
 
+L'inspection du [protocole XPC épinglé](https://github.com/kageroumado/phosphene/blob/8b5bd57c1450eda74cf2ec6ceaae2e586cfdfcd6/PhospheneExtension/WallpaperExtension-Bridging-Header.h)
+confirme qu'il ne déclare que cycle de vie, réglages, choix, téléchargements et
+notifications : aucune route de pointeur. La documentation Apple de
+[`addGlobalMonitorForEvents`](https://developer.apple.com/documentation/appkit/nsevent/addglobalmonitorforevents%28matching%3Ahandler%3A%29)
+garantit seulement une copie asynchrone des événements livrés aux autres applications,
+sans possibilité de les modifier ou de les bloquer. Ce moniteur peut alimenter
+un futur adaptateur, mais ne prouve pas à lui seul qu'un clic visait une icône Finder.
+Le mode direct devra donc rester désactivé quand cette priorité ne peut pas être
+établie ; aucune action en double n'est acceptable.
+
 Pour ce seul diagnostic, réutiliser les notifications Darwin déjà employées
 par l'amont : noms fixes sans charge utile et actions idempotentes, traitées
 sur Lifecycle.queue. Canal non authentifié, sans accusé de réception ni garantie
