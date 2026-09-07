@@ -4,6 +4,15 @@ Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolémen
 
 ## Reprise actuelle — qualification native
 
+**Dernier résultat 23:57 : lancement rétabli après retour enregistré au build 3
+`compile.nXn2Mw`.** PID 12860, chemin réel vérifié, journal `colorDiag installed
+sweep` puis UPDATE. Build 4 aGAdKG conservé mais désenregistré ; ne pas le
+substituer pendant la revue visuelle demandée à l'utilisateur. Aucun service
+Apple arrêté. Les snapshots du build 3 échouent encore sur PNG/AVFoundation.
+L'animation visible, les transitions et les clics restent à qualifier. Aucun
+code produit modifié ; le retour concerne uniquement les registres du paquet.
+Schéma inchangé : aucune nouvelle frontière implémentée. Voir fiche native.
+
 Dernière contre-preuve : après resélection, toujours aucune animation selon
 l'utilisateur. Les lancements échouent avec `Invalid bundle record for current process`
 dans ExtensionFoundation ; chemin réellement lancé build 3 nXn2Mw malgré registre

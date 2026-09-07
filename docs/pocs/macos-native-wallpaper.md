@@ -2,8 +2,10 @@
 
 ## Tester le paquet préparé
 
-Le build courant est dans
-`dist/pocs/macos-native-wallpaper/compile.aGAdKG/Native Wallpaper Probe.app` (build 4).
+Le paquet actuellement enregistré et relancé est
+`dist/pocs/macos-native-wallpaper/compile.nXn2Mw/Native Wallpaper Probe.app` (build 3).
+Le build 4 `compile.aGAdKG` reste conservé mais non enregistré après le retour
+ciblé ci-dessous ; ne pas le réenregistrer pendant la qualification visuelle.
 Ouvrir cette application dans Finder, puis cliquer « Ouvrir les réglages ».
 Elle n'affiche pas de fenêtre wallpaper : sa boîte de dialogue explique le test.
 Dans Réglages > Fond d'écran, rechercher **Native Wallpaper Probe**, puis
@@ -34,6 +36,27 @@ sélectionné le diagnostic, puis signalé un fond noir. Ne pas déplacer le bui
 ## Correction du démarrage et du noir — 7 septembre 2026
 
 ### Contre-vérification après nouvelle sélection utilisateur
+
+**Résultat du retour ciblé, 23:57 :** après validation de sa signature, l'hôte
+build 3 nXn2Mw et son extension ont été réenregistrés. L'enregistrement pluginkit
+du build 4 a été retiré (fichiers conservés). Le registre ne contient alors
+qu'une extension du projet. Navigation Computer Use Apparence → Fond d'écran :
+le processus PID 12860 est lancé depuis nXn2Mw ; à 21:57:29.800Z son journal
+confirme `[colorDiag] installed sweep on display 1 (1512x982)`, puis des requêtes
+UPDATE. Aucun service Apple ni processus de diagnostic n'a été arrêté pendant
+ce retour. Le lancement est donc rétabli ; ce n'est pas encore une confirmation
+visuelle d'animation. L'utilisateur est invité à observer le bureau actuel,
+sans refaire une sélection. L'erreur de snapshot PNG/AVFoundation du build 3
+reste présente. Garder cette version vivante jusqu'à la revue visuelle.
+
+**Piste boutons non implémentée :** un moniteur souris dans un hôte distinct
+pourrait observer les clics sans fenêtre wallpaper superposée. L'[API Apple
+NSEvent](https://developer.apple.com/documentation/appkit/nsevent/addglobalmonitorforevents(matching:handler:))
+ne fournit que des copies asynchrones et ne bloque pas leur destinataire.
+Cela ne résout pas à lui seul la priorité des icônes Finder, le filtrage des
+autres fenêtres ou la liaison sécurisée à l'extension sandboxée. Ne pas activer
+de surveillance globale ni demander des droits d'accessibilité sans cadrer
+ce test séparé et ses limites. Aucun bouton/panneau fonctionnel n'est livré ici.
 
 L'utilisateur rapporte qu'une version animait le fond, puis que l'animation a
 disparu. La resélection ne résout pas le défaut. Les journaux système à 23:50
