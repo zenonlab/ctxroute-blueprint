@@ -5345,7 +5345,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5434,7 +5434,7 @@
         {
           "id": "step-3",
           "title": "Pousser et fusionner le commit vérifié",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "La branche contenant 1f5c2de est poussée sans réécriture d’historique",
             "La PR vers main passe les contrôles CI et est fusionnée"
@@ -5449,12 +5449,16 @@
             "gh pr checks --watch",
             "gh pr merge --merge"
           ],
-          "evidence": []
+          "evidence": [
+            "PR #15 merged into origin/main as e6b8e54 after Worker, packages, clean-install and Linux/macOS/Windows repository checks passed.",
+            "CRG reported risk 0.85 solely on the 126-file change graph; the reviewed override is explicit and no functional CI check failed.",
+            "The published parser implementation is commit 1f5c2de and publication tracking is commit 41459c5."
+          ]
         },
         {
           "id": "step-4",
           "title": "Publier les artefacts et le Worker par plan exact",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les ZIP 1.0.0 sont reconstruits et leurs hashes vérifiés",
             "Le plan Cloudflare cible uniquement deux objets R2 versionnés et worker:tobirink-public-api",
@@ -5472,12 +5476,16 @@
             "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip --operation worker-deploy",
             "npm run infra:apply -- --plan .ctxroute/state/tobirink-parser-publication-plan.json --approve <digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api"
           ],
-          "evidence": []
+          "evidence": [
+            "Approved plan 313d3bbb… applied only the two versioned R2 objects and worker:tobirink-public-api; no D1 operation was included.",
+            "Remote uploads completed for Chrome and Firefox 1.0.0; Worker version 2ca7a811-a224-443a-951b-30d293b7dd9b serves 100%.",
+            "Next static export rebuilt successfully and Wrangler uploaded 28 changed assets before deploying the Worker."
+          ]
         },
         {
           "id": "step-5",
           "title": "Vérifier la production et auditer la reproduction",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les routes publiques et la 404 répondent comme prévu",
             "Les ZIP distants correspondent au manifeste local",
@@ -5492,7 +5500,11 @@
             "shasum -a 256 downloaded artifacts",
             "git status --short"
           ],
-          "evidence": []
+          "evidence": [
+            "Production /, /library, /agenda, /privacy and /download return 200; an unknown route returns 404.",
+            "Remote ZIP hashes match local release-manifest.json: Chrome 41e5d667…2c11b and Firefox e2111228…fd79; immutable download headers are present.",
+            "Audit confirms the bounded local pipeline is delivered; MangaDex X-01, live historical differential validation, local-language runtime composition and store signing remain outside or incomplete."
+          ]
         }
       ]
     },
