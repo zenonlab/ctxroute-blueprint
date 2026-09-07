@@ -43,6 +43,12 @@ synthetic 82-case manifest plus deep oracle in
 `packages/application/src/favorites`; neither module activates a provider or
 the extension background.
 
+The next pure application slice implements shared title normalization and the
+deterministic provider matcher for canonical cases `P-01…P-08`. It compares
+only normalized identity evidence, stops at the first matching level, preserves
+provider-qualified references, and fails closed before consuming an incomplete
+candidate set.
+
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
 contracts, browser builds and reproducible packages to the release gate. It

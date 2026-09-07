@@ -181,7 +181,12 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
 
 function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
   contract(input.provider === provider, 'candidate provider must match its envelope.');
-  return Object.freeze({ ...input, externalId: nonEmpty(input.externalId, 'externalId'), titles: boundedTexts(input.titles, 'titles', favoriteAliasLimit) });
+  contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
+  return Object.freeze({
+    ...input,
+    externalId: nonEmpty(input.externalId, 'externalId'),
+    titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
+  });
 }
 
 export function createProviderCandidateEnvelope(input: ProviderCandidateEnvelope): ProviderCandidateEnvelope {

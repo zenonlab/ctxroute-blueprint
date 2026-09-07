@@ -1494,6 +1494,51 @@
             "Typecheck de tous les workspaces, ESLint, Oxlint et Sensor SAFE passent sans réseau, stockage ni background activé",
             "Décisions, docs, cohérence, 51 tests Progress, Archify dataflow/all showcase et diff-check passent"
           ]
+        },
+        {
+          "id": "step-20",
+          "title": "Implémenter la normalisation et le matcher de titres déterministe",
+          "status": "DONE",
+          "acceptance": [
+            "P-01 à P-08 produisent les décisions canoniques indépendamment de l ordre fournisseur",
+            "Normalisation, clé compacte, tokens significatifs et distance bornée sont purs, immuables et bornés",
+            "Préfixe, sous-titre, stemming, token coverage, popularité et métadonnées ne créent aucun match",
+            "Une enveloppe fournisseur incomplète échoue fermée avant matching",
+            "Tests, typecheck, lints, Sensor, documentation, Progress et Archify showcase passent"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/application/src/favorites/title-normalization.ts",
+            "packages/application/src/favorites/title-normalization.test.ts",
+            "packages/application/src/favorites/provider-matcher.ts",
+            "packages/application/src/favorites/provider-matcher.test.ts",
+            "packages/application/src/favorites/index.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add deterministic title matcher\""
+          ],
+          "evidence": [
+            "Domain 18/18 et Application 79/79 : P-01…P-08, ambiguïté stable, réponse incomplète et alias bornés validés.",
+            "TypeScript, ESLint, Oxlint, Sensor AST et git diff --check passent sans diagnostic.",
+            "Décisions/docs/cohérence, Progress 51/51 et Archify showcase all passent."
+          ]
         }
       ]
     },

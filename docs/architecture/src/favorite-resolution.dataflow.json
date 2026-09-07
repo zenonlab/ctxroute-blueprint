@@ -42,7 +42,7 @@
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "versionné" },
     { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "même IndexedDB" },
     { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "cadence indexée" },
-    { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "unicité requise" },
+    { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "P-01…P-08" },
     { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "décision humaine" },
     { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "seule autorité" }
   ],
