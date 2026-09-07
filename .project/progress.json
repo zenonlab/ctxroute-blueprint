@@ -1878,7 +1878,7 @@
         {
           "id": "step-30",
           "title": "Auditer et valider la pipeline complète",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Architecture, modularité, scalabilité locale, sécurité, migrations et absence de données fictives sont auditées sans écart critique.",
             "Tous les tests, builds, lints, Sensor, npm audit, Archify showcase, stack-audit et diff-check passent.",
@@ -1903,7 +1903,11 @@
             "git status --short",
             "git commit -m \"docs(parser): record production audit evidence\""
           ],
-          "evidence": []
+          "evidence": [
+            "Gates verts: verify, typecheck, ESLint, Oxlint, npm audit 0 vulnérabilité, CRG et Archify all showcase.",
+            "Audit critique: inventaire getTree global sans checkpoint durable; scalabilité locale complète non démontrée.",
+            "Audit critique: L/Q/B/X ne possèdent pas encore tous un scénario oracle métier; receipts/compaction/langue/candidats ambigus restent non composés."
+          ]
         }
       ]
     },

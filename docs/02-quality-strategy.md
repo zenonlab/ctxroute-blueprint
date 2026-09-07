@@ -84,6 +84,9 @@ browser or `workerd` test when platform behavior is the risk.
   50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.
   Baseline locale du 2026-09-07 : 0,124 ms typique et 0,852 ms maximal sur
   200/50 itérations; la CI republie les valeurs au lieu de les arrondir.
+- Le snapshot canonique des favoris est un garde de régression, pas une preuve
+  d’équivalence historique tant que chaque famille `L/Q/B/X` ne dispose pas de
+  son entrée et de ses assertions métier indépendantes de l’implémentation.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.

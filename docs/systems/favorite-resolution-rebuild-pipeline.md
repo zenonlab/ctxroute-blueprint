@@ -560,7 +560,7 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
 | metadata mêlant HTTP, HTML, sécurité et mapping | ports fournisseur étroits et projections validées | aucun import réseau dans domaine/application |
 | background portant les règles | racine de composition mince | test structurel et Sensor |
 | helpers concurrents | un seul artefact canonique versionné | égalité profonde du corpus |
-| arbre complet aplati en mémoire | parcours `getChildren`, tranches et checkpoint | grand inventaire repris après suspension |
+| arbre complet aplati en mémoire | cible : parcours `getChildren`, tranches et checkpoint | non livré : le runtime utilise encore `getTree()` |
 | import seulement à l’installation | quatre événements + réconciliation | tests création/changement/déplacement/suppression |
 | favori traité comme autorité | commande d’import vers IndexedDB | suppression sans cascade |
 | type manga par défaut | `UNKNOWN` jusqu’à une preuve | U-02 et routage séparé |
@@ -670,6 +670,36 @@ git diff --check
 
 Les commandes non pertinentes à une vague peuvent rester hors de son test
 ciblé, mais `npm run verify` devient obligatoire avant l’activation complète.
+
+## Audit de validité du 2026-09-07
+
+L’audit du code, des tests et des migrations confirme les éléments livrés
+suivants : frontières domaine/application/adaptateurs respectées, parser et
+matcher sans I/O, outbox v6 atomique et indexée, limites réseau et locales
+explicites, suppression de favori sans cascade, migrations Chromium, et gates
+de qualité reproductibles. `npm run verify`, le typecheck, ESLint, Oxlint,
+`npm audit --audit-level=high`, CRG et toutes les vues Archify showcase passent.
+
+Il reste toutefois trois écarts critiques par rapport à la définition de
+terminé. Ils interdisent de déclarer la pipeline complète :
+
+1. l’inventaire utilise encore `bookmarks.getTree()` et une réconciliation
+   globale. Il n’existe ni parcours `getChildren()` par tranches, ni checkpoint
+   d’inventaire durable, ni journal individuel persistant des événements;
+2. l’oracle exécute bien parser, matcher et projection pour 82 identifiants et
+   gèle leur sortie profonde, mais plusieurs familles (`L`, `Q`, `B`, `X`) ne
+   construisent pas encore leur scénario métier propre. Le snapshot protège
+   contre une régression future; il ne prouve pas à lui seul les 77
+   conservations et quatre corrections face au contrat historique;
+3. les stores et étapes cibles `inventoryCheckpoints`,
+   `resolutionReceipts`, compaction, preuve de langue locale et persistance des
+   candidats ambigus ne sont pas composés dans le runtime v6.
+
+La validation mécanique est donc verte, mais la validité fonctionnelle globale
+reste **non acquise**. La prochaine vague doit fermer ces écarts dans cet ordre :
+inventaire durable, oracle sémantique par famille, puis preuves et compaction
+manquantes. Aucun déploiement ne doit être fondé sur le seul passage des gates
+actuelles.
 
 ## Définition de terminé
 
