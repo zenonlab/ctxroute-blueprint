@@ -84,6 +84,8 @@
       "docs/architecture/src/production-surface.architecture.json",
       "docs/architecture/src/ui-system.architecture.json",
       "docs/architecture/src/active-page-progress.dataflow.json",
+      "docs/architecture/src/favorite-resolution.dataflow.json",
+      "docs/architecture/src/favorite-source-boundaries.architecture.json",
       "docs/architecture/src/extension-delivery-validation.dataflow.json",
       "docs/architecture/src/production-publication.dataflow.json",
       "docs/architecture/src/tobirink-ux.dataflow.json"

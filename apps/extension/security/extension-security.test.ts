@@ -79,13 +79,18 @@ describe('extension security boundary', () => {
     }).parse(JSON.parse(await readFile('package.json', 'utf8')));
     const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
     const localStorage = await readFile('runtime/local-storage.ts', 'utf8');
+    const favoriteResolution = await readFile('runtime/favorite-resolution-runtime.ts', 'utf8');
 
     expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
     expect(background).toMatch(/createExtensionLocalStorage\(\)/);
     expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
     expect(background).toMatch(/browser\.runtime\.onInstalled\.addListener/);
-    expect(background).toMatch(/normalizeBookmarks\(await bookmarks\.importBookmarks\(\)\)/);
-    expect(background).toMatch(/importFavoriteSources\(favorites, privateStorage\.storage/);
+    expect(favoriteResolution).toMatch(/readBookmarkBatch\(cursor, 100\)/);
+    expect(favoriteResolution).toMatch(/normalizeBookmarks\(slice\.records\)/);
+    expect(favoriteResolution).toMatch(/importFavoriteSources\(favorites, dependencies\.storage/);
+    expect(background).toMatch(/WebExtensionBookmarkEventAdapter\(browser\.bookmarks\)/);
+    expect(background).toMatch(/DexieFavoriteResolutionOutbox\(privateStorage\.storage\.database\)/);
+    expect(background).toMatch(/createFavoriteResolutionRuntime/);
     expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
     expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);
     expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
@@ -100,6 +105,7 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/applyConfirmedOrganizerPreview/);
     expect(background).toMatch(/DexieOrganizerSnapshotStore/);
     expect(background).not.toMatch(/bookmarks\.(?:create|move|remove|update)\s*\(/);
+    expect(favoriteResolution).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
   });

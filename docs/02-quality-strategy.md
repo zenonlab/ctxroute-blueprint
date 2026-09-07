@@ -80,6 +80,14 @@ browser or `workerd` test when platform behavior is the risk.
 
 - Local UI operations: visible response within 200 ms on the reference profile.
 - Background startup: no unbounded scan and no network dependency.
+- Parser favori local : p95 inférieur à 10 ms pour une entrée typique et à
+  50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.
+  Baseline locale du 2026-09-07 : 0,124 ms typique et 0,852 ms maximal sur
+  200/50 itérations; la CI republie les valeurs au lieu de les arrondir.
+- Le snapshot canonique des favoris garde la forme profonde; le gate
+  `test:parser-equivalence` exige en plus un test sémantique exécuté pour chacun
+  des 82 identifiants, vérifie l’unicité de leurs attentes et maintient le bilan
+  77 conservés / 4 corrigés / `X-01` futur.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.

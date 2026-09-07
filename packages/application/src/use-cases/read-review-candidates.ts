@@ -41,6 +41,7 @@ export const localReviewRevisionPort: ReviewRevisionPort = Object.freeze({
       source.folderPath,
       source.importedAt,
       source.order,
+      source.presence,
       source.title,
       source.url,
     ]);
@@ -60,7 +61,7 @@ export async function readReviewCandidates(
     source: await session.findFavoriteSourceByReviewId(reviewId),
   }));
 
-  if (!context.review || !context.source) throw new Error('Review candidate context is unavailable.');
+  if (!context.review || !context.source || context.source.presence !== 'observed') throw new Error('Review candidate context is unavailable.');
   if (context.review.status !== 'pending') throw new Error('Review candidate context is stale.');
 
   const reference = sourceParser.parse(context.source.url);

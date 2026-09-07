@@ -4,7 +4,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
-export const LIMITS = { bytes: 256 * 1024, goals: 40, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
+export const LIMITS = { bytes: 512 * 1024, goals: 40, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['collaborative', 'autonomous']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
@@ -15,7 +15,7 @@ export const progressRevision = value => createHash('sha256').update(JSON.string
 export async function readProgress(root = process.cwd()) {
   try {
     const source = await readFile(resolve(root, PROGRESS_PATH), 'utf8');
-    if (Buffer.byteLength(source) > LIMITS.bytes) throw new Error('progress file exceeds 256 KiB');
+    assertProgressSize(source);
     const value = JSON.parse(source); const errors = inspectProgressChecklist(value);
     if (errors.length) throw new Error(errors.join('; '));
     return { ...value, goals: value.goals.map(goal => ({ ...goal, executionMode: goal.executionMode ?? 'collaborative', modeOffered: goal.modeOffered ?? false })) };
@@ -80,7 +80,7 @@ export async function approvePlan(plan, root = process.cwd(), options = {}) {
   if (!result.ok) throw new Error(`Invalid progress plan: ${result.errors.join('; ')}`);
   const goal = result.normalized; const next = current.goals.some(item => item.id === goal.id) ? current : { ...current, goals: [...current.goals, goal] };
   const errors = inspectProgressChecklist(next); if (errors.length) throw new Error(errors.join('; '));
-  const json = `${JSON.stringify(next, null, 2)}\n`; if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 256 KiB');
+  const json = `${JSON.stringify(next, null, 2)}\n`; assertProgressSize(json);
   await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
 }
 
@@ -190,11 +190,12 @@ async function atomicWrite(path, content) { await mkdir(dirname(path), { recursi
 async function updateProgress(root, transform, options = {}) {
   const current = await readProgress(root); assertExpectedRevision(current, options.expectedRevision); const next = transform(current); const json = `${JSON.stringify(next, null, 2)}\n`;
   const errors = inspectProgressChecklist(next); if (errors.length) throw new Error(errors.join('; '));
-  if (Buffer.byteLength(json) > LIMITS.bytes) throw new Error('progress file exceeds 256 KiB');
+  assertProgressSize(json);
   await atomicWrite(resolve(root, PROGRESS_PATH), json); await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(next)); return next;
 }
 
 function findGoalIndex(current, goalId) { const index = current.goals.findIndex(goal => goal.id === goalId); if (index < 0) throw new Error(`Unknown goal: ${goalId}`); return index; }
+function assertProgressSize(content) { if (Buffer.byteLength(content) > LIMITS.bytes) throw new Error(`progress file exceeds ${LIMITS.bytes / 1024} KiB`); }
 function copyList(value) { return Array.isArray(value) ? [...value] : value; }
 function withDerivedStatus(goal, steps) { const remaining = steps.filter(step => step.status !== 'DONE'); const status = steps.every(step => step.status === 'DONE') ? 'DONE' : remaining.every(step => step.status === 'BLOCKED') ? 'BLOCKED' : 'ACTIVE'; return { ...goal, status, steps }; }
 

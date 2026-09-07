@@ -1,4 +1,5 @@
 import { verifyStoragePortContract } from '@tobirink/contracts';
+import { commitTask, importFavoriteSources, recordTaskEffect } from '@tobirink/application';
 import {
   agendaEntryId,
   createAgendaEntry,
@@ -11,7 +12,7 @@ import {
   reviewId,
   workId,
 } from '@tobirink/domain';
-import { DexieOrganizerSnapshotStore, DexieStoragePort, verifyDatabaseIntegrity } from '../src';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieStoragePort, verifyDatabaseIntegrity } from '../src';
 
 const storage = new DexieStoragePort(`tobirink-contract-${Date.now()}`);
 const organizerSnapshots = new DexieOrganizerSnapshotStore(`tobirink-organizer-contract-${Date.now()}`);
@@ -32,6 +33,22 @@ try {
   if (!(await storage.getReview(review.id)) || !(await storage.getAgendaEntry(agenda.id)) || !(await storage.getReminder(reminder.id))) {
     throw new Error('Review, agenda or reminder did not round-trip through IndexedDB.');
   }
+  await importFavoriteSources([{ bookmarkId: 'browser-atomic', folderPath: ['Mangas'], order: 0, state: 'eligible', title: 'Atomic fixture', url: 'https://reader.example/manga/atomic-fixture' }], storage, '2026-09-07T12:00:00.000Z');
+  const imported = (await storage.listFavoriteSources({ limit: 10 })).find((source) => source.bookmarkId === 'browser-atomic');
+  if (imported === undefined || await storage.getFavoriteParseArtifact(imported.id) === undefined) throw new Error('Favorite artifact did not share the import transaction.');
+  const tasks = await storage.database.favoriteResolutionTasks.toArray();
+  if (tasks.length !== 1 || tasks[0]?.state !== 'READY' || tasks[0].lane !== 'routing') throw new Error('Favorite resolution outbox did not share the import transaction.');
+  const resolutionOutbox = new DexieFavoriteResolutionOutbox(storage.database);
+  const claimed = await resolutionOutbox.claimNext({ claimedAt: '2026-09-07T12:01:00.000Z', claimExpiresAt: '2026-09-07T12:02:00.000Z', claimToken: 'browser-claim', kind: 'favorite-resolution', lane: 'routing' });
+  if (claimed?.state !== 'CLAIMED' || claimed.availableAt !== '2026-09-07T12:02:00.000Z') throw new Error('Favorite resolution outbox did not claim through its compound due index.');
+  const committed = commitTask(recordTaskEffect(claimed, 'browser-claim', 'browser:resolved'), 'browser-claim');
+  if (imported === undefined) throw new Error('Imported source disappeared before receipt test.');
+  await storage.transaction(['favoriteResolutionReceipts', 'favoriteResolutionTasks'], async (session) => {
+    await session.putFavoriteResolutionTask(committed);
+    await session.putFavoriteResolutionReceipt({ completedAt: '2026-09-07T12:03:00.000Z', effectDigest: 'browser:resolved', id: `${imported.id}:favorite-resolution`, idempotencyKey: committed.idempotencyKey, sourceId: imported.id });
+  });
+  if (await resolutionOutbox.compactCommitted({ before: '2026-10-08T00:00:00.000Z', limit: 8 }) !== 1 || await storage.getFavoriteResolutionTask(committed.id) !== undefined) throw new Error('Committed resolution task did not compact into its receipt.');
+  if (await storage.getFavoriteResolutionReceipt(`${imported.id}:favorite-resolution`) === undefined) throw new Error('Resolution receipt disappeared during compaction.');
   await storage.database.table('organizer').put({
     folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],
     id: 'organizer',

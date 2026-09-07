@@ -27,6 +27,7 @@ async function resolveManualWork(
   } else {
     const sources = await session.listFavoriteSources({ limit: 500 });
     for (const source of sources) {
+      if (source.presence !== 'observed') continue;
       if (source.url !== decision.value.trim()) continue;
       const review = await session.getReview(source.reviewId);
       if (review?.matchedWorkId && allowed.has(review.matchedWorkId)) matches.push(review.matchedWorkId);
@@ -41,7 +42,7 @@ async function hasResolvedHttpSource(session: StorageSession, workId: WorkId): P
   const reviews = await session.listReviewsByWorkId({ limit: 100, workId });
   for (const review of reviews) {
     const source = await session.findFavoriteSourceByReviewId(review.id);
-    if (!source) continue;
+    if (!source || source.presence !== 'observed') continue;
     try {
       const url = new URL(source.url);
       if (url.protocol === 'http:' || url.protocol === 'https:') return true;
@@ -60,7 +61,7 @@ export async function recordReviewDecision(
   return storage.transaction(['favoriteSources', 'libraries', 'reviews', 'works'], async (session) => {
     const review = await session.getReview(input.reviewId);
     const source = await session.findFavoriteSourceByReviewId(input.reviewId);
-    if (!review || !source || review.status !== 'pending') throw new Error('Review decision context is stale.');
+    if (!review || !source || source.presence !== 'observed' || review.status !== 'pending') throw new Error('Review decision context is stale.');
     const currentRevision = await revisionPort.createRevision({ review, source });
     if (currentRevision !== input.revision) throw new Error('Review decision revision conflict.');
 

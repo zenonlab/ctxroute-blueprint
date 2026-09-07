@@ -1,6 +1,9 @@
 export type {
   BookmarkPort,
   BookmarkImportPort,
+  BookmarkInventoryCursor,
+  BookmarkInventoryFrame,
+  BookmarkInventorySlice,
   BookmarkProjectionPort,
   BookmarkRecord,
   BootstrapEnvelope,
@@ -14,9 +17,9 @@ export type {
   TelemetryEvent,
   TelemetryPort,
 } from './ports/capability-ports';
-export { privateStoreNames } from './ports/storage-port';
+export { createFavoriteParseArtifactRecord, privateStoreNames } from './ports/storage-port';
 export { agendaEntryListLimit, assertAgendaEntryListQuery, assertReviewMatchListQuery, reviewMatchListLimit } from './ports/storage-port';
-export type { AgendaEntryListQuery, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, ReviewMatchListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
+export type { AgendaEntryListQuery, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, ReviewMatchListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
 export { defaultQuickPreferences, quickPreferencesSchema } from './ports/quick-preferences-port';
 export type { QuickPreferences, QuickPreferencesPort } from './ports/quick-preferences-port';
 export type {
@@ -51,6 +54,7 @@ export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';
 export { favoriteImportBatchSize, importFavoriteSources } from './use-cases/import-favorite-sources';
 export type { FavoriteImportSummary } from './use-cases/import-favorite-sources';
+export { favoritePresencePageLimit, reconcileFavoriteSourcePresence, reconcileFavoriteSourcePresenceForInventory } from './use-cases/reconcile-favorite-source-presence';
 export { readReviewQueue, reviewQueueLimit } from './use-cases/read-review-queue';
 export type { ReviewQueueItem, ReviewQueueSnapshot } from './use-cases/read-review-queue';
 export { readLocalReviewCandidates } from './use-cases/read-local-review-candidates';
@@ -72,3 +76,4 @@ export * from './popup';
 export * from './collective-index';
 export * from './recovery';
 export * from './organizer';
+export * from './favorites';

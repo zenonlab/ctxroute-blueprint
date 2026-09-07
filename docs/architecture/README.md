@@ -26,6 +26,42 @@ documents the runtime data path from the voluntarily exposed active tab through
 local identity correlation, the monotonic progress guard, IndexedDB and the
 reconstructible continuation cache to the popup WorkCard.
 
+[`src/favorite-resolution.dataflow.json`](src/favorite-resolution.dataflow.json)
+documents the lossless path from browser favorites through URL evidence,
+versioned parsing, durable MV3 tasks and deterministic provider matching to
+Review or the authoritative private IndexedDB records. Its bounded convergence
+view accompanies the implementation contract in
+[`favorite-resolution-rebuild-pipeline.md`](../systems/favorite-resolution-rebuild-pipeline.md):
+inventory slices, checkpoints, additive migration and exact-ID hydration are
+delivered without moving private authority out of IndexedDB. Resolution uses
+an outbox in the same private schema as each source and Review; indexed
+provider lanes claim bounded work, and incomplete candidate sets fail closed.
+The separate durable-task database remains the notification adapter and is not
+presented as an atomic resolution outbox. The first implementation wave places
+the immutable bounded contracts in `packages/domain/src/favorites` and the
+synthetic 82-case manifest plus deep oracle in
+`packages/application/src/favorites`; neither module activates a provider or
+the extension background.
+
+The next pure application slice implements shared title normalization and the
+deterministic provider matcher for canonical cases `P-01…P-08`. It compares
+only normalized identity evidence, stops at the first matching level, preserves
+provider-qualified references, and fails closed before consuming an incomplete
+candidate set.
+
+The URL evidence slice keeps qualification and source analysis as pure
+application modules. Exact-origin adapters may emit provider IDs, while one
+generic fallback derives only structural evidence; utility pages and adapter
+conflicts fail closed, and a valid observed HTTP origin is never rewritten.
+The first browser-owned exact adapter covers AniList anime and manga routes by
+decimal public ID. It is a pure URL mapper: it performs no fetch and accepts
+only the four explicitly declared HTTP(S), bare and `www` origins.
+
+[`src/favorite-source-boundaries.architecture.json`](src/favorite-source-boundaries.architecture.json)
+shows the package boundary behind that behavior: Application owns qualification,
+registry selection and the generic fallback; Browser Adapters owns exact AniList
+URL knowledge; Domain validates the immutable `SourceEvidence` result.
+
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
 contracts, browser builds and reproducible packages to the release gate. It

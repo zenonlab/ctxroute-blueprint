@@ -33,7 +33,7 @@ describe('owned port contracts', () => {
     await notifications.publish({ body: 'Disponible', deduplicationKey: 'release_1', title: 'Frieren' });
     telemetry.record({ name: 'local.operation', fields: { durationMs: 2 } });
 
-    expect(await bookmarks.importBookmarks()).toEqual([]);
+    expect(await bookmarks.readBookmarkBatch()).toEqual({ complete: true, records: [] });
     expect((await catalogue.findWork(id))?.preferredTitle).toBe('Frieren');
     expect(await media.coverUrl(id, 'cover-sm')).toContain('cover-sm');
     expect(await page.readActivePage()).toEqual({ title: 'Frieren', url: 'https://example.invalid/frieren' });

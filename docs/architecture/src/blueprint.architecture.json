@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1280, 520],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns goals and bounded platform-aware dashboard startup; Stop hands off; CTXRoute dispatches lifecycle." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns goals in a 512 KiB bounded record; Stop hands off; CTXRoute dispatches lifecycle." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
@@ -17,7 +17,7 @@
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "Sole hook orchestrator", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Runnable goals + state", "pos": [30, 230], "size": [170, 60] },
+    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Runnable goals · 512 KiB max", "pos": [30, 230], "size": [170, 60] },
     { "id": "progressDashboard", "type": "frontend", "label": "Progress dashboard", "sublabel": "Autosaved cards + explicit structure", "pos": [30, 410], "size": [190, 60] },
     { "id": "dashboardState", "type": "database", "label": "Dashboard state", "sublabel": "Ignored PID + session markers", "pos": [280, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },

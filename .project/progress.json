@@ -1344,6 +1344,598 @@
             "Extension 80/80, UI 118/118, Workbench 9/9, accessibilite 8/8 et securite 12/12 passent; Reglages lit et serialise les ecritures par messages stricts sans Dexie navigateur reseau ni action Apply Restore fictive.",
             "Typecheck 8 workspaces, performance 3/3, builds Chrome 613.91 kB et Firefox 614.03 kB, lints, anti-slop, Sensor SAFE, docs, decisions, diff-check et deux Archify 9/9 passent; audit Chromium desktop corrige l espace etire, shell Workbench natif 390 px reste un correctif distinct."
           ]
+        },
+        {
+          "id": "step-16",
+          "title": "Figer le contrat complet du parser et de la résolution",
+          "status": "DONE",
+          "acceptance": [
+            "Chaque règle FavLib auditée est classée à conserver, corriger ou rejeter avec sa preuve source",
+            "Le contrat couvre identité, titres, saisons, progression, ambiguïtés, fournisseurs, provenance, reprise MV3, événements et oracle",
+            "IndexedDB reste l’autorité privée TobiRink et aucun code, asset, secret ou donnée FavLib n’est copié",
+            "Le dataflow produit passe les neuf contrôles Archify showcase sans erreur ni avertissement",
+            "Les validateurs ADR, documentation et architecture ainsi que git diff --check passent"
+          ],
+          "files": [
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/README.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/decisions/README.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- favorite-resolution",
+            "npm run validate:architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Spécification canonique de 780 lignes avec 82 cas traçables et vocabulaires fermés du parser, resolver, langue et file MV3",
+            "ADR-0037, validate:decisions, validate:docs et Sensor JSON SAFE passent; aucun code, asset, secret ou donnée FavLib copié",
+            "favorite-resolution et toute l’architecture produit passent Archify showcase 9/9 avec 0 erreur et 0 avertissement"
+          ]
+        },
+        {
+          "id": "step-17",
+          "title": "Définir la pipeline améliorée de reconstruction des favoris",
+          "status": "DONE",
+          "acceptance": [
+            "La pipeline relie chaque événement navigateur aux écritures locales et aux projections sans étape implicite",
+            "Chaque composant cible possède entrée, sortie, limite, erreur, idempotence et preuve de test",
+            "Une matrice relie les défauts FavLib aux améliorations et critères mesurables TobiRink",
+            "Les migrations, la compatibilité des artefacts et l’ordre de livraison sont explicitement bornés",
+            "Documentation, architecture Archify showcase, Progress, Sensor et diff-check passent"
+          ],
+          "files": [
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/systems/README.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- favorite-resolution",
+            "npm run validate:architecture",
+            "npm run sensor -- docs/architecture/src/favorite-resolution.dataflow.json",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Pipeline cible de 471 lignes: 11 étapes, 13 composants bornés, erreurs, migration v5 et 8 vagues",
+            "validate:docs et 51 tests Progress passent; Sensor JSON SAFE sur Progress et le dataflow",
+            "Archify dataflow et all passent showcase 9/9, 0 erreur et 0 avertissement"
+          ]
+        },
+        {
+          "id": "step-18",
+          "title": "Corriger le contrat de pipeline après audit complet",
+          "status": "DONE",
+          "acceptance": [
+            "La parité distingue 77 cas conservés, quatre corrections volontaires et un cas futur, avec oracle exécutable obligatoire",
+            "Toute troncature fournisseur échoue fermée et NO_MATCH maintient une Review explicite",
+            "L outbox de résolution est atomique avec FavoriteSource et Review; les claims sont indexés, bornés et isolés par type et fournisseur",
+            "Langue, OVA, pré-sérialisation, taxonomie, TTL, cadences, empreintes, rétention et budgets sont explicitement placés et bornés",
+            "Documentation, décisions, Archify showcase, Progress, Sensor et diff-check passent"
+          ],
+          "files": [
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "npm run sensor -- .project/progress.json docs/architecture/src/favorite-resolution.dataflow.json",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Contrat v2 et pipeline corrigés: oracle 77/4/X-01, troncation fail-closed, Review no-match et budgets normatifs",
+            "Outbox atomique dans tobirink-private, claims indexés par lane, empreinte et rétention bornées documentés",
+            "Documentation, décisions, cohérence, 51 tests Progress, Sensor SAFE et Archify showcase all passent"
+          ]
+        },
+        {
+          "id": "step-19",
+          "title": "Matérialiser les contrats, le corpus synthétique et l’oracle",
+          "status": "DONE",
+          "acceptance": [
+            "Les contrats de FavoriteObservation, SourceEvidence, FavoriteParseArtifact, ProviderCandidateEnvelope et ResolutionDecision sont immuables, validés et bornés",
+            "Le corpus synthétique contient exactement 82 identifiants uniques, 77 conservations, quatre corrections et X-01 futur sans donnée privée",
+            "L’oracle profond réutilisable compare artefact, décision et projection et échoue sur toute divergence ou réponse fournisseur tronquée",
+            "Aucun réseau, adaptateur fournisseur, stockage ou background n’est activé",
+            "Tests, typecheck, lints, Sensor, documentation, Progress et Archify showcase passent"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/favorites/vocabularies.ts",
+            "packages/domain/src/favorites/index.ts",
+            "packages/domain/src/index.ts",
+            "packages/application/src/favorites/equivalence-corpus.ts",
+            "packages/application/src/favorites/equivalence-oracle.ts",
+            "packages/application/src/favorites/equivalence-oracle.test.ts",
+            "packages/application/src/favorites/index.ts",
+            "packages/application/src/index.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add favorite equivalence contracts\""
+          ],
+          "evidence": [
+            "Domain 18/18 et Application 65/65: contrats bornés, identité provider+externalId, corpus 82/77/4/1 et oracle profond fail-closed",
+            "Typecheck de tous les workspaces, ESLint, Oxlint et Sensor SAFE passent sans réseau, stockage ni background activé",
+            "Décisions, docs, cohérence, 51 tests Progress, Archify dataflow/all showcase et diff-check passent"
+          ]
+        },
+        {
+          "id": "step-20",
+          "title": "Implémenter la normalisation et le matcher de titres déterministe",
+          "status": "DONE",
+          "acceptance": [
+            "P-01 à P-08 produisent les décisions canoniques indépendamment de l ordre fournisseur",
+            "Normalisation, clé compacte, tokens significatifs et distance bornée sont purs, immuables et bornés",
+            "Préfixe, sous-titre, stemming, token coverage, popularité et métadonnées ne créent aucun match",
+            "Une enveloppe fournisseur incomplète échoue fermée avant matching",
+            "Tests, typecheck, lints, Sensor, documentation, Progress et Archify showcase passent"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/application/src/favorites/title-normalization.ts",
+            "packages/application/src/favorites/title-normalization.test.ts",
+            "packages/application/src/favorites/provider-matcher.ts",
+            "packages/application/src/favorites/provider-matcher.test.ts",
+            "packages/application/src/favorites/index.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add deterministic title matcher\""
+          ],
+          "evidence": [
+            "Domain 18/18 et Application 79/79 : P-01…P-08, ambiguïté stable, réponse incomplète et alias bornés validés.",
+            "TypeScript, ESLint, Oxlint, Sensor AST et git diff --check passent sans diagnostic.",
+            "Décisions/docs/cohérence, Progress 51/51 et Archify showcase all passent."
+          ]
+        },
+        {
+          "id": "step-21",
+          "title": "Implémenter la qualification URL et les preuves de source",
+          "status": "DONE",
+          "acceptance": [
+            "Les cas U-01 à U-10 produisent des résultats déterministes et synthétiques",
+            "Les origines HTTP valides restent HTTP et les routes génériques restent UNKNOWN",
+            "Les pages utilitaires, slugs numériques et drama non marqué échouent fermés",
+            "Aucun runtime, stockage, réseau ou API de plateforme ne rejoint le parser pur"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/favorites/vocabularies.ts",
+            "packages/domain/src/favorites/limits.ts",
+            "packages/domain/src/favorites/source-evidence-contract.ts",
+            "packages/application/src/favorites/eligibility.ts",
+            "packages/application/src/favorites/eligibility.test.ts",
+            "packages/application/src/favorites/source-evidence.ts",
+            "packages/application/src/favorites/source-evidence.test.ts",
+            "packages/application/src/favorites/index.ts",
+            "docs/architecture/README.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run check:coherence",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add favorite URL evidence\""
+          ],
+          "evidence": [
+            "Domain 19/19 et Application 103/103 : U-01…U-10, conflits d’adaptateurs et bornes URL validés.",
+            "TypeScript, ESLint, Oxlint et Sensor AST passent; aucun import réseau, navigateur, Dexie ou temporisateur.",
+            "Décisions/docs/cohérence, Progress 51/51, Archify all showcase et git diff --check passent."
+          ]
+        },
+        {
+          "id": "step-22",
+          "title": "Ajouter l’adaptateur AniList exact",
+          "status": "DONE",
+          "acceptance": [
+            "AniList anime/manga fournit un ID exact sur les seules origines HTTP(S) admises",
+            "Origine trompeuse, route ou ID invalide échoue fermé sans réseau"
+          ],
+          "files": [
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-browser/src/index.ts",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/README.md",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run archify:validate -- architecture",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Browser 15/15; typecheck et lints passent.",
+            "Archify architecture showcase 9/9, 0 erreur/avertissement.",
+            "Config, docs et Progress 51/51 passent; aucun réseau activé."
+          ]
+        },
+        {
+          "id": "step-23",
+          "title": "Préserver les observations URL rejetées",
+          "status": "DONE",
+          "acceptance": [
+            "Le brut URL borné est conservé avant qualification et les rejets restent fail-closed.",
+            "Origin et canonicalUrl sont cohérents; tests et validations passent."
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/favorites/source-evidence-contract.ts",
+            "packages/domain/tsconfig.json",
+            "packages/application/src/favorites/source-evidence.test.ts",
+            "packages/application/src/favorites/eligibility.test.ts",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Domaine 23/23 et application 105/105 passent; les rejets URL restent bruts et non actionnables.",
+            "Typecheck, ESLint, Oxlint, Sensor ciblé SAFE et validate complet passent.",
+            "Favorite-resolution Archify passe showcase 9/9; diff-check passe."
+          ]
+        },
+        {
+          "id": "step-24",
+          "title": "Construire le parser local T-I-S-R",
+          "status": "DONE",
+          "acceptance": [
+            "T-01…T-10, I-01…I-07, S-01…S-07 et R-01…R-14 exécutent des fixtures synthétiques.",
+            "Artefact déterministe, gelé, borné, brut intact et sans I/O."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/domain/tsconfig.json",
+            "packages/application/src/favorites/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 147/147: fixtures T-01…T-10, I-01…I-07, S-01…S-07 et R-01…R-14 passent.",
+            "Domaine 23/23, typecheck tous workspaces, ESLint, Oxlint et Sensor ciblé SAFE passent.",
+            "Validate complet et favorite-resolution Archify showcase 9/9 passent."
+          ]
+        },
+        {
+          "id": "step-25",
+          "title": "Compléter la décision fournisseur pure",
+          "status": "DONE",
+          "acceptance": [
+            "L’ordre source-id, source-url, exact, saison, mots et distance est déterministe et fail-closed.",
+            "F-01/F-02 et C-01/C-02 bloquent sans heuristique de popularité."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "domain 23/23; application 151/151",
+            "six ordered levels + F/C cases",
+            "typecheck, Sensor SAFE, validate, Archify 9/9"
+          ]
+        },
+        {
+          "id": "step-26",
+          "title": "Composer les frontières fournisseur locales",
+          "status": "DONE",
+          "acceptance": [
+            "MangaUpdates extrait uniquement /series/{id} exact et le routage respecte ANIME/MANGA/MANHWA/MANHUA/UNKNOWN.",
+            "Les ports de recherche et hydratation sont bornés, distincts et testables sans réseau; AniList reste compatible."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-browser/src/index.ts",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "npm run archify:validate -- favorite-source-boundaries.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "application 161/161; browser adapters 22/22",
+            "MangaUpdates exact route + five-kind routing",
+            "all-workspace typecheck, Sensor SAFE, validate, Archify showcase"
+          ]
+        },
+        {
+          "id": "step-27",
+          "title": "Rendre import et outbox atomiques",
+          "status": "DONE",
+          "acceptance": [
+            "IndexedDB v6 stocke artefact et tâche de résolution dans tobirink-private, séparément de tobirink-durable-tasks.",
+            "Chaque nouvel import éligible écrit source, Review, artefact brut et tâche READY dans une transaction rollback-safe."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/tasks/**",
+            "packages/application/src/use-cases/import-favorite-sources*",
+            "packages/adapters-indexeddb/src/**",
+            "packages/contracts/src/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "npm run validate",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 164/164, domaine 23/23 et contrats 16/16 passent; import, artefact et tâche READY sont atomiques avec rollback testé.",
+            "IndexedDB Chromium, stockage, tâches et migrations v1-v5 vers v6 passent; deux stores privés additifs et index de disponibilité validés.",
+            "Typecheck de tous les workspaces, Sensor SAFE, validate global, git diff --check et Archify favorite-resolution showcase passent."
+          ]
+        },
+        {
+          "id": "step-28",
+          "title": "Composer le runner durable et les événements favoris",
+          "status": "DONE",
+          "acceptance": [
+            "Le runner réclame des tâches bornées, applique recherche, décision et hydratation via des ports injectés, puis persiste un effet idempotent.",
+            "Les adaptateurs AniList et MangaUpdates valident des réponses bornées avec timeout sans appel réseau dans les tests.",
+            "Les événements create/change/move/remove convergent sans supprimer Work, progression ou Agenda."
+          ],
+          "files": [
+            "packages/domain/src/favorite-source.ts",
+            "packages/domain/src/index.ts",
+            "packages/application/src/favorites/**",
+            "packages/application/src/tasks/**",
+            "packages/application/src/use-cases/**",
+            "packages/application/src/recovery/**",
+            "packages/adapters-browser/src/**",
+            "packages/adapters-browser/package.json",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/wxt.config.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/security/**",
+            "apps/extension/**/*.test.ts",
+            "package-lock.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --workspace @tobirink/adapters-browser --save-exact zod@4.5.4",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run build:extension",
+            "npm run typecheck",
+            "npm run sensor -- packages/application/src/favorites packages/application/src/tasks packages/adapters-browser/src apps/extension/wxt-entrypoints/background.ts",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate",
+            "git diff --check",
+            "git commit -m \"feat(parser): compose durable favorite resolution\""
+          ],
+          "evidence": [
+            "174 tests application, 30 adaptateurs navigateur, 2 IndexedDB avec contrat Chromium et 94 extension passent.",
+            "Build Chrome MV3, typecheck complet, Sensor SAFE et git diff --check passent.",
+            "Archify dataflow showcase passe sans erreur ni avertissement; npm run validate passe."
+          ]
+        },
+        {
+          "id": "step-29",
+          "title": "Remplacer l'oracle factice et mesurer les bornes",
+          "status": "DONE",
+          "acceptance": [
+            "Les 82 cas exécutent réellement le parser, le matcher et la projection puis comparent des résultats métier profonds.",
+            "Les benchmarks publient p95 typique et maximal avec les budgets documentés.",
+            "Le harnais Chromium et la commande verify exécutent de façon stable tous les tests produit requis."
+          ],
+          "files": [
+            "packages/application/src/favorites/**",
+            "packages/application/package.json",
+            "packages/adapters-indexeddb/test/**",
+            "package.json",
+            "scripts/**",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm run test:performance",
+            "npm run verify",
+            "npm run typecheck",
+            "npm run sensor -- packages/application/src/favorites packages/adapters-indexeddb/test scripts",
+            "git diff --check",
+            "git commit -m \"test(parser): verify behavioral equivalence\""
+          ],
+          "evidence": [
+            "82 cas canoniques exécutent qualification, parser, matcher et projection; snapshot profond versionné; application 174/174.",
+            "p95 parser mesuré à 0,124 ms typique et 0,852 ms maximal, sous budgets 10/50 ms; builds Chrome/Firefox 802,31/802,42 kB.",
+            "npm run verify passe: typecheck, tous tests workspace, Chromium IndexedDB, performance, audit 0 vulnérabilité et docs."
+          ]
+        },
+        {
+          "id": "step-30",
+          "title": "Fermer les écarts et valider la pipeline locale complète",
+          "status": "DONE",
+          "acceptance": [
+            "L’inventaire utilise getChildren en tranches de 100 avec checkpoint IndexedDB et journal d’événements durable; aucune perte ni cascade sur Work, progression ou Agenda.",
+            "Les 82 cas possèdent des attentes métier indépendantes; L/Q/B/X exécutent leurs modules réels et le gate prouve 77 conservations, quatre corrections et X-01 futur.",
+            "Receipts, compaction, cadence fournisseur et six candidats Review au plus sont persistés par migrations additives sans perte.",
+            "Tous les tests, builds, lints, Sensor, npm audit, Archify showcase, stack-audit et diff-check passent; dépôt propre et aucun déploiement."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "packages/application/src/inventory/**",
+            "packages/application/src/ports/**",
+            "packages/application/src/use-cases/**",
+            "packages/contracts/src/**",
+            "packages/adapters-browser/src/bookmarks/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-indexeddb/src/**",
+            "packages/adapters-indexeddb/test/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/**/*.test.ts",
+            "scripts/**",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-*.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:migrations",
+            "npm run test:security",
+            "npm run test:performance",
+            "npm run verify",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm audit --audit-level=high",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src packages/adapters-browser/src packages/adapters-indexeddb/src apps/extension/runtime",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "npm run crg:review",
+            "git diff --check",
+            "git status --short",
+            "git commit -m \"feat(parser): complete durable local pipeline\""
+          ],
+          "evidence": [
+            "Inventory uses getChildren with a durable DFS cursor, 100-item slices, eight slices per wake, persisted latest-event journal and non-cascading reconciliation; extension 97/97.",
+            "Canonical oracle and semantic gate cover 82 unique cases with 77 conserved, four corrected and X-01 future; domain 24/24 and application 181/181.",
+            "IndexedDB v8 persists inventory state, provider cadence, receipts and bounded Review candidates; Chromium base, task and v1-v8 migration contracts pass.",
+            "npm run verify passes: all workspace tests, typecheck, lint, performance builds, CRG/integration, 0 high vulnerabilities and showcase Archify 9/9; git diff --check passes."
+          ]
         }
       ]
     },
@@ -3073,6 +3665,29 @@
           "evidence": [
             "40 Progress tests; decisions; docs; diff pass."
           ]
+        },
+        {
+          "id": "step-2",
+          "title": "Porter Progress à 512 Kio",
+          "status": "DONE",
+          "acceptance": [
+            "Borne 512 Kio testée sans perte des 40 goals."
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "41 tests; validate complet; Archify 9/9; 40 goals conservés."
+          ]
         }
       ]
     },
@@ -4730,7 +5345,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -4815,6 +5430,69 @@
             "Production verification: /, /library, /agenda, /privacy and /download return 200; an unknown route returns 404; /download exposes both versioned MV3 links with immutable cache headers.",
             "Remote SHA-256 values match the published bytes: Chrome 237aa4165022d0dd44042812a24ba2d1a198b64071e992e789a9864ef0452794; Firefox 62ecb5d2afdc027eccf5ce136219aacee70abe24e184123ff5889f74ca1c6d48; product dataflow and architecture validate showcase 9/9."
           ]
+        },
+        {
+          "id": "step-3",
+          "title": "Pousser et fusionner le commit vérifié",
+          "status": "TODO",
+          "acceptance": [
+            "La branche contenant 1f5c2de est poussée sans réécriture d’historique",
+            "La PR vers main passe les contrôles CI et est fusionnée"
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git push -u origin fix/tobirink-parser-pipeline",
+            "gh pr create --base main --head fix/tobirink-parser-pipeline",
+            "gh pr checks --watch",
+            "gh pr merge --merge"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Publier les artefacts et le Worker par plan exact",
+          "status": "TODO",
+          "acceptance": [
+            "Les ZIP 1.0.0 sont reconstruits et leurs hashes vérifiés",
+            "Le plan Cloudflare cible uniquement deux objets R2 versionnés et worker:tobirink-public-api",
+            "Aucune migration D1, ressource FavLib, suppression ou secret n’est touché"
+          ],
+          "files": [
+            "apps/extension/.output/packages/release-manifest.json",
+            ".ctxroute/state/tobirink-parser-publication-plan.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip --operation worker-deploy",
+            "npm run infra:apply -- --plan .ctxroute/state/tobirink-parser-publication-plan.json --approve <digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Vérifier la production et auditer la reproduction",
+          "status": "TODO",
+          "acceptance": [
+            "Les routes publiques et la 404 répondent comme prévu",
+            "Les ZIP distants correspondent au manifeste local",
+            "L’audit sépare clairement la pipeline reproduite des capacités futures ou manuelles"
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "curl production routes and downloads",
+            "shasum -a 256 downloaded artifacts",
+            "git status --short"
+          ],
+          "evidence": []
         }
       ]
     },

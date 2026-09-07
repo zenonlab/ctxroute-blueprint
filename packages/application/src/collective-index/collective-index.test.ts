@@ -63,7 +63,7 @@ describe('collective index use cases', () => {
     });
   });
 
-  it('hashes the dedicated revoke credential', async () => {
+  it('revokes consent with the dedicated credential', async () => {
     const index = new MemoryCollectiveIndex();
     index.consent = { consentId: 'consent_test', createdAt: 'now', revokeTokenHash: 'hash:revoke', writeTokenHash: 'hash:write' };
     await expect(revokeCollectiveConsent({ clock: { now: () => 'later' }, credentials, index }, 'consent_test', 'revoke')).resolves.toBe(true);

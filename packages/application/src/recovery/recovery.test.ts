@@ -41,4 +41,18 @@ describe('private recovery', () => {
     await importPrivateExport(JSON.stringify(legacy), store, 'replace-private-state');
     expect((await store.readSnapshot()).organizer).toBeUndefined();
   });
+
+  it('restores legacy favorite sources as observed', () => {
+    const review = createReview({ id: reviewId('review_legacy'), sourceLabel: 'https://reader.example/legacy', status: 'pending', title: 'Legacy' });
+    const legacy = {
+      ...empty,
+      exportedAt: '2026-09-04T10:00:00.000Z',
+      favoriteSources: [{ bookmarkId: 'legacy', folderPath: [], id: 'source_legacy', importedAt: '2026-09-04T09:00:00.000Z', order: 0, reviewId: review.id, title: 'Legacy', url: 'https://reader.example/legacy' }],
+      format: 'tobirink-private-export',
+      reviews: [review],
+      version: 2,
+    };
+
+    expect(validatePrivateExport(JSON.stringify(legacy)).favoriteSources[0]?.presence).toBe('observed');
+  });
 });

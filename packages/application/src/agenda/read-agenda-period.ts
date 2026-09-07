@@ -26,7 +26,7 @@ function compareSources(left: FavoriteSource, right: FavoriteSource): number {
 async function preferredSource(storage: StorageReadPort, workId: WorkId): Promise<FavoriteSource | undefined> {
   const reviews = await storage.listReviewsByWorkId({ limit: reviewMatchListLimit, workId });
   const sources = await Promise.all(reviews.map((review) => storage.findFavoriteSourceByReviewId(review.id)));
-  return sources.filter((source): source is FavoriteSource => source !== undefined).sort(compareSources)[0];
+  return sources.filter((source): source is FavoriteSource => source?.presence === 'observed').sort(compareSources)[0];
 }
 
 export async function readAgendaPeriod(

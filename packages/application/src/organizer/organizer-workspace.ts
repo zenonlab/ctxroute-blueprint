@@ -32,13 +32,16 @@ function needsUnavailableMetadata(folders: readonly OrganizerFolder[]): boolean 
 async function readFavoriteSources(storage: Pick<StoragePort, 'listFavoriteSources'>): Promise<{ sources: readonly FavoriteSource[]; truncated: boolean }> {
   const sources: FavoriteSource[] = [];
   let afterId: FavoriteSource['id'] | undefined;
+  let inspected = 0;
 
-  while (sources.length < organizerPreviewLimit) {
+  while (inspected < organizerPreviewLimit) {
+    const limit = Math.min(organizerPageSize, organizerPreviewLimit - inspected);
     const page = await storage.listFavoriteSources(afterId === undefined
-      ? { limit: organizerPageSize }
-      : { afterId, limit: organizerPageSize });
-    sources.push(...page);
-    if (page.length < organizerPageSize) return { sources, truncated: false };
+      ? { limit }
+      : { afterId, limit });
+    inspected += page.length;
+    sources.push(...page.filter((source) => source.presence === 'observed'));
+    if (page.length < limit) return { sources, truncated: false };
     afterId = page.at(-1)?.id;
     if (afterId === undefined) return { sources, truncated: false };
   }

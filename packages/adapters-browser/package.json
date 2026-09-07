@@ -8,6 +8,7 @@
   "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
   "dependencies": {
     "@tobirink/application": "*",
-    "@tobirink/domain": "*"
+    "@tobirink/domain": "*",
+    "zod": "4.5.4"
   }
 }

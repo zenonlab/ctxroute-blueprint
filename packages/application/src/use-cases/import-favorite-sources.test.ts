@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
+import { claimTask, commitTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
@@ -23,9 +24,13 @@ describe('importFavoriteSources', () => {
     const [source] = await storage.listFavoriteSources({ limit: 10 });
     expect(source).toMatchObject({ bookmarkId: '42', folderPath: ['Lectures', 'Manga'], importedAt, order: 3 });
     expect(source && await storage.getReview(source.reviewId)).toMatchObject({ status: 'pending', title: favorite.title });
+    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt, reviewId: source?.reviewId });
+    const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
+    expect(task).toMatchObject({ availableAt: '1970-01-01T00:00:00.000Z', kind: 'favorite-resolution', state: 'READY' });
+    expect(task?.payload).toContain(source?.id);
   });
 
-  it('updates placement while preserving import time and a resolved Review', async () => {
+  it('Q-02 creates a new semantic task revision while preserving import time and a resolved Review', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([favorite], storage, importedAt);
     const [initial] = await storage.listFavoriteSources({ limit: 1 });
@@ -36,10 +41,14 @@ describe('importFavoriteSources', () => {
       await session.putReview(createReview({ id: initial.reviewId, matchedWorkId: work.id, sourceLabel: initial.url, status: 'resolved', title: initial.title }));
     });
 
+    const initialTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     await importFavoriteSources([{ ...favorite, folderPath: ['À lire'], order: 0, title: 'Frieren', url: 'https://reader.example/frieren' }], storage, '2026-09-06T01:00:00.000Z');
     const [updated] = await storage.listFavoriteSources({ limit: 1 });
     expect(updated).toMatchObject({ folderPath: ['À lire'], importedAt, order: 0, title: 'Frieren' });
     expect(updated && await storage.getReview(updated.reviewId)).toMatchObject({ matchedWorkId: work.id, status: 'resolved', title: 'Frieren' });
+    const revisedTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
+    expect(revisedTask).toMatchObject({ state: 'READY' });
+    expect(revisedTask?.idempotencyKey).not.toBe(initialTask?.idempotencyKey);
   });
 
   it('rolls back a batch when one source is invalid', async () => {
@@ -48,5 +57,20 @@ describe('importFavoriteSources', () => {
     await expect(importFavoriteSources([favorite, invalid], storage, importedAt)).rejects.toThrow();
     await expect(storage.listFavoriteSources({ limit: 10 })).resolves.toEqual([]);
     await expect(storage.getReview(reviewId('review_4_3432'))).resolves.toBeUndefined();
+    await expect(storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).resolves.toBeUndefined();
+  });
+
+  it('Q-01 does not duplicate or reopen a committed resolution after a placement-only move', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const taskId = 'favorite-resolution_4_3432';
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    if (task === undefined) throw new Error('Expected resolution task.');
+    const claimed = claimTask(task, 'claim', importedAt, '2026-09-06T00:01:00.000Z');
+    await storage.putFavoriteResolutionTask(commitTask(recordTaskEffect(claimed, 'claim', 'resolved:test'), 'claim'));
+
+    await importFavoriteSources([{ ...favorite, folderPath: ['Moved'], order: 0 }], storage, '2026-09-06T01:00:00.000Z');
+
+    await expect(storage.getFavoriteResolutionTask(taskId)).resolves.toMatchObject({ state: 'COMMITTED' });
   });
 });
