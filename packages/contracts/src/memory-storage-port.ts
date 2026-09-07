@@ -1,5 +1,5 @@
 import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
-import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
+import type { DurableTask, FavoriteParseArtifactRecord, PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import { createOrganizerConfiguration } from '@tobirink/domain';
 import type {
   AgendaEntry,
@@ -18,12 +18,15 @@ import type {
   Work,
   WorkId,
 } from '@tobirink/domain';
+import { createMemoryFavoriteResolutionSession } from './memory-favorite-resolution-storage';
 
 type RecordMap<T> = Map<string, T>;
 
 interface MemoryState {
   agenda: RecordMap<AgendaEntry>;
   favoriteSources: RecordMap<FavoriteSource>;
+  favoriteArtifacts: RecordMap<FavoriteParseArtifactRecord>;
+  favoriteResolutionTasks: RecordMap<DurableTask>;
   libraries: RecordMap<Library>;
   organizer?: OrganizerConfiguration;
   progress: RecordMap<Progress>;
@@ -33,12 +36,14 @@ interface MemoryState {
 }
 
 function emptyState(): MemoryState {
-  return { agenda: new Map(), favoriteSources: new Map(), libraries: new Map(), progress: new Map(), reminders: new Map(), reviews: new Map(), works: new Map() };
+  return { agenda: new Map(), favoriteArtifacts: new Map(), favoriteResolutionTasks: new Map(), favoriteSources: new Map(), libraries: new Map(), progress: new Map(), reminders: new Map(), reviews: new Map(), works: new Map() };
 }
 
 function cloneState(state: MemoryState): MemoryState {
   const cloned: MemoryState = {
     agenda: new Map(state.agenda),
+    favoriteArtifacts: new Map(state.favoriteArtifacts),
+    favoriteResolutionTasks: new Map(state.favoriteResolutionTasks),
     favoriteSources: new Map(state.favoriteSources),
     libraries: new Map(state.libraries),
     progress: new Map(state.progress),
@@ -55,6 +60,7 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
     if (allowed && !allowed.has(store)) throw new Error(`Store ${store} is outside the transaction scope.`);
   };
   return {
+    ...createMemoryFavoriteResolutionSession(state, requireStore),
     getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); return state.agenda.get(id); },
     getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); return state.favoriteSources.get(id); },
     findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
@@ -133,6 +139,8 @@ export class MemoryStoragePort implements StoragePort {
   }
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
+  getFavoriteParseArtifact: StoragePort['getFavoriteParseArtifact'] = (sourceId) => this.session().getFavoriteParseArtifact(sourceId);
+  getFavoriteResolutionTask: StoragePort['getFavoriteResolutionTask'] = (id) => this.session().getFavoriteResolutionTask(id);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
@@ -147,6 +155,8 @@ export class MemoryStoragePort implements StoragePort {
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
+  putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
+  putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
   putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);

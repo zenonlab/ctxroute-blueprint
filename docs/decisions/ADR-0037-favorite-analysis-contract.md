@@ -68,7 +68,12 @@ création soit atomique. Réutiliser les transitions pures de tâche existantes,
 mais pas l’adaptateur `tobirink-durable-tasks` des notifications : sa base
 séparée ne fournit pas cette atomicité et sa sélection actuelle parcourt tous
 les états disponibles. Les claims de résolution sont bornés par des index de
-type, fournisseur, état et échéance.
+type, lane, état et échéance.
+Le schéma IndexedDB v6 matérialise cette décision avec `favoriteArtifacts` et
+`favoriteResolutionTasks`. Un premier import écrit les quatre enregistrements
+dans une transaction; une réimportation conserve l’instant d’import et ne
+duplique pas la tâche stable. La lane de routage est explicite et chaque tâche
+possède toujours `availableAt`.
 
 Exiger que chaque réponse de candidats indique si l’ensemble pertinent est
 complet ou tronqué. Un ensemble incomplet ne peut jamais produire une

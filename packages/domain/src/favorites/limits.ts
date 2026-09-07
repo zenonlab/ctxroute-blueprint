@@ -1,4 +1,5 @@
 export const favoriteObservationByteLimit = 64 * 1024;
+export const favoriteParseArtifactByteLimit = 64 * 1024;
 export const favoriteTitleByteLimit = 8 * 1024;
 export const favoriteUrlByteLimit = 32 * 1024;
 export const favoriteFolderSegmentLimit = 32;

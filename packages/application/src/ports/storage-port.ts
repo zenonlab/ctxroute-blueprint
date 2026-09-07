@@ -1,3 +1,4 @@
+import { createFavoriteParseArtifact, favoriteSourceId, reviewId } from '@tobirink/domain';
 import type {
   AgendaEntry,
   AgendaEntryId,
@@ -15,9 +16,24 @@ import type {
   ReviewStatus,
   Work,
   WorkId,
+  FavoriteParseArtifact,
 } from '@tobirink/domain';
+import type { DurableTask } from '../tasks/task-state';
 
-export const privateStoreNames = ['agenda', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
+export interface FavoriteParseArtifactRecord {
+  artifact: FavoriteParseArtifact;
+  recordedAt: string;
+  reviewId: ReviewId;
+  sourceId: FavoriteSourceId;
+}
+
+export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRecord): FavoriteParseArtifactRecord {
+  const recordedAt = new Date(input.recordedAt);
+  if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
+  return Object.freeze({ ...input, artifact: createFavoriteParseArtifact(input.artifact), reviewId: reviewId(input.reviewId), sourceId: favoriteSourceId(input.sourceId) });
+}
+
+export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
 export type PrivateStoreName = (typeof privateStoreNames)[number];
 
 export interface FavoriteSourcePageQuery {
@@ -65,6 +81,8 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 export interface StorageReadPort {
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
+  getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;
+  getFavoriteResolutionTask(id: string): Promise<DurableTask | undefined>;
   findFavoriteSourceByReviewId(reviewId: ReviewId): Promise<FavoriteSource | undefined>;
   getLibrary(id: LibraryId): Promise<Library | undefined>;
   getOrganizerConfiguration(): Promise<OrganizerConfiguration | undefined>;
@@ -82,6 +100,8 @@ export interface StorageReadPort {
 export interface StorageWritePort {
   putAgendaEntry(entry: AgendaEntry): Promise<void>;
   putFavoriteSource(source: FavoriteSource): Promise<void>;
+  putFavoriteParseArtifact(record: FavoriteParseArtifactRecord): Promise<void>;
+  putFavoriteResolutionTask(task: DurableTask): Promise<void>;
   putLibrary(library: Library): Promise<void>;
   putOrganizerConfiguration(configuration: OrganizerConfiguration): Promise<void>;
   putProgress(progress: Progress): Promise<void>;

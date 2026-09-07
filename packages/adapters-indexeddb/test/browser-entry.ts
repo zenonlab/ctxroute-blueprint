@@ -1,4 +1,5 @@
 import { verifyStoragePortContract } from '@tobirink/contracts';
+import { importFavoriteSources } from '@tobirink/application';
 import {
   agendaEntryId,
   createAgendaEntry,
@@ -32,6 +33,11 @@ try {
   if (!(await storage.getReview(review.id)) || !(await storage.getAgendaEntry(agenda.id)) || !(await storage.getReminder(reminder.id))) {
     throw new Error('Review, agenda or reminder did not round-trip through IndexedDB.');
   }
+  await importFavoriteSources([{ bookmarkId: 'browser-atomic', folderPath: ['Mangas'], order: 0, state: 'eligible', title: 'Atomic fixture', url: 'https://reader.example/manga/atomic-fixture' }], storage, '2026-09-07T12:00:00.000Z');
+  const imported = (await storage.listFavoriteSources({ limit: 10 })).find((source) => source.bookmarkId === 'browser-atomic');
+  if (imported === undefined || await storage.getFavoriteParseArtifact(imported.id) === undefined) throw new Error('Favorite artifact did not share the import transaction.');
+  const tasks = await storage.database.favoriteResolutionTasks.toArray();
+  if (tasks.length !== 1 || tasks[0]?.state !== 'READY' || tasks[0].lane !== 'routing') throw new Error('Favorite resolution outbox did not share the import transaction.');
   await storage.database.table('organizer').put({
     folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],
     id: 'organizer',

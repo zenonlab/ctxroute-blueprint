@@ -27,7 +27,7 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - `normalizeBookmarks` qualifie uniquement les URL HTTP(S);
 - `importFavoriteSources` écrit `FavoriteSource` et `Review` par transactions
   de 100 entrées et conserve `importedAt` lors d’un nouvel import;
-- Dexie v5 stocke les données privées dans `tobirink-private`;
+- Dexie v6 stocke les données privées dans `tobirink-private`;
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
@@ -321,7 +321,7 @@ décisions résolues sans hydratation complète. Elle crée uniquement les tâch
 manquantes avec leurs clés idempotentes.
 
 Les lectures utilisent `idempotencyKey` unique, l’index composé
-`[kind+provider+state+availableAt]` pour les tâches dues et
+`[kind+lane+state+availableAt]` pour les tâches dues et
 `[state+claimExpiresAt]` pour les claims expirés. Aucun runner ne charge toute
 la file avec `toArray()` et chaque lane réclame seulement ses propres types.
 Chaque tâche possède toujours `availableAt`, y compris `READY`, afin que la
@@ -507,17 +507,19 @@ global et ne contourne pas le consentement.
 
 ## Migration depuis Dexie v5
 
-La première étape de stockage ajoute une version Dexie additive au-dessus de
-v5 dans `tobirink-private`, avec `parseArtifacts`, `resolutionTasks` et
-`inventoryCheckpoints`. `resolutionTasks` porte les index uniques et composés
-définis plus haut. Elle ne supprime et ne renomme aucun store existant. La base
-séparée des notifications n’est ni migrée ni utilisée par le resolver.
+La version Dexie v6 est additive au-dessus de v5 dans `tobirink-private`, avec
+`favoriteArtifacts` et `favoriteResolutionTasks`. La tâche porte la lane
+`routing`, une clé d’idempotence unique et l’index composé défini plus haut.
+Source, Review, artefact et première tâche `READY` sont écrits dans la même
+transaction. Aucun store existant n’est supprimé ou renommé. Le checkpoint
+d’inventaire reste une étape ultérieure; la base séparée des notifications
+n’est ni migrée ni utilisée par le resolver.
 
 | Store | Index nécessaires |
 | --- | --- |
 | `favoriteSources` | index existants, puis `observationSequence`, `semanticFingerprint`, `[presence+id]` |
-| `parseArtifacts` | `&id`, `sourceId`, `[sourceId+parserVersion]` |
-| `resolutionTasks` | `&id`, `&idempotencyKey`, `sourceId`, `[kind+provider+state+availableAt]`, `[state+claimExpiresAt]` |
+| `favoriteArtifacts` | `&sourceId`, `reviewId`, `recordedAt`, `artifact.semanticFingerprint` |
+| `favoriteResolutionTasks` | `&id`, `&idempotencyKey`, `kind`, `lane`, `state`, `availableAt`, `[kind+lane+state+availableAt]` |
 | `resolutionReceipts` | `&[sourceId+operation]`, `&idempotencyKey` |
 | `inventoryCheckpoints` | `&id`, `status`, `baseSequence` |
 | `providerRateCheckpoints` | `&provider`, `nextAllowedAt` |

@@ -1749,6 +1749,42 @@
             "MangaUpdates exact route + five-kind routing",
             "all-workspace typecheck, Sensor SAFE, validate, Archify showcase"
           ]
+        },
+        {
+          "id": "step-27",
+          "title": "Rendre import et outbox atomiques",
+          "status": "DONE",
+          "acceptance": [
+            "IndexedDB v6 stocke artefact et tâche de résolution dans tobirink-private, séparément de tobirink-durable-tasks.",
+            "Chaque nouvel import éligible écrit source, Review, artefact brut et tâche READY dans une transaction rollback-safe."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/tasks/**",
+            "packages/application/src/use-cases/import-favorite-sources*",
+            "packages/adapters-indexeddb/src/**",
+            "packages/contracts/src/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "npm run validate",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 164/164, domaine 23/23 et contrats 16/16 passent; import, artefact et tâche READY sont atomiques avec rollback testé.",
+            "IndexedDB Chromium, stockage, tâches et migrations v1-v5 vers v6 passent; deux stores privés additifs et index de disponibilité validés.",
+            "Typecheck de tous les workspaces, Sensor SAFE, validate global, git diff --check et Archify favorite-resolution showcase passent."
+          ]
         }
       ]
     },

@@ -7,6 +7,7 @@ import {
   favoriteFolderSegmentByteLimit,
   favoriteFolderSegmentLimit,
   favoriteObservationByteLimit,
+  favoriteParseArtifactByteLimit,
   favoriteTitleByteLimit,
   favoriteTransformationLimit,
   favoriteUrlByteLimit,
@@ -140,10 +141,15 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
   if (aliases !== undefined) Object.assign(artifact, { aliases: Object.freeze(aliases.map((alias) => Object.freeze({ ...alias }))) });
   if (seasonEvidence !== undefined) Object.assign(artifact, { seasonEvidence: Object.freeze({ ...seasonEvidence }) });
   if (segments !== undefined) Object.assign(artifact, { segments: Object.freeze(segments.map((segment) => Object.freeze({ ...segment }))) });
-  if (progress === undefined) return Object.freeze(artifact);
-  const frozenProgress = { ...progress, rejections: Object.freeze([...progress.rejections]) };
-  if (progress.candidates !== undefined) Object.assign(frozenProgress, { candidates: Object.freeze(progress.candidates.map((candidate) => Object.freeze({ ...candidate }))) });
-  return Object.freeze({ ...artifact, progress: Object.freeze(frozenProgress) });
+  let result: FavoriteParseArtifact;
+  if (progress === undefined) result = Object.freeze(artifact);
+  else {
+    const frozenProgress = { ...progress, rejections: Object.freeze([...progress.rejections]) };
+    if (progress.candidates !== undefined) Object.assign(frozenProgress, { candidates: Object.freeze(progress.candidates.map((candidate) => Object.freeze({ ...candidate }))) });
+    result = Object.freeze({ ...artifact, progress: Object.freeze(frozenProgress) });
+  }
+  contract(utf8ByteLength(JSON.stringify(result)) <= favoriteParseArtifactByteLimit, `artifact exceeds ${favoriteParseArtifactByteLimit} UTF-8 bytes.`);
+  return result;
 }
 
 function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {

@@ -23,6 +23,10 @@ describe('importFavoriteSources', () => {
     const [source] = await storage.listFavoriteSources({ limit: 10 });
     expect(source).toMatchObject({ bookmarkId: '42', folderPath: ['Lectures', 'Manga'], importedAt, order: 3 });
     expect(source && await storage.getReview(source.reviewId)).toMatchObject({ status: 'pending', title: favorite.title });
+    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt, reviewId: source?.reviewId });
+    const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
+    expect(task).toMatchObject({ availableAt: '1970-01-01T00:00:00.000Z', kind: 'favorite-resolution', state: 'READY' });
+    expect(task?.payload).toContain(source?.id);
   });
 
   it('updates placement while preserving import time and a resolved Review', async () => {
@@ -48,5 +52,6 @@ describe('importFavoriteSources', () => {
     await expect(importFavoriteSources([favorite, invalid], storage, importedAt)).rejects.toThrow();
     await expect(storage.listFavoriteSources({ limit: 10 })).resolves.toEqual([]);
     await expect(storage.getReview(reviewId('review_4_3432'))).resolves.toBeUndefined();
+    await expect(storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).resolves.toBeUndefined();
   });
 });

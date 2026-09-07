@@ -72,6 +72,19 @@ async function seedVersion4(name: string): Promise<void> {
   database.close();
 }
 
+async function seedVersion5(name: string): Promise<void> {
+  const database = new Dexie(name);
+  database.version(5).stores({
+    agenda: '&id, workId, occursAt, availability', favoriteSources: '&id, &bookmarkId, reviewId, importedAt',
+    libraries: '&id', organizer: '&id', progress: '&id, workId, kind', reminders: '&id, agendaEntryId, channel',
+    reviews: '&id, status, matchedWorkId', works: '&id, mediaKind, preferredTitle',
+  });
+  await database.table('works').bulkAdd(versionThree.works);
+  await database.table('reviews').add(resolvedReview);
+  await database.table('favoriteSources').add(favoriteSource);
+  database.close();
+}
+
 async function verifySuccessfulMigration(name: string, seed: (databaseName: string) => Promise<void>, expectedSources = 0): Promise<void> {
   await seed(name);
   const database = new TobirinkDatabase(name);
@@ -86,7 +99,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 5 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 6 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   database.close();
 }
 
@@ -117,12 +130,14 @@ const versionOneName = `tobirink-migration-v1-${Date.now()}`;
 const versionTwoName = `tobirink-migration-v2-${Date.now()}`;
 const versionThreeName = `tobirink-migration-v3-${Date.now()}`;
 const versionFourName = `tobirink-migration-v4-${Date.now()}`;
+const versionFiveName = `tobirink-migration-v5-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
   await verifySuccessfulMigration(versionThreeName, seedVersion3, 1);
   await verifySuccessfulMigration(versionFourName, seedVersion4, 1);
+  await verifySuccessfulMigration(versionFiveName, seedVersion5, 1);
   await verifyInterruptedMigration(interruptedName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
@@ -134,5 +149,6 @@ try {
   await deleteDatabase(versionTwoName);
   await deleteDatabase(versionThreeName);
   await deleteDatabase(versionFourName);
+  await deleteDatabase(versionFiveName);
   await deleteDatabase(interruptedName);
 }

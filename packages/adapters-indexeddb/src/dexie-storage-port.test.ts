@@ -7,9 +7,11 @@ const adapter = readFileSync(new URL('./dexie-storage-port.ts', import.meta.url)
 describe('DexieStoragePort structure', () => {
   it('keeps Dexie inside the adapter and declares every private aggregate store', () => {
     expect(database).toMatch(/from 'dexie'/);
-    for (const store of ['agenda', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works']) {
+    for (const store of ['agenda', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works']) {
       expect(database).toContain(`${store}: '&id`);
     }
+    expect(database).toContain("favoriteArtifacts: '&sourceId");
+    expect(database).toContain("favoriteResolutionTasks: '&id, &idempotencyKey, kind, lane, state, availableAt");
     expect(adapter).toMatch(/implements StoragePort/);
     expect(adapter).toMatch(/reviews\.where\('status'\)\.equals\(status\)\.limit\(limit\)/);
     expect(database).toMatch(/reviews: '&id, status, matchedWorkId'/);
@@ -22,7 +24,7 @@ describe('DexieStoragePort structure', () => {
   });
 
   it('opens explicit read-write scopes and revalidates domain records', () => {
-    expect(adapter).toMatch(/transaction\('rw', this\.tables\(stores\)/);
+    expect(adapter).toMatch(/transaction\('rw', privateStoreTables\(this\.database, stores\)/);
     expect(adapter).toMatch(/outside the transaction scope/);
     for (const factory of ['createAgendaEntry', 'createFavoriteSource', 'createLibrary', 'createOrganizerConfiguration', 'createProgress', 'createReminder', 'createReview', 'createWork']) {
       expect(adapter).toContain(factory);

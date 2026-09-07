@@ -27,8 +27,9 @@ import type {
   Work,
   WorkId,
 } from '@tobirink/domain';
-import type { Table } from 'dexie';
 import { TobirinkDatabase } from './database';
+import { createDexieFavoriteResolutionSession } from './favorite-resolution/dexie-favorite-resolution-session';
+import { privateStoreTables } from './private-store-tables';
 
 export class DexieStoragePort implements StoragePort {
   readonly database: TobirinkDatabase;
@@ -37,25 +38,12 @@ export class DexieStoragePort implements StoragePort {
     this.database = new TobirinkDatabase(databaseName);
   }
 
-  private tables(stores: readonly PrivateStoreName[]): Table[] {
-    const tables = {
-      agenda: this.database.agenda,
-      favoriteSources: this.database.favoriteSources,
-      libraries: this.database.libraries,
-      organizer: this.database.organizer,
-      progress: this.database.progress,
-      reminders: this.database.reminders,
-      reviews: this.database.reviews,
-      works: this.database.works,
-    } satisfies Record<PrivateStoreName, Table>;
-    return [...new Set(stores)].map((store) => tables[store]);
-  }
-
   private session(allowed?: ReadonlySet<PrivateStoreName>): StorageSession {
     const requireStore = (store: PrivateStoreName) => {
       if (allowed && !allowed.has(store)) throw new Error(`Store ${store} is outside the transaction scope.`);
     };
     return {
+      ...createDexieFavoriteResolutionSession(this.database, requireStore),
       getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); const entry = await this.database.agenda.get(id); return entry && createAgendaEntry(entry); },
       getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); const source = await this.database.favoriteSources.get(id); return source && createFavoriteSource(source); },
       findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
@@ -122,6 +110,8 @@ export class DexieStoragePort implements StoragePort {
   }
 
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
+  getFavoriteParseArtifact: StoragePort['getFavoriteParseArtifact'] = (sourceId) => this.session().getFavoriteParseArtifact(sourceId);
+  getFavoriteResolutionTask: StoragePort['getFavoriteResolutionTask'] = (id) => this.session().getFavoriteResolutionTask(id);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
@@ -136,6 +126,8 @@ export class DexieStoragePort implements StoragePort {
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
+  putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
+  putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
   putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);
@@ -147,7 +139,7 @@ export class DexieStoragePort implements StoragePort {
   async transaction<TResult>(stores: readonly PrivateStoreName[], operation: (session: StorageSession) => Promise<TResult>): Promise<TResult> {
     if (stores.length === 0) throw new Error('A storage transaction requires at least one store.');
     const allowed = new Set(stores);
-    return this.database.transaction('rw', this.tables(stores), () => operation(this.session(allowed)));
+    return this.database.transaction('rw', privateStoreTables(this.database, stores), () => operation(this.session(allowed)));
   }
 
   close() {
