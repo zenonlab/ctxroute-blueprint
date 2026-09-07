@@ -142,6 +142,7 @@ une icône native exactement dessus, partiellement puis complètement.
 | B-O05 | Fenêtre opaque/translucide, plein écran, plusieurs moniteurs | Visibilité connue/inconnue explicitement rapportée ; pas d'assimilation automatique plein écran=occlusion totale |
 | B-O06 | DPI mixte, hotplug, Spaces/bureaux virtuels, redémarrage du shell | Coordonnées et cycle de surface corrects, réattachement ou repli explicite |
 | B-O07 | Permissions refusées, API absente, terminal absent | Mode dégradé annoncé, aucune élévation ou relance cachée |
+| B-O08 | Sélection de session puis demande de premier plan acceptée/refusée par l'OS | Distinguer session sélectionnée, requête transmise et activation visible ; aucun faux succès ni contournement de focus |
 
 Pour chaque geste répéter et consigner le nombre d'essais et d'échecs. Zéro échec
 observé n'est pas une garantie universelle. Sur un bureau sans gestionnaire d'icônes,

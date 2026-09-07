@@ -5,6 +5,11 @@ C0–C6 et ADR-0035/0038 restent inchangés. Ce document précise les candidats 
 preuves nécessaires ; il ne décide pas d'un langage ou moteur de production.
 Lire d'abord [la faisabilité OS et MAC-01](os-feasibility.md).
 
+Direction de travail clarifiée : notre runtime ciblé, assemblé avec des
+bibliothèques spécialisées et des adaptateurs natifs. Aucun moteur de jeu complet
+n'est prévu par défaut. Godot reste une référence historique de comparaison,
+pas une dépendance, un finaliste obligatoire ou un prototype à réaliser.
+
 ## Répartition du travail
 
 Développer nous-mêmes signifie posséder la composition, l'expérience, les contrats,
@@ -20,7 +25,7 @@ fonctionnalités de l'application dont elle provient.
 | Surface Windows | windows-rs ; Lively comme référence | Explorer/DPI/redémarrage et priorité native ; pas d'API WorkerW stable présumée |
 | Surface Wayland | wayland-client / Smithay client toolkit | Rôle layer-shell, événements, disponibilité réelle ; pas d'xdg_toplevel réétiqueté |
 | Fenêtres ordinaires | winit candidat | Terminal/prévisualisation et événements ; ne pas lui attribuer l'intégration wallpaper complète |
-| Rendu | wgpu ciblé face à un moteur existant, Godot candidat de comparaison | Scène représentative, animation, texte utile, surface et invalidation ; mesurer ce qui reste à coder |
+| Rendu | Runtime ciblé, wgpu candidat et bibliothèques spécialisées selon les besoins | Scène représentative, animation, texte utile, surface et invalidation ; ne développer que les fonctions manquantes |
 | PTY | portable-pty | Cycle des sessions, backpressure, fermeture, signalisation et liens avec l'interface |
 | Émulation terminal | xterm.js ou alacritty_terminal | Interface custom, portraits, IME/accessibilité réels ; comparer des périmètres explicites |
 | UI terminal | Tauri/TypeScript ou interface native à préciser | Pas de décision implicite d'embarquer WebView dans le wallpaper ; aucune UI native complète déjà sélectionnée |
@@ -51,7 +56,7 @@ non archivés lors du relevé. Une branche active n'est pas une garantie de supp
 | [alacritty_terminal d692748](https://github.com/alacritty/alacritty/blob/d692748d3f61253ebe9f5094320120d22f6a046f/alacritty_terminal/Cargo.toml) | Crate 0.26.1-dev, Apache-2.0 | Bibliothèque VT/grille, pas GUI terminée ; révision de développement |
 | [Tauri 406feea](https://github.com/tauri-apps/tauri/tree/406feea75283545496ef7398c5e2f0fb9b306b64) | Cargo racine : Rust 1.90, Apache-2.0 OR MIT | Vérifier version de chaque crate, WebView et dépendances système |
 | [xterm.js c58ea36](https://github.com/xtermjs/xterm.js/tree/c58ea3637f3968e0e6e79cd92cf9aace7ef89ee2) | Dépôt émulateur terminal ; métadonnée GitHub MIT | Vérifier versions du paquet et des addons ensemble |
-| [Godot 1b4643a](https://github.com/godotengine/godot/tree/1b4643ae7c8778cd9fd254d838f054f5d7a1e43c) | Dépôt moteur ; métadonnée GitHub MIT | Comparer un export minimal, pas le coût de l'éditeur ; ancrage/invalidation non prouvés |
+| [Godot 1b4643a](https://github.com/godotengine/godot/tree/1b4643ae7c8778cd9fd254d838f054f5d7a1e43c) | Repère historique de moteur complet ; métadonnée GitHub MIT | Hors shortlist active ; aucune intégration ni comparaison exécutable imposée |
 | [Lively c1036fe](https://github.com/rocksdanister/lively/tree/c1036feb664960722e34bf4309042c247d6a909d) | Branche par défaut core-separation ; métadonnée GitHub GPL-3.0 | Référence Windows ; vérifier licence des fichiers et mode de réutilisation avant intégration |
 
 Les licences workspace et métadonnées GitHub ne couvrent pas automatiquement
@@ -71,12 +76,12 @@ mesuré sur MAC-01 ne prouve pas le comportement des autres WebViews.
 
 ## Comparaisons à mener, sans surconstruire
 
-**Rendu :** conserver wgpu comme candidat ciblé ; comparer à un export minimal
-d'un moteur existant si l'intégration native est plausible. Godot est une piste
-à examiner, pas un deuxième moteur à intégrer intégralement. Si son ancrage exige
-un fork lourd, documenter ce coût avant d'engager le comparatif complet. Un moteur
-de scène existant qui consomme davantage peut encore être utile hors ligne pour
-préparer un thème ; ne pas confondre cet usage avec le runtime permanent.
+**Rendu :** commencer par la surface native puis intégrer le minimum graphique
+avec wgpu candidat. Identifier les bibliothèques utiles aux assets, animations,
+mathématiques et texte avant d'écrire leurs équivalents. Une comparaison doit
+résoudre une question précise, pas imposer un deuxième moteur complet. Godot
+ne revient dans l'étude active que si un manque concret justifie de réexaminer
+cette option, avec son coût OS et énergétique ; aucun travail n'en dépend actuellement.
 
 **Terminal :** Tauri/xterm.js reste un candidat complet d'interface. Pour la voie
 native, commencer par l'inventaire des briques manquantes autour de la grille :
@@ -93,6 +98,29 @@ mais C0–C3 restent indépendants. Ni partage zero-copy ni surface interchangea
 sans adaptation ne sont acquis.
 
 ## Sobriété de l'assemblage
+
+### Points techniques déjà documentés
+
+- winit distingue attente d'événement, attente jusqu'à une échéance et polling.
+  L'attente seule ne supprime pas les réveils causés par nos timers, animations ou
+  autres threads : instrumenter ces sources plutôt que déclarer la sobriété d'après
+  le nom du mode. [ControlFlow](https://docs.rs/winit/latest/winit/event_loop/enum.ControlFlow.html).
+- Tauri documente les Channels pour les flux ordonnés et des échanges binaires.
+  Le candidat terminal ne doit pas être pénalisé artificiellement par un événement
+  JSON par caractère ; tester un transport approprié avec buffers bornés.
+  [Channels](https://v2.tauri.app/develop/calling-frontend/),
+  [échanges avec Rust](https://v2.tauri.app/develop/calling-rust/).
+- xterm.js traite `write` de façon asynchrone. Le retour de l'appel n'est pas un
+  acquittement de consommation. Son guide utilise callbacks et seuils haut/bas :
+  la régulation doit couvrir PTY, transport et consommateur. Ne pas confondre le
+  callback de parsing et une preuve de pixels présentés à l'écran.
+  [Flow control xterm.js](https://xtermjs.org/docs/guides/flowcontrol/).
+
+Ce sont des contraintes de montage des futurs essais, pas des mesures du produit.
+La voie native doit également borner ses files et traiter correctement Unicode,
+IME, sélection et accessibilité ; une grille dessinée ne prouve pas ces fonctions.
+
+### Systèmes à ne pas démarrer inutilement
 
 Beaucoup de capacités disponibles ne signifie pas beaucoup de services actifs.
 Le futur benchmark doit vérifier les systèmes absents autant que ceux présents :

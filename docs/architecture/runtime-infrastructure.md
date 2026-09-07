@@ -15,7 +15,8 @@ La priorité utilisateur est désormais **énergie minimale d'abord, personnalis
 ensuite**. Voir [ADR-0035](../decisions/ADR-0035-platform-capabilities-and-energy.md).
 La recommandation à éprouver est un wallpaper natif Rust/wgpu/WGSL, séparé du
 terminal Tauri/TypeScript/xterm.js avec portable-pty. Ce n'est pas une adoption :
-comparer son coût de développement et ses mesures à un moteur existant. wgpu
+comparer son coût de développement et ses mesures aux briques réutilisables utiles,
+sans imposer un deuxième moteur complet. wgpu
 fournit une [abstraction graphique portable](https://wgpu.rs/), pas l'ancrage
 desktop ni un moteur de scènes complet. Aucun gain énergétique n'est encore mesuré.
 
@@ -79,7 +80,12 @@ uniquement les systèmes nécessaires et mesurer le delta face au bureau natif.
 L'absence de présentations GPU ne prouve pas une consommation identique au système.
 Une visibilité inconnue déclenche un repli explicite, pas un faux état « suspendu ».
 
-## Hypothèse technique antérieure à comparer
+## Archive : hypothèse technique antérieure
+
+Archive de raisonnement, hors shortlist active : la direction actuelle est un
+runtime ciblé assemblant des bibliothèques. Cette section ne prescrit aucun
+prototype Godot ni installation de moteur complet. Elle reste conservée pour
+expliquer les alternatives envisagées, sans devenir une étape de réalisation.
 
 Hypothèse, sans préférence figée : **contrôle Rust, terminal Tauri/xterm.js
 avec portable-pty, hôte de scène Godot et adaptateurs desktop par environnement**.

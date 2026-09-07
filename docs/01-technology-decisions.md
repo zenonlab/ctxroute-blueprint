@@ -17,6 +17,11 @@ de la [recherche initiale](research/initial-research.md).
 
 ## Principe de sélection
 
+Direction de travail : développer notre runtime ciblé avec des bibliothèques
+réutilisées. Un moteur de jeu complet n'est pas une dépendance par défaut ; Godot
+est un repère historique hors shortlist active. Cette clarification ne constitue
+pas encore une adoption de version wgpu, de langage ou de stack terminal.
+
 Le [préflight OS](research/os-feasibility.md) relève MAC-01 et les obstacles natifs
 avant sélection du moteur. La [revue de stack](research/stack-preflight.md) sépare
 notre intégration des bibliothèques réutilisées, avec révisions repérées et limites.

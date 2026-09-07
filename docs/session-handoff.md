@@ -5,7 +5,26 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
-Dernier travail : [faisabilité OS](research/os-feasibility.md) et
+Clarification et preuves natives : Godot est hors shortlist active, conservé comme
+référence historique seulement. Direction : runtime ciblé, bibliothèques spécialisées
+et adaptateurs natifs ; pas de moteur complet imposé. Voir le
+[préflight actualisé](research/stack-preflight.md).
+Le [diagnostic natif MAC-01](research/os-feasibility.md#diagnostic-natif-effectivement-exécuté)
+a terminé avec code 0 : écran 1512×982 points à facteur 2, maximum annoncé 120 Hz,
+Metal à mémoire unifiée, préflight écoute positif pour le processus de diagnostic.
+rustc/cargo 1.97.1 vérifiés sans installation automatique. Aucun rendu, fenêtre,
+hook, capture, changement de permission ou benchmark produit exécuté.
+Lecture ciblée de Lively documentée ; B-O08 ajoute le cas du focus refusé par l'OS.
+Les contrats et sources Archify ne changent pas : précisions de recherche et de
+test seulement, pas de nouvelle frontière architecturale ou dépendance adoptée.
+
+Vérification de cette mise à jour : `npm run verify` réussi ; 262 tests réussis,
+1 ignoré, 0 échec, 3 intégrations réussies et 0 vulnérabilité npm. La commande
+extraite du bloc documentaire a été réexécutée avec code 0 et mêmes observations.
+64 liens locaux vérifiés sur les six documents modifiés, aucun fichier cible absent.
+`git diff --check` propre ; aucun fichier supprimé ni changement des hooks.
+
+Travail précédent : [faisabilité OS](research/os-feasibility.md) et
 [préflight de stack](research/stack-preflight.md). MAC-01 observé en lecture seule :
 M1 Pro, 16 Go, macOS 26.2 ARM64, écran principal 3024×1964 ; SDK 26.5 et outillage
 Apple accessibles. Aucun ancrage ni mesure énergie exécuté ; pas de demande de
