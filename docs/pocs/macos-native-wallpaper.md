@@ -4,9 +4,9 @@
 
 L'utilisateur confirme l'animation du build 3. Son processus PID 12860 reste
 intact. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.ZJRqMF/Native Wallpaper Probe.app`.
+`dist/pocs/macos-native-wallpaper/compile.Zl05p9/Native Wallpaper Probe.app`.
 Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
-`org.wallpaperthemes.nativeprobe.interactive.extension`, version 6. Signature et
+`org.wallpaperthemes.nativeprobe.interactive.extension`, version 7. Signature et
 plist validées. Hôte enregistré par
 `lsregister -f`, extension par `pluginkit -a` ; le fond actif n'a pas été changé
 et ce nouveau binaire n'a pas encore été lancé. L'ancien compagnon build 5
@@ -15,7 +15,7 @@ cette mise à jour ; il ne lit pas le dernier manifeste.
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin ZJRqMF** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin Zl05p9** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -51,7 +51,7 @@ de fichiers observe le fond Finder comme
 `AXGroup → AXScrollArea → AXApplication` et les icônes comme
 `AXImage → AXGroup → AXScrollArea → AXApplication`. Cette mesure prouve que les
 deux cibles sont distinguables sur cette session macOS 26.2 ; elle ne qualifie
-pas encore le binaire ZJRqMF, dont la confiance AX propre reste inconnue tant
+pas encore le binaire Zl05p9, dont la confiance AX propre reste inconnue tant
 qu'il n'est pas lancé. Aucune signature n'est donc promue en production.
 
 `interactive-theme.json` constitue le premier asset de composition partagé par
@@ -78,14 +78,14 @@ taille réduite), soit 65 contrôles.
 Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.ZJRqMF`
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.Zl05p9`
 réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
 Son hôte porte le SHA-256
-`fc00935d1d5ce2976211686ae3ae38dca744fc7978c02aadd3aaaaf9cfb29ec2` et son
-extension `dc1c7eeb7e22d66f864cd891305339dc25547b57182a4a81c712ad4c9aeca5a5`.
+`fee63b2b5e84fd29ae0cb52718f1c738e992eb3e82ea62981ff586895dd89ff3` et son
+extension `f33adb10ceedb2493e0f9cfe8cddce7d90def88e2b6cce042d7a29a1345bdcaa`.
 LaunchServices et pluginkit référencent ce chemin unique pour l'identité
-interactive ; l'ancien enregistrement g74ecK a été retiré sans supprimer son
-paquet. Aucun processus ZJRqMF n'est observé après l'enregistrement : il n'a pas
+interactive ; l'ancien enregistrement ZJRqMF a été retiré sans supprimer son
+paquet. Aucun processus Zl05p9 n'est observé après l'enregistrement : il n'a pas
 été lancé et le fond actif n'a pas été modifié.
 
 Le candidat g74ecK a été lancé et sa fenêtre AppKit, ses sept boutons ainsi que
@@ -94,10 +94,13 @@ l'état « demande envoyée » ont été observés. Les Réglages ont affiché l
 `Balayage diagnostic`. Sa sélection a laissé le bureau blanc et n'a lancé aucun
 processus d'extension g74ecK. Les journaux WallpaperAgent indiquent la fusion de
 groupes portant le même identifiant ; la copie amont réutilisait en effet
-`video-wallpapers`. ZJRqMF remplace cet identifiant par
-`native-wallpaper-interactive` et le build l'atteste par un contrôle explicite.
-Ce correctif est compilé et enregistré, mais pas encore lancé ni sélectionné ;
-il ne faut donc pas annoncer que le défaut visuel est résolu.
+`video-wallpapers`. ZJRqMF a introduit l'identifiant
+`native-wallpaper-interactive`, mais conservait `CFBundleVersion` 6. Une lecture
+des Réglages après réenregistrement montrait encore le modèle mis en cache.
+Zl05p9 conserve le groupe propre, passe le couple hôte/extension à la version 7
+et vérifie ces deux invariants pendant le build. Il est compilé et enregistré,
+mais pas encore lancé ni sélectionné ; il ne faut donc pas annoncer que le
+catalogue ou le défaut visuel est résolu.
 Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
 états interactifs : transitions, mise en veille et énergie restent à qualifier.
 Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle

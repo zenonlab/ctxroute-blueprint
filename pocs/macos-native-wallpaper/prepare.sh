@@ -69,6 +69,8 @@ if [[ "${1:-}" == --package ]]; then
     "$probe_extension/Contents/MacOS" "$probe_extension/Contents/Resources"
   cp "$probe_root/pocs/macos-native-wallpaper/Host-Info.plist" "$probe_app/Contents/Info.plist"
   cp "$probe_root/pocs/macos-native-wallpaper/Extension-Info.plist" "$probe_extension/Contents/Info.plist"
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_app/Contents/Info.plist")" == 7 ]]
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_extension/Contents/Info.plist")" == 7 ]]
   cp "$probe_stage/NativeWallpaperProbe" "$probe_extension/Contents/MacOS/NativeWallpaperProbe"
   cp "$probe_stage/LICENSE" "$probe_app/Contents/Resources/Phosphene-LICENSE"
   cp "$probe_root/pocs/macos-native-wallpaper/interactive-theme.json" "$probe_app/Contents/Resources/interactive-theme.json"

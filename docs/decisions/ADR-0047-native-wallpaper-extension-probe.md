@@ -76,6 +76,9 @@ Le groupe de Réglages porte également un identifiant propre
 `native-wallpaper-interactive`. Réutiliser l'identifiant amont
 `video-wallpapers` provoque une fusion entre fournisseurs dans WallpaperAgent,
 associe la mauvaise tuile au nouveau groupe et empêche de qualifier le lancement.
+Une modification du contrat de catalogue augmente aussi `CFBundleVersion` pour
+que LaunchServices et WallpaperAgent ne réutilisent pas le modèle en cache d'un
+binaire antérieur portant la même identité et la même version.
 
 Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
 dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.
