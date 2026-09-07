@@ -6,8 +6,8 @@
     { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection par utilisateur", "pos": [40, 110], "size": [230, 80] },
     { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système Apple", "pos": [520, 110], "size": [240, 80] },
     { "id": "extension", "type": "backend", "label": "Extension diagnostic", "sublabel": "Phosphene · XPC privé", "pos": [1010, 110], "size": [230, 80] },
-    { "id": "animation", "type": "backend", "label": "Animation de test", "sublabel": "ColorDiag · Core Animation", "pos": [1010, 530], "size": [230, 80] },
-    { "id": "context", "type": "frontend", "label": "Contexte distant", "sublabel": "CAContext · API privée", "pos": [520, 530], "size": [240, 80] },
+    { "id": "animation", "type": "backend", "label": "Visuels du diagnostic", "sublabel": "ColorDiag · snapshot PNG", "pos": [1010, 530], "size": [230, 80] },
+    { "id": "context", "type": "frontend", "label": "Surfaces système", "sublabel": "CAContext · IOSurface", "pos": [520, 530], "size": [240, 80] },
     { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "Bureau et transitions", "pos": [40, 530], "size": [230, 80] }
   ],
   "boundaries": [{ "kind": "region", "label": "Paquet .app / .appex", "wraps": ["extension"], "pad": 20 }],
@@ -15,7 +15,7 @@
     { "from": "picker", "to": "host", "label": "choix du fond" },
     { "from": "host", "to": "extension", "label": "cycle de vie XPC" },
     { "from": "extension", "to": "animation", "label": "diagnostic visuel", "labelDy": 24 },
-    { "from": "animation", "to": "context", "label": "couches animées" },
+    { "from": "animation", "to": "context", "label": "calques / image fixe" },
     { "from": "context", "to": "desktop", "label": "rendu hébergé" }
   ]
 }

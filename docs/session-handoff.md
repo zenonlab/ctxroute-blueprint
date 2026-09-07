@@ -10,11 +10,14 @@ isole une préparation native Phosphene/ColorDiag, sans installer ni lancer l'ex
 Lire [la fiche native](pocs/macos-native-wallpaper.md) et utiliser son script compile-only.
 Compilation directe possible ; Xcodebuild local échoue sur un plugin incompatible.
 `prepare.sh --package` construit maintenant l'hôte et son `.appex` sandboxé avec
-signature ad hoc vérifiée. Le build `compile.YbX8ea` est enregistré (1 plug-in).
-L'utilisateur peut ouvrir Native Wallpaper Probe.app et tester la sélection.
-Affichage dans Réglages, lancement XPC et transitions restent à qualifier ;
-ne pas confondre présence au registre et wallpaper fonctionnel.
-Le fond de l'utilisateur n'a pas été changé. Les paragraphes suivants sont historiques.
+signature ad hoc vérifiée. Le dernier build est `compile.aGAdKG` (version 4).
+Point d'entrée `_NSExtensionMain` corrigé : lancement XPC et apparition dans Réglages
+observés par Computer Use. L'utilisateur a sélectionné le diagnostic puis signalé
+un fond noir. Patch ColorDiag réellement appliqué depuis le build 3 ; snapshots PNG
+via ImageIO/IOSurface corrigés au build 4, encore à vérifier en affichage réel.
+Contrôle GUI de resélection indisponible ; une sélection utilisateur est demandée.
+Ne pas annoncer l'animation ou les transitions validées. Voir la fiche native.
+Les paragraphes suivants sont historiques.
 
 ## Historique — L1 en fenêtre
 

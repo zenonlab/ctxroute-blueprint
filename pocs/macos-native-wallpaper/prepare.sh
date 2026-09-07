@@ -23,11 +23,13 @@ git -C "$probe_upstream" cat-file -e "$probe_revision^{commit}"
 probe_stage="$(mktemp -d "$probe_base/compile.XXXXXX")"
 git -C "$probe_upstream" archive "$probe_revision" PhospheneExtension LICENSE |
   tar -x -C "$probe_stage"
-git -C "$probe_stage" apply --check "$probe_root/pocs/macos-native-wallpaper/diagnostic.patch"
-git -C "$probe_stage" apply "$probe_root/pocs/macos-native-wallpaper/diagnostic.patch"
+patch --batch -p1 -d "$probe_stage" -i "$probe_root/pocs/macos-native-wallpaper/diagnostic.patch"
+# git apply from a nested export can silently skip paths relative to the outer repo.
+grep -q '#if WALLPAPER_NATIVE_DIAGNOSTIC' "$probe_stage/PhospheneExtension/ColorDiag.swift"
 probe_sdk="$(env -u SDKROOT xcrun --sdk macosx --show-sdk-path)"
 probe_arch="$(uname -m)"
 probe_sources=()
+probe_linker=(-Xlinker -e -Xlinker _main)
 for probe_source in "$probe_stage"/PhospheneExtension/*.swift; do
   if [[ "${1:-}" == --package && ( "$probe_source" == */VideoLibrary.swift || "$probe_source" == */SpiralRecovery.swift ) ]]; then
     continue
@@ -35,6 +37,9 @@ for probe_source in "$probe_stage"/PhospheneExtension/*.swift; do
   probe_sources+=("$probe_source")
 done
 if [[ "${1:-}" == --package ]]; then
+  # Match Xcode's extensionkit-extension product (DarwinProductTypes.xcspec).
+  # AppExtension.main registers the implementation; NSExtensionMain hosts its loop.
+  probe_linker=(-Xlinker -e -Xlinker _NSExtensionMain)
   (cd "$probe_root" && node pocs/macos-native-wallpaper/package.mjs "$probe_stage")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
 fi
@@ -44,7 +49,7 @@ env -u SDKROOT xcrun swiftc \
   -module-name NativeWallpaperProbe \
   -module-cache-path "$probe_stage/module-cache" \
   -import-objc-header "$probe_stage/PhospheneExtension/WallpaperExtension-Bridging-Header.h" \
-  "${probe_sources[@]}" \
+  "${probe_sources[@]}" "${probe_linker[@]}" \
   -o "$probe_stage/NativeWallpaperProbe"
 file "$probe_stage/NativeWallpaperProbe"
 shasum -a 256 "$probe_stage/NativeWallpaperProbe"

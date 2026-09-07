@@ -14,6 +14,23 @@ for (const name of readdirSync(join(directory, 'PhospheneExtension'))) {
   let source = readFileSync(path, 'utf8').replaceAll('glass.kagerou.phosphene', 'org.wallpaperthemes.nativeprobe');
   if (name === 'WallpaperXPCHandler.swift') {
     source = replaceOnce(source, 'let opened = NSWorkspace.shared.open(url)', 'let opened = false // Diagnostic: never launch an external application.');
+    source = replaceOnce(source,
+      'if ColorDiag.enabled { reply(replyObj, nil); colorDiagInstall(rootLayer: rootLayer, for: key); return }',
+      'if ColorDiag.enabled { colorDiagInstall(rootLayer: rootLayer, for: key); reply(replyObj, nil); return }');
+  }
+  if (name === 'SnapshotCreation.swift') {
+    source = 'import ImageIO\n' + source;
+    source = replaceOnce(source,
+      'func createSnapshotViaRuntime(currentTime: CMTime? = nil) async -> AnyObject? {',
+      `func createSnapshotViaRuntime(currentTime: CMTime? = nil) async -> AnyObject? {
+    if ColorDiag.enabled {
+        guard let url = Bundle.main.url(forResource: "diagnostic", withExtension: "png"),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        let snapshot = renderSnapshotToIOSurface(image: image)
+        extensionLog("[Diagnostic] PNG snapshot via IOSurface: \\(snapshot != nil)")
+        return snapshot
+    }`);
   }
   if (name === 'SettingsProvider.swift') {
     source = replaceOnce(source, 'Phosphene \\u{2014} Video Wallpapers', 'Native Wallpaper Probe');

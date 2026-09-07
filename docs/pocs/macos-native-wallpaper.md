@@ -3,7 +3,7 @@
 ## Tester le paquet préparé
 
 Le build courant est dans
-`dist/pocs/macos-native-wallpaper/compile.YbX8ea/Native Wallpaper Probe.app`.
+`dist/pocs/macos-native-wallpaper/compile.aGAdKG/Native Wallpaper Probe.app` (build 4).
 Ouvrir cette application dans Finder, puis cliquer « Ouvrir les réglages ».
 Elle n'affiche pas de fenêtre wallpaper : sa boîte de dialogue explique le test.
 Dans Réglages > Fond d'écran, rechercher **Native Wallpaper Probe**, puis
@@ -27,9 +27,48 @@ bash pocs/macos-native-wallpaper/prepare.sh --package
 Le script affiche le nouveau chemin ; il ne l'enregistre pas automatiquement.
 Le paquet courant a été enregistré explicitement avec `pluginkit -a` sur son
 `.appex`. La requête `pluginkit -m -A -D -v -i org.wallpaperthemes.nativeprobe.extension`
-renvoie **1 plug-in** à ce chemin. Ceci valide sa présence au registre, pas son
-affichage dans les réglages, son lancement XPC ou l'animation réelle.
-Ne pas déplacer le build courant avant le test. Aucune sélection de fond n'a été faite.
+doit identifier ce chemin. La présence dans Réglages et le lancement XPC ont été
+observés sur le build 2 corrigé, mais pas l'animation correcte. L'utilisateur a
+sélectionné le diagnostic, puis signalé un fond noir. Ne pas déplacer le build courant.
+
+## Correction du démarrage et du noir — 7 septembre 2026
+
+Trois défauts distincts ont été isolés, sans redémarrer WallpaperAgent ou Finder :
+
+1. Le binaire ordinaire utilisait `_main`. La spécification locale Xcode
+   `DarwinProductTypes.xcspec` attribue `_NSExtensionMain` aux produits app-extension,
+   dont hérite extensionkit-extension. Le linker du paquet reprend désormais
+   ce point d'entrée. Avec le build 2 (`compile.icGI0X`), le journal passe de
+   l'erreur XPC 4099 à `END provideSettingsViewModels` et Computer Use confirme
+   l'entrée **Native Wallpaper Probe / Balayage diagnostic** dans Réglages.
+2. `git apply` exécuté depuis l'export imbriqué sautait le chemin du patch sans
+   échouer. Le build remplace cet appel par `patch -p1 -d <copie>` puis exige
+   la présence du drapeau dans ColorDiag.swift. Le build 3 (`compile.nXn2Mw`)
+   journalise réellement `[colorDiag] installed sweep`, contrairement aux précédents.
+3. Les snapshots de ce diagnostic passaient le PNG à AVAssetImageGenerator,
+   produisant `AVFoundation -11828`. Le build 4 décode le PNG via ImageIO et
+   réutilise `renderSnapshotToIOSurface`. Il installe également les calques avant
+   de répondre à la première acquisition du contexte.
+
+La signature et la compilation du build 4 réussissent ; sa sélection et ses
+snapshots réels restent à confirmer. La tentative GUI de recliquer a échoué
+(`cannotClickOffscreenElement`, puis `noWindowsAvailable`). Une sélection par
+l'utilisateur est demandée ; ne pas annoncer le fond noir résolu sans observation.
+Les fichiers des anciens builds sont conservés. Leurs enregistrements obsolètes
+ont été retirés au profit du dernier. Seul le processus de test PID 53800, dont
+le chemin avait été vérifié, a reçu SIGTERM pour permettre un rechargement.
+
+Contrôles : `npm run verify` réussi (262 tests réussis, un ignoré, aucun échec ;
+trois tests MCP réussis ; audit npm sans vulnérabilité). Le mode sans argument
+recompile aussi : une régression Bash 3.2 sur tableau vide avec `set -u` a été
+corrigée en explicitant `_main` pour ce mode. Diff et syntaxes vérifiés, clone
+amont et hooks inchangés. Archify précise le snapshot PNG et son IOSurface,
+sans nouvelle frontière ou nouveau contrat système.
+
+Documentation consultée : [point d'entrée AppExtension Apple](https://developer.apple.com/documentation/extensionfoundation/appextension/main%28%29-5zfjx).
+Un [signalement CodexBar](https://github.com/steipete/CodexBar/issues/1095) présente
+un symptôme analogue ; ce n'est pas la preuve du correctif, qui repose ici sur
+la spécification Xcode locale et les résultats XPC/UI observés.
 
 ## Isolation et contrôles du paquet
 
@@ -47,7 +86,8 @@ Les ouvertures d'applications externes de l'extension sont neutralisées, les
 notifications sont renommées, les contrôles XPC échouent fermés. L'extension reste
 sandboxée, sans entitlement réseau. Des préférences/caches/logs propres peuvent
 être créés par le reste du code amont dans son conteneur, pas dans celui de Phosphene.
-La sandbox, la sélection et les transitions restent à observer au lancement réel.
+Les transitions et la consommation restent à observer ; l'entrée a été lancée
+par WallpaperAgent, mais le rendu final n'est pas encore qualifié.
 
 Validation de cette étape : deux builds de paquet réussis (le dernier inclut
 les refus XPC), signatures vérifiées, sandbox présente dans la signature et
@@ -59,8 +99,8 @@ Ces vérifications ne sont pas un test visuel de l'extension.
 
 Archify documente la frontière `.app`/`.appex` : architecture showcase 9/9,
 zéro erreur/avertissement, aucune correction géométrique pour cette mise à jour.
-Source SHA-256 `bf8fba72d829337de3a0288f7dda17c1820285a491c8719fb36b7ecbf16ae0aa` ;
-HTML SHA-256 `6c00b3d74673a99936f13a9ccd368bc75de02effc9c04b7f8ce8225dc343629e`.
+Source SHA-256 `3cbe78123d6f26b5ce78142a61e7b647bc8884078c013ccbab730f1f317f6040` ;
+HTML SHA-256 `6920b07465447501841905405ab91dd4562f3677d6e0f965d7001589cdc150e3`.
 Quatre tailles desktop sans débordement ; capture sombre 2048×1320 inspectée
 par l'agent. Revue humaine du reçu automatique `pending`, interface fixe anglaise.
 
