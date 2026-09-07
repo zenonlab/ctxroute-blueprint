@@ -13,6 +13,11 @@ ni service de décompilation universelle. La découverte assistée par IA interv
 à la demande pour préparer une dépendance manquante, pas pour afficher le thème.
 Voir [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
 
+Priorité confirmée : minimiser l'énergie du wallpaper avant d'étendre les effets
+et la personnalisation. Windows/macOS/Linux sont les familles visées, sans
+promesse de parité universelle ; voir la [matrice de qualification](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité)
+et [ADR-0035](decisions/ADR-0035-platform-capabilities-and-energy.md).
+
 Créer un environnement de travail personnel inspiré des jeux vidéo, dans lequel
 un décor interactif et un terminal personnalisé forment une expérience cohérente.
 L'objectif est de rendre le travail agréable et personnalisable, avec de vrais

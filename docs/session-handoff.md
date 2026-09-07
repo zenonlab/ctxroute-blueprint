@@ -5,6 +5,13 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernière décision : [ADR-0035](decisions/ADR-0035-platform-capabilities-and-energy.md),
+énergie prioritaire et [matrice OS par fonctionnalité](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité).
+Aucun OS certifié. Rust/wgpu/WGSL pour le wallpaper natif devient la recommandation
+à éprouver, terminal Tauri/xterm.js séparé ; aucune dépendance adoptée ou installée.
+Prochaine action : choisir les machines/versions de référence et le premier PoC
+surface native + mesure énergétique, avant de figer la stack.
+
 Décision actuelle : [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
 Nous créons des packages de thèmes pour wallpapers et terminaux custom.
 Nos créations et notre logique restent séparées de la bibliothèque locale du jeu.
@@ -87,6 +94,21 @@ les six définitions locales dans `/hooks` si Codex le demande, conformément
 au [guide amont conservé](../README.md). Aucune configuration globale modifiée.
 
 ## Vérification finale
+
+Étape matrice OS : schéma runtime livré avec Archify, 9 contrôles showcase
+réussis, aucune erreur ni avertissement. Contrôle de débordement réussi aux
+quatre tailles desktop ; capture sombre 2048×1320 inspectée par l'agent.
+Le reçu automatique conserve `visualReview: pending` (pas de validation humaine).
+Interface fixe du visualiseur en anglais, contenu produit en français.
+Reçu de livraison : source SHA-256
+`f19f2da4b7f4a1fb50989740b561c099bf14702be4380531346e98464a92a0cb`
+(1795 octets), HTML SHA-256
+`df10dd3c62c09b1a41f69a7778c1333593074aaee8738d474fef611057eee663`
+(706140 octets). Artefact local :
+`dist/architecture/runtime-infrastructure.architecture.html`.
+`npm run verify` réussi : 262 tests du socle (261 réussis, 1 ignoré, 0 échec),
+3 tests d'intégration réussis et audit npm sans vulnérabilité. Aucun test desktop
+produit exécuté. AGENTS.md, CLAUDE.md, configuration et hooks inchangés.
 
 Recadrage thèmes/IA : schéma de préparation actualisé, livré avec Archify,
 `npm run verify` réussi : 261 tests réussis, un ignoré, aucun échec ; trois

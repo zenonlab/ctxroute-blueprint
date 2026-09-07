@@ -17,6 +17,14 @@ Les résultats réellement obtenus sont consignés dans la
 
 ## Scénarios d'acceptation produit
 
+Appliquer ces scénarios par environnement selon la
+[matrice de qualification OS](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité).
+Ajouter aux preuves desktop : refus des permissions avec repli non interactif,
+visibilité inconnue sans faux statut de suspension, verrouillage/veille/reprise,
+redémarrage du Shell et masquage d'un seul écran. Documenter la configuration
+exacte et l'énergie incrémentale face au bureau natif. Aucun résultat de cette
+suite blueprint ne certifie une plateforme produit.
+
 | ID | Situation | Résultat attendu |
 | --- | --- | --- |
 | P01 | Utiliser le terminal seul | Aucun bureau animé requis ; saisie, sélection, copier-coller, défilement et navigation clavier utilisables. |

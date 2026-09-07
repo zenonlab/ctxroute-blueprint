@@ -11,6 +11,14 @@ prime : créer des thèmes, préparer les dépendances par découverte IA à la 
 puis comparer les technologies. L'assemblage ci-dessous est une hypothèse
 antérieure conservée, sans priorité actuelle ni adoption.
 
+La priorité utilisateur est désormais **énergie minimale d'abord, personnalisation
+ensuite**. Voir [ADR-0035](../decisions/ADR-0035-platform-capabilities-and-energy.md).
+La recommandation à éprouver est un wallpaper natif Rust/wgpu/WGSL, séparé du
+terminal Tauri/TypeScript/xterm.js avec portable-pty. Ce n'est pas une adoption :
+comparer son coût de développement et ses mesures à un moteur existant. wgpu
+fournit une [abstraction graphique portable](https://wgpu.rs/), pas l'ancrage
+desktop ni un moteur de scènes complet. Aucun gain énergétique n'est encore mesuré.
+
 ## Découpage des responsabilités
 
 | Module | Possède | Ne doit pas posséder |
@@ -75,8 +83,9 @@ ses scènes propriétaires comme seule archive du jeu.
 - Rendu web réutilisant des lecteurs existants : intégration visuelle au terminal
   potentiellement plus simple, mais coût et intégration WebView à mesurer.
 - Rust/wgpu spécialisé : contrôle plus fin, mais charge de développement du
-  moteur, des imports, animations et outils. Repli si le moteur existant échoue
-  au budget ou aux besoins ; ne pas développer les deux moteurs simultanément.
+  moteur, des imports, animations et outils. Candidat prioritaire à éprouver
+  depuis la clarification énergétique ; ne pas développer deux moteurs complets
+  simultanément ni présumer qu'un langage garantit la consommation.
 - Lively sous Windows : candidat d'adoption/intégration ou référence d'ancrage,
   pas une dépendance à imposer à Linux/macOS.
 
@@ -105,6 +114,81 @@ automatiquement possible : vérifier le chemin natif avant de retenir le moteur.
 Si l'ancrage d'un environnement manque, proposer une prévisualisation en fenêtre
 et annoncer le wallpaper non supporté ; ne pas détourner les entrées globales
 pour simuler silencieusement la compatibilité.
+
+### Matrice de qualification par fonctionnalité
+
+État au 7 septembre 2026 : **aucun support produit testé ou certifié**.
+« Candidat » signifie une piste d'intégration, pas une fonctionnalité disponible.
+La matrice définit le banc d'essai ; elle ne promet ni toutes les versions des
+OS, ni tous les pilotes, matériels ou compositeurs. Mobile, consoles et autres
+OS ne sont pas dans ce banc desktop. Convertibilité d'un jeu et support de l'OS
+d'affichage sont deux qualifications indépendantes.
+
+| Fonction à qualifier | Windows | macOS | GNOME Wayland | KDE Wayland | Sway Wayland | X11 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Recette commune, références locales | Prévu | Prévu | Prévu | Prévu | Prévu | Prévu |
+| Terminal et sessions indépendants | Prévu | Prévu | Prévu | Prévu | Prévu | Prévu |
+| Prévisualisation en fenêtre | Prévue | Prévue | Prévue | Prévue | Prévue | Prévue |
+| Wallpaper sous les icônes/fenêtres | Adaptateur Explorer candidat | Adaptateur AppKit candidat | Intégration Shell à prouver | Layer-shell candidat | Layer-shell candidat | Adaptateur desktop candidat |
+| Clic sans voler le focus | Filtrage bureau à prouver | Routage et permissions à prouver | Routage Shell à prouver | Pointeur si surface exposée, à tester | Pointeur si surface exposée, à tester | Coexistence avec gestionnaire d'icônes à prouver |
+| Suspension pour occlusion | Détection à prouver | Détection à prouver | Coopération Shell à prouver | Signal disponible à vérifier | Signal disponible à vérifier | Détection à prouver |
+| Multi-écrans, DPI, espaces, reprise | À tester | À tester | À tester | À tester | À tester | À tester |
+
+KDE et Sway ont chacun leur ligne : un protocole commun ne certifie pas les
+mêmes comportements. GNOME n'hérite pas du support layer-shell. Les limites du
+protocole sont documentées par [GTK4 Layer Shell](https://github.com/wmww/gtk4-layer-shell#supported-desktops).
+Hyprland, Niri, COSMIC et les autres environnements devront obtenir leurs propres
+preuves ; cette matrice est extensible, pas une interdiction de les ajouter.
+Les WebViews [diffèrent selon l'OS dans Tauri](https://v2.tauri.app/reference/webview-versions/) :
+tester le terminal aussi, pas seulement la compilation de son backend.
+
+### Capacités et replis obligatoires
+
+L'adaptateur rapporte séparément ancrage, pointeur sûr, visibilité par écran et
+reprise des surfaces, avec statut disponible, indisponible ou inconnu et motif.
+Le contrôle choisit le mode ; l'hôte applique son budget. Une capacité inconnue
+ne devient jamais vraie par défaut. Les noms de champs et le transport ne sont
+pas encore un schéma API adopté.
+
+- Ancrage absent : terminal seul ou prévisualisation en fenêtre, clairement
+  nommée ; ne pas annoncer un wallpaper opérationnel.
+- Pointeur sûr absent ou permission refusée : décor ambiant non cliquable ;
+  actions accessibles depuis le terminal/contrôle, aucune capture clavier globale.
+- Visibilité inconnue : ne pas prétendre détecter toutes les occultations.
+  Profil économe borné et pause manuelle disponibles ; pas de polling intensif
+  ni d'élévation de privilèges pour obtenir une parité artificielle.
+- Surface perdue, écran débranché ou Shell redémarré : arrêter les soumissions
+  concernées, recréer seulement si possible, sinon signaler le repli ; garder
+  les sessions terminal indépendantes. Ne jamais dessiner au-dessus d'une session verrouillée.
+- Action système indisponible : association désactivée et motif visible.
+  Les recettes utilisent des intentions portables résolues localement, pas une
+  commande `xdg-open` imposée à tous les OS.
+
+L'inactivité souris seule ne signifie pas image inchangée : une animation continue
+requiert encore des images. Rendre sur invalidation pour le statique, borner le
+framerate pour l'animé, suspendre les soumissions lors d'une occultation connue.
+Cela ne garantit pas zéro watt : compositeur, audio et terminal ont leurs coûts.
+Pas d'animation à 144 Hz par défaut ; audio et effets coûteux restent optionnels.
+
+### Preuve requise pour annoncer un support
+
+Pour chaque ligne et fonctionnalité, enregistrer version/build OS, architecture
+CPU, compositeur et version, GPU/pilote/backend, écrans/DPI/fréquences,
+permissions, version produit et dépendances, scénario, résultat et date.
+Statuts publiés : non testé, expérimental, validé sur configuration précise,
+ou indisponible. Une CI de compilation ne vaut pas validation desktop.
+
+Le banc utilisera une même scène synthétique originale, sans ROM : statique,
+animée et masquée ; terminal seul, wallpaper seul et ensemble. Tester saisie/IME,
+icônes, refus de permissions, plein écran, plusieurs écrans dont un seul masqué,
+verrouillage, veille/reprise et redémarrage du Shell. Mesurer sur matériel réel
+CPU par processus, temps GPU, mémoire/VRAM, réveils, latence et énergie incrémentale
+par rapport au bureau natif, à luminosité et charge comparables. Documenter durée,
+répétitions et variabilité ; les seuils 1–2 % restent des cibles à contextualiser.
+
+Les versions minimales, architectures CPU, machines et ordre des PoC sont encore
+à choisir. Une version non testée ne reçoit pas automatiquement le statut de sa
+famille. Toute modification de l'intégration native exige les tests concernés.
 
 ## Flux, permissions et durée de vie
 
