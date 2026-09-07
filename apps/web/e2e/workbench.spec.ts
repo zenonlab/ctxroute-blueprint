@@ -108,7 +108,7 @@ test('Agenda keeps seven horizontal days and emits one read per week', async ({ 
 
 test('missing extension keeps the Workbench empty surfaces while verified downloads stay public', async ({ page, request }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Bibliothèque vide' })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole('heading', { name: 'Votre bibliothèque est vide' })).toBeVisible({ timeout: 3_000 });
   await expect(page.getByRole('heading', { name: 'Semaine vide' })).toBeVisible();
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(0);
   await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');

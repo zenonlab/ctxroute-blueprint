@@ -1,10 +1,10 @@
 'use client';
 
-import { Button, FeedbackState, Status, WorkCard, createAgendaDays, createLocalAgendaPeriod } from '@tobirink/ui';
+import { MemberOverview, createAgendaDays, createLocalAgendaPeriod } from '@tobirink/ui';
 import type { AgendaDay } from '@tobirink/ui';
 import type { WebAgendaPeriod, WebLibraryPage } from '@tobirink/contracts/web-bridge';
 import { useEffect, useMemo, useState } from 'react';
-import { BridgeState, SiteShell } from './components/SiteShell';
+import { SiteShell } from './components/SiteShell';
 import { useWebBridge } from './components/WebBridgeProvider';
 
 function dateAfter(dateOnly: string, days: number) {
@@ -25,19 +25,6 @@ function agendaDays(period: ReturnType<typeof createLocalAgendaPeriod>, agenda?:
   })) ?? [] });
 }
 
-function EmptyHomeOverview() {
-  return <>
-    <section className="member-section" aria-labelledby="library-overview-title">
-      <header className="section-heading"><div><p className="eyebrow">Bibliothèque locale</p><h2 id="library-overview-title">Bibliothèque</h2></div><a className="text-link" href="/library">Tout voir</a></header>
-      <FeedbackState kind="empty" layout="centered" title="Bibliothèque vide" description="Installez TobiRink pour importer vos favoris sur cet appareil." />
-    </section>
-    <section className="member-section" aria-labelledby="agenda-overview-title">
-      <header className="section-heading"><div><p className="eyebrow">Semaine locale</p><h2 id="agenda-overview-title">Agenda</h2></div><a className="text-link" href="/agenda">Ouvrir l’agenda</a></header>
-      <FeedbackState kind="empty" layout="centered" title="Semaine vide" description="Les sorties locales apparaîtront ici après l’installation de TobiRink." />
-    </section>
-  </>;
-}
-
 function HomePrivateOverview() {
   const { bootstrap, readAgenda, readLibrary, status } = useWebBridge();
   const [library, setLibrary] = useState<WebLibraryPage>();
@@ -55,26 +42,13 @@ function HomePrivateOverview() {
       .catch(() => setFailed(true));
   }, [period, readAgenda, readLibrary, retryCount, status]);
 
-  if (status === 'loading' || status === 'reconnecting') return <section className="member-intro"><BridgeState /></section>;
-  if (status === 'extension-missing') return <EmptyHomeOverview />;
-  if (failed) return <section className="member-section"><FeedbackState action={<Button icon="refresh-cw" onClick={() => setRetryCount((count) => count + 1)}>Réessayer</Button>} kind="error" recoverable title="Aperçu local indisponible" description="La bibliothèque et l’agenda restent intacts dans l’extension." /></section>;
-  if (!library || !agenda) return <section className="member-section"><FeedbackState kind="loading" title="Préparation de votre espace…" description="Lecture des projections locales de la bibliothèque et de la semaine." /></section>;
+  const loading = status === 'loading' || status === 'reconnecting' || status === 'connected' && (!library || !agenda);
+  const empty = status === 'extension-missing';
   const days = agendaDays(period, agenda);
-  return <>
-    <section className="member-section" aria-labelledby="library-overview-title">
-      <header className="section-heading"><div><p className="eyebrow">Bibliothèque locale</p><h2 id="library-overview-title">{bootstrap?.libraryCount ?? library.items.length} œuvres</h2></div><a className="text-link" href="/library">Tout voir</a></header>
-      {library.items.length === 0
-        ? <FeedbackState kind="empty" title="Bibliothèque vide" description="Importez vos favoris depuis l’extension pour commencer." />
-        : <div className="work-grid">{library.items.map((item) => <WorkCard coverSrc={item.coverUrl} context={item.mediaKind === 'anime' ? 'Anime' : 'Manga'} detail={item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale'} href={item.sourceUrl} indicator={item.progressLabel} key={item.workId} title={item.title} variant="library" />)}</div>}
-    </section>
-    <section className="member-section" aria-labelledby="agenda-overview-title">
-      <header className="section-heading"><div><p className="eyebrow">Semaine locale</p><h2 id="agenda-overview-title">{period.label}</h2></div><a className="text-link" href="/agenda">Ouvrir l’agenda</a></header>
-      {agenda.entries.some((entry) => entry.availability === 'estimated') ? <Status tone="accent">La semaine contient des horaires estimés</Status> : null}
-      <div aria-label={`Aperçu Agenda · ${period.label}`} className="agenda-preview" tabIndex={0}>{days.map((day) => <section className="agenda-preview-day" key={day.id}><header><strong>{day.label}</strong><span>{day.displayDate}</span></header>{day.releases.map((release) => <WorkCard context={release.availability === 'estimated' ? 'Estimation' : release.availability === 'official' ? 'Officielle' : 'Confirmée'} detail={`${release.release} · ${release.source}`} href={release.href} indicator={release.displayDate} key={release.id} title={release.title} variant="agenda" />)}</section>)}</div>
-    </section>
-  </>;
+  const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga', progress: item.progressLabel, source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale', title: item.title })) ?? [];
+  return <MemberOverview agendaDays={days} agendaHref="/agenda" agendaState={failed ? 'error' : loading ? 'loading' : empty || agenda?.entries.length === 0 ? 'empty' : 'ready'} libraryCount={bootstrap?.libraryCount ?? libraryItems.length} libraryHref="/library" libraryItems={libraryItems} libraryState={failed ? 'error' : loading ? 'loading' : empty || libraryItems.length === 0 ? 'empty' : 'ready'} onRetry={() => setRetryCount((count) => count + 1)} periodLabel={period.label} />;
 }
 
 export default function HomePage() {
-  return <SiteShell><main className="member-page"><HomePrivateOverview /></main></SiteShell>;
+  return <SiteShell><HomePrivateOverview /></SiteShell>;
 }
