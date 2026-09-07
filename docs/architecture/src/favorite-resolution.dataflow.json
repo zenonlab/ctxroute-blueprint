@@ -40,8 +40,8 @@
     { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "fail-closed" },
     { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "adaptateur URL" },
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "versionné" },
-    { "id": "durableQueue", "type": "messagebus", "label": "File durable MV3", "stage": 2, "row": 4, "width": 150, "tag": "IndexedDB" },
-    { "id": "providerAdapters", "type": "external", "label": "Fournisseurs publics", "stage": 3, "row": 4, "width": 150, "tag": "cadence bornée" },
+    { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "même IndexedDB" },
+    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "cadence indexée" },
     { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "unicité requise" },
     { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "décision humaine" },
     { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "seule autorité" }
@@ -51,7 +51,7 @@
     { "from": "bookmarkEvents", "to": "sourceEvidence", "label": "déclenche une convergence", "classification": "idempotent", "variant": "dashed", "labelAt": [208, 660] },
     { "from": "eligibility", "to": "parseArtifact", "label": "titre + URL admissibles", "classification": "sans perte", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
     { "from": "sourceEvidence", "to": "parseArtifact", "label": "indices structurés", "classification": "provenance locale", "variant": "default" },
-    { "from": "parseArtifact", "to": "durableQueue", "label": "entrée immuable + empreinte", "classification": "avant réseau", "variant": "security", "labelAt": [575, 440] },
+    { "from": "parseArtifact", "to": "durableQueue", "label": "source + Review + tâche", "classification": "transaction atomique", "variant": "security", "labelAt": [575, 440] },
     { "from": "durableQueue", "to": "providerAdapters", "label": "requête réservée", "classification": "au moins une fois", "variant": "dashed", "route": "straight", "labelAt": [638, 660] },
     { "from": "providerAdapters", "to": "titleMatcher", "label": "candidats typés", "classification": "réponse bornée", "variant": "default", "labelAt": [745, 660] },
     { "from": "parseArtifact", "to": "titleMatcher", "label": "aliases et preuves", "classification": "ordre déterministe", "variant": "emphasis", "route": "straight", "labelAt": [638, 320] },
@@ -82,9 +82,9 @@
       "dot": "cyan",
       "title": "Convergence MV3 bornée",
       "items": [
-        "Curseurs et tranches évitent les parcours globaux",
-        "Les effets, délais et Retry-After ont un checkpoint durable",
-        "Les migrations additives préservent l’autorité IndexedDB"
+        "Source, Review et tâche rejoignent la même transaction",
+        "Les claims sont indexés par type, fournisseur, état et échéance",
+        "Un ensemble fournisseur incomplet interdit toute résolution automatique"
       ]
     }
   ]

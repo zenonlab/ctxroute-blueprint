@@ -1,7 +1,7 @@
 # Contrat du parser et de la résolution des favoris
 
 - Statut : canonique pour la reconstruction
-- Version du contrat : 1
+- Version du contrat : 2
 - Date de l’audit comportemental : 2026-09-07
 - Décision associée : [ADR-0037](../decisions/ADR-0037-favorite-analysis-contract.md)
 - Dataflow associé :
@@ -88,8 +88,11 @@ Le flux cible est le suivant :
 
 Le parser reçoit au minimum `title` et `url`. L’import conserve aussi
 `externalBookmarkId`, `folderPath`, `siblingOrder` et `observedAt`. `title` et
-`url` sont conservés octet pour octet dans l’artefact ; les formes normalisées
-ne les remplacent jamais.
+`url` conservent exactement la chaîne JavaScript reçue ; les formes normalisées
+ne les remplacent jamais. Le navigateur ne fournit pas les octets d’origine :
+parler d’une conservation « octet pour octet » serait donc une promesse
+incorrecte. Toute empreinte encode explicitement les chaînes en UTF-8 avec leur
+longueur avant concaténation.
 
 ### Qualification
 
@@ -157,7 +160,8 @@ L’artefact cible contient au minimum :
 
 - identifiant et version du parser d’identité ;
 - version du parser de progression et du matcher ;
-- empreinte stable calculée sur l’identifiant du parser et les entrées brutes ;
+- empreinte stable calculée sur titre brut, URL brute et versions du parser et
+  de l’adaptateur de source ;
 - `raw.title` et `raw.url` inchangés ;
 - provenance brute et liste ordonnée des transformations d’identité ;
 - preuve de source utilisée ;
@@ -170,6 +174,11 @@ L’artefact cible contient au minimum :
 - statut `parsed` ou `identity-missing` ;
 - diagnostics stables ;
 - tous les candidats de progression et tous les candidats rejetés.
+
+L’empreinte sémantique couvre uniquement le titre brut, l’URL brute et les
+versions du parser et de l’adaptateur de source. `observedAt`, `folderPath`,
+`siblingOrder` et le type de déclencheur appartiennent à la révision
+d’observation : leur changement ne relance pas une résolution fournisseur.
 
 L’empreinte historique FNV-1a sert seulement à détecter un artefact obsolète.
 Elle n’est ni une signature, ni un MAC, ni une preuve de sécurité. TobiRink
@@ -188,6 +197,7 @@ empreinte différente en incrémentant explicitement la version.
 | Transformations de segment | `excluded_progression`, `excluded_numeric`, `excluded_release_marker`, `excluded_observed_hostname`, `cleaned_generic_suffix` |
 | Provenance d’alias | `stable-url-slug`, `aligned-bookmark-segment` |
 | Diagnostics d’identité | `OPAQUE_IDENTITY_UNCORROBORATED`, `URL_IDENTITY_MISSING` |
+| Diagnostics de pipeline | `INPUT_LIMIT_EXCEEDED`, `SOURCE_ADAPTER_CONFLICT`, `INCOMPLETE_CANDIDATE_SET`, `BLOCKED_CONTENT_TAXONOMY` |
 | Preuves de route | `CATEGORY_PATH`, `TITLE_SLUG`, `RELEASE_SUFFIX`, `RELEASE_PATH`, `EXPLICIT_URL_SEASON` |
 | Provenance de sortie URL | `URL_PATH`, `URL_SLUG_SUFFIX` |
 | Disposition URL | `INVALID_URL`, `NON_WEB_URL`, `UTILITY_PAGE`, `ROOT_PAGE`, `URL_IDENTITY_UNRESOLVED` |
@@ -537,11 +547,32 @@ Une recherche de titre demande seulement les champs nécessaires au matching.
 L’hydratation complète arrive après une décision par ID exact, possède ses TTL
 positif/négatif et ne relance jamais le matching de titre.
 
+Une réponse de recherche porte obligatoirement `complete` et `truncated`. Un
+ensemble incomplet, tronqué ou dont une page manque ne peut jamais produire
+`MATCH`, même si un seul candidat visible correspond. Il produit une erreur
+récupérable `INCOMPLETE_CANDIDATE_SET`, puis `BLOCKED` si la politique de retry
+est épuisée. `AMBIGUOUS` reste réservé à plusieurs identifiants distincts dans
+un ensemble complet.
+La limite de vingt candidats est un budget de transport, pas une preuve que le
+vingt-et-unième candidat n’existe pas.
+
+Les caches d’adaptateur sont locaux et versionnés. Une hydratation positive
+expire au plus tard après 24 heures et une absence après 15 minutes. Une entrée
+expirée peut accélérer un affichage local existant, mais ne peut pas décider une
+nouvelle identité sans revalidation.
+
 ## File durable et suspension MV3
 
 Chaque tâche conserve : identifiant stable, version, opération, entrée figée,
 clé d’idempotence, état, curseur, tentative, expiration de claim, résultat ou
-digest, prochaine échéance et erreur structurée.
+digest, `availableAt` toujours défini et erreur structurée.
+
+Les tâches de résolution vivent dans une outbox du même schéma
+`tobirink-private` que `FavoriteSource`, `Review` et les artefacts. L’import de
+ces quatre écritures est une seule transaction Dexie. La base technique
+`tobirink-durable-tasks` déjà utilisée pour les notifications Agenda reste une
+file distincte : elle n’est pas réutilisée pour la résolution et ne peut pas
+rompre l’atomicité de l’import.
 
 Le cycle cible est `READY → CLAIMED → EFFECT_RECORDED → COMMITTED`, avec
 `RETRY_AT` et `BLOCKED` non terminaux. Un claim expiré est rejoué avec la même
@@ -563,14 +594,25 @@ favori, l’empreinte des entrées et la version du matcher. L’enqueue batch :
   les clés encore absentes ;
 - échoue explicitement si la seconde écriture ne converge pas.
 
-Un réveil traite au plus huit tâches par défaut et respecte aussi un budget de
-temps réel. Les attentes longues deviennent `retryAt` et rendent la main au
-worker. Un seul effet fournisseur est réservé à la fois. Le curseur de page et
-le checkpoint fournisseur sont écrits avant de poursuivre.
+Un réveil traite au plus huit tâches et s’arrête après 20 secondes de temps
+réel, même si le lot n’est pas terminé. Un claim expire après 60 secondes. Une
+tâche transitoire effectue au plus huit tentatives automatiques ; elle devient
+ensuite `BLOCKED` et exige un retry manuel explicite. Le backoff exponentiel
+part de 30 secondes, est plafonné à 6 heures et son jitter de 0 à 10 % est
+calculé puis persisté une seule fois. `Retry-After`, `X-RateLimit-Reset` et les
+délais 403 définis plus haut priment sur ce calcul.
+
+Chaque fournisseur possède une lane avec au plus un effet en vol et sa cadence
+monotone : 2 200 ms pour AniList, 3 000 ms pour MangaUpdates. Les deux lanes
+peuvent avancer indépendamment; l’ordre de leurs réponses ne participe jamais
+au matching. Les claims sont lus sans `toArray()` global par les index composés
+`[kind+provider+state+availableAt]` et `[state+claimExpiresAt]`, avec
+`idempotencyKey` unique. Le curseur et le checkpoint fournisseur sont écrits
+avant de poursuivre.
 
 Une résolution persiste d’abord le résultat `RESOLVED` ou `REVIEW`, l’artefact,
-la décision et au plus dix candidats de Review historiques. TobiRink devra
-utiliser sa limite de contrat actuelle si elle est plus stricte. Une résolution
+la décision et au plus six candidats pour une Review active. Les ensembles
+complets ne sont pas archivés : seul leur digest est conservé. Une résolution
 unique enfile ensuite une hydratation par ID exact.
 
 ## Événements favoris et convergence
@@ -591,6 +633,13 @@ Une suppression navigateur ne supprime jamais automatiquement `Work`,
 progression ou historique Review. Elle peut marquer la source observée absente
 selon une future politique explicitement approuvée.
 
+Les listeners sont enregistrés avant l’inventaire. Comme WebExtension ne donne
+pas d’identifiant d’événement stable, chaque commande reçoit une séquence locale
+croissante dans IndexedDB et une révision dérivée de l’état observable. Une
+tranche d’inventaire porte sa séquence de base : elle ne peut pas écraser une
+création, modification, déplacement ou suppression reçue plus tard. Les
+identifiants touchés pendant le scan sont réconciliés avant sa clôture.
+
 L’inventaire complet ne doit pas être transformé par une seule opération
 mémoire non bornée. La lecture, la normalisation, l’enqueue et les écritures
 sont paginées ou découpées en tranches durables. Une installation avec zéro
@@ -602,6 +651,11 @@ dernière projection lisible et publie une erreur récupérable.
 `MATCH` écrit une résolution locale. `NO_MATCH`, `AMBIGUOUS`, conflit de saison,
 type incompatible, identité opaque non corroborée et corruption de provenance
 ouvrent ou maintiennent une Review.
+
+`NO_MATCH` écrit explicitement `Review.status = no-match`, conserve les motifs
+et reste résoluble manuellement. Il ne crée aucune `Work` et ne disparaît pas de
+l’historique sous prétexte que la file principale affiche seulement les Review
+`pending`.
 
 Une décision Review doit relire la Review pending, sa `FavoriteSource`, la
 révision opaque et le `Work` choisi dans une seule transaction. Révision
@@ -644,6 +698,32 @@ L’oracle FavLib comparait par égalité profonde quinze artefacts synthétique
 un commit Git figé. TobiRink doit importer le principe, pas la dépendance au
 répertoire FavLib : corpus versionné dans TobiRink, sortie complète comparée et
 aucun titre ou URL privé dans les fixtures.
+
+### Contrat d’équivalence
+
+La matrice ci-dessous contient exactement 82 cas : 77 `CONSERVER`, quatre
+`CORRIGER` (`U-02`, `U-10`, `B-03`, `O-02`) et un comportement conditionnel à
+un futur adaptateur (`X-01`). « Même résultat » signifie la même disposition,
+identité, saison, progression, décision de matching et classe de diagnostic ;
+cela ne signifie pas un JSON identique à l’ancien artefact FavLib.
+
+L’oracle TobiRink est obligatoire avant toute composition runtime :
+
+1. une fixture synthétique fournit l’observation et les réponses fournisseur
+   normalisées, jamais un appel réseau vivant ;
+2. la sortie attendue contient l’artefact complet, la décision et la projection ;
+3. les 77 cas `CONSERVER` doivent être égaux au résultat comportemental audité ;
+4. les quatre corrections possèdent un résultat TobiRink explicite et une
+   assertion interdisant l’ancien défaut ;
+5. `X-01` reste exclu du gate principal tant que MangaDex n’est pas activé ;
+6. toute réponse marquée `truncated` vérifie qu’aucun `MATCH` n’est possible ;
+7. une modification volontaire exige version, fixture et mise à jour de cette
+   matrice avant le code.
+
+Les protections d’infrastructure ajoutent des tests hors des 82 cas historiques :
+observation à 64 Kio et au-delà, ensemble candidat incomplet, rollback de
+l’outbox atomique, claim indexé sur une file volumineuse et compaction d’un reçu
+terminal. Elles ne sont jamais utilisées pour annoncer une équivalence FavLib.
 
 ## Matrice exhaustive des cas de test
 

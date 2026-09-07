@@ -1,6 +1,7 @@
 ---
 scope:
   - docs/systems/favorite-parsing-resolution-spec.md
+  - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
   - packages/domain/**
   - packages/application/**
@@ -9,12 +10,14 @@ scope:
   - packages/adapters-indexeddb/**
   - apps/extension/**
 review: on-change
+revised: true
 ---
 
 # ADR-0037 — Versionner le contrat d’analyse et de résolution des favoris
 
 - Status: accepted
 - Date: 2026-09-07
+- Revised: 2026-09-07
 
 ## Contexte
 
@@ -50,6 +53,20 @@ Conserver la reprise MV3 dans une file IndexedDB durable dont l’entrée est
 sont des opérations séparées. Les effets sont idempotents et les attentes
 longues sont persistées plutôt que gardées en mémoire.
 
+Implémenter les tâches de résolution comme une outbox du même schéma
+`tobirink-private` que `FavoriteSource`, `Review` et les artefacts afin que leur
+création soit atomique. Réutiliser les transitions pures de tâche existantes,
+mais pas l’adaptateur `tobirink-durable-tasks` des notifications : sa base
+séparée ne fournit pas cette atomicité et sa sélection actuelle parcourt tous
+les états disponibles. Les claims de résolution sont bornés par des index de
+type, fournisseur, état et échéance.
+
+Exiger que chaque réponse de candidats indique si l’ensemble pertinent est
+complet ou tronqué. Un ensemble incomplet ne peut jamais produire une
+correspondance automatique, même si un seul candidat visible correspond. Les
+lanes AniList et MangaUpdates appliquent séparément leurs cadences; l’ordre de
+leurs réponses ne modifie pas le résultat du matcher.
+
 Maintenir ADR-0025 : IndexedDB est la seule autorité privée. Les favoris sont
 des commandes d’import et leur suppression ne supprime pas une œuvre ou une
 progression. Maintenir ADR-0033 : toute contribution collective exige un
@@ -60,12 +77,26 @@ et modules TobiRink séparés, un corpus synthétique local et une matrice de
 traçabilité. Les anciennes versions servent seulement de référence
 comportementale.
 
+Définir l’équivalence sur le résultat métier, pas sur la forme JSON historique :
+77 cas sont conservés, `U-02`, `U-10`, `B-03` et `O-02` sont corrigés, et
+`X-01` reste exclu tant que MangaDex n’est pas activé. Un oracle synthétique
+compare artefact, décision et projection sans appeler un fournisseur vivant.
+Le module de langue de document reste un enrichissement local facultatif,
+séparé du parser de favoris; OVA et pré-sérialisation appartiennent à la
+compatibilité candidat, et la taxonomie éditoriale s’applique après hydratation.
+
 ## Conséquences
 
 Chaque changement de règle exige une version, une fixture synthétique, une
 comparaison d’artefact complet et une migration ou invalidation explicite. Les
 ambiguïtés deviennent visibles dans Review au lieu d’être masquées par un
 classement fournisseur.
+
+Une observation trop grande ou une réponse fournisseur tronquée échoue fermée
+vers Review au lieu de tronquer silencieusement les preuves. `NO_MATCH` conserve
+une Review `no-match` et ne crée pas de `Work`. Les artefacts et tâches
+techniques sont compactés selon une politique bornée sans supprimer les sources,
+Reviews, œuvres ou progressions autoritaires.
 
 Le premier chantier de code devra composer le pipeline complet depuis les
 événements favoris jusqu’aux écritures `FavoriteSource`, `Review` et `Work`.

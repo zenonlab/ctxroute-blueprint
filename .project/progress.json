@@ -1411,6 +1411,41 @@
             "validate:docs et 51 tests Progress passent; Sensor JSON SAFE sur Progress et le dataflow",
             "Archify dataflow et all passent showcase 9/9, 0 erreur et 0 avertissement"
           ]
+        },
+        {
+          "id": "step-18",
+          "title": "Corriger le contrat de pipeline après audit complet",
+          "status": "DONE",
+          "acceptance": [
+            "La parité distingue 77 cas conservés, quatre corrections volontaires et un cas futur, avec oracle exécutable obligatoire",
+            "Toute troncature fournisseur échoue fermée et NO_MATCH maintient une Review explicite",
+            "L outbox de résolution est atomique avec FavoriteSource et Review; les claims sont indexés, bornés et isolés par type et fournisseur",
+            "Langue, OVA, pré-sérialisation, taxonomie, TTL, cadences, empreintes, rétention et budgets sont explicitement placés et bornés",
+            "Documentation, décisions, Archify showcase, Progress, Sensor et diff-check passent"
+          ],
+          "files": [
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- dataflow",
+            "npm run archify:validate -- all",
+            "npm run sensor -- .project/progress.json docs/architecture/src/favorite-resolution.dataflow.json",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Contrat v2 et pipeline corrigés: oracle 77/4/X-01, troncation fail-closed, Review no-match et budgets normatifs",
+            "Outbox atomique dans tobirink-private, claims indexés par lane, empreinte et rétention bornées documentés",
+            "Documentation, décisions, cohérence, 51 tests Progress, Sensor SAFE et Archify showcase all passent"
+          ]
         }
       ]
     },

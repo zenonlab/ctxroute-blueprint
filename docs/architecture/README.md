@@ -33,7 +33,11 @@ Review or the authoritative private IndexedDB records. Its bounded convergence
 view accompanies the implementation contract in
 [`favorite-resolution-rebuild-pipeline.md`](../systems/favorite-resolution-rebuild-pipeline.md):
 inventory slices, checkpoints, additive migration and exact-ID hydration are
-delivered without moving private authority out of IndexedDB.
+delivered without moving private authority out of IndexedDB. Resolution uses
+an outbox in the same private schema as each source and Review; indexed
+provider lanes claim bounded work, and incomplete candidate sets fail closed.
+The separate durable-task database remains the notification adapter and is not
+presented as an atomic resolution outbox.
 
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
