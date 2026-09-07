@@ -82,12 +82,13 @@ Quand la file est vide, la bulle reprend l'empty state FavLib compact : une
 icône Inbox grise et le seul libellé « Aucune correspondance à vérifier », sans
 en-tête ni description internes supplémentaires.
 La route Bibliothèque commence directement par ses filtres et ses cartes, sans
-en-tête local redondant. Ses états non utilisables, comme ceux de la route
-Review, réutilisent `FeedbackState` en présentation centrée avec une icône
-Lucide grise, un texte court et aucune coque visuelle. L'état vide de la
-Bibliothèque propose de télécharger l'extension via un callback fourni par son
-hôte, sans destination codée en dur. La route Review explique seulement que la
-résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
+en-tête redondant. Ses états non utilisables réutilisent `FeedbackState` en
+présentation centrée avec une icône Lucide grise, un texte court et aucune coque
+visuelle. L’absence d’extension propose son téléchargement via un callback
+fourni par son hôte, sans destination codée en dur. Accueil et Agenda utilisent
+la même présentation isolée tant que l’extension est absente, sans rendre leurs
+sections privées. La route Review explique seulement que la résolution se
+trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
 
 ## Parcours reliés aux surfaces
 

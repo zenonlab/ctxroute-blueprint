@@ -20,7 +20,14 @@ describe('shared Library surface', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
   });
 
-  it('accepts a real local source without changing the Extension fallback', () => {
+  it('accepts a real stored source without changing the Extension fallback', () => {
     expect(component).toContain('item.href ?? `#work-${item.id}`');
+  });
+
+  it('distinguishes an absent extension from an installed empty library', () => {
+    expect(component).toContain('Extension TobiRink requise');
+    expect(component).toContain('retrouver automatiquement les œuvres de vos favoris');
+    expect(component).toContain('Aucune œuvre trouvée');
+    expect(component).not.toContain('Importez vos favoris');
   });
 });

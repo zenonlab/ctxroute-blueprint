@@ -7,7 +7,7 @@ const css = readFileSync(new URL('./Review.module.css', import.meta.url), 'utf8'
 const preview = readFileSync(new URL('./Review.preview.tsx', import.meta.url), 'utf8');
 
 describe('Review surface', () => {
-  it('publishes every relevant local state', () => {
+  it('publishes every relevant stored state', () => {
     expect(reviewVariants).toEqual(['resolution']);
     expect(reviewStates).toEqual(['ready', 'loading', 'empty', 'partial', 'offline', 'error', 'conflict']);
   });

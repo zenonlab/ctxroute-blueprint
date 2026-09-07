@@ -55,7 +55,7 @@ function MemberNavigationDemo({ state }: { state: MemberNavigationState }) {
       }}
     >
       <main className={styles.previewContent}>
-        <p className={styles.previewEyebrow}>Bibliothèque locale</p>
+        <p className={styles.previewEyebrow}>Bibliothèque</p>
         <h1>Vos œuvres</h1>
         <p>Le shell complet reprend la navigation, la recherche et le resolver Review FavLib.</p>
         <p aria-live="polite">{message}</p>

@@ -137,7 +137,7 @@ export function Popup({
               {continuations.state === 'ready' && continuations.items.length === 0 ? <p className={styles.continuationEmpty}>Aucune œuvre à reprendre.</p> : null}
               {continuations.state === 'loading' ? <p aria-live="polite" className={styles.continuationEmpty}>Lecture des reprises…</p> : null}
               {continuations.state === 'error' ? <p role="alert" className={styles.continuationEmpty}>Les reprises sont momentanément indisponibles.</p> : null}
-              {continuations.state === 'blocked' ? <p className={styles.continuationEmpty}>Les reprises locales ne sont pas accessibles.</p> : null}
+              {continuations.state === 'blocked' ? <p className={styles.continuationEmpty}>Les reprises ne sont pas accessibles.</p> : null}
             </section>
           </section>
         ) : null}
@@ -147,9 +147,9 @@ export function Popup({
             <PanelHeading>Sorties</PanelHeading>
             {agenda.state === 'ready' && agenda.items.length > 0 ? <div className={styles.cardGrid}>{agenda.items.map((item) => <Work item={item} key={`${item.href ?? 'unavailable'}-${item.title}`} variant="agenda" />)}</div> : null}
             {agenda.state === 'loading' ? <FeedbackState className={styles.feedback} kind="loading" layout="centered" title="Lecture des sorties…" /> : null}
-            {agenda.state === 'error' && onRetryAgenda ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetryAgenda}>Réessayer</Button>} className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable title="Agenda indisponible" /> : null}
-            {agenda.state === 'error' && !onRetryAgenda ? <FeedbackState className={styles.feedback} description="Les données locales restent intactes." kind="error" layout="centered" recoverable={false} title="Agenda indisponible" /> : null}
-            {agenda.state === 'blocked' ? <FeedbackState className={styles.feedback} description="Le menu n’a pas encore accès aux sorties locales." icon="calendar-days" kind="error" layout="centered" recoverable={false} title="Sorties indisponibles" /> : null}
+            {agenda.state === 'error' && onRetryAgenda ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetryAgenda}>Réessayer</Button>} className={styles.feedback} description="Les données restent intactes." kind="error" layout="centered" recoverable title="Agenda indisponible" /> : null}
+            {agenda.state === 'error' && !onRetryAgenda ? <FeedbackState className={styles.feedback} description="Les données restent intactes." kind="error" layout="centered" recoverable={false} title="Agenda indisponible" /> : null}
+            {agenda.state === 'blocked' ? <FeedbackState className={styles.feedback} description="Le menu n’a pas encore accès aux sorties." icon="calendar-days" kind="error" layout="centered" recoverable={false} title="Sorties indisponibles" /> : null}
           </section>
         ) : null}
 

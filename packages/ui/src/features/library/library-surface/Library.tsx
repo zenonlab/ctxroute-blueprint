@@ -10,6 +10,7 @@ import type { LibraryState, LibraryVariant, LibraryWork } from './library-surfac
 import styles from './Library.module.css';
 
 export interface LibraryProps {
+  extensionRequired?: boolean;
   filterOptions: LibraryFilterOptions;
   filters: LibraryFiltersValue;
   hasMore?: boolean;
@@ -25,6 +26,7 @@ export interface LibraryProps {
 }
 
 export function Library({
+  extensionRequired = false,
   filterOptions,
   filters,
   hasMore = false,
@@ -49,13 +51,13 @@ export function Library({
 
         {state === 'empty' ? (
           <FeedbackState
-            action={onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
+            action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
             className={styles.centeredState}
-            description="Importez vos favoris ou ajoutez une première œuvre."
+            description={extensionRequired ? 'Installez l’extension TobiRink pour retrouver automatiquement les œuvres de vos favoris.' : 'Aucune œuvre compatible n’a été trouvée dans vos favoris.'}
             icon="library-big"
             kind="empty"
             layout="centered"
-            title="Votre bibliothèque est vide"
+            title={extensionRequired ? 'Extension TobiRink requise' : 'Aucune œuvre trouvée'}
           />
         ) : null}
 
@@ -64,14 +66,14 @@ export function Library({
         ) : null}
 
         {state === 'blocked' ? (
-          <FeedbackState action={<Button icon="rotate-ccw" onClick={onOpenRecovery}>Ouvrir la récupération</Button>} className={styles.centeredState} description="La migration locale doit être reprise avant toute modification." kind="error" layout="centered" recoverable title="Migration locale interrompue" />
+          <FeedbackState action={<Button icon="rotate-ccw" onClick={onOpenRecovery}>Ouvrir la récupération</Button>} className={styles.centeredState} description="Vos données doivent être réparées avant de continuer." kind="error" layout="centered" recoverable title="Bibliothèque indisponible" />
         ) : null}
 
         {usable ? (
           <>
             <LibraryFilters onChange={onChangeFilters} options={filterOptions} value={filters} />
-            {state === 'partial' ? <Status tone="accent">Métadonnées incomplètes · données locales disponibles</Status> : null}
-            {state === 'offline' ? <Status tone="warning">Hors ligne · recherche et progression locale disponibles</Status> : null}
+            {state === 'partial' ? <Status tone="accent">Métadonnées incomplètes · données enregistrées disponibles</Status> : null}
+            {state === 'offline' ? <Status tone="warning">Hors ligne · recherche et progression disponibles</Status> : null}
             {items.length === 0 ? (
               <FeedbackState className={styles.centeredState} description="Modifiez la recherche ou retirez une facette." icon="search" kind="empty" layout="centered" title="Aucun résultat" />
             ) : (

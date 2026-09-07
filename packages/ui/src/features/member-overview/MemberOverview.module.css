@@ -1,0 +1,18 @@
+.overview { background: var(--color-canvas); color: var(--color-text); display: grid; font-family: var(--font-family-sans); gap: var(--space-8); margin: 0 auto; max-width: var(--size-content-wide); min-height: calc(100vh - var(--size-control-touch) - var(--space-6)); padding: var(--space-8) var(--space-6) calc(var(--space-8) * 2); width: 100%; }
+.section { display: grid; gap: var(--space-6); min-width: 0; }
+.section + .section { border-top: var(--size-border) solid var(--color-border); padding-top: var(--space-8); }
+.heading { align-items: end; display: flex; gap: var(--space-4); justify-content: space-between; }
+.heading > div { display: grid; gap: var(--space-1); }
+.heading h1, .heading h2 { font-size: var(--font-size-title); letter-spacing: var(--letter-spacing-tight); line-height: var(--line-height-tight); margin: 0; }
+.eyebrow { color: var(--color-primary); font-size: var(--font-size-meta); font-weight: var(--font-weight-strong); letter-spacing: var(--letter-spacing-label); margin: 0; text-transform: uppercase; }
+.link { color: var(--color-primary); font-size: var(--font-size-label); font-weight: var(--font-weight-strong); text-underline-offset: var(--space-1); }
+.link:focus-visible { outline: calc(var(--size-border) * 2) solid var(--color-focus); outline-offset: var(--space-1); }
+.grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(min(12.25rem, 100%), 12.25rem)); min-width: 0; }
+.week { display: grid; gap: var(--space-4); grid-template-columns: repeat(7, 11.25rem); max-width: 100%; overflow-x: auto; padding: var(--space-1) var(--space-1) var(--space-4); }
+.week:focus-visible { border-radius: var(--radius-sm); box-shadow: var(--shadow-focus); outline: 0; }
+.day { align-content: start; display: grid; gap: var(--space-4); min-width: 11.25rem; }
+.day > header { display: grid; gap: var(--space-1); }
+.day > header strong { font-size: var(--font-size-caption); text-transform: capitalize; }
+.day > header span { color: var(--color-text-subtle); font-size: var(--font-size-meta); }
+.centeredState { align-self: center; justify-self: center; max-width: calc(var(--size-column-min) * 2); width: 100%; }
+@media (max-width: 48rem) { .overview { gap: var(--space-6); padding: var(--space-6) var(--space-4) calc(var(--size-control-touch) + var(--space-8) * 2); } .heading { align-items: start; flex-direction: column; } .grid { gap: var(--space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); } }

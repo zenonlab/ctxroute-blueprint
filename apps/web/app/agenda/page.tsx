@@ -34,13 +34,15 @@ function AgendaSurface() {
     void readAgenda(from, to).then(setSnapshot).catch(() => setFailed(true));
   }, [from, readAgenda, status, to]);
 
-  if (status !== 'connected') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'extension-missing') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const items: AgendaPeriodItem[] = snapshot?.entries.map((entry) => ({
     availability: entry.availability,
     id: `${entry.workId}_${entry.occursAt}`,
     occursAt: entry.occursAt,
     release: entry.releaseLabel,
-    source: entry.sourceLabel ?? 'Source locale',
+    source: entry.sourceLabel ?? 'Source enregistrée',
     sourceUrl: entry.sourceUrl,
     title: entry.title,
   })) ?? [];

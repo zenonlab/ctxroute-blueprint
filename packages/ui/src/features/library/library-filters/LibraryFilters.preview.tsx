@@ -88,7 +88,7 @@ const libraryFiltersPreview = definePreview({
             <p className={styles.eyebrow}>Métier · Bibliothèque</p>
             <h3>Trouver sans changer de langage</h3>
           </div>
-          <span className={styles.index}>Local / combinable</span>
+          <span className={styles.index}>Combinable</span>
         </header>
         <div className={styles.sample}>
           <LibraryFiltersDemo key={selectedState} state={selectedState} />

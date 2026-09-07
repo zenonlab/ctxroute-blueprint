@@ -32,7 +32,7 @@
     { "id": "uiPackage", "type": "frontend", "label": "Package UI", "sublabel": "tokens + composants + marque", "pos": [210, 80], "size": [170, 64] },
     { "id": "reviewResolver", "type": "frontend", "label": "ReviewResolver", "sublabel": "choix + navigation différée", "pos": [460, 80], "size": [180, 64] },
     { "id": "memberNavigation", "type": "frontend", "label": "Shell membre", "sublabel": "recherche + cloche + bulle", "pos": [730, 80], "size": [180, 64] },
-    { "id": "sharedSurfaces", "type": "frontend", "label": "Compositions membre", "sublabel": "Library + Agenda", "pos": [730, 190], "size": [180, 64], "tag": "API publique" },
+    { "id": "sharedSurfaces", "type": "frontend", "label": "Compositions membre", "sublabel": "Library + Agenda + Overview", "pos": [730, 190], "size": [180, 64], "tag": "API publique" },
     { "id": "extension", "type": "frontend", "label": "Surfaces Tobirink", "sublabel": "extension + web statique", "pos": [1030, 80], "size": [180, 64] }
   ],
   "boundaries": [
@@ -49,7 +49,7 @@
     { "id": "uiReviewResolver", "from": "uiPackage", "to": "reviewResolver", "label": "API publique", "variant": "default" },
     { "id": "resolverNavigation", "from": "reviewResolver", "to": "memberNavigation", "label": "bulle de la cloche", "variant": "emphasis", "labelAt": [685, 158] },
     { "id": "uiSharedSurfaces", "from": "uiPackage", "to": "sharedSurfaces", "label": "tokens + primitives", "variant": "default", "fromSide": "bottom", "toSide": "left" },
-    { "id": "sharedSurfacesConsumer", "from": "sharedSurfaces", "to": "extension", "label": "Library + Agenda", "variant": "emphasis", "fromSide": "top", "toSide": "left" },
+    { "id": "sharedSurfacesConsumer", "from": "sharedSurfaces", "to": "extension", "label": "surfaces membre", "variant": "emphasis", "fromSide": "top", "toSide": "left" },
     { "id": "navigationExtension", "from": "extension", "to": "memberNavigation", "label": "routes + file locale", "variant": "default" }
   ],
   "cards": [
@@ -92,7 +92,14 @@
       "dot": "rose",
       "title": "Workbench ciblé",
       "items": [
-        "Le viewport contient seulement catalogue et aperçu",
+        "Le viewport contient seulement catalogue et aperçu, sans hero parasite sur l’accueil",
+        "Agenda aligne ses états vide, chargement et erreur sur le FeedbackState centré de Library",
+        "Review aligne aussi ses états vide, chargement et erreur sur la même composition centrée",
+        "Le shell membre expose Review vide même sans extension, sans créer de candidat",
+        "Les libellés visibles évitent le qualificatif local et privilégient les noms produit directs",
+        "Les surfaces distinguent extension requise et données vides sans demander un import manuel",
+        "Accueil et Agenda reprennent l’état isolé de Bibliothèque lorsque l’extension est absente",
+        "Les textes visibles décrivent le bénéfice utilisateur sans exposer le protocole, le stockage ou le format de paquet",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }

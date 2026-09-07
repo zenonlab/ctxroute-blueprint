@@ -51,6 +51,8 @@ export { Library, libraryStates, libraryVariants } from './features/library/libr
 export type { LibraryProps, LibraryState, LibraryVariant, LibraryWork } from './features/library/library-surface';
 export { Agenda, agendaStates, agendaVariants, createAgendaDays, createLocalAgendaPeriod } from './features/agenda';
 export type { AgendaAvailability, AgendaDay, AgendaPeriodItem, AgendaProps, AgendaRelease, AgendaState, AgendaVariant, LocalAgendaPeriod } from './features/agenda';
+export { MemberOverview } from './features/member-overview';
+export type { MemberOverviewProps } from './features/member-overview';
 export { ReviewResolver, reviewResolverStates } from './features/review/review-resolver';
 export type {
   ReviewCandidate,

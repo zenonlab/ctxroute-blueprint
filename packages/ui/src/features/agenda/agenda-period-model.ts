@@ -33,7 +33,7 @@ export function createAgendaDays(period: LocalAgendaPeriod, snapshot: { items: r
   return period.days.map(({ date, id }) => ({
     displayDate: dateLabel.format(date), id, isToday: id === localDayId(new Date()), label: dayLabel.format(date),
     releases: snapshot.items.filter((item) => localDayId(new Date(item.occursAt)) === id).map((item) => {
-      const release = { availability: item.availability, displayDate: timeLabel.format(new Date(item.occursAt)), id: item.id, occursAt: item.occursAt, precision: item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire local', release: item.release, source: item.source, title: item.title };
+      const release = { availability: item.availability, displayDate: timeLabel.format(new Date(item.occursAt)), id: item.id, occursAt: item.occursAt, precision: item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire', release: item.release, source: item.source, title: item.title };
       return item.sourceUrl ? { ...release, href: item.sourceUrl } : release;
     }),
   }));

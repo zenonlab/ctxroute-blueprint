@@ -54,11 +54,13 @@ function LibrarySurface() {
     id: item.workId,
     mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga',
     progress: item.progressLabel,
-    source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source locale',
+    source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source enregistrée',
     title: item.title,
   })) ?? [];
 
-  if (status !== 'connected') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
+  if (status === 'extension-missing') return <Library extensionRequired filterOptions={filterOptions} filters={filters} items={[]} navigation={navigation} onChangeFilters={setQuery} onDownloadExtension={() => router.push('/download')} onLoadMore={() => undefined} onOpenRecovery={() => setRetryCount((count) => count + 1)} onRetry={() => setRetryCount((count) => count + 1)} state="empty" />;
+  if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const filtered = search.length > 0 || facet !== 'all';
   const state: LibraryState = failed ? 'error' : loading ? 'loading' : page && items.length === 0 && !filtered ? 'empty' : 'ready';
 

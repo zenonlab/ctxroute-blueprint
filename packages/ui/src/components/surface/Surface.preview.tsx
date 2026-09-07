@@ -61,7 +61,7 @@ const surfacePreview = definePreview({
             state={selectedState}
             variant={selectedVariant}
           >
-            <h4 className={styles.sampleTitle}>Bibliothèque locale</h4>
+            <h4 className={styles.sampleTitle}>Bibliothèque</h4>
             <p className={styles.sampleCopy}>La surface organise. Le composant métier garde son identité.</p>
           </Surface>
         </div>

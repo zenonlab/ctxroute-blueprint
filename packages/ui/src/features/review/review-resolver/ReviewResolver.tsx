@@ -13,6 +13,8 @@ export interface ReviewResolverProps {
   canNext: boolean;
   canPrevious: boolean;
   item?: ReviewItem;
+  extensionRequired?: boolean;
+  onDownloadExtension?: () => void;
   onNext: () => void;
   onPrevious: () => void;
   onRefresh: () => void;
@@ -39,6 +41,8 @@ export function ReviewResolver({
   canNext,
   canPrevious,
   item,
+  extensionRequired = false,
+  onDownloadExtension,
   onNext,
   onPrevious,
   onRefresh,
@@ -65,12 +69,12 @@ export function ReviewResolver({
     if (!item || busy) return;
     const value = manualValue.trim();
     if (!value) {
-      setManualError('Saisissez un identifiant ou une URL fournisseur.');
+      setManualError('Saisissez un identifiant ou une adresse web.');
       return;
     }
     const source = manualSource(value);
     if (source === 'url' && !validHttpUrl(value)) {
-      setManualError('Saisissez une URL HTTP(S) valide.');
+      setManualError('Saisissez une adresse web valide.');
       return;
     }
     setManualError(null);
@@ -78,17 +82,19 @@ export function ReviewResolver({
   };
 
   if (state === 'loading') {
-    return <FeedbackState description="Lecture de la file conservée sur cet appareil." kind="loading" title="Préparation des Reviews…" />;
+    return <FeedbackState className={styles.centeredState} description="Lecture de la file conservée sur cet appareil." kind="loading" layout="centered" title="Préparation des Reviews…" />;
   }
 
   if (state === 'empty') {
     return (
       <FeedbackState
+        action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
         className={styles.empty}
+        description={extensionRequired ? 'Installez l’extension TobiRink pour retrouver les œuvres de vos favoris à vérifier.' : undefined}
         icon="inbox"
         kind="empty"
         layout="centered"
-        title="Aucune correspondance à vérifier"
+        title={extensionRequired ? 'Extension TobiRink requise' : 'Aucune correspondance à vérifier'}
       />
     );
   }
@@ -96,9 +102,11 @@ export function ReviewResolver({
   if (state === 'error') {
     return (
       <FeedbackState
-        action={<Button disabled={busy} icon="refresh-cw" onClick={onRetry}>Recharger les candidats</Button>}
-        description="La file locale est conservée. Seuls les candidats seront relus."
+        action={<Button disabled={busy} icon="refresh-cw" onClick={onRetry}>Recharger les suggestions</Button>}
+        className={styles.centeredState}
+        description="Vos correspondances restent enregistrées. Seules les suggestions seront rechargées."
         kind="error"
+        layout="centered"
         recoverable
         title="Candidats indisponibles"
       />
@@ -130,8 +138,8 @@ export function ReviewResolver({
 
   return (
     <section aria-busy={busy || undefined} className={styles.resolver}>
-      {state === 'partial' ? <Status tone="accent">Un fournisseur est indisponible · décision locale conservée</Status> : null}
-      {state === 'offline' ? <Status tone="warning">Hors ligne · hydratation différée après décision</Status> : null}
+      {state === 'partial' ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
+      {state === 'offline' ? <Status tone="warning">Hors ligne · les détails seront complétés à la reconnexion</Status> : null}
 
       <section aria-label="Contexte du favori" className={styles.sourceContext}>
         <div>
@@ -190,7 +198,7 @@ export function ReviewResolver({
       {!candidatesDeferred && manualOpen ? (
         <div className={styles.manualPanel} id={manualPanelId}>
           <form onSubmit={submitManual}>
-            <label htmlFor={manualInputId}>Identifiant ou URL fournisseur</label>
+            <label htmlFor={manualInputId}>Identifiant ou adresse de la source</label>
             <div className={styles.manualControls}>
               <input
                 aria-describedby={manualError ? manualErrorId : undefined}

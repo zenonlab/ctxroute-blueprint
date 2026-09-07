@@ -82,7 +82,7 @@ const layoutPreview = definePreview({
         </div>
       </section>
 
-      <p className="layout-foundation__rule">Six espacements. Sept tailles de texte. Aucune valeur locale improvisée.</p>
+      <p className="layout-foundation__rule">Six espacements. Sept tailles de texte. Aucune valeur improvisée.</p>
     </section>
   ),
 });

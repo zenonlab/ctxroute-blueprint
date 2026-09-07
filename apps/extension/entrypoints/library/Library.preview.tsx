@@ -41,7 +41,7 @@ function LibraryDemo({ state }: { state: LibraryState }) {
       return matchesQuery && matchesType;
     });
   }, [filters]);
-  const visible = state === 'partial' ? filtered.map((work, index) => index === 1 ? { ...work, source: 'Métadonnées locales' } : work).slice(0, limit) : filtered.slice(0, limit);
+  const visible = state === 'partial' ? filtered.map((work, index) => index === 1 ? { ...work, source: 'Métadonnées enregistrées' } : work).slice(0, limit) : filtered.slice(0, limit);
   const shown = state === 'empty' || state === 'loading' || state === 'error' || state === 'blocked' ? [] : visible;
 
   return (
@@ -99,11 +99,11 @@ const libraryPreview = definePreview({
   title: 'Bibliothèque',
   category: 'Surfaces',
   level: 'surface',
-  purpose: 'Parcourir les œuvres locales, filtrer et consulter la progression synchronisée.',
+  purpose: 'Parcourir les œuvres enregistrées, filtrer et consulter la progression conservée.',
   presentation: 'page',
   variants: [...libraryVariants],
   states: [...libraryStates],
-  fixtures: ['6 œuvres locales · pagination par 4 · progression automatique sur les cartes'],
+  fixtures: ['6 œuvres enregistrées · pagination par 4 · progression automatique sur les cartes'],
   sources: [
     { label: 'API publique', path: 'entrypoints/library/index.ts' },
     { label: 'Contrat partagé', path: 'packages/ui/src/features/library/library-surface/library-surface.contract.ts' },
@@ -116,7 +116,7 @@ const libraryPreview = definePreview({
   accessibility: [
     'Le titre principal nomme la surface et chaque carte conserve un lien clavier',
     'Les états asynchrones utilisent les composants FeedbackState partagés',
-    'Chaque progression synchronisée reste lisible dans la zone dédiée de WorkCard',
+    'Chaque progression conservée reste lisible dans la zone dédiée de WorkCard',
   ],
   usage: `import { Library } from '@tobirink/ui';`,
   render: ({ state }) => (

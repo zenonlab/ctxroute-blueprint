@@ -73,7 +73,7 @@ function PopupDemo({ state, variant }: { state: PopupState; variant: PopupVarian
   return (
     <Popup
       agenda={agenda}
-      connection={{ label: 'Données locales prêtes', tone: 'ready' }}
+      connection={{ label: 'Données prêtes', tone: 'ready' }}
       continuations={continuations}
       initialPanel={variant}
       onOpenFullSettings={() => undefined}
