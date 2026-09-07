@@ -42,6 +42,8 @@ if [[ "${1:-}" == --package ]]; then
   probe_linker=(-Xlinker -e -Xlinker _NSExtensionMain)
   (cd "$probe_root" && node pocs/macos-native-wallpaper/package.mjs "$probe_stage")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
+  probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift")
+  probe_sources+=("$probe_root/pocs/macos-native-wallpaper/InteractiveDiagnostic.swift")
 fi
 env -u SDKROOT xcrun swiftc \
   -sdk "$probe_sdk" -target "$probe_arch-apple-macos26.0" \
@@ -67,6 +69,8 @@ if [[ "${1:-}" == --package ]]; then
   cp "$probe_stage/LICENSE" "$probe_app/Contents/Resources/Phosphene-LICENSE"
   env -u SDKROOT xcrun swiftc -sdk "$probe_sdk" -target "$probe_arch-apple-macos26.0" \
     -swift-version 6 -parse-as-library "$probe_root/pocs/macos-native-wallpaper/Host.swift" \
+    "$probe_root/pocs/macos-native-wallpaper/HostControls.swift" \
+    "$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift" \
     -o "$probe_app/Contents/MacOS/NativeWallpaperProbeHost"
   "$probe_app/Contents/MacOS/NativeWallpaperProbeHost" --thumbnail "$probe_extension/Contents/Resources/diagnostic.png"
   plutil -lint "$probe_app/Contents/Info.plist" "$probe_extension/Contents/Info.plist"

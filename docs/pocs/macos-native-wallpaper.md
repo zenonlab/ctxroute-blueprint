@@ -1,6 +1,59 @@
 # Sonde native macOS — paquet local de test
 
-## Tester le paquet préparé
+## Build interactif séparé — 8 septembre 2026
+
+L'utilisateur confirme l'animation du build 3. Son processus PID 12860 et son
+enregistrement restent intacts. Le nouveau paquet est
+`dist/pocs/macos-native-wallpaper/compile.Bbw4WZ/Native Wallpaper Probe.app`.
+Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
+`.extension`, version 5. Signature et plist validées. Hôte enregistré par
+`lsregister -f`, extension par `pluginkit -a` ; le fond actif n'a pas été changé.
+Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
+n'a pas été enregistré et ne doit pas être utilisé.
+
+Pour tester le nouveau paquet : ouvrir **ce chemin Bbw4WZ** dans Finder ; le
+compagnon présente ses commandes et un bouton vers les Réglages. Choisir
+**Native Wallpaper Interactive → Balayage diagnostic** uniquement pour ce test.
+Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
+Les deux catalogues ont une vignette similaire, mais des fournisseurs distincts.
+Fermer le compagnon ne termine pas le wallpaper hébergé par macOS.
+
+Fonctions implémentées : panneau dans les calques du décor, pause/reprise du
+balayage sans réinitialiser sa phase, effet de contour lumineux, fermeture du
+panneau, reset des états visuels. Commandes via boutons AppKit dans une fenêtre
+ordinaire du compagnon. Cette fenêtre n'est ni un overlay permanent de bureau,
+ni le wallpaper lui-même. L'observation globale souris/clavier n'est pas ajoutée.
+La demande d'accord pour étudier les clics directs et le filtrage Finder reste
+sans réponse au moment de cette livraison.
+
+La transmission utilise sept notifications Darwin nommées sans payload,
+idempotentes mais non authentifiées et sans garantie de livraison. Aucun shell,
+fichier utilisateur, réseau ou terminal réel n'est piloté. L'UI annonce
+« demande envoyée », pas « appliquée ». L'extension écrit `[Interaction] applied`
+dans son conteneur propre à réception ; aucune boucle de polling supplémentaire.
+L'absence de récepteur doit laisser le compagnon utilisable sans attendre.
+
+Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 22
+assertions commandes/états et 11 assertions sur les calques (pause idempotente,
+reprise, effet, reset, panneau unique, taille réduite). Dispatch direct de test,
+pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
+Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
+du panneau par WallpaperAgent ni un clic réel. Le build complet réussit avec
+deux avertissements amont déjà présents ; aucune notarisation revendiquée.
+Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
+états interactifs : transitions, mise en veille et énergie restent à qualifier.
+`npm run verify` réussit également ; syntaxes Bash/Node et diff vérifiés.
+AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
+
+Archify architecture : 9/9 showcase, zéro erreur/avertissement, une correction
+de placement de libellé. Source SHA-256
+`ba6ae4ed845b65e3e0f53ad0bd8b2976e9a874905b7a1adcf88fc01f9b1ab84a` ; HTML
+`c9c658325d38a9789c96e293d5135435bcc1a98901a6ec38bf5c5771e233cfb2`.
+Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
+tailles sans débordement, capture sombre 2048×1320 inspectée. Reçu de revue
+humaine `pending`. Libellés français, interface fixe du visualiseur en anglais.
+
+## Paquet animé précédent conservé
 
 Le paquet actuellement enregistré et relancé est
 `dist/pocs/macos-native-wallpaper/compile.nXn2Mw/Native Wallpaper Probe.app` (build 3).

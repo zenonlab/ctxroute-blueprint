@@ -4,6 +4,16 @@ Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolémen
 
 ## Reprise actuelle — qualification native
 
+**8 septembre : animation build 3 confirmée par l'utilisateur.** Build interactif
+5 séparé `compile.Bbw4WZ`, identités `.nativeprobe.interactive[.extension]`,
+compilé/signé/enregistré sans modifier le fond actif ni arrêter PID 12860.
+Compagnon AppKit avec sept commandes visuelles Darwin, panneau dans les calques,
+pause/reprise et effet. 22 assertions d'état + 11 calques passent via `test.sh`.
+Transport réel, rendu du panneau et clics non qualifiés ; pas de surveillance
+globale. Demande d'accord pour compagnon souris/Accessibilité encore sans réponse.
+Ne pas présenter cette étape comme terminal/jeux intégrés ou clics diégétiques
+fonctionnels. Lire la fiche native pour chemins et protocole de test.
+
 **Dernier résultat 23:57 : lancement rétabli après retour enregistré au build 3
 `compile.nXn2Mw`.** PID 12860, chemin réel vérifié, journal `colorDiag installed
 sweep` puis UPDATE. Build 4 aGAdKG conservé mais désenregistré ; ne pas le

@@ -62,3 +62,28 @@ l'espace de nom propre. Les échecs d'identification des appelants XPC deviennen
 des refus. Les échanges privés et leur rendu restent des hypothèses à tester.
 
 Source : [Phosphene épinglé](https://github.com/kageroumado/phosphene/tree/8b5bd57c1450eda74cf2ec6ceaae2e586cfdfcd6).
+
+## Commandes visuelles isolées — 8 septembre 2026
+
+Après confirmation utilisateur de l'animation du build 3, conserver ce paquet
+en cours. Le build interactif utilise une identité différente
+`org.wallpaperthemes.nativeprobe.interactive` et `.extension` : sa compilation
+ne remplace ni l'enregistrement ni le processus déjà qualifié.
+
+Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
+dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.
+Le panneau de commande est une fenêtre ordinaire, pas une imitation de wallpaper.
+Le panneau du décor est, lui, dessiné dans le contexte natif de l'extension.
+
+Pour ce seul diagnostic, réutiliser les notifications Darwin déjà employées
+par l'amont : noms fixes sans charge utile et actions idempotentes, traitées
+sur Lifecycle.queue. Canal non authentifié, sans accusé de réception ni garantie
+de livraison : l'UI indique une demande envoyée, jamais une réussite supposée.
+Interdiction d'y transporter des commandes système, chemins, sessions ou données
+privées. Les références aux calques sont faibles ; aucun timer supplémentaire.
+Ce transport n'est pas le contrat IPC du produit final.
+
+Aucune observation souris/clavier globale ni permission Accessibilité activée.
+Le clic direct sur le décor et la priorité Finder restent une expérience séparée,
+soumise à accord utilisateur et preuve. Ne pas annoncer cette étape comme
+l'intégration du terminal, des jeux, ou de toutes les interactions produit.

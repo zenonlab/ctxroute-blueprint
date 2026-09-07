@@ -22,14 +22,8 @@ enum ProbeHost {
         }
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
-        app.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "Native Wallpaper Probe"
-        alert.informativeText = "Test expérimental d’une extension Apple, sans fenêtre wallpaper superposée.\n\nDans Réglages > Fond d’écran, chercher Native Wallpaper Probe puis Balayage diagnostic. Si absent : l’admission de l’extension a échoué ; ne pas désactiver les protections macOS.\n\nAvant sélection, noter votre fond actuel. Pour arrêter, sélectionner de nouveau ce fond. Les clics dans le décor ne font pas partie de ce test."
-        alert.addButton(withTitle: "Ouvrir les réglages")
-        alert.addButton(withTitle: "Fermer")
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension")!)
-        }
+        let controls = HostControls()
+        app.delegate = controls
+        withExtendedLifetime(controls) { app.run() }
     }
 }
