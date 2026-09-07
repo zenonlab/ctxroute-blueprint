@@ -45,6 +45,12 @@ pas un produit desktop qui n'existe pas encore.
 
 Commandes existantes : `npm run setup`, `npm run validate`,
 `npm run verify`, `npm run archify:visual-check`.
+Le PoC wallpaper natif ajoute
+`bash pocs/macos-native-wallpaper/verify-package.sh <paquet.app>` : ce contrôle
+post-build vérifie le périmètre du chemin, les identités et versions des deux
+bundles, l'extension point Apple, les assets, les signatures et le seul
+entitlement sandbox autorisé. Il ne lance ni l'hôte ni l'extension et ne prouve
+donc pas le rendu dans WallpaperAgent.
 Les résultats réellement obtenus sont consignés dans la
 [note de reprise](session-handoff.md).
 

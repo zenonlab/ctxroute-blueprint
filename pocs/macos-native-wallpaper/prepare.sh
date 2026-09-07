@@ -90,5 +90,6 @@ if [[ "${1:-}" == --package ]]; then
   codesign --force --sign - "$probe_app"
   codesign --verify --strict --verbose=2 "$probe_extension"
   codesign --verify --deep --strict --verbose=2 "$probe_app"
+  bash "$probe_root/pocs/macos-native-wallpaper/verify-package.sh" "$probe_app"
   echo "Package (ad hoc signature; OS admission untested): $probe_app"
 fi

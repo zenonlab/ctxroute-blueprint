@@ -34,6 +34,13 @@ La sélection réelle dans les réglages reste une étape de qualification disti
 Ne pas présenter l'absence de certificat local comme preuve que toute signature
 ad hoc serait impossible ; son admission n'est simplement pas établie.
 
+Après assemblage et signature, `verify-package.sh` rejoue une porte statique
+bornée sur le paquet produit. Elle refuse les chemins extérieurs au répertoire
+isolé du PoC et vérifie identités, versions de catalogue, point d'extension,
+assets, signature et entitlement sandbox. Cette porte ne lance aucun binaire et
+ne transforme donc pas une conformité de structure en preuve d'admission ou de
+rendu par macOS.
+
 ## Consequences
 
 Le framework et CAContext sont privés : cette voie ne garantit ni stabilité

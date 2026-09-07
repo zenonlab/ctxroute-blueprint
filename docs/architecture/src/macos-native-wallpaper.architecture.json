@@ -5,6 +5,7 @@
   "components": [
     { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection par utilisateur", "pos": [40, 110], "size": [230, 80] },
     { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système Apple", "pos": [520, 110], "size": [240, 80] },
+    { "id": "package-gate", "type": "security", "label": "Gate paquet", "sublabel": "16 contrôles · sans lancement", "pos": [750, 20], "size": [190, 70] },
     { "id": "extension", "type": "backend", "label": "Extension diagnostic", "sublabel": "Phosphene · XPC privé", "pos": [1010, 110], "size": [230, 80] },
     { "id": "animation", "type": "backend", "label": "Visuels interactifs", "sublabel": "Calques · panneau · effets", "pos": [1010, 530], "size": [230, 80] },
     { "id": "controls", "type": "frontend", "label": "Compagnon local", "sublabel": "Boutons AppKit explicites", "pos": [40, 320], "size": [230, 80] },
@@ -19,6 +20,7 @@
   "connections": [
     { "from": "picker", "to": "host", "label": "choix du fond" },
     { "from": "host", "to": "extension", "label": "cycle de vie XPC" },
+    { "from": "package-gate", "to": "extension", "label": "qualifie le bundle", "variant": "security", "labelAt": [1000, 16] },
     { "from": "extension", "to": "animation", "label": "diagnostic visuel", "labelDy": 24 },
     { "from": "controls", "to": "commands", "label": "action explicite" },
     { "from": "priority", "to": "hit-testing" },

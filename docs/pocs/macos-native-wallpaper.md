@@ -101,6 +101,13 @@ Zl05p9 conserve le groupe propre, passe le couple hôte/extension à la version 
 et vérifie ces deux invariants pendant le build. Il est compilé et enregistré,
 mais pas encore lancé ni sélectionné ; il ne faut donc pas annoncer que le
 catalogue ou le défaut visuel est résolu.
+
+`verify-package.sh` permet de rejouer la qualification statique sur un paquet
+déjà construit sans l'exécuter. Zl05p9 passe ses 16 contrôles : emplacement isolé,
+binaires présents, plist, identités, versions, extension point, manifeste et
+schéma, nom/UUID de scène, identifiant de groupe compilé, signatures et sandbox.
+Le vérificateur refuse un chemin extérieur au répertoire de builds du PoC et
+exige que la sandbox soit l'unique entitlement de l'extension.
 Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
 états interactifs : transitions, mise en veille et énergie restent à qualifier.
 Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle
@@ -110,11 +117,11 @@ AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
 
 Archify architecture : 9/9 showcase, zéro erreur/avertissement, deux corrections
 ciblées de placement/routage. Source SHA-256
-`7ac456574735d2555813aaa730b431195afd4858250fe76fa3ad6672ed928bb5` ; HTML
-`01e57a6233792ea317f732d7bf9d69073de65b62ae3b386d160d0c9e402167d7`.
+`040f1ea6f0e2329b04f74dab0ff9be358506e9996bc770d075ad0f687ae41504` ; HTML
+`e8cb008650a6cdc7c4f2189a4d2a072b3e345d4099f74c4f79d282ddf8dbfbd6`.
 Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
 tailles sans débordement, capture sombre 2048×1320 inspectée : hiérarchie,
-relations et libellés lisibles, sans collision visible. Revue visuelle réussie
+relations, gate statique et libellés lisibles, sans collision visible. Revue visuelle réussie
 après deux corrections ciblées de placement/routage. Libellés français, interface fixe du
 visualiseur en anglais.
 
