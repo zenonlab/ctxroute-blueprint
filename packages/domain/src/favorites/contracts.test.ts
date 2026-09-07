@@ -22,6 +22,12 @@ const observation = () => createFavoriteObservation({
 });
 
 describe('favorite pipeline contracts', () => {
+  it('X-02 strips provider progress fields from canonical candidates', () => {
+    const input = { candidates: [{ externalId: 'manga', lastChapter: 42, lastVolume: 7, mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Fixture'] }], complete: true, digest: 'x-02', provider: 'mangaupdates' as const, truncated: false };
+    const [candidate] = createProviderCandidateEnvelope(input).candidates;
+    expect(candidate).not.toHaveProperty('lastChapter');
+    expect(candidate).not.toHaveProperty('lastVolume');
+  });
   it('preserves raw strings, freezes nested values and counts UTF-8 bytes', () => {
     const value = observation();
     expect(value.title).toBe('Œuvre synthétique');

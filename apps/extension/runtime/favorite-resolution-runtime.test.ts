@@ -1,18 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
-import { createFavoriteResolutionRuntime } from './favorite-resolution-runtime';
+import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('coalesces concurrent reconciliation requests', async () => {
+  it('persists the latest bookmark mutation before requesting convergence', async () => {
+    const storage = new MemoryStoragePort();
+    const ensureReady = vi.fn(async () => ({ schemaVersion: 8 }));
+    const reconcile = vi.fn(async () => undefined);
+    await recordFavoriteBookmarkMutation(
+      { ensureReady, now: () => '2026-09-07T12:00:00.000Z', storage, token: () => 'mutation-sequence' },
+      { bookmarkId: 'bookmark-1', kind: 'changed' },
+      reconcile,
+    );
+    expect(await storage.getFavoriteBookmarkMutation('bookmark-1')).toEqual({
+      bookmarkId: 'bookmark-1',
+      kind: 'changed',
+      recordedAt: '2026-09-07T12:00:00.000Z',
+      sequence: 'mutation-sequence',
+    });
+    expect(ensureReady).toHaveBeenCalledOnce();
+    expect(reconcile).toHaveBeenCalledOnce();
+  });
+
+  it('Q-03 coalesces concurrent reconciliation requests', async () => {
     let release: (() => void) | undefined;
     const imported = new Promise<void>((resolve) => { release = resolve; });
-    const importBookmarks = vi.fn(async () => { await imported; return []; });
+    const readBookmarkBatch = vi.fn(async () => { await imported; return { complete: true, records: [] as const }; });
     const unavailable = { search: async () => { throw new Error('unused'); } };
     const noHydration = { hydrate: async () => undefined };
     const storage = new MemoryStoragePort();
     const reconcile = createFavoriteResolutionRuntime({
-      bookmarks: { importBookmarks },
+      bookmarks: { readBookmarkBatch },
       candidates: { anilist: unavailable, mangaupdates: unavailable },
       ensureReady: async () => ({ schemaVersion: 6 }),
       hydration: { anilist: noHydration, mangaupdates: noHydration },
@@ -28,18 +47,18 @@ describe('createFavoriteResolutionRuntime', () => {
     expect(first).toBe(second);
     release?.();
     await first;
-    expect(importBookmarks).toHaveBeenCalledTimes(1);
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(1);
   });
 
   it('runs one bounded follow-up pass for a bookmark mutation during reconciliation', async () => {
     let release: (() => void) | undefined;
     let calls = 0;
     const firstImport = new Promise<void>((resolve) => { release = resolve; });
-    const importBookmarks = vi.fn(async () => { calls += 1; if (calls === 1) await firstImport; return []; });
+    const readBookmarkBatch = vi.fn(async () => { calls += 1; if (calls === 1) await firstImport; return { complete: true, records: [] as const }; });
     const unavailable = { search: async () => { throw new Error('unused'); } };
     const noHydration = { hydrate: async () => undefined };
     const reconcile = createFavoriteResolutionRuntime({
-      bookmarks: { importBookmarks }, candidates: { anilist: unavailable, mangaupdates: unavailable },
+      bookmarks: { readBookmarkBatch }, candidates: { anilist: unavailable, mangaupdates: unavailable },
       ensureReady: async () => ({ schemaVersion: 6 }), hydration: { anilist: noHydration, mangaupdates: noHydration },
       libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
       outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [],
@@ -49,6 +68,42 @@ describe('createFavoriteResolutionRuntime', () => {
     expect(reconcile(true)).toBe(active);
     release?.();
     await active;
-    expect(importBookmarks).toHaveBeenCalledTimes(2);
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it('Q-04 and B-05 resume the persisted inventory cursor after an interrupted slice while preserving the prior projection', async () => {
+    const storage = new MemoryStoragePort();
+    const cursor = { frames: [{ folderId: '0', folderPath: [], nextChildIndex: 1 }], rootId: '0' } as const;
+    const firstReader = vi.fn()
+      .mockResolvedValueOnce({ complete: false, cursor, records: [{ bookmarkId: 'first', folderPath: [], order: 0, title: 'First', url: 'https://reader.example/manga/first' }] })
+      .mockRejectedValueOnce(new Error('suspended'));
+    const dependencies = {
+      candidates: { anilist: { search: async () => { throw new Error('unused'); } }, mangaupdates: { search: async () => { throw new Error('unused'); } } },
+      ensureReady: async () => ({ schemaVersion: 7 }),
+      hydration: { anilist: { hydrate: async () => undefined }, mangaupdates: { hydrate: async () => undefined } },
+      libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'inventory-session',
+    } as const;
+    await expect(createFavoriteResolutionRuntime({ ...dependencies, bookmarks: { readBookmarkBatch: firstReader } })()).rejects.toThrow('suspended');
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor, sessionId: 'inventory-session', status: 'active' });
+
+    const resumedReader = vi.fn(async () => ({ complete: true, records: [] as const }));
+    await createFavoriteResolutionRuntime({ ...dependencies, bookmarks: { readBookmarkBatch: resumedReader } })();
+    expect(resumedReader).toHaveBeenCalledWith(cursor, 100);
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ sessionId: 'inventory-session', status: 'complete' });
+    expect((await storage.listFavoriteSources({ limit: 10 }))[0]?.presence).toBe('observed');
+  });
+
+  it('B-04 completes an empty inventory without creating private data', async () => {
+    const storage = new MemoryStoragePort();
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) },
+      candidates: { anilist: { search: async () => { throw new Error('unused'); } }, mangaupdates: { search: async () => { throw new Error('unused'); } } },
+      ensureReady: async () => ({ schemaVersion: 8 }), hydration: { anilist: { hydrate: async () => undefined }, mangaupdates: { hydrate: async () => undefined } },
+      libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z', outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'empty-session',
+    });
+    await expect(reconcile()).resolves.toBeUndefined();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ sessionId: 'empty-session', status: 'complete' });
+    await expect(storage.listFavoriteSources({ limit: 1 })).resolves.toEqual([]);
   });
 });

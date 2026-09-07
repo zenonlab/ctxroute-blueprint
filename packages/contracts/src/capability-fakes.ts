@@ -27,7 +27,10 @@ export class MemoryTelemetry implements TelemetryPort {
 export class FakeBookmarkPort implements BookmarkPort {
   readonly projected: Array<{ bookmarkId?: string; title: string; url: string; workId: WorkId }> = [];
   constructor(readonly bookmarks: readonly BookmarkRecord[] = []) {}
-  async importBookmarks() { return this.bookmarks; }
+  async readBookmarkBatch(cursor?: { frames: readonly unknown[]; rootId: string }, limit = 100) {
+    if (cursor !== undefined) return Object.freeze({ complete: true, records: Object.freeze([]) });
+    return Object.freeze({ complete: true, records: Object.freeze(this.bookmarks.slice(0, limit)) });
+  }
   async projectWork(input: { bookmarkId?: string; title: string; url: string; workId: WorkId }) {
     this.projected.push(input);
     return input.bookmarkId ?? `bookmark_${this.projected.length}`;

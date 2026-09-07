@@ -1,5 +1,5 @@
 import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
-import type { DurableTask, FavoriteParseArtifactRecord, PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
+import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import { createOrganizerConfiguration } from '@tobirink/domain';
 import type {
   AgendaEntry,
@@ -26,6 +26,12 @@ interface MemoryState {
   agenda: RecordMap<AgendaEntry>;
   favoriteSources: RecordMap<FavoriteSource>;
   favoriteArtifacts: RecordMap<FavoriteParseArtifactRecord>;
+  favoriteBookmarkMutations: RecordMap<FavoriteBookmarkMutation>;
+  favoriteInventoryCheckpoints: RecordMap<FavoriteInventoryCheckpoint>;
+  favoriteInventoryMarks: RecordMap<FavoriteInventoryMark>;
+  favoriteProviderRateCheckpoints: RecordMap<FavoriteProviderRateCheckpoint>;
+  favoriteResolutionReceipts: RecordMap<FavoriteResolutionReceipt>;
+  favoriteReviewCandidateSets: RecordMap<FavoriteReviewCandidateSet>;
   favoriteResolutionTasks: RecordMap<DurableTask>;
   libraries: RecordMap<Library>;
   organizer?: OrganizerConfiguration;
@@ -36,13 +42,19 @@ interface MemoryState {
 }
 
 function emptyState(): MemoryState {
-  return { agenda: new Map(), favoriteArtifacts: new Map(), favoriteResolutionTasks: new Map(), favoriteSources: new Map(), libraries: new Map(), progress: new Map(), reminders: new Map(), reviews: new Map(), works: new Map() };
+  return { agenda: new Map(), favoriteArtifacts: new Map(), favoriteBookmarkMutations: new Map(), favoriteInventoryCheckpoints: new Map(), favoriteInventoryMarks: new Map(), favoriteProviderRateCheckpoints: new Map(), favoriteResolutionReceipts: new Map(), favoriteResolutionTasks: new Map(), favoriteReviewCandidateSets: new Map(), favoriteSources: new Map(), libraries: new Map(), progress: new Map(), reminders: new Map(), reviews: new Map(), works: new Map() };
 }
 
 function cloneState(state: MemoryState): MemoryState {
   const cloned: MemoryState = {
     agenda: new Map(state.agenda),
     favoriteArtifacts: new Map(state.favoriteArtifacts),
+    favoriteBookmarkMutations: new Map(state.favoriteBookmarkMutations),
+    favoriteInventoryCheckpoints: new Map(state.favoriteInventoryCheckpoints),
+    favoriteInventoryMarks: new Map(state.favoriteInventoryMarks),
+    favoriteProviderRateCheckpoints: new Map(state.favoriteProviderRateCheckpoints),
+    favoriteResolutionReceipts: new Map(state.favoriteResolutionReceipts),
+    favoriteReviewCandidateSets: new Map(state.favoriteReviewCandidateSets),
     favoriteResolutionTasks: new Map(state.favoriteResolutionTasks),
     favoriteSources: new Map(state.favoriteSources),
     libraries: new Map(state.libraries),
@@ -61,6 +73,12 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
   };
   return {
     ...createMemoryFavoriteResolutionSession(state, requireStore),
+    getFavoriteBookmarkMutation: async (bookmarkId) => { requireStore('favoriteBookmarkMutations'); return state.favoriteBookmarkMutations.get(bookmarkId); },
+    getFavoriteInventoryCheckpoint: async () => { requireStore('favoriteInventoryCheckpoints'); return state.favoriteInventoryCheckpoints.get('favorite-inventory'); },
+    getFavoriteInventoryMark: async (bookmarkId) => { requireStore('favoriteInventoryMarks'); return state.favoriteInventoryMarks.get(bookmarkId); },
+    getFavoriteProviderRateCheckpoint: async (provider) => { requireStore('favoriteProviderRateCheckpoints'); return state.favoriteProviderRateCheckpoints.get(provider); },
+    getFavoriteResolutionReceipt: async (id) => { requireStore('favoriteResolutionReceipts'); return state.favoriteResolutionReceipts.get(id); },
+    getFavoriteReviewCandidateSet: async (reviewId) => { requireStore('favoriteReviewCandidateSets'); return state.favoriteReviewCandidateSets.get(reviewId); },
     getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); return state.agenda.get(id); },
     getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); return state.favoriteSources.get(id); },
     findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
@@ -114,6 +132,12 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .slice(0, query.limit);
     },
     putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); state.agenda.set(entry.id, entry); },
+    putFavoriteBookmarkMutation: async (mutation) => { requireStore('favoriteBookmarkMutations'); state.favoriteBookmarkMutations.set(mutation.bookmarkId, mutation); },
+    putFavoriteInventoryCheckpoint: async (checkpoint) => { requireStore('favoriteInventoryCheckpoints'); state.favoriteInventoryCheckpoints.set(checkpoint.id, checkpoint); },
+    putFavoriteInventoryMark: async (mark) => { requireStore('favoriteInventoryMarks'); state.favoriteInventoryMarks.set(mark.bookmarkId, mark); },
+    putFavoriteProviderRateCheckpoint: async (checkpoint) => { requireStore('favoriteProviderRateCheckpoints'); state.favoriteProviderRateCheckpoints.set(checkpoint.provider, checkpoint); },
+    putFavoriteResolutionReceipt: async (receipt) => { requireStore('favoriteResolutionReceipts'); state.favoriteResolutionReceipts.set(receipt.id, receipt); },
+    putFavoriteReviewCandidateSet: async (set) => { requireStore('favoriteReviewCandidateSets'); state.favoriteReviewCandidateSets.set(set.reviewId, set); },
     putFavoriteSource: async (source: FavoriteSource) => {
       requireStore('favoriteSources');
       const duplicate = [...state.favoriteSources.values()].find((record) => record.bookmarkId === source.bookmarkId && record.id !== source.id);
@@ -141,6 +165,12 @@ export class MemoryStoragePort implements StoragePort {
   getAgendaEntry: StoragePort['getAgendaEntry'] = (id) => this.session().getAgendaEntry(id);
   getFavoriteParseArtifact: StoragePort['getFavoriteParseArtifact'] = (sourceId) => this.session().getFavoriteParseArtifact(sourceId);
   getFavoriteResolutionTask: StoragePort['getFavoriteResolutionTask'] = (id) => this.session().getFavoriteResolutionTask(id);
+  getFavoriteBookmarkMutation: StoragePort['getFavoriteBookmarkMutation'] = (bookmarkId) => this.session().getFavoriteBookmarkMutation(bookmarkId);
+  getFavoriteInventoryCheckpoint: StoragePort['getFavoriteInventoryCheckpoint'] = () => this.session().getFavoriteInventoryCheckpoint();
+  getFavoriteInventoryMark: StoragePort['getFavoriteInventoryMark'] = (bookmarkId) => this.session().getFavoriteInventoryMark(bookmarkId);
+  getFavoriteProviderRateCheckpoint: StoragePort['getFavoriteProviderRateCheckpoint'] = (provider) => this.session().getFavoriteProviderRateCheckpoint(provider);
+  getFavoriteResolutionReceipt: StoragePort['getFavoriteResolutionReceipt'] = (id) => this.session().getFavoriteResolutionReceipt(id);
+  getFavoriteReviewCandidateSet: StoragePort['getFavoriteReviewCandidateSet'] = (reviewId) => this.session().getFavoriteReviewCandidateSet(reviewId);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
@@ -157,6 +187,12 @@ export class MemoryStoragePort implements StoragePort {
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
   putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);
+  putFavoriteBookmarkMutation: StoragePort['putFavoriteBookmarkMutation'] = (mutation) => this.session().putFavoriteBookmarkMutation(mutation);
+  putFavoriteInventoryCheckpoint: StoragePort['putFavoriteInventoryCheckpoint'] = (checkpoint) => this.session().putFavoriteInventoryCheckpoint(checkpoint);
+  putFavoriteInventoryMark: StoragePort['putFavoriteInventoryMark'] = (mark) => this.session().putFavoriteInventoryMark(mark);
+  putFavoriteProviderRateCheckpoint: StoragePort['putFavoriteProviderRateCheckpoint'] = (checkpoint) => this.session().putFavoriteProviderRateCheckpoint(checkpoint);
+  putFavoriteResolutionReceipt: StoragePort['putFavoriteResolutionReceipt'] = (receipt) => this.session().putFavoriteResolutionReceipt(receipt);
+  putFavoriteReviewCandidateSet: StoragePort['putFavoriteReviewCandidateSet'] = (set) => this.session().putFavoriteReviewCandidateSet(set);
   putFavoriteSource: StoragePort['putFavoriteSource'] = (source) => this.session().putFavoriteSource(source);
   putLibrary: StoragePort['putLibrary'] = (library) => this.session().putLibrary(library);
   putOrganizerConfiguration: StoragePort['putOrganizerConfiguration'] = (configuration) => this.session().putOrganizerConfiguration(configuration);

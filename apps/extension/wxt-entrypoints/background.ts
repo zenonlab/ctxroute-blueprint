@@ -11,7 +11,7 @@ import {
   WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
 } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -21,7 +21,7 @@ import { extensionMessageSchema } from '../runtime/messages';
 const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
-import { createFavoriteResolutionRuntime } from '../runtime/favorite-resolution-runtime';
+import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
@@ -40,8 +40,10 @@ export default defineBackground({
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
+    const now = () => new Date().toISOString();
+    const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
-    const { anilist, mangaupdates: mangaUpdates } = createFavoriteProviderPorts(browser.storage.local);
+    const { anilist, mangaupdates: mangaUpdates } = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
@@ -52,19 +54,19 @@ export default defineBackground({
       ensureReady: privateStorage.ensureReady,
       hydration: { anilist, mangaupdates: mangaUpdates },
       libraryId: primaryLibraryId,
-      now: () => new Date().toISOString(),
+      now,
       outbox: resolutionOutbox,
       sourceAdapters: favoriteSourceAdapters,
       storage: privateStorage.storage,
-      token: () => crypto.randomUUID(),
+      token,
     });
-    bookmarkEvents.subscribe(() => { void reconcileFavorites(true).catch(() => undefined); });
     browser.runtime.onInstalled.addListener(async () => {
       await privateStorage.ensureReady();
       await reconcileFavorites();
       await ensureReminderAlarm();
       await resumeNotifications();
     });
+    subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);

@@ -84,9 +84,10 @@ browser or `workerd` test when platform behavior is the risk.
   50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.
   Baseline locale du 2026-09-07 : 0,124 ms typique et 0,852 ms maximal sur
   200/50 itérations; la CI republie les valeurs au lieu de les arrondir.
-- Le snapshot canonique des favoris est un garde de régression, pas une preuve
-  d’équivalence historique tant que chaque famille `L/Q/B/X` ne dispose pas de
-  son entrée et de ses assertions métier indépendantes de l’implémentation.
+- Le snapshot canonique des favoris garde la forme profonde; le gate
+  `test:parser-equivalence` exige en plus un test sémantique exécuté pour chacun
+  des 82 identifiants, vérifie l’unicité de leurs attentes et maintient le bilan
+  77 conservés / 4 corrigés / `X-01` futur.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.

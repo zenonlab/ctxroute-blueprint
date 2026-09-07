@@ -11,10 +11,11 @@ describe('durable tasks', () => {
     expect(() => commitTask(claimed, 'token')).toThrow('EFFECT_RECORDED');
     expect(commitTask(recordTaskEffect(claimed, 'token', 'effect'), 'token').state).toBe('COMMITTED');
   });
-  it('recovers expired claims and delayed retries by time input', () => {
+  it('Q-05 recovers expired claims with the same idempotency key and delays retries by time input', () => {
     const ready = createDurableTask({ id: 'task-2', idempotencyKey: 'key-2', kind: 'fixture', payload: '{}' });
     const claimed = claimTask(ready, 'token', '2026-09-04T10:00:00.000Z', '2026-09-04T10:01:00.000Z');
     expect(isTaskAvailable(claimed, '2026-09-04T10:02:00.000Z')).toBe(true);
+    expect(claimTask(claimed, 'next-token', '2026-09-04T10:02:00.000Z', '2026-09-04T10:03:00.000Z').idempotencyKey).toBe(ready.idempotencyKey);
     expect(isTaskAvailable(retryTask(claimed, 'token', '2026-09-04T10:03:00.000Z'), '2026-09-04T10:02:00.000Z')).toBe(false);
   });
   it('keeps scheduled work unavailable until its exact instant', () => {

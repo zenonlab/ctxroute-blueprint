@@ -17,6 +17,12 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   const alternateSource = createFavoriteSource({ bookmarkId: 'bookmark-contract-alt', folderPath: ['Lectures'], id: favoriteSourceId('source_contract-alt'), importedAt: '2026-09-05T20:00:00.000Z', order: 1, reviewId: alternateReview.id, title: work.preferredTitle, url: 'https://reader.example/work/alternate' });
   const agenda = createAgendaEntry({ availability: 'official', id: agendaEntryId('agenda_contract'), occursAt: '2026-09-08T10:00:00.000Z', releaseLabel: 'Episode contractuel', workId: id });
   const organizer = createOrganizerConfiguration({ folders: [{ conditions: { mediaTypes: ['MANGA'] }, id: 'manga', name: 'Manga' }], updatedAt: '2026-09-06T00:00:00.000Z' });
+  const checkpoint = { id: 'favorite-inventory' as const, sessionId: 'inventory-contract', startedAt: '2026-09-07T00:00:00.000Z', status: 'active' as const };
+  const mark = { bookmarkId: source.bookmarkId, sessionId: checkpoint.sessionId };
+  const mutation = { bookmarkId: source.bookmarkId, kind: 'changed' as const, recordedAt: '2026-09-07T00:01:00.000Z', sequence: 'mutation-contract' };
+  const rate = { nextAllowedAt: 1_788_739_260_000, provider: 'anilist' as const };
+  const receipt = { completedAt: '2026-09-07T00:02:00.000Z', effectDigest: 'resolved:anilist:contract', id: `${source.id}:favorite-resolution`, idempotencyKey: 'resolution-contract', sourceId: source.id };
+  const candidateSet = { candidates: [{ externalId: 'contract', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Contract work'] }], digest: 'candidate-contract', recordedAt: '2026-09-07T00:02:00.000Z', reviewId: review.id };
 
   await storage.transaction(['works', 'libraries', 'organizer', 'progress', 'reviews', 'favoriteSources', 'agenda'], async (session) => {
     await session.putWork(work);
@@ -29,12 +35,26 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     await session.putAgendaEntry(agenda);
     await session.putOrganizerConfiguration(organizer);
   });
+  await storage.transaction(['favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteReviewCandidateSets'], async (session) => {
+    await session.putFavoriteBookmarkMutation(mutation);
+    await session.putFavoriteInventoryCheckpoint(checkpoint);
+    await session.putFavoriteInventoryMark(mark);
+    await session.putFavoriteProviderRateCheckpoint(rate);
+    await session.putFavoriteResolutionReceipt(receipt);
+    await session.putFavoriteReviewCandidateSet(candidateSet);
+  });
   assert((await storage.getWork(id))?.preferredTitle === 'Contract work', 'work round-trip');
   assert((await storage.getLibrary(library.id))?.workIds[0] === id, 'library round-trip');
   assert((await storage.getProgress(progress.id))?.value === 12, 'progress round-trip');
   assert((await storage.findProgressByWorkId(id))?.id === progress.id, 'progress lookup by Work');
   assert((await storage.getOrganizerConfiguration())?.folders[0]?.id === 'manga', 'organizer configuration round-trip');
   assert((await storage.getFavoriteSource(source.id))?.url === source.url, 'favorite source round-trip');
+  assert((await storage.getFavoriteBookmarkMutation(source.bookmarkId))?.sequence === mutation.sequence, 'favorite mutation round-trip');
+  assert((await storage.getFavoriteInventoryCheckpoint())?.sessionId === checkpoint.sessionId, 'favorite inventory checkpoint round-trip');
+  assert((await storage.getFavoriteInventoryMark(source.bookmarkId))?.sessionId === checkpoint.sessionId, 'favorite inventory mark round-trip');
+  assert((await storage.getFavoriteProviderRateCheckpoint('anilist'))?.nextAllowedAt === rate.nextAllowedAt, 'favorite provider rate checkpoint round-trip');
+  assert((await storage.getFavoriteResolutionReceipt(receipt.id))?.effectDigest === receipt.effectDigest, 'favorite resolution receipt round-trip');
+  assert((await storage.getFavoriteReviewCandidateSet(review.id))?.candidates.length === 1, 'favorite Review candidate set round-trip');
   assert((await storage.findFavoriteSourceByReviewId(review.id))?.id === source.id, 'favorite source lookup by Review');
   assert((await storage.listFavoriteSources({ limit: 1 }))[0]?.id === source.id, 'favorite source bounded listing');
   assert((await storage.listFavoriteSources({ afterId: alternateSource.id, limit: 1 })).length === 0, 'favorite source stable cursor');

@@ -7,9 +7,13 @@ const adapter = readFileSync(new URL('./dexie-storage-port.ts', import.meta.url)
 describe('DexieStoragePort structure', () => {
   it('keeps Dexie inside the adapter and declares every private aggregate store', () => {
     expect(database).toMatch(/from 'dexie'/);
-    for (const store of ['agenda', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works']) {
+    for (const store of ['agenda', 'favoriteInventoryCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works']) {
       expect(database).toContain(`${store}: '&id`);
     }
+    expect(database).toContain("favoriteBookmarkMutations: '&bookmarkId");
+    expect(database).toContain("favoriteInventoryMarks: '&bookmarkId");
+    expect(database).toContain("favoriteProviderRateCheckpoints: '&provider");
+    expect(database).toContain("favoriteReviewCandidateSets: '&reviewId");
     expect(database).toContain("favoriteArtifacts: '&sourceId");
     expect(database).toContain("favoriteResolutionTasks: '&id, &idempotencyKey, kind, lane, state, availableAt");
     expect(adapter).toMatch(/implements StoragePort/);

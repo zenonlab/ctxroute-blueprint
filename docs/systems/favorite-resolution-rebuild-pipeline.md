@@ -23,11 +23,12 @@ autorité sur la bibliothèque ou la progression.
 
 Le runtime actuel possède déjà des fondations réutilisables :
 
-- `WebExtensionBookmarkImportAdapter` lit l’arbre des favoris;
+- `WebExtensionBookmarkImportAdapter` parcourt l’arbre avec
+  `bookmarks.getChildren`, par tranches de 100 feuilles et curseur DFS;
 - `normalizeBookmarks` qualifie uniquement les URL HTTP(S);
 - `importFavoriteSources` écrit `FavoriteSource` et `Review` par transactions
   de 100 entrées et conserve `importedAt` lors d’un nouvel import;
-- Dexie v6 stocke les données privées dans `tobirink-private`;
+- Dexie v8 stocke les données privées dans `tobirink-private`;
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
@@ -40,25 +41,28 @@ Le runtime actuel possède déjà des fondations réutilisables :
   MangaUpdates, puis lance la convergence à l’installation, au démarrage, sur
   alarme et sur les quatre mutations de favoris;
 - l’import persiste atomiquement `FavoriteSource`, `Review`, artefact et tâche;
-- l’outbox IndexedDB v6 réclame les tâches dues par index composé sans
+- l’outbox IndexedDB v8 réclame les tâches dues par index composé sans
   `toArray()` global, huit au plus par tranche;
 - le runner recherche, décide, hydrate par ID exact, puis écrit `Work`,
   Bibliothèque, Review et reçu de tâche dans une transaction;
 - les cadences fournisseur sont sérialisées et leur `nextAllowedAt` est écrit
-  dans `browser.storage.local` avant chaque effet HTTP;
+  dans IndexedDB avant chaque effet HTTP;
+- les checkpoints d’inventaire, la dernière mutation de chaque favori, les
+  marques de présence, les reçus de résolution et les candidats ambigus sont
+  persistés dans des stores additifs;
 - l’oracle canonique exécute réellement qualification, parser, matcher et
   projection sur les 82 identifiants synthétiques et compare leur snapshot
   profond versionné;
+- la langue locale facultative arbitre déclarations fortes, statistique fiable
+  et `hreflang` faible sans introduire de réseau ni de décision implicite;
 - une source absente est marquée `detached`; elle reste sauvegardable mais ne
   fournit plus de lien à Review, Agenda, Organisateur ou popup.
 
-Un écart de scalabilité reste explicitement ouvert :
-`WebExtensionBookmarkImportAdapter` lit encore `bookmarks.getTree()` et le
-runtime reconstruit l’inventaire complet avant de le traiter par transactions
-de 100. Les événements concurrents sont coalescés et provoquent une seconde
-passe bornée, mais ils ne sont pas encore persistés individuellement. Les
-sections « Capturer » et « Inventorier » ci-dessous décrivent donc la cible du
-prochain durcissement, pas un comportement déjà livré.
+L’inventaire ne matérialise jamais l’arbre complet : le runtime reprend le
+curseur durable, traite au plus huit tranches de 100 par réveil puis programme
+la convergence suivante. La dernière mutation de chaque favori est journalisée
+avant le réveil; aucune suppression de favori ne cascade vers une œuvre ou sa
+progression.
 
 ## Résultat attendu
 
@@ -428,8 +432,9 @@ doivent pas être dupliquées sous forme de constantes concurrentes.
 
 L’outbox conserve l’artefact courant et au plus son prédécesseur par source;
 un artefact référencé par une Review ouverte ou une tâche non terminale est
-épinglé. Après 30 jours, une tâche `COMMITTED` est remplacée atomiquement par
-l’unique `ResolutionReceipt` courant de son couple `(sourceId, operation)` :
+épinglé. Chaque commit écrit atomiquement l’unique `ResolutionReceipt` courant
+de son couple `(sourceId, operation)` puis, après 30 jours, compacte la tâche
+`COMMITTED` correspondante :
 `idempotencyKey`, `completedAt`, versions et `effectDigest`. Le nombre de reçus
 reste donc proportionnel aux sources, pas aux événements historiques. Cette
 compaction ne supprime aucune source, Review, œuvre ou progression et garde la
@@ -515,8 +520,10 @@ global et ne contourne pas le consentement.
 
 ## Migration depuis Dexie v5
 
-La version Dexie v6 est additive au-dessus de v5 dans `tobirink-private`, avec
-`favoriteArtifacts` et `favoriteResolutionTasks`. La tâche porte la lane
+Les versions Dexie v6 à v8 sont additives au-dessus de v5 dans
+`tobirink-private`. V6 ajoute `favoriteArtifacts` et
+`favoriteResolutionTasks`; v7 ajoute le journal, les checkpoints et les marques
+d’inventaire; v8 ajoute cadence fournisseur, reçus et candidats Review. La tâche porte la lane
 `routing`, une clé d’idempotence unique et l’index composé défini plus haut.
 Source, Review, artefact et première tâche `READY` sont écrits dans la même
 transaction. Aucun store existant n’est supprimé ou renommé. Le checkpoint
@@ -528,9 +535,12 @@ n’est ni migrée ni utilisée par le resolver.
 | `favoriteSources` | index existants, puis `observationSequence`, `semanticFingerprint`, `[presence+id]` |
 | `favoriteArtifacts` | `&sourceId`, `reviewId`, `recordedAt`, `artifact.semanticFingerprint` |
 | `favoriteResolutionTasks` | `&id`, `&idempotencyKey`, `kind`, `lane`, `state`, `availableAt`, `[kind+lane+state+availableAt]` |
-| `resolutionReceipts` | `&[sourceId+operation]`, `&idempotencyKey` |
-| `inventoryCheckpoints` | `&id`, `status`, `baseSequence` |
-| `providerRateCheckpoints` | `&provider`, `nextAllowedAt` |
+| `favoriteResolutionReceipts` | `&id`, `&idempotencyKey`, `sourceId`, `completedAt` |
+| `favoriteInventoryCheckpoints` | `&id`, `status`, `sessionId` |
+| `favoriteInventoryMarks` | `&bookmarkId`, `sessionId` |
+| `favoriteBookmarkMutations` | `&bookmarkId`, `sequence`, `kind` |
+| `favoriteProviderRateCheckpoints` | `&provider` |
+| `favoriteReviewCandidateSets` | `&reviewId`, `recordedAt` |
 
 Les index composés ne contiennent aucune valeur optionnelle sur leur chemin de
 lecture : `provider`, `availableAt`, `claimExpiresAt` et `presence` reçoivent
@@ -560,7 +570,7 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
 | metadata mêlant HTTP, HTML, sécurité et mapping | ports fournisseur étroits et projections validées | aucun import réseau dans domaine/application |
 | background portant les règles | racine de composition mince | test structurel et Sensor |
 | helpers concurrents | un seul artefact canonique versionné | égalité profonde du corpus |
-| arbre complet aplati en mémoire | cible : parcours `getChildren`, tranches et checkpoint | non livré : le runtime utilise encore `getTree()` |
+| arbre complet aplati en mémoire | parcours `getChildren`, tranches et checkpoint | reprise testée sans rematérialiser l’arbre |
 | import seulement à l’installation | quatre événements + réconciliation | tests création/changement/déplacement/suppression |
 | favori traité comme autorité | commande d’import vers IndexedDB | suppression sans cascade |
 | type manga par défaut | `UNKNOWN` jusqu’à une preuve | U-02 et routage séparé |
@@ -673,33 +683,18 @@ ciblé, mais `npm run verify` devient obligatoire avant l’activation complète
 
 ## Audit de validité du 2026-09-07
 
-L’audit du code, des tests et des migrations confirme les éléments livrés
-suivants : frontières domaine/application/adaptateurs respectées, parser et
-matcher sans I/O, outbox v6 atomique et indexée, limites réseau et locales
-explicites, suppression de favori sans cascade, migrations Chromium, et gates
-de qualité reproductibles. `npm run verify`, le typecheck, ESLint, Oxlint,
-`npm audit --audit-level=high`, CRG et toutes les vues Archify showcase passent.
+L’audit du code, des tests et des migrations confirme les frontières
+domaine/application/adaptateurs, le parser et le matcher sans I/O, l’outbox v8
+atomique et indexée, les limites réseau et locales, et l’absence de cascade à la
+suppression d’un favori. Chromium valide les migrations et le contrat réel
+IndexedDB.
 
-Il reste toutefois trois écarts critiques par rapport à la définition de
-terminé. Ils interdisent de déclarer la pipeline complète :
-
-1. l’inventaire utilise encore `bookmarks.getTree()` et une réconciliation
-   globale. Il n’existe ni parcours `getChildren()` par tranches, ni checkpoint
-   d’inventaire durable, ni journal individuel persistant des événements;
-2. l’oracle exécute bien parser, matcher et projection pour 82 identifiants et
-   gèle leur sortie profonde, mais plusieurs familles (`L`, `Q`, `B`, `X`) ne
-   construisent pas encore leur scénario métier propre. Le snapshot protège
-   contre une régression future; il ne prouve pas à lui seul les 77
-   conservations et quatre corrections face au contrat historique;
-3. les stores et étapes cibles `inventoryCheckpoints`,
-   `resolutionReceipts`, compaction, preuve de langue locale et persistance des
-   candidats ambigus ne sont pas composés dans le runtime v6.
-
-La validation mécanique est donc verte, mais la validité fonctionnelle globale
-reste **non acquise**. La prochaine vague doit fermer ces écarts dans cet ordre :
-inventaire durable, oracle sémantique par famille, puis preuves et compaction
-manquantes. Aucun déploiement ne doit être fondé sur le seul passage des gates
-actuelles.
+Les trois écarts précédemment critiques sont fermés : inventaire
+`getChildren()` reprenable et journalisé; assertions sémantiques exécutées pour
+les familles `L/Q/B/X` en plus de l’oracle profond 82 / 77 / 4 / 1; reçus,
+compaction bornée, cadence fournisseur, preuve de langue locale et candidats
+ambigus persistés. La validité reste conditionnée au passage du gate racine
+`npm run verify`; elle n’autorise ni publication ni déploiement.
 
 ## Définition de terminé
 

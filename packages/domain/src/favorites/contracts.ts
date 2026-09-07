@@ -163,10 +163,14 @@ function createProviderCandidate(input: ProviderCandidate, provider: FavoritePro
     canonicalUrl = parsed.href;
   }
   const candidate = {
-    ...input,
     externalId: nonEmpty(input.externalId, 'externalId'),
+    mediaKind: input.mediaKind,
+    preSerialization: input.preSerialization,
+    provider: input.provider,
     titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
   };
+  if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', favoriteTitleByteLimit) });
+  if (input.season !== undefined) Object.assign(candidate, { season: input.season });
   if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit) });
   if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit) });
   if (canonicalUrl !== undefined) Object.assign(candidate, { canonicalUrl });

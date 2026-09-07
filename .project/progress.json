@@ -554,7 +554,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-review-resolution",
       "title": "Documenter l’inventaire, la résolution et la Review locale",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -1877,36 +1877,64 @@
         },
         {
           "id": "step-30",
-          "title": "Auditer et valider la pipeline complète",
-          "status": "IN_PROGRESS",
+          "title": "Fermer les écarts et valider la pipeline locale complète",
+          "status": "DONE",
           "acceptance": [
-            "Architecture, modularité, scalabilité locale, sécurité, migrations et absence de données fictives sont auditées sans écart critique.",
-            "Tous les tests, builds, lints, Sensor, npm audit, Archify showcase, stack-audit et diff-check passent.",
-            "Le dépôt termine propre avec des preuves reproductibles et aucun déploiement."
+            "L’inventaire utilise getChildren en tranches de 100 avec checkpoint IndexedDB et journal d’événements durable; aucune perte ni cascade sur Work, progression ou Agenda.",
+            "Les 82 cas possèdent des attentes métier indépendantes; L/Q/B/X exécutent leurs modules réels et le gate prouve 77 conservations, quatre corrections et X-01 futur.",
+            "Receipts, compaction, cadence fournisseur et six candidats Review au plus sont persistés par migrations additives sans perte.",
+            "Tous les tests, builds, lints, Sensor, npm audit, Archify showcase, stack-audit et diff-check passent; dépôt propre et aucun déploiement."
           ],
           "files": [
-            "docs/architecture/src/**",
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "packages/application/src/inventory/**",
+            "packages/application/src/ports/**",
+            "packages/application/src/use-cases/**",
+            "packages/contracts/src/**",
+            "packages/adapters-browser/src/bookmarks/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-indexeddb/src/**",
+            "packages/adapters-indexeddb/test/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/**/*.test.ts",
+            "scripts/**",
             "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
             "docs/systems/favorite-*.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
           "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:migrations",
+            "npm run test:security",
+            "npm run test:performance",
             "npm run verify",
             "npm run typecheck",
             "npm run lint",
             "npm run lint:anti-slop",
             "npm audit --audit-level=high",
+            "npm run sensor -- packages/domain/src/favorites packages/application/src packages/adapters-browser/src packages/adapters-indexeddb/src apps/extension/runtime",
+            "npm run archify:validate -- dataflow",
             "npm run archify:validate -- all",
             "npm run crg:review",
             "git diff --check",
             "git status --short",
-            "git commit -m \"docs(parser): record production audit evidence\""
+            "git commit -m \"feat(parser): complete durable local pipeline\""
           ],
           "evidence": [
-            "Gates verts: verify, typecheck, ESLint, Oxlint, npm audit 0 vulnérabilité, CRG et Archify all showcase.",
-            "Audit critique: inventaire getTree global sans checkpoint durable; scalabilité locale complète non démontrée.",
-            "Audit critique: L/Q/B/X ne possèdent pas encore tous un scénario oracle métier; receipts/compaction/langue/candidats ambigus restent non composés."
+            "Inventory uses getChildren with a durable DFS cursor, 100-item slices, eight slices per wake, persisted latest-event journal and non-cascading reconciliation; extension 97/97.",
+            "Canonical oracle and semantic gate cover 82 unique cases with 77 conserved, four corrected and X-01 future; domain 24/24 and application 181/181.",
+            "IndexedDB v8 persists inventory state, provider cadence, receipts and bounded Review candidates; Chromium base, task and v1-v8 migration contracts pass.",
+            "npm run verify passes: all workspace tests, typecheck, lint, performance builds, CRG/integration, 0 high vulnerabilities and showcase Archify 9/9; git diff --check passes."
           ]
         }
       ]

@@ -7,7 +7,7 @@ function event<TListener extends (...values: never[]) => void>() {
 }
 
 describe('WebExtensionBookmarkEventAdapter', () => {
-  it('maps all four browser mutations to bounded signals', () => {
+  it('B-02 maps all four browser mutations to idempotent bounded signals', () => {
     const onCreated = event<(id: string, node: { id: string }) => void>();
     const onChanged = event<(id: string, info: { title?: string; url?: string }) => void>();
     const onMoved = event<(id: string, info: { index: number; parentId: string }) => void>();

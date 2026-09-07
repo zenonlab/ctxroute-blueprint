@@ -17,10 +17,16 @@ export interface IntegrityReport {
 }
 
 export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promise<IntegrityReport> {
-  const [agenda, favoriteArtifacts, favoriteResolutionTasks, favoriteSources, libraries, organizer, progress, reminders, reviews, works] = await Promise.all([
+  const [agenda, favoriteArtifacts, favoriteBookmarkMutations, favoriteInventoryCheckpoints, favoriteInventoryMarks, favoriteProviderRateCheckpoints, favoriteResolutionReceipts, favoriteResolutionTasks, favoriteReviewCandidateSets, favoriteSources, libraries, organizer, progress, reminders, reviews, works] = await Promise.all([
     database.agenda.toArray(),
     database.favoriteArtifacts.toArray(),
+    database.favoriteBookmarkMutations.toArray(),
+    database.favoriteInventoryCheckpoints.toArray(),
+    database.favoriteInventoryMarks.toArray(),
+    database.favoriteProviderRateCheckpoints.toArray(),
+    database.favoriteResolutionReceipts.toArray(),
     database.favoriteResolutionTasks.toArray(),
+    database.favoriteReviewCandidateSets.toArray(),
     database.favoriteSources.toArray(),
     database.libraries.toArray(),
     database.organizer.toArray(),
@@ -44,6 +50,11 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
   const agendaIds = new Set(validAgenda.map((entry) => entry.id));
   const reviewIds = new Set(validReviews.map((review) => review.id));
   const sourceIds = new Set(validFavoriteSources.map((source) => source.id));
+
+  if (favoriteInventoryCheckpoints.length > 1) throw new Error('Favorite inventory contains more than one checkpoint.');
+  for (const checkpoint of favoriteProviderRateCheckpoints) {
+    if ((checkpoint.provider !== 'anilist' && checkpoint.provider !== 'mangaupdates') || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
+  }
 
   for (const library of validLibraries) {
     if (library.workIds.some((id) => !workIds.has(id))) throw new Error(`Library ${library.id} references a missing work.`);
@@ -69,9 +80,15 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     const artifact = validFavoriteArtifacts.find((record) => record.sourceId === payload.sourceId);
     if (!sourceIds.has(payload.sourceId) || !reviewIds.has(payload.reviewId) || artifact?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error(`Favorite resolution task ${task.id} references stale private data.`);
   }
+  for (const receipt of favoriteResolutionReceipts) {
+    if (!sourceIds.has(receipt.sourceId) || !receipt.idempotencyKey.trim() || !receipt.effectDigest.trim()) throw new Error(`Favorite resolution receipt ${receipt.id} is invalid.`);
+  }
+  for (const set of favoriteReviewCandidateSets) {
+    if (!reviewIds.has(set.reviewId) || set.candidates.length > 6 || !set.digest.trim()) throw new Error(`Favorite Review candidate set ${set.reviewId} is invalid.`);
+  }
 
   return {
-    checkedRecords: agenda.length + favoriteArtifacts.length + favoriteResolutionTasks.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
+    checkedRecords: agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
     schemaVersion: database.verno,
   };
 }

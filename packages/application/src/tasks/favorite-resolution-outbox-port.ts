@@ -11,5 +11,6 @@ export interface FavoriteResolutionClaim {
 export interface FavoriteResolutionOutboxPort {
   block(id: string, token: string, reason: string): Promise<DurableTask>;
   claimNext(claim: FavoriteResolutionClaim): Promise<DurableTask | undefined>;
+  compactCommitted?(input: { before: string; limit: number }): Promise<number>;
   retry(id: string, token: string, retryAt: string): Promise<DurableTask>;
 }

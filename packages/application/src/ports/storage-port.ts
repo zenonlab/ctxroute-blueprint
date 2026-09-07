@@ -17,8 +17,50 @@ import type {
   Work,
   WorkId,
   FavoriteParseArtifact,
+  ProviderCandidate,
 } from '@tobirink/domain';
 import type { DurableTask } from '../tasks/task-state';
+import type { BookmarkInventoryCursor } from './capability-ports';
+
+export interface FavoriteInventoryCheckpoint {
+  cursor?: BookmarkInventoryCursor;
+  id: 'favorite-inventory';
+  sessionId: string;
+  startedAt: string;
+  status: 'active' | 'complete';
+}
+
+export interface FavoriteInventoryMark {
+  bookmarkId: string;
+  sessionId: string;
+}
+
+export interface FavoriteBookmarkMutation {
+  bookmarkId: string;
+  kind: 'changed' | 'created' | 'moved' | 'removed';
+  recordedAt: string;
+  sequence: string;
+}
+
+export interface FavoriteProviderRateCheckpoint {
+  nextAllowedAt: number;
+  provider: 'anilist' | 'mangaupdates';
+}
+
+export interface FavoriteResolutionReceipt {
+  completedAt: string;
+  effectDigest: string;
+  id: string;
+  idempotencyKey: string;
+  sourceId: FavoriteSourceId;
+}
+
+export interface FavoriteReviewCandidateSet {
+  candidates: readonly ProviderCandidate[];
+  digest: string;
+  recordedAt: string;
+  reviewId: ReviewId;
+}
 
 export interface FavoriteParseArtifactRecord {
   artifact: FavoriteParseArtifact;
@@ -33,7 +75,7 @@ export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRe
   return Object.freeze({ ...input, artifact: createFavoriteParseArtifact(input.artifact), reviewId: reviewId(input.reviewId), sourceId: favoriteSourceId(input.sourceId) });
 }
 
-export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
+export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
 export type PrivateStoreName = (typeof privateStoreNames)[number];
 
 export interface FavoriteSourcePageQuery {
@@ -83,6 +125,12 @@ export interface StorageReadPort {
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;
   getFavoriteResolutionTask(id: string): Promise<DurableTask | undefined>;
+  getFavoriteBookmarkMutation(bookmarkId: string): Promise<FavoriteBookmarkMutation | undefined>;
+  getFavoriteInventoryCheckpoint(): Promise<FavoriteInventoryCheckpoint | undefined>;
+  getFavoriteInventoryMark(bookmarkId: string): Promise<FavoriteInventoryMark | undefined>;
+  getFavoriteProviderRateCheckpoint(provider: 'anilist' | 'mangaupdates'): Promise<FavoriteProviderRateCheckpoint | undefined>;
+  getFavoriteResolutionReceipt(id: string): Promise<FavoriteResolutionReceipt | undefined>;
+  getFavoriteReviewCandidateSet(reviewId: ReviewId): Promise<FavoriteReviewCandidateSet | undefined>;
   findFavoriteSourceByReviewId(reviewId: ReviewId): Promise<FavoriteSource | undefined>;
   getLibrary(id: LibraryId): Promise<Library | undefined>;
   getOrganizerConfiguration(): Promise<OrganizerConfiguration | undefined>;
@@ -102,6 +150,12 @@ export interface StorageWritePort {
   putFavoriteSource(source: FavoriteSource): Promise<void>;
   putFavoriteParseArtifact(record: FavoriteParseArtifactRecord): Promise<void>;
   putFavoriteResolutionTask(task: DurableTask): Promise<void>;
+  putFavoriteBookmarkMutation(mutation: FavoriteBookmarkMutation): Promise<void>;
+  putFavoriteInventoryCheckpoint(checkpoint: FavoriteInventoryCheckpoint): Promise<void>;
+  putFavoriteInventoryMark(mark: FavoriteInventoryMark): Promise<void>;
+  putFavoriteProviderRateCheckpoint(checkpoint: FavoriteProviderRateCheckpoint): Promise<void>;
+  putFavoriteResolutionReceipt(receipt: FavoriteResolutionReceipt): Promise<void>;
+  putFavoriteReviewCandidateSet(set: FavoriteReviewCandidateSet): Promise<void>;
   putLibrary(library: Library): Promise<void>;
   putOrganizerConfiguration(configuration: OrganizerConfiguration): Promise<void>;
   putProgress(progress: Progress): Promise<void>;

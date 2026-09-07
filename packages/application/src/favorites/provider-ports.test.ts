@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy, routeFavoriteProviders } from './provider-ports';
 
 describe('favorite provider ports', () => {
+  it('X-01 keeps MangaDex outside the enabled provider routes', () => {
+    expect(routeFavoriteProviders('MANGA')).toEqual(['mangaupdates']);
+    expect(routeFavoriteProviders('UNKNOWN')).toEqual(['anilist', 'mangaupdates']);
+  });
   it.each([
     ['ANIME', ['anilist']],
     ['MANGA', ['mangaupdates']],

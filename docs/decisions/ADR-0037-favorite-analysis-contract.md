@@ -70,7 +70,9 @@ séparée ne fournit pas cette atomicité et sa sélection actuelle parcourt tou
 les états disponibles. Les claims de résolution sont bornés par des index de
 type, lane, état et échéance.
 Le schéma IndexedDB v6 matérialise cette décision avec `favoriteArtifacts` et
-`favoriteResolutionTasks`. Un premier import écrit les quatre enregistrements
+`favoriteResolutionTasks`. Les versions additives v7 et v8 ajoutent les
+checkpoints et marques d’inventaire, le journal de mutations, les cadences
+fournisseur, les reçus de résolution et les candidats Review persistés. Un premier import écrit les quatre enregistrements
 dans une transaction; une réimportation conserve l’instant d’import et ne
 duplique pas la tâche stable. La lane de routage est explicite et chaque tâche
 possède toujours `availableAt`.
@@ -103,9 +105,10 @@ Définir l’équivalence sur le résultat métier, pas sur la forme JSON histor
 77 cas sont conservés, `U-02`, `U-10`, `B-03` et `O-02` sont corrigés, et
 `X-01` reste exclu tant que MangaDex n’est pas activé. Un oracle synthétique
 compare artefact, décision et projection sans appeler un fournisseur vivant.
-La commande racine `npm run verify` exécute cet oracle avec tous les tests de
-workspaces, le typecheck et les budgets de performance avant les gates de
-livraison documentaire.
+La commande racine `npm run verify` exécute cet oracle, vérifie que chaque ID
+canonique possède un test sémantique distinct du snapshot, puis lance tous les
+tests de workspaces, le typecheck et les budgets de performance avant les gates
+de livraison documentaire.
 Le module de langue de document reste un enrichissement local facultatif,
 séparé du parser de favoris; OVA et pré-sérialisation appartiennent à la
 compatibilité candidat, et la taxonomie éditoriale s’applique après hydratation.
@@ -126,7 +129,8 @@ Reviews, œuvres ou progressions autoritaires.
 Le runtime compose désormais les événements favoris, l’import atomique, les
 adaptateurs AniList/MangaUpdates, le runner borné et les écritures
 `FavoriteSource`, `Review`, `Work` et Bibliothèque. Les suppressions deviennent
-une présence `detached` et ne cascadent jamais. L’inventaire navigateur reste
-un rescan `getTree()` coalescé; son remplacement par des tranches durables est
-requis avant de déclarer la scalabilité locale complète. Cette révision
+une présence `detached` et ne cascadent jamais. L’inventaire navigateur utilise
+`getChildren()` avec un curseur durable, des tranches de 100 et au plus huit
+tranches par réveil. Les effets validés reçoivent un reçu avant compaction de la
+tâche technique; la cadence et les candidats ambigus survivent à MV3. Cette révision
 n’ajoute aucune permission hôte, contribution cloud ou opération de déploiement.

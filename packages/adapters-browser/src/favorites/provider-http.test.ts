@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FavoriteProviderRateGate } from './provider-http';
 
 describe('FavoriteProviderRateGate', () => {
-  it('persists the next reservation before the provider effect', async () => {
+  it('Q-06 persists the exact next reservation before the provider effect', async () => {
     let stored = 12_000;
     let current = 10_000;
     const wait = vi.fn(async (milliseconds: number) => { current += milliseconds; });

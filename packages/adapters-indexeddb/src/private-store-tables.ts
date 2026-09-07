@@ -6,6 +6,12 @@ export function privateStoreTables(database: TobirinkDatabase, stores: readonly 
   const tables = {
     agenda: database.agenda,
     favoriteArtifacts: database.favoriteArtifacts,
+    favoriteBookmarkMutations: database.favoriteBookmarkMutations,
+    favoriteInventoryCheckpoints: database.favoriteInventoryCheckpoints,
+    favoriteInventoryMarks: database.favoriteInventoryMarks,
+    favoriteProviderRateCheckpoints: database.favoriteProviderRateCheckpoints,
+    favoriteResolutionReceipts: database.favoriteResolutionReceipts,
+    favoriteReviewCandidateSets: database.favoriteReviewCandidateSets,
     favoriteResolutionTasks: database.favoriteResolutionTasks,
     favoriteSources: database.favoriteSources,
     libraries: database.libraries,

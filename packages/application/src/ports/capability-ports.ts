@@ -8,8 +8,25 @@ export interface BookmarkRecord {
   url: string;
 }
 
+export interface BookmarkInventoryFrame {
+  folderId: string;
+  folderPath: readonly string[];
+  nextChildIndex: number;
+}
+
+export interface BookmarkInventoryCursor {
+  frames: readonly BookmarkInventoryFrame[];
+  rootId: string;
+}
+
+export interface BookmarkInventorySlice {
+  complete: boolean;
+  cursor?: BookmarkInventoryCursor;
+  records: readonly BookmarkRecord[];
+}
+
 export interface BookmarkImportPort {
-  importBookmarks(): Promise<readonly BookmarkRecord[]>;
+  readBookmarkBatch(cursor?: BookmarkInventoryCursor, limit?: number): Promise<BookmarkInventorySlice>;
 }
 
 export interface BookmarkProjectionPort {

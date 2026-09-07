@@ -68,7 +68,7 @@ describe('collective Review API', () => {
     expect(leaked.status).toBe(400);
   });
 
-  it('enforces nonce replay protection, daily quota and revocation', async () => {
+  it('Q-08 enforces nonce replay protection, daily quota and immediate revocation', async () => {
     const credentials = await createConsent();
     const firstNonce = crypto.randomUUID();
     expect((await contribute(credentials, firstNonce)).status).toBe(201);

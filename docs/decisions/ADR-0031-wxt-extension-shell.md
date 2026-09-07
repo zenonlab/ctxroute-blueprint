@@ -58,11 +58,12 @@ a separate bounded `storage.local` adapter and never becomes authoritative. The
 extension workspace declares `@tobirink/adapters-indexeddb` directly because
 the composition root imports it; the dependency is not obtained transitively.
 
-The explicit `runtime.onInstalled` lifecycle event performs the initial local
-bookmark import. The browser adapter flattens `bookmarks.getTree()` into owned,
-serializable records; the application use case writes bounded batches into
-IndexedDB. No inventory scan runs merely because the worker wakes, and the
-installation import performs no provider or public-service request.
+Installation, startup, alarm and bookmark mutations request local convergence.
+The browser adapter traverses `bookmarks.getChildren()` with an owned DFS
+cursor and returns at most 100 serializable leaves. IndexedDB persists the
+cursor and the latest mutation per bookmark; a worker wake processes at most
+eight slices and resumes without flattening the complete tree. The inventory
+phase itself performs no provider or public-service request.
 
 Review reads use a separate versioned message. The background opens IndexedDB
 only after that validated request and delegates to an application query capped

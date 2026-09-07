@@ -99,7 +99,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 6 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 8 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   database.close();
 }
 

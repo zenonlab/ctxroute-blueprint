@@ -36,7 +36,7 @@ describe('favorite equivalence corpus', () => {
     expect(favoriteEquivalenceCorpus.find((item) => item.id === 'X-01')?.disposition).toBe('FUTUR');
   });
 
-  it('uses only the reserved synthetic origin and labels', () => {
+  it('O-02 rejects private corpus data by requiring reserved synthetic origins and labels', () => {
     expect(favoriteEquivalenceCorpus.every((item) => item.syntheticTitle === `Fixture ${item.id}`)).toBe(true);
     expect(favoriteEquivalenceCorpus.every((item) => item.syntheticUrl.startsWith('https://fixtures.tobirink.invalid/'))).toBe(true);
   });

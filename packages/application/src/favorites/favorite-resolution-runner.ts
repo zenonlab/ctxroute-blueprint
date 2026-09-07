@@ -1,8 +1,9 @@
-import { addWork, createLibrary, createReview, createWork, workId } from '@tobirink/domain';
+import { createReview } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, ProviderCandidateEnvelope, Review } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { commitTask, parseFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
+import { parseFavoriteResolutionTaskPayload } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
+import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, routeFavoriteProviders } from './provider-ports';
@@ -13,6 +14,7 @@ export const favoriteResolutionWakeBudgetMs = 20_000;
 export const favoriteResolutionClaimMs = 60_000;
 export const favoriteResolutionAttemptLimit = 8;
 export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
+export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 
 export interface FavoriteResolutionRunnerDependencies {
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
@@ -44,46 +46,6 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   return Object.freeze([...new Set(titles)]);
 }
 
-function stableWorkId(candidate: ProviderCandidate) {
-  const encoded = [...new TextEncoder().encode(`${candidate.provider}:${candidate.externalId}`)]
-    .map((value) => value.toString(16).padStart(2, '0')).join('');
-  return workId(`work_${encoded}`);
-}
-
-function mediaKind(candidate: ProviderCandidate): 'anime' | 'manga' {
-  return candidate.mediaKind === 'ANIME' ? 'anime' : 'manga';
-}
-
-function preferredTitle(candidate: ProviderCandidate, fallback: string): string {
-  return candidate.titles.find((title) => title.trim().length > 0) ?? fallback;
-}
-
-async function complete(
-  dependencies: FavoriteResolutionRunnerDependencies,
-  task: DurableTask,
-  token: string,
-  review: Review,
-  effect: string,
-  candidate?: ProviderCandidate,
-): Promise<void> {
-  const stores = candidate === undefined ? ['favoriteResolutionTasks', 'reviews'] as const : ['favoriteResolutionTasks', 'libraries', 'reviews', 'works'] as const;
-  await dependencies.storage.transaction(stores, async (session) => {
-    if (candidate !== undefined) {
-      const work = createWork({
-        externalReferences: [{ externalId: candidate.externalId, provider: candidate.provider }],
-        id: review.matchedWorkId ?? stableWorkId(candidate),
-        mediaKind: mediaKind(candidate),
-        preferredTitle: preferredTitle(candidate, review.title),
-      });
-      await session.putWork(work);
-      const library = await session.getLibrary(dependencies.libraryId) ?? createLibrary(dependencies.libraryId);
-      if (!library.workIds.includes(work.id)) await session.putLibrary(addWork(library, work.id));
-    }
-    await session.putReview(review);
-    await session.putFavoriteResolutionTask(commitTask(recordTaskEffect(task, token, effect), token));
-  });
-}
-
 function unresolvedReview(review: Review, status: 'no-match' | 'pending'): Review {
   return createReview({ id: review.id, sourceLabel: review.sourceLabel, status, title: review.title });
 }
@@ -111,12 +73,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   ]);
   if (source === undefined || record === undefined || review === undefined || record.reviewId !== payload.reviewId || record.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
   if (source.presence === 'detached') {
-    await complete(dependencies, task, token, review, 'source:detached');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, review, 'source:detached');
     return 'completed';
   }
   const artifact = record.artifact;
   if (artifact.status !== 'parsed') {
-    await complete(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
     return 'completed';
   }
   const explicit = artifact.sourceEvidence.explicitProviderReference;
@@ -131,20 +93,20 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
     const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
     if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
-      await complete(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
+      await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
       return 'completed';
     }
     if (hasExactBlockedProviderTaxonomy(candidate)) {
-      await complete(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+      await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
       return 'completed';
     }
-    const resolved = createReview({ ...review, matchedWorkId: stableWorkId(candidate), status: 'resolved' });
-    await complete(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
+    const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
+    await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
     return 'completed';
   }
   const titles = providerTitles(artifact);
   if (titles.length === 0) {
-    await complete(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
     return 'completed';
   }
   const providers = routeFavoriteProviders(artifact.mediaKind);
@@ -168,11 +130,14 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (outcome.kind === 'AMBIGUOUS') {
-    await complete(dependencies, task, token, unresolvedReview(review, 'pending'), `review:${outcome.kind.toLowerCase()}`);
+    const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
+    const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
+    const candidateSet = Object.freeze({ candidates: Object.freeze(candidates), digest: envelopes.map((envelope) => envelope.digest).join('|'), recordedAt: dependencies.now(), reviewId: review.id });
+    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), `review:${outcome.kind.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
   }
   if (outcome.kind === 'NO_MATCH') {
-    await complete(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:no-match');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:no-match');
     return 'completed';
   }
   const provider = outcome.matchedReference.provider;
@@ -185,11 +150,11 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
   if (hasExactBlockedProviderTaxonomy(candidate)) {
-    await complete(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
     return 'completed';
   }
-  const resolved = createReview({ ...review, matchedWorkId: stableWorkId(candidate), status: 'resolved' });
-  await complete(dependencies, task, token, resolved, `resolved:${provider}:${candidate.externalId}`, candidate);
+  const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
+  await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${provider}:${candidate.externalId}`, candidate);
   return 'completed';
 }
 
@@ -218,5 +183,6 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
       blocked += 1;
     }
   }
+  await dependencies.outbox.compactCommitted?.({ before: new Date(startedAt - favoriteResolutionTaskRetentionMs).toISOString(), limit: favoriteResolutionSliceLimit });
   return Object.freeze({ blocked, completed, retried });
 }

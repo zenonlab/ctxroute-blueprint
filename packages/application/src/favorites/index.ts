@@ -3,6 +3,7 @@ export * from './equivalence-oracle';
 export * from './eligibility';
 export * from './favorite-parser';
 export * from './favorite-resolution-runner';
+export * from './local-language-evidence';
 export * from './progression-extraction';
 export * from './provider-matcher';
 export * from './provider-ports';

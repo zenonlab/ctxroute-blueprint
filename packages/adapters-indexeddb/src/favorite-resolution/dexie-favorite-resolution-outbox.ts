@@ -39,4 +39,16 @@ export class DexieFavoriteResolutionOutbox implements FavoriteResolutionOutboxPo
 
   block(id: string, token: string, reason: string) { return this.change(id, (task) => blockTask(task, token, reason)); }
   retry(id: string, token: string, retryAt: string) { return this.change(id, (task) => retryTask(task, token, retryAt)); }
+
+  async compactCommitted(input: { before: string; limit: number }): Promise<number> {
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) throw new RangeError('Compaction limit must be between 1 and 100.');
+    const before = new Date(input.before);
+    if (Number.isNaN(before.valueOf()) || before.toISOString() !== input.before) throw new TypeError('Compaction bound must be canonical.');
+    return this.database.transaction('rw', this.database.favoriteResolutionTasks, async () => {
+      const tasks = await this.database.favoriteResolutionTasks.where('[state+claimedAt]').between(['COMMITTED', Dexie.minKey], ['COMMITTED', input.before], true, false).limit(input.limit).toArray();
+      const compactedIds = tasks.map(restoreDurableTask).map((task) => task.id);
+      await this.database.favoriteResolutionTasks.bulkDelete(compactedIds);
+      return compactedIds.length;
+    });
+  }
 }

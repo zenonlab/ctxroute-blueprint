@@ -7,7 +7,7 @@ const first = { bookmarkId: 'first', folderPath: [], order: 0, state: 'eligible'
 const second = { ...first, bookmarkId: 'second', order: 1, title: 'Second', url: 'https://reader.example/manga/second' };
 
 describe('reconcileFavoriteSourcePresence', () => {
-  it('marks a missing browser observation detached without deleting private data', async () => {
+  it('B-03 marks a missing browser observation detached without deleting private data', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([first, second], storage, '2026-09-07T12:00:00.000Z');
     await expect(reconcileFavoriteSourcePresence([second], storage)).resolves.toEqual({ detached: 1, observed: 1 });
