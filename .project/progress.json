@@ -1652,6 +1652,38 @@
             "Typecheck, ESLint, Oxlint, Sensor ciblé SAFE et validate complet passent.",
             "Favorite-resolution Archify passe showcase 9/9; diff-check passe."
           ]
+        },
+        {
+          "id": "step-24",
+          "title": "Construire le parser local T-I-S-R",
+          "status": "DONE",
+          "acceptance": [
+            "T-01…T-10, I-01…I-07, S-01…S-07 et R-01…R-14 exécutent des fixtures synthétiques.",
+            "Artefact déterministe, gelé, borné, brut intact et sans I/O."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/domain/tsconfig.json",
+            "packages/application/src/favorites/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Application 147/147: fixtures T-01…T-10, I-01…I-07, S-01…S-07 et R-01…R-14 passent.",
+            "Domaine 23/23, typecheck tous workspaces, ESLint, Oxlint et Sensor ciblé SAFE passent.",
+            "Validate complet et favorite-resolution Archify showcase 9/9 passent."
+          ]
         }
       ]
     },

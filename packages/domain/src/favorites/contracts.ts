@@ -1,6 +1,6 @@
 import { canonicalDateTime } from '../invariant';
 import { createSourceEvidence } from './source-evidence-contract';
-import type { SourceEvidence } from './source-evidence-contract';
+import type { FavoriteParseArtifact } from './parse-artifact-contract';
 import {
   favoriteAliasLimit,
   favoriteDiagnosticLimit,
@@ -16,17 +16,14 @@ import {
 import type {
   FavoriteMatchMethod,
   FavoriteMediaKind,
-  FavoritePipelineDiagnostic,
   FavoritePresence,
-  FavoriteProgressionProof,
-  FavoriteProgressionRejection,
   FavoriteProvider,
-  FavoriteTransformation,
 } from './vocabularies';
 
 export * from './limits';
 export { createSourceEvidence };
 export type { SourceEvidence } from './source-evidence-contract';
+export type { FavoriteParseArtifact } from './parse-artifact-contract';
 
 export const favoriteContractVersion = 2 as const;
 
@@ -40,21 +37,6 @@ export interface FavoriteObservation {
   readonly siblingOrder: number;
   readonly title: string;
   readonly url: string;
-}
-
-export interface FavoriteParseArtifact {
-  readonly contractVersion: typeof favoriteContractVersion;
-  readonly diagnostics: readonly FavoritePipelineDiagnostic[];
-  readonly identityKey?: string;
-  readonly mediaKind: FavoriteMediaKind;
-  readonly parserVersion: string;
-  readonly progress?: Readonly<{ kind: 'chapter' | 'episode' | 'volume'; proof: FavoriteProgressionProof; rejections: readonly FavoriteProgressionRejection[]; value: number }>;
-  readonly raw: Readonly<{ title: string; url: string }>;
-  readonly season?: number;
-  readonly semanticFingerprint: string;
-  readonly sourceAdapterVersion: string;
-  readonly sourceEvidence: SourceEvidence;
-  readonly transformations: readonly FavoriteTransformation[];
 }
 
 export interface ProviderCandidate {
@@ -135,7 +117,7 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
   contract(input.diagnostics.length <= favoriteDiagnosticLimit, `diagnostics exceeds ${favoriteDiagnosticLimit} entries.`);
   if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'season must be a positive safe integer.');
   if (input.progress !== undefined) contract(Number.isFinite(input.progress.value) && input.progress.value >= 0, 'progress.value must be finite and non-negative.');
-  const { progress, ...rest } = input;
+  const { aliases, progress, seasonEvidence, segments, ...rest } = input;
   const rawTitle = boundedText(input.raw.title, 'raw.title', favoriteTitleByteLimit);
   const rawUrl = boundedText(input.raw.url, 'raw.url', favoriteUrlByteLimit);
   const sourceEvidence = createSourceEvidence(input.sourceEvidence);
@@ -151,8 +133,13 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
     sourceEvidence,
     transformations: Object.freeze([...input.transformations]),
   };
+  if (aliases !== undefined) Object.assign(artifact, { aliases: Object.freeze(aliases.map((alias) => Object.freeze({ ...alias }))) });
+  if (seasonEvidence !== undefined) Object.assign(artifact, { seasonEvidence: Object.freeze({ ...seasonEvidence }) });
+  if (segments !== undefined) Object.assign(artifact, { segments: Object.freeze(segments.map((segment) => Object.freeze({ ...segment }))) });
   if (progress === undefined) return Object.freeze(artifact);
-  return Object.freeze({ ...artifact, progress: Object.freeze({ ...progress, rejections: Object.freeze([...progress.rejections]) }) });
+  const frozenProgress = { ...progress, rejections: Object.freeze([...progress.rejections]) };
+  if (progress.candidates !== undefined) Object.assign(frozenProgress, { candidates: Object.freeze(progress.candidates.map((candidate) => Object.freeze({ ...candidate }))) });
+  return Object.freeze({ ...artifact, progress: Object.freeze(frozenProgress) });
 }
 
 function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {

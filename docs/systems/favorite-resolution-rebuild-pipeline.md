@@ -33,6 +33,9 @@ Le runtime actuel possède déjà des fondations réutilisables :
   réponses supérieures à 64 Kio;
 - le WebBridge limite les parcours Bibliothèque à 500 œuvres, les pages à 24,
   Agenda à 100 entrées et ses enveloppes à 64 Kio;
+- les modules purs `title-segmentation`, `season-extraction`,
+  `progression-extraction` et `favorite-parser` produisent désormais l’artefact
+  local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
 - le background compose les ports locaux et lance l’import à l’installation ou
   à la mise à jour.
 - un noyau générique de tâches durables existe déjà, mais son adaptateur utilise

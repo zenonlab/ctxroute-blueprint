@@ -1,0 +1,17 @@
+import { createFavoriteObservation, createSourceEvidence } from '@tobirink/domain';
+import { describe, expect, it } from 'vitest';
+import { parseFavoriteObservation } from './favorite-parser';
+
+const observation = (title: string) => createFavoriteObservation({ bookmarkId: 'parser', folderPath: [], observationRevision: 'r1', observationSequence: 1, observedAt: '2026-09-07T10:00:00.000Z', presence: 'observed', siblingOrder: 0, title, url: 'https://fixtures.tobirink.invalid/anime/work' });
+const evidence = (values = {}) => createSourceEvidence({ aliases: [], diagnostics: [], key: 'parser', mediaKind: 'ANIME', origin: 'https://fixtures.tobirink.invalid', path: '/anime/work', proofs: ['TITLE_SLUG'], sourceAdapter: 'fixture', strategy: 'generic', ...values });
+
+describe('favorite identity parser I-01…I-07', () => {
+  it('I-01 aligns routing, language and reader decorations', () => expect(parseFavoriteObservation(observation('Frieren [reader]'), evidence({ rawSlug: '123-vostfr-frieren-reader', stableSlug: '123-vostfr-frieren-reader' }))).toMatchObject({ identityKey: 'frieren', status: 'parsed' }));
+  it('I-02 replaces an opaque slug with one human title', () => expect(parseFavoriteObservation(observation('Frieren'), evidence({ rawSlug: '9f3a8c21', stableSlug: '9f3a8c21' }))).toMatchObject({ identityKey: 'frieren', transformations: ['opaque-url-slug-replaced'] }));
+  it('I-03 blocks an uncorroborated opaque identity', () => expect(parseFavoriteObservation(observation('9f3a8c21'), evidence({ rawSlug: '9f3a8c21', stableSlug: '9f3a8c21' }))).toMatchObject({ diagnostics: ['OPAQUE_IDENTITY_UNCORROBORATED'], status: 'identity-missing' }));
+  it('I-04 removes a contradicted numeric prefix', () => expect(parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: '123-frieren' })).identityKey).toBe('frieren'));
+  it('I-05 preserves an uncontradicted numeric prefix', () => expect(parseFavoriteObservation(observation('86 Eighty Six'), evidence({ stableSlug: '86-eighty-six' })).identityKey).toBe('86 eighty six'));
+  it('I-06 excludes release-bearing aliases', () => expect(parseFavoriteObservation(observation('Frieren chapter 1'), evidence({ stableSlug: 'frieren-chapter-1' })).aliases?.every((alias) => !/chapter/iu.test(alias.value))).toBe(true));
+  it('I-07 records missing URL identity and keeps raw input', () => { const rejected = createSourceEvidence({ aliases: [], diagnostics: [], disposition: 'ROOT_PAGE', key: 'parser', mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'fixture', strategy: 'generic' }); const artifact = parseFavoriteObservation(observation('Frieren'), rejected); expect(artifact).toMatchObject({ diagnostics: ['URL_IDENTITY_MISSING'], raw: { title: 'Frieren' }, status: 'identity-missing' }); });
+  it('is deeply deterministic and immutable', () => { const first = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); const second = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); expect(first).toEqual(second); expect(Object.isFrozen(first)).toBe(true); expect(Object.isFrozen(first.segments)).toBe(true); });
+});
