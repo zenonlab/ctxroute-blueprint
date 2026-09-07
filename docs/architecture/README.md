@@ -26,6 +26,11 @@ documents the runtime data path from the voluntarily exposed active tab through
 local identity correlation, the monotonic progress guard, IndexedDB and the
 reconstructible continuation cache to the popup WorkCard.
 
+[`src/favorite-resolution.dataflow.json`](src/favorite-resolution.dataflow.json)
+documents the lossless path from browser favorites through URL evidence,
+versioned parsing, durable MV3 tasks and deterministic provider matching to
+Review or the authoritative private IndexedDB records.
+
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
 contracts, browser builds and reproducible packages to the release gate. It

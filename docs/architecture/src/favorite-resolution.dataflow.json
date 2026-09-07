@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Tobirink — analyse et résolution locale des favoris",
+    "output": "favorite-resolution.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1180, 800],
+    "views": [
+      {
+        "id": "identity-proof",
+        "label": "Preuve d’identité",
+        "focus": ["browserFavorites", "eligibility", "sourceEvidence", "parseArtifact", "titleMatcher"],
+        "note": "Le brut reste intact; URL, titre, saison et progression deviennent des preuves séparées et auditables."
+      },
+      {
+        "id": "durable-resolution",
+        "label": "Résolution durable",
+        "focus": ["parseArtifact", "durableQueue", "providerAdapters", "titleMatcher", "reviewGate", "privateStore"],
+        "note": "Chaque effet fournisseur reprend depuis IndexedDB et toute ambiguïté rejoint Review sans sélection implicite."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Navigateur" },
+    { "label": "Qualification" },
+    { "label": "Analyse" },
+    { "label": "Résolution" },
+    { "label": "Autorité locale" }
+  ],
+  "nodes": [
+    { "id": "browserFavorites", "type": "external", "label": "Favoris navigateur", "stage": 0, "row": 1, "width": 150, "tag": "entrée brute" },
+    { "id": "bookmarkEvents", "type": "messagebus", "label": "Événements favoris", "stage": 0, "row": 4, "width": 150, "tag": "reprise" },
+    { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "fail-closed" },
+    { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "adaptateur URL" },
+    { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "versionné" },
+    { "id": "durableQueue", "type": "messagebus", "label": "File durable MV3", "stage": 2, "row": 4, "width": 150, "tag": "IndexedDB" },
+    { "id": "providerAdapters", "type": "external", "label": "Fournisseurs publics", "stage": 3, "row": 4, "width": 150, "tag": "cadence bornée" },
+    { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "unicité requise" },
+    { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "décision humaine" },
+    { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "seule autorité" }
+  ],
+  "flows": [
+    { "from": "browserFavorites", "to": "eligibility", "label": "inventaire brut", "classification": "privé local", "variant": "security", "route": "straight", "labelAt": [208, 320] },
+    { "from": "bookmarkEvents", "to": "sourceEvidence", "label": "déclenche une convergence", "classification": "idempotent", "variant": "dashed", "labelAt": [208, 660] },
+    { "from": "eligibility", "to": "parseArtifact", "label": "titre + URL admissibles", "classification": "sans perte", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
+    { "from": "sourceEvidence", "to": "parseArtifact", "label": "indices structurés", "classification": "provenance locale", "variant": "default" },
+    { "from": "parseArtifact", "to": "durableQueue", "label": "entrée immuable + empreinte", "classification": "avant réseau", "variant": "security", "labelAt": [575, 440] },
+    { "from": "durableQueue", "to": "providerAdapters", "label": "requête réservée", "classification": "au moins une fois", "variant": "dashed", "route": "straight", "labelAt": [638, 660] },
+    { "from": "providerAdapters", "to": "titleMatcher", "label": "candidats typés", "classification": "réponse bornée", "variant": "default", "labelAt": [745, 660] },
+    { "from": "parseArtifact", "to": "titleMatcher", "label": "aliases et preuves", "classification": "ordre déterministe", "variant": "emphasis", "route": "straight", "labelAt": [638, 320] },
+    { "from": "titleMatcher", "to": "privateStore", "label": "correspondance unique", "classification": "upsert idempotent", "variant": "security", "route": "straight", "labelAt": [853, 210] },
+    { "from": "titleMatcher", "to": "reviewGate", "label": "ambigu ou sans résultat", "classification": "aucun choix implicite", "variant": "dashed" },
+    { "from": "reviewGate", "to": "privateStore", "label": "décision confirmée", "classification": "révision vérifiée", "variant": "security", "labelAt": [960, 660] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Preuves séparées",
+      "items": [
+        "Le titre brut et l’URL brute restent inchangés",
+        "Identité, saison et progression ont leurs propres provenances",
+        "Les fragments rejetés restent auditables"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Décision fail-closed",
+      "items": [
+        "L’ordre fournisseur, la popularité et les images ne prouvent rien",
+        "Chaque niveau exige un seul identifiant fournisseur distinct",
+        "Une égalité ou un conflit passe en Review"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Reprise MV3",
+      "items": [
+        "L’entrée est persistée avant tout effet fournisseur",
+        "Les délais longs et Retry-After restent durables",
+        "IndexedDB demeure la seule autorité privée"
+      ]
+    }
+  ]
+}

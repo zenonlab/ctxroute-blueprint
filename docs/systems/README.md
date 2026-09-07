@@ -1,5 +1,12 @@
 # Product systems
 
+The canonical behavioral contract for reconstructing favorite analysis and
+provider resolution is
+[`favorite-parsing-resolution-spec.md`](favorite-parsing-resolution-spec.md).
+It preserves raw inputs, parsing provenance, season and progression evidence,
+deterministic matching, Review ambiguity, and MV3 recovery while keeping
+IndexedDB as the sole private authority.
+
 ## Domain and application
 
 The domain owns library entries, reading progress, agenda rules, and invariants.
