@@ -40,7 +40,7 @@
 
 - [x] **Renuméroter l’ADR dashboard et réaligner les références** — DONE _(evidence: ADR dashboard renumbered from 0022 to unique 0028 without content loss., Component-boundaries goal now reserves ADR-0029 through the authenticated Progress API., ADR-0021 now documents the two exact reviewed Sensor exceptions.)_
 
-## Documenter l’inventaire, la résolution et la Review locale — ACTIVE
+## Documenter l’inventaire, la résolution et la Review locale — DONE
 
 - [x] **Preserver les sources favorites locales comme donnees privees autoritaires** — DONE _(evidence: Domaine 8/8, application 15/15, contrats 9/9 et recovery 10/10 passent; export prive v2 preserve FavoriteSource et importe v1 vide., IndexedDB 2/2 + contrat Chromium passent; migrations Chromium v1/v2 vers v3 passent et integrite refuse une FavoriteSource orpheline., Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, docs, 34 ADR, infrastructure 16/16 et Archify Tobirink 9/9 passent; validate global est uniquement interrompu par .codex/config.toml modifie hors scope dans une autre session.)_
 - [x] **Composer Dexie dans le background sans confondre cache et autorite** — DONE _(evidence: Extension 60/60: composition Dexie construite une fois, ouverture lazy coalescee, reprise apres echec et nom stable tobirink-private., IndexedDB 2/2 + contrat Chromium; builds Chrome/Firefox ~584 kB; securite 12/12 et performance 3/3 passent sans scan, timer, reseau ni nouvelle permission., Typecheck 8 workspaces, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR, lockfile coherent et Archify Tobirink 9/9 passent; navigateur integre indisponible, donc aucun smoke UI manuel revendique.)_
@@ -63,7 +63,7 @@
 - [x] **Matérialiser les contrats, le corpus synthétique et l’oracle** — DONE _(evidence: Domain 18/18 et Application 65/65: contrats bornés, identité provider+externalId, corpus 82/77/4/1 et oracle profond fail-closed, Typecheck de tous les workspaces, ESLint, Oxlint et Sensor SAFE passent sans réseau, stockage ni background activé, Décisions, docs, cohérence, 51 tests Progress, Archify dataflow/all showcase et diff-check passent)_
 - [x] **Implémenter la normalisation et le matcher de titres déterministe** — DONE _(evidence: Domain 18/18 et Application 79/79 : P-01…P-08, ambiguïté stable, réponse incomplète et alias bornés validés., TypeScript, ESLint, Oxlint, Sensor AST et git diff --check passent sans diagnostic., Décisions/docs/cohérence, Progress 51/51 et Archify showcase all passent.)_
 - [x] **Implémenter la qualification URL et les preuves de source** — DONE _(evidence: Domain 19/19 et Application 103/103 : U-01…U-10, conflits d’adaptateurs et bornes URL validés., TypeScript, ESLint, Oxlint et Sensor AST passent; aucun import réseau, navigateur, Dexie ou temporisateur., Décisions/docs/cohérence, Progress 51/51, Archify all showcase et git diff --check passent.)_
-- [ ] **Ajouter l’adaptateur de source AniList exact** — IN_PROGRESS
+- [x] **Ajouter l’adaptateur AniList exact** — DONE _(evidence: Browser 15/15; typecheck et lints passent., Archify architecture showcase 9/9, 0 erreur/avertissement., Config, docs et Progress 51/51 passent; aucun réseau activé.)_
 
 ## Concevoir l’architecture UI et le catalogue visuel — DONE
 

@@ -57,6 +57,11 @@ The first browser-owned exact adapter covers AniList anime and manga routes by
 decimal public ID. It is a pure URL mapper: it performs no fetch and accepts
 only the four explicitly declared HTTP(S), bare and `www` origins.
 
+[`src/favorite-source-boundaries.architecture.json`](src/favorite-source-boundaries.architecture.json)
+shows the package boundary behind that behavior: Application owns qualification,
+registry selection and the generic fallback; Browser Adapters owns exact AniList
+URL knowledge; Domain validates the immutable `SourceEvidence` result.
+
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
 contracts, browser builds and reproducible packages to the release gate. It

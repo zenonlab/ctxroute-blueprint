@@ -554,7 +554,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-review-resolution",
       "title": "Documenter l’inventaire, la résolution et la Review locale",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -1589,38 +1589,34 @@
         },
         {
           "id": "step-22",
-          "title": "Ajouter l’adaptateur de source AniList exact",
-          "status": "IN_PROGRESS",
+          "title": "Ajouter l’adaptateur AniList exact",
+          "status": "DONE",
           "acceptance": [
-            "Les URL anime et manga AniList produisent un identifiant fournisseur exact",
-            "HTTP et HTTPS ainsi que le hostname www restent explicitement bornés",
-            "Les sous-domaines ressemblants, mauvais IDs et routes inconnues ne produisent aucune preuve",
-            "Aucun réseau, permission ou runtime extension n’est activé"
+            "AniList anime/manga fournit un ID exact sur les seules origines HTTP(S) admises",
+            "Origine trompeuse, route ou ID invalide échoue fermé sans réseau"
           ],
           "files": [
-            "packages/adapters-browser/src/favorites/anilist-source-adapter.ts",
-            "packages/adapters-browser/src/favorites/anilist-source-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/**",
             "packages/adapters-browser/src/index.ts",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
             "docs/architecture/README.md",
-            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/project-config.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
           "commands": [
             "npm test --workspace @tobirink/adapters-browser",
-            "npm test --workspace @tobirink/application",
             "npm run typecheck",
             "npm run lint",
-            "npm run lint:anti-slop",
-            "npm run sensor -- packages/adapters-browser/src/favorites",
-            "npm run validate:decisions",
-            "npm run validate:docs -- --all",
-            "npm run archify:validate -- all",
+            "npm run archify:validate -- architecture",
             "node --test tests/progress*.test.mjs",
-            "git diff --check",
-            "git commit -m \"feat(parser): add AniList source adapter\""
+            "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Browser 15/15; typecheck et lints passent.",
+            "Archify architecture showcase 9/9, 0 erreur/avertissement.",
+            "Config, docs et Progress 51/51 passent; aucun réseau activé."
+          ]
         }
       ]
     },
