@@ -77,6 +77,7 @@
   ],
   "architecture": {
     "documents": [
+      "docs/architecture/src/product-roadmap.workflow.json",
       "docs/architecture/src/product-vision.architecture.json",
       "docs/architecture/src/game-transformation.architecture.json",
       "docs/architecture/src/runtime-infrastructure.architecture.json"

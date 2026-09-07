@@ -2,6 +2,9 @@
 
 Cette étape vérifie le socle et la documentation. Les scénarios produit
 ci-dessous préparent la prochaine session ; ils ne sont pas encore automatisés.
+La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces
+scénarios à E2–E6. E1 fixe le banc et les seuils avant expérimentation ; E2 mesure
+le wallpaper seul avant ajout du terminal personnalisé ou de l'ingestion IA.
 
 ## Vérification du socle
 

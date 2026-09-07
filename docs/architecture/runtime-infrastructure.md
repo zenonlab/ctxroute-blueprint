@@ -270,8 +270,10 @@ captures vidéo, et ne pas rendre à 144 Hz par défaut. En terminal seul, ne pa
 démarrer le moteur ; en bureau seul, ne pas créer de PTY ou interface terminal
 inutile. Les budgets numériques seront fixés sur le matériel sélectionné.
 
-Prochaine action : comparer l'existant pour créer et activer un package de thème
-wallpaper/terminal, puis choisir la stack et le banc d'essai. Aucune installation de dépendances ou
+Prochaine action : préparer E1 selon la [feuille de route unique](../03-product-roadmap.md),
+puis éprouver ancrage et énergie sans ROM avant le terminal custom et l'ingestion IA.
+Les preuves ci-dessus sont regroupées par sujet, pas par ordre d'exécution.
+Aucune installation de dépendances ou
 implémentation n'a été effectuée dans cette phase documentaire.
 
 ## Sources et consultation

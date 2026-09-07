@@ -60,7 +60,8 @@ export function inspectDocumentSource(document, file) {
   if (document.format === 'archify-json-ir') {
     let parsed;
     try { parsed = JSON.parse(source); } catch { failures.push(`${file}: invalid architecture JSON IR`); return; }
-    if (parsed.schema_version !== 1 || !['architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle'].includes(parsed.diagram_type)) failures.push(`${file}: expected Archify JSON IR schema_version 1 and a supported diagram type`);
+    const supportedVersion = parsed.schema_version === 1 || (parsed.diagram_type === 'workflow' && parsed.schema_version === 2);
+    if (!supportedVersion || !['architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle'].includes(parsed.diagram_type)) failures.push(`${file}: expected Archify JSON IR version 1, or version 2 for workflow, and a supported diagram type`);
   }
 }
 

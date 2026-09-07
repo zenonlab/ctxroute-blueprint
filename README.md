@@ -12,6 +12,8 @@ et d'agents peuvent être représentées par des personnages interchangeables.
 Commencer par la [note de reprise](docs/session-handoff.md), la
 [vision produit](docs/00-project-brief.md) et les
 [questions techniques ouvertes](docs/01-technology-decisions.md).
+L'ordre de réalisation et les critères de sortie sont réunis dans la
+[feuille de route produit](docs/03-product-roadmap.md).
 Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
 La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise
 les modules et composants à éprouver ; la [cartographie des consoles](docs/research/console-coverage.md)

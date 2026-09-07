@@ -5,12 +5,15 @@ It documents desired capabilities only; product technologies remain undecided.
 
 ## Parcours de lecture produit
 
+Ordre d'exécution : [feuille de route E1–E6](../03-product-roadmap.md) et
+[workflow](src/product-roadmap.workflow.json), distincts du découpage des modules.
+
 1. [Vision](product-vision.md) : expérience et sessions indépendantes des thèmes.
 2. [Préparation des thèmes](game-transformation.md) : découverte IA à la demande, conversion locale et package séparé.
 3. [Infrastructure](runtime-infrastructure.md) : modules, frontières, candidats et organisation cible.
 4. [Consoles](../research/console-coverage.md) : recherche exploratoire, non inventaire à compléter.
 
-Les trois schémas sont complémentaires ; l'infrastructure contient une proposition
+Les schémas produit sont complémentaires ; l'infrastructure contient une proposition
 de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,
 les recherches portent les preuves et les documents d'architecture les contrats.
 

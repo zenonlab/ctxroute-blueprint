@@ -125,6 +125,9 @@ la réutilisation.
 Reporté à la prochaine session : langage, runtime, interface, rendu, intégration
 desktop, terminal/PTY, gestion des agents, stockage, format d'assets, packaging,
 observabilité, sécurité détaillée et budgets de performance.
+Ces choix sont désormais rattachés aux échéances E1–E6 de la
+[feuille de route unique](03-product-roadmap.md), et non à une session indéfinie.
+E1 doit consigner les choix nécessaires au périmètre expérimental avant code.
 Aucun backend distant, compte utilisateur ou service cloud n'est demandé.
 L'utilisateur fournit sa ROM et lance lui-même la conversion locale séparée.
 Il peut demander à une IA de découvrir les outils publics pertinents, préparer

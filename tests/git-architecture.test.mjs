@@ -62,6 +62,25 @@ test('the documentation audit ignores files excluded by Git', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('document audit accepts workflow v2 only and preserves v1 compatibility', () => {
+  const cwd = repository();
+  const source = join(cwd, 'docs/architecture/src/blueprint.architecture.json');
+  for (const [diagramType, version, expected] of [
+    ['workflow', 2, 0],
+    ['workflow', 1, 0],
+    ['architecture', 1, 0],
+    ['architecture', 2, 1],
+    ['workflow', 3, 1],
+    ['workflow', '2', 1],
+    ['unknown', 1, 1],
+  ]) {
+    writeFileSync(source, JSON.stringify({ schema_version: version, diagram_type: diagramType }));
+    const result = spawnSync(process.execPath, [docsValidator, '--all'], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, expected, `${diagramType}/${version}: ${result.stderr}`);
+    if (expected === 1) assert.match(result.stderr, /expected Archify JSON IR version/u);
+  }
+});
+
 function repository() {
   const cwd = mkdtempSync(join(tmpdir(), 'git-architecture-'));
   for (const directory of ['.codex', '.project', 'docs/architecture/src', 'docs/decisions', 'src', 'tests']) mkdirSync(join(cwd, directory), { recursive: true });

@@ -3,6 +3,15 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "product-roadmap",
+      "kind": "workflow-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/product-roadmap.workflow.json",
+      "narrative": "docs/03-product-roadmap.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
       "id": "runtime-infrastructure",
       "kind": "architecture-ir",
       "audience": "product",

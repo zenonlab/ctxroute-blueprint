@@ -5,6 +5,11 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Ordre de réalisation actuel : [feuille de route E1–E6](03-product-roadmap.md),
+selon [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md). E1 à préparer,
+aucune étape produit exécutée. Cette feuille de route remplace les anciens ordres
+de discussion ci-dessous, qui restent historiques.
+
 Dernière décision : [ADR-0035](decisions/ADR-0035-platform-capabilities-and-energy.md),
 énergie prioritaire et [matrice OS par fonctionnalité](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité).
 Aucun OS certifié. Rust/wgpu/WGSL pour le wallpaper natif devient la recommandation
@@ -94,6 +99,28 @@ les six définitions locales dans `/hooks` si Codex le demande, conformément
 au [guide amont conservé](../README.md). Aucune configuration globale modifiée.
 
 ## Vérification finale
+
+Étape feuille de route : workflow E1–E6 validé avec Archify, 9 contrôles showcase
+réussis, 0 erreur et 0 avertissement. Contenance vérifiée aux quatre tailles
+desktop ; capture sombre 2048×1320 inspectée par l'agent. Reçu automatique
+`visualReview: pending` ; interface fixe en anglais, contenu en français.
+Source SHA-256 `9a4669b4fd030b89e23ff46584edc5baf8ededaa0197042905d103abf6c69f0c`
+(1893 octets), HTML SHA-256
+`aa2e971f621a592982160918710d2a7adc9168e0600ce6084b00461fc25cd949`
+(706958 octets), artefact `dist/architecture/product-roadmap.workflow.html`.
+
+Une première vérification a détecté le refus de workflow v2 par validate-docs.
+Correction limitée à l'enveloppe de version, couverte par 14 tests ciblés réussis.
+Audit blueprint : conforme, aucun nouveau module/dépendance runtime ; allowlist
+et fermeture transitive vérifiées par `npm run blueprint:review`. Progress absent
+du câblage et Stop fail-open selon ce contrôle. Requêtes, autorité des workers,
+schémas de rapports et modes de coordination inchangés dans le diff.
+AGENTS.md, CLAUDE.md et .codex/hooks.json inchangés. Seul le validateur documentaire
+est modifié parmi les hooks ; rollback documenté dans ADR-0036. Aucun code produit.
+Vérification complète après correction : `npm run verify` réussi, 263 tests
+(262 réussis, 1 ignoré, 0 échec), 3 tests d'intégration réussis, audit npm sans
+vulnérabilité et génération des quatre schémas produit réussie. Ce résultat ne
+valide ni un prototype ni la consommation sur un OS cible.
 
 Étape matrice OS : schéma runtime livré avec Archify, 9 contrôles showcase
 réussis, aucune erreur ni avertissement. Contrôle de débordement réussi aux
@@ -188,6 +215,12 @@ La [recherche archivée](research/initial-research.md) est une synthèse explici
 non verbatim du texte initial ; ses chiffres et références restent à vérifier.
 
 ## Prochaine conversation
+
+Instruction de reprise actuelle : préparer E1 de docs/03-product-roadmap.md.
+Identifier matériel/OS, budgets et décisions initiales ; première preuve E2 =
+wallpaper synthétique sans ROM ni IA, avant terminal custom. Satisfaire les règles
+d'initialisation avant code produit. Les prompts suivants sont historiques et
+ne doivent pas rétablir l'ancien ordre ou rendre OoT obligatoire.
 
 Priorité actuelle : comparer les solutions existantes pour créer, installer et
 activer un package de thème wallpaper/terminal, puis choisir langages, composants

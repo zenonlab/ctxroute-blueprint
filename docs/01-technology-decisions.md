@@ -1,6 +1,11 @@
 # Décisions techniques — prochaine session
 
 Aucune stack produit n'est sélectionnée au 7 septembre 2026.
+L'ordre actuel est la [feuille de route E1–E6](03-product-roadmap.md), selon
+[ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md). Depuis ADR-0035,
+Rust/wgpu/WGSL est le candidat wallpaper prioritaire à éprouver, sans adoption
+ni gain énergétique démontré. Les questions ci-dessous sont fermées aux échéances
+de la feuille de route, pas toutes au cours d'une même session.
 Une [architecture de référence à éprouver](architecture/runtime-infrastructure.md)
 est documentée : responsabilités, hypothèses d'assemblage et alternatives.
 Voir [ADR-0033](decisions/ADR-0033-runtime-boundaries-and-evaluation.md).
@@ -52,19 +57,18 @@ La [transformation du jeu](architecture/game-transformation.md) retient désorma
 la bibliothèque canonique, la conversion par scène et le diorama ambiant adapté.
 Une preuve d'ingestion possible reste le PoC OoT précédemment proposé : pièce,
 acteur animé, collision, musique et placements avec références conservées.
-Comparer les outils sur cette chaîne avant de choisir formats et stack.
+Comparer les outils sur cette chaîne avant de choisir les formats d'ingestion.
 Ce PoC n'est pas une condition pour commencer un thème original ni pour comparer
 les technologies du terminal et du wallpaper.
 La récupération par décompilation/recompilation reste une piste à évaluer.
 
-1. Partir du package de thème : créer, installer, personnaliser et activer wallpaper et terminal séparément ou ensemble.
-2. Comparer les solutions existantes sur ce parcours, puis les langages, formats et intégrations OS ; ne pas privilégier automatiquement l'assemblage antérieur.
-3. Définir l'assistance IA de préparation : recherche publique, exécution locale isolée et chaîne reproductible, sans choisir un fournisseur prématurément.
-4. Choisir le thème de preuve, le matériel et les budgets ; un thème original sans ROM suffit pour commencer la comparaison.
-5. Éprouver les choix ; préparer un jeu à la demande si le thème en dépend, sans inventorier toutes les consoles ni décompiler un jeu complet au préalable.
+Suivre E1–E6 : banc et décisions initiales, ancrage/énergie sans ROM, contrat de
+thème, terminal, qualification/distribution, puis ingestion assistée optionnelle.
+Le détail et les critères de sortie vivent uniquement dans la feuille de route.
 
-Rust, wgpu, winit, parry3d, cpal, symphonia, glTF et un bundle `.scene`
-sont des pistes héritées, pas des dépendances autorisées pour le produit.
+Rust/wgpu est recommandé pour l'expérimentation, pas adopté. winit, parry3d,
+cpal, symphonia, glTF et un bundle `.scene` restent des pistes à évaluer seulement
+si l'étape les nécessite, pas une liste de dépendances à installer d'avance.
 La découverte et préparation assistées par IA font partie du parcours optionnel
 des thèmes dépendant d'un jeu ; elles ne sont pas requises pour afficher un thème
 déjà préparé. Une génération de code n'est nécessaire que si l'existant ne suffit pas.

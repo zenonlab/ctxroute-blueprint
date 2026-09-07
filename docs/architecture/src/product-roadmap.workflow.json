@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": { "title": "Thèmes — progression par preuves", "quality_profile": "showcase" },
+  "lanes": [
+    { "id": "proof", "label": "Fondations et énergie" },
+    { "id": "theme", "label": "Expérience de thème" },
+    { "id": "release", "label": "Distribution et extension" }
+  ],
+  "mainPath": ["baseline", "wallpaper", "package", "terminal", "qualification"],
+  "nodes": [
+    { "id": "baseline", "lane": "proof", "col": 0, "width": 150, "type": "security", "label": "E1 · Banc défini", "sublabel": "Matériel et budgets" },
+    { "id": "wallpaper", "lane": "proof", "col": 1, "width": 180, "type": "backend", "label": "E2 · Wallpaper", "sublabel": "Ancrage et énergie mesurés" },
+    { "id": "package", "lane": "theme", "col": 1, "width": 180, "type": "database", "label": "E3 · Thèmes", "sublabel": "Contrats et imports sûrs" },
+    { "id": "terminal", "lane": "theme", "col": 2, "width": 180, "type": "frontend", "label": "E4 · Terminal", "sublabel": "Sessions indépendantes" },
+    { "id": "qualification", "lane": "release", "col": 2, "width": 180, "type": "security", "label": "E5 · Qualification", "sublabel": "Paquets et preuves par OS" },
+    { "id": "ingestion", "lane": "release", "col": 3, "width": 180, "type": "backend", "label": "E6 · Ingestion", "sublabel": "Locale, assistée, optionnelle" }
+  ],
+  "edges": [
+    { "from": "baseline", "to": "wallpaper", "label": "protocole fixé", "role": "main" },
+    { "from": "wallpaper", "to": "package", "label": "budget tenu", "role": "main" },
+    { "from": "package", "to": "terminal", "label": "contrat validé", "role": "main" },
+    { "from": "terminal", "to": "qualification", "label": "trois modes testés", "role": "main" },
+    { "from": "qualification", "to": "ingestion", "label": "si thème de jeu", "role": "branch", "variant": "dashed" }
+  ]
+}
