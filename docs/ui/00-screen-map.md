@@ -9,7 +9,7 @@ qu'un résumé ou un raccourci vers celle-ci.
 | Surface | Rôle principal | Contenu essentiel | Ne doit pas devenir |
 | --- | --- | --- | --- |
 | Menu d’extension | Agir sans quitter la page active | œuvre détectée, reprises récentes, prochaines sorties et réglages rapides | un tableau de bord, une bibliothèque miniature ou la page complète de réglages |
-| Bibliothèque | Parcourir et maintenir les œuvres suivies | filtres puis cartes directement, ou un état central illustré si aucun contenu n'est utilisable | un miroir de favoris navigateur ou un second titre sous la navigation |
+| Bibliothèque | Parcourir et maintenir les œuvres suivies | en-tête de page, filtres puis cartes, ou un état illustré sous l’en-tête si aucun contenu n'est utilisable | un miroir de favoris navigateur ou une coque décorative autour de l’état |
 | Panneau Review | Résoudre les correspondances ambiguës depuis le header | contexte condensé, candidats, preuve de source, saisie manuelle AniList/MangaUpdates, absence de correspondance, conflit de révision | une page autonome, une carte mère ou un avis utilisateur |
 | Agenda | Comprendre les prochaines sorties | semaine de sept jours, lecture horizontale, dates officielles, confirmées ou estimées | une liste verticale infinie ou une date présentée comme certaine sans provenance |
 | Réglages complets de l’extension | Organiser les favoris depuis l’extension | arbre de dossiers ordonné, filtres réellement disponibles et aperçu local des déplacements | une page générale de préférences, de diagnostic ou d’export |
@@ -81,13 +81,14 @@ ou une URL locale unique avant d'écrire ; elle ne déclenche aucun appel D1.
 Quand la file est vide, la bulle reprend l'empty state FavLib compact : une
 icône Inbox grise et le seul libellé « Aucune correspondance à vérifier », sans
 en-tête ni description internes supplémentaires.
-La route Bibliothèque commence directement par ses filtres et ses cartes, sans
-en-tête local redondant. Ses états non utilisables, comme ceux de la route
-Review, réutilisent `FeedbackState` en présentation centrée avec une icône
-Lucide grise, un texte court et aucune coque visuelle. L'état vide de la
-Bibliothèque propose de télécharger l'extension via un callback fourni par son
-hôte, sans destination codée en dur. La route Review explique seulement que la
-résolution se trouve dans la cloche ; elle ne duplique ni la file ni ses choix.
+La route Bibliothèque conserve son en-tête « Collection · Bibliothèque » dans
+tous ses états, comme Agenda conserve son propre en-tête. Les filtres et les
+cartes viennent ensuite lorsque les données sont utilisables. Les états non
+utilisables réutilisent `FeedbackState` sous cet en-tête, avec une icône Lucide
+grise, un texte court et aucune coque visuelle. L’absence d’extension propose
+son téléchargement via un callback fourni par l’hôte, sans destination codée
+en dur. La route Review explique seulement que la résolution se trouve dans la
+cloche ; elle ne duplique ni la file ni ses choix.
 
 ## Parcours reliés aux surfaces
 

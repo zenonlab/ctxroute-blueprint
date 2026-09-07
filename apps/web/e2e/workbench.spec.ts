@@ -85,6 +85,7 @@ test('connected empty Library matches the Workbench empty surface', async ({ pag
   await installBridge(page, { agenda: [], library: [] });
   await page.goto('/library');
   await expect(page.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+  await expect(page.getByRole('heading', { exact: true, name: 'Bibliothèque' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Aucune œuvre trouvée' })).toBeVisible();
   await expect(page.getByText('Aucun favori HTTP(S) compatible n’a été trouvé lors de l’analyse.')).toBeVisible();
   await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
@@ -115,6 +116,7 @@ test('missing extension keeps the Workbench empty surfaces while verified downlo
   await page.getByRole('button', { name: /Correspondances à vérifier/u }).click();
   await expect(page.getByRole('heading', { name: 'Extension TobiRink requise' })).toBeVisible();
   await page.goto('/library');
+  await expect(page.getByRole('heading', { exact: true, name: 'Bibliothèque' })).toBeVisible({ timeout: 3_000 });
   await expect(page.getByRole('heading', { name: 'Extension TobiRink requise' })).toBeVisible({ timeout: 3_000 });
   await expect(page.getByText(/analyse automatiquement les favoris HTTP\(S\) de votre navigateur/u)).toBeVisible();
   await page.goto('/agenda');
