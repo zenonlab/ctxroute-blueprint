@@ -56,6 +56,7 @@
   "directories": {
     "source": [
       "pocs/macos-surface/",
+      "pocs/macos-native-wallpaper/",
       "packages/",
       "scripts/"
     ],
@@ -79,6 +80,7 @@
   ],
   "architecture": {
     "documents": [
+      "docs/architecture/src/macos-native-wallpaper.architecture.json",
       "docs/architecture/src/macos-surface-poc.architecture.json",
       "docs/architecture/src/product-roadmap.workflow.json",
       "docs/architecture/src/product-vision.architecture.json",

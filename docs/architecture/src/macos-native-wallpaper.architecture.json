@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "Essai natif — intégration à qualifier", "quality_profile": "showcase", "viewBox": [1280, 760] },
+  "components": [
+    { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection par utilisateur", "pos": [40, 110], "size": [230, 80] },
+    { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système Apple", "pos": [520, 110], "size": [240, 80] },
+    { "id": "extension", "type": "backend", "label": "Extension Phosphene", "sublabel": "Protocole privé XPC", "pos": [1010, 110], "size": [230, 80] },
+    { "id": "animation", "type": "backend", "label": "Animation de test", "sublabel": "ColorDiag · Core Animation", "pos": [1010, 530], "size": [230, 80] },
+    { "id": "context", "type": "frontend", "label": "Contexte distant", "sublabel": "CAContext · API privée", "pos": [520, 530], "size": [240, 80] },
+    { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "Bureau et transitions", "pos": [40, 530], "size": [230, 80] }
+  ],
+  "connections": [
+    { "from": "picker", "to": "host", "label": "choix du fond" },
+    { "from": "host", "to": "extension", "label": "cycle de vie XPC" },
+    { "from": "extension", "to": "animation", "label": "diagnostic visuel", "labelDy": 24 },
+    { "from": "animation", "to": "context", "label": "couches animées" },
+    { "from": "context", "to": "desktop", "label": "rendu hébergé" }
+  ]
+}

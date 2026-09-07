@@ -2,7 +2,17 @@
 
 Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolément.
 
-## Reprise actuelle — L1
+## Reprise actuelle — qualification native
+
+L'utilisateur rejette les fenêtres superposées ; ne pas poursuivre le split-input
+comme s'il répondait au besoin. [ADR-0047](decisions/ADR-0047-native-wallpaper-extension-probe.md)
+isole une préparation native Phosphene/ColorDiag, sans installer ni lancer l'extension.
+Lire [la fiche native](pocs/macos-native-wallpaper.md) et utiliser son script compile-only.
+Compilation directe possible ; Xcodebuild local échoue sur un plugin incompatible.
+Signature, bundle hôte, admission par macOS et transitions restent à qualifier.
+Le fond de l'utilisateur n'a pas été changé. Les paragraphes suivants sont historiques.
+
+## Historique — L1 en fenêtre
 
 ADR-0046 ajoute `desktop --split-input --export-still --duration 180` : deux plans
 de rendu/interaction inspirés d'Übersicht et export PNG préparatoire à la continuité.
