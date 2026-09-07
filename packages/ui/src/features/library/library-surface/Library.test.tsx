@@ -13,8 +13,6 @@ describe('shared Library surface', () => {
   });
 
   it('keeps the approved card grid and centered SVG states', () => {
-    expect(component).toContain('<p>Collection</p><h1>Bibliothèque</h1>');
-    expect(component.indexOf('className={styles.header}')).toBeLessThan(component.indexOf("state === 'empty'"));
     expect(css).toMatch(/minmax\(min\(12\.25rem, 100%\), 12\.25rem\)/);
     expect(css).toMatch(/repeat\(2, minmax\(0, 1fr\)\)/);
     expect(component).toContain('layout="centered"');

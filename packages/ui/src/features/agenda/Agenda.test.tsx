@@ -28,11 +28,6 @@ describe('shared Agenda surface', () => {
     expect(days.flatMap((day) => day.releases)[0]).toMatchObject({ precision: 'Horaire estimé', title: 'Frieren' });
   });
 
-  it('distinguishes extension setup from a genuinely empty week', () => {
-    expect(component).toContain('Extension TobiRink requise');
-    expect(component).toContain('Semaine vide');
-  });
-
   it('uses only named tokens and exposes all private data states', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
     expect(component).toContain("state === 'partial'");

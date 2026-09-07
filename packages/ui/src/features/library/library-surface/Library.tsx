@@ -45,10 +45,6 @@ export function Library({
   return (
     <MemberNavigation {...navigation}>
       <main aria-label="Bibliothèque" className={styles.library} data-state={state} data-variant={variant}>
-        <header className={styles.header}>
-          <div><p>Collection</p><h1>Bibliothèque</h1></div>
-        </header>
-
         {state === 'loading' ? (
           <FeedbackState className={styles.centeredState} description="Lecture des œuvres enregistrées sur cet appareil." kind="loading" layout="centered" title="Préparation de la bibliothèque…" />
         ) : null}

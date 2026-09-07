@@ -3,7 +3,6 @@
 import { Agenda, createAgendaDays, createLocalAgendaPeriod } from '@tobirink/ui';
 import type { AgendaPeriodItem, AgendaState } from '@tobirink/ui';
 import type { WebAgendaPeriod } from '@tobirink/contracts/web-bridge';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BridgeState, WebMemberShell, useWebMemberNavigation } from '../components/SiteShell';
 import { WebBridgeProvider, useWebBridge } from '../components/WebBridgeProvider';
@@ -15,7 +14,6 @@ function dateAfter(dateOnly: string, days: number) {
 }
 
 function AgendaSurface() {
-  const router = useRouter();
   const navigation = useWebMemberNavigation();
   const { readAgenda, status } = useWebBridge();
   const [weekOffset, setWeekOffset] = useState(0);
@@ -37,7 +35,7 @@ function AgendaSurface() {
   }, [from, readAgenda, status, to]);
 
   if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
-  if (status === 'extension-missing') return <Agenda canNext={false} canPrevious={false} days={createAgendaDays(period, { items: [] })} extensionRequired navigation={navigation} onDownloadExtension={() => router.push('/download')} onNext={() => undefined} onPrevious={() => undefined} onRetry={() => undefined} periodLabel={period.label} state="empty" updatedAt="" />;
+  if (status === 'extension-missing') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const items: AgendaPeriodItem[] = snapshot?.entries.map((entry) => ({
     availability: entry.availability,

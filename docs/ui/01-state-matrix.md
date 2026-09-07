@@ -7,7 +7,7 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 | Surface | Vide | Chargement | Partiel | Hors ligne | Erreur récupérable | Blocage explicite |
 | --- | --- | --- | --- | --- | --- | --- |
 | Menu d’extension | Cette œuvre affiche un état central; les reprises peuvent rester disponibles | analyse de l’onglet actif, agenda ou préférences annoncée dans le panneau actif | titre actif conservé sans enrichissement distant | cache de reprise et données locales restent consultables | nouvelle tentative limitée à Cette œuvre ou Sorties; Réglages complets reste accessible | état central explicite si `activeTab` ou le port de lecture manque; Réglages complets reste accessible |
-| Bibliothèque | en-tête conservé puis état illustré distinguant extension requise et absence de favori compatible | en-tête conservé puis état illustré sans contrôles inactifs | filtres et œuvres enregistrées visibles, métadonnées manquantes signalées | recherche, filtres et progression restent actifs | en-tête conservé puis nouvelle tentative ciblée | en-tête conservé puis état expliquant la reprise de migration |
+| Bibliothèque | état isolé distinguant extension requise et absence de favori compatible | état central illustré sans contrôles inactifs | filtres et œuvres enregistrées visibles, métadonnées manquantes signalées | recherche, filtres et progression restent actifs | état central avec nouvelle tentative ciblée | état central expliquant la reprise de migration |
 | Panneau Review | bulle compacte avec Inbox et un seul libellé | état central pendant la lecture locale | contexte local et navigation conservés ; aucune décision sans candidat | état central confirmant la disponibilité locale ; choix dans la cloche | état central avec relecture ciblée | état central demandant de rouvrir la cloche après conflit |
 | Agenda | aucune sortie connue pour la période | squelette de groupes temporels | dates estimées séparées des dates confirmées | dernier agenda local daté et consultable | actualiser la période concernée | permission de notification refusée pour un rappel |
 | Réglages complets | arbre racine visible, invitation à créer un premier dossier | calcul de l’aperçu annoncé sans masquer l’arbre | règles locales visibles, métadonnées nécessaires absentes | édition et aperçu local restent disponibles | relire la configuration ou recalculer uniquement l’aperçu | organisateur indisponible si le message local ou IndexedDB échoue |
@@ -18,9 +18,9 @@ local reste utilisable lorsque les services optionnels sont indisponibles.
 
 - Un état vide propose une prochaine action réelle et ne ressemble pas à une
   erreur.
-- Bibliothèque conserve son en-tête de page au-dessus de `FeedbackState` dans
-  tous ses états, sans fond, bordure ou seconde coque. Review conserve sa
-  présentation compacte dans la cloche.
+- Bibliothèque utilise la présentation centrée de `FeedbackState`, sans fond,
+  bordure ou seconde coque. Accueil et Agenda reprennent cette présentation
+  isolée quand l’extension est absente. Review reste compacte dans la cloche.
 - Un chargement conserve les dimensions principales afin d'éviter les sauts de
   mise en page.
 - Le popup conserve son header et sa navigation basse dans tous les états; seul

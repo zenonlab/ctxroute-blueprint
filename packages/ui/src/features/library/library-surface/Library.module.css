@@ -9,10 +9,6 @@
   width: 100%;
 }
 
-.header { align-items: end; display: flex; gap: var(--space-4); justify-content: space-between; }
-.header p { color: var(--color-primary); font-size: var(--font-size-meta); font-weight: var(--font-weight-strong); letter-spacing: var(--letter-spacing-label); margin: 0; text-transform: uppercase; }
-.header h1 { font-size: var(--font-size-display); letter-spacing: var(--letter-spacing-tight); line-height: var(--line-height-tight); margin: var(--space-1) 0 0; }
-
 .grid {
   display: grid;
   gap: var(--space-4);
