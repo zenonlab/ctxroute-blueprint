@@ -7,6 +7,11 @@ Voir [ADR-0041](../decisions/ADR-0041-ai-prepared-selective-behaviors.md),
 
 ## Solution retenue
 
+Direction retenue pour expérimentation, non solution optimale démontrée.
+Le [plan L1–L3](../05-poc-start-plan.md) borne les premières implémentations :
+contrôleurs compilés relus, données originales, événements simulés ; pas de code
+généré exécuté ni de parseur universel. A01–A08 restent des tests à réaliser.
+
 **L'IA prépare une composition vérifiée ; un runtime déterministe l'exécute.**
 L'utilisateur décrit le résultat voulu, pas une liste de parseurs à assembler.
 La préparation recherche les outils, résout les relations et propose ou génère

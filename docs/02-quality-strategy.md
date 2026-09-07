@@ -1,9 +1,16 @@
 # Stratégie qualité
 
+Le [plan L1–L3](05-poc-start-plan.md) fixe les premiers tests : sonde OS native,
+invariants de contrôleur Rust sans GPU, puis scène représentative. Bornes de
+fixture et protocole d'états simulés sont des exigences à implémenter, non des
+tests disponibles. L'absence d'instrument énergétique n'empêche pas un diagnostic
+fonctionnel, mais interdit un verdict de sobriété.
+
 Cette étape vérifie le socle et la documentation. Les scénarios produit
 ci-dessous préparent la prochaine session ; ils ne sont pas encore automatisés.
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces
-scénarios à E2–E6. E1 fixe le banc et les seuils avant expérimentation ; E2 mesure
+scénarios à E2–E6. E1 fixe le banc et les règles ; les seuils comparatifs sont
+gelés après baseline exploratoire, avant comparaison. E2 mesure
 le wallpaper seul avant ajout du terminal personnalisé ou de l'ingestion IA.
 Les [contrats et tests de remplacement](architecture/module-contracts.md)
 ajoutent R01–R08 : cœur sans moteur, surfaces remplaçables, scène représentative,

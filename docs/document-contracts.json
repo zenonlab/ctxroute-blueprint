@@ -3,6 +3,13 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "poc-start-plan",
+      "kind": "product-test-protocol",
+      "format": "markdown",
+      "source": "docs/05-poc-start-plan.md",
+      "requiredSections": ["Verdict corrigé", "Stack expérimentale retenue", "Trois livrables bornés", "Profil de données et sécurité initial", "Mesure et critères de décision", "Passage à l'implémentation"]
+    },
+    {
       "id": "ai-prepared-behaviors",
       "kind": "product-contract-design",
       "format": "markdown",

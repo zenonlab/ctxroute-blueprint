@@ -1,6 +1,10 @@
-# Décisions techniques — prochaine session
+# Décisions techniques — expérimentation puis adoption
 
-Aucune stack produit n'est sélectionnée au 7 septembre 2026.
+Aucune stack de production n'est sélectionnée au 7 septembre 2026.
+Le [plan de démarrage](05-poc-start-plan.md) sélectionne toutefois les outils des
+PoCs : Swift/AppKit pour sonder macOS, Rust pour les contrôleurs, puis wgpu/WGSL
+et winit pour le candidat de rendu. Ce choix borné remplace le report général
+des décisions initiales ; voir [ADR-0042](decisions/ADR-0042-bounded-poc-start.md).
 L'ordre actuel est la [feuille de route E1–E6](03-product-roadmap.md), selon
 [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md). Depuis ADR-0035,
 Rust/wgpu/WGSL est le candidat wallpaper prioritaire à éprouver, sans adoption
@@ -63,8 +67,8 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 
 ## Ordre de la prochaine discussion
 
-La prochaine session porte sur l'architecture et l'infrastructure, après ce
-cadrage documentaire. Elle peut comparer les composants sans ROM ; l'adoption
+La prochaine session exécute le plan L1–L3 après initialisation. Elle compare
+les composants sans ROM ; l'adoption
 définitive des formats d'ingestion dépend cependant de la preuve d'extraction.
 La séparation locale est acquise dans
 [ADR-0032](decisions/ADR-0032-local-conversion-and-theme-distribution.md).
@@ -82,7 +86,8 @@ Suivre E1–E6 : banc et décisions initiales, ancrage/énergie sans ROM, contra
 thème, terminal, qualification/distribution, puis ingestion assistée optionnelle.
 Le détail et les critères de sortie vivent uniquement dans la feuille de route.
 
-Rust/wgpu est recommandé pour l'expérimentation, pas adopté. winit, parry3d,
+Rust/wgpu et winit sont retenus pour le candidat expérimental, pas pour la
+production. parry3d,
 cpal, symphonia, glTF et un bundle `.scene` restent des pistes à évaluer seulement
 si l'étape les nécessite, pas une liste de dépendances à installer d'avance.
 La découverte et préparation assistées par IA font partie du parcours optionnel
@@ -138,5 +143,6 @@ de l'application. Les versions et preuves d'installation figurent dans la
 
 Les décisions acquises sont consignées dans
 [ADR-0029](decisions/ADR-0029-product-framing.md).
-Les choix techniques restent explicitement ouverts ; ne pas exécuter
-`npm run initialize` avant leur résolution.
+Les choix de production restent ouverts. `npm run initialize` doit précéder
+le code, après report et validation des décisions expérimentales L1–L3 ; ne pas
+attendre le choix définitif du terminal ou du moteur pour initialiser ce périmètre.

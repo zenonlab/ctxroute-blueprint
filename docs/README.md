@@ -2,7 +2,9 @@
 
 Le projet est en cadrage produit. Le socle CTXRoute Blueprint est installé ;
 le terminal, le bureau et l'ingestion restent à concevoir.
-Le statut `template` est intentionnel : la stack sera discutée à la prochaine session.
+Le statut `template` persiste jusqu'à l'initialisation vérifiée avant code.
+Le [plan de démarrage des PoCs](05-poc-start-plan.md) fixe les outils et le
+périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 
 ## Lecture de reprise
 
@@ -30,5 +32,5 @@ dans `dist/architecture/` et n'est pas versionné.
 Le [registre documentaire](document-contracts.json) déclare les sources et contrôles.
 
 Avant tout code produit, poursuivre l'initialisation selon [AGENTS.md](../AGENTS.md)
-avec les décisions de la prochaine session. Ne pas transformer les suggestions
+avec les décisions expérimentales d'ADR-0042. Ne pas transformer les suggestions
 de la recherche en choix acceptés.

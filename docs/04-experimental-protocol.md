@@ -1,6 +1,8 @@
 # Protocole expérimental produit
 
 État : protocole préparé le 7 septembre 2026 ; aucun essai produit exécuté.
+Le [plan de démarrage L1–L3](05-poc-start-plan.md) fixe maintenant la stack
+expérimentale, les fixtures bornées, les états simulés et les premiers livrables.
 Complète la [stratégie qualité](02-quality-strategy.md), les tests P01–P28 et
 [R01–R08](architecture/module-contracts.md), sans changer l'ordre E1–E6.
 La [synthèse des audits](research/architecture-audit-synthesis.md) distingue les
@@ -13,7 +15,8 @@ GPU/pilotes, écrans, instruments et périmètre fonctionnel de référence. Un 
 [préflight MAC-01](research/os-feasibility.md#premier-banc-observé--mac-01) relève
 matériel et outillage en lecture seule ; fréquence écran, profil de mesure et
 qualification des instruments restent à compléter. Ce relevé ne clôt pas E1.
-Définir avant les mesures les budgets par scénario (énergie, mémoire, latence),
+Établir une baseline exploratoire, puis définir avant les mesures comparatives
+les budgets par scénario (énergie, mémoire, latence),
 les marges d'incertitude admissibles et la capacité de maintenance de l'équipe.
 Ne pas transformer les chiffres des audits en seuils de production.
 
@@ -202,5 +205,6 @@ factice n'est créé avant exécution.
 Un ADR d'adoption référence les preuves, le périmètre couvert, les budgets retenus,
 les limites et le coût de remplacement. Les tests du blueprint et la validation
 des schémas documentaires ne valent jamais réussite de B-R/B-T/B-O/B-F.
-À ce jour tous ces essais sont prévus ; la prochaine action est de renseigner
-le banc réel et les budgets E1 avant d'écrire le premier prototype.
+À ce jour tous ces essais sont prévus. La prochaine action est l'initialisation
+du périmètre retenu puis L1 ; les instruments manquants ne bloquent pas la sonde
+fonctionnelle, mais le verdict énergétique demeure non concluant sans mesure.

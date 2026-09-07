@@ -1,6 +1,8 @@
 # Feuille de route produit — progression par preuves
 
-État au 7 septembre 2026 : plan documenté, **E1 à préparer ; E2–E6 non démarrées**.
+État au 7 septembre 2026 : **E1 cadrée, initialisation à terminer ; E2–E6 non démarrées**.
+Le [plan L1–L3](05-poc-start-plan.md) et
+[ADR-0042](decisions/ADR-0042-bounded-poc-start.md) fixent le premier périmètre.
 Aucun prototype produit, benchmark ou support OS certifié. Ce document est la
 référence unique pour l'ordre d'exécution ; les anciens ordres de discussion et
 la roadmap de recherche sont historiques, sans engagement de calendrier.
@@ -91,6 +93,11 @@ restent hors de ce périmètre et requièrent leur ADR avant introduction.
 Ne pas attendre le benchmark d'E2 pour définir ce qui autorise à écrire E2.
 Le dépôt reste aujourd'hui `template` ; aucune initialisation n'est effectuée ici.
 
+Précision ADR-0042 : les seuils initiaux n'interdisent pas une baseline exploratoire
+ou un diagnostic fonctionnel L1/L2. Geler les budgets énergétiques après cette
+baseline et avant comparaison des candidats ; sans instrument qualifié, conserver
+un verdict énergétique non concluant. Cela ne permet pas de déclarer E2 réussi.
+
 ## Preuves et traçabilité
 
 L'[étude publique OoT](research/oot-environment-pilot.md) apporte maintenant les
@@ -119,9 +126,10 @@ impactées. Les tests du dépôt actuel prouvent seulement le socle documentaire
 
 ## Prochaine action
 
-Préparer E1 : relever la machine disponible avec ses versions, choisir le premier
-environnement de preuve et fixer la fiche de mesure et les budgets. Pas de ROM,
-de conversion ou de fournisseur IA à choisir pour commencer.
+Terminer l'initialisation du périmètre expérimental, puis L1 sur MAC-01 : sonde
+native en fenêtre et desktop passif séparés. Ensuite L2 contrôleur sans GPU et
+L3 scène Rust/wgpu. Pas de nouvelle discussion générale de stack ni de ROM requise.
+Les premières mesures établissent la baseline ; geler les budgets avant comparaison.
 
 Schéma workflow en français ; interface fixe du visualiseur en anglais (repli
 Archify). HTML généré : `dist/architecture/product-roadmap.workflow.html`.

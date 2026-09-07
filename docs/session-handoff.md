@@ -1,9 +1,30 @@
 # Reprise de session — Wallpaper
 
-Mise à jour : 7 septembre 2026. Phase : cadrage produit documenté,
-choix techniques reportés à la prochaine session.
+Mise à jour : 7 septembre 2026. Phase : périmètre expérimental défini,
+initialisation et premiers PoCs à exécuter.
 
 ## Commencer ici
+
+Lire en premier le [plan L1–L3](05-poc-start-plan.md) et
+[ADR-0042](decisions/ADR-0042-bounded-poc-start.md). Sonde Swift/AppKit sur MAC-01,
+contrôleur Rust sans GPU, puis scène wgpu/WGSL : choix expérimentaux seulement.
+Les données sont originales, les sessions simulées et les actions locales bornées.
+Prochaine action : terminer l'initialisation obligatoire puis implémenter L1.
+Cette session corrige les documents ; elle ne livre aucun PoC ni benchmark.
+Le statut `template` n'a pas été modifié. Ne pas annoncer E2 commencé.
+
+Vérification de cette correction : `npm run verify` réussi, 262 tests réussis,
+1 ignoré, 0 échec ; 3 tests d'intégration réussis ; audit npm sans vulnérabilité.
+Ces résultats portent sur l'outillage. Aucun fichier supprimé, hook modifié ou
+code produit ajouté. AGENTS.md, CLAUDE.md et hooks Codex inspectés, inchangés.
+Workflow Archify livré : showcase 9/9, zéro erreur/avertissement, quatre tailles
+sans débordement ; capture sombre 2048×1320 inspectée, revue humaine `pending`.
+Libellés français, interface fixe en anglais ; artefact :
+`dist/architecture/product-roadmap.workflow.html`.
+SHA-256 source : `28d1c8e8744895702ebf5a1630aff08a5857eaef4850869fc750fb761ffdf446`.
+SHA-256 HTML : `ac547c768f1a51a684bd2742a663860aa807b6f8999b11819ebda2187bee1052`.
+
+Les paragraphes et reçus suivants décrivent les étapes antérieures :
 
 Direction actuelle : [préparation IA et comportements](architecture/ai-prepared-behaviors.md),
 [ADR-0041](decisions/ADR-0041-ai-prepared-selective-behaviors.md).

@@ -2,7 +2,10 @@
 
 État : architecture de référence proposée le 7 septembre 2026 ; responsabilités
 formalisées, hypothèses techniques à comparer, aucune dépendance
-produit installée. Le dépôt reste `template` jusqu'aux choix exécutables.
+produit installée. Le dépôt reste `template` jusqu'à l'initialisation vérifiée.
+Le [plan L1–L3](../05-poc-start-plan.md) fixe maintenant les choix expérimentaux :
+sonde OS indépendante, contrôleur sans GPU puis candidat de rendu. Les assemblages
+de production ci-dessous ne sont toujours pas des dépendances adoptées.
 Voir [ADR-0033](../decisions/ADR-0033-runtime-boundaries-and-evaluation.md),
 le [schéma runtime](src/runtime-infrastructure.architecture.json) et le
 [pipeline de conversion séparé](game-transformation.md).

@@ -3,6 +3,9 @@
 État : spécification sémantique de conception, 7 septembre 2026. Aucun contrat
 exécutable ni test produit implémenté. Les identifiants C0–C6 organisent la review ;
 ils ne figent ni langage, ni ABI de plugins, ni sérialisation ou protocole IPC.
+Le [profil expérimental](../05-poc-start-plan.md#profil-de-données-et-sécurité-initial)
+précise maintenant bornes, événements simulés et contrôleurs compilés pour L2.
+Ce profil ne fige pas l'API publique ; C0–C6 restent les responsabilités communes.
 Voir [ADR-0037](../decisions/ADR-0037-replaceable-module-contracts.md),
 le [schéma runtime C1–C5](src/runtime-infrastructure.architecture.json) et
 la [feuille de route](../03-product-roadmap.md).

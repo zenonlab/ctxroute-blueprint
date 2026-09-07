@@ -2,7 +2,9 @@
 
 État : cadrage produit, 7 septembre 2026. Nom de travail : Wallpaper.
 Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
-Le statut du dépôt reste `template` jusqu'à la session de décisions techniques.
+Le statut du dépôt reste `template` jusqu'à l'initialisation vérifiée avant code.
+Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
+il ne constitue ni un prototype livré ni une adoption de production.
 
 Les audits sont consolidés dans la [synthèse sourcée](research/architecture-audit-synthesis.md).
 Le [protocole expérimental](04-experimental-protocol.md) prépare les preuves avant
@@ -140,9 +142,23 @@ bureau utilisables seuls, sessions de terminaux et d'agents, personnalisation
 des joueurs, isolation des données de jeu, cible des trois OS et priorité à
 la réutilisation.
 
-Reporté à la prochaine session : langage, runtime, interface, rendu, intégration
-desktop, terminal/PTY, gestion des agents, stockage, format d'assets, packaging,
-observabilité, sécurité détaillée et budgets de performance.
+Pour démarrer, [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) retient :
+
+| Domaine | Décision expérimentale |
+| --- | --- |
+| Langage/runtime | Swift/AppKit pour la sonde OS indépendante ; Rust pour contrôleur et candidat de rendu |
+| Frontend | Fenêtre native de diagnostic, puis wgpu/WGSL avec winit ; pas de toolkit complet maison |
+| Backend | Aucun serveur ; états de sessions simulés en mémoire, sans PTY |
+| Stockage | JSON de fixture original versionné ; sorties reconstructibles sous `dist/`, aucune donnée privée |
+| Tests | Contrôleurs unitaires sans GPU, gestes natifs consignés, mesures B-R séparées des tests blueprint |
+| Déploiement | Compilation/lancement locaux explicites sur MAC-01, aucun auto-start ni installateur |
+| Observabilité | Compteurs et durées locaux bornés, aucun contenu de session ou capture privée |
+| Sécurité | Contrôleurs relus compilés ; données bornées, pas de script tiers, réseau ou commande externe |
+| Performance | Plafond animé initial 30 Hz, attente sans animation, pause manuelle ; baseline puis budgets comparatifs gelés |
+
+Terminal/PTY, stockage durable, format public, packaging et isolation du code tiers
+restent hors du périmètre initial. Versions et commandes doivent être qualifiées
+lors de l'initialisation et de l'ajout du PoC concerné.
 Ces choix sont désormais rattachés aux échéances E1–E6 de la
 [feuille de route unique](03-product-roadmap.md), et non à une session indéfinie.
 E1 doit consigner les choix nécessaires au périmètre expérimental avant code.
@@ -165,7 +181,8 @@ Voir les [questions techniques](01-technology-decisions.md) et la
 
 Pour cette étape : un socle CTXRoute installé, une documentation cohérente,
 un schéma conceptuel validé et une note permettant de reprendre sans relire
-la conversation. Aucun code produit ni stack produit sélectionnée.
+la conversation. Aucun code produit ni stack de production sélectionnée ;
+le périmètre expérimental est désormais défini.
 
 Pour le futur produit : les trois modes sont utilisables, chaque joueur ouvre
 la bonne session, changer d'apparence conserve le travail, les assets disponibles

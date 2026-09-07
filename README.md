@@ -17,7 +17,9 @@ L'ordre de réalisation et les critères de sortie sont réunis dans la
 Les [audits consolidés](docs/research/architecture-audit-synthesis.md) et le
 [protocole expérimental](docs/04-experimental-protocol.md) cadrent les comparaisons
 de rendu, terminal et ancrage natif avant adoption d'une technologie.
-Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
+Le socle est installé ; aucun code produit n'est encore livré. Le
+[plan des PoCs](docs/05-poc-start-plan.md) choisit les outils expérimentaux,
+sans adoption de stack de production ni résultat énergétique annoncé.
 La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise
 les modules et composants à éprouver ; la [cartographie des consoles](docs/research/console-coverage.md)
 reste une recherche exploratoire, pas une liste fermée de jeux autorisés.
