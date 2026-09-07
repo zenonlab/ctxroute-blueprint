@@ -5345,7 +5345,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5430,6 +5430,69 @@
             "Production verification: /, /library, /agenda, /privacy and /download return 200; an unknown route returns 404; /download exposes both versioned MV3 links with immutable cache headers.",
             "Remote SHA-256 values match the published bytes: Chrome 237aa4165022d0dd44042812a24ba2d1a198b64071e992e789a9864ef0452794; Firefox 62ecb5d2afdc027eccf5ce136219aacee70abe24e184123ff5889f74ca1c6d48; product dataflow and architecture validate showcase 9/9."
           ]
+        },
+        {
+          "id": "step-3",
+          "title": "Pousser et fusionner le commit vérifié",
+          "status": "TODO",
+          "acceptance": [
+            "La branche contenant 1f5c2de est poussée sans réécriture d’historique",
+            "La PR vers main passe les contrôles CI et est fusionnée"
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git push -u origin fix/tobirink-parser-pipeline",
+            "gh pr create --base main --head fix/tobirink-parser-pipeline",
+            "gh pr checks --watch",
+            "gh pr merge --merge"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Publier les artefacts et le Worker par plan exact",
+          "status": "TODO",
+          "acceptance": [
+            "Les ZIP 1.0.0 sont reconstruits et leurs hashes vérifiés",
+            "Le plan Cloudflare cible uniquement deux objets R2 versionnés et worker:tobirink-public-api",
+            "Aucune migration D1, ressource FavLib, suppression ou secret n’est touché"
+          ],
+          "files": [
+            "apps/extension/.output/packages/release-manifest.json",
+            ".ctxroute/state/tobirink-parser-publication-plan.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.0.zip --operation r2-publish:tobirink-firefox-mv3-1.0.0.zip --operation worker-deploy",
+            "npm run infra:apply -- --plan .ctxroute/state/tobirink-parser-publication-plan.json --approve <digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip --allow worker:tobirink-public-api"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Vérifier la production et auditer la reproduction",
+          "status": "TODO",
+          "acceptance": [
+            "Les routes publiques et la 404 répondent comme prévu",
+            "Les ZIP distants correspondent au manifeste local",
+            "L’audit sépare clairement la pipeline reproduite des capacités futures ou manuelles"
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "curl production routes and downloads",
+            "shasum -a 256 downloaded artifacts",
+            "git status --short"
+          ],
+          "evidence": []
         }
       ]
     },
