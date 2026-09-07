@@ -36,6 +36,12 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 
 ## Ordre de la prochaine discussion
 
+La clarification sur la [transformation du jeu](architecture/game-transformation.md)
+ajoute un préalable : décider du niveau de fidélité des comportements et des
+interactions attendues. Comparer ensuite les outils capables de conserver
+ressources, règles et dépendances, pas seulement d'exporter des maillages.
+La récupération par décompilation/recompilation reste une piste à évaluer.
+
 1. Vérifier les bases existantes pour le terminal et le bureau multiplateforme.
 2. Définir la modularité et le modèle de session à partir de leurs capacités.
 3. Choisir un jeu pilote après examen des extracteurs et des assets disponibles.

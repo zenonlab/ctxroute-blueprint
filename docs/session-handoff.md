@@ -5,6 +5,14 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernière précision : lire aussi [la transformation du jeu](architecture/game-transformation.md)
+et [ADR-0030](decisions/ADR-0030-game-transformation.md). L'utilisateur veut
+programmer des compositions à partir d'une bibliothèque couvrant le jeu entier,
+avec ressources, relations, collisions et comportements compris, tout en
+n'exécutant que la sélection nécessaire. Mario Kart reste un exemple.
+La composition par code est prioritaire ; les questions de fidélité, contrôle,
+couverture progressive, pilote et énergie restent ouvertes.
+
 Lire [AGENTS.md](../AGENTS.md), la [vision produit](00-project-brief.md), puis
 les [questions techniques](01-technology-decisions.md).
 Le projet reste volontairement au statut `template`. Ne pas lancer
@@ -97,3 +105,12 @@ Prompt de reprise possible :
 > Compare d'abord les bases possibles pour un terminal et un bureau ludiques
 > modulaires sur Linux, macOS et Windows. Ne considère pas la stack de la
 > recherche initiale comme déjà décidée.
+
+Prompt complémentaire pour poursuivre la réflexion :
+
+> Lis docs/architecture/game-transformation.md et ADR-0030. Aide-moi à trancher
+> le niveau de fidélité des comportements, le type de contrôle des personnages,
+> la conversion progressive du jeu entier, le premier jeu de validation et
+> les compromis de consommation. Nous composons par code et réutilisons au
+> maximum les lecteurs et systèmes existants. Ne choisis pas encore la stack
+> sans relier chaque proposition à ces exigences.

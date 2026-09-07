@@ -16,6 +16,11 @@ Le statut `template` est intentionnel : la stack sera discutée à la prochaine 
 
 ## Séparer produit et outillage
 
+La [transformation du jeu et l'exécution sélective](architecture/game-transformation.md)
+complètent la vision avec les dernières précisions : composition par code,
+bibliothèque du jeu entier, collisions et comportements récupérables.
+Les questions ouvertes figurent à la fin de ce document.
+
 Les ADR antérieurs à ADR-0029 et les documents historiques sous `diff/`
 décrivent le blueprint amont. Leurs preuves ne constituent pas des tests du produit.
 Les guides et l'outillage sont conservés ; aucun nettoyage de starter n'est effectué.

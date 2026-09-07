@@ -40,6 +40,15 @@ compatibilité du futur bureau.
 
 ## Mesures à définir
 
+Compléter les scénarios par une composition utilisant collisions et déplacement :
+sol, mur, pente, décollage et atterrissage selon les comportements retenus.
+Vérifier les dépendances nécessaires, les associations scène/minimap/portrait,
+la conservation des identifiants lors d'un export et l'absence de chargement
+des systèmes exclus. Un changement de fréquence d'affichage ne doit pas modifier
+la simulation attendue. Pour chaque comportement, annoncer s'il est récupéré,
+adapté, réimplémenté, précalculé ou non supporté. Les preuves de fidélité et les
+seuils seront définis après réponse aux questions de cadrage.
+
 Mesurer CPU, GPU, mémoire, énergie, latence d'interaction et temps de chargement
 sur une machine et une scène documentées, avec écran et fréquence connus.
 Séparer le coût décor/terminal de celui des commandes et agents exécutés.

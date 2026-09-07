@@ -3,6 +3,15 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "game-transformation",
+      "kind": "architecture-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/game-transformation.architecture.json",
+      "narrative": "docs/architecture/game-transformation.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
       "id": "product-vision",
       "kind": "architecture-ir",
       "audience": "product",

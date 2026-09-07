@@ -50,6 +50,18 @@ copier-coller, défilement, raccourcis et navigation clavier priment sur le déc
 
 ## Données de jeu et personnalisation
 
+Précision du 7 septembre : l'objectif est de transformer le jeu entier hors ligne
+en bibliothèque, puis de programmer une composition qui ne charge et n'exécute
+que le nécessaire. Le cœur doit être extensible à différents jeux ; les exemples
+ne définissent pas ses règles. La composition par code prime sur un éditeur
+grand public. Voir [transformation du jeu](architecture/game-transformation.md)
+et [ADR-0030](decisions/ADR-0030-game-transformation.md).
+
+La bibliothèque doit pouvoir conserver aussi collisions, relations entre
+représentations et comportements compris. Une animation, une surface de
+collision et une règle de saut sont trois choses distinctes. Leur récupération
+dépend des formats et du code du jeu ; la fidélité exigée reste à décider.
+
 L'ambition exprimée est de disposer des données du jeu et d'en isoler les éléments
 pour les réutiliser : environnements, personnages, objets, textures, squelettes,
 animations, sons, musiques et éléments d'interface lorsqu'ils sont disponibles.

@@ -77,7 +77,8 @@
   ],
   "architecture": {
     "documents": [
-      "docs/architecture/src/product-vision.architecture.json"
+      "docs/architecture/src/product-vision.architecture.json",
+      "docs/architecture/src/game-transformation.architecture.json"
     ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",
