@@ -29,6 +29,13 @@ bus générique, ni plugin natif téléchargeable ne découle de cette spécific
 
 ## Catalogue des contrats
 
+En mode wallpaper seul, C2 suffit à demander les actions locales au contrôle
+autorisé ; C3 n'est requis que pour les capacités de sessions disponibles.
+L'absence ou la déconnexion du terminal désactive ces associations sans bloquer
+le décor et sans démarrer implicitement un PTY. Le schéma ne prescrit pas un
+processus de contrôle supplémentaire. Les essais [B-F](../04-experimental-protocol.md#b-f--autonomie-et-domaines-de-panne)
+vérifient cette autonomie et les limites de protection contre les pannes.
+
 | Contrat | Producteur → consommateur ; propriétaire | Contenu minimal | Erreurs et limites |
 | --- | --- | --- | --- |
 | C0 — Recette | Auteur → préparateur ; thème | Identité/version de thème, références logiques, paramètres, ancres, comportements et capacités requises/optionnelles | Une recette ne donne ni chemin privé libre, ni handle moteur/PTY, ni permission d'exécuter une commande. Import non fiable, taille et profondeur bornées. |

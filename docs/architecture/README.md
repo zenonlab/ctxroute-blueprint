@@ -13,6 +13,8 @@ Ordre d'exécution : [feuille de route E1–E6](../03-product-roadmap.md) et
 3. [Infrastructure](runtime-infrastructure.md) : modules, frontières, candidats et organisation cible.
    [Contrats](module-contracts.md) : propriétaires, échanges, compatibilité et preuves de remplacement.
 4. [Consoles](../research/console-coverage.md) : recherche exploratoire, non inventaire à compléter.
+5. [Synthèse des audits](../research/architecture-audit-synthesis.md) : corrections sourcées, candidats et limites.
+6. [Protocole expérimental](../04-experimental-protocol.md) : banc E1, mesures et preuves avant adoption.
 
 Les schémas produit sont complémentaires ; l'infrastructure contient une proposition
 de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,

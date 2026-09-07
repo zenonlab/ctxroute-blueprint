@@ -14,6 +14,9 @@ Commencer par la [note de reprise](docs/session-handoff.md), la
 [questions techniques ouvertes](docs/01-technology-decisions.md).
 L'ordre de réalisation et les critères de sortie sont réunis dans la
 [feuille de route produit](docs/03-product-roadmap.md).
+Les [audits consolidés](docs/research/architecture-audit-synthesis.md) et le
+[protocole expérimental](docs/04-experimental-protocol.md) cadrent les comparaisons
+de rendu, terminal et ancrage natif avant adoption d'une technologie.
 Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
 La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise
 les modules et composants à éprouver ; la [cartographie des consoles](docs/research/console-coverage.md)

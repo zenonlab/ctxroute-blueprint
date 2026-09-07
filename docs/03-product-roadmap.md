@@ -12,6 +12,12 @@ et tester le remplacement des modules, sans promettre une migration gratuite.
 
 ## Règles de progression
 
+Le [protocole expérimental E1](04-experimental-protocol.md) précise les mesures
+et les preuves à produire sans modifier cet ordre. Étude courte des candidats,
+puis au plus deux finalistes par question ; pas de construction simultanée de
+plusieurs moteurs complets. B-O/B-R commencent en E2, B-T complet en E4,
+qualification élargie en E5 et extraction optionnelle en E6.
+
 Énergie du wallpaper d'abord, personnalisation ensuite. Réutiliser l'existant,
 mesurer avant de généraliser, ne jamais rendre IA ou conversion obligatoires
 pour utiliser un thème préparé. Le premier thème est original et synthétique,

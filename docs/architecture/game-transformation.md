@@ -4,6 +4,12 @@
 technologies et formats encore ouverts. Aucun extracteur n'est implémenté.
 Voir le [schéma conceptuel](src/game-transformation.architecture.json).
 
+La [consolidation des audits](../research/architecture-audit-synthesis.md) conserve
+cette frontière : découverte et conversion locales optionnelles hors affichage,
+pas de décompilation universelle garantie ni de fusion dans le thème partageable.
+Le [protocole](../04-experimental-protocol.md) teste d'abord le runtime avec des
+ressources originales synthétiques ; les preuves d'extraction restent en E6.
+
 ## Intention confirmée
 
 L'infrastructure doit permettre de programmer des expériences à partir de jeux

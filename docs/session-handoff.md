@@ -5,7 +5,30 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
-Dernière review : [ADR-0037](decisions/ADR-0037-replaceable-module-contracts.md) et
+Vérification de cette consolidation documentaire : `npm run verify` réussi
+(263 tests : 262 réussis, 1 ignoré, 0 échec ; 3 tests d'intégration réussis ;
+audit npm : 0 vulnérabilité). Aucun test produit ni mesure énergétique exécuté.
+AGENTS.md, CLAUDE.md et les hooks restent inchangés ; aucune suppression de fichier.
+
+Archify : runtime showcase validé 9/9, 0 erreur/avertissement ; HTML livré sous
+`dist/architecture/runtime-infrastructure.architecture.html`. Contrôle visuel
+automatique réussi sur quatre tailles, captures claires/sombres ; capture sombre
+2048×1320 inspectée par l'agent. La revue humaine reste `pending` dans le reçu
+`dist/architecture/runtime-infrastructure.architecture.visual-check.json`.
+Le viewer conserve ses commandes anglaises ; le diagramme produit est en français.
+Empreinte source : `cec1c002c6ee742d2d0905a7a79210a95b595083b359f17a3c54bd687c1da16d`.
+Empreinte HTML : `9e836e2556eef3816a1592bb842d2b4b8124b53fa0ebc6729d3e9c0b507b341f`.
+
+Dernière consolidation : [ADR-0038](decisions/ADR-0038-neutral-experimental-protocol.md),
+[synthèse des audits](research/architecture-audit-synthesis.md) et
+[protocole expérimental](04-experimental-protocol.md). Les corrections techniques
+sont séparées des hypothèses ; B-R/B-T/B-O/B-F sont prévus, aucun n'est exécuté.
+Autonomie wallpaper et sessions conditionnelles précisées dans C2/C3 et le schéma.
+La protection des sessions vise les pannes du wallpaper, pas une persistance
+universelle. Aucun choix forcé de terminal natif, vidéo ou Wasm. La prochaine
+action reste de renseigner machines/instruments/budgets E1 avant le premier PoC.
+
+Review précédente : [ADR-0037](decisions/ADR-0037-replaceable-module-contracts.md) et
 [contrats C0–C6](architecture/module-contracts.md). Propriétaires et échanges
 documentés sans figer les codecs/API. E2 doit éprouver une scène représentative
 et R01–R04, pas seulement un triangle. Contraintes terminal/import examinées dès

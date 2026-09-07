@@ -21,6 +21,10 @@ desktop ni un moteur de scènes complet. Aucun gain énergétique n'est encore m
 
 ## Découpage des responsabilités
 
+Les [corrections des audits](../research/architecture-audit-synthesis.md) et le
+[protocole comparatif](../04-experimental-protocol.md) complètent cette proposition.
+Le schéma représente des responsabilités, pas un processus par boîte.
+
 Les [contrats C0–C6](module-contracts.md) précisent propriétaires, données,
 erreurs, versions et tests de remplacement. C1–C5 sont nommés sur le schéma.
 La séparation reste à démontrer par le code ; surface et moteur peuvent avoir
@@ -47,6 +51,33 @@ seul. Ne pas créer un démon par console, par session ou par moniteur.
 Le schéma regroupe les détails par responsabilité ; les liens nommant des
 commandes et événements représentent un échange dans les deux sens, pas une
 promesse de protocole réseau ni un diagramme de séquence.
+
+### Autonomie et limites de l'isolation
+
+Le contrôle local reste accessible en mode wallpaper seul : une animation, un son
+ou une action OS autorisée ne dépend pas de la présence du terminal. L'hôte émet
+une intention ; le contrôle vérifie les permissions et réalise l'action autorisée.
+Le thème et le moteur graphique n'obtiennent pas de lancement libre de commande.
+Ce contrôle peut être hébergé dans le mode actif sans ajouter un troisième démon.
+
+C3 est conditionnel : les sessions publiées activent leurs représentations et
+intentions. En l'absence du terminal, ces associations sont inactives/indisponibles,
+avec retour explicite, sans lancer un terminal ou PTY caché. Les autres fonctions
+du wallpaper restent opérationnelles. Le canal local bidirectionnel transporte
+états sémantiques et intentions bornées, jamais le flux PTY brut du terminal.
+
+La cible d'isolation sépare le processus de rendu wallpaper du propriétaire des
+sessions. Un arrêt, crash, gel ou rechargement du wallpaper ne doit pas terminer
+les shells ni bloquer leur interface : vérifier liens de supervision, files bornées
+et reconnexion par B-F/R07–R08. Deux processus seuls ne constituent pas cette preuve.
+L'arrêt du terminal propriétaire des PTY, l'OOM global, la fermeture de session et
+le reboot ne sont pas couverts. Un superviseur détaché serait une extension distincte,
+pas une garantie de survie au redémarrage du système.
+
+Les catégories statique/2D/vidéo/3D ne sont pas une échelle énergétique. Réveiller
+uniquement les systèmes nécessaires et mesurer le delta face au bureau natif.
+L'absence de présentations GPU ne prouve pas une consommation identique au système.
+Une visibilité inconnue déclenche un repli explicite, pas un faux état « suspendu ».
 
 ## Hypothèse technique antérieure à comparer
 

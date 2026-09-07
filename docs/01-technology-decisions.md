@@ -17,6 +17,12 @@ de la [recherche initiale](research/initial-research.md).
 
 ## Principe de sélection
 
+La [synthèse contradictoire](research/architecture-audit-synthesis.md) référence
+les dépôts candidats, leurs rôles réels et les conclusions non retenues des audits.
+Le [protocole expérimental](04-experimental-protocol.md), adopté par
+[ADR-0038](decisions/ADR-0038-neutral-experimental-protocol.md), cadre les preuves
+avant adoption. Ni terminal natif, ni Wasm, ni vidéo ne sont imposés par l'audit.
+
 Commencer par les projets et composants existants, vérifier leurs capacités
 réelles et ne développer que les liaisons ou fonctions manquantes.
 Comparer adoption directe, extension et assemblage avant d'envisager une

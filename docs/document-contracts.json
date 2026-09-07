@@ -3,6 +3,20 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "architecture-audit-synthesis",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/research/architecture-audit-synthesis.md",
+      "requiredSections": ["Disposition des conclusions", "Corrections techniques et sources primaires", "Ce qui reste à établir"]
+    },
+    {
+      "id": "experimental-protocol",
+      "kind": "product-test-protocol",
+      "format": "markdown",
+      "source": "docs/04-experimental-protocol.md",
+      "requiredSections": ["Préparation E1 et ordre d'exécution", "Règles métrologiques communes", "Preuves, décisions et critères de sortie"]
+    },
+    {
       "id": "module-contracts",
       "kind": "product-contract-design",
       "format": "markdown",

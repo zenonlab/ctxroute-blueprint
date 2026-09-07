@@ -13,6 +13,12 @@ E2 les sonde avec des doubles sans construire les fonctions complètes.
 
 ## Vérification du socle
 
+Le [protocole produit](04-experimental-protocol.md) détaille désormais B-R (rendu),
+B-T (terminal), B-O (ancrage) et B-F (autonomie/pannes), en complément des P/R.
+Il impose référence native, répétitions, métriques définies et comparaisons neutres.
+Machines et budgets E1 restent à renseigner ; tous les essais produit sont prévus,
+non exécutés. Voir aussi la [synthèse des audits](research/architecture-audit-synthesis.md).
+
 Conserver les contrôles fournis par le blueprint : installation officielle,
 configuration, CTXRoute, contrats documentaires, ADR, schémas Archify, cohérence,
 Sensor et tests du template. Les tests du template vérifient l'outillage,

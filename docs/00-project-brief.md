@@ -4,6 +4,10 @@
 Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
 Le statut du dépôt reste `template` jusqu'à la session de décisions techniques.
 
+Les audits sont consolidés dans la [synthèse sourcée](research/architecture-audit-synthesis.md).
+Le [protocole expérimental](04-experimental-protocol.md) prépare les preuves avant
+choix de stack ; aucun benchmark ni support OS n'est acquis par cette documentation.
+
 ## Synthèse
 
 Le produit est un système de **thèmes pour wallpapers et terminaux personnalisés**.
