@@ -3,6 +3,13 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "theme-interactions",
+      "kind": "product-contract-design",
+      "format": "markdown",
+      "source": "docs/architecture/theme-interactions.md",
+      "requiredSections": ["Ce que le produit doit permettre", "Modèle commun, sans dépendance au moteur", "Tranche de validation et limites"]
+    },
+    {
       "id": "os-feasibility",
       "kind": "research-evidence",
       "format": "markdown",

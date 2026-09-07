@@ -50,6 +50,16 @@ C0 et C6 appartiennent à la préparation détaillée dans
 [game-transformation.md](game-transformation.md) ; le schéma runtime n'affiche
 que C1–C5. Les liens du schéma représentent des échanges, pas des RPC imposés.
 
+Extension sémantique [ADR-0039](../decisions/ADR-0039-programmable-theme-interactions.md) :
+C0 décrit aussi panneaux, contrôles et liaisons événement/action ; C1 résout leurs
+cibles et capacités. C2 transporte intentions, résultats corrélés et changements
+d'état logique pour la scène **et** l'UI, ainsi que les événements significatifs
+d'animation/effet. Le contrôle arbitre cet état ; l'hôte garde les interpolations
+et l'état visuel local, sans échange par frame. C5 qualifie chaque présentation
+(dans la scène, overlay ou fenêtre distincte), sa visibilité et son focus.
+Ce sont les mêmes contrats, pas un nouveau bus. Les règles de propagation,
+d'annulation et de quotas figurent dans [theme-interactions.md](theme-interactions.md).
+
 ## Identités, versions et migration
 
 Séparer identité logique et empreinte de contenu : deux objets peuvent partager

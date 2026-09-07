@@ -34,6 +34,13 @@ son identité visuelle ne doit pas devenir l'identité technique de la session.
 
 ## Modes et modularité
 
+Les [interactions programmables](architecture/theme-interactions.md) couvrent
+objets, géométrie, boutons et panneaux : un objet ouvre une UI, ses contrôles
+pilotent animations/effets et leurs résultats actualisent l'UI. Ces relations
+sont composables, sans règles propres à un jeu dans le cœur. Les panneaux du
+wallpaper fonctionnent sans terminal ; saisie, présentation et actions externes
+restent conditionnées aux capacités OS et aux autorisations.
+
 | Mode | Expérience attendue |
 | --- | --- |
 | Terminal seul | Un terminal utilisable comme outil de travail, avec thème et sélecteur de sessions, sans activer le bureau animé. |

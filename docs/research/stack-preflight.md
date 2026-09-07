@@ -140,6 +140,13 @@ exécutables restent à choisir au moment où leurs besoins sont établis.
 
 ## Conditions avant adoption
 
+Qualifier aussi les [interactions objet/UI](../architecture/theme-interactions.md) :
+layout, widgets, texte, focus/IME, accessibilité et présentation des panneaux.
+Le coût de ces fonctions doit figurer dans l'assemblage comparé, même en mode
+wallpaper seul. Un moteur de rendu ou une crate VT ne couvre pas implicitement
+cette UI. Réutiliser les briques adaptées sans imposer Godot ou une WebView ;
+la chaîne minimale I01 est une preuve E2 avant adoption du socle.
+
 1. MAC-01 et les autres cibles de première livraison ont leurs capacités natives
    testées, ou leurs limites explicitement acceptées et publiées.
 2. Les versions compatibles entre elles sont fixées, avec outil de compilation

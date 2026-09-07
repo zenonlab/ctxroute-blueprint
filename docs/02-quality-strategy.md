@@ -31,6 +31,11 @@ Les résultats réellement obtenus sont consignés dans la
 
 ## Scénarios d'acceptation produit
 
+Les [épreuves I01–I10](architecture/theme-interactions.md#tranche-de-validation-et-limites)
+ajoutent le parcours objet → panneau → bouton → animation/effet → retour UI,
+la priorité des entrées, les cycles bornés, l'annulation, les permissions,
+l'accessibilité et l'énergie par surface. Elles sont prévues, non exécutées.
+
 Appliquer ces scénarios par environnement selon la
 [matrice de qualification OS](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité).
 Ajouter aux preuves desktop : refus des permissions avec repli non interactif,
@@ -47,7 +52,7 @@ suite blueprint ne certifie une plateforme produit.
 | P04 | Changer le personnage d'une session active | Même travail en cours ; aucune relance de processus provoquée par le changement visuel. |
 | P05 | Changer le thème ou désactiver l'animation | Les sessions restent accessibles ; les associations restent cohérentes. |
 | P06 | Cliquer sur une icône native ou une application | Aucune action du décor déclenchée par erreur ; focus et comportement natifs préservés. |
-| P07 | Choisir un objet interactif du décor | Seule l'action configurée est demandée ; le clavier n'est capturé qu'après activation explicite du terminal. |
+| P07 | Choisir un objet interactif du décor | Seule l'action configurée est demandée ; le clavier n'est reçu que par le panneau ou terminal explicitement focalisé. Aucun détournement global de saisie. |
 | P08 | Importer des assets incomplets | Couverture et dépendances annoncées ; aucune promesse de récupération totale du jeu. |
 | P09 | Recomposer personnage, animation et décor | Les éléments compatibles sont réutilisables séparément ; les incompatibilités sont visibles. |
 | P10 | Utiliser une application plein écran puis revenir | Rendu ralenti ou suspendu selon la politique retenue ; reprise et sessions correctes. |

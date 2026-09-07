@@ -8,15 +8,15 @@
   },
   "components": [
     { "id": "prepared", "type": "database", "label": "Composition préparée", "sublabel": "Références et capacités validées", "pos": [40, 100], "size": [260, 80] },
-    { "id": "control", "type": "backend", "label": "Contrôle local", "sublabel": "Actions locales et permissions", "pos": [540, 100], "size": [250, 80] },
-    { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "Rendu à la demande, budget énergie", "pos": [1040, 100], "size": [260, 80] },
+    { "id": "control", "type": "backend", "label": "Contrôle local", "sublabel": "Règles, état et permissions", "pos": [540, 100], "size": [250, 80] },
+    { "id": "scene", "type": "frontend", "label": "Scène et panneaux", "sublabel": "Objets, UI, animations et effets", "pos": [1040, 100], "size": [260, 80] },
     { "id": "terminal", "type": "frontend", "label": "Interface terminal", "sublabel": "Texte et portraits des sessions", "pos": [40, 460], "size": [260, 80] },
     { "id": "sessions", "type": "backend", "label": "Gestion des sessions", "sublabel": "Identités, PTY, shells et agents", "pos": [540, 460], "size": [250, 80] },
     { "id": "desktop", "type": "backend", "label": "Adaptateur de bureau", "sublabel": "Capacités OS et replis explicites", "pos": [1040, 460], "size": [260, 80] }
   ],
   "connections": [
     { "id": "load", "from": "prepared", "to": "control", "label": "C1 · sélection résolue" },
-    { "id": "scene-command", "from": "control", "to": "scene", "label": "C2 · scène et intentions" },
+    { "id": "scene-command", "from": "control", "to": "scene", "label": "C2 · interactions et état" },
     { "id": "session-command", "from": "control", "to": "sessions", "label": "C3 · sessions disponibles", "labelAt": [665, 320] },
     { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "C4 · flux et saisie" },
     { "id": "surface", "from": "scene", "to": "desktop", "label": "C5 · surface et capacités", "labelAt": [1170, 320] }

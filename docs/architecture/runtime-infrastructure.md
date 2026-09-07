@@ -26,6 +26,13 @@ Les [corrections des audits](../research/architecture-audit-synthesis.md) et le
 [protocole comparatif](../04-experimental-protocol.md) complètent cette proposition.
 Le schéma représente des responsabilités, pas un processus par boîte.
 
+Les [interactions programmables](theme-interactions.md) étendent ces responsabilités
+à l'UI : le contrôle possède règles, état logique et permissions ; l'hôte présente
+objets, panneaux, animations et effets. « Scène et panneaux » peut recouvrir
+plusieurs surfaces ou briques UI, sans imposer un backend unique. Chaque surface
+a son budget et sa visibilité : masquer le bureau ne doit pas figer un panneau
+natif encore utilisé, ni maintenir les effets cachés actifs sans raison.
+
 Les [contrats C0–C6](module-contracts.md) précisent propriétaires, données,
 erreurs, versions et tests de remplacement. C1–C5 sont nommés sur le schéma.
 La séparation reste à démontrer par le code ; surface et moteur peuvent avoir

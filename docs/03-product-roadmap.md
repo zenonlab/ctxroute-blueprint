@@ -56,6 +56,13 @@ complet ni l'ingestion IA ; le package public reste à spécifier après le prot
 
 ## Décisions à fermer au bon moment
 
+Précision [ADR-0039](decisions/ADR-0039-programmable-theme-interactions.md) : E2
+inclut une chaîne minimale objet → panneau → bouton → animation et effet → UI,
+sans terminal ni bibliothèque complète de widgets. E3 formalise les liaisons,
+quotas et annulations ; E4–E5 qualifient saisie, accessibilité et sessions.
+Les [tests I01–I10](architecture/theme-interactions.md#tranche-de-validation-et-limites)
+complètent les preuves existantes sans changer l'ordre E1–E6.
+
 | Décision encore ouverte | Échéance | Règle de choix |
 | --- | --- | --- |
 | Machines, versions OS et première cible | E1 | Choisir selon accès réel au matériel ; ne pas inventer des machines disponibles ni promettre tous les OS. |

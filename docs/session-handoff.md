@@ -5,6 +5,28 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernier cadrage : [interactions programmables](architecture/theme-interactions.md)
+et [ADR-0039](decisions/ADR-0039-programmable-theme-interactions.md).
+Objets, géométrie et boutons peuvent ouvrir des panneaux ; leurs contrôles
+pilotent animations/effets, dont les événements actualisent l'UI. C0–C2 et C5
+sont précisés sans nouveau bus ni adoption de moteur. Le schéma runtime inclut
+désormais scène et panneaux. Tests I01–I10 prévus, aucun code produit exécuté.
+Prochaine preuve : préparer E1 puis éprouver en E2 cette chaîne minimale avec
+priorité des icônes natives et budget énergétique par surface.
+
+Vérification de cette extension : `npm run verify` réussi (262 tests réussis,
+1 ignoré, 0 échec ; 3 intégrations réussies ; 0 vulnérabilité npm).
+Archify showcase : 9/9, aucune erreur ni avertissement ; contrôle automatique
+réussi sur quatre tailles en clair/sombre, capture sombre 2048×1320 inspectée
+par l'agent. Revue humaine toujours `pending` ; commandes du viewer en anglais.
+Artefact : `dist/architecture/runtime-infrastructure.architecture.html`.
+SHA-256 source : `ebaf25802dceb677b59ca94e14d9f3508db9116ea4b24177a8858833c983e240`.
+SHA-256 HTML : `290b4a431f3ae295598794e1d929f1b136c440febeffd836b7e0ce66f8c332ec`.
+Aucun fichier supprimé, aucune dépendance installée ; instructions et hooks
+inchangés. Ces contrôles valident la documentation et le socle, pas le produit.
+
+Les comptes rendus ci-dessous concernent les mises à jour précédentes.
+
 Clarification et preuves natives : Godot est hors shortlist active, conservé comme
 référence historique seulement. Direction : runtime ciblé, bibliothèques spécialisées
 et adaptateurs natifs ; pas de moteur complet imposé. Voir le

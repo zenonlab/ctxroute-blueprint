@@ -78,8 +78,8 @@ sans importer ses types dans C0–C3. Ne pas confondre wrapper GPU et moteur de 
 | B-R01 | Image statique 10 minutes après premier affichage | Présentations après stabilisation, réveils, mémoire, ΔE/ΔP ; référence wallpaper natif |
 | B-R02 | Trois jauges et un portrait mis à jour à 1 Hz, valeurs déterministes | Invalidation uniquement nécessaire, coût des mises à jour et des uploads |
 | B-R03 | Même décor cyclique de 60 secondes, trajectoire fixe | Comparaison rendu temps réel/vidéo si visuellement comparables ; codec, résolution, fréquence et chemin hwdec effectif consignés |
-| B-R04 | Déplacer un objet, changer une animation, sélectionner une ancre, modifier la caméra | Préservation de la recomposition ; une vidéo fixe ne réussit pas ce cas par équivalence visuelle |
-| B-R05 | Masquage, verrouillage, veille/reprise et un seul moniteur masqué | Suspension des soumissions/décodage concernés, reprise correcte, politique audio explicite |
+| B-R04 | Objet ouvrant un panneau, bouton pilotant animation/effet, résultat actualisant l'UI ; déplacer l'objet et modifier la caméra | Parcours I01 sans terminal ; préservation de la recomposition ; une vidéo fixe ne réussit pas ce cas par équivalence visuelle |
+| B-R05 | Masquage, verrouillage, veille/reprise, un seul moniteur masqué et panneau distinct restant visible | Budget par surface, suspension des soumissions/décodage concernés, reprise correcte, politique audio explicite ; voir I08/I10 |
 | B-R06 | Surface inactive sur machine hybride | Adaptateur choisi, résidence GPU, preuve d'état d'alimentation et effet éventuel des instruments |
 
 Documenter draw calls, uploads, pixels/overdraw, mémoire, coût CPU et nombre de
