@@ -41,6 +41,8 @@ if [[ "${1:-}" == --package ]]; then
   # AppExtension.main registers the implementation; NSExtensionMain hosts its loop.
   probe_linker=(-Xlinker -e -Xlinker _NSExtensionMain)
   (cd "$probe_root" && node pocs/macos-native-wallpaper/package.mjs "$probe_stage")
+  grep -q 'GroupID(id: "native-wallpaper-interactive")' \
+    "$probe_stage/PhospheneExtension/SettingsProvider.swift"
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticTheme.swift")

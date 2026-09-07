@@ -4,7 +4,7 @@
 
 L'utilisateur confirme l'animation du build 3. Son processus PID 12860 reste
 intact. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.g74ecK/Native Wallpaper Probe.app`.
+`dist/pocs/macos-native-wallpaper/compile.ZJRqMF/Native Wallpaper Probe.app`.
 Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
 `org.wallpaperthemes.nativeprobe.interactive.extension`, version 6. Signature et
 plist validées. Hôte enregistré par
@@ -15,7 +15,7 @@ cette mise à jour ; il ne lit pas le dernier manifeste.
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin g74ecK** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin ZJRqMF** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -51,7 +51,7 @@ de fichiers observe le fond Finder comme
 `AXGroup → AXScrollArea → AXApplication` et les icônes comme
 `AXImage → AXGroup → AXScrollArea → AXApplication`. Cette mesure prouve que les
 deux cibles sont distinguables sur cette session macOS 26.2 ; elle ne qualifie
-pas encore le binaire g74ecK, dont la confiance AX propre reste inconnue tant
+pas encore le binaire ZJRqMF, dont la confiance AX propre reste inconnue tant
 qu'il n'est pas lancé. Aucune signature n'est donc promue en production.
 
 `interactive-theme.json` constitue le premier asset de composition partagé par
@@ -78,15 +78,26 @@ taille réduite), soit 65 contrôles.
 Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.g74ecK`
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.ZJRqMF`
 réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
 Son hôte porte le SHA-256
-`0068aa701bfd9a1413c7d8ca87fbd66cef2426bcc6bd22e1fd83a00dbf5b8026` et son
-extension `0270cf904ee579f4084d7fdd92861eb9f18763adb40fe2b59c76b8d4ffb4bfd5`.
+`fc00935d1d5ce2976211686ae3ae38dca744fc7978c02aadd3aaaaf9cfb29ec2` et son
+extension `dc1c7eeb7e22d66f864cd891305339dc25547b57182a4a81c712ad4c9aeca5a5`.
 LaunchServices et pluginkit référencent ce chemin unique pour l'identité
-interactive ; l'ancien enregistrement 13L9I5 a été retiré sans supprimer son
-paquet. Aucun processus g74ecK n'est observé après l'enregistrement : il n'a pas
+interactive ; l'ancien enregistrement g74ecK a été retiré sans supprimer son
+paquet. Aucun processus ZJRqMF n'est observé après l'enregistrement : il n'a pas
 été lancé et le fond actif n'a pas été modifié.
+
+Le candidat g74ecK a été lancé et sa fenêtre AppKit, ses sept boutons ainsi que
+l'état « demande envoyée » ont été observés. Les Réglages ont affiché le groupe
+`Native Wallpaper Interactive`, mais avec l'ancienne tuile
+`Balayage diagnostic`. Sa sélection a laissé le bureau blanc et n'a lancé aucun
+processus d'extension g74ecK. Les journaux WallpaperAgent indiquent la fusion de
+groupes portant le même identifiant ; la copie amont réutilisait en effet
+`video-wallpapers`. ZJRqMF remplace cet identifiant par
+`native-wallpaper-interactive` et le build l'atteste par un contrôle explicite.
+Ce correctif est compilé et enregistré, mais pas encore lancé ni sélectionné ;
+il ne faut donc pas annoncer que le défaut visuel est résolu.
 Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
 états interactifs : transitions, mise en veille et énergie restent à qualifier.
 Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle

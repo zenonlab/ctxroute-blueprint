@@ -38,6 +38,8 @@ for (const name of readdirSync(join(directory, 'PhospheneExtension'))) {
   }
   if (name === 'SettingsProvider.swift') {
     source = replaceOnce(source, 'Phosphene \\u{2014} Video Wallpapers', 'Native Wallpaper Interactive');
+    source = replaceOnce(source, 'let groupID = GroupID(id: "video-wallpapers")',
+      'let groupID = GroupID(id: "native-wallpaper-interactive")');
   }
   if (name === 'CallerValidation.swift') {
     if (source.split('            return true').length !== 4) throw new Error('Caller guards changed');

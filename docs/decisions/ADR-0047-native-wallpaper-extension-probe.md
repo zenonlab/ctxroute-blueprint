@@ -72,6 +72,10 @@ ne remplace ni l'enregistrement ni le processus déjà qualifié.
 Sa scène emploie aussi un UUID distinct du diagnostic animé précédent : les
 descripteurs de choix de WallpaperAgent ne doivent jamais partager l'identité
 de contenu entre deux fournisseurs.
+Le groupe de Réglages porte également un identifiant propre
+`native-wallpaper-interactive`. Réutiliser l'identifiant amont
+`video-wallpapers` provoque une fusion entre fournisseurs dans WallpaperAgent,
+associe la mauvaise tuile au nouveau groupe et empêche de qualifier le lancement.
 
 Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
 dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.
