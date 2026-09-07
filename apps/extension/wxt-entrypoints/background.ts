@@ -43,16 +43,16 @@ export default defineBackground({
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
-    const { anilist, mangaupdates: mangaUpdates } = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
+    const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
       bookmarks,
-      candidates: { anilist, mangaupdates: mangaUpdates },
+      candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
-      hydration: { anilist, mangaupdates: mangaUpdates },
+      hydration: providerPorts,
       libraryId: primaryLibraryId,
       now,
       outbox: resolutionOutbox,

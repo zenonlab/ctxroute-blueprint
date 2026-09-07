@@ -1,19 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy, routeFavoriteProviders } from './provider-ports';
+import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy, routeFavoriteProviderTiers, routeFavoriteProviders } from './provider-ports';
 
 describe('favorite provider ports', () => {
   it('X-01 keeps MangaDex outside the enabled provider routes', () => {
-    expect(routeFavoriteProviders('MANGA')).toEqual(['mangaupdates']);
-    expect(routeFavoriteProviders('UNKNOWN')).toEqual(['anilist', 'mangaupdates']);
+    expect(routeFavoriteProviders('MANGA')).toEqual(['mangaupdates', 'kitsu-manga']);
+    expect(routeFavoriteProviders('UNKNOWN')).not.toContain('mangadex');
   });
   it.each([
-    ['ANIME', ['anilist']],
-    ['MANGA', ['mangaupdates']],
-    ['MANHWA', ['mangaupdates']],
-    ['MANHUA', ['mangaupdates']],
-    ['UNKNOWN', ['anilist', 'mangaupdates']],
+    ['ANIME', ['anilist', 'kitsu-anime']],
+    ['MANGA', ['mangaupdates', 'kitsu-manga']],
+    ['MANHWA', ['mangaupdates', 'kitsu-manga']],
+    ['MANHUA', ['mangaupdates', 'kitsu-manga']],
+    ['UNKNOWN', ['anilist', 'mangaupdates', 'kitsu-anime', 'kitsu-manga']],
   ] as const)('routes %s through its bounded lane', (mediaKind, providers) => {
     expect(routeFavoriteProviders(mediaKind)).toEqual(providers);
+  });
+
+  it('keeps fallback tiers separate so partial providers are never merged', () => {
+    expect(routeFavoriteProviderTiers('UNKNOWN')).toEqual([['anilist', 'mangaupdates'], ['kitsu-anime', 'kitsu-manga']]);
   });
 
   it('bounds candidate searches and freezes their title snapshot', () => {

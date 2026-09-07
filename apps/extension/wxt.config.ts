@@ -17,7 +17,7 @@ export default defineConfig({
     browser_specific_settings: browser === 'firefox'
       ? {
           gecko: {
-            data_collection_permissions: { required: ['none'] },
+            data_collection_permissions: { required: ['bookmarksInfo'] },
             id: 'tobirink@tobirink.local',
           },
         }
@@ -27,7 +27,11 @@ export default defineConfig({
     },
     description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
     externally_connectable: { matches: externallyConnectableMatches },
-    host_permissions: [],
+    host_permissions: [
+      'https://api.mangaupdates.com/*',
+      'https://graphql.anilist.co/*',
+      'https://kitsu.io/*',
+    ],
     icons: extensionIcons,
     name: 'Tobirink',
     permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'],

@@ -80,8 +80,15 @@ possède toujours `availableAt`.
 Exiger que chaque réponse de candidats indique si l’ensemble pertinent est
 complet ou tronqué. Un ensemble incomplet ne peut jamais produire une
 correspondance automatique, même si un seul candidat visible correspond. Les
-lanes AniList et MangaUpdates appliquent séparément leurs cadences; l’ordre de
-leurs réponses ne modifie pas le résultat du matcher.
+lanes AniList et MangaUpdates appliquent séparément leurs cadences. Elles
+restent les sources exactes des références déjà reconnues, mais leur
+indisponibilité ne peut plus immobiliser toutes les nouvelles résolutions.
+Deux lanes publiques Kitsu distinctes, `kitsu-anime` et `kitsu-manga`, forment
+un second palier afin que leurs identifiants ne puissent jamais entrer en
+collision. Un palier est évalué entièrement ou ignoré; le premier palier dont
+toutes les réponses sont complètes alimente seul le matcher. L’ordre interne
+des réponses ne modifie jamais le résultat et une réponse incomplète ne permet
+aucune correspondance automatique.
 Les recherches de candidats et l’hydratation par identifiant utilisent deux
 ports applicatifs distincts. Le routage par titre réserve AniList à l’anime,
 MangaUpdates aux mangas, manhwa et manhua, et dédouble seulement le type inconnu;
@@ -113,6 +120,16 @@ Le module de langue de document reste un enrichissement local facultatif,
 séparé du parser de favoris; OVA et pré-sérialisation appartiennent à la
 compatibilité candidat, et la taxonomie éditoriale s’applique après hydratation.
 
+La résolution distante transmet uniquement les titres analysés ou les
+identifiants fournisseur déjà présents dans un favori. Elle ne transmet ni URL
+brute, chemin de dossier, progression, bibliothèque ni historique. Cette
+transmission dérivée de favoris est déclarée `bookmarksInfo` dans le manifeste
+Firefox et expliquée sur la surface Confidentialité; `none` est interdit tant
+que les lanes réseau sont composées.
+Le manifeste borne les accès réseau aux origines HTTPS exactes d’AniList
+GraphQL, de MangaUpdates API et de Kitsu. Aucun joker de domaine ni fournisseur
+supplémentaire n’est autorisé.
+
 ## Conséquences
 
 Chaque changement de règle exige une version, une fixture synthétique, une
@@ -127,10 +144,13 @@ techniques sont compactés selon une politique bornée sans supprimer les source
 Reviews, œuvres ou progressions autoritaires.
 
 Le runtime compose désormais les événements favoris, l’import atomique, les
-adaptateurs AniList/MangaUpdates, le runner borné et les écritures
+adaptateurs AniList/MangaUpdates et le repli Kitsu, le runner borné et les écritures
 `FavoriteSource`, `Review`, `Work` et Bibliothèque. Les suppressions deviennent
 une présence `detached` et ne cascadent jamais. L’inventaire navigateur utilise
 `getChildren()` avec un curseur durable, des tranches de 100 et au plus huit
 tranches par réveil. Les effets validés reçoivent un reçu avant compaction de la
-tâche technique; la cadence et les candidats ambigus survivent à MV3. Cette révision
-n’ajoute aucune permission hôte, contribution cloud ou opération de déploiement.
+tâche technique; la cadence et les candidats ambigus survivent à MV3. Cette
+révision ajoute les trois permissions hôte exactes indispensables aux appels
+catalogue du background, sans contribution cloud ni opération de déploiement.
+Les adaptateurs restent bornés, validés et remplaçables derrière les ports
+applicatifs.

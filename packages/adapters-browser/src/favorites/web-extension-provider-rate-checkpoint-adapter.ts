@@ -1,11 +1,9 @@
 import { z } from 'zod';
+import type { ResolutionProvider } from '@tobirink/application';
 import type { FavoriteProviderRateCheckpointPort } from './provider-http';
 
-type CheckpointKey = 'favorite-provider-next-allowed-at:anilist' | 'favorite-provider-next-allowed-at:mangaupdates';
-interface ProviderRateStorageEnvelope {
-  'favorite-provider-next-allowed-at:anilist'?: number;
-  'favorite-provider-next-allowed-at:mangaupdates'?: number;
-}
+type CheckpointKey = `favorite-provider-next-allowed-at:${ResolutionProvider}`;
+type ProviderRateStorageEnvelope = Partial<Record<CheckpointKey, number>>;
 export interface FavoriteProviderCheckpointStorageArea {
   get(key: CheckpointKey): Promise<ProviderRateStorageEnvelope>;
   set(values: ProviderRateStorageEnvelope): Promise<void>;
@@ -13,25 +11,26 @@ export interface FavoriteProviderCheckpointStorageArea {
 
 const checkpointSchema = z.number().int().nonnegative();
 
+function checkpointKey(provider: ResolutionProvider): CheckpointKey {
+  if (provider === 'anilist') return 'favorite-provider-next-allowed-at:anilist';
+  if (provider === 'kitsu-anime') return 'favorite-provider-next-allowed-at:kitsu-anime';
+  if (provider === 'kitsu-manga') return 'favorite-provider-next-allowed-at:kitsu-manga';
+  return 'favorite-provider-next-allowed-at:mangaupdates';
+}
+
 export class WebExtensionProviderRateCheckpointAdapter implements FavoriteProviderRateCheckpointPort {
   constructor(private readonly storage: FavoriteProviderCheckpointStorageArea) {}
 
-  async read(provider: 'anilist' | 'mangaupdates'): Promise<number | undefined> {
-    const key: CheckpointKey = provider === 'anilist'
-      ? 'favorite-provider-next-allowed-at:anilist'
-      : 'favorite-provider-next-allowed-at:mangaupdates';
+  async read(provider: ResolutionProvider): Promise<number | undefined> {
+    const key = checkpointKey(provider);
     const values = await this.storage.get(key);
-    const value = provider === 'anilist'
-      ? values['favorite-provider-next-allowed-at:anilist']
-      : values['favorite-provider-next-allowed-at:mangaupdates'];
-    const parsed = checkpointSchema.safeParse(value);
+    const parsed = checkpointSchema.safeParse(values[key]);
     return parsed.success ? parsed.data : undefined;
   }
 
-  write(provider: 'anilist' | 'mangaupdates', nextAllowedAt: number): Promise<void> {
+  write(provider: ResolutionProvider, nextAllowedAt: number): Promise<void> {
     const value = checkpointSchema.parse(nextAllowedAt);
-    return provider === 'anilist'
-      ? this.storage.set({ 'favorite-provider-next-allowed-at:anilist': value })
-      : this.storage.set({ 'favorite-provider-next-allowed-at:mangaupdates': value });
+    const key = checkpointKey(provider);
+    return this.storage.set({ [key]: value });
   }
 }

@@ -1,6 +1,6 @@
 export type FavoriteMediaKind = 'ANIME' | 'MANGA' | 'MANHUA' | 'MANHWA' | 'UNKNOWN';
 export type FavoritePresence = 'observed' | 'detached';
-export type FavoriteProvider = 'anilist' | 'mangaupdates' | 'mangadex';
+export type FavoriteProvider = 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangaupdates' | 'mangadex';
 export type FavoriteMatchMethod = 'bounded-edit-distance' | 'explicit-season' | 'ordered-exact' | 'reordered-significant-words' | 'source-id' | 'source-url';
 export type FavoriteProgressionProof = 'bare-number-after-validated-identity' | 'explicit-marker' | 'labelled-url-path' | 'numeric-url-segment-after-source-identity' | 'season-divergence' | 'separated-release';
 export type FavoriteProgressionRejection = 'EARLIER_SAME_QUALITY_EVIDENCE' | 'EXPLICIT_EVIDENCE_PRESENT' | 'INCOMPATIBLE_KIND' | 'LOWER_QUALITY_EVIDENCE';

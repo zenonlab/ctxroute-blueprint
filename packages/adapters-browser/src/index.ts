@@ -3,6 +3,7 @@ export { anilistSourceAdapter } from './favorites/anilist-source-adapter';
 export { mangaUpdatesSourceAdapter } from './favorites/mangaupdates-source-adapter';
 export { AniListFavoriteProviderAdapter, anilistGraphqlEndpoint } from './favorites/anilist-provider-adapter';
 export { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './favorites/mangaupdates-provider-adapter';
+export { KitsuFavoriteProviderAdapter, kitsuApiOrigin } from './favorites/kitsu-provider-adapter';
 export { FavoriteProviderRateGate } from './favorites/provider-http';
 export type { FavoriteProviderRateCheckpointPort } from './favorites/provider-http';
 export { WebExtensionProviderRateCheckpointAdapter } from './favorites/web-extension-provider-rate-checkpoint-adapter';

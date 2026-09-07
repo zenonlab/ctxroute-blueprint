@@ -17,6 +17,7 @@ import type {
   Work,
   WorkId,
   FavoriteParseArtifact,
+  FavoriteProvider,
   ProviderCandidate,
 } from '@tobirink/domain';
 import type { DurableTask } from '../tasks/task-state';
@@ -44,7 +45,7 @@ export interface FavoriteBookmarkMutation {
 
 export interface FavoriteProviderRateCheckpoint {
   nextAllowedAt: number;
-  provider: 'anilist' | 'mangaupdates';
+  provider: Extract<FavoriteProvider, 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangaupdates'>;
 }
 
 export interface FavoriteResolutionReceipt {
@@ -128,7 +129,7 @@ export interface StorageReadPort {
   getFavoriteBookmarkMutation(bookmarkId: string): Promise<FavoriteBookmarkMutation | undefined>;
   getFavoriteInventoryCheckpoint(): Promise<FavoriteInventoryCheckpoint | undefined>;
   getFavoriteInventoryMark(bookmarkId: string): Promise<FavoriteInventoryMark | undefined>;
-  getFavoriteProviderRateCheckpoint(provider: 'anilist' | 'mangaupdates'): Promise<FavoriteProviderRateCheckpoint | undefined>;
+  getFavoriteProviderRateCheckpoint(provider: FavoriteProviderRateCheckpoint['provider']): Promise<FavoriteProviderRateCheckpoint | undefined>;
   getFavoriteResolutionReceipt(id: string): Promise<FavoriteResolutionReceipt | undefined>;
   getFavoriteReviewCandidateSet(reviewId: ReviewId): Promise<FavoriteReviewCandidateSet | undefined>;
   findFavoriteSourceByReviewId(reviewId: ReviewId): Promise<FavoriteSource | undefined>;

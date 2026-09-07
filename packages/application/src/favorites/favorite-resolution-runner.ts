@@ -6,7 +6,7 @@ import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
-import { favoriteProviderPolicy, routeFavoriteProviders } from './provider-ports';
+import { favoriteProviderPolicy, routeFavoriteProviderTiers } from './provider-ports';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, ResolutionProvider } from './provider-ports';
 
 export const favoriteResolutionSliceLimit = 8;
@@ -86,35 +86,41 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const reference = { externalId: explicit.externalId, provider: explicit.provider } as const;
     let candidate: ProviderCandidate | undefined;
     try { candidate = await dependencies.hydration[reference.provider].hydrate(reference); } catch { candidate = undefined; }
-    if (candidate === undefined) {
-      const retryAt = new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString();
-      return retryClaim(dependencies, task, token, retryAt);
-    }
-    if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-    const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
-    if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
-      await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
+    if (candidate !== undefined) {
+      if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
+      if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
+        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
+        return 'completed';
+      }
+      if (hasExactBlockedProviderTaxonomy(candidate)) {
+        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+        return 'completed';
+      }
+      const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
+      await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
       return 'completed';
     }
-    if (hasExactBlockedProviderTaxonomy(candidate)) {
-      await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
-      return 'completed';
-    }
-    const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
-    await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
-    return 'completed';
   }
   const titles = providerTitles(artifact);
   if (titles.length === 0) {
     await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
     return 'completed';
   }
-  const providers = routeFavoriteProviders(artifact.mediaKind);
-  const perProviderLimit = Math.floor(20 / providers.length);
-  let envelopes: readonly ProviderCandidateEnvelope[];
-  try {
-    envelopes = await Promise.all(providers.map((provider) => dependencies.candidates[provider].search({ limit: perProviderLimit, provider, titles })));
-  } catch {
+  let envelopes: readonly ProviderCandidateEnvelope[] | undefined;
+  for (const providers of routeFavoriteProviderTiers(artifact.mediaKind)) {
+    const perProviderLimit = Math.floor(20 / providers.length);
+    try {
+      const tier = await Promise.all(providers.map((provider) => dependencies.candidates[provider].search({ limit: perProviderLimit, provider, titles })));
+      if (tier.every((envelope) => envelope.complete && !envelope.truncated)) {
+        envelopes = tier;
+        break;
+      }
+    } catch {
+      // A provider outage invalidates this complete tier; the next tier may proceed.
+    }
+  }
+  if (envelopes === undefined) {
     const exponent = Math.max(0, task.attempt - 1);
     const retryAt = new Date(timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** exponent))).toISOString();
     return retryClaim(dependencies, task, token, retryAt);
@@ -141,7 +147,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const provider = outcome.matchedReference.provider;
-  if (provider !== 'anilist' && provider !== 'mangaupdates') throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
+  if (provider === 'mangadex') throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
   let candidate: ProviderCandidate | undefined;
   try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch { candidate = undefined; }
   if (candidate === undefined) {
