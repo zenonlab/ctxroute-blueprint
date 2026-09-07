@@ -28,13 +28,19 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 | Rendu et interaction | Quel moteur existant restitue les assets et permet les clics ? | Scène représentative, animations, sélection et coût mesuré. |
 | Ingestion | Quel jeu et quelle version serviront de pilote ? Quels extracteurs ? | Inventaire réel des éléments récupérés et des catégories manquantes. |
 | Formats | Réutiliser quels formats d'assets, scènes et thèmes ? | Hiérarchie, matériaux, animations, audio et références conservés. |
-| Distribution | Une ou plusieurs applications ? Quelles versions minimales ? | Installation et fonctionnement des modes séparés sur les trois OS. |
+| Distribution | Convertisseur séparé acquis ; quels paquets et versions minimales ? | Application utilisable sans outil de conversion, recettes sans assets extraits, activation locale. |
 | État local | Quoi sauvegarder : thèmes, associations, disposition, historique ? | Comportement de reprise défini avant de choisir un stockage. |
 | Énergie et audio | Quand ralentir, suspendre ou couper le son ? | Mesures au repos, en animation, pendant le travail et sous occlusion. |
 | Actions et imports | Quelle séparation entre données, scripts, commandes et autorisations ? | Un thème importé ne lance pas implicitement de commandes. |
 | Observabilité | Quelles informations suffisent au diagnostic local ? | Diagnostic utile sans journaliser par défaut le contenu sensible du terminal. |
 
 ## Ordre de la prochaine discussion
+
+La prochaine session porte sur l'architecture et l'infrastructure, après ce
+cadrage documentaire. Elle peut comparer les composants sans ROM ; l'adoption
+définitive des formats d'ingestion dépend cependant de la preuve d'extraction.
+La séparation locale est acquise dans
+[ADR-0032](decisions/ADR-0032-local-conversion-and-theme-distribution.md).
 
 La [transformation du jeu](architecture/game-transformation.md) retient désormais
 la bibliothèque canonique, la conversion par scène et le diorama ambiant adapté.
@@ -53,6 +59,61 @@ Rust, wgpu, winit, parry3d, cpal, symphonia, glTF et un bundle `.scene`
 sont des pistes héritées, pas des dépendances autorisées pour le produit.
 La génération d'adaptateurs par IA est une piste ultérieure, pas un prérequis
 pour commencer.
+
+## Candidats évoqués, non adoptés
+
+Cette liste archive la discussion et les sources consultées le 7 septembre 2026.
+Aucun benchmark ou essai produit n'a été réalisé. Relever les révisions et
+licences exactes lors de l'évaluation ; ce n'est pas une liste de dépendances.
+
+| Besoin | Candidats et sources | Arbitrage à démontrer |
+| --- | --- | --- |
+| Terminal très personnalisé | [Tauri](https://v2.tauri.app/reference/webview-versions/) + [xterm.js](https://xtermjs.org/) + backend PTY, dont portable-pty à examiner | Réutiliser l'affichage terminal ; prouver saisie/TUI, IPC, sécurité et coût WebView sur chaque OS. Tauri ne résout pas seul l'ancrage wallpaper. |
+| Terminal existant extensible | [WezTerm](https://wezterm.org/) | Comparer configuration/extension à l'effort d'une interface entièrement spécifique ; ne pas supposer qu'un HUD 3D arbitraire est configurable. |
+| Wallpaper Windows | [Lively](https://github.com/rocksdanister/lively) | Évaluer adoption ou intégration ; ce n'est pas une solution multiplateforme démontrée. |
+| Rendu commun | Moteur existant à comparer à la piste Rust/wgpu | Ne pas écrire un moteur maison avant d'avoir mesuré le manque et le coût des solutions existantes. |
+
+### Émulateurs comme références hors ligne
+
+Ces candidats peuvent servir à observer le jeu et comparer les résultats,
+si leur plateforme et leur outillage conviennent. Ils ne sont ni installés
+dans le produit ni nécessaires au runtime. Un jeu émulable n'est pas pour
+autant convertible : la couverture dépend des lecteurs, versions et capacités.
+
+| Console | Candidats évoqués |
+| --- | --- |
+| NES | FCEUmm |
+| SNES | bsnes, Snes9x |
+| Game Boy / Color | SameBoy, Gambatte |
+| Game Boy Advance | mGBA |
+| Nintendo DS | melonDS |
+| Nintendo 64 | Mupen64Plus |
+| GameCube / Wii | Dolphin |
+| PlayStation | Beetle PSX |
+| PlayStation 2 | PCSX2 |
+| PSP | PPSSPP |
+| Mega Drive | Genesis Plus GX |
+| Dreamcast | Flycast |
+
+Sources : [catalogue Libretro](https://docs.libretro.com/guides/core-list/),
+[Dolphin](https://dolphin-emu.org/), [PCSX2](https://github.com/PCSX2/pcsx2),
+[PPSSPP](https://github.com/hrydgard/ppsspp).
+RetroArch est une interface à des cœurs : aucune API universelle d'extraction
+de scènes, squelettes et comportements n'est déduite de ce catalogue.
+
+### Personnalisation et réduction du code spécifique
+
+La composition code la scène, caméra, personnages, portraits, disposition des
+sessions, animations, sons, actions et profil énergétique. Les variantes peuvent
+être configurables sans forker le runtime. Une session possède une identité
+stable indépendante de sa représentation ; minimap et portrait utilisent les
+relations du lecteur, pas une règle Mario Kart inscrite dans le cœur.
+
+Priorité : réutiliser les lecteurs et composants terminal/rendu existants,
+matérialiser les ressources à la demande, mutualiser la bibliothèque locale,
+préparer les dérivés hors ligne et mesurer avant toute réécriture native.
+Les permissions des scripts/actions et les thèmes utilisables sans ROM font
+partie du parcours, pas des ajouts à repousser après l'intégration.
 
 ## Socle installé
 

@@ -20,6 +20,13 @@ machines de mesure restent à fournir ou choisir ; aucun PoC n'a été exécuté
 
 Lire [AGENTS.md](../AGENTS.md), la [vision produit](00-project-brief.md), puis
 les [questions techniques](01-technology-decisions.md).
+Dernier ajout : [ADR-0032](decisions/ADR-0032-local-conversion-and-theme-distribution.md).
+Convertisseur local séparé, ROM fournie par l'utilisateur, recettes distribuées
+sans assets extraits et aucun envoi de données du jeu côté fournisseur.
+La bibliothèque persistante locale est une hypothèse à confirmer pour sa
+conservation/purge ; ne pas confondre cette question avec le refus de collecte.
+Les candidats terminal/wallpaper et la liste d'émulateurs hors ligne sont
+archivés dans les questions techniques, sans adoption ni preuve d'exécution.
 Le projet reste volontairement au statut `template`. Ne pas lancer
 `npm run initialize` ni développer le produit avant la discussion technique.
 
@@ -61,6 +68,22 @@ au [guide amont conservé](../README.md). Aucune configuration globale modifiée
 
 ## Vérification finale
 
+Mise à jour distribution locale : `npm run verify` terminé avec succès
+pour cette mise à jour documentaire (261 tests réussis, un ignoré, aucun échec ;
+trois tests d'intégration réussis ; audit npm sans vulnérabilité signalée).
+Le projet conserve le statut `template` ; aucun code produit ni hook modifié.
+Schéma `game-transformation` livré avec Archify, neuf contrôles showcase
+réussis, zéro erreur et zéro avertissement.
+Le contrôle de débordement réussit aux quatre tailles desktop ; capture sombre
+2048×1320 inspectée par l'agent. La revue humaine du reçu reste `pending`.
+Libellés français, interface fixe du visualiseur en anglais (repli Archify).
+Artefact : `dist/architecture/game-transformation.architecture.html`.
+SHA-256 source : `ad26e413b6b44a6915e151086814213f5b400d6907c507b5177085987b23f8f6`.
+SHA-256 HTML : `c8f4ad274b7a4aebeece6e3807e7f8581cca13d94933161d4ed9f385c48b955d`.
+
+Les preuves ci-dessous concernent la validation antérieure du socle et de la
+vue produit ; elles ne sont pas des tests du futur runtime.
+
 Le second passage de `npm run verify` a terminé avec succès : validation,
 tests du template, smoke CRG, intégration MCP, audit npm et génération HTML.
 La suite rapporte 262 tests, 261 réussis, aucun échec ; couverture globale
@@ -98,7 +121,10 @@ non verbatim du texte initial ; ses chiffres et références restent à vérifie
 
 ## Prochaine conversation
 
-Priorité actuelle : préparer la preuve d'extraction OoT décrite dans
+Prochaine étape demandée : travailler sur l'architecture et l'infrastructure,
+en comparant l'existant avec les frontières maintenant documentées. La discussion
+peut commencer sans ROM ; ne pas adopter une stack à partir des seuls exemples.
+La preuve d'ingestion à préparer reste l'extraction OoT décrite dans
 [la transformation du jeu](architecture/game-transformation.md). Aucune ROM
 `.z64`, `.n64`, `.v64` ni image `.iso`/`.gcm` n'a été trouvée dans le dossier
 du projet lors de cette mise à jour. Identifier l'entrée et sa version avant

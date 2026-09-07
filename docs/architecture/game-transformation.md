@@ -41,6 +41,9 @@ nouveau lecteur universel de toutes les consoles.
 
 ## Bibliothèque canonique et conversion par scène
 
+La bibliothèque décrite ici est locale à la machine utilisateur. Voir aussi
+[ADR-0032](../decisions/ADR-0032-local-conversion-and-theme-distribution.md).
+
 La bibliothèque est le référentiel persistant du jeu : index des scènes
 identifiées, ressources partagées, textures, animations, audio, collisions,
 paramètres et relations. Dédupliquer les contenus identiques sans fusionner
@@ -56,6 +59,67 @@ ne fige pas encore un exécutable, une CLI publique ou un format de bundle.
 La couverture doit distinguer scènes identifiées, scènes matérialisées,
 catégories récupérées et catégories inconnues/non supportées. Elle ne se réduit
 pas à un pourcentage global qui masquerait l'absence de collisions ou d'audio.
+
+## Distribution et conversion locale séparée
+
+Trois livrables sont distincts : application terminal/wallpaper, recettes de
+thèmes, convertisseur hors ligne avec ses adaptateurs. Le convertisseur est
+installable et exécutable séparément ; il n'est pas nécessaire à l'affichage
+d'une composition déjà préparée. Le packaging exact reste à choisir.
+
+Nous distribuons les outils et recettes, pas les ROM ni les bibliothèques ou
+bundles contenant des assets extraits des jeux. Les recettes décrivent des
+références, dispositions, comportements et paramètres, sans incorporer textures,
+portraits PNG, modèles, musiques ou code récupérés du jeu. Aperçus de catalogue
+et fixtures suivent la même séparation : utiliser des ressources originales ou
+explicitement autorisées. Les licences des outils et contenus distribués restent
+à examiner avant publication ; cette frontière n'est pas une conclusion juridique.
+
+L'utilisateur fournit son entrée et lance le convertisseur sur sa machine.
+Le parcours ne transmet ni ROM, ni assets, ni dumps ou captures à nos services
+ou à une IA distante. Télécharger des outils/recettes est distinct du traitement
+local des données ; aucun catalogue ou service réseau n'est encore choisi.
+
+Interprétation de travail de « on n'enregistre rien » : aucune collecte ou
+conservation de données de jeu côté fournisseur. Une bibliothèque persistante
+sur le disque utilisateur reste l'hypothèse cohérente avec ADR-0031, à confirmer
+pour son emplacement, sa durée de conservation, sa purge et un éventuel mode
+éphémère. Ne pas annoncer une absence de stockage local. Aucune suppression
+automatique de la ROM ou de la bibliothèque n'est autorisée par cette décision.
+
+### Activation d'un thème
+
+1. Installer l'application et une recette sans assets extraits.
+2. Vérifier localement les ressources et capacités requises par cette recette.
+3. Si elles manquent, indiquer jeu/version et dépendances attendues, sans
+   télécharger le jeu ; l'utilisateur lance le convertisseur séparé sur sa ROM.
+4. Indexer, extraire progressivement et valider provenance, relations et capacités.
+   Une version inconnue n'est pas considérée comme compatible par défaut.
+5. Résoudre les références locales et préparer les dérivés nécessaires.
+6. Afficher la composition sans ROM ouverte, convertisseur ni émulateur actif.
+
+Un thème de jeu sans bibliothèque compatible reste indisponible avec explication.
+Le terminal et les thèmes sans dépendance ROM doivent rester utilisables.
+Changer de thème conserve les sessions, leurs identités et le travail en cours.
+
+### Contrats à préciser avant implémentation
+
+- Identités/versionnement de jeu, adaptateur, ressource et recette ; références
+  stables entre scène, minimap, portraits et animations.
+- Résolution des dépendances partagées, validation des capacités, cache et
+  invalidation des dérivés lorsque leurs entrées changent.
+- Export partageable distinct des résultats privés ; aucune bibliothèque locale
+  incluse automatiquement dans une recette publiée.
+- Adaptateurs et scripts importés non fiables : limites de ressources et accès
+  fichiers, isolation et permissions explicites à définir.
+- Actions système autorisées par l'utilisateur ; un thème importé ne dispose
+  pas implicitement d'un accès arbitraire au shell.
+- Diagnostics locaux sans contenu du terminal ou octets du jeu par défaut ;
+  assainissement d'un éventuel rapport volontaire à spécifier.
+
+La génération d'adaptateurs par IA distante n'est pas un prérequis et ne peut
+contourner cette frontière de confidentialité. Aucun protocole, format ou
+sandbox n'est adopté par cette description.
 
 ## Préservation sans suppression volontaire à l'ingestion
 

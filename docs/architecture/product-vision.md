@@ -22,6 +22,10 @@ dont l'accès à une session ; ce raccourci est détaillé dans le brief.
 Cette vue décrit l'expérience visible. La préparation des ressources et des
 comportements est détaillée dans [la transformation du jeu](game-transformation.md).
 « Assets isolés » ne résume donc pas à lui seul la bibliothèque à préparer.
+Les sources et assets restent locaux : le convertisseur est séparé du runtime.
+La recette distribuée ne contient pas les assets extraits ; le « thème » de
+cette vue représente son résultat résolu localement, pas une archive de jeu
+partageable. Voir ADR-0032 pour cette frontière de distribution.
 
 Les trois modes — terminal, bureau, ensemble — sont des modes utilisateur.
 Les boîtes ne présument ni un backend distant, ni une base de données dédiée,

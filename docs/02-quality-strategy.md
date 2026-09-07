@@ -32,6 +32,16 @@ Les résultats réellement obtenus sont consignés dans la
 | P11 | Changer d'écran, de résolution ou d'espace | Coordonnées et sélection restent justes sur les configurations déclarées supportées. |
 | P12 | Naviguer sans souris ou avec animations réduites | Les sessions et actions essentielles restent accessibles et lisibles. |
 | P13 | Importer un thème contenant une proposition d'action | Pas d'exécution implicite ; l'association relève de la configuration utilisateur. |
+| P14 | Installer l'application sans ROM ni convertisseur | Terminal et thèmes sans dépendance ROM utilisables ; thème de jeu indisponible avec diagnostic. |
+| P15 | Convertir une entrée locale avec le réseau désactivé après installation des outils | Extraction et validation possibles pour l'adaptateur supporté ; aucune transmission de ROM, asset, dump ou capture. |
+| P16 | Fermer le convertisseur puis activer un thème préparé | Aucune ROM ouverte, aucun convertisseur/émulateur permanent ; uniquement les ressources sélectionnées. |
+| P17 | Exporter une recette partageable | Aucun asset extrait, code du jeu, ROM, chemin privé ou contenu de session embarqué automatiquement. |
+| P18 | Fournir une version inconnue ou une référence manquante | Échec explicite ou capacités restreintes ; aucun téléchargement du jeu ni rapprochement silencieux. |
+| P19 | Changer de recette utilisant des ressources partagées | Références locales cohérentes, dérivés invalidés si nécessaire, sessions préservées. |
+
+Ces tests sont prévus, pas exécutés. Compléter P15 par observation des accès
+réseau et audit des journaux ; un échec réseau seul ne prouve pas l'absence
+de tentative d'envoi. La politique de stockage/purge locale reste à confirmer.
 
 Exécuter les parcours pertinents sur Linux, macOS et Windows.
 Décliner Linux par environnement d'affichage effectivement retenu.

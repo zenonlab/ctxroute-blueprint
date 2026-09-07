@@ -92,8 +92,8 @@ Les possibilités de composition entre plusieurs jeux restent à étudier.
   le focus et les usages normaux du système.
 - La décoration doit consommer peu de ressources et pouvoir ralentir ou
   se suspendre. Les budgets seront mesurés sur du matériel identifié.
-- L'absence d'émulateur permanent reste une orientation issue de la recherche
-  initiale ; la stratégie d'ingestion est à évaluer.
+- Le runtime ne fait fonctionner ni émulateur ni jeu complet en arrière-plan ;
+  il consomme les ressources préparées par un convertisseur local séparé.
 - Le changement d'apparence ne doit pas interrompre le travail. La survie des
   processus à la fermeture complète ou au redémarrage est une décision distincte.
 - Les actions système doivent correspondre aux associations configurées par
@@ -113,7 +113,12 @@ Reporté à la prochaine session : langage, runtime, interface, rendu, intégrat
 desktop, terminal/PTY, gestion des agents, stockage, format d'assets, packaging,
 observabilité, sécurité détaillée et budgets de performance.
 Aucun backend distant, compte utilisateur ou service cloud n'est demandé.
-L'usage personnel local est l'hypothèse de travail, pas une interdiction future.
+L'utilisateur fournit sa ROM et lance lui-même la conversion locale séparée.
+Nous distribuons outils et recettes sans ROM ni assets extraits ; aucune donnée
+de jeu n'est envoyée à nos services ou à une IA distante dans ce parcours.
+Une bibliothèque persistante uniquement sur son disque reste l'hypothèse de
+travail ; sa conservation/purge est à confirmer. Voir
+[ADR-0032](decisions/ADR-0032-local-conversion-and-theme-distribution.md).
 
 Voir les [questions techniques](01-technology-decisions.md) et la
 [décision de cadrage](decisions/ADR-0029-product-framing.md).
