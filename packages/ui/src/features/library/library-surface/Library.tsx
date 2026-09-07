@@ -10,6 +10,7 @@ import type { LibraryState, LibraryVariant, LibraryWork } from './library-surfac
 import styles from './Library.module.css';
 
 export interface LibraryProps {
+  extensionRequired?: boolean;
   filterOptions: LibraryFilterOptions;
   filters: LibraryFiltersValue;
   hasMore?: boolean;
@@ -25,6 +26,7 @@ export interface LibraryProps {
 }
 
 export function Library({
+  extensionRequired = false,
   filterOptions,
   filters,
   hasMore = false,
@@ -49,13 +51,13 @@ export function Library({
 
         {state === 'empty' ? (
           <FeedbackState
-            action={onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
+            action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
             className={styles.centeredState}
-            description="Importez vos favoris ou ajoutez une première œuvre."
+            description={extensionRequired ? 'À l’installation, TobiRink analyse automatiquement les favoris HTTP(S) de votre navigateur et prépare votre bibliothèque.' : 'Aucun favori HTTP(S) compatible n’a été trouvé lors de l’analyse.'}
             icon="library-big"
             kind="empty"
             layout="centered"
-            title="Votre bibliothèque est vide"
+            title={extensionRequired ? 'Extension TobiRink requise' : 'Aucune œuvre trouvée'}
           />
         ) : null}
 

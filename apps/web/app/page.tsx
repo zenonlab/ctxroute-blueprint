@@ -3,8 +3,9 @@
 import { MemberOverview, createAgendaDays, createLocalAgendaPeriod } from '@tobirink/ui';
 import type { AgendaDay } from '@tobirink/ui';
 import type { WebAgendaPeriod, WebLibraryPage } from '@tobirink/contracts/web-bridge';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { SiteShell } from './components/SiteShell';
+import { BridgeState, SiteShell } from './components/SiteShell';
 import { useWebBridge } from './components/WebBridgeProvider';
 
 function dateAfter(dateOnly: string, days: number) {
@@ -26,6 +27,7 @@ function agendaDays(period: ReturnType<typeof createLocalAgendaPeriod>, agenda?:
 }
 
 function HomePrivateOverview() {
+  const router = useRouter();
   const { bootstrap, readAgenda, readLibrary, status } = useWebBridge();
   const [library, setLibrary] = useState<WebLibraryPage>();
   const [agenda, setAgenda] = useState<WebAgendaPeriod>();
@@ -46,7 +48,8 @@ function HomePrivateOverview() {
   const empty = status === 'extension-missing';
   const days = agendaDays(period, agenda);
   const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga', progress: item.progressLabel, source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source enregistrée', title: item.title })) ?? [];
-  return <MemberOverview agendaDays={days} agendaHref="/agenda" agendaState={failed ? 'error' : loading ? 'loading' : empty || agenda?.entries.length === 0 ? 'empty' : 'ready'} libraryCount={bootstrap?.libraryCount ?? libraryItems.length} libraryHref="/library" libraryItems={libraryItems} libraryState={failed ? 'error' : loading ? 'loading' : empty || libraryItems.length === 0 ? 'empty' : 'ready'} onRetry={() => setRetryCount((count) => count + 1)} periodLabel={period.label} />;
+  if (status === 'incompatible' || status === 'error') return <main className="member-state-page"><BridgeState /></main>;
+  return <MemberOverview agendaDays={days} agendaHref="/agenda" agendaState={failed ? 'error' : loading ? 'loading' : empty || agenda?.entries.length === 0 ? 'empty' : 'ready'} extensionRequired={empty} libraryCount={bootstrap?.libraryCount ?? libraryItems.length} libraryHref="/library" libraryItems={libraryItems} libraryState={failed ? 'error' : loading ? 'loading' : empty || libraryItems.length === 0 ? 'empty' : 'ready'} onDownloadExtension={() => router.push('/download')} onRetry={() => setRetryCount((count) => count + 1)} periodLabel={period.label} />;
 }
 
 export default function HomePage() {

@@ -18,7 +18,7 @@ function activeNavigation(pathname: string) {
 export function useWebMemberNavigation(): MemberNavigationConfig {
   const router = useRouter();
   const pathname = usePathname();
-  const { bootstrap, decideReview, refreshReview, review, status } = useWebBridge();
+  const { bootstrap, decideReview, refreshReview, retry, review, status } = useWebBridge();
   const reviewItem = review?.reviewId && review.revision ? {
     candidates: review.candidates.map((candidate) => ({
       candidateId: candidate.workId ?? candidate.candidateId,
@@ -45,13 +45,15 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
   const resolver: ReviewResolverProps = {
     canNext: false,
     canPrevious: false,
+    extensionRequired: status === 'extension-missing',
     item: reviewItem,
     onNext: () => undefined,
+    onDownloadExtension: () => router.push('/download'),
     onPrevious: () => undefined,
     onRefresh: () => void refreshReview(),
-    onRetry: () => void refreshReview(),
+    onRetry: status === 'connected' ? () => void refreshReview() : retry,
     onSubmitDecision: submitDecision,
-    state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' || status === 'extension-missing' ? 'empty' : 'offline',
+    state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' || status === 'extension-missing' ? 'empty' : 'error',
   };
   return {
     activeId: activeNavigation(pathname),
@@ -72,13 +74,14 @@ export function SiteShell({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 export function BridgeState() {
+  const router = useRouter();
   const { retry, status } = useWebBridge();
   if (status === 'connected') return <Status tone="success">Extension connectée · vue privée disponible</Status>;
   if (status === 'loading' || status === 'reconnecting') {
     return <FeedbackState description="Vos données restent dans l’extension pendant cette vérification." kind="loading" layout="centered" title={status === 'loading' ? 'Connexion à l’extension…' : 'Reconnexion à l’extension…'} />;
   }
   if (status === 'extension-missing') {
-    return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description="Installez TobiRink pour ouvrir vos vues privées sur cet appareil." icon="puzzle" kind="empty" layout="centered" title="Extension absente" />;
+    return <FeedbackState action={<Button icon="download" onClick={() => router.push('/download')} variant="primary">Télécharger l’extension</Button>} description="Installez TobiRink pour ouvrir vos vues privées sur cet appareil." icon="puzzle" kind="empty" layout="centered" title="Extension absente" />;
   }
-  return <FeedbackState action={<Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Installez la version actuelle de TobiRink.' : 'Vos données privées restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
+  return <FeedbackState action={status === 'incompatible' ? <Button icon="download" onClick={() => router.push('/download')} variant="primary">Télécharger la version actuelle</Button> : <Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Cette version ne peut pas communiquer avec le site.' : 'Vos données privées restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
 }

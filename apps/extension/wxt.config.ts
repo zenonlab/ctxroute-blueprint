@@ -25,7 +25,7 @@ export default defineConfig({
     content_security_policy: {
       extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
     },
-    description: 'Bibliothèque manga et anime locale, progression, Review et agenda.',
+    description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
     externally_connectable: { matches: externallyConnectableMatches },
     host_permissions: [],
     icons: extensionIcons,

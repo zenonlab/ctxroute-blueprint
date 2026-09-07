@@ -30,7 +30,9 @@ describe('ReviewResolver', () => {
     expect(component).toMatch(/className={styles\.empty}/);
     expect(component).toMatch(/icon="inbox"/);
     expect(component).toMatch(/layout="centered"/);
-    expect(component).toMatch(/title="Aucune correspondance à vérifier"/);
+    expect(component).toContain("'Aucune correspondance à vérifier'");
+    expect(component).toContain("'Extension TobiRink requise'");
+    expect(component).toContain('analyse automatiquement les favoris HTTP(S) de votre navigateur');
     expect(component).not.toMatch(/Aucune Review en attente|Toutes les correspondances ambiguës ont une décision enregistrée/);
     expect(css).toMatch(/\.empty[\s\S]*min-height: calc\(var\(--size-control-touch\) \* 3\)/);
   });

@@ -59,7 +59,8 @@ function LibrarySurface() {
   })) ?? [];
 
   if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
-  if (status === 'extension-missing') return <Library filterOptions={filterOptions} filters={filters} items={[]} navigation={navigation} onChangeFilters={setQuery} onDownloadExtension={() => router.push('/download')} onLoadMore={() => undefined} onOpenRecovery={() => setRetryCount((count) => count + 1)} onRetry={() => setRetryCount((count) => count + 1)} state="empty" />;
+  if (status === 'extension-missing') return <Library extensionRequired filterOptions={filterOptions} filters={filters} items={[]} navigation={navigation} onChangeFilters={setQuery} onDownloadExtension={() => router.push('/download')} onLoadMore={() => undefined} onOpenRecovery={() => setRetryCount((count) => count + 1)} onRetry={() => setRetryCount((count) => count + 1)} state="empty" />;
+  if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const filtered = search.length > 0 || facet !== 'all';
   const state: LibraryState = failed ? 'error' : loading ? 'loading' : page && items.length === 0 && !filtered ? 'empty' : 'ready';
 

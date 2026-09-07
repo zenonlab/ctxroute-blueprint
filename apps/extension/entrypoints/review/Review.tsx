@@ -24,7 +24,7 @@ const reviewCopy = {
     title: 'Certaines métadonnées manquent',
   },
   offline: {
-    description: 'Les décisions disponibles localement restent accessibles depuis la cloche.',
+    description: 'Les décisions déjà disponibles restent accessibles depuis la cloche.',
     title: 'Review reste disponible hors ligne',
   },
   conflict: {

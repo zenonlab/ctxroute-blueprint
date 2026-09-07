@@ -97,6 +97,7 @@
         "Review aligne aussi ses états vide, chargement et erreur sur la même composition centrée",
         "Le shell membre expose Review vide même sans extension, sans créer de candidat",
         "Les libellés visibles évitent le qualificatif local et privilégient les noms produit directs",
+        "Les surfaces distinguent extension requise et données vides sans demander un import manuel",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }

@@ -23,4 +23,11 @@ describe('shared Library surface', () => {
   it('accepts a real stored source without changing the Extension fallback', () => {
     expect(component).toContain('item.href ?? `#work-${item.id}`');
   });
+
+  it('distinguishes an absent extension from an installed empty library', () => {
+    expect(component).toContain('Extension TobiRink requise');
+    expect(component).toContain('analyse automatiquement les favoris HTTP(S) de votre navigateur');
+    expect(component).toContain('Aucune œuvre trouvée');
+    expect(component).not.toContain('Importez vos favoris');
+  });
 });

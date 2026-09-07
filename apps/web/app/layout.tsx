@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'TobiRink — votre Workbench privé',
-  description: 'Bibliothèque, progression et agenda projetés localement par l’extension TobiRink.',
+  description: 'Bibliothèque, progression et agenda projetés par l’extension TobiRink.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

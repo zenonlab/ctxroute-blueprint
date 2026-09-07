@@ -13,6 +13,8 @@ export interface ReviewResolverProps {
   canNext: boolean;
   canPrevious: boolean;
   item?: ReviewItem;
+  extensionRequired?: boolean;
+  onDownloadExtension?: () => void;
   onNext: () => void;
   onPrevious: () => void;
   onRefresh: () => void;
@@ -39,6 +41,8 @@ export function ReviewResolver({
   canNext,
   canPrevious,
   item,
+  extensionRequired = false,
+  onDownloadExtension,
   onNext,
   onPrevious,
   onRefresh,
@@ -84,11 +88,13 @@ export function ReviewResolver({
   if (state === 'empty') {
     return (
       <FeedbackState
+        action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
         className={styles.empty}
+        description={extensionRequired ? 'À l’installation, TobiRink analyse automatiquement les favoris HTTP(S) de votre navigateur et prépare les correspondances à vérifier.' : undefined}
         icon="inbox"
         kind="empty"
         layout="centered"
-        title="Aucune correspondance à vérifier"
+        title={extensionRequired ? 'Extension TobiRink requise' : 'Aucune correspondance à vérifier'}
       />
     );
   }

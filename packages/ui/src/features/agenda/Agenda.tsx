@@ -7,17 +7,17 @@ import type { MemberNavigationConfig } from '../navigation/member-navigation';
 import type { AgendaDay, AgendaState, AgendaVariant } from './agenda.contract';
 import styles from './Agenda.module.css';
 
-export interface AgendaProps { canNext: boolean; canPrevious: boolean; days: readonly AgendaDay[]; navigation: MemberNavigationConfig; onNext: () => void; onPrevious: () => void; onRetry: () => void; periodLabel: string; state: AgendaState; updatedAt: string; variant?: AgendaVariant; }
+export interface AgendaProps { canNext: boolean; canPrevious: boolean; days: readonly AgendaDay[]; extensionRequired?: boolean; navigation: MemberNavigationConfig; onDownloadExtension?: () => void; onNext: () => void; onPrevious: () => void; onRetry: () => void; periodLabel: string; state: AgendaState; updatedAt: string; variant?: AgendaVariant; }
 const availabilityLabels = { confirmed: 'Confirmée', estimated: 'Estimation', official: 'Officielle', unavailable: 'Indisponible' } as const;
 
-export function Agenda({ canNext, canPrevious, days, navigation, onNext, onPrevious, onRetry, periodLabel, state, updatedAt, variant = 'timeline' }: AgendaProps) {
+export function Agenda({ canNext, canPrevious, days, extensionRequired = false, navigation, onDownloadExtension, onNext, onPrevious, onRetry, periodLabel, state, updatedAt, variant = 'timeline' }: AgendaProps) {
   const usable = state === 'ready' || state === 'partial' || state === 'offline' || state === 'blocked';
   const releaseCount = days.reduce((total, day) => total + day.releases.length, 0);
   return <MemberNavigation {...navigation}>
     <main aria-labelledby="agenda-title" className={styles.agenda} data-state={state} data-variant={variant}>
       <header className={styles.header}><div><p>Calendrier</p><h1 id="agenda-title">Agenda</h1></div><span className={styles.count}>{releaseCount}</span></header>
       {state === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des sorties enregistrées pour la période." kind="loading" layout="centered" title="Préparation de l’agenda…" /> : null}
-      {state === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucune sortie datée n’est enregistrée entre ces deux lundis." icon="calendar-days" kind="empty" layout="centered" title="Semaine vide" /> : null}
+      {state === 'empty' ? <FeedbackState action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined} className={styles.centeredState} description={extensionRequired ? 'Installez TobiRink pour afficher les sorties associées à votre bibliothèque.' : 'Aucune sortie datée n’est enregistrée pour cette semaine.'} icon="calendar-days" kind="empty" layout="centered" title={extensionRequired ? 'Extension TobiRink requise' : 'Semaine vide'} /> : null}
       {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable title="Actualisation interrompue" /> : null}
       {usable ? <>
         {state === 'partial' ? <Status tone="accent">Dates estimées séparées · certaines sources manquent</Status> : null}

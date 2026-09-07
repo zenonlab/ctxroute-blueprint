@@ -99,7 +99,7 @@ const libraryPreview = definePreview({
   title: 'Bibliothèque',
   category: 'Surfaces',
   level: 'surface',
-  purpose: 'Parcourir les œuvres enregistrées, filtrer et consulter la progression synchronisée.',
+  purpose: 'Parcourir les œuvres enregistrées, filtrer et consulter la progression conservée.',
   presentation: 'page',
   variants: [...libraryVariants],
   states: [...libraryStates],
@@ -116,7 +116,7 @@ const libraryPreview = definePreview({
   accessibility: [
     'Le titre principal nomme la surface et chaque carte conserve un lien clavier',
     'Les états asynchrones utilisent les composants FeedbackState partagés',
-    'Chaque progression synchronisée reste lisible dans la zone dédiée de WorkCard',
+    'Chaque progression conservée reste lisible dans la zone dédiée de WorkCard',
   ],
   usage: `import { Library } from '@tobirink/ui';`,
   render: ({ state }) => (
