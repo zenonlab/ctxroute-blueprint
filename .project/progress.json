@@ -5358,7 +5358,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-production-publication",
       "title": "Publier TobiRink 1.0.0 sur Cloudflare",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5518,6 +5518,35 @@
             "Remote ZIP hashes match local release-manifest.json: Chrome 41e5d667…2c11b and Firefox e2111228…fd79; immutable download headers are present.",
             "Audit confirms the bounded local pipeline is delivered; MangaDex X-01, live historical differential validation, local-language runtime composition and store signing remain outside or incomplete."
           ]
+        },
+        {
+          "id": "step-6",
+          "title": "Fusionner, publier et vérifier la résolution vivante",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "La branche intègre origin/main sans perte et la CI de la PR passe avant fusion",
+            "Le plan Cloudflare cible uniquement les deux ZIP 1.0.0 et worker:tobirink-public-api",
+            "Aucune donnée D1, aucun secret et aucun autre objet R2 ne sont modifiés",
+            "Les ZIP précédents sont sauvegardés et le Worker précédent reste disponible pour rollback",
+            "Les routes, les hashes distants et le vrai parcours WebBridge installé passent après publication"
+          ],
+          "files": [
+            ".ctxroute/state/tobirink-live-resolution-deployment-plan.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "apps/extension/.output/packages/**",
+            "apps/web/out/**"
+          ],
+          "commands": [
+            "git fetch origin && git merge origin/main",
+            "npm run verify && npm run build --workspace @tobirink/web && npm run package:extension",
+            "npm run test:e2e --workspace @tobirink/web",
+            "git push, gh pr create, gh pr checks, gh pr merge",
+            "npm run infra:inspect, infra:plan and infra:apply with exact allowlist",
+            "curl production routes and shasum downloaded artifacts",
+            "git commit -m chore(release): publish live favorite resolution"
+          ],
+          "evidence": []
         }
       ]
     },
