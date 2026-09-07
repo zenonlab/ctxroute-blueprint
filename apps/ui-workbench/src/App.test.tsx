@@ -12,7 +12,7 @@ describe('UI workbench', () => {
   it('navigates the complete plan and renders the matching preview', () => {
     render(<App />);
 
-    expect(screen.getByLabelText('23 éléments')).toBeTruthy();
+    expect(screen.getByLabelText('24 éléments')).toBeTruthy();
     fireEvent.change(catalogueSearch(), { target: { value: 'Review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Panneau Review' }));
 
@@ -123,7 +123,7 @@ describe('UI workbench', () => {
     expect(screen.queryByRole('button', { name: 'Confirmer la décision' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Saisir un identifiant ou une URL' }));
-    fireEvent.change(screen.getByLabelText('Identifiant ou URL fournisseur'), { target: { value: '30013' } });
+    fireEvent.change(screen.getByLabelText('Identifiant ou adresse de la source'), { target: { value: '30013' } });
     fireEvent.click(screen.getByRole('button', { name: 'Vérifier' }));
     expect(screen.getByText('Décision prête · manual')).toBeTruthy();
 
@@ -181,7 +181,7 @@ describe('UI workbench', () => {
     expect(screen.getByText('1 / 3')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Saisir un identifiant ou une URL' }));
-    fireEvent.change(screen.getByLabelText('Identifiant ou URL fournisseur'), { target: { value: '30013' } });
+    fireEvent.change(screen.getByLabelText('Identifiant ou adresse de la source'), { target: { value: '30013' } });
     fireEvent.click(screen.getByRole('button', { name: 'Vérifier' }));
     expect(screen.getByText('Décision enregistrée : manual')).toBeTruthy();
 
