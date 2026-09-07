@@ -17,10 +17,13 @@ public struct ProbeState: Sendable {
     public var reducedMotion = false
     public let interactive: Bool
 
-    public init(interactive: Bool) { self.interactive = interactive }
+    public init(interactive: Bool, animate: Bool = false) {
+        self.interactive = interactive
+        self.animationRequested = animate
+    }
 
     public var shouldAnimate: Bool {
-        interactive && animationRequested && !paused && !reducedMotion && visibility == .visible
+        animationRequested && !paused && !reducedMotion && visibility == .visible
     }
 
     public mutating func openPanel() {

@@ -12,7 +12,11 @@ sh pocs/macos-surface/probe.sh desktop --duration 60
 ```
 
 `desktop` lance réellement la surface de bureau, pas la fenêtre de contrôles.
-Le dessin de test reste statique et passif, sans interface de terminal ni jeu.
+Le fond demande maintenant l'animation ; il reste transparent aux clics.
+Le menu **WP** dans la barre macOS donne Pause/Reprendre, Animation, Halo et Arrêter.
+Les clics sur l'objet du fond ne sont pas activés : ils restent à qualifier face à Finder.
+La fenêtre et sa couche de dessin sont conservées aux changements de Space/réveil.
+L'absence de blanc pendant les transitions n'est pas encore démontrée.
 Pour la fenêtre de diagnostic uniquement : `run --duration 60`.
 En fenêtre : cliquer l'objet ou « Ouvrir l’objet », puis animer, activer le halo,
 mettre en pause et reprendre. Fermer la fenêtre ou « Quitter la sonde » termine
@@ -22,19 +26,29 @@ Essais distincts, à lancer un par un :
 
 ```sh
 sh pocs/macos-surface/probe.sh run --smoke --snapshot --duration 6
-sh pocs/macos-surface/probe.sh run --mode desktop --duration 10
+sh pocs/macos-surface/probe.sh desktop --smoke --duration 6
 ```
 
-Le smoke actionne les boutons par code, pas par injection souris. Il échoue si
+Le smoke de fenêtre actionne les boutons par code, pas par injection souris. Il échoue si
 l'animation demandée ne progresse pas quand les animations sont autorisées.
-Une fenêtre signalée invisible suspend les ticks : ne pas contourner ce garde.
-`--snapshot` capture uniquement notre NSView et exige `--smoke`.
+Le smoke de bureau actionne le menu et les handlers de transition par code :
+il teste la conservation de surface/état, pas le mouvement réel du compositeur.
+`motion_observed_in_ticks` distingue une animation exécutée d'une animation seulement demandée.
+`--snapshot` capture uniquement notre NSView et exige `--smoke` en mode fenêtre.
 Le rendu des contrôles natifs dans cette capture hors écran peut être incomplet ;
 elle ne remplace pas l'inspection d'une fenêtre visible.
 
-Le mode bureau ignore entièrement la souris, ne devient ni fenêtre clé ni fenêtre
-principale et ne demande pas d'activation. Il ne teste aucune ancre interactive.
+La surface bureau ignore entièrement la souris, ne devient ni fenêtre clé ni fenêtre
+principale et ne demande pas d'activation. Son menu reçoit des actions explicites.
 Il ne modifie ni fond système, ni Finder, ni permissions, ni démarrage de session.
+
+Le pacing accepte la visibilité AppKit ; sinon, il utilise le repli déclaré
+« Finder au premier plan + surface ordonnée sur Space actif ». Ce repli n'est pas
+une mesure exacte d'occlusion. Si une autre application masque le fond, l'animation
+peut rester suspendue jusqu'au retour sur le bureau. Veille écran, session inactive,
+pause et réglage système de réduction des animations restent prioritaires.
+La dernière image reste conservée pendant la suspension ; la phase n'est pas remise
+à zéro. Le test s'arrête toujours à sa durée limite, indiquée dans le menu WP.
 
 Le lanceur sélectionne le SDK Xcode local sans modifier `SDKROOT` globalement.
 Builds et caches SwiftPM sont dirigés sous `dist/pocs/macos-surface/`. Le runtime

@@ -12,9 +12,9 @@ public struct ProbeOptions: Sendable {
 
     public static let usage = """
     SurfaceProbe [--mode window|desktop] [--duration 1...600] [--smoke] [--snapshot]
-    Défaut : fenêtre statique, arrêt après 60 s. Smoke : fenêtre, durée minimale 4 s.
+    Défaut : fenêtre statique, arrêt après 60 s. Smoke : durée minimale 4 s.
     --snapshot : capture de notre vue seule, uniquement avec --smoke.
-    Mode desktop : strictement passif, sans focus ni clics ; Ctrl-C pour arrêter.
+    Mode desktop : animé selon activité, clics via menu WP uniquement, sans focus du fond.
     """
 
     public static func parse(_ arguments: [String]) throws -> Self {
@@ -47,10 +47,12 @@ public struct ProbeOptions: Sendable {
         }
         let smoke = flags.contains("--smoke")
         let snapshot = flags.contains("--snapshot")
-        guard !smoke || (mode == .window && duration >= 4) else {
-            throw OptionError.invalid("Smoke réservé à la fenêtre avec durée >= 4 secondes")
+        guard !smoke || duration >= 4 else {
+            throw OptionError.invalid("Smoke exige une durée >= 4 secondes")
         }
-        guard !snapshot || smoke else { throw OptionError.invalid("Snapshot réservé au smoke") }
+        guard !snapshot || (smoke && mode == .window) else {
+            throw OptionError.invalid("Snapshot réservé au smoke en fenêtre")
+        }
         return Self(mode: mode, duration: duration, smoke: smoke, snapshot: snapshot)
     }
 }

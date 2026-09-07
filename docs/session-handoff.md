@@ -4,6 +4,12 @@ Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolémen
 
 ## Reprise actuelle — L1
 
+Version ADR-0045 : animation demandée en bureau, contrôles via menu **WP**, même
+fenêtre conservée au retour Spaces/réveil. Les tests d'état et handlers passent,
+pas encore la fluidité réelle des transitions. La sonde peut suspendre l'animation
+si le fond est masqué ; voir `scheduling_source` dans le reçu. Clic sur géométrie
+derrière les icônes toujours non qualifié. Lire la version actuelle de la fiche L1.
+
 Lire [la fiche d'essai](pocs/macos-surface.md) et
 [ADR-0043](decisions/ADR-0043-isolated-macos-surface-poc.md).
 Source autonome : `pocs/macos-surface/`, aucun lien au futur moteur ou au terminal.

@@ -44,10 +44,18 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var ticksAtPause = 0
     var snapshotName: String?
     var finishing = false
+    var desktopMenu: DesktopMenu?
+    var displaysAwake = true
+    var sessionActive = true
+    var desktopRestorations = 0
+    var spacesNotifications = 0
+    var schedulingSource = "suspended"
+    var finderFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder"
 
     init(options: ProbeOptions) {
         self.options = options
-        self.state = ProbeState(interactive: options.mode == .window)
+        // Desktop controls are explicit menu actions; the surface itself ignores input.
+        self.state = ProbeState(interactive: true, animate: options.mode == .desktop)
     }
 
     var renderedScene: SceneView { ui?.scene ?? scene }
@@ -61,6 +69,14 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                                name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(motionChanged),
                                                           name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+        if options.mode == .desktop {
+            observeDesktopLifecycle()
+            desktopMenu = DesktopMenu(target: self, pause: #selector(togglePause),
+                                      animation: #selector(toggleAnimation), effect: #selector(toggleEffect),
+                                      quit: #selector(quit), duration: options.duration, readState: { [weak self] in
+                self?.state ?? ProbeState(interactive: false)
+            })
+        }
         updateVisibility()
         refreshUI()
         schedule(after: options.duration, selector: #selector(deadlineReached))
@@ -81,7 +97,13 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
             window.ignoresMouseEvents = true
             window.hasShadow = false
+            window.hidesOnDeactivate = false
+            window.canHide = false
+            window.isExcludedFromWindowsMenu = true
             window.isOpaque = true
+            scene.isDesktop = true
+            scene.wantsLayer = true
+            scene.layerContentsRedrawPolicy = .onSetNeedsDisplay
             window.contentView = scene
             // Front of the desktop level, not front of normal applications.
             // This does not activate the app or change the key window.
@@ -135,6 +157,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if options.mode == .desktop {
             guard let screen = NSScreen.main else { finish(reason: "screen-lost", code: 1) }
             window.setFrame(screen.frame, display: true)
+            restoreDesktop()
         }
         updateVisibility()
     }
@@ -144,11 +167,53 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         refreshUI()
     }
 
+    private func observeDesktopLifecycle() {
+        let center = NSWorkspace.shared.notificationCenter
+        for (name, selector) in [
+            (NSWorkspace.activeSpaceDidChangeNotification, #selector(spaceChanged)),
+            (NSWorkspace.didActivateApplicationNotification, #selector(foregroundChanged(_:))),
+            (NSWorkspace.screensDidSleepNotification, #selector(displaysSlept)),
+            (NSWorkspace.screensDidWakeNotification, #selector(displaysWoke)),
+            (NSWorkspace.sessionDidResignActiveNotification, #selector(sessionResigned)),
+            (NSWorkspace.sessionDidBecomeActiveNotification, #selector(sessionResumed))
+        ] { center.addObserver(self, selector: selector, name: name, object: nil) }
+    }
+
+    @objc private func foregroundChanged(_ notification: Notification) {
+        if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+            finderFrontmost = app.bundleIdentifier == "com.apple.finder"
+        }
+        updateVisibility()
+    }
+    @objc private func spaceChanged() { spacesNotifications += 1; restoreDesktop() }
+    @objc private func displaysSlept() { displaysAwake = false; updateVisibility() }
+    @objc private func displaysWoke() { displaysAwake = true; restoreDesktop() }
+    @objc private func sessionResigned() { sessionActive = false; updateVisibility() }
+    @objc private func sessionResumed() { sessionActive = true; restoreDesktop() }
+
+    private func restoreDesktop() {
+        guard options.mode == .desktop, !finishing, displaysAwake, sessionActive else { return }
+        desktopRestorations += 1
+        // Reorder the retained window; never replace the scene or reset its phase.
+        window.orderFrontRegardless()
+        updateVisibility()
+        refreshUI()
+    }
+
     private func updateVisibility() {
         guard window != nil, !finishing else { return }
         visibilityNotifications += 1
         let previous = state.visibility
-        state.visibility = window.occlusionState.contains(.visible) && !window.isMiniaturized ? .visible : .notVisible
+        let appKitVisible = window.occlusionState.contains(.visible) && !window.isMiniaturized
+        if options.mode == .desktop {
+            schedulingSource = DesktopActivity.source(ordered: window.isVisible,
+                activeSpace: window.isOnActiveSpace, appKitVisible: appKitVisible,
+                finderFrontmost: finderFrontmost,
+                awake: displaysAwake, sessionActive: sessionActive)
+            state.visibility = schedulingSource == "suspended" ? .notVisible : .visible
+        } else {
+            state.visibility = appKitVisible ? .visible : .notVisible
+        }
         if previous != state.visibility { refreshUI() } else { syncAnimationTimer() }
     }
 
@@ -197,6 +262,10 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func smokeStep(_ timer: Timer) {
+        if options.mode == .desktop {
+            desktopSmokeStep(timer)
+            return
+        }
         guard let step = timer.userInfo as? Int, let controls = ui else { return }
         switch step {
         case 0:
@@ -232,6 +301,41 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    private func desktopSmokeStep(_ timer: Timer) {
+        guard let step = timer.userInfo as? Int, let menu = desktopMenu?.item.menu else { return }
+        switch step {
+        case 0:
+            smokeChecks["desktop_ignores_input"] = window.ignoresMouseEvents && !window.canBecomeKey
+            smokeChecks["menu_available"] = menu.numberOfItems == 6
+        case 1:
+            smokeChecks["animation_requested"] = state.animationRequested
+        case 2:
+            menu.performActionForItem(at: 2)
+            phaseAtPause = state.phaseSeconds
+            ticksAtPause = state.ticks
+            smokeChecks["menu_pause_stops_timer"] = state.paused && animationTimer == nil
+        case 3:
+            smokeChecks["pause_preserves_phase"] = state.phaseSeconds == phaseAtPause && state.ticks == ticksAtPause
+            menu.performActionForItem(at: 2)
+        case 4:
+            let originalWindow = window.windowNumber
+            let phase = state.phaseSeconds
+            spaceChanged() // Handler-only test: not a real macOS Spaces transition.
+            smokeChecks["space_handler_retains_surface"] = originalWindow == window.windowNumber && phase == state.phaseSeconds
+            displaysSlept()
+            smokeChecks["sleep_handler_stops_timer"] = animationTimer == nil
+            displaysWoke()
+        case 5:
+            menu.performActionForItem(at: 4)
+            smokeChecks["menu_effect_updates_state"] = state.effectEnabled
+            menu.performActionForItem(at: 3)
+            smokeChecks["menu_animation_stop"] = !state.animationRequested && animationTimer == nil
+        default:
+            let passed = smokeChecks.count == 9 && smokeChecks.values.allSatisfy { $0 }
+            finish(reason: "desktop-handler-smoke", code: passed ? 0 : 1)
+        }
+    }
+
     private func captureOwnView() {
         guard let root = window.contentView,
               let bitmap = root.bitmapImageRepForCachingDisplay(in: root.bounds) else {
@@ -260,6 +364,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         scheduledTimers.forEach { $0.invalidate() }
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        desktopMenu?.remove()
         let receipt: [String: Any] = [
             "schema_version": 1, "poc": "macos-surface-l1", "mode": options.mode.rawValue,
             "reason": reason, "exit_code": code,
@@ -268,6 +373,15 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "draw_callbacks": renderedScene.drawCount, "simulation_ticks": state.ticks,
             "local_actions": state.actions, "requested_invalidations": invalidations,
             "visibility_notifications": visibilityNotifications, "visibility_signal": state.visibility.rawValue,
+            "appkit_visible": window?.occlusionState.contains(.visible) ?? false,
+            "scheduling_source": schedulingSource,
+            "finder_frontmost": finderFrontmost,
+            "spaces_notifications": spacesNotifications, "desktop_restorations": desktopRestorations,
+            "hides_on_deactivate": window?.hidesOnDeactivate ?? false,
+            "layer_backed": renderedScene.wantsLayer,
+            "input_policy": options.mode == .desktop ? "explicit-menu-only" : "window",
+            "motion_observed_in_ticks": state.ticks > 0,
+            "transitions_evidence": options.smoke && options.mode == .desktop ? "synthetic-handlers-only" : "not-qualified",
             "timer_active_before_cleanup": timerActiveBeforeCleanup,
             "timer_active_after_cleanup": false, "reduced_motion": state.reducedMotion,
             "ignores_mouse_events": window?.ignoresMouseEvents ?? true,

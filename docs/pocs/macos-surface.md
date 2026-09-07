@@ -5,6 +5,51 @@ Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
 montre uniquement cette sonde ; aucun lien au terminal ou à l'ingestion.
 
+## Version actuelle — animation et transitions (ADR-0045)
+
+[ADR-0045](../decisions/ADR-0045-desktop-motion-and-transitions.md) sépare animation
+et droit de clic : le fond demande l'animation, ignore toujours la souris, et propose
+Pause/Reprendre, Animation, Halo et Arrêter depuis le menu macOS **WP**. Ce menu
+n'est pas l'interactivité géométrique demandée pour le produit final. Aucun hook
+global ni panneau superposé aux icônes n'est ajouté.
+
+La même fenêtre et le même état sont conservés ; couche backing, `canHide = false`,
+`hidesOnDeactivate = false`. Les handlers Spaces et réveil réordonnent cette fenêtre
+sans reconstruction. Ils ne promettent pas une absence de blanc pendant l'animation
+de Mission Control ou lors du passage plein écran, non reproduits ici.
+
+Le pacing distingue `appkit_visible` brut de `scheduling_source`. Si AppKit n'annonce
+pas la visibilité, le repli explicite `finder-frontmost-proxy` autorise l'animation
+sur un Space actif avec surface ordonnée et Finder au premier plan. Ce n'est pas
+une mesure d'occlusion : une fenêtre Finder peut couvrir le fond. Session inactive,
+veille écran, pause et réduction des animations bloquent la simulation. Aucun watt
+n'est mesuré. L'événement d'activation n'enregistre que le booléen Finder, pas une
+liste d'applications ni leurs contenus.
+
+Preuves : 11 tests XCTest réussis, dont les 64 combinaisons des gardes de pacing,
+animation sans droit de clic et conservation d'état pendant suspension.
+`desktop --smoke --duration 6` : 9 contrôles de handlers/menu réussis, code 0,
+4 actions locales, 2 réordonnancements de la même surface. `simulation_ticks: 0`
+et `motion_observed_in_ticks: false` dans cette session inactive : ne pas présenter
+ce smoke comme preuve d'une animation affichée. Les événements Spaces/veille sont
+synthétiques dans ce test, explicitement étiquetés `synthetic-handlers-only`.
+
+Prochaine preuve : lancer `desktop --duration 300`, revenir sur Finder et utiliser
+WP → Halo/Pause/Reprendre. Éprouver séparément Spaces, sortie du plein écran et
+Mission Control ; préciser lequel fait disparaître le fond. Ne pas confondre ce
+défaut avec l'arrêt automatique après 300 secondes.
+
+Archify actualisé : architecture showcase 9/9, zéro erreur/avertissement.
+Source SHA-256 : `9d092f5648ec1372a549fc673a1acec12fb4eea79ff2b053be729c38e6228b7d`.
+HTML SHA-256 : `75c90473252b7706da0db9ad43a2465e1775cbc0e7322c19a230d838256cca04`.
+Visual-check réussi sur quatre tailles ; capture sombre 2048×1320 inspectée.
+Interface fixe anglaise et labels français ; revue humaine du reçu toujours `pending`.
+`npm run verify` réussit : 262 tests, 1 ignoré, 3 intégrations, aucun échec.
+Le Sensor reste en couverture lexicale Swift (`WARN`, parseur indisponible) ;
+la compilation native et XCTest constituent les vérifications Swift effectives.
+AGENTS.md, CLAUDE.md et hooks inchangés.
+Les sections suivantes conservent les preuves des versions antérieures.
+
 ## Correction du lancement bureau — ADR-0044
 
 `sh pocs/macos-surface/probe.sh desktop --duration 60` lance désormais une `.app`

@@ -15,7 +15,7 @@ final class ProbeCoreTests: XCTestCase {
             ["--duration", "nan"], ["--duration", "inf"], ["--duration", "0"],
             ["--duration", "601"], ["--duration"], ["--mode", "other"],
             ["--exec", "anything"], ["--mode", "window", "--mode", "desktop"],
-            ["--smoke", "--smoke"], ["--snapshot"], ["--mode", "desktop", "--smoke"],
+            ["--smoke", "--smoke"], ["--snapshot"], ["--mode", "desktop", "--smoke", "--snapshot"],
             ["--smoke", "--duration", "3"]
         ] {
             XCTAssertThrowsError(try ProbeOptions.parse(arguments), "\(arguments)")
@@ -26,9 +26,10 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertEqual(try ProbeOptions.parse(["--mode", "desktop", "--duration", "1"]).mode, .desktop)
         XCTAssertEqual(try ProbeOptions.parse(["--duration", "600"]).duration, 600)
         XCTAssertTrue(try ProbeOptions.parse(["--smoke", "--snapshot", "--duration", "4"]).snapshot)
+        XCTAssertTrue(try ProbeOptions.parse(["--mode", "desktop", "--smoke"]).smoke)
     }
 
-    func testDesktopRejectsEveryLocalAction() {
+    func testPassiveStateRejectsEveryLocalAction() {
         var state = ProbeState(interactive: false)
         state.visibility = .visible
         state.openPanel()
@@ -96,5 +97,52 @@ final class ProbeCoreTests: XCTestCase {
         state.visibility = .visible
         state.toggleAnimation()
         return state
+    }
+
+    func testAnimationDoesNotRequireSurfaceInput() {
+        var state = ProbeState(interactive: false, animate: true)
+        state.visibility = .visible
+        XCTAssertTrue(state.advance(by: 0.03))
+        state.openPanel()
+        XCTAssertFalse(state.panelOpen)
+        XCTAssertEqual(state.actions, 0)
+        state.reducedMotion = true
+        XCTAssertFalse(state.advance(by: 0.03))
+    }
+
+    func testDesktopSchedulingGatesAndProxyAreExplicit() {
+        for ordered in [false, true] {
+            for active in [false, true] {
+                for awake in [false, true] {
+                    for session in [false, true] {
+                        for visible in [false, true] {
+                            for finder in [false, true] {
+                                let source = DesktopActivity.source(ordered: ordered, activeSpace: active,
+                                    appKitVisible: visible, finderFrontmost: finder, awake: awake, sessionActive: session)
+                                let expected = ordered && active && awake && session
+                                    ? (visible ? "appkit-visible" : (finder ? "finder-frontmost-proxy" : "suspended"))
+                                    : "suspended"
+                                XCTAssertEqual(source, expected)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testSuspensionPreservesAnimationAndEffectState() {
+        var state = ProbeState(interactive: true, animate: true)
+        state.visibility = .visible
+        state.toggleEffect()
+        state.advance(by: 0.03)
+        let phase = state.phaseSeconds
+        state.visibility = .notVisible
+        XCTAssertFalse(state.advance(by: 100))
+        XCTAssertEqual(state.phaseSeconds, phase)
+        state.visibility = .visible
+        XCTAssertTrue(state.advance(by: 0.03))
+        XCTAssertTrue(state.effectEnabled)
+        XCTAssertTrue(state.animationRequested)
     }
 }
