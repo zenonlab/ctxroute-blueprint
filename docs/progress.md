@@ -160,6 +160,7 @@
 ## Augmenter la capacité bornée de Progress sans perdre l’historique — DONE
 
 - [x] **Porter la limite Progress à 128 Kio** — DONE _(evidence: 40 Progress tests; decisions; docs; diff pass.)_
+- [x] **Porter Progress à 512 Kio** — DONE _(evidence: 41 tests; validate complet; Archify 9/9; 40 goals conservés.)_
 
 ## Aligner l’autorisation avec le mode autonome confirmé — DONE
 

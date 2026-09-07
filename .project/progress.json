@@ -3346,6 +3346,29 @@
           "evidence": [
             "40 Progress tests; decisions; docs; diff pass."
           ]
+        },
+        {
+          "id": "step-2",
+          "title": "Porter Progress à 512 Kio",
+          "status": "DONE",
+          "acceptance": [
+            "Borne 512 Kio testée sans perte des 40 goals."
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "41 tests; validate complet; Archify 9/9; 40 goals conservés."
+          ]
         }
       ]
     },

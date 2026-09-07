@@ -23,7 +23,33 @@ test('approval writes JSON and generated Markdown atomically and is idempotent',
 test('multiple goals preserve insertion order and status is compact', async () => { const directory = root(); await approvePlan({ ...plan(), approved: true }, directory); await approvePlan({ ...plan({ goalId: 'goal-10', title: 'Second' }), approved: true }, directory); assert.deepEqual(progressStatus(await readProgress(directory)).map(item => item.id), ['goal-9', 'goal-10']); });
 test('approval is explicit and rejects paths, secrets, duplicate steps, and limits', async () => { const directory = root(); await assert.rejects(() => approvePlan(plan(), directory), /approved must be true/u); assert.equal(validatePlan({ ...plan(), steps: [{ ...plan().steps[0], files: ['../secret'] }], validationEvidence: ['ok'] }).ok, false); assert.equal(validatePlan({ ...plan(), steps: [{ ...plan().steps[0], id: 'step-1' }, { ...plan().steps[0], id: 'step-1' }] }).ok, false); assert.equal(validatePlan({ ...plan(), validationEvidence: ['apiKey: hidden'] }).ok, false); });
 test('invalid stored JSON is rejected', async () => { const directory = root(); const path = join(directory, '.project/progress.json'); mkdirSync(join(directory, '.project')); writeFileSync(path, '{invalid'); await assert.rejects(() => readProgress(directory), /Cannot read progress checklist/u); });
-test('stored progress remains bounded at 256 KiB', async () => { const directory = root(); const path = join(directory, '.project/progress.json'); mkdirSync(join(directory, '.project')); assert.equal(LIMITS.bytes, 256 * 1024); writeFileSync(path, 'x'.repeat(LIMITS.bytes + 1)); await assert.rejects(() => readProgress(directory), /exceeds 256 KiB/u); });
+test('stored progress remains bounded at 512 KiB', async () => { const directory = root(); const path = join(directory, '.project/progress.json'); mkdirSync(join(directory, '.project')); assert.equal(LIMITS.bytes, 512 * 1024); writeFileSync(path, 'x'.repeat(LIMITS.bytes + 1)); await assert.rejects(() => readProgress(directory), /exceeds 512 KiB/u); });
+test('stored progress accepts a valid checklist larger than 256 KiB', async () => {
+  const directory = root();
+  const reference = 'a'.repeat(350);
+  const goals = Array.from({ length: 12 }, (_, goalIndex) => ({
+    id: `goal-${goalIndex}`,
+    title: `Goal ${goalIndex}`,
+    status: 'ACTIVE',
+    executionMode: 'collaborative',
+    modeOffered: false,
+    steps: Array.from({ length: LIMITS.steps }, (_, stepIndex) => ({
+      id: `step-${stepIndex}`,
+      title: `Step ${stepIndex}`,
+      status: 'TODO',
+      acceptance: [reference],
+      files: [`docs/${goalIndex}-${stepIndex}-${reference}.md`],
+      commands: [reference],
+      evidence: [],
+    })),
+  }));
+  const source = `${JSON.stringify({ schemaVersion: 1, goals }, null, 2)}\n`;
+  assert.ok(Buffer.byteLength(source) > 256 * 1024);
+  assert.ok(Buffer.byteLength(source) < LIMITS.bytes);
+  mkdirSync(join(directory, '.project'));
+  writeFileSync(join(directory, '.project/progress.json'), source);
+  assert.equal((await readProgress(directory)).goals.length, goals.length);
+});
 test('stored progress validation accepts both execution modes and rejects unknown modes', () => { const value = { schemaVersion: 1, goals: [{ id: 'goal-9', title: 'Modes', status: 'ACTIVE', executionMode: 'autonomous', modeOffered: true, steps: [{ id: 'step-1', title: 'Verify', status: 'TODO', acceptance: ['ok'], files: ['.project/progress.json'], commands: ['npm test'], evidence: [] }] }] }; assert.deepEqual(validateProgress(value), []); assert.match(validateProgress({ ...value, goals: [{ ...value.goals[0], executionMode: 'manual' }] })[0], /executionMode/u); });
 test('stored progress validation rejects duplicate goal identifiers', () => { const goal = { id: 'goal-9', title: 'Goal', status: 'ACTIVE', steps: [] }; assert.match(validateProgress({ schemaVersion: 1, goals: [goal, goal] }).join(' '), /goal ids/u); });
 test('stored progress validation rejects malformed step references', () => { const goal = { id: 'goal-9', title: 'Goal', status: 'ACTIVE', steps: [{ id: 'step-1', title: 'Step', status: 'TODO', acceptance: ['ok'], files: ['../outside'], commands: ['npm test'], evidence: [] }] }; assert.match(validateProgress({ schemaVersion: 1, goals: [goal] }).join(' '), /invalid files/u); });
