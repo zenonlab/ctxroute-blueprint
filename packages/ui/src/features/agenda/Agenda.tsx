@@ -18,7 +18,7 @@ export function Agenda({ canNext, canPrevious, days, navigation, onNext, onPrevi
       <header className={styles.header}><div><p>Calendrier</p><h1 id="agenda-title">Agenda</h1></div><span className={styles.count}>{releaseCount}</span></header>
       {state === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des sorties enregistrées pour la période." kind="loading" layout="centered" title="Préparation de l’agenda…" /> : null}
       {state === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucune sortie datée n’est enregistrée pour cette semaine." icon="calendar-days" kind="empty" layout="centered" title="Semaine vide" /> : null}
-      {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable title="Actualisation interrompue" /> : null}
+      {state === 'error' ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Les sorties déjà affichées restent disponibles." kind="error" layout="centered" recoverable title="Actualisation interrompue" /> : null}
       {usable ? <>
         {state === 'partial' ? <Status tone="accent">Dates estimées séparées · certaines sources manquent</Status> : null}
         {state === 'offline' ? <Status tone="warning">{`Cache du ${updatedAt} · hors ligne`}</Status> : null}

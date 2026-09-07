@@ -78,10 +78,10 @@ export function BridgeState() {
   const { retry, status } = useWebBridge();
   if (status === 'connected') return <Status tone="success">Extension connectée · vue privée disponible</Status>;
   if (status === 'loading' || status === 'reconnecting') {
-    return <FeedbackState description="Vos données restent dans l’extension pendant cette vérification." kind="loading" layout="centered" title={status === 'loading' ? 'Connexion à l’extension…' : 'Reconnexion à l’extension…'} />;
+    return <FeedbackState description="Connexion à votre extension en cours." kind="loading" layout="centered" title={status === 'loading' ? 'Ouverture de votre bibliothèque…' : 'Reconnexion à l’extension…'} />;
   }
   if (status === 'extension-missing') {
-    return <FeedbackState action={<Button icon="download" onClick={() => router.push('/download')} variant="primary">Télécharger l’extension</Button>} description="Installez TobiRink pour ouvrir vos vues privées sur cet appareil." icon="puzzle" kind="empty" layout="centered" title="Extension absente" />;
+    return <FeedbackState action={<Button icon="download" onClick={() => router.push('/download')} variant="primary">Télécharger l’extension</Button>} description="Installez l’extension TobiRink pour retrouver votre bibliothèque et vos sorties." icon="puzzle" kind="empty" layout="centered" title="Extension requise" />;
   }
   return <FeedbackState action={status === 'incompatible' ? <Button icon="download" onClick={() => router.push('/download')} variant="primary">Télécharger la version actuelle</Button> : <Button icon="refresh-cw" onClick={retry}>Réessayer</Button>} description={status === 'incompatible' ? 'Cette version ne peut pas communiquer avec le site.' : 'Vos données privées restent intactes dans l’extension.'} kind="error" layout="centered" recoverable title={status === 'incompatible' ? 'Extension incompatible' : 'Connexion interrompue'} />;
 }

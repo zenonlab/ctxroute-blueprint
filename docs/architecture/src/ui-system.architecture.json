@@ -99,6 +99,7 @@
         "Les libellés visibles évitent le qualificatif local et privilégient les noms produit directs",
         "Les surfaces distinguent extension requise et données vides sans demander un import manuel",
         "Accueil et Agenda reprennent l’état isolé de Bibliothèque lorsque l’extension est absente",
+        "Les textes visibles décrivent le bénéfice utilisateur sans exposer le protocole, le stockage ou le format de paquet",
         "Aucun éditeur ni source brute n’entre dans le build"
       ]
     }

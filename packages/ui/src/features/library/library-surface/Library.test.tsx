@@ -26,7 +26,7 @@ describe('shared Library surface', () => {
 
   it('distinguishes an absent extension from an installed empty library', () => {
     expect(component).toContain('Extension TobiRink requise');
-    expect(component).toContain('analyse automatiquement les favoris HTTP(S) de votre navigateur');
+    expect(component).toContain('retrouver automatiquement les œuvres de vos favoris');
     expect(component).toContain('Aucune œuvre trouvée');
     expect(component).not.toContain('Importez vos favoris');
   });

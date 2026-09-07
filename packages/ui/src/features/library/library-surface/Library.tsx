@@ -53,7 +53,7 @@ export function Library({
           <FeedbackState
             action={extensionRequired && onDownloadExtension ? <Button icon="download" onClick={onDownloadExtension} variant="primary">Télécharger l’extension</Button> : undefined}
             className={styles.centeredState}
-            description={extensionRequired ? 'À l’installation, TobiRink analyse automatiquement les favoris HTTP(S) de votre navigateur et prépare votre bibliothèque.' : 'Aucun favori HTTP(S) compatible n’a été trouvé lors de l’analyse.'}
+            description={extensionRequired ? 'Installez l’extension TobiRink pour retrouver automatiquement les œuvres de vos favoris.' : 'Aucune œuvre compatible n’a été trouvée dans vos favoris.'}
             icon="library-big"
             kind="empty"
             layout="centered"
@@ -66,7 +66,7 @@ export function Library({
         ) : null}
 
         {state === 'blocked' ? (
-          <FeedbackState action={<Button icon="rotate-ccw" onClick={onOpenRecovery}>Ouvrir la récupération</Button>} className={styles.centeredState} description="La migration doit être reprise avant toute modification." kind="error" layout="centered" recoverable title="Migration interrompue" />
+          <FeedbackState action={<Button icon="rotate-ccw" onClick={onOpenRecovery}>Ouvrir la récupération</Button>} className={styles.centeredState} description="Vos données doivent être réparées avant de continuer." kind="error" layout="centered" recoverable title="Bibliothèque indisponible" />
         ) : null}
 
         {usable ? (

@@ -86,7 +86,7 @@ test('connected empty Library matches the Workbench empty surface', async ({ pag
   await page.goto('/library');
   await expect(page.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Aucune œuvre trouvée' })).toBeVisible();
-  await expect(page.getByText('Aucun favori HTTP(S) compatible n’a été trouvé lors de l’analyse.')).toBeVisible();
+  await expect(page.getByText('Aucune œuvre compatible n’a été trouvée dans vos favoris.')).toBeVisible();
   await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
   await expect(page.locator('[data-variant="library"]')).toHaveCount(1);
   await expect(page.locator('h2').filter({ hasText: 'Aucune œuvre trouvée' })).toHaveCSS('font-size', '18px');
@@ -107,16 +107,16 @@ test('Agenda keeps seven horizontal days and emits one read per week', async ({ 
 
 test('missing extension keeps the Workbench empty surfaces while verified downloads stay public', async ({ page, request }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Extension absente' })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole('heading', { name: 'Extension requise' })).toBeVisible({ timeout: 3_000 });
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(0);
   await expect(page.locator('[data-layout="centered"] svg').first()).toHaveCSS('width', '48px');
   await page.getByRole('button', { name: /Correspondances à vérifier/u }).click();
   await expect(page.getByRole('heading', { name: 'Extension TobiRink requise' })).toBeVisible();
   await page.goto('/library');
   await expect(page.getByRole('heading', { name: 'Extension TobiRink requise' })).toBeVisible({ timeout: 3_000 });
-  await expect(page.getByText(/analyse automatiquement les favoris HTTP\(S\) de votre navigateur/u)).toBeVisible();
+  await expect(page.getByText(/retrouver automatiquement les œuvres de vos favoris/u)).toBeVisible();
   await page.goto('/agenda');
-  await expect(page.getByRole('heading', { name: 'Extension absente' })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByRole('heading', { name: 'Extension requise' })).toBeVisible({ timeout: 3_000 });
   await expect(page.getByRole('button', { name: 'Télécharger l’extension' })).toBeVisible();
   await page.goto('/download');
   await expect(page.getByRole('heading', { name: 'Choisir votre navigateur' })).toBeVisible();

@@ -14,13 +14,13 @@ export function MemberOverview({ agendaDays, agendaHref, agendaState, libraryCou
     ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Réessayer</Button>} className={styles.centeredState} description="Les œuvres déjà conservées ne sont pas supprimées." kind="error" layout="centered" recoverable title="Lecture interrompue" />
     : <FeedbackState className={styles.centeredState} description="Les œuvres déjà conservées ne sont pas supprimées." kind="error" layout="centered" recoverable={false} title="Lecture interrompue" />;
   const agendaError = onRetry
-    ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable title="Actualisation interrompue" />
-    : <FeedbackState className={styles.centeredState} description="Le cache précédent reste intact." kind="error" layout="centered" recoverable={false} title="Actualisation interrompue" />;
+    ? <FeedbackState action={<Button icon="refresh-cw" onClick={onRetry}>Actualiser la période</Button>} className={styles.centeredState} description="Les sorties déjà affichées restent disponibles." kind="error" layout="centered" recoverable title="Actualisation interrompue" />
+    : <FeedbackState className={styles.centeredState} description="Les sorties déjà affichées restent disponibles." kind="error" layout="centered" recoverable={false} title="Actualisation interrompue" />;
   return <main aria-label="Accueil" className={styles.overview}>
     <section className={styles.section} aria-labelledby="library-overview-title">
       <header className={styles.heading}><div><p className={styles.eyebrow}>Bibliothèque</p><h1 id="library-overview-title">{libraryCount} œuvres</h1></div><a className={styles.link} href={libraryHref}>Tout voir</a></header>
       {libraryState === 'loading' ? <FeedbackState className={styles.centeredState} description="Lecture des œuvres enregistrées sur cet appareil." kind="loading" layout="centered" title="Préparation de la bibliothèque…" /> : null}
-      {libraryState === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucun favori HTTP(S) compatible n’a été trouvé lors de l’analyse." icon="library-big" kind="empty" layout="centered" title="Aucune œuvre trouvée" /> : null}
+      {libraryState === 'empty' ? <FeedbackState className={styles.centeredState} description="Aucune œuvre compatible n’a été trouvée dans vos favoris." icon="library-big" kind="empty" layout="centered" title="Aucune œuvre trouvée" /> : null}
       {libraryState === 'error' ? libraryError : null}
       {libraryState === 'ready' ? <div className={styles.grid}>{libraryItems.map((item) => <WorkCard coverAlt={item.coverAlt} coverSrc={item.coverSrc} context={item.mediaType} detail={item.source} href={item.href} indicator={item.progress} key={item.id} title={item.title} variant="library" />)}</div> : null}
     </section>
