@@ -38,11 +38,15 @@ and agenda surfaces. Contextual reprise belongs to the popup and product pages;
 no additional persistent contextual surface is packaged.
 
 Generate permissions from `wxt.config.ts`. Allow only `storage`, `bookmarks`,
-`alarms` and `notifications`, expose no host permission, and keep extension
-scripts under `script-src 'self'` with object embedding disabled.
+`alarms` and `notifications`. Bound host permissions to the exact HTTPS origins
+of AniList GraphQL, MangaUpdates API and Kitsu; these permissions enable only
+the catalogue adapters composed by the background. Keep extension scripts under
+`script-src 'self'` with object embedding disabled.
 Firefox builds declare the stable signing identifier `tobirink@tobirink.local`
-and `data_collection_permissions.required: [none]`, because the local-first
-extension transmits no user data.
+and `data_collection_permissions.required: [bookmarksInfo]`. Resolution sends
+only a parsed title or an explicit provider identifier to the selected public
+catalogue. Raw bookmark URLs, folders, progress and the resulting local library
+are not transmitted.
 
 The background entrypoint owns WebExtension API access. Browser globals are
 read only inside its `main` callback. Its message router accepts only a closed,

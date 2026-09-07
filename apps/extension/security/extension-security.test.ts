@@ -10,7 +10,7 @@ const generatedManifestSchema = z.object({
   }),
   browser_specific_settings: z.object({
     gecko: z.object({
-      data_collection_permissions: z.object({ required: z.tuple([z.literal('none')]) }),
+      data_collection_permissions: z.object({ required: z.tuple([z.literal('bookmarksInfo')]) }),
       id: z.literal('tobirink@tobirink.local'),
     }),
   }).optional(),
@@ -37,7 +37,11 @@ describe('extension security boundary', () => {
     const value = await loadManifest();
     const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
     expect(value.manifest_version).toBe(3);
-    expect(value.host_permissions ?? []).toEqual([]);
+    expect(value.host_permissions ?? []).toEqual([
+      'https://api.mangaupdates.com/*',
+      'https://graphql.anilist.co/*',
+      'https://kitsu.io/*',
+    ]);
     expect(value.permissions?.every((permission) => allowed.has(permission))).toBe(true);
     expect(value.permissions).toEqual(expect.arrayContaining(['activeTab', 'alarms', 'bookmarks', 'notifications', 'storage']));
     expect(value.icons).toEqual({
@@ -67,9 +71,9 @@ describe('extension security boundary', () => {
     expect(extensionMessageSchema.safeParse(null).success).toBe(false);
   });
 
-  it('declares no Firefox data collection and a stable signing ID', async () => {
+  it('declares the bounded Firefox bookmark transmission and a stable signing ID', async () => {
     const value = await firefoxManifest();
-    expect(value.browser_specific_settings?.gecko.data_collection_permissions.required).toEqual(['none']);
+    expect(value.browser_specific_settings?.gecko.data_collection_permissions.required).toEqual(['bookmarksInfo']);
     expect(value.browser_specific_settings?.gecko.id).toBe('tobirink@tobirink.local');
   });
 

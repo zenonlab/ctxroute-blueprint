@@ -53,7 +53,7 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
 
   if (favoriteInventoryCheckpoints.length > 1) throw new Error('Favorite inventory contains more than one checkpoint.');
   for (const checkpoint of favoriteProviderRateCheckpoints) {
-    if ((checkpoint.provider !== 'anilist' && checkpoint.provider !== 'mangaupdates') || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
+    if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangaupdates'].includes(checkpoint.provider) || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
   }
 
   for (const library of validLibraries) {

@@ -1,4 +1,5 @@
 import { favoriteProviderPolicy } from '@tobirink/application';
+import type { ResolutionProvider } from '@tobirink/application';
 import type { z } from 'zod';
 
 export const favoriteProviderResponseByteLimit = 64 * 1024;
@@ -6,8 +7,8 @@ export type FavoriteProviderFetch = (input: string, init: RequestInit) => Promis
 
 export interface FavoriteProviderJson<TValue> { readonly digest: string; readonly value: TValue }
 export interface FavoriteProviderRateCheckpointPort {
-  read(provider: 'anilist' | 'mangaupdates'): Promise<number | undefined>;
-  write(provider: 'anilist' | 'mangaupdates', nextAllowedAt: number): Promise<void>;
+  read(provider: ResolutionProvider): Promise<number | undefined>;
+  write(provider: ResolutionProvider, nextAllowedAt: number): Promise<void>;
 }
 
 export class FavoriteProviderRateGate {
@@ -15,7 +16,7 @@ export class FavoriteProviderRateGate {
   private nextAllowedAt = 0;
 
   constructor(
-    private readonly provider: 'anilist' | 'mangaupdates',
+    private readonly provider: ResolutionProvider,
     private readonly checkpoints?: FavoriteProviderRateCheckpointPort,
     private readonly clock: () => number = Date.now,
     private readonly wait: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => { setTimeout(resolve, milliseconds); }),
@@ -42,7 +43,7 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
     const response = await fetcher(url, { cache: 'default', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', ...init, signal: controller.signal });
     if (!response.ok) throw new Error(`Favorite provider request failed with HTTP ${response.status}.`);
     const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
-    if (contentType !== undefined && contentType !== 'application/json') throw new Error('Favorite provider response must be JSON.');
+    if (contentType !== undefined && contentType !== 'application/json' && !contentType.endsWith('+json')) throw new Error('Favorite provider response must be JSON.');
     const declaredLength = Number(response.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
     const text = await response.text();

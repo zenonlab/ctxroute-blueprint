@@ -2839,7 +2839,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-vertical-flows",
       "title": "Livrer les parcours fonctionnels verticaux",
-      "status": "BLOCKED",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -3090,38 +3090,51 @@
         },
         {
           "id": "step-8",
-          "title": "Valider les parcours UX de bout en bout avant livraison",
-          "status": "BLOCKED",
+          "title": "Rendre la résolution vivante et prouver le ZIP installé",
+          "status": "DONE",
           "acceptance": [
-            "Import, bibliothèque, progression, Review, agenda et réglages passent dans une extension chargée",
-            "Clavier, focus, zoom 200 pourcent, mouvement réduit et formats étroits passent sur Chrome et Firefox",
-            "Les états vide, chargement, partiel, hors ligne, erreur, conflit et blocage sont vérifiés sans contenu inventé",
-            "Le package final reste déterministe et aucune publication ni aucun déploiement n’est automatique"
+            "Un fournisseur public disponible couvre anime et manga derrière les ports existants, avec identité propre, limites, cadence et échec fermé",
+            "AniList et MangaUpdates peuvent échouer sans bloquer un repli borné ni produire de correspondance certaine depuis une réponse incomplète",
+            "La page Confidentialité et le manifeste Firefox déclarent exactement les titres ou identifiants issus des favoris transmis aux fournisseurs",
+            "Un test Chromium installe le build MV3 réel et prouve import, résolution, persistance, WebBridge et mode hors ligne sans mock de bridge",
+            "La matrice complète, Archify showcase et npm run verify passent avant commit"
           ],
           "files": [
-            "tests/e2e",
-            "apps/extension",
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "packages/application/src/ports/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/**",
+            "apps/extension/wxt.config.ts",
+            "apps/extension/security/**",
+            "apps/web/app/privacy/page.tsx",
+            "apps/web/e2e/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
             "docs/ui/accessibility-evidence.md",
             "docs/browser-support.md",
-            "docs/release.md"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
           ],
           "commands": [
-            "npm run test:e2e",
-            "npm run test:a11y",
+            "npm run test --workspace @tobirink/adapters-browser",
+            "npm run test --workspace @tobirink/application",
+            "npm run test --workspace @tobirink/extension",
             "npm run test:security",
-            "npm run test:performance",
-            "npm run build:extension",
-            "npm run build:extension:firefox",
-            "npm run verify"
+            "npm run test:e2e",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m fix(parser): add resilient live resolution"
           ],
           "evidence": [
-            "Extension tests 88/88 and accessibility tests 8/8 pass; security tests pass extension 8/8 and Worker 4/4.",
-            "Performance suite 3/3 passes; Chrome and Firefox WXT builds are deterministic-sized at 641.68 kB and 641.80 kB.",
-            "npm run archify:validate -- tobirink-ux.dataflow passes all 9 showcase checks with 0 errors and 0 warnings.",
-            "Delivered UX dataflow artifact SHA-256 0b9c46fe1fc7f186f93732584dc00f4f22bb2ca0545018cb98453eceaebb00a4; visual-check passes light/dark at 1440x900, 1600x1000, 1920x1080 and 2048x1320 with no overflow.",
-            "Manual screenshot inspection confirms the five-stage UX path, labels, legend, and conclusion cards are readable in the delivered light artifact.",
-            "npm run verify reaches architecture, docs, UI, lint, anti-slop, Sensor and AST gates, then fails only at mcp:validate because pre-existing .codex/config.toml adds four tool overrides.",
-            "external: browser controller reports Browser is not available; real loaded-extension Chrome/Firefox journeys, zoom 200 percent and multi-browser focus checks cannot run in this environment."
+            "Packaged Chrome 1.0.0 Playwright journey passed: real bookmark import, AniList outage, Kitsu anime resolution, IndexedDB commit, production WebBridge rendering and offline reload without bridge injection.",
+            "npm run verify passed end to end: all workspace tests and typechecks, parser equivalence, performance, security, audit with 0 vulnerabilities and documentation build.",
+            "Next static export and all 7 web Playwright tests passed; favorite-resolution Archify showcase passed 9/9 with 0 errors and 0 warnings; git diff --check passed."
           ]
         }
       ]

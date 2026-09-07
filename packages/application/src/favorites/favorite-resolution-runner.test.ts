@@ -10,6 +10,14 @@ import { runFavoriteResolutionSlice } from './favorite-resolution-runner';
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
 const candidate = { externalId: '154587', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Frieren'] };
+const unusedSearch = { search: async () => { throw new Error('not routed'); } };
+const unusedHydration = { hydrate: async () => undefined };
+function candidatePorts(anilist: { search: () => Promise<ReturnType<typeof createProviderCandidateEnvelope>> }, kitsuAnime = unusedSearch) {
+  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedSearch, mangaupdates: unusedSearch } as const;
+}
+function hydrationPorts(anilist: { hydrate: () => Promise<typeof candidate | undefined> }, kitsuAnime = unusedHydration) {
+  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedHydration, mangaupdates: unusedHydration } as const;
+}
 
 class MemoryOutbox implements FavoriteResolutionOutboxPort {
   constructor(private readonly storage: MemoryStoragePort, private readonly id: string) {}
@@ -42,8 +50,8 @@ describe('runFavoriteResolutionSlice', () => {
     const { outbox, storage, task } = await fixture();
     const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'search-1', provider: 'anilist', truncated: false });
     const result = await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => envelope }, mangaupdates: { search: async () => { throw new Error('not routed'); } } },
-      hydration: { anilist: { hydrate: async () => candidate }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => envelope }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }),
       libraryId: libraryId('library_primary'),
       now: () => now,
       outbox,
@@ -63,8 +71,8 @@ describe('runFavoriteResolutionSlice', () => {
   it('persists a retry after a recoverable provider failure', async () => {
     const { outbox, storage, task } = await fixture();
     const result = await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => { throw new Error('offline'); } }, mangaupdates: { search: async () => { throw new Error('not routed'); } } },
-      hydration: { anilist: { hydrate: async () => undefined }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => { throw new Error('offline'); } }),
+      hydration: hydrationPorts({ hydrate: async () => undefined }),
       libraryId: libraryId('library_primary'),
       now: () => now,
       outbox,
@@ -75,13 +83,36 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
   });
 
+  it('uses one complete Kitsu fallback tier when AniList is unavailable', async () => {
+    const { outbox, storage, task } = await fixture();
+    const kitsuCandidate = { ...candidate, externalId: '46474', provider: 'kitsu-anime' as const };
+    const fallback = createProviderCandidateEnvelope({ candidates: [kitsuCandidate], complete: true, digest: 'kitsu-search', provider: 'kitsu-anime', truncated: false });
+    const result = await runFavoriteResolutionSlice({
+      candidates: {
+        anilist: { search: async () => { throw new Error('AniList unavailable'); } },
+        'kitsu-anime': { search: async () => fallback },
+        'kitsu-manga': unusedSearch,
+        mangaupdates: unusedSearch,
+      },
+      hydration: {
+        anilist: unusedHydration,
+        'kitsu-anime': { hydrate: async () => kitsuCandidate },
+        'kitsu-manga': unusedHydration,
+        mangaupdates: unusedHydration,
+      },
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
+    });
+    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:kitsu-anime:46474', state: 'COMMITTED' });
+  });
+
   it('commits a detached source without contacting a provider', async () => {
     const { outbox, storage, task } = await fixture();
     await reconcileFavoriteSourcePresence([], storage);
     let providerCalls = 0;
     const result = await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => { providerCalls += 1; throw new Error('must not run'); } }, mangaupdates: { search: async () => { providerCalls += 1; throw new Error('must not run'); } } },
-      hydration: { anilist: { hydrate: async () => undefined }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => { providerCalls += 1; throw new Error('must not run'); } }),
+      hydration: hydrationPorts({ hydrate: async () => undefined }),
       libraryId: libraryId('library_primary'),
       now: () => now,
       outbox,
@@ -107,8 +138,8 @@ describe('runFavoriteResolutionSlice', () => {
     const outbox = new MemoryOutbox(storage, task.id);
     let searches = 0;
     const result = await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => { searches += 1; throw new Error('must not search'); } }, mangaupdates: { search: async () => { searches += 1; throw new Error('must not search'); } } },
-      hydration: { anilist: { hydrate: async () => candidate }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => { searches += 1; throw new Error('must not search'); } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }),
       libraryId: libraryId('library_primary'),
       now: () => now,
       outbox,
@@ -131,8 +162,8 @@ describe('runFavoriteResolutionSlice', () => {
     if (task === undefined) throw new Error('Expected blocked-taxonomy task.');
     const blockedCandidate = { ...candidate, categories: ['Hentai'] };
     await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => { throw new Error('must not search'); } }, mangaupdates: { search: async () => { throw new Error('must not search'); } } },
-      hydration: { anilist: { hydrate: async () => blockedCandidate }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => { throw new Error('must not search'); } }),
+      hydration: hydrationPorts({ hydrate: async () => blockedCandidate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'claim-token',
     });
 
@@ -145,8 +176,8 @@ describe('runFavoriteResolutionSlice', () => {
     const { outbox, storage, task } = await fixture();
     const incomplete = createProviderCandidateEnvelope({ candidates: [candidate], complete: false, digest: 'partial', provider: 'anilist', truncated: true });
     const result = await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => incomplete }, mangaupdates: { search: async () => { throw new Error('not routed'); } } },
-      hydration: { anilist: { hydrate: async () => candidate }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => incomplete }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
 
@@ -159,8 +190,8 @@ describe('runFavoriteResolutionSlice', () => {
     const second = { ...candidate, externalId: '154588' };
     const ambiguous = createProviderCandidateEnvelope({ candidates: [candidate, second], complete: true, digest: 'ambiguous', provider: 'anilist', truncated: false });
     await runFavoriteResolutionSlice({
-      candidates: { anilist: { search: async () => ambiguous }, mangaupdates: { search: async () => { throw new Error('not routed'); } } },
-      hydration: { anilist: { hydrate: async () => { throw new Error('must not hydrate'); } }, mangaupdates: { hydrate: async () => undefined } },
+      candidates: candidatePorts({ search: async () => ambiguous }),
+      hydration: hydrationPorts({ hydrate: async () => { throw new Error('must not hydrate'); } }),
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
     const [source] = await storage.listFavoriteSources({ limit: 1 });

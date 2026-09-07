@@ -46,7 +46,8 @@ browser or `workerd` test when platform behavior is the risk.
 ## Security and privacy assertions
 
 - The extension operates without the public API.
-- No private domain record is serialized into a remote request in v1.
+- Provider requests contain only the parsed title or explicit provider ID;
+  fixtures reject raw URLs, folders, progress, library and history fields.
 - IndexedDB remains the only active authority; bookmark deletion cannot delete
   an entry, and repeated import or projection is idempotent.
 - `storage.sync` contains neither secrets nor the full library and rejects a
@@ -67,8 +68,13 @@ browser or `workerd` test when platform behavior is the risk.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles
   and provider references, rejects malformed limits and cursors, treats query
   values as bound data, and never exposes a private identifier or URL.
-- Manifest permissions correspond to documented user flows and no broader host
-  permission is accepted by default.
+- Manifest permissions correspond to documented user flows. Host permissions
+  equal the three exact catalogue origins; wildcards beyond their path suffix
+  and additional origins fail the package test.
+- The packaged-Chrome Playwright journey unpacks the produced `1.0.0` ZIP into
+  an isolated profile, creates a synthetic bookmark through the real extension,
+  proves Kitsu fallback persistence and production WebBridge rendering, then
+  reloads the private library offline without injecting a bridge mock.
 - Logs and CI artifacts redact URLs, titles, identifiers, payload bodies, and
   secrets unless a field is explicitly classified as safe.
 - Infrastructure `apply` refuses absent, stale, mismatched, or unapproved plans.

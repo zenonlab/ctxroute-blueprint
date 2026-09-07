@@ -41,7 +41,7 @@
     { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "générique + AniList" },
     { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "L · T · I · S · R purs" },
     { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "8 tâches · compaction 30 j" },
-    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "ports search/hydrate" },
+    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "paliers · Kitsu · déclaré" },
     { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "6 niveaux · F/C exacts" },
     { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "candidats persistés" },
     { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "preuves · reçus · autorité" }
@@ -52,7 +52,7 @@
     { "from": "eligibility", "to": "parseArtifact", "label": "brut + disposition URL", "classification": "fail-closed", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
     { "from": "sourceEvidence", "to": "parseArtifact", "label": "indices structurés", "classification": "provenance locale", "variant": "default" },
     { "from": "parseArtifact", "to": "durableQueue", "label": "source + Review + tâche", "classification": "transaction atomique", "variant": "security", "labelAt": [575, 440] },
-    { "from": "durableQueue", "to": "providerAdapters", "label": "cadence persistée", "classification": "au moins une fois", "variant": "dashed", "route": "straight", "labelAt": [620, 660] },
+    { "from": "durableQueue", "to": "providerAdapters", "label": "titre/ID déclaré · cadence", "classification": "bookmarksInfo borné", "variant": "dashed", "route": "straight", "labelAt": [620, 660] },
     { "from": "providerAdapters", "to": "titleMatcher", "label": "candidats typés", "classification": "réponse bornée", "variant": "default", "labelAt": [760, 660] },
     { "from": "parseArtifact", "to": "titleMatcher", "label": "aliases et preuves", "classification": "ordre déterministe", "variant": "emphasis", "route": "straight", "labelAt": [638, 320] },
     { "from": "titleMatcher", "to": "privateStore", "label": "correspondance unique", "classification": "upsert idempotent", "variant": "security", "route": "straight", "labelAt": [853, 210] },
@@ -85,7 +85,8 @@
         "Source, Review et tâche rejoignent la même transaction",
         "Le curseur DFS, les reçus et les marques survivent aux suspensions",
         "Les claims sont indexés par type, lane, état et échéance",
-        "Un ensemble fournisseur incomplet interdit toute résolution automatique"
+        "Un ensemble fournisseur incomplet interdit toute résolution automatique",
+        "Un palier indisponible cède à Kitsu sans mélanger des ensembles partiels"
       ]
     }
   ]
