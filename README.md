@@ -1,3 +1,17 @@
+# Wallpaper — bureau et terminal ludiques
+
+Le projet vise un bureau interactif et un terminal personnalisé, utilisables
+séparément ou ensemble sur Linux, macOS et Windows. Les sessions de terminaux
+et d'agents peuvent être représentées par des personnages interchangeables.
+
+Commencer par la [note de reprise](docs/session-handoff.md), la
+[vision produit](docs/00-project-brief.md) et les
+[questions techniques ouvertes](docs/01-technology-decisions.md).
+Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
+
+La documentation amont du template est conservée ci-dessous pour son installation
+et son fonctionnement. Elle décrit l'outillage, pas l'application à construire.
+
 # CTXRoute Blueprint
 
 [![Validate](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml/badge.svg)](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml)

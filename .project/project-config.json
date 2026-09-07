@@ -6,9 +6,9 @@
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "not applicable: blueprint tooling only",
+    "language": "[Product language pending the next technology session]; Node.js is blueprint tooling only",
     "runtime": "Node.js 22.13+ for repository governance; derived product is undecided",
-    "frontend": "none: no product UI is selected",
+    "frontend": "[Product UI technology pending]; modular terminal and interactive desktop required on Linux, macOS and Windows",
     "backend": "none: no product service is selected",
     "storage": "none: product storage is undecided; local SQLite is tooling-only",
     "deployment": "none: documentation artifacts only; derived product decides deployment",
@@ -76,7 +76,9 @@
     ".json"
   ],
   "architecture": {
-    "documents": [],
+    "documents": [
+      "docs/architecture/src/product-vision.architecture.json"
+    ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",
       "docs/architecture/src/traffic.dataflow.json",

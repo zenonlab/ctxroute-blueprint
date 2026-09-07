@@ -1,33 +1,29 @@
-# Project documentation
+# Documentation du projet Wallpaper
 
-This repository is a GitHub starter. Discovery documents remain guides while `.project/project-config.json` has `"status": "template"`.
+Le projet est en cadrage produit. Le socle CTXRoute Blueprint est installé ;
+le terminal, le bureau et l'ingestion restent à concevoir.
+Le statut `template` est intentionnel : la stack sera discutée à la prochaine session.
 
-## Workflow
+## Lecture de reprise
 
-1. Read the complete request and every starter document.
-2. Complete `00-project-brief.md` and `01-technology-decisions.md`.
-3. Produce a showcase-quality Archify architecture JSON IR.
-4. Define the test strategy.
-5. Add required ADRs.
-6. Replace guides with real project documentation and change the configuration to `initialized`.
+1. [Note de reprise](session-handoff.md) : état du dépôt et prochaine discussion.
+2. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
+3. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
+4. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
+5. [Concepts produit](architecture/product-vision.md) : relations sans stack imposée.
+6. [Décision de cadrage](decisions/ADR-0029-product-framing.md) : décisions durables.
+7. [Recherche initiale](research/initial-research.md) : synthèse archivée, non validée.
 
-Initialization fails if a decision, source directory, code extension, mutation
-choice, or required architecture evidence is missing. The versioned Archify JSON
-IR is the architecture source of truth.
+## Séparer produit et outillage
 
-## Structure
+Les ADR antérieurs à ADR-0029 et les documents historiques sous `diff/`
+décrivent le blueprint amont. Leurs preuves ne constituent pas des tests du produit.
+Les guides et l'outillage sont conservés ; aucun nettoyage de starter n'est effectué.
 
-- `00-project-brief.md`: goals, scope, and constraints.
-- `01-technology-decisions.md`: technical choices and criteria.
-- `02-quality-strategy.md`: test and quality strategy.
-- `architecture/`: versioned Archify JSON IR and architecture guidance.
-- `decisions/`: durable decisions as ADRs.
-- `diff/`: evidence-backed architecture audits, comparisons, external research, risks, and validation records.
-- `systems/`: subsystem contracts and responsibilities.
-- `workflows/`: important procedures and interactions.
-- `templates/`: documentation templates to copy and adapt.
+Le schéma produit est une source Archify JSON versionnée. Le HTML est généré
+dans `dist/architecture/` et n'est pas versionné.
+Le [registre documentaire](document-contracts.json) déclare les sources et contrôles.
 
-Archify JSON IR is the versioned source; interactive HTML is generated under `dist/`.
-The schema-first document registry is [`document-contracts.json`](document-contracts.json);
-it declares authoritative structured sources and the Markdown context that
-complements them. `npm run validate:docs -- --all` validates the registry.
+Avant tout code produit, poursuivre l'initialisation selon [AGENTS.md](../AGENTS.md)
+avec les décisions de la prochaine session. Ne pas transformer les suggestions
+de la recherche en choix acceptés.

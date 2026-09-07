@@ -1,90 +1,116 @@
-# Project brief
+# Vision produit — bureau et terminal ludiques
 
-This repository is the stack-neutral CTXRoute blueprint itself. It is not a
-product project and must not initialize a frontend, backend, storage, or cloud
-deployment by default. Product decisions remain placeholders for a derived
-repository.
+État : cadrage produit, 7 septembre 2026. Nom de travail : Wallpaper.
+Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
+Le statut du dépôt reste `template` jusqu'à la session de décisions techniques.
 
-## Summary
+## Synthèse
 
-- Name: `[project name]`
-- Problem solved: `[the user or business problem]`
-- Users: `[primary users, operators, and stakeholders]`
-- In scope: `[capabilities delivered by this project]`
-- Out of scope: `[explicit exclusions and future work]`
-- Product shape: `[CLI, library, web app, mobile app, worker, pipeline, or other]`
+Créer un environnement de travail personnel inspiré des jeux vidéo, dans lequel
+un décor interactif et un terminal personnalisé forment une expérience cohérente.
+L'objectif est de rendre le travail agréable et personnalisable, avec de vrais
+terminaux et agents derrière les personnages et les objets cliquables.
 
-## Discovery context
+L'utilisateur initial travaille avec plusieurs shells et agents de programmation.
+Les « joueurs » représentent ces sessions, pas des utilisateurs distants ni une
+fonction multijoueur. Un personnage est une représentation interchangeable :
+son identité visuelle ne doit pas devenir l'identité technique de la session.
 
-- Expected usage and traffic: `[users, concurrency, latency, availability]`
-- Data and lifecycle: `[data types, volume, retention, consistency, recovery]`
-- Integrations: `[APIs, devices, browsers, queues, files, providers]`
-- Team and ownership: `[skills, operators, support model, delivery cadence]`
-- Risk and compliance: `[privacy, regulatory, abuse, loss, and availability risks]`
-- Deployment environments: `[local, cloud, on-premises, edge, mobile, or mixed]`
-- Expected change: `[UI, domain, integration, data, or scale changes]`
+## Modes et modularité
 
-## Constraints
+| Mode | Expérience attendue |
+| --- | --- |
+| Terminal seul | Un terminal utilisable comme outil de travail, avec thème et sélecteur de sessions, sans activer le bureau animé. |
+| Bureau seul | Un décor interactif, des objets et des raccourcis, sans obligation d'utiliser le terminal personnalisé. |
+| Ensemble intégré | Décor, terminal et sélecteur de joueurs se répondent dans une expérience commune. |
 
-- Performance: `[budgets, latency, throughput, memory, and scale limits]`
-- Security: `[trust boundaries, identity, secrets, abuse cases, and verification]`
-- Reliability: `[availability, failure recovery, backup, and graceful shutdown]`
-- Platform: `[supported operating systems, devices, runtimes, and browsers]`
-- Delivery: `[release, migration, rollback, and support constraints]`
+La fusion visuelle est souhaitée ; elle ne décide ni du nombre d'applications,
+ni du nombre de processus, ni du packaging. Les modules doivent pouvoir évoluer
+et être activés indépendamment. On veut pouvoir changer de jeu, de décor,
+de personnage, de disposition ou d'ambiance sans reconstruire le produit.
 
-## Template-provided baseline
+## Parcours de référence
 
-The blueprint supplies repository governance, CTXRoute context routing,
-official code-review-graph v2.3.8, Archify documentation validation, and a
-separate Sensor for static diagnostics. Sensor language packs are exact,
-project-local dependencies; setup synchronizes declared packs, while hooks and
-analysis never install from the network. Tooling requires Git, Node.js 22.13+,
-npm 10+, Python 3.10+, and uv 0.11.2; Python 3.12 is the reference CRG runtime.
-These are template constraints, not product architecture choices. A derived
-project may adapt them only through the approved initialization and cleanup
-process.
+1. L'utilisateur choisit un thème inspiré de Mario Kart et ouvre deux terminaux,
+   dont l'un exécute un agent. Des portraits de joueurs représentent les sessions,
+   par exemple en haut à droite.
+2. Il clique sur un portrait : le terminal correspondant devient accessible.
+   La saisie clavier va au terminal uniquement lorsqu'il le choisit explicitement.
+3. Il remplace le personnage d'une session : les commandes et le travail en cours
+   continuent, sans recréer la session.
+4. Il clique sur un objet configuré du décor pour ouvrir une session, une
+   application ou une destination. L'objet reste distinct de l'action associée.
+5. Il passe à un thème différent ou désactive le décor animé : il conserve
+   l'accès à ses sessions de travail.
 
-### Local orchestration boundary
+Mario Kart est un exemple de langage visuel, pas le premier jeu définitivement
+retenu. La liste en haut à droite est une piste de disposition, pas une position
+immuable. Le terminal doit rester lisible et utilisable : texte, sélection,
+copier-coller, défilement, raccourcis et navigation clavier priment sur le décor.
 
-The blueprint control plane is a local Node.js tool exposed through stdio MCP,
-CLI commands, Git worktrees, and ignored files under `.ctxroute/`. It has no
-HTTP endpoint, dashboard, hosted runtime, account system, remote deployment, or
-application availability target. The orchestrator owns revisioned goals,
-missions, validation receipts, audit records, and recoverable worktree
-operations; workers receive only the bounded mission projection they need.
+## Données de jeu et personnalisation
 
-Git worktrees isolate checkout and index state, not hostile processes. The
-security boundary assumes cooperative local agents. Any future remote,
-multi-tenant, adversarial, externally served, or production-SLA requirement
-must reopen the architecture and threat model before adding a service plane or
-stronger sandbox.
+L'ambition exprimée est de disposer des données du jeu et d'en isoler les éléments
+pour les réutiliser : environnements, personnages, objets, textures, squelettes,
+animations, sons, musiques et éléments d'interface lorsqu'ils sont disponibles.
 
-## Decisions
+Un asset est un élément réutilisable ; un thème en compose plusieurs avec une
+présentation ; une session porte le travail ; une association relie la session
+à un personnage ou une action à un objet. Ce vocabulaire décrit le produit,
+pas un schéma de données ou une API déjà approuvés.
 
-- Language: `[choice and reason]`
-- Runtime: `[choice, supported versions, and lifecycle policy]`
-- Frontend: `[choice or explicitly none, with user-flow evidence]`
-- Backend: `[choice or explicitly none, with trust-boundary evidence]`
-- Storage: `[choice, consistency, recovery, and migration strategy]`
-- Deployment: `[environments, release, rollback, and ownership]`
-- Observability: `[logs, metrics, traces, alerts, redaction, and retention]`
-- Security: `[threat model, controls, and verification level]`
-- Performance: `[budgets and validation method]`
+La couverture devra être démontrée par jeu, version et catégorie d'asset.
+Importer une scène ne prouve pas que tous les personnages, animations, sons ou
+comportements du jeu sont récupérables. Les dépendances entre éléments doivent
+rester explicites pour éviter de promettre des échanges incompatibles.
+Les possibilités de composition entre plusieurs jeux restent à étudier.
 
-See [`docs/01-technology-decisions.md`](01-technology-decisions.md) for the
-questions, trade-offs, and research anchors used to make these decisions.
+## Contraintes
 
-## Success criteria
+- Linux, macOS et Windows font partie de la cible produit. Les versions minimales
+  et environnements Linux supportés seront décidés après investigation.
+- Le bureau doit préserver les icônes, les clics destinés aux applications,
+  le focus et les usages normaux du système.
+- La décoration doit consommer peu de ressources et pouvoir ralentir ou
+  se suspendre. Les budgets seront mesurés sur du matériel identifié.
+- L'absence d'émulateur permanent reste une orientation issue de la recherche
+  initiale ; la stratégie d'ingestion est à évaluer.
+- Le changement d'apparence ne doit pas interrompre le travail. La survie des
+  processus à la fermeture complète ou au redémarrage est une décision distincte.
+- Les actions système doivent correspondre aux associations configurées par
+  l'utilisateur. Un asset importé ou un nom suggéré par IA n'autorise pas,
+  à lui seul, l'exécution d'une commande.
+- Réutiliser au maximum les composants existants. Toute création spécifique doit
+  expliquer le manque concret de l'existant et son coût de maintenance.
 
-- `[observable product outcome]`
-- `[quality and security acceptance criteria]`
-- `[operational readiness and recovery criteria]`
-- `[architecture, tests, and cross-platform CI evidence]`
+## Décisions
 
-For the blueprint control plane, success requires schema-validated state and
-messages, deterministic crash/replay and multi-process coverage, orchestrator-
-owned validation receipts, non-destructive worktree reconciliation, bounded
-redacted telemetry, internal Archify validation, and a blocking CRG `high`
-risk gate. The complete repository validation must pass without introducing an
-HTTP, daemon, Kubernetes, GitOps-runtime, hardware-simulation, LLM, or network
-dependency into orchestration tests.
+Confirmé par l'utilisateur : expérience intégrée mais modulaire, terminal et
+bureau utilisables seuls, sessions de terminaux et d'agents, personnalisation
+des joueurs, isolation des données de jeu, cible des trois OS et priorité à
+la réutilisation.
+
+Reporté à la prochaine session : langage, runtime, interface, rendu, intégration
+desktop, terminal/PTY, gestion des agents, stockage, format d'assets, packaging,
+observabilité, sécurité détaillée et budgets de performance.
+Aucun backend distant, compte utilisateur ou service cloud n'est demandé.
+L'usage personnel local est l'hypothèse de travail, pas une interdiction future.
+
+Voir les [questions techniques](01-technology-decisions.md) et la
+[décision de cadrage](decisions/ADR-0029-product-framing.md).
+
+## Critères de réussite
+
+Pour cette étape : un socle CTXRoute installé, une documentation cohérente,
+un schéma conceptuel validé et une note permettant de reprendre sans relire
+la conversation. Aucun code produit ni stack produit sélectionnée.
+
+Pour le futur produit : les trois modes sont utilisables, chaque joueur ouvre
+la bonne session, changer d'apparence conserve le travail, les assets disponibles
+sont recomposables et les interactions natives du bureau sont préservées.
+Les preuves devront être établies sur Linux, macOS et Windows.
+
+Les [scénarios d'acceptation](02-quality-strategy.md) sont des exigences à tester,
+pas des fonctionnalités livrées. La [recherche initiale](research/initial-research.md)
+et sa roadmap ne constituent ni une architecture approuvée ni un engagement
+de délai.

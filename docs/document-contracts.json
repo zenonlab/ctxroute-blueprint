@@ -3,6 +3,29 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "product-vision",
+      "kind": "architecture-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/product-vision.architecture.json",
+      "narrative": "docs/architecture/product-vision.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
+      "id": "session-handoff",
+      "kind": "handoff",
+      "format": "markdown",
+      "source": "docs/session-handoff.md",
+      "requiredSections": ["Ce que l'utilisateur a confirmé", "État du socle et provenance", "Prochaine conversation"]
+    },
+    {
+      "id": "initial-research",
+      "kind": "research-archive",
+      "format": "markdown",
+      "source": "docs/research/initial-research.md",
+      "requiredSections": ["Intention d'origine", "Évolution confirmée après cette recherche"]
+    },
+    {
       "id": "architecture",
       "kind": "architecture-ir",
       "audience": "internal",
@@ -34,7 +57,7 @@
       "kind": "brief",
       "format": "markdown",
       "source": "docs/00-project-brief.md",
-      "requiredSections": ["Summary", "Constraints", "Decisions", "Success criteria"]
+      "requiredSections": ["Synthèse", "Contraintes", "Décisions", "Critères de réussite"]
     },
     {
       "id": "technology-decisions",
@@ -47,7 +70,7 @@
       "kind": "quality-strategy",
       "format": "markdown",
       "source": "docs/02-quality-strategy.md",
-      "requiredSections": ["Quality strategy", "Decision rule"]
+      "requiredSections": ["Stratégie qualité", "Règle de décision"]
     },
     {
       "id": "architecture-decisions",

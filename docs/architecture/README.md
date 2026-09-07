@@ -1,5 +1,8 @@
 # Architecture
 
+Product discovery: see [the conceptual product view](product-vision.md).
+It documents desired capabilities only; product technologies remain undecided.
+
 Typed Archify product diagrams under `docs/architecture/src/` are the versioned
 source of truth. The agent chooses the type that describes the product result:
 `architecture`, `workflow`, `sequence`, `dataflow`, or `lifecycle`.

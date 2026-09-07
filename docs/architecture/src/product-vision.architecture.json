@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Bureau ludique — vision conceptuelle",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 700],
+    "views": [
+      { "id": "personnalisation", "label": "Personnalisation", "focus": ["sources", "assets", "theme", "desktop", "terminal"], "note": "Les éléments du jeu sont isolés puis recomposés selon le mode choisi." },
+      { "id": "travail", "label": "Sessions de travail", "focus": ["desktop", "terminal", "players", "sessions"], "note": "Un personnage représente une session ; changer son apparence ne relance pas son travail." }
+    ]
+  },
+  "components": [
+    { "id": "sources", "type": "external", "label": "Sources de jeu", "sublabel": "Couverture à démontrer", "pos": [40, 70], "size": [210, 70] },
+    { "id": "assets", "type": "database", "label": "Assets isolés", "sublabel": "Objets, joueurs, sons", "pos": [510, 70], "size": [220, 70] },
+    { "id": "theme", "type": "frontend", "label": "Thème configurable", "sublabel": "Composition indépendante", "pos": [510, 310], "size": [220, 70] },
+    { "id": "desktop", "type": "frontend", "label": "Bureau interactif", "sublabel": "Décor et objets cliquables", "pos": [40, 310], "size": [220, 70] },
+    { "id": "terminal", "type": "frontend", "label": "Terminal personnalisé", "sublabel": "Utilisable seul ou intégré", "pos": [990, 310], "size": [240, 70] },
+    { "id": "players", "type": "frontend", "label": "Sélecteur de joueurs", "sublabel": "Identité visuelle des sessions", "pos": [500, 560], "size": [240, 70] },
+    { "id": "sessions", "type": "backend", "label": "Sessions de travail", "sublabel": "Terminaux et agents", "pos": [990, 560], "size": [240, 70] }
+  ],
+  "connections": [
+    { "id": "isolation", "from": "sources", "to": "assets", "label": "extraire et identifier" },
+    { "id": "composition", "from": "assets", "to": "theme", "label": "composer", "labelAt": [620, 225] },
+    { "id": "decor", "from": "theme", "to": "desktop", "label": "habiller le bureau" },
+    { "id": "terminal-theme", "from": "theme", "to": "terminal", "label": "habiller le terminal" },
+    { "id": "avatars", "from": "theme", "to": "players", "label": "choisir les personnages", "labelAt": [620, 470] },
+    { "id": "selection", "from": "players", "to": "sessions", "label": "sélectionner une session" },
+    { "id": "affichage", "from": "sessions", "to": "terminal", "label": "afficher le travail" }
+  ]
+}
