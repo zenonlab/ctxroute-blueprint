@@ -10,6 +10,7 @@ Ordre d'exécution : [feuille de route E1–E6](../03-product-roadmap.md) et
 
 1. [Vision](product-vision.md) : expérience et sessions indépendantes des thèmes.
 2. [Préparation des thèmes](game-transformation.md) : découverte IA à la demande, conversion locale et package séparé.
+   [Cas concret OoT](../research/oot-environment-pilot.md) : dépôts épinglés, données récupérables, logique source et raccordements à prouver.
 3. [Infrastructure](runtime-infrastructure.md) : modules, frontières, candidats et organisation cible.
    [Contrats](module-contracts.md) : propriétaires, échanges, compatibilité et preuves de remplacement.
    [Interactions programmables](theme-interactions.md) : objets, panneaux, boutons, animations et effets dans les deux sens.

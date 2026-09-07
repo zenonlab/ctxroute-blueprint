@@ -86,6 +86,11 @@ Le dépôt reste aujourd'hui `template` ; aucune initialisation n'est effectuée
 
 ## Preuves et traçabilité
 
+L'[étude publique OoT](research/oot-environment-pilot.md) apporte maintenant les
+références amont et la tranche V1–V6. Elle évite de redémontrer les structures
+déjà documentées, sans confondre lecture du code et extraction réussie. L'étude
+informe E1/E2 ; la chaîne privée effective reste optionnelle en E6.
+
 Pour chaque étape, conserver révision produit, dépendances exactes et licences,
 configuration, commandes, résultats bruts assainis et verdict lié au critère.
 Chaque option rejetée a un motif concret. Les fixtures publiques restent

@@ -12,6 +12,13 @@ pas une dépendance, un finaliste obligatoire ou un prototype à réaliser.
 
 ## Répartition du travail
 
+Le [cas OoT](oot-environment-pilot.md) précise le chemin candidat hors ligne :
+extracteur Python actuel de zeldaret, Fast64/Blender à éprouver pour l'inspection,
+puis pont de normalisation ciblé. ZAPD n'est pas présumé l'extracteur du HEAD OoT ;
+Shipwright référence Torch. Ces outils ne deviennent pas des dépendances du
+wallpaper. Les contrôleurs originaux ne sont pas inclus automatiquement dans
+les ressources graphiques ; réutilisation et adaptation restent qualifiées.
+
 Développer nous-mêmes signifie posséder la composition, l'expérience, les contrats,
 les politiques énergétiques et l'intégration OS. Cela n'oblige pas à réécrire
 émulation VT, accès PTY, décodeurs, parsing de formats ou abstraction GPU.

@@ -5,6 +5,30 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernière étude : [OoT vers un environnement interactif](research/oot-environment-pilot.md),
+[ADR-0040](decisions/ADR-0040-source-engine-and-theme-runtime.md).
+Sources publiques épinglées lues : OoT utilise une extraction Python, Shipwright
+référence Torch, Fast64 décrit des limites d'import et des extensions glTF draft.
+Temple du Temps est le cas provisoire, pas un jeu obligatoire ni certifié.
+L'étude distingue données, code original dépendant du jeu et interactions créées.
+Aucune ROM fournie/cherchée, aucun outil installé/exécuté, aucun bundle extrait.
+E1 reste à fermer avant code ; V1–V6 cadrent l'intégration réelle ultérieure.
+L'extraction privée nécessitera un chemin local fourni et une isolation qualifiée.
+
+Vérification de l'étude : `npm run verify` réussi (262 tests réussis, 1 ignoré,
+0 échec ; 3 intégrations réussies ; 0 vulnérabilité npm). Les 17 liens de fichiers
+amont du rapport ont été revérifiés via raw HTTP 200 ; les cinq liens de dépôts
+pointent sur les révisions relevées par API. Aucun test d'extraction produit.
+Archify architecture : showcase 9/9, aucune erreur ni avertissement ; contrôle
+de containment réussi sur quatre tailles, captures clair/sombre ; capture sombre
+2048×1320 inspectée par l'agent. Revue humaine `pending`, viewer en anglais.
+Artefact : `dist/architecture/game-transformation.architecture.html`.
+SHA-256 source : `1555132720f900a729be3e92e2569368adcb76f024a771313b8e96d9dc224d9f`.
+SHA-256 HTML : `519a646a3d250492f0d936d1798b42675afc29270ef84b246e2258fbca460278`.
+Instructions et hooks inchangés ; aucun fichier supprimé ni dépendance installée.
+
+Historique de cadrage et de vérification :
+
 Dernier cadrage : [interactions programmables](architecture/theme-interactions.md)
 et [ADR-0039](decisions/ADR-0039-programmable-theme-interactions.md).
 Objets, géométrie et boutons peuvent ouvrir des panneaux ; leurs contrôles

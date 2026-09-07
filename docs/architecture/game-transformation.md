@@ -32,6 +32,14 @@ et non une propriété garantie par le format ou par l'extracteur.
 
 ## Frontières de l'infrastructure
 
+Le [cas OoT documenté](../research/oot-environment-pilot.md) et
+[ADR-0040](../decisions/ADR-0040-source-engine-and-theme-runtime.md) précisent la
+frontière : le moteur source conditionne le lecteur, pas l'obligation d'exécuter
+le jeu. Géométrie/collisions récupérées, comportement original porté et règles
+créées par le thème sont trois résultats distincts. Notre runtime peut rendre
+un objet sélectionnable et ouvrir un panneau sans porter son gameplay original.
+À l'inverse, récupérer un clip de marche ne récupère pas le contrôleur marche/saut.
+
 | Étape | Responsabilité | Résultat attendu |
 | --- | --- | --- |
 | Lecture et analyse hors ligne | Réutiliser lecteurs, extracteurs et travaux de compréhension du jeu ; identifier données et code pertinents. | Ressources identifiées, provenance, relations et limites de couverture. |
@@ -318,6 +326,12 @@ Comparer aussi mémoire, énergie et réactivité. Les iGPU et Apple Silicon son
 prioritaires ; les références matérielles précises restent à sélectionner.
 
 ## PoC préalable à la sélection définitive du jeu pilote
+
+Étude publique désormais disponible : [OoT → environnement interactif](../research/oot-environment-pilot.md).
+Temple du Temps est le cas provisoire ; révisions, voies Python/Torch, limites
+Fast64 et raccordements V1–V6 y sont précisés. Aucun extracteur exécuté.
+La petite tranche objet/panneau n'exige pas toutes les capacités du tableau
+ci-dessous ; celui-ci reste le contrôle plus complet d'une chaîne d'ingestion.
 
 Ocarina of Time est le candidat prioritaire. Tester une scène unique, Temple du
 Temps ou Maison de Link, après identification d'une version exacte du jeu et

@@ -3,6 +3,13 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "oot-environment-pilot",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/research/oot-environment-pilot.md",
+      "requiredSections": ["Verdict et périmètre", "Dépôts et fonctions réellement vérifiés", "Matrice des ressources et comportements", "Chaîne proposée et code restant", "Tranche réelle et preuves manquantes"]
+    },
+    {
       "id": "theme-interactions",
       "kind": "product-contract-design",
       "format": "markdown",
