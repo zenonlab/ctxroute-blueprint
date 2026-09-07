@@ -3,6 +3,17 @@
 Product discovery: see [the conceptual product view](product-vision.md).
 It documents desired capabilities only; product technologies remain undecided.
 
+## Parcours de lecture produit
+
+1. [Vision](product-vision.md) : expérience et sessions indépendantes des thèmes.
+2. [Transformation](game-transformation.md) : ROM locale, conversion séparée et bibliothèque.
+3. [Infrastructure](runtime-infrastructure.md) : modules, frontières, candidats et organisation cible.
+4. [Consoles](../research/console-coverage.md) : inventaire élargi, capacités et preuves de support.
+
+Les trois schémas sont complémentaires ; l'infrastructure contient une proposition
+de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,
+les recherches portent les preuves et les documents d'architecture les contrats.
+
 Typed Archify product diagrams under `docs/architecture/src/` are the versioned
 source of truth. The agent chooses the type that describes the product result:
 `architecture`, `workflow`, `sequence`, `dataflow`, or `lifecycle`.

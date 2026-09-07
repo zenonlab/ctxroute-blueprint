@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Runtime local — responsabilités séparées",
+    "quality_profile": "showcase",
+    "viewBox": [1340, 700]
+  },
+  "components": [
+    { "id": "prepared", "type": "database", "label": "Composition préparée", "sublabel": "Références et capacités validées", "pos": [40, 100], "size": [260, 80] },
+    { "id": "control", "type": "backend", "label": "Contrôle local", "sublabel": "Thème, actions et permissions", "pos": [540, 100], "size": [250, 80] },
+    { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "Rendu, animation, audio, picking", "pos": [1040, 100], "size": [260, 80] },
+    { "id": "terminal", "type": "frontend", "label": "Interface terminal", "sublabel": "Texte et portraits des sessions", "pos": [40, 460], "size": [260, 80] },
+    { "id": "sessions", "type": "backend", "label": "Gestion des sessions", "sublabel": "Identités, PTY, shells et agents", "pos": [540, 460], "size": [250, 80] },
+    { "id": "desktop", "type": "backend", "label": "Adaptateur de bureau", "sublabel": "Surface, input, visibilité par OS", "pos": [1040, 460], "size": [260, 80] }
+  ],
+  "connections": [
+    { "id": "load", "from": "prepared", "to": "control", "label": "résoudre la sélection" },
+    { "id": "scene-command", "from": "control", "to": "scene", "label": "configurer et recevoir les clics" },
+    { "id": "session-command", "from": "control", "to": "sessions", "label": "actions autorisées et états", "labelAt": [665, 320] },
+    { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "flux terminal et saisie" },
+    { "id": "surface", "from": "scene", "to": "desktop", "label": "ancrage et événements OS", "labelAt": [1170, 320] }
+  ]
+}

@@ -1,6 +1,9 @@
 # Décisions techniques — prochaine session
 
 Aucune stack produit n'est sélectionnée au 7 septembre 2026.
+Une [architecture de référence à éprouver](architecture/runtime-infrastructure.md)
+est maintenant proposée : responsabilités, assemblage prioritaire et alternatives.
+Voir [ADR-0033](decisions/ADR-0033-runtime-boundaries-and-evaluation.md).
 La [vision produit](00-project-brief.md) prime sur les propositions techniques
 de la [recherche initiale](research/initial-research.md).
 
@@ -49,11 +52,11 @@ acteur animé, collision, musique et placements avec références conservées.
 Comparer les outils sur cette chaîne avant de choisir formats et stack.
 La récupération par décompilation/recompilation reste une piste à évaluer.
 
-1. Identifier l'entrée OoT et la scène de test, puis vérifier la chaîne d'extraction avec les outils existants.
-2. Confirmer ou écarter OoT comme pilote après cette preuve ; SM64 et Sunshine restent des alternatives.
-3. Comparer les bases de terminal et de bureau multiplateforme et définir le modèle de session.
-4. Définir le premier parcours intégré, les budgets mesurables et le périmètre OS précis.
-5. Sélectionner ensuite la stack minimale, le packaging et les vérifications.
+1. Choisir l'environnement et le matériel du banc d'essai terminal/surface synthétique ; aucune ROM nécessaire pour cette preuve.
+2. Éprouver l'assemblage proposé et ses frontières OS, sécurité et énergie avant de verrouiller les dépendances.
+3. Identifier l'entrée OoT et la scène de test pour la chaîne d'extraction ; SM64 et Sunshine restent des alternatives.
+4. Élargir ensuite à un second lecteur et un exemple 2D selon la cartographie des consoles.
+5. Finaliser la stack minimale, les versions, le packaging et les budgets sur ces preuves.
 
 Rust, wgpu, winit, parry3d, cpal, symphonia, glTF et un bundle `.scene`
 sont des pistes héritées, pas des dépendances autorisées pour le produit.
@@ -80,24 +83,9 @@ si leur plateforme et leur outillage conviennent. Ils ne sont ni installés
 dans le produit ni nécessaires au runtime. Un jeu émulable n'est pas pour
 autant convertible : la couverture dépend des lecteurs, versions et capacités.
 
-| Console | Candidats évoqués |
-| --- | --- |
-| NES | FCEUmm |
-| SNES | bsnes, Snes9x |
-| Game Boy / Color | SameBoy, Gambatte |
-| Game Boy Advance | mGBA |
-| Nintendo DS | melonDS |
-| Nintendo 64 | Mupen64Plus |
-| GameCube / Wii | Dolphin |
-| PlayStation | Beetle PSX |
-| PlayStation 2 | PCSX2 |
-| PSP | PPSSPP |
-| Mega Drive | Genesis Plus GX |
-| Dreamcast | Flycast |
-
-Sources : [catalogue Libretro](https://docs.libretro.com/guides/core-list/),
-[Dolphin](https://dolphin-emu.org/), [PCSX2](https://github.com/PCSX2/pcsx2),
-[PPSSPP](https://github.com/hrydgard/ppsspp).
+La liste de référence est désormais la
+[cartographie élargie](research/console-coverage.md), classée par constructeur,
+extensions, systèmes spécialisés et limites. Elle remplace l'échantillon initial.
 RetroArch est une interface à des cœurs : aucune API universelle d'extraction
 de scènes, squelettes et comportements n'est déduite de ce catalogue.
 

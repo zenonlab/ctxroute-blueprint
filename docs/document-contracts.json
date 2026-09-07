@@ -3,6 +3,22 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "runtime-infrastructure",
+      "kind": "architecture-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/runtime-infrastructure.architecture.json",
+      "narrative": "docs/architecture/runtime-infrastructure.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
+      "id": "console-coverage",
+      "kind": "research-evidence",
+      "format": "markdown",
+      "source": "docs/research/console-coverage.md",
+      "requiredSections": ["Lire la compatibilité correctement", "Priorisation et preuve d'admission", "Sources transversales et limites"]
+    },
+    {
       "id": "game-transformation",
       "kind": "architecture-ir",
       "audience": "product",

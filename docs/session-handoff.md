@@ -5,6 +5,16 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Dernière étape : [infrastructure locale](architecture/runtime-infrastructure.md)
+et [cartographie élargie des consoles](research/console-coverage.md), avec
+[ADR-0033](decisions/ADR-0033-runtime-boundaries-and-evaluation.md).
+Responsabilités séparées sans multiplier les démons ; organisation future des
+sources et données documentée sans dossiers vides ni déplacement du blueprint.
+Assemblage prioritaire à éprouver : Rust/Tauri/xterm.js/portable-pty pour le
+terminal et contrôle, Godot pour la scène ; intégration OS et énergie non prouvées.
+Ce ne sont pas des dépendances adoptées. Aucune console n'est encore certifiée
+convertible dans notre produit ; les émulateurs servent de références hors ligne.
+
 Dernière précision : lire aussi [la transformation du jeu](architecture/game-transformation.md)
 et [ADR-0030](decisions/ADR-0030-game-transformation.md). L'utilisateur veut
 programmer des compositions à partir d'une bibliothèque couvrant le jeu entier,
@@ -68,6 +78,18 @@ au [guide amont conservé](../README.md). Aucune configuration globale modifiée
 
 ## Vérification finale
 
+Étude infrastructure/consoles : troisième schéma produit livré et validé par
+Archify (architecture, 9/9 contrôles showcase, zéro erreur/avertissement).
+`npm run verify` réussi : 261 tests réussis, un ignoré, aucun échec ; trois
+tests d'intégration réussis, audit npm sans vulnérabilité signalée. Le registre
+déclare les trois schémas produit ; le statut demeure `template` et les hooks
+sont inchangés. Ces résultats vérifient le dépôt, pas le produit envisagé.
+Contenance vérifiée à 1440×900, 1600×1000, 1920×1080 et 2048×1320 ; capture
+sombre 2048×1320 inspectée par l'agent, revue humaine du reçu `pending`.
+Artefact : `dist/architecture/runtime-infrastructure.architecture.html`.
+SHA-256 source : `81ec3ca438081182efc3c5e9690a7c6ae47b587ba6fee1fa330c4dd417c54129`.
+SHA-256 HTML : `16682c09692b10393c6e6eb525511e033724d91e77d1c886511255b6b8b78c6f`.
+
 Mise à jour distribution locale : `npm run verify` terminé avec succès
 pour cette mise à jour documentaire (261 tests réussis, un ignoré, aucun échec ;
 trois tests d'intégration réussis ; audit npm sans vulnérabilité signalée).
@@ -124,6 +146,9 @@ non verbatim du texte initial ; ses chiffres et références restent à vérifie
 Prochaine étape demandée : travailler sur l'architecture et l'infrastructure,
 en comparant l'existant avec les frontières maintenant documentées. La discussion
 peut commencer sans ROM ; ne pas adopter une stack à partir des seuls exemples.
+L'étude documentaire est désormais disponible. La prochaine preuve proposée
+est terminal + surface synthétique : choisir l'environnement hôte et le matériel,
+puis tester l'ancrage et la consommation avant de verrouiller les composants.
 La preuve d'ingestion à préparer reste l'extraction OoT décrite dans
 [la transformation du jeu](architecture/game-transformation.md). Aucune ROM
 `.z64`, `.n64`, `.v64` ni image `.iso`/`.gcm` n'a été trouvée dans le dossier

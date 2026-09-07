@@ -8,6 +8,9 @@ Commencer par la [note de reprise](docs/session-handoff.md), la
 [vision produit](docs/00-project-brief.md) et les
 [questions techniques ouvertes](docs/01-technology-decisions.md).
 Le socle est installé ; aucun code produit ni stack produit n'est encore choisi.
+La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise
+les modules et composants à éprouver ; la [cartographie des consoles](docs/research/console-coverage.md)
+sépare émulation existante et conversion réellement validée.
 
 La documentation amont du template est conservée ci-dessous pour son installation
 et son fonctionnement. Elle décrit l'outillage, pas l'application à construire.

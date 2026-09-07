@@ -43,6 +43,18 @@ Ces tests sont prévus, pas exécutés. Compléter P15 par observation des accè
 réseau et audit des journaux ; un échec réseau seul ne prouve pas l'absence
 de tentative d'envoi. La politique de stockage/purge locale reste à confirmer.
 
+Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructure.md) :
+
+| ID | Situation | Résultat attendu |
+| --- | --- | --- |
+| P20 | Interrompre l'hôte de scène | Sessions et texte conservés ; erreur signalée, aucun redémarrage du shell causé par le décor. |
+| P21 | Saturer la sortie PTY et déplacer rapidement le curseur | Texte ordonné, mémoire bornée/backpressure ; événements de survol fusionnables sans bloquer la saisie. |
+| P22 | Envoyer une action non autorisée ou un message trop grand | Rejet à la frontière de contrôle, aucun accès direct du thème au PTY ou au shell. |
+| P23 | Charger un thème 2D sans géométrie 3D | Affichage et interactions adaptés aux capacités ; aucune collision 3D fabriquée pour prétendre au support. |
+
+Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
+par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.
+
 Exécuter les parcours pertinents sur Linux, macOS et Windows.
 Décliner Linux par environnement d'affichage effectivement retenu.
 Un test macOS ou une CI multiplateforme du template ne prouvent pas la
