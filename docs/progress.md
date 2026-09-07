@@ -66,6 +66,7 @@
 - [x] **Ajouter l’adaptateur AniList exact** — DONE _(evidence: Browser 15/15; typecheck et lints passent., Archify architecture showcase 9/9, 0 erreur/avertissement., Config, docs et Progress 51/51 passent; aucun réseau activé.)_
 - [x] **Préserver les observations URL rejetées** — DONE _(evidence: Domaine 23/23 et application 105/105 passent; les rejets URL restent bruts et non actionnables., Typecheck, ESLint, Oxlint, Sensor ciblé SAFE et validate complet passent., Favorite-resolution Archify passe showcase 9/9; diff-check passe.)_
 - [x] **Construire le parser local T-I-S-R** — DONE _(evidence: Application 147/147: fixtures T-01…T-10, I-01…I-07, S-01…S-07 et R-01…R-14 passent., Domaine 23/23, typecheck tous workspaces, ESLint, Oxlint et Sensor ciblé SAFE passent., Validate complet et favorite-resolution Archify showcase 9/9 passent.)_
+- [x] **Compléter la décision fournisseur pure** — DONE _(evidence: domain 23/23; application 151/151, six ordered levels + F/C cases, typecheck, Sensor SAFE, validate, Archify 9/9)_
 
 ## Concevoir l’architecture UI et le catalogue visuel — DONE
 

@@ -1684,6 +1684,37 @@
             "Domaine 23/23, typecheck tous workspaces, ESLint, Oxlint et Sensor ciblé SAFE passent.",
             "Validate complet et favorite-resolution Archify showcase 9/9 passent."
           ]
+        },
+        {
+          "id": "step-25",
+          "title": "Compléter la décision fournisseur pure",
+          "status": "DONE",
+          "acceptance": [
+            "L’ordre source-id, source-url, exact, saison, mots et distance est déterministe et fail-closed.",
+            "F-01/F-02 et C-01/C-02 bloquent sans heuristique de popularité."
+          ],
+          "files": [
+            "packages/domain/src/favorites/**",
+            "packages/application/src/favorites/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run validate",
+            "git diff --check"
+          ],
+          "evidence": [
+            "domain 23/23; application 151/151",
+            "six ordered levels + F/C cases",
+            "typecheck, Sensor SAFE, validate, Archify 9/9"
+          ]
         }
       ]
     },

@@ -1,7 +1,7 @@
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteProvider, ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
-import { matchFavoriteTitles } from './provider-matcher';
+import { isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 
 function candidate(externalId: string, title: string, provider: FavoriteProvider = 'anilist'): ProviderCandidate {
   return { externalId, mediaKind: provider === 'anilist' ? 'ANIME' : 'MANGA', preSerialization: false, provider, titles: [title] };
@@ -46,6 +46,42 @@ describe('deterministic favorite title matcher P-01…P-08', () => {
 
   it('P-08 rejects stemming and token-coverage matches', () => {
     expect(matchFavoriteTitles({ sourceTitles: ['Magical Girls Academy'] }, [envelope([candidate('1', 'Magic Girl')])])).toMatchObject({ kind: 'NO_MATCH' });
+  });
+
+  it('selects source ID and canonical URL before title evidence', () => {
+    const candidates = [
+      { ...candidate('1', 'Wrong title'), canonicalUrl: 'https://anilist.co/anime/1' },
+      { ...candidate('2', 'Frieren'), canonicalUrl: 'https://anilist.co/anime/2' },
+    ];
+    expect(matchFavoriteTitles({ explicitProviderReference: { externalId: '1', provider: 'anilist' }, sourceTitles: ['Frieren'] }, [envelope(candidates)])).toMatchObject({ kind: 'MATCH', level: 'source-id', matchedReference: { externalId: '1' } });
+    expect(matchFavoriteTitles({ sourceCanonicalUrl: 'https://anilist.co/anime/1', sourceTitles: ['Frieren'] }, [envelope(candidates)])).toMatchObject({ kind: 'MATCH', level: 'source-url', matchedReference: { externalId: '1' } });
+  });
+
+  it('uses an explicitly corroborated season before reordered words', () => {
+    const candidates = [
+      { ...candidate('1', 'The Journey Season 1'), season: 1 },
+      { ...candidate('2', 'The Journey Season 2'), season: 2 },
+    ];
+    expect(matchFavoriteTitles({ explicitSeason: 2, sourceTitles: ['The Journey'] }, [envelope(candidates)])).toMatchObject({ kind: 'MATCH', level: 'explicit-season', matchedReference: { externalId: '2' } });
+  });
+
+  it('F-01 and F-02 require symmetric OVA and pre-serialization compatibility', () => {
+    const ova = { ...candidate('ova', 'Frieren'), format: 'OVA' };
+    const ordinary = candidate('tv', 'Frieren');
+    const pre = { ...candidate('pre', 'Frieren'), preSerialization: true };
+    expect(isProviderCandidateCompatible({ sourceFormat: 'OVA', sourceTitles: ['Frieren'] }, ova)).toBe(true);
+    expect(isProviderCandidateCompatible({ sourceFormat: 'OVA', sourceTitles: ['Frieren'] }, ordinary)).toBe(false);
+    expect(isProviderCandidateCompatible({ sourceFormat: 'TV', sourceTitles: ['Frieren'] }, ova)).toBe(false);
+    expect(isProviderCandidateCompatible({ preSerialization: true, sourceTitles: ['Frieren'] }, pre)).toBe(true);
+    expect(isProviderCandidateCompatible({ preSerialization: true, sourceTitles: ['Frieren'] }, ordinary)).toBe(false);
+    expect(isProviderCandidateCompatible({ preSerialization: false, sourceTitles: ['Frieren'] }, pre)).toBe(false);
+  });
+
+  it('C-01 blocks exact normalized taxonomy and C-02 never blocks substrings', () => {
+    const exact = { ...candidate('1', 'Fixture'), categories: ['Explicit-Séx'] };
+    const substring = { ...candidate('2', 'Fixture'), categories: ['Discussion of explicit sex in literature'] };
+    expect(isProviderCandidateCompatible({ sourceTitles: ['Fixture'] }, exact)).toBe(false);
+    expect(isProviderCandidateCompatible({ sourceTitles: ['Fixture'] }, substring)).toBe(true);
   });
 
   it('fails closed before matching an incomplete response', () => {

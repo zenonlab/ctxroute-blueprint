@@ -223,6 +223,9 @@ persistés avant l’effet. Le routeur applique cet ordre :
    sans correspondance produit une Review `no-match`.
 
 AniList couvre l’anime et MangaUpdates les formats manga retenus par le contrat.
+La décision fournisseur pure exécute désormais les six niveaux documentés,
+après les gardes symétriques de nature, OVA, pré-sérialisation et taxonomie
+exacte. Elle n'observe ni popularité, ni rang, ni ordre de réponse.
 Un adaptateur legacy, par exemple MangaDex, reste hors du chemin principal et
 ne devient actif qu’après une décision dédiée.
 

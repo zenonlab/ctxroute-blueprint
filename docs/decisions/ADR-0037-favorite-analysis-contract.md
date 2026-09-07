@@ -47,6 +47,10 @@ unique identité distincte à chaque niveau. Identifiant et URL exacts précède
 le titre exact, la saison explicitement corroborée, les mots significatifs
 réordonnés et la distance d’édition bornée. Popularité, rang, ordre, date,
 image, inclusion partielle et richesse de fiche ne sont jamais des preuves.
+La décision pure implémente les six niveaux dans cet ordre. Elle applique avant
+comparaison la compatibilité symétrique de nature, OVA et pré-sérialisation.
+La taxonomie hydratée est normalisée exactement et filtre le candidat sans
+jamais devenir une preuve ni un score.
 
 La capture borne mais ne qualifie pas la chaîne URL. La qualification possède
 seule les dispositions `INVALID_URL` et `NON_WEB_URL`; une preuve rejetée ne

@@ -40,11 +40,15 @@ export interface FavoriteObservation {
 }
 
 export interface ProviderCandidate {
+  readonly canonicalUrl?: string;
+  readonly categories?: readonly string[];
   readonly externalId: string;
   readonly format?: string;
+  readonly genres?: readonly string[];
   readonly mediaKind: Exclude<FavoriteMediaKind, 'UNKNOWN'>;
   readonly preSerialization: boolean;
   readonly provider: FavoriteProvider;
+  readonly season?: number;
   readonly titles: readonly string[];
 }
 
@@ -145,11 +149,22 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
 function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
   contract(input.provider === provider, 'candidate provider must match its envelope.');
   contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
-  return Object.freeze({
+  if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'candidate season must be a positive safe integer.');
+  let canonicalUrl: string | undefined;
+  if (input.canonicalUrl !== undefined) {
+    const parsed = new URL(boundedText(input.canonicalUrl, 'canonicalUrl', favoriteUrlByteLimit));
+    contract(parsed.protocol === 'http:' || parsed.protocol === 'https:', 'canonicalUrl must use HTTP(S).');
+    canonicalUrl = parsed.href;
+  }
+  const candidate = {
     ...input,
     externalId: nonEmpty(input.externalId, 'externalId'),
     titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
-  });
+  };
+  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit) });
+  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit) });
+  if (canonicalUrl !== undefined) Object.assign(candidate, { canonicalUrl });
+  return Object.freeze(candidate);
 }
 
 export function createProviderCandidateEnvelope(input: ProviderCandidateEnvelope): ProviderCandidateEnvelope {

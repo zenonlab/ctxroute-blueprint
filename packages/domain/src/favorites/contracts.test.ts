@@ -50,6 +50,8 @@ describe('favorite pipeline contracts', () => {
     const candidate = { externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Fixture'] };
     expect(() => createProviderCandidateEnvelope({ candidates: Array.from({ length: 21 }, () => candidate), complete: true, digest: 'digest-oversized', provider: 'anilist', truncated: false })).toThrow(/20 entries/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, titles: ['a'.repeat(8 * 1024 + 1)] }], complete: true, digest: 'digest-title', provider: 'anilist', truncated: false })).toThrow(/titles\[0\] exceeds/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, canonicalUrl: 'ftp://example.invalid/work' }], complete: true, digest: 'digest-url', provider: 'anilist', truncated: false })).toThrow(/HTTP\(S\)/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, season: 0 }], complete: true, digest: 'digest-season', provider: 'anilist', truncated: false })).toThrow(/positive safe integer/u);
   });
 
   it('validates a complete artifact and unique matching decision', () => {

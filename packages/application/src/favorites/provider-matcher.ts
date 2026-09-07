@@ -3,6 +3,13 @@ import type { FavoriteMatchMethod, ProviderCandidate, ProviderCandidateEnvelope,
 import { isWithinFavoriteEditDistance, normalizeFavoriteTitle } from './title-normalization';
 
 export interface FavoriteTitleMatchQuery {
+  readonly blockedTaxonomy?: readonly string[];
+  readonly explicitProviderReference?: ProviderCandidateReference;
+  readonly explicitSeason?: number;
+  readonly mediaKind?: ProviderCandidate['mediaKind'];
+  readonly preSerialization?: boolean;
+  readonly sourceCanonicalUrl?: string;
+  readonly sourceFormat?: string;
   readonly sourceTitles: readonly string[];
 }
 
@@ -17,6 +24,31 @@ interface PreparedTitle {
 interface PreparedCandidate {
   readonly candidate: ProviderCandidate;
   readonly titles: readonly PreparedTitle[];
+}
+
+const blockedGenres = Object.freeze(['Adult', 'Erotica', 'Hentai', 'Smut']);
+const blockedCategories = Object.freeze(['18+', 'Adult', 'Erotica', 'Explicit Sex', 'Explicit Sexual Content', 'Graphic Sex', 'Hardcore', 'Hentai', 'Lolicon', 'Pornographic Content', 'Pornography', 'Sexual Content', 'Shotacon', 'Smut']);
+
+function normalizedTaxonomy(value: string): string {
+  return normalizeFavoriteTitle(value).normalized;
+}
+
+function hasExactBlockedTaxonomy(candidate: ProviderCandidate, additions: readonly string[]): boolean {
+  const genres = new Set([...blockedGenres, ...additions].map(normalizedTaxonomy));
+  const categories = new Set([...blockedCategories, ...additions].map(normalizedTaxonomy));
+  return candidate.genres?.some((value) => genres.has(normalizedTaxonomy(value))) === true
+    || candidate.categories?.some((value) => categories.has(normalizedTaxonomy(value))) === true;
+}
+
+function isOva(value?: string): boolean {
+  return value !== undefined && normalizeFavoriteTitle(value).normalized === 'ova';
+}
+
+export function isProviderCandidateCompatible(query: FavoriteTitleMatchQuery, candidate: ProviderCandidate): boolean {
+  if (query.mediaKind !== undefined && query.mediaKind !== candidate.mediaKind) return false;
+  if (query.sourceFormat !== undefined && isOva(query.sourceFormat) !== isOva(candidate.format)) return false;
+  if (query.preSerialization !== undefined && query.preSerialization !== candidate.preSerialization) return false;
+  return !hasExactBlockedTaxonomy(candidate, query.blockedTaxonomy ?? []);
 }
 
 function prepare(value: string): PreparedTitle {
@@ -53,6 +85,29 @@ function matchingReferences(sourceTitles: readonly PreparedTitle[], candidates: 
   return Object.freeze([...matches.values()].sort((left, right) => referenceKey(left).localeCompare(referenceKey(right))));
 }
 
+function directReferences(query: FavoriteTitleMatchQuery, candidates: readonly PreparedCandidate[], method: Extract<FavoriteMatchMethod, 'source-id' | 'source-url'>): readonly ProviderCandidateReference[] {
+  const matches = new Map<string, ProviderCandidateReference>();
+  for (const item of candidates) {
+    const matched = method === 'source-id'
+      ? query.explicitProviderReference !== undefined && referenceKey(query.explicitProviderReference) === referenceKey(reference(item.candidate))
+      : query.sourceCanonicalUrl !== undefined && item.candidate.canonicalUrl === query.sourceCanonicalUrl;
+    if (matched) {
+      const value = reference(item.candidate);
+      matches.set(referenceKey(value), value);
+    }
+  }
+  return Object.freeze([...matches.values()].sort((left, right) => referenceKey(left).localeCompare(referenceKey(right))));
+}
+
+function seasonReferences(sourceTitles: readonly PreparedTitle[], explicitSeason: number | undefined, candidates: readonly PreparedCandidate[]): readonly ProviderCandidateReference[] {
+  if (explicitSeason === undefined) return Object.freeze([]);
+  const seasonSuffix = new RegExp(`\\s+(?:saison|season)\\s*${explicitSeason}\\s*$`, 'iu');
+  const compatible = candidates
+    .filter((item) => item.candidate.season === explicitSeason)
+    .map((item) => Object.freeze({ candidate: item.candidate, titles: Object.freeze(item.candidate.titles.map((title) => prepare(title.replace(seasonSuffix, '')))) }));
+  return matchingReferences(sourceTitles, compatible, 'ordered-exact');
+}
+
 function decisionFor(method: FavoriteMatchMethod, references: readonly ProviderCandidateReference[], envelopes: readonly ProviderCandidateEnvelope[]): ResolutionDecision | undefined {
   if (references.length === 0) return undefined;
   if (references.length === 1) {
@@ -71,11 +126,25 @@ export function matchFavoriteTitles(query: FavoriteTitleMatchQuery, envelopes: r
   const candidateCount = envelopes.reduce((total, envelope) => total + envelope.candidates.length, 0);
   if (candidateCount > providerCandidateLimit) throw new RangeError(`matcher accepts at most ${providerCandidateLimit} candidates.`);
   if (envelopes.some((envelope) => !envelope.complete || envelope.truncated)) return Object.freeze({ kind: 'INCOMPLETE_CANDIDATE_SET' });
+  if (query.explicitSeason !== undefined && (!Number.isSafeInteger(query.explicitSeason) || query.explicitSeason <= 0)) throw new TypeError('explicitSeason must be a positive safe integer.');
+  if (query.sourceCanonicalUrl !== undefined) {
+    const parsed = new URL(query.sourceCanonicalUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new TypeError('sourceCanonicalUrl must use HTTP(S).');
+    query = { ...query, sourceCanonicalUrl: parsed.href };
+  }
 
   const sourceTitles = Object.freeze(query.sourceTitles.map(prepare));
-  const candidates = Object.freeze(envelopes.flatMap((envelope) => envelope.candidates).map((candidate) => Object.freeze({ candidate, titles: Object.freeze(candidate.titles.map(prepare)) })));
-  for (const method of ['ordered-exact', 'reordered-significant-words', 'bounded-edit-distance'] as const) {
-    const decision = decisionFor(method, matchingReferences(sourceTitles, candidates, method), envelopes);
+  const candidates = Object.freeze(envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => isProviderCandidateCompatible(query, candidate)).map((candidate) => Object.freeze({ candidate, titles: Object.freeze(candidate.titles.map(prepare)) })));
+  const levels = [
+    ['source-id', () => directReferences(query, candidates, 'source-id')],
+    ['source-url', () => directReferences(query, candidates, 'source-url')],
+    ['ordered-exact', () => matchingReferences(sourceTitles, candidates, 'ordered-exact')],
+    ['explicit-season', () => seasonReferences(sourceTitles, query.explicitSeason, candidates)],
+    ['reordered-significant-words', () => matchingReferences(sourceTitles, candidates, 'reordered-significant-words')],
+    ['bounded-edit-distance', () => matchingReferences(sourceTitles, candidates, 'bounded-edit-distance')],
+  ] as const;
+  for (const [method, findReferences] of levels) {
+    const decision = decisionFor(method, findReferences(), envelopes);
     if (decision !== undefined) return decision;
   }
   return createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'bounded-edit-distance', reasons: ['no-candidate-at-any-level'] }, envelopes);
