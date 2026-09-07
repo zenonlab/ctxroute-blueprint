@@ -159,6 +159,12 @@ L'audio suit sa politique explicite, sans déduction automatique à partir du fo
 
 ## Tranche de validation et limites
 
+Le [cas course et formation](ai-prepared-behaviors.md#cas-course--vrais-virages-formation-stable-et-sessions)
+ajoute un comportement spatial réel : trajectoire, virages, place stable par
+session et récupération visuelle. Ce n'est pas un simple mouvement du fond derrière
+des icônes fixes. Les contrôleurs partagent une autorité de transformation explicite
+et ne modifient pas les sessions. Tests A01–A08 complémentaires aux I ci-dessous.
+
 E2 ajoute à la scène synthétique : un objet ouvrant un panneau, un bouton animant
 un autre objet et un effet, puis un retour d'état à la fin. Variante à cible absente
 et refus d'entrée inclus. Cette preuve doit précéder l'adoption d'un rendu qui ne

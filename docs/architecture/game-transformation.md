@@ -56,6 +56,14 @@ nouveau lecteur universel de toutes les consoles.
 
 ## Découverte assistée par IA à la demande
 
+La [stratégie de préparation](ai-prepared-behaviors.md) et
+[ADR-0041](../decisions/ADR-0041-ai-prepared-selective-behaviors.md) étendent la
+préparation aux connexions comportementales, pas seulement aux assets.
+L'entrée peut être une ROM, des fichiers de jeu ou un projet disponible.
+Choisir la représentation 2D/3D adaptée, préparer les contrôleurs et prouver
+leurs raccordements. Le runtime n'héberge pas le raisonnement de l'IA ; les
+ressources et comportements privés ne sont pas fusionnés au thème partageable.
+
 L'utilisateur peut demander une préparation pour un jeu non encore pris en
 charge. Il n'est pas nécessaire de l'avoir inscrit dans un catalogue fermé.
 L'IA de préparation est distincte des agents de travail du terminal et du

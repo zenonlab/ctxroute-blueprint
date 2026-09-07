@@ -12,6 +12,13 @@ et tester le remplacement des modules, sans promettre une migration gratuite.
 
 ## Règles de progression
 
+Précision [ADR-0041](decisions/ADR-0041-ai-prepared-selective-behaviors.md) :
+les [contrôleurs sélectifs](architecture/ai-prepared-behaviors.md) sont éprouvés
+sur fixtures originales 2D/3D/custom, avec états de sessions synthétiques en E2.
+OoT n'est pas une dépendance obligatoire. L'IA prépare les liens en E6 ; elle
+n'entre pas dans la boucle de rendu. Le cas course impose de vrais virages et
+une formation, pas un remplacement implicite par des portraits fixes.
+
 Avancement documentaire E1 : [MAC-01 et faisabilité OS](research/os-feasibility.md)
 relevés ; [préflight de stack](research/stack-preflight.md) préparé. Budgets,
 instruments de mesure et autres bancs restent à qualifier. Aucun prototype exécuté.

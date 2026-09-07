@@ -17,6 +17,13 @@ ni service de décompilation universelle. La découverte assistée par IA interv
 à la demande pour préparer une dépendance manquante, pas pour afficher le thème.
 Voir [ADR-0034](decisions/ADR-0034-theme-first-and-on-demand-discovery.md).
 
+Direction précisée : [préparation IA et contrôleurs sélectifs](architecture/ai-prepared-behaviors.md).
+L'IA prépare les connexions et adaptations pour des entrées 2D, 3D, hybrides ou
+custom ; le runtime utilise le résultat validé sans LLM permanent. Réutiliser
+les données utiles et adapter les comportements en priorité, porter une logique
+originale seulement si nécessaire et isolable. Pas de garantie de conversion
+universelle, ni de dépendance obligatoire à OoT ou à un moteur de jeu complet.
+
 Priorité confirmée : minimiser l'énergie du wallpaper avant d'étendre les effets
 et la personnalisation. Windows/macOS/Linux sont les familles visées, sans
 promesse de parité universelle ; voir la [matrice de qualification](architecture/runtime-infrastructure.md#matrice-de-qualification-par-fonctionnalité)

@@ -5,6 +5,30 @@ choix techniques reportés à la prochaine session.
 
 ## Commencer ici
 
+Direction actuelle : [préparation IA et comportements](architecture/ai-prepared-behaviors.md),
+[ADR-0041](decisions/ADR-0041-ai-prepared-selective-behaviors.md).
+Données originales + contrôleurs adaptés en priorité ; portage original au cas
+par cas. Entrées 2D/3D/hybrides/custom, sans liste fermée ni conversion garantie.
+L'IA prépare les liens et tests hors runtime. La course conserve vrais virages,
+formation stable et récupération visuelle sans relance implicite du travail.
+États inconnus/périmés explicites ; aucune télémétrie déduite du seul silence PTY.
+Prochaine étape : fermer E1 avec fixtures et périmètre minimal, puis E2 trajectoire
+et formation sur données originales synthétiques. Pas de ROM nécessaire à cette
+preuve ; OoT reste une étude, pas le point de passage de tous les jeux.
+
+Vérification ADR-0041 : `npm run verify` réussi (262 tests réussis, 1 ignoré,
+0 échec ; 3 intégrations réussies ; 0 vulnérabilité npm). 73 cibles de liens
+locaux vérifiées, aucune absente ; `git diff --check` propre. Aucun fichier
+supprimé, dépendance installée ou hook modifié. Aucun test produit exécuté.
+Archify architecture : showcase 9/9, aucune erreur ni avertissement ; contrôle
+automatique sur quatre tailles réussi ; capture sombre 2048×1320 inspectée.
+Revue humaine `pending`, viewer anglais, libellés produit français.
+Artefact : `dist/architecture/game-transformation.architecture.html`.
+SHA-256 source : `952c57d60dde583eae62ab1b55e907b0211bbf6395716cec70d6e7634832104f`.
+SHA-256 HTML : `ab657403aa0279747b39d777f33554e634b92ebeb4670cf80d7d07f5edeebffe`.
+
+Les comptes rendus suivants sont historiques :
+
 Dernière étude : [OoT vers un environnement interactif](research/oot-environment-pilot.md),
 [ADR-0040](decisions/ADR-0040-source-engine-and-theme-runtime.md).
 Sources publiques épinglées lues : OoT utilise une extraction Python, Shipwright

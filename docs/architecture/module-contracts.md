@@ -62,6 +62,14 @@ d'annulation et de quotas figurent dans [theme-interactions.md](theme-interactio
 
 ## Identités, versions et migration
 
+Les [contrôleurs préparés par IA](ai-prepared-behaviors.md) réutilisent C0–C6 :
+C1 vérifie ressources et capacités exécutables, C2 active les contrôleurs bornés.
+La génération ne vaut ni implémentation d'une capacité absente ni autorisation.
+C3 distingue état de processus, travail annoncé et état inconnu/périmé ; silence
+PTY ne signifie pas erreur. Une animation de récupération ne change pas l'état
+réel d'une session et ne relance pas son travail. Provenance et fraîcheur des
+événements doivent être explicites avant d'y associer une réaction du thème.
+
 Séparer identité logique et empreinte de contenu : deux objets peuvent partager
 la même texture sans devenir le même objet. Une référence locale précise son
 espace d'identités, sa version et son rôle ; sa résolution fournit une ressource

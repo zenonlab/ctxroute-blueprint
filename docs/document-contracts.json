@@ -3,6 +3,13 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "ai-prepared-behaviors",
+      "kind": "product-contract-design",
+      "format": "markdown",
+      "source": "docs/architecture/ai-prepared-behaviors.md",
+      "requiredSections": ["Solution retenue", "Arbitrage des approches", "Ce que l'IA produit et ce que le runtime reçoit", "Cas course : vrais virages, formation stable et sessions", "Preuves ciblées et prochaine étape"]
+    },
+    {
       "id": "oot-environment-pilot",
       "kind": "research-evidence",
       "format": "markdown",

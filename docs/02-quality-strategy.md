@@ -13,6 +13,12 @@ E2 les sonde avec des doubles sans construire les fonctions complètes.
 
 ## Vérification du socle
 
+Les [tests A01–A08](architecture/ai-prepared-behaviors.md#preuves-ciblées-et-prochaine-étape)
+qualifient contrôleurs 2D/3D/custom, trajectoires réelles, formation, récupération,
+absence de LLM à l'activation, état inconnu et sécurité des sorties générées.
+Fixtures originales et invariants indépendants du générateur ; tests prévus,
+non exécutés. Mesurer les contrôleurs séparément du rendu et du terminal.
+
 Le [protocole produit](04-experimental-protocol.md) détaille désormais B-R (rendu),
 B-T (terminal), B-O (ancrage) et B-F (autonomie/pannes), en complément des P/R.
 Il impose référence native, répétitions, métriques définies et comparaisons neutres.
