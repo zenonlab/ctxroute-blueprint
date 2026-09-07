@@ -1,10 +1,10 @@
 # Vision produit — bureau et terminal ludiques
 
-État : cadrage produit, 7 septembre 2026. Nom de travail : Wallpaper.
+État : expérimentation L1, 7 septembre 2026. Nom de travail : Wallpaper.
 Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
-Le statut du dépôt reste `template` jusqu'à l'initialisation vérifiée avant code.
+Le dépôt est initialisé ; une [sonde native isolée](pocs/macos-surface.md) est implémentée.
 Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
-il ne constitue ni un prototype livré ni une adoption de production.
+Il ne constitue pas une adoption de production ; L1 reste partiellement validé.
 
 Les audits sont consolidés dans la [synthèse sourcée](research/architecture-audit-synthesis.md).
 Le [protocole expérimental](04-experimental-protocol.md) prépare les preuves avant
@@ -159,6 +159,13 @@ Pour démarrer, [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) retient :
 Terminal/PTY, stockage durable, format public, packaging et isolation du code tiers
 restent hors du périmètre initial. Versions et commandes doivent être qualifiées
 lors de l'initialisation et de l'ajout du PoC concerné.
+L1 est désormais cadré par [ADR-0043](decisions/ADR-0043-isolated-macos-surface-poc.md) :
+Swift 6.3.2, SDK macOS 26.5, package SwiftPM autonome sans dépendance, XCTest,
+avertissements de compilation bloquants et durée finie (60 secondes par défaut,
+600 maximum). Cible de compilation macOS 14 ; seul MAC-01 sous 26.2 est disponible.
+État en mémoire, compteurs sur stdout ; fichiers de build et snapshots de notre
+vue sous `dist/pocs/macos-surface/` via le lanceur fourni. Sonde sans sandbox hostile, sans
+chargement tiers, permission globale d'entrée ou modification des réglages système.
 Ces choix sont désormais rattachés aux échéances E1–E6 de la
 [feuille de route unique](03-product-roadmap.md), et non à une session indéfinie.
 E1 doit consigner les choix nécessaires au périmètre expérimental avant code.
@@ -181,8 +188,8 @@ Voir les [questions techniques](01-technology-decisions.md) et la
 
 Pour cette étape : un socle CTXRoute installé, une documentation cohérente,
 un schéma conceptuel validé et une note permettant de reprendre sans relire
-la conversation. Aucun code produit ni stack de production sélectionnée ;
-le périmètre expérimental est désormais défini.
+la conversation. Une sonde expérimentale est disponible, sans stack de production
+sélectionnée ni qualification complète du bureau.
 
 Pour le futur produit : les trois modes sont utilisables, chaque joueur ouvre
 la bonne session, changer d'apparence conserve le travail, les assets disponibles

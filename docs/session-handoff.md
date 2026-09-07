@@ -1,9 +1,20 @@
 # Reprise de session — Wallpaper
 
-Mise à jour : 7 septembre 2026. Phase : périmètre expérimental défini,
-initialisation et premiers PoCs à exécuter.
+Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolément.
 
-## Commencer ici
+## Reprise actuelle — L1
+
+Lire [la fiche d'essai](pocs/macos-surface.md) et
+[ADR-0043](decisions/ADR-0043-isolated-macos-surface-poc.md).
+Source autonome : `pocs/macos-surface/`, aucun lien au futur moteur ou au terminal.
+Les tests Swift passent ; le smoke AppKit ne valide pas l'animation dans cette
+session où la fenêtre est signalée invisible. Ne pas forcer son exécution masquée.
+Prochaine action : lancer la sonde depuis une session graphique visible et vérifier
+les gestes réels. L2/L3, consommation électrique et compatibilité OS restent ouverts.
+
+Les sections suivantes conservent les relevés documentaires antérieurs.
+
+## Historique — avant implémentation L1
 
 Lire en premier le [plan L1–L3](05-poc-start-plan.md) et
 [ADR-0042](decisions/ADR-0042-bounded-poc-start.md). Sonde Swift/AppKit sur MAC-01,

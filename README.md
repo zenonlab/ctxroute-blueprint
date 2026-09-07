@@ -17,7 +17,8 @@ L'ordre de réalisation et les critères de sortie sont réunis dans la
 Les [audits consolidés](docs/research/architecture-audit-synthesis.md) et le
 [protocole expérimental](docs/04-experimental-protocol.md) cadrent les comparaisons
 de rendu, terminal et ancrage natif avant adoption d'une technologie.
-Le socle est installé ; aucun code produit n'est encore livré. Le
+Le dépôt est initialisé ; une [sonde macOS isolée L1](docs/pocs/macos-surface.md)
+est implémentée. Ses tests d'état passent ; la qualification du bureau reste ouverte. Le
 [plan des PoCs](docs/05-poc-start-plan.md) choisit les outils expérimentaux,
 sans adoption de stack de production ni résultat énergétique annoncé.
 La [carte d'infrastructure](docs/architecture/runtime-infrastructure.md) organise

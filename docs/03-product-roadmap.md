@@ -1,9 +1,10 @@
 # Feuille de route produit — progression par preuves
 
-État au 7 septembre 2026 : **E1 cadrée, initialisation à terminer ; E2–E6 non démarrées**.
+État au 7 septembre 2026 : **dépôt initialisé, E1 à compléter, sonde L1 partiellement éprouvée**.
+E2 n'est pas validée ; L2/L3 et E3–E6 restent non démarrées.
 Le [plan L1–L3](05-poc-start-plan.md) et
 [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) fixent le premier périmètre.
-Aucun prototype produit, benchmark ou support OS certifié. Ce document est la
+Le [PoC L1](pocs/macos-surface.md) ne certifie aucun support OS ni benchmark. Ce document est la
 référence unique pour l'ordre d'exécution ; les anciens ordres de discussion et
 la roadmap de recherche sont historiques, sans engagement de calendrier.
 Voir [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md) et le
@@ -23,7 +24,8 @@ une formation, pas un remplacement implicite par des portraits fixes.
 
 Avancement documentaire E1 : [MAC-01 et faisabilité OS](research/os-feasibility.md)
 relevés ; [préflight de stack](research/stack-preflight.md) préparé. Budgets,
-instruments de mesure et autres bancs restent à qualifier. Aucun prototype exécuté.
+instruments de mesure et autres bancs restent à qualifier. Les premiers essais L1
+sont consignés séparément, sans lever les exigences de mesure E1.
 
 Le [protocole expérimental E1](04-experimental-protocol.md) précise les mesures
 et les preuves à produire sans modifier cet ordre. Étude courte des candidats,

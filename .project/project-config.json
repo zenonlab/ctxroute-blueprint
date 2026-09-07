@@ -1,20 +1,20 @@
 {
   "schemaVersion": 1,
-  "status": "template",
+  "status": "initialized",
   "tooling": {
     "runtime": "node",
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "[Product language pending the next technology session]; Node.js is blueprint tooling only",
-    "runtime": "Node.js 22.13+ for repository governance; derived product is undecided",
-    "frontend": "[Product UI technology pending]; modular terminal and interactive desktop required on Linux, macOS and Windows",
-    "backend": "none: no product service is selected",
-    "storage": "none: product storage is undecided; local SQLite is tooling-only",
-    "deployment": "none: documentation artifacts only; derived product decides deployment",
-    "observability": "CI logs and sanitized validation artifacts only",
-    "security": "minimal CI permissions, pinned actions, local hooks, and Sensor gates",
-    "performance": "bounded setup and single-flight local tooling; product budgets undecided"
+    "language": "L1: Swift 6, observed compiler 6.3.2; later L2-L3: Rust candidate, not installed by L1. Node.js is governance tooling only.",
+    "runtime": "L1: standalone macOS AppKit process, local SDK 26.5; deployment target macOS 14, qualified only on MAC-01 macOS 26.2.",
+    "frontend": "L1: native AppKit controls and CoreGraphics test drawing; ordinary interactive window or separately selected passive desktop surface.",
+    "backend": "None for L1: no service, IPC, PTY, game reader or LLM runtime.",
+    "storage": "L1: memory-only scene; build artifacts and optional own-view snapshots in ignored dist/pocs/macos-surface; bounded stdout summary.",
+    "deployment": "L1: manual local SwiftPM build and launch; no installer, autostart, shell settings or wallpaper preference writes.",
+    "observability": "L1: bounded diagnostic summary with draw/tick/action counters and monotonic durations, no private terminal or desktop capture.",
+    "security": "L1: reviewed compiled code, no external input files, commands or network; passive desktop never accepts input. Process separation is not a hostile-code sandbox. Swift compiler/tests complement lexical-only Sensor coverage.",
+    "performance": "L1: no animation timer at rest or paused, 30 Hz maximum requested animation rate, finite lifetime up to 600 seconds; energy verdict deferred to measured baseline."
   },
   "commands": {
     "test": "npm run test:coverage",
@@ -55,10 +55,12 @@
   },
   "directories": {
     "source": [
+      "pocs/macos-surface/",
       "packages/",
       "scripts/"
     ],
     "tests": [
+      "pocs/macos-surface/Tests/",
       "tests/"
     ],
     "generated": [
@@ -77,6 +79,7 @@
   ],
   "architecture": {
     "documents": [
+      "docs/architecture/src/macos-surface-poc.architecture.json",
       "docs/architecture/src/product-roadmap.workflow.json",
       "docs/architecture/src/product-vision.architecture.json",
       "docs/architecture/src/game-transformation.architecture.json",
@@ -106,6 +109,7 @@
   },
   "contracts": {
     "patterns": [
+      "**/Package.swift",
       "package.json",
       "**/package.json",
       "**/package-lock.json",

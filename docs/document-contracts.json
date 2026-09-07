@@ -3,6 +3,15 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "macos-surface-poc",
+      "kind": "architecture-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/macos-surface-poc.architecture.json",
+      "narrative": "docs/pocs/macos-surface.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
       "id": "poc-start-plan",
       "kind": "product-test-protocol",
       "format": "markdown",

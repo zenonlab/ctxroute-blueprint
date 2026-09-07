@@ -1,13 +1,19 @@
 # Stratégie qualité
 
+Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
+reprise ; compilation native avec avertissements bloquants, puis smoke AppKit
+à durée finie. Les gestes Finder restent une preuve manuelle distincte.
+Voir [la fiche L1](pocs/macos-surface.md). Sensor n'a pas de parseur Swift qualifié ;
+sa couverture lexicale ne remplace ni le compilateur ni ces tests.
+
 Le [plan L1–L3](05-poc-start-plan.md) fixe les premiers tests : sonde OS native,
 invariants de contrôleur Rust sans GPU, puis scène représentative. Bornes de
 fixture et protocole d'états simulés sont des exigences à implémenter, non des
 tests disponibles. L'absence d'instrument énergétique n'empêche pas un diagnostic
 fonctionnel, mais interdit un verdict de sobriété.
 
-Cette étape vérifie le socle et la documentation. Les scénarios produit
-ci-dessous préparent la prochaine session ; ils ne sont pas encore automatisés.
+Le socle et les tests d'état L1 sont vérifiés séparément. Les scénarios produit
+ci-dessous restent à éprouver au-delà de cette sonde, sans validation automatique implicite.
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces
 scénarios à E2–E6. E1 fixe le banc et les règles ; les seuils comparatifs sont
 gelés après baseline exploratoire, avant comparaison. E2 mesure

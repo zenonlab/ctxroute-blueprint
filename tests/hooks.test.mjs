@@ -31,15 +31,23 @@ test('Codex and Claude expose exactly one handler for the same six lifecycle eve
 });
 
 test('initialize refuses an incomplete template without changing status', () => {
-  const configPath = join(root, '.project/project-config.json');
+  const liveBefore = readFileSync(join(root, '.project/project-config.json'), 'utf8');
+  const cwd = starterWorkspace();
+  const configPath = join(cwd, '.project/project-config.json');
   const before = JSON.parse(readFileSync(configPath, 'utf8'));
+  for (const file of ['00-project-brief.md', '01-technology-decisions.md', '02-quality-strategy.md']) {
+    writeFileSync(join(cwd, 'docs', file), 'Fixture incomplete by design.\n');
+  }
   const result = spawnSync(process.execPath, [join(root, '.githooks/initialize.mjs')], {
-    cwd: root,
+    cwd,
+    env: { ...process.env, npm_execpath: join(cwd, 'must-not-run.mjs') },
     encoding: 'utf8',
+    timeout: 5000,
   });
   assert.equal(result.status, 1);
-  assert.match(`${result.stdout}\n${result.stderr}`, /(Initialization blocked|Run initialization through npm)/u);
+  assert.match(result.stderr, /Initialization blocked/u);
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).status, before.status);
+  assert.equal(readFileSync(join(root, '.project/project-config.json'), 'utf8'), liveBefore);
 });
 
 test('project configuration inspection accepts the declared internal/product split', () => {
@@ -267,7 +275,8 @@ test('postinstall detects legacy global CTXRoute hooks without changing them', (
   ]);
 });
 
-test('both lifecycle dialects enforce local governance without automatic CTXRoute injection', () => {
+test('both lifecycle dialects allow only scoped ADR reminders without automatic CTXRoute injection', () => {
+  const initialized = JSON.parse(readFileSync(join(root, '.project/project-config.json'), 'utf8')).status === 'initialized';
   for (const harness of ['codex', 'claude']) {
     const session = `dispatcher-${harness}-${process.pid}-${Date.now()}`;
     const pseudoPatch = ['***', 'Update File: .project/project-config.json'].join(' ');
@@ -277,7 +286,13 @@ test('both lifecycle dialects enforce local governance without automatic CTXRout
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout.trim(), '', `${harness} nominal PreToolUse should stay silent`);
+    if (initialized) {
+      const output = JSON.parse(result.stdout);
+      assert.deepEqual(Object.keys(output), ['hookSpecificOutput']);
+      assert.equal(output.hookSpecificOutput.hookEventName, 'PreToolUse');
+      assert.match(output.hookSpecificOutput.additionalContext, /^Applicable ADRs:/u);
+      assert.ok(output.hookSpecificOutput.additionalContext.length <= 1200);
+    } else assert.equal(result.stdout.trim(), '', `${harness} template PreToolUse should stay silent`);
     assert.equal(result.stderr.trim(), '', `${harness} nominal PreToolUse should not emit diagnostics`);
   }
 });

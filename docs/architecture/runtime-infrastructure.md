@@ -2,7 +2,8 @@
 
 État : architecture de référence proposée le 7 septembre 2026 ; responsabilités
 formalisées, hypothèses techniques à comparer, aucune dépendance
-produit installée. Le dépôt reste `template` jusqu'à l'initialisation vérifiée.
+produit tierce installée. Le dépôt est initialisé ; la [sonde L1](../pocs/macos-surface.md)
+est un package autonome, pas l'implémentation du runtime ci-dessous.
 Le [plan L1–L3](../05-poc-start-plan.md) fixe maintenant les choix expérimentaux :
 sonde OS indépendante, contrôleur sans GPU puis candidat de rendu. Les assemblages
 de production ci-dessous ne sont toujours pas des dépendances adoptées.

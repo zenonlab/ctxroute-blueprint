@@ -1,6 +1,8 @@
 # Démarrage des PoCs — décisions expérimentales
 
-État au 7 septembre 2026 : plan accepté pour expérimentation, aucun PoC exécuté.
+État au 7 septembre 2026 : L1 implémenté et partiellement éprouvé ; L2/L3 non commencés.
+Les [résultats L1](pocs/macos-surface.md) distinguent tests réussis et smoke graphique
+non validé lorsque AppKit signale la fenêtre invisible.
 Ce document ferme le périmètre de départ, pas le choix de production.
 Il complète [E1–E6](03-product-roadmap.md) et le
 [protocole de mesure](04-experimental-protocol.md), sans les remplacer.
