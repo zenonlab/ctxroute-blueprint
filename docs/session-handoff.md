@@ -4,6 +4,14 @@ Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolémen
 
 ## Reprise actuelle — qualification native
 
+Dernière contre-preuve : après resélection, toujours aucune animation selon
+l'utilisateur. Les lancements échouent avec `Invalid bundle record for current process`
+dans ExtensionFoundation ; chemin réellement lancé build 3 nXn2Mw malgré registre
+build 4 aGAdKG. Hôte aGAdKG réenregistré via lsregister puis pluginkit, effet sur
+le lancement encore non validé. Pas de nouveau build ni de bouton factice ajouté.
+La demande de boutons/panneaux reste ouverte : route souris non établie dans
+le protocole natif inspecté. Ne pas revenir à un overlay sans accord.
+
 L'utilisateur rejette les fenêtres superposées ; ne pas poursuivre le split-input
 comme s'il répondait au besoin. [ADR-0047](decisions/ADR-0047-native-wallpaper-extension-probe.md)
 isole une préparation native Phosphene/ColorDiag, sans installer ni lancer l'extension.

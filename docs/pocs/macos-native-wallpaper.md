@@ -33,6 +33,33 @@ sélectionné le diagnostic, puis signalé un fond noir. Ne pas déplacer le bui
 
 ## Correction du démarrage et du noir — 7 septembre 2026
 
+### Contre-vérification après nouvelle sélection utilisateur
+
+L'utilisateur rapporte qu'une version animait le fond, puis que l'animation a
+disparu. La resélection ne résout pas le défaut. Les journaux système à 23:50
+montrent des tentatives de lancement suivies de
+`ExtensionFoundation/EXRunningExtension.swift:92: Fatal error: Invalid bundle record for current process`.
+Le rapport local `NativeWallpaperProbe-2026-09-07-234858.000.ips` identifie le
+build 3 et SIGTRAP dans `_EXRunningExtension._start`, avant le diagnostic.
+Le chemin effectivement lancé reste `compile.nXn2Mw`, alors que pluginkit
+référence le build 4 `compile.aGAdKG`. L'absence de processus vivant ne signifie
+donc pas que macOS n'a pas tenté de relancer l'extension.
+
+L'hôte build 4 a été réenregistré avec `lsregister -f` (cette application seule),
+puis son extension avec `pluginkit -a`. Aucun service Apple n'a été redémarré.
+Le nouveau registre pointe sur aGAdKG ; ce contrôle ne prouve pas la résolution
+du crash. Computer Use voit le diagnostic sélectionné, mais ses tentatives de
+clic échouent (`cannotClickOffscreenElement`, puis `noWindowsAvailable`).
+Le dernier journal applicatif reste celui du build précédent ; animation et
+reprise restent non validées. Ne pas multiplier les builds avant de vérifier
+le chemin réellement lancé et la disparition de l'assertion.
+
+Les boutons demandés restent non implémentés dans cette extension : le protocole
+XPC inspecté ne fournit pas de route souris vers la scène. Dessiner des boutons
+ne suffit pas ; une route d'entrée préservant les icônes Finder doit être prouvée
+avant de déclarer les actions, panneaux et effets interactifs fonctionnels.
+Une fenêtre superposée ne constitue pas un repli accepté par l'utilisateur.
+
 Trois défauts distincts ont été isolés, sans redémarrer WallpaperAgent ou Finder :
 
 1. Le binaire ordinaire utilisait `_main`. La spécification locale Xcode
