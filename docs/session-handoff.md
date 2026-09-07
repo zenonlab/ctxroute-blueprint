@@ -10,8 +10,13 @@ et [ADR-0030](decisions/ADR-0030-game-transformation.md). L'utilisateur veut
 programmer des compositions à partir d'une bibliothèque couvrant le jeu entier,
 avec ressources, relations, collisions et comportements compris, tout en
 n'exécutant que la sélection nécessaire. Mario Kart reste un exemple.
-La composition par code est prioritaire ; les questions de fidélité, contrôle,
-couverture progressive, pilote et énergie restent ouvertes.
+La composition par code est prioritaire. La dernière décision est
+[ADR-0031](decisions/ADR-0031-canonical-library-and-capabilities.md) : bibliothèque
+canonique préservée, indexation globale et exports progressifs par scène,
+comportements ambiants adaptés, clics et réactivité système, capacités explicites,
+profils énergétiques soumis à mesure. OoT est candidat prioritaire pour un PoC
+avant sélection définitive du pilote. La ROM/version, la scène précise et les
+machines de mesure restent à fournir ou choisir ; aucun PoC n'a été exécuté.
 
 Lire [AGENTS.md](../AGENTS.md), la [vision produit](00-project-brief.md), puis
 les [questions techniques](01-technology-decisions.md).
@@ -93,10 +98,12 @@ non verbatim du texte initial ; ses chiffres et références restent à vérifie
 
 ## Prochaine conversation
 
-Comparer les solutions existantes pour terminal, bureau multiplateforme et
-assets ; choisir ensuite un premier parcours démontrable et un jeu pilote.
-Définir le modèle de session, les limites de personnalisation et les budgets
-avant de décider langage, rendu, packaging ou infrastructure.
+Priorité actuelle : préparer la preuve d'extraction OoT décrite dans
+[la transformation du jeu](architecture/game-transformation.md). Aucune ROM
+`.z64`, `.n64`, `.v64` ni image `.iso`/`.gcm` n'a été trouvée dans le dossier
+du projet lors de cette mise à jour. Identifier l'entrée et sa version avant
+d'exécuter l'extraction. Comparer ensuite terminal, bureau et intégration à
+partir des capacités démontrées ; les formats et la stack restent ouverts.
 
 Prompt de reprise possible :
 
@@ -108,9 +115,9 @@ Prompt de reprise possible :
 
 Prompt complémentaire pour poursuivre la réflexion :
 
-> Lis docs/architecture/game-transformation.md et ADR-0030. Aide-moi à trancher
-> le niveau de fidélité des comportements, le type de contrôle des personnages,
-> la conversion progressive du jeu entier, le premier jeu de validation et
-> les compromis de consommation. Nous composons par code et réutilisons au
-> maximum les lecteurs et systèmes existants. Ne choisis pas encore la stack
-> sans relier chaque proposition à ces exigences.
+> Lis docs/architecture/game-transformation.md et ADR-0031. Prépare le PoC OoT
+> avec les outils existants : identifier la ROM/version disponible et une scène,
+> vérifier géométrie, matériaux, acteur animé, collision, audio et placements
+> traçables. Conserver les données canoniques et qualifier les capacités manquantes.
+> Ne fixe pas la stack avant ces preuves. La composition par code et le diorama
+> ambiant économe sont déjà décidés ; la couverture globale progresse par scène.

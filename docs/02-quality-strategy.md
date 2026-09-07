@@ -46,8 +46,19 @@ Vérifier les dépendances nécessaires, les associations scène/minimap/portrai
 la conservation des identifiants lors d'un export et l'absence de chargement
 des systèmes exclus. Un changement de fréquence d'affichage ne doit pas modifier
 la simulation attendue. Pour chaque comportement, annoncer s'il est récupéré,
-adapté, réimplémenté, précalculé ou non supporté. Les preuves de fidélité et les
-seuils seront définis après réponse aux questions de cadrage.
+adapté, réimplémenté, précalculé ou non supporté. Le mode ambiant peut simplifier
+les comportements sans modifier les données canoniques conservées.
+
+La matrice détaillée du [PoC OoT](architecture/game-transformation.md) fait foi :
+pièce et matériaux, acteur animé, collision séparée, audio référencé et placements
+traçables. Ajouter les essais négatifs : collision absente → pas de patrouille,
+AABB de clic → aucune navigation implicite, matériau dégradé → fidélité signalée,
+boucle non validée → lecture unique ou crossfade annoncé. Vérifier la conservation
+des sources après simplification et la résolution des ressources partagées.
+
+Tester chaque profil énergétique sur batterie et secteur, avec animation,
+sans interaction, sous occlusion totale et avec une autre surface encore visible.
+La suspension du diorama ne doit pas interrompre les sessions de travail.
 
 Mesurer CPU, GPU, mémoire, énergie, latence d'interaction et temps de chargement
 sur une machine et une scène documentées, avec écran et fréquence connus.

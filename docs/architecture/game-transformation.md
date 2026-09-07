@@ -1,7 +1,7 @@
 # Transformation du jeu et exécution sélective
 
-État : orientation conceptuelle confirmée le 7 septembre 2026 ; technologies,
-formats et niveau de fidélité encore ouverts. Aucun extracteur n'est implémenté.
+État : bibliothèque canonique et diorama ambiant confirmés le 7 septembre 2026 ;
+technologies et formats encore ouverts. Aucun extracteur n'est implémenté.
 Voir le [schéma conceptuel](src/game-transformation.architecture.json).
 
 ## Intention confirmée
@@ -15,6 +15,13 @@ L'ambition est de transformer le jeu entier en une bibliothèque exploitable,
 puis de ne charger et exécuter que les éléments nécessaires à une composition.
 La portée de l'analyse hors ligne et celle de l'exécution sont distinctes.
 La couverture complète de tout jeu reste un objectif, pas une capacité démontrée.
+
+Le mode d'exécution principal est un diorama ambiant : animations autonomes,
+réactivité aux événements système utiles et clics diégétiques. Les comportements
+de gameplay peuvent être adaptés dans la composition. Le contrôle direct reste
+une extension optionnelle à activation explicite ; il ne capte pas le clavier
+du bureau en mode nominal. La fidélité sensorielle est un objectif à vérifier,
+et non une propriété garantie par le format ou par l'extracteur.
 
 ## Frontières de l'infrastructure
 
@@ -32,6 +39,42 @@ particulières. Le cœur commun ne doit pas dépendre des identifiants Mario Kar
 On privilégie des adaptateurs existants ; l'objectif n'est pas de créer un
 nouveau lecteur universel de toutes les consoles.
 
+## Bibliothèque canonique et conversion par scène
+
+La bibliothèque est le référentiel persistant du jeu : index des scènes
+identifiées, ressources partagées, textures, animations, audio, collisions,
+paramètres et relations. Dédupliquer les contenus identiques sans fusionner
+leurs identités logiques ni perdre les références et provenances d'origine.
+
+Le pipeline vise l'indexation globale du support et de ses ressources communes,
+puis la matérialisation progressive par scène. Une scène n'est pas présumée
+autonome : son export résout les ressources partagées et dépendances nécessaires.
+Les portions encore inconnues de l'index sont signalées, pas déclarées couvertes.
+La sélection `export --scene <id>` exprime la capacité souhaitée ; cette notation
+ne fige pas encore un exécutable, une CLI publique ou un format de bundle.
+
+La couverture doit distinguer scènes identifiées, scènes matérialisées,
+catégories récupérées et catégories inconnues/non supportées. Elle ne se réduit
+pas à un pourcentage global qui masquerait l'absence de collisions ou d'audio.
+
+## Préservation sans suppression volontaire à l'ingestion
+
+Conserver toutes les informations effectivement récupérées : géométrie,
+topologie, drapeaux de surface, paramètres, tables, animations, audio, code ou
+scripts compris et leurs relations. Conserver leur provenance et leur version ;
+les représentations normalisées ne doivent pas effacer leurs sources ou les
+propriétés que le diorama n'utilise pas encore. Les blocs identifiés mais non
+interprétés doivent rester traçables et distingués des données comprises.
+
+Les simplifications appartiennent aux dérivés de composition, jamais à une
+réécriture destructive de la bibliothèque. Elles peuvent être préparées hors
+ligne pour économiser le runtime : maillage de picking simplifié, matériau
+de repli, rendu audio ou sélection d'animations. Le choix est celui de la
+composition ; il n'est pas nécessaire de recalculer ces dérivés à chaque
+instanciation. Retrouver une propriété déjà conservée ne nécessite pas une
+nouvelle extraction ; comprendre une propriété jusque-là inconnue peut en
+revanche nécessiter un nouveau passage du lecteur.
+
 ## Ce que signifie récupérer une mécanique
 
 | Catégorie | Contenu | Limite à préserver |
@@ -48,7 +91,9 @@ pas automatiquement ses règles en composants indépendants.
 Pour chaque comportement, distinguer : original récupéré, original adapté,
 équivalent réimplémenté, animation précalculée, ou non supporté. Cette distinction
 évite de présenter une imitation visuelle comme une mécanique originale.
-Le choix acceptable entre ces catégories reste à discuter.
+Le diorama autorise les comportements adaptés et simplifiés, en conservant la
+distinction et la source originale disponible. La bibliothèque peut accueillir
+des mécaniques plus fidèles ultérieurement sans les activer dans chaque composition.
 
 ## Relations communes entre représentations
 
@@ -86,6 +131,87 @@ constitue une optimisation valide que si le comportement attendu est conservé
 ou si la simplification est explicitement acceptée.
 Une recompilation native ne garantit pas à elle seule une faible consommation.
 
+## Capacités explicites et dégradations qualifiées
+
+Chaque export doit indiquer les capacités réellement disponibles, leur périmètre
+(scène ou ressource), la provenance, les approximations et les raisons des
+désactivations. Le runtime vérifie les capacités requises avant d'activer un
+système. Une capacité inconnue ne vaut pas une capacité disponible.
+
+| Usage | Condition d'activation | Repli et conséquence |
+| --- | --- | --- |
+| Sol et navigation | Collision séparée validée et données nécessaires au comportement de déplacement | Aucune AABB générique ne remplace un sol. Si insuffisant : entités statiques, animations sur place possibles, patrouille dynamique désactivée. |
+| Clic sur un objet | Volume de picking identifié | AABB possible à partir de la géométrie, avec précision annoncée comme approximative ; ne confère aucune capacité de navigation. |
+| Matériaux | Effets et propriétés nécessaires effectivement restitués | Unlit/Lambert possible si la composition l'accepte ; fidélité visuelle signalée comme approximative. |
+| Audio en boucle | Points, unité temporelle, séquence/décodage et continuité validés | Lecture unique ou crossfade explicitement choisi et signalé ; ne pas annoncer une boucle exacte. |
+
+Un TriMesh avec normales valides ne prouve pas à lui seul qu'un personnage sait
+naviguer : les surfaces pertinentes, obstacles, chemins et règles nécessaires
+au déplacement retenu doivent aussi être validés.
+
+Un manifeste typé de capacités est requis conceptuellement. L'exemple utilisateur
+`navigation: false, visual_fidelity: fallback_unlit, audio_loop: exact` illustre
+ces informations, mais le schéma et les valeurs définitives restent à concevoir.
+Un journal structuré devra relier chaque omission ou approximation à sa source.
+Un export partiel peut réussir avec restrictions ; une corruption empêchant de
+garantir sa structure ou une dépendance obligatoire non résolue ne doit pas être
+masquée par un fallback silencieux.
+
+## Profils énergétiques à mesurer
+
+| Profil | Politique cible | Conditions |
+| --- | --- | --- |
+| Économie | Cadence d'origine lorsqu'elle est connue, généralement 20–30 FPS pour les exemples visés ; pas d'interpolation visuelle supplémentaire | Défaut sur batterie. Suspension du rendu de la surface entièrement masquée. |
+| Bureau fluide | Cible 60 FPS avec interpolation adaptée aux transformations | Sur secteur et bureau actif. Réduction ou suspension lorsque les animations et événements utiles le permettent. |
+| Haute fréquence | Cadence de l'écran, notamment 120+ Hz | Option expérimentale explicite ; mesures et limites thermiques à définir avant activation. |
+
+La cadence d'origine vient du jeu/de la séquence identifiée, pas d'une constante
+universelle par console. Les interpolations de rotation doivent respecter leur
+représentation ; les paramètres du solveur physique ne suivent pas arbitrairement
+la cadence d'affichage. Sans input, une animation autonome peut encore justifier
+un rendu : la politique doit choisir explicitement de la poursuivre, la ralentir
+ou la mettre en pause. Ne pas promettre simultanément 1 FPS et animation fluide.
+
+La suspension concerne les surfaces entièrement masquées, selon les capacités
+réelles de l'OS et la configuration multi-écrans. Elle ne suspend ni les shells
+ni les agents de travail. Le comportement audio en arrière-plan reste à choisir.
+Zéro frame soumise n'est pas une garantie de consommation nulle du système.
+
+Les cibles inférieures à 1–2 % CPU/GPU sont des budgets exploratoires soumis
+à mesure. Définir matériel, résolution, nombre d'écrans, scène, nombre d'entités,
+alimentation, durée et méthode de calcul avant d'en faire un critère bloquant.
+Comparer aussi mémoire, énergie et réactivité. Les iGPU et Apple Silicon sont
+prioritaires ; les références matérielles précises restent à sélectionner.
+
+## PoC préalable à la sélection définitive du jeu pilote
+
+Ocarina of Time est le candidat prioritaire. Tester une scène unique, Temple du
+Temps ou Maison de Link, après identification d'une version exacte du jeu et
+de ce que les outils savent réellement extraire. SM64 et Sunshine sont des
+alternatives à évaluer si des relations critiques manquent ou si l'intégration
+spécifique devient excessive ; aucune bascule automatique n'est définie.
+
+| Preuve | Critère de réussite |
+| --- | --- |
+| Pièce et matériaux | Géométrie complète de la pièce, textures et couleurs de sommets conservées, orientation et UV vérifiées dans un visualiseur ; approximations recensées. |
+| Acteur animé | Squelette et au moins une animation cyclique rejouable ; provenance et éventuelle boucle artificielle distinguées de l'animation originale. |
+| Collision | Données séparées du maillage visible, avec surfaces et propriétés identifiées ; pas de substitution silencieuse par la géométrie de rendu. |
+| Audio | Relation scène → musique prouvée ; flux ou séquence avec ses dépendances et repères, puis lecture en boucle réellement testée. Des tags seuls ne suffisent pas. |
+| Placements | Positions et repères rattachés aux données de scène, de salle ou de spawn ; transformations documentées, sans repositionnement manuel présenté comme original. |
+| Sélection et conservation | Export de la scène avec ses dépendances ; données originales récupérées toujours disponibles, systèmes non nécessaires absents de l'exécution. |
+
+Si le personnage démontré n'est pas un acteur placé dans la salle, documenter
+séparément l'origine de son modèle/animation et celle de son point d'entrée.
+Une insertion décidée par la composition reste autorisée comme démonstration,
+mais ne satisfait pas la preuve d'un placement extrait.
+De même, une musique séquencée peut demander banques d'instruments et rendu
+hors ligne ; elle ne doit pas être traitée comme un fichier Ogg déjà présent.
+
+Le rapport du PoC doit fixer les révisions des outils, l'identité de l'entrée,
+les commandes exécutées, les ressources obtenues, les références manquantes,
+les capacités et les preuves visuelles/audio. Évaluer le code de liaison requis
+avant de fixer formats et stack. Aucun outil n'est adopté sur sa réputation seule.
+
 ## Éléments vérifiés dans les projets existants
 
 Sources consultées le 7 septembre 2026. Il s'agit d'une lecture documentaire et
@@ -119,19 +245,11 @@ licences et compatibilité des outils avec le projet.
 
 ## Questions pour la suite
 
-1. Fidélité : faut-il conserver exactement marche/saut/collisions d'origine,
-   ou peut-on remplacer certains comportements par des équivalents plus simples ?
-2. Interaction : contrôle direct clavier/manette, comportements autonomes,
-   réactions aux sessions, ou plusieurs de ces usages ?
-3. Bibliothèque complète : une conversion progressive avec catégories non
-   supportées clairement signalées convient-elle pour les premiers jeux ?
-4. Validation : quel premier jeu et quelle version utiliser pour démontrer
-   collisions, déplacement et composition, sans en faire une limite du cœur ?
-5. Énergie : quel matériel de référence et quelle priorité entre fidélité,
-   fluidité et économie lorsqu'un comportement coûteux est actif ?
-
-Ces questions restent ouvertes ; aucune réponse n'est présumée.
-La stack et les interfaces techniques seront décidées ensuite.
+Le mode ambiant, la conservation des données et la conversion progressive sont
+désormais tranchés. Restent à préciser : la ROM/version disponible, la scène
+exacte du PoC, les machines de mesure, les seuils thermiques et la politique
+audio au repos. La stack, les interfaces et formats seront décidés après les
+preuves. Cette étape documentaire n'a pas exécuté le PoC ni extrait de ROM.
 
 ## Schéma et preuves documentaires
 
@@ -142,7 +260,5 @@ Le contrôle automatique aux quatre résolutions de bureau a réussi ; la captur
 sombre à 2048×1320 a été inspectée par l'agent. Le reçu conserve la revue humaine
 en attente. Le contenu est en français, les commandes du visualiseur en anglais.
 
-SHA-256 de la source :
-`7613b29b6c92d6cb42fdbcac721fbe150662a517f010c8e8ff9696711b4f7517`.
-SHA-256 du HTML :
-`a4d4acfeb2e644118165d5f8b6bcb67722d2d20f8723858c4d9a6329d26d8594`.
+Les empreintes de la livraison courante sont fournies par `npm run build:docs`
+et le reçu `dist/architecture/game-transformation.architecture.visual-check.json`.

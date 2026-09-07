@@ -9,6 +9,7 @@ scope:
   - docs/document-contracts.json
   - .project/project-config.json
 review: on-change
+revised: true
 ---
 # ADR-0030 — Transformer le jeu hors ligne, exécuter une sélection
 
@@ -40,3 +41,7 @@ Fidélité, contrôles, stratégie de conversion progressive, premier jeu pilote
 budgets restent ouverts. Aucun choix de langage, recompiler, moteur physique,
 format ou protocole de plugin n'est accepté par cet ADR.
 Le statut du projet reste `template` jusqu'aux décisions techniques.
+
+Précision ultérieure : [ADR-0031](ADR-0031-canonical-library-and-capabilities.md)
+résout le mode nominal et la conversion progressive, retient OoT comme candidat
+prioritaire et définit la politique de capacités. Les budgets restent à mesurer.

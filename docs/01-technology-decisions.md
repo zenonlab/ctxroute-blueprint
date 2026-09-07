@@ -36,16 +36,17 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 
 ## Ordre de la prochaine discussion
 
-La clarification sur la [transformation du jeu](architecture/game-transformation.md)
-ajoute un préalable : décider du niveau de fidélité des comportements et des
-interactions attendues. Comparer ensuite les outils capables de conserver
-ressources, règles et dépendances, pas seulement d'exporter des maillages.
+La [transformation du jeu](architecture/game-transformation.md) retient désormais
+la bibliothèque canonique, la conversion par scène et le diorama ambiant adapté.
+La prochaine preuve est un PoC d'extraction OoT, candidat prioritaire : pièce,
+acteur animé, collision, musique et placements avec références conservées.
+Comparer les outils sur cette chaîne avant de choisir formats et stack.
 La récupération par décompilation/recompilation reste une piste à évaluer.
 
-1. Vérifier les bases existantes pour le terminal et le bureau multiplateforme.
-2. Définir la modularité et le modèle de session à partir de leurs capacités.
-3. Choisir un jeu pilote après examen des extracteurs et des assets disponibles.
-4. Définir un premier parcours démontrable, les budgets et le périmètre OS précis.
+1. Identifier l'entrée OoT et la scène de test, puis vérifier la chaîne d'extraction avec les outils existants.
+2. Confirmer ou écarter OoT comme pilote après cette preuve ; SM64 et Sunshine restent des alternatives.
+3. Comparer les bases de terminal et de bureau multiplateforme et définir le modèle de session.
+4. Définir le premier parcours intégré, les budgets mesurables et le périmètre OS précis.
 5. Sélectionner ensuite la stack minimale, le packaging et les vérifications.
 
 Rust, wgpu, winit, parry3d, cpal, symphonia, glTF et un bundle `.scene`

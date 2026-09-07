@@ -60,7 +60,14 @@ et [ADR-0030](decisions/ADR-0030-game-transformation.md).
 La bibliothèque doit pouvoir conserver aussi collisions, relations entre
 représentations et comportements compris. Une animation, une surface de
 collision et une règle de saut sont trois choses distinctes. Leur récupération
-dépend des formats et du code du jeu ; la fidélité exigée reste à décider.
+dépend des formats et du code du jeu. La bibliothèque conserve les informations
+récupérées ; le mode nominal diorama peut adapter les comportements. La fidélité
+sensorielle recherchée et chaque approximation doivent être vérifiées et signalées.
+
+La dernière décision retient l'indexation globale, les exports progressifs par
+scène, les capacités explicites et les profils énergétiques mesurables.
+OoT est candidat prioritaire pour une preuve d'extraction, pas encore un jeu
+pilote validé. Voir [ADR-0031](decisions/ADR-0031-canonical-library-and-capabilities.md).
 
 L'ambition exprimée est de disposer des données du jeu et d'en isoler les éléments
 pour les réutiliser : environnements, personnages, objets, textures, squelettes,
