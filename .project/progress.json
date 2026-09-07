@@ -554,7 +554,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-review-resolution",
       "title": "Documenter l’inventaire, la résolution et la Review locale",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -1586,6 +1586,41 @@
             "TypeScript, ESLint, Oxlint et Sensor AST passent; aucun import réseau, navigateur, Dexie ou temporisateur.",
             "Décisions/docs/cohérence, Progress 51/51, Archify all showcase et git diff --check passent."
           ]
+        },
+        {
+          "id": "step-22",
+          "title": "Ajouter l’adaptateur de source AniList exact",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Les URL anime et manga AniList produisent un identifiant fournisseur exact",
+            "HTTP et HTTPS ainsi que le hostname www restent explicitement bornés",
+            "Les sous-domaines ressemblants, mauvais IDs et routes inconnues ne produisent aucune preuve",
+            "Aucun réseau, permission ou runtime extension n’est activé"
+          ],
+          "files": [
+            "packages/adapters-browser/src/favorites/anilist-source-adapter.ts",
+            "packages/adapters-browser/src/favorites/anilist-source-adapter.test.ts",
+            "packages/adapters-browser/src/index.ts",
+            "docs/architecture/README.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run sensor -- packages/adapters-browser/src/favorites",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- all",
+            "node --test tests/progress*.test.mjs",
+            "git diff --check",
+            "git commit -m \"feat(parser): add AniList source adapter\""
+          ],
+          "evidence": []
         }
       ]
     },

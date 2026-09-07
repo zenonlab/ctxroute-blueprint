@@ -53,6 +53,9 @@ The URL evidence slice keeps qualification and source analysis as pure
 application modules. Exact-origin adapters may emit provider IDs, while one
 generic fallback derives only structural evidence; utility pages and adapter
 conflicts fail closed, and a valid observed HTTP origin is never rewritten.
+The first browser-owned exact adapter covers AniList anime and manga routes by
+decimal public ID. It is a pure URL mapper: it performs no fetch and accepts
+only the four explicitly declared HTTP(S), bare and `www` origins.
 
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
