@@ -32,11 +32,15 @@ Premier paquet signé **KJsOlG** construit et vérifié, mais installation refus
 Lagon était redevenu actif et macOS recréait son provider. Ancien agent redémarré
 sous le job persistant, aucune substitution forcée. Une question asynchrone demande
 de laisser Noir sélectionné pendant la migration.
-Dernier candidat **BdNKFb** inclut le rechargement après Quitter ; build en cours,
-session exec **6151**, bloqué sur codesign / SecurityAgent (demande d'accès à la clé).
-L'outil UI refuse SecurityAgent pour raisons de sécurité : validation utilisateur
-nécessaire, aucun contournement ni saisie de mot de passe. Ne pas installer ce
-paquet avant la fin du build et ne pas reconstruire après l'autorisation TCC finale.
+Dernier candidat **BdNKFb** inclut le rechargement après Quitter ; build terminé
+(session exec 6151, exit 0) après validation du trousseau par l'utilisateur.
+Signature deep/strict vérifiée ; requirement de l'agent lié au certificat ci-dessus.
+Tests natifs : 7 lanceur + 9 fichiers + 9 Finder + catalogue 3 thèmes passent.
+Toujours non installé : Réglages montre maintenant **Ambre statique — PoC 2**,
+changé par l'utilisateur depuis Lagon. La tentative de sélection Noir est refusée
+par Computer Use (`cannotClickOffscreenElement`). Aucun arrêt ni remplacement
+forcé ; sélectionner manuellement un fond Apple reste nécessaire. Ne pas
+reconstruire après l'autorisation TCC finale.
 
 ADR-0055 + source Archify mis à jour : showcase 9/9, aucun avertissement ; source
 SHA256 `989ec71d0092ecbd8fa5f45f782e9b1978357a2daa6341708e491fc4974c2ca9`, HTML
