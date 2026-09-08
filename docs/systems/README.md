@@ -1,11 +1,16 @@
 # Product systems
 
+The [favorite correction plan v3](favorite-resolution-correction-plan.md) owns
+the corrected browser authority, provider-ID sync, Review and Worker/D1 rules.
+Earlier implementation notes below describe the baseline where explicitly
+superseded by that contract.
+
 The canonical behavioral contract for reconstructing favorite analysis and
 provider resolution is
 [`favorite-parsing-resolution-spec.md`](favorite-parsing-resolution-spec.md).
 It preserves raw inputs, parsing provenance, season and progression evidence,
 deterministic matching, Review ambiguity, and MV3 recovery while keeping
-IndexedDB as the sole private authority.
+browser presence separate from private IndexedDB transactions.
 
 The target implementation path is specified in
 [`favorite-resolution-rebuild-pipeline.md`](favorite-resolution-rebuild-pipeline.md).
@@ -30,7 +35,7 @@ notifications, storage events, tabs, and messaging.
 Bookmarks are a replaceable connector. The default mode imports bookmark
 events into application commands. An optional mode also projects selected
 changes back to the linked bookmark. A bookmark identifier or URL never becomes
-a domain identifier or an authority for membership and progress.
+a Work identifier. Browser presence and observed progress remain authoritative.
 
 The local organizer owns a bounded folder-rule tree and a pure preview use
 case. Rules run in pre-order, the first complete match wins, and their selected
@@ -51,11 +56,11 @@ parent and index. It creates no missing bookmark and deletes nothing.
 
 The storage package defines `StoragePort`, versioned records, migrations,
 export, import, and recovery contracts. The first adapter uses Dexie and
-IndexedDB, which is the sole active authority for favorite sources, Reviews,
-the private library, progress, agenda, organizer rules and verified organizer
-snapshot, and durable task queue. `storage.local` is limited to
+IndexedDB, which owns transactional artifacts, works, decisions, agenda,
+organizer snapshots and durable tasks, while bookmarks own active presence
+and observed progress. `storage.local` is limited to
 technical preferences and bootstrap state. `storage.sync` may hold only a
-small, quota-checked, non-secret recovery envelope; it does not mirror the
+versioned, fragmented snapshot of provider IDs; it does not mirror the
 database. Private state remains on-device and local functionality cannot depend
 on the public service.
 
@@ -75,7 +80,7 @@ projection.
 Agenda uses the same boundary for half-open weekly `occursAt` ranges. The
 storage port returns at most 100 ordered entries, the application joins only
 their local Work records, and a missing Work makes the serialized period
-partial without triggering catalogue traffic. A bounded indexed Review lookup
+partial without triggering catalogue traffic. A bounded indexed source-to-Work lookup
 then resolves the preferred private favorite URL by folder path, bookmark order
 and stable identifier. The serialized item omits the URL when no local source
 exists; its WorkCard stays visible but is not a link.
@@ -83,12 +88,12 @@ exists; its WorkCard stays visible but is not a link.
 On the explicit extension installation or update event, the browser adapter
 reads the bookmark tree and emits serializable records with their folder path
 and sibling order. The application imports HTTP(S) entries into IndexedDB in
-bounded batches, atomically pairing each `FavoriteSource` with its Review. A
+bounded batches, atomically writing source, artifact and task without Review. A
 rerun preserves the initial import time and resolved decisions; missing browser
 bookmarks are not interpreted as local deletions.
 
 The background exposes the pending Review queue as a bounded, schema-validated
-local snapshot. IndexedDB is opened on demand, at most 100 pending rows are
+local snapshot. IndexedDB is opened on demand, at most 100 actionable AMBIGUOUS/NOT_FOUND pending rows are
 read through the status index, and no public catalogue request is made by this
 read path.
 
@@ -109,8 +114,8 @@ this client until the separate permission and disclosure decision is approved.
 
 An imported bookmark is preserved as a private `FavoriteSource`: its stable
 Tobirink source identity, external bookmark identifier, raw title, HTTP(S) URL,
-folder path, sibling order, import time and associated Review. Resolution stays
-on the Review record, and only a resolved Review points to a `Work`. This keeps
+folder path, sibling order, import time, optional Review and direct Work link.
+Versioned resolution records separate technical work from human Review. This keeps
 the original navigation target available after import without turning either
 the bookmark or its URL into a Work identity. Favorite-source reads are bounded
 and ordered by stable source ID.

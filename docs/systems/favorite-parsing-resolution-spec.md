@@ -1,7 +1,7 @@
 # Contrat du parser et de la résolution des favoris
 
-- Statut : canonique pour la reconstruction
-- Version du contrat : 2
+- Statut : règles pures canoniques, complétées par le [plan v3](favorite-resolution-correction-plan.md)
+- Version du contrat : 3
 - Date de l’audit comportemental : 2026-09-07
 - Décision associée : [ADR-0037](../decisions/ADR-0037-favorite-analysis-contract.md)
 - Dataflow associé :
@@ -47,11 +47,11 @@ répertoire FavLib à l’exécution, au build ou dans ses tests.
 
 ## Frontières et autorités
 
-1. IndexedDB reste la seule autorité privée TobiRink pour `FavoriteSource`,
-   `Review`, `Work`, bibliothèque, progression, agenda et tâches durables.
-2. Les favoris navigateur sont une entrée d’import et, si activé séparément,
-   une projection sortante. Leur identifiant et leur URL ne deviennent jamais
-   l’identité d’une œuvre.
+1. Les favoris navigateur possèdent présence, placement et progression observée.
+   IndexedDB possède les artefacts, Work, décisions, agenda et tâches transactionnels.
+2. L'identifiant et l'URL du favori ne deviennent jamais l'identité d'une œuvre.
+   `storage.sync` contient les IDs fournisseurs seuls et leurs manifestes.
+   La doctrine est celle de `3267de2`, précisée par le plan canonique v3.
 3. Le parser est pur et déterministe. Il ne lit ni navigateur, ni IndexedDB, ni
    réseau, ni horloge.
 4. Les adaptateurs d’URL extraient seulement des preuves structurelles. Ils ne
@@ -61,8 +61,8 @@ répertoire FavLib à l’exécution, au build ou dans ses tests.
 6. Le réseau fournisseur reste derrière des ports et une file durable. React
    et les pages web n’appellent jamais directement un fournisseur.
 7. Une seule correspondance fournisseur distincte peut être automatique.
-   Zéro correspondance, plusieurs correspondances ou un conflit vont en
-   `Review` sans tri implicite.
+   Une ambiguïté ou un introuvable terminal média va en `REVIEW_REQUIRED`.
+   Import, panne et unsupported ne créent jamais de Review.
 8. Les décisions Review sont des mutations locales confirmées. La contribution
    collective reste un consentement séparé, révocable et désactivé par défaut.
 
@@ -76,7 +76,8 @@ Le flux cible est le suivant :
 3. extraire une preuve de source versionnée ;
 4. produire un artefact de parsing versionné et une empreinte de fraîcheur ;
 5. persister l’entrée et la tâche avant toute requête fournisseur ;
-6. router vers le ou les fournisseurs compatibles ;
+6. essayer ID/route exacte, artefact/aliases, fiches locales, D1 owner-scoped
+   via Worker puis recherche fournisseur locale selon le plan v3 ;
 7. comparer les candidats avec une politique symétrique et déterministe ;
 8. persister la résolution unique ou publier une Review explicite ;
 9. hydrater par identifiant exact dans une tâche distincte ;
@@ -518,14 +519,13 @@ qu’un libellé plus long non identique, ne doit pas être bloquée par inclusi
 Le filtre est une règle éditoriale après hydratation, jamais une preuve de
 matching. Toute évolution de la liste exige une décision produit distincte.
 
-### Adaptateurs legacy hors résolution cible
+### MangaDex spécialisé
 
-FavLib contenait aussi un adaptateur MangaDex : UUID strict, recherche par titre
-limitée à 20, aliases multilingues, lien MangaUpdates public facultatif,
-matching symétrique commun et refus d’utiliser `lastChapter`/`lastVolume` comme
-autorité de progression. Ces invariants restent documentés, mais MangaDex
-n’appartient pas au routage cible AniList/MangaUpdates de cette reconstruction.
-L’ajouter comme fournisseur exigerait une étape et des permissions séparées.
+MangaDex conserve les UUID stricts, aliases multilingues, référence MU publique
+facultative et sorties. Une référence exacte est hydratable; ses champs
+lastChapter/lastVolume ne sont pas une progression personnelle. Il ne remplace
+pas la recherche principale MangaUpdates; X-01 est désormais dans le scope.
+Le plan v3 fixe les lanes Kitsu après NO_MATCH complet seulement.
 
 Le mapping adjacent de statut ramenait `hiatus` vers `Hiatus`,
 `complete/completed/finished` vers `Completed`,
@@ -558,14 +558,14 @@ Une recherche de titre demande seulement les champs nécessaires au matching.
 L’hydratation complète arrive après une décision par ID exact, possède ses TTL
 positif/négatif et ne relance jamais le matching de titre.
 
-Une réponse de recherche porte obligatoirement `complete` et `truncated`. Un
-ensemble incomplet, tronqué ou dont une page manque ne peut jamais produire
-`MATCH`, même si un seul candidat visible correspond. Il produit une erreur
-récupérable `INCOMPLETE_CANDIDATE_SET`, puis `BLOCKED` si la politique de retry
-est épuisée. `AMBIGUOUS` reste réservé à plusieurs identifiants distincts dans
-un ensemble complet.
-La limite de vingt candidats est un budget de transport, pas une preuve que le
-vingt-et-unième candidat n’existe pas.
+Une réponse distingue validité, curseur, hasMore et exhaustivité pertinente.
+Vingt candidats est une limite par page, jamais une preuve que le suivant
+n'existe pas. Une page manquante ou un budget atteint reste RETRYABLE, avec
+curseur et aliases persistés. Une unicité ou une absence automatique exige
+l'ensemble pertinent complet; deux identités distinctes prouvées au même
+niveau suffisent à établir une ambiguïté. Le fallback ne suit que NO_MATCH
+complet, jamais panne, timeout, 429 ou résultat incomplet. Une pagination valide
+avance, elle ne réessaie pas indéfiniment la première page.
 
 Les caches d’adaptateur sont locaux et versionnés. Une hydratation positive
 expire au plus tard après 24 heures et une absence après 15 minutes. Une entrée
@@ -579,8 +579,7 @@ clé d’idempotence, état, curseur, tentative, expiration de claim, résultat 
 digest, `availableAt` toujours défini et erreur structurée.
 
 Les tâches de résolution vivent dans une outbox du même schéma
-`tobirink-private` que `FavoriteSource`, `Review` et les artefacts. L’import de
-ces quatre écritures est une seule transaction Dexie. La base technique
+`tobirink-private` que `FavoriteSource`, `Review` et les artefacts. L'import écrit source, artefact et tâche en une transaction Dexie sans Review. La base technique
 `tobirink-durable-tasks` déjà utilisée pour les notifications Agenda reste une
 file distincte : elle n’est pas réutilisée pour la résolution et ne peut pas
 rompre l’atomicité de l’import.
@@ -621,7 +620,7 @@ au matching. Les claims sont lus sans `toArray()` global par les index composés
 `idempotencyKey` unique. Le curseur et le checkpoint fournisseur sont écrits
 avant de poursuivre.
 
-Une résolution persiste d’abord le résultat `RESOLVED` ou `REVIEW`, l’artefact,
+Une résolution persiste d’abord le résultat v3 explicite, l’artefact,
 la décision et au plus six candidats pour une Review active. Les ensembles
 complets ne sont pas archivés : seul leur digest est conservé. Une résolution
 unique enfile ensuite une hydratation par ID exact.
@@ -641,8 +640,8 @@ Le coordinateur doit couvrir :
 
 Chaque événement déclenche une commande idempotente et une convergence locale.
 Une suppression navigateur ne supprime jamais automatiquement `Work`,
-progression ou historique Review. Elle peut marquer la source observée absente
-selon une future politique explicitement approuvée.
+progression ou historique Review. Elle marque la source détachée et recalcule la présence active sans perdre
+l'historique, conformément à ADR-0025.
 
 Les listeners sont enregistrés avant l’inventaire. Comme WebExtension ne donne
 pas d’identifiant d’événement stable, chaque commande reçoit une séquence locale
@@ -659,34 +658,21 @@ dernière projection lisible et publie une erreur récupérable.
 
 ## Review et collectif
 
-`MATCH` écrit une résolution locale. `NO_MATCH`, `AMBIGUOUS`, conflit de saison,
-type incompatible, identité opaque non corroborée et corruption de provenance
-ouvrent ou maintiennent une Review.
+Le [plan v3](favorite-resolution-correction-plan.md) définit RESOLVED,
+REVIEW_REQUIRED/AMBIGUOUS ou NOT_FOUND, UNSUPPORTED et RETRYABLE. L'import
+ne crée aucune Review. NO_MATCH fournisseur complet ouvre NOT_FOUND actionnable;
+seule la confirmation humaine écrit Review.status=no-match. Corruption,
+entrée non média, panne ou dépassement de borne reste diagnostic hors cloche.
 
-`NO_MATCH` écrit explicitement `Review.status = no-match`, conserve les motifs
-et reste résoluble manuellement. Il ne crée aucune `Work` et ne disparaît pas de
-l’historique sous prétexte que la file principale affiche seulement les Review
-`pending`.
+La décision humaine relit source, Review et révision en transaction. Un ID/source
+manuel exact est hydratable sans Work préalable en bibliothèque. Les candidats
+comparables et leur provenance sont conservés; l'ordre ne tranche jamais.
 
-Une décision Review doit relire la Review pending, sa `FavoriteSource`, la
-révision opaque et le `Work` choisi dans une seule transaction. Révision
-périmée, œuvre absente, hors bibliothèque ou correspondance manuelle ambiguë
-échouent sans effet.
-
-Une contribution collective :
-
-- n’existe qu’après consentement séparé et révocable ;
-- n’est enfilée qu’après une décision locale explicite ;
-- contient une clé normalisée hachée, un pseudonyme local opaque, le
-  fournisseur, l’ID public et un nonce court à usage unique ;
-- ne contient jamais titre, URL, source, bibliothèque, progression, compte ou
-  appareil ;
-- revérifie le consentement avant le challenge et avant l’envoi final ;
-- bloque les tâches pending si le consentement est retiré ;
-- ne transforme jamais un vote collectif en identité automatique.
-
-Ces règles complètent l’ADR-0033 et ne réactivent aucun adaptateur distant
-dormant sans permission et disclosure séparées.
+Le collectif suit ADR-0033 : clé hachée, média, IDs publics, versions, nonce et
+authentification propriétaire. Worker seul détenteur D1, consentement révocable,
+préférence owner-scoped avant confirmation partagée de deux owners distincts.
+Aucun titre brut, URL, dossier ou progression; secrets dans storage.local.
+Le site et WebBridge ne participent ni à l'authentification owner ni à D1.
 
 ## Versioning et oracle
 
@@ -712,9 +698,9 @@ aucun titre ou URL privé dans les fixtures.
 
 ### Contrat d’équivalence
 
-La matrice ci-dessous contient exactement 82 cas : 77 `CONSERVER`, quatre
+La matrice historique ci-dessous contient exactement 82 cas : 77 `CONSERVER`, quatre
 `CORRIGER` (`U-02`, `U-10`, `B-03`, `O-02`) et un comportement conditionnel à
-un futur adaptateur (`X-01`). « Même résultat » signifie la même disposition,
+un adaptateur alors futur (`X-01`, désormais requis par v3). « Même résultat » signifie la même disposition,
 identité, saison, progression, décision de matching et classe de diagnostic ;
 cela ne signifie pas un JSON identique à l’ancien artefact FavLib.
 
@@ -726,7 +712,7 @@ L’oracle TobiRink est exécuté par Vitest avec un snapshot profond versionné
 3. les 77 cas `CONSERVER` doivent être égaux au résultat comportemental audité ;
 4. les quatre corrections possèdent un résultat TobiRink explicite et une
    assertion interdisant l’ancien défaut ;
-5. `X-01` reste exclu du gate principal tant que MangaDex n’est pas activé ;
+5. `X-01` rejoint le gate principal avec l'adaptateur exact MangaDex ;
 6. toute réponse marquée `truncated` vérifie qu’aucun `MATCH` n’est possible ;
 7. une modification volontaire exige version, fixture et mise à jour de cette
    matrice avant le code.
@@ -757,7 +743,7 @@ terminal. Elles ne sont jamais utilisées pour annoncer une équivalence FavLib.
 | F-02 | Pré-sérialisation d’un seul côté | candidat automatique refusé | CONSERVER | `SI` |
 | C-01 | Genre/catégorie bloqué exact normalisé | exclusion avec brut et normalisé | CONSERVER | `SI` |
 | C-02 | Libellé contenant seulement un mot sensible | pas d’exclusion par inclusion | CONSERVER | `SI` |
-| X-01 | MangaDex UUID invalide | candidat refusé | CONSERVER si adaptateur futur | `SI` |
+| X-01 | MangaDex UUID invalide | candidat refusé | CONSERVER — requis v3 | `SI` |
 | X-02 | MangaDex lastChapter/lastVolume | jamais progression autoritaire | CONSERVER | `SI` |
 | U-01 | Route catégorie + slug | identité de source et `CATEGORY_PATH` | CONSERVER | `SI`, `BR` |
 | U-02 | Route générique + sortie | type `UNKNOWN` jusqu’à preuve | CORRIGER | `BR` contre `SI` |
@@ -851,7 +837,7 @@ MangaUpdates directement.
   fournisseurs, agenda et mapping de statut ;
 - background de plusieurs centaines de lignes portant toute l’orchestration ;
 - base locale et file durable aux responsabilités mélangées ;
-- bookmarks considérés comme autorité métier ;
+- confusion entre présence navigateur et transactions privées IndexedDB ;
 - type manga inventé pour une route générique ;
 - URL canonique dont le protocole ou le hostname sont réécrits sans preuve ;
 - sélection par popularité, rang, ordre de réponse, richesse de métadonnées ou

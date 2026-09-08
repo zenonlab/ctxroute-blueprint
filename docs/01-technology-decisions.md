@@ -24,8 +24,8 @@ architecture evidence and desktop visual containment checks.
 | Workspace | npm workspaces on Node.js 24 LTS | Boring, native monorepo support and current LTS | Root commands are the public interface |
 | Extension | WXT 0.21.x, exact pin | MV3, Chrome/Firefox targets, entrypoint conventions, packaging and publishing helpers | WXT exists only in `apps/extension` and implements browser ports |
 | UI | React 19 and CSS Modules | Mature component/testing ecosystem with minimal styling runtime | UI depends on application use cases, not provider SDKs |
-| Private authority | IndexedDB through Dexie | Transactional source of truth for library, progress, agenda, and tasks | `StoragePort` owns the contract |
-| Browser storage | `storage.local` plus bounded `storage.sync` | Technical preferences locally; opt-in recovery envelope through browser sync | `BootstrapPort`; never authoritative domain storage |
+| Private authority | Bookmarks plus IndexedDB through Dexie | Browser presence/observations; IndexedDB private transactions | `StoragePort` owns the contract |
+| Browser storage | `storage.local` plus bounded `storage.sync` | Technical preferences locally; provider-ID snapshot through browser sync | `BootstrapPort`; never authoritative domain storage |
 | Contracts | Zod 4 at untrusted boundaries | Runtime validation for messages, imports, and HTTP payloads | Schemas are exposed through application contracts |
 | Optional API | Hono on Cloudflare Workers | Small TypeScript edge surface without a server framework | `PublicDataPort` and a Cloudflare adapter |
 | Public database | Cloudflare D1 | Normalized reconstructible catalogue close to the Worker | `CataloguePort`; no private rows or binary assets |
@@ -64,19 +64,16 @@ domain.
 
 ## Data authority and recovery
 
-Every private aggregate has one authoritative record in IndexedDB. A Tobirink
-work ID is stable and independent of URLs, provider identifiers, and browser
-bookmark IDs. Bookmarks operate in `import-only` mode by default; the optional
-`import-and-project` mode may update a linked bookmark but never makes it an
-authority for membership or progress. Bookmark deletion cannot delete a work.
+Browser bookmarks own presence and observed progress; IndexedDB owns private
+transactional artifacts, works, decisions, tasks and agenda. Source removal
+marks absence without deleting historical records. Work IDs remain independent
+of bookmark IDs and providers; source→Work does not require a Review.
 
-The extension cache is disposable. Public work records and cover variants are
-reconstructed from the catalogue by stable Tobirink ID. Private state cannot be
-reconstructed from public IDs alone, so recovery uses a versioned export or an
-opt-in encrypted backup blob. Browser sync carries only a small non-secret
-envelope: backup locator, schema version, generation and a passphrase-wrapped
-key envelope. The passphrase or plaintext key is never stored there. Browser
-sync remains a convenience channel with strict quota checks, not a database.
+Browser sync contains only versioned provider-ID sets and fragment manifests.
+Reset follows rescan, sync read, exact hydration, aliases, parsing and resolution.
+Export and encrypted backup separately recover private history. No backup locator
+or wrapped key is newly written into sync. The [v3 correction plan](systems/favorite-resolution-correction-plan.md)
+fixes quotas, generation/digest validation and additive legacy compatibility.
 
 Encrypted backup v1 creates a fresh 256-bit AES-GCM data key for every export.
 The payload and data key use separate 96-bit nonces; a PBKDF2-SHA-256 key with
@@ -116,18 +113,17 @@ hour of stale revalidation; invalid and missing resources use `no-store`.
 
 ## Consented collective index policy
 
-The optional collective index accepts only validated associations between a
-canonical Tobirink ID and a provider's public work ID. A separate explicit
-consent issues opaque write and revoke credentials whose SHA-256 hashes alone
-are stored. Strict schemas reject titles, URLs, library state, progress and all
-unknown fields. A nonce unique per consent prevents replay; a configured daily
-quota bounds abuse; revocation immediately blocks new writes. Logs redact
-credentials, request bodies and both public identifiers.
+The optional collective index maps normalized-key fingerprints and media to
+public IDs, with owner-scoped preferences and distinct-owner confirmations.
+The extension owns opaque identity and explicitly paired installations. Secrets
+remain in trusted storage.local; D1 stores their hashes. Strict requests carry
+only key fingerprints, media, public IDs, versions, nonces and authentication.
+Worker prepared SQL and atomic batches enforce ownership, quotas, replay and
+idempotent receipts. The site and WebBridge cannot access D1 or credentials.
 
-The Worker accesses D1 through a binding and prepared statements. Local tests
-may materialize migrations in workerd, but resource creation, migration apply,
-deployment and secrets remain behind the separately approved infrastructure
-gate.
+The [v3 correction plan](systems/favorite-resolution-correction-plan.md) and
+ADR-0033 define additive tables and indexed bounded queries. Catalogue tables
+remain separate. Only the operational gate may apply production migrations.
 
 ## Image policy
 

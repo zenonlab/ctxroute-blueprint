@@ -5702,6 +5702,382 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-favlib-complete-correction",
+      "title": "Corriger intégralement FavLib → TobiRink selon la doctrine 3267de2",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Documentation canonique historique et plan complet",
+          "status": "DONE",
+          "acceptance": [
+            "30 écarts, décisions, migrations, matrice équivalence documentés depuis 3267de2; contradictions alignées, dont ADR-0034 et brief",
+            "Aucun code produit modifié; Archify produit showcase 9/9 sans erreur ni avertissement; docs, ADR, cohérence et diff validés; commit obligatoire avant étape 2"
+          ],
+          "files": [
+            "docs/systems/favlib-parsing-gap-audit.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/systems/README.md",
+            "docs/00-project-brief.md",
+            "docs/01-technology-decisions.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'docs(favorites): define complete favlib correction plan'"
+          ],
+          "evidence": [
+            "Plan canonique v3 et 30 écarts: doctrine 3267de2, autorités, sync, Worker SQL, migrations et oracle réel; ADR 0025/0033/0034/0037 alignés.",
+            "validate:docs, validate:decisions et validate:coherence passent; toutes les vues produit Archify showcase 9/9 sans erreur/avertissement; git diff --check passe.",
+            "Aucun code produit modifié; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Autorités et contrats de résolution versionnés",
+          "status": "TODO",
+          "acceptance": [
+            "Review optionnelle à import; RESOLVED/REVIEW_REQUIRED avec AMBIGUOUS ou NOT_FOUND/UNSUPPORTED/RETRYABLE stricts",
+            "Versions parser matcher règles décisions reçus; exports compatibles et migrations additives sans perte"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'refactor(favorites): restore authoritative resolution contracts'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Parsing, routage et fournisseurs déterministes",
+          "status": "TODO",
+          "acceptance": [
+            "Ordre ID, règle route, artefact/aliases, hydraté, D1 owner-scoped, recherche, Review terminale",
+            "Kitsu après NO_MATCH complet seulement; aucune panne ni ambiguïté arbitrée par fallback; niveaux probants et lanes indépendantes",
+            "YouTube non média exclu, Anime-Sama par route, fautes uniques résolues, Hunter × Hunter ambigu, saisons/nombres préservés"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/adapters-browser/**",
+            "packages/contracts/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm run test:e2e",
+            "npm run test:parser-equivalence",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'fix(parser): restore deterministic provider resolution'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Snapshot sync fragmenté et reconstruction",
+          "status": "TODO",
+          "acceptance": [
+            "IDs seuls triés dédupliqués; fragments <8192 octets, total <102400 et <512 items, cadence bornée",
+            "Ancienne génération préservée jusqu’à validation; corruption, interruption, concurrence, quotas, reset et Chrome/Firefox vérifiés"
+          ],
+          "files": [
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:recovery",
+            "npm run test:migrations",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm run test:e2e",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'feat(recovery): restore synchronized provider identities'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Collectif Worker/D1 SQL owner-scoped",
+          "status": "TODO",
+          "acceptance": [
+            "Worker seul détenteur D1; SQL préparé et batch borné; tables additives séparées du catalogue",
+            "Owners opaques/installations appairées, clés empreintes, IDs publics, conflits, confirmations owners distincts, nonces et reçus",
+            "Aucun titre URL progression secret clair; isolation, replay, concurrence et plans SQL indexés testés localement; production exclue"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-cloudflare/**",
+            "apps/worker/**",
+            "apps/extension/**",
+            "scripts/infra/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm run test:security",
+            "npm run test:infra",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'feat(worker): restore owner-scoped collective resolution'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-6",
+          "title": "Migration additive et Review actionnable",
+          "status": "TODO",
+          "acceptance": [
+            "Décisions humaines conservées; anciennes pending masquées sans suppression, tâches réenfilées et reçus reprenables",
+            "Seules versions automatiques fautives invalidées; Review distingue ambigu/introuvable/en cours/panne/unsupported et actions humaines complètes"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            "packages/ui/**",
+            "apps/ui-workbench/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:migrations",
+            "npm run test:contracts",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:e2e",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'fix(review): show only actionable resolution failures'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-7",
+          "title": "Oracle FavLib réel en lecture seule",
+          "status": "TODO",
+          "acceptance": [
+            "Base FavLib lue seule hors dépôt; fixtures uniquement synthétiques/anonymisées; aucune donnée privée dans Git/logs/artefacts partagés",
+            "Corpus complet comparé sur artefact type progression identité décision raison; environ 40/4 reste hypothèse avant mesure; aucune différence inexpliquée"
+          ],
+          "files": [
+            "scripts/parser-equivalence/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "docs/02-quality-strategy.md",
+            "package.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:parser-equivalence",
+            "npm run test:contracts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'test(favorites): validate against readonly favlib oracle'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-8",
+          "title": "Validation complète et préparation locale de publication",
+          "status": "TODO",
+          "acceptance": [
+            "Tests domaines contrats adapters extension Worker D1 local, migrations Chromium/Firefox, MV3 checkpoints, Review/WebBridge, quotas sécurité budgets et oracle passent",
+            "npm run verify, Archify showcase, CRG, audit dépendances et diff passent; ZIP 1.0.0 reproductibles préparés hors chemins publiés, tests réellement installés verts",
+            "Aucune publication, remplacement ZIP, migration production, push ou fusion; preuve honnête de toute limite"
+          ],
+          "files": [
+            "scripts/release/**",
+            "scripts/performance/**",
+            "scripts/parser-equivalence/**",
+            "tests/**",
+            "apps/extension/**",
+            "apps/worker/**",
+            "packages/adapters-indexeddb/**",
+            "packages/adapters-cloudflare/**",
+            "packages/contracts/**",
+            "docs/browser-support.md",
+            "docs/release.md",
+            "docs/performance.md",
+            "docs/ui/accessibility-evidence.md",
+            "package.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run test:migrations",
+            "npm run test:security",
+            "npm run test:worker",
+            "npm run crg:review",
+            "npm audit --audit-level=high",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'test(favorites): verify complete favlib parity'"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

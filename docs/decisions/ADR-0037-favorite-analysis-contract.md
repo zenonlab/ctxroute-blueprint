@@ -13,144 +13,80 @@ review: on-change
 revised: true
 ---
 
-# ADR-0037 — Versionner le contrat d’analyse et de résolution des favoris
+# ADR-0037 — Contrat versionné de résolution des favoris
 
 - Status: accepted
 - Date: 2026-09-07
-- Revised: 2026-09-07
+- Revised: 2026-09-08
 
 ## Contexte
 
-L’audit du moteur FavLib a retrouvé des règles utiles de parsing de titre,
-d’identité URL, de saison, de progression et de matching fournisseur. Elles
-étaient toutefois réparties entre un parser dense, un module metadata
-monolithique, une file locale et un background MV3. Certaines règles se
-chevauchaient et l’architecture laissait les favoris navigateur concurrencer la
-base locale.
-
-TobiRink importe les favoris HTTP(S) en `FavoriteSource` et `Review`; la
-résolution composée est désormais portée par une outbox locale et des ports
-fournisseur séparés. Réécrire sans contrat ferait perdre des cas qui protègent notamment
-les saisons, les nombres intrinsèques aux titres, les slugs techniques et les
-ambiguïtés fournisseur.
+La pipeline précédente créait une Review à l'import et pouvait confier à
+Kitsu une recherche principale indisponible. L'oracle synthétique 77/4/1 ne
+prouvait pas la parité réelle. La référence normative est la doctrine FavLib
+`3267de2`, précisée par la demande du 2026-09-08.
 
 ## Décision
 
-Adopter
-[`favorite-parsing-resolution-spec.md`](../systems/favorite-parsing-resolution-spec.md)
-comme contrat canonique préalable à la réécriture.
+Le [plan de correction v3](../systems/favorite-resolution-correction-plan.md)
+possède la pipeline, les 30 écarts, migrations et critères d'équivalence.
+La [spécification](../systems/favorite-parsing-resolution-spec.md) conserve les
+règles pures et la [pipeline](../systems/favorite-resolution-rebuild-pipeline.md)
+leur orchestration. Les prescriptions v1/v2 contraires sont remplacées.
 
-Conserver les entrées brutes et toutes les transformations dans un artefact
-versionné. Séparer les preuves d’identité, de saison et de progression. Toute
-politique de matching est pure, symétrique entre fournisseurs et exige une
-unique identité distincte à chaque niveau. Identifiant et URL exacts précèdent
-le titre exact, la saison explicitement corroborée, les mots significatifs
-réordonnés et la distance d’édition bornée. Popularité, rang, ordre, date,
-image, inclusion partielle et richesse de fiche ne sont jamais des preuves.
-La décision pure implémente les six niveaux dans cet ordre. Elle applique avant
-comparaison la compatibilité symétrique de nature, OVA et pré-sérialisation.
-La taxonomie hydratée est normalisée exactement et filtre le candidat sans
-jamais devenir une preuve ni un score.
+Autorités selon ADR-0025 : favoris pour présence/progression observée;
+IndexedDB pour les transactions privées; sync pour IDs publics seuls.
+Import atomique source/artefact/tâche, aucune Review créée. Source→Work direct,
+Review optionnelle. Résultats stricts : RESOLVED, REVIEW_REQUIRED avec
+AMBIGUOUS ou NOT_FOUND, UNSUPPORTED, RETRYABLE. Seul l'humain confirme no-match.
+La cloche affiche uniquement les ambiguïtés et introuvables actionnables.
 
-La capture borne mais ne qualifie pas la chaîne URL. La qualification possède
-seule les dispositions `INVALID_URL` et `NON_WEB_URL`; une preuve rejetée ne
-peut contenir aucun champ d’identité actionnable. Une URL canonique éventuelle
-doit conserver l’origine explicitement déclarée.
+Ordre : ID/URL exact, règle origine/route, artefact/aliases, fiche locale
+hydratée, lookup owner-scoped via Worker, recherche fournisseur locale,
+Review terminale. AniList anime puis Kitsu Anime après NO_MATCH complet;
+MangaUpdates manga/manhwa/manhua puis MangaDex dans son rôle exact/sorties,
+puis Kitsu Manga. Une référence AniList manga explicite reste hydratable.
+Type inconnu : lanes indépendantes, aucune validation unilatérale si l'autre
+lane manque; deux identités de types différents imposent Review.
 
-Conserver la reprise MV3 dans une file IndexedDB durable dont l’entrée est
-écrite avant le réseau. Recherche, hydratation exacte et contribution Review
-sont des étapes et ports séparés d’une même tâche durable de résolution. Les effets sont idempotents et les attentes
-longues sont persistées plutôt que gardées en mémoire.
+Panne, 429, timeout et réponse incomplète n'autorisent pas le fallback.
+Kitsu n'arbitre pas l'ambiguïté principale. Le matcher s'arrête au premier
+niveau probant : ID, URL, titre exact, saison corroborée, tokens réordonnés,
+distance bornée. Plusieurs identités distinctes sont ambiguës. Popularité,
+rang, ordre, couverture et premier résultat sont interdits comme preuves.
+OVA/pré-sérialisation restent des compatibilités symétriques; taxonomie
+éditoriale s'applique après hydratation, sans fabriquer une identité.
 
-Implémenter les tâches de résolution comme une outbox du même schéma
-`tobirink-private` que `FavoriteSource`, `Review` et les artefacts afin que leur
-création soit atomique. Réutiliser les transitions pures de tâche existantes,
-mais pas l’adaptateur `tobirink-durable-tasks` des notifications : sa base
-séparée ne fournit pas cette atomicité et sa sélection actuelle parcourt tous
-les états disponibles. Les claims de résolution sont bornés par des index de
-type, lane, état et échéance.
-Le schéma IndexedDB v6 matérialise cette décision avec `favoriteArtifacts` et
-`favoriteResolutionTasks`. Les versions additives v7 et v8 ajoutent les
-checkpoints et marques d’inventaire, le journal de mutations, les cadences
-fournisseur, les reçus de résolution et les candidats Review persistés. Un premier import écrit les quatre enregistrements
-dans une transaction; une réimportation conserve l’instant d’import et ne
-duplique pas la tâche stable. La lane de routage est explicite et chaque tâche
-possède toujours `availableAt`.
+Payload valide, pagination et exhaustivité sont distincts. La limite de
+20 candidats est par page; l'absence/unicité doit porter sur l'ensemble
+pertinent prouvé, pas sur la première page. Le curseur et jusqu'à trois aliases
+sont persistés; budget atteint ou page manquante reste RETRYABLE. Une panne
+ne doit pas boucler sur une page déjà attestée ni devenir no-match humain.
 
-Exiger que chaque réponse de candidats indique si l’ensemble pertinent est
-complet ou tronqué. Un ensemble incomplet ne peut jamais produire une
-correspondance automatique, même si un seul candidat visible correspond. Les
-lanes AniList et MangaUpdates appliquent séparément leurs cadences. Elles
-restent les sources exactes des références déjà reconnues, mais leur
-indisponibilité ne peut plus immobiliser toutes les nouvelles résolutions.
-Deux lanes publiques Kitsu distinctes, `kitsu-anime` et `kitsu-manga`, forment
-un second palier afin que leurs identifiants ne puissent jamais entrer en
-collision. Un palier est évalué entièrement ou ignoré; le premier palier dont
-toutes les réponses sont complètes alimente seul le matcher. L’ordre interne
-des réponses ne modifie jamais le résultat et une réponse incomplète ne permet
-aucune correspondance automatique.
-Les recherches de candidats et l’hydratation par identifiant utilisent deux
-ports applicatifs distincts. Le routage par titre réserve AniList à l’anime,
-MangaUpdates aux mangas, manhwa et manhua, et dédouble seulement le type inconnu;
-une référence AniList explicite peut toutefois hydrater exactement un manga
-AniList sans recherche de titre.
-Les adaptateurs HTTP valident leurs DTO externes avec les schémas Zod déjà
-retenus par le projet avant toute conversion en candidats du domaine; leurs
-réponses et délais restent bornés au point d’entrée réseau.
+Parser, matcher, progression, normalisation, règles, décisions et reçus sont
+versionnés. Brut et transformations restent locaux. Les règles distribuées
+par Worker sont des données JSON bornées origine/segments/type/progression;
+aucun code distant ni regex distante n'est exécuté. Les origines réseau
+restent explicites et les DTO Zod stricts à chaque frontière.
 
-Maintenir ADR-0025 : IndexedDB est la seule autorité privée. Les favoris sont
-des commandes d’import et leur suppression ne supprime pas une œuvre ou une
-progression. Maintenir ADR-0033 : toute contribution collective exige un
-consentement distinct, révocable et revérifié.
-
-Rejeter le portage direct des modules FavLib. La réécriture utilise des contrats
-et modules TobiRink séparés, un corpus synthétique local et une matrice de
-traçabilité. Les anciennes versions servent seulement de référence
-comportementale.
-
-Définir l’équivalence sur le résultat métier, pas sur la forme JSON historique :
-77 cas sont conservés, `U-02`, `U-10`, `B-03` et `O-02` sont corrigés, et
-`X-01` reste exclu tant que MangaDex n’est pas activé. Un oracle synthétique
-compare artefact, décision et projection sans appeler un fournisseur vivant.
-La commande racine `npm run verify` exécute cet oracle, vérifie que chaque ID
-canonique possède un test sémantique distinct du snapshot, puis lance tous les
-tests de workspaces, le typecheck et les budgets de performance avant les gates
-de livraison documentaire.
-Le module de langue de document reste un enrichissement local facultatif,
-séparé du parser de favoris; OVA et pré-sérialisation appartiennent à la
-compatibilité candidat, et la taxonomie éditoriale s’applique après hydratation.
-
-La résolution distante transmet uniquement les titres analysés ou les
-identifiants fournisseur déjà présents dans un favori. Elle ne transmet ni URL
-brute, chemin de dossier, progression, bibliothèque ni historique. Cette
-transmission dérivée de favoris est déclarée `bookmarksInfo` dans le manifeste
-Firefox et expliquée sur la surface Confidentialité; `none` est interdit tant
-que les lanes réseau sont composées.
-Le manifeste borne les accès réseau aux origines HTTPS exactes d’AniList
-GraphQL, de MangaUpdates API et de Kitsu. Aucun joker de domaine ni fournisseur
-supplémentaire n’est autorisé.
+L'outbox reste dans `tobirink-private`, jamais dans la base de notifications.
+Source/artefact/tâche sont atomiques avant réseau; claims indexés par lane,
+état/échéance, au plus huit tâches et 20 s par réveil. Résultat, hydratation,
+lien Work et reçu sont commités atomiquement. Les checkpoints et cadences
+survivent à MV3; réseau au-moins-une-fois et effets locaux idempotents.
+Les migrations des anciens v6/v7/v8 sont additives et préservent les décisions
+humaines; les pending d'import sont masquées et réenfilées avec reçus.
 
 ## Conséquences
 
-Chaque changement de règle exige une version, une fixture synthétique, une
-comparaison d’artefact complet et une migration ou invalidation explicite. Les
-ambiguïtés deviennent visibles dans Review au lieu d’être masquées par un
-classement fournisseur.
+L'oracle réel FavLib est lu seul, hors dépôt; seuls les cas synthétiques sont
+versionnés. Environ 40 ambiguïtés/4 introuvables est un repère à mesurer, jamais
+un comptage forcé. Différences comparées sur artefact/type/progression/identité/
+décision/raison; aucune différence inexpliquée ne valide la parité.
 
-Une observation trop grande ou une réponse fournisseur tronquée échoue fermée
-vers Review au lieu de tronquer silencieusement les preuves. `NO_MATCH` conserve
-une Review `no-match` et ne crée pas de `Work`. Les artefacts et tâches
-techniques sont compactés selon une politique bornée sans supprimer les sources,
-Reviews, œuvres ou progressions autoritaires.
-
-Le runtime compose désormais les événements favoris, l’import atomique, les
-adaptateurs AniList/MangaUpdates et le repli Kitsu, le runner borné et les écritures
-`FavoriteSource`, `Review`, `Work` et Bibliothèque. Les suppressions deviennent
-une présence `detached` et ne cascadent jamais. L’inventaire navigateur utilise
-`getChildren()` avec un curseur durable, des tranches de 100 et au plus huit
-tranches par réveil. Les effets validés reçoivent un reçu avant compaction de la
-tâche technique; la cadence et les candidats ambigus survivent à MV3. Cette
-révision ajoute les trois permissions hôte exactes indispensables aux appels
-catalogue du background, sans contribution cloud ni opération de déploiement.
-Les adaptateurs restent bornés, validés et remplaçables derrière les ports
-applicatifs.
+Le réseau fournisseur est exécuté par l'extension avec disclosure
+`bookmarksInfo` Firefox. Seuls titre analysé ou ID exact sont transmis aux
+fournisseurs; seul le payload minimal ADR-0033 va au Worker. URL brute,
+dossiers, progression et historique ne quittent pas le stockage privé.
+`npm run verify`, tests installés Chromium/Firefox, migrations, SQL, quotas,
+MV3, WebBridge et ZIP reproductibles sont requis avant publication séparée.

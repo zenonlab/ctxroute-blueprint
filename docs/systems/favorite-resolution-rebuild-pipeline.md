@@ -1,7 +1,7 @@
 # Pipeline de reconstruction des favoris
 
-- Version de pipeline : 2
-- Contrat comportemental : `favorite-parsing-resolution-spec` v2
+- Version de pipeline : 3
+- Contrat comportemental : `favorite-parsing-resolution-spec` v3 et [plan correctif v3](favorite-resolution-correction-plan.md)
 
 ## Statut et portée
 
@@ -14,10 +14,11 @@ Il ne remplace pas la spécification des règles. La spécification décide ce
 qu’un indice signifie; ce document décide où il est produit, persisté, repris,
 testé et projeté.
 
-La pipeline reste entièrement locale jusqu’aux adaptateurs de catalogue
-publics. IndexedDB est la seule autorité privée. Le favori navigateur est une
-observation et une commande d’import, jamais l’identité d’une œuvre ni une
-autorité sur la bibliothèque ou la progression.
+Le navigateur possède présence et progression observée; IndexedDB possède
+les transactions privées. Sync restaure seulement les IDs. Le Worker seul
+possède D1, pour lookup owner-scoped puis confirmations distinctes. La pipeline
+et ses budgets suivent le plan v3; la section suivante décrit l'ancien runtime,
+qui ne constitue pas le résultat cible.
 
 ## État implémenté vérifié
 
@@ -66,19 +67,10 @@ progression.
 
 ## Résultat attendu
 
-Une observation favorite converge vers exactement un des résultats suivants :
-
-- ignorée avec une raison stable;
-- importée et en attente d’une résolution durable;
-- résolue vers un identifiant fournisseur unique puis hydratée par cet ID;
-- envoyée à Review avec les preuves et candidats bornés;
-- sans correspondance, avec une Review `no-match` et sans œuvre inventée;
-- en attente d’une reprise datée après une erreur récupérable.
-- bloquée avec une raison stable et un retry manuel explicite.
-
-Chaque résultat doit être explicable depuis les données locales. Une suspension
-du service worker entre deux lignes de code ne doit ni perdre l’entrée, ni
-dupliquer un effet observable, ni changer la décision finale.
+RESOLVED, REVIEW_REQUIRED (AMBIGUOUS ou NOT_FOUND), UNSUPPORTED ou RETRYABLE.
+Aucune Review à l'import; la cloche contient uniquement les décisions humaines
+actionnables après résolution terminale. no-match est une confirmation humaine.
+Chaque résultat porte versions, source, révision, provenance et reçu.
 
 ## Principes de reconstruction
 
@@ -181,7 +173,7 @@ L’empreinte encode chaque chaîne en UTF-8 avec sa longueur. Le parser accepte
 une observation sérialisée d’au plus 64 Kio, dont au plus 8 Kio pour le titre,
 32 Kio pour l’URL et 32 segments de chemin de 512 octets chacun. Un dépassement
 produit `INPUT_LIMIT_EXCEEDED`, conserve la source locale, interdit la résolution
-automatique et ouvre une Review; il ne tronque jamais silencieusement le brut.
+automatique et conserve un diagnostic hors cloche; il ne tronque jamais silencieusement le brut.
 
 ### Complexité et sûreté du parser local
 
@@ -207,7 +199,7 @@ persistance et des entrées-sorties.
 ### 5. Importer atomiquement
 
 Une transaction dans `tobirink-private` écrit ou met à jour `FavoriteSource`,
-garantit sa `Review` et enregistre l’artefact ainsi que la première entrée de
+ne crée aucune `Review` et enregistre l’artefact ainsi que la première entrée de
 l’outbox `ResolutionTask`. Aucun appel réseau n’a lieu avant le commit.
 L’identité locale reste dérivée de l’identifiant du favori selon le contrat
 actuel; `importedAt` et une décision Review existante sont préservés.
@@ -224,25 +216,16 @@ Review. Une purge future demanderait une action produit séparée et explicite.
 
 Le runner réclame au plus huit tâches dues et s’arrête après 20 secondes par
 réveil. Le claim de 60 secondes, son expiration et l’`idempotencyKey` sont
-persistés avant l’effet. Le routeur applique cet ordre :
+persistés avant l’effet. Le routeur applique l'ordre du plan v3 : ID URL, règle exacte origine/route,
+artefact/aliases, fiche hydratée, D1 owner-scoped via Worker, recherche locale,
+puis Review terminale seulement. AniList anime et MangaUpdates manga sont
+prioritaires; Kitsu suit seulement NO_MATCH complet. MangaDex reste exact/sorties.
+Type inconnu : deux lanes indépendantes, ambiguïté inter-types explicite.
+Panne, 429, timeout ou ensemble incomplet ne déclenche aucun arbitre suivant.
 
-1. identifiant fournisseur explicite et valide;
-2. URL fournisseur officielle réduite localement à un identifiant public;
-3. titre normalisé borné, envoyé seulement au fournisseur compatible;
-4. type `UNKNOWN` routé vers les fournisseurs séparément, sans défaut manga;
-5. une identité insuffisante maintient une Review `pending`; un ensemble complet
-   sans correspondance produit une Review `no-match`.
+Les ports candidats/hydratation restent séparés et DTO Zod stricts. La décision
+pure applique ID, URL, exact, saison, tokens, distance sans score de popularité.
 
-AniList couvre l’anime et MangaUpdates les formats manga retenus par le contrat.
-La décision fournisseur pure exécute désormais les six niveaux documentés,
-après les gardes symétriques de nature, OVA, pré-sérialisation et taxonomie
-exacte. Elle n'observe ni popularité, ni rang, ni ordre de réponse.
-Les ports `FavoriteProviderCandidatePort` et `FavoriteProviderHydrationPort`
-séparent désormais la recherche bornée de l’hydratation par référence exacte.
-Leur politique versionne 20 candidats, 8 secondes de timeout, les intervalles
-de 2 200/3 000 ms et les TTL 24 h/15 min sans effectuer de réseau elle-même.
-Un adaptateur legacy, par exemple MangaDex, reste hors du chemin principal et
-ne devient actif qu’après une décision dédiée.
 
 Chaque fournisseur possède sa lane avec une seule requête en vol. AniList
 respecte au moins 2 200 ms entre réservations et MangaUpdates 3 000 ms; leurs
@@ -258,14 +241,13 @@ Le `ProviderMatcher` pur applique les niveaux de l’ADR-0037. À chaque niveau,
 un seul identifiant fournisseur distinct autorise `CERTAIN`. Zéro candidat
 passe au niveau suivant; plusieurs identifiants produisent `AMBIGUOUS`.
 
-La réponse fournisseur est ramenée à vingt candidats structurés au maximum
-avant matching et porte `complete` et `truncated`. Si le fournisseur ne prouve
-pas l’exhaustivité de l’ensemble pertinent, le matcher ne peut jamais produire
-`CERTAIN` ou `AMBIGUOUS`; la tâche reprend ou devient `BLOCKED`. Review n’en
-expose que six. Les
-images, dates, rangs,
-popularités et positions de réponse restent des métadonnées, jamais des
-preuves d’identité.
+La page fournisseur est ramenée à vingt candidats au plus, avec validité,
+curseur, hasMore et exhaustivité pertinente distincts. L'agrégation est bornée
+et checkpointée par page/alias. Unicité et absence exigent un ensemble pertinent
+complet. Budget atteint ou page manquante : RETRYABLE avec curseur, sans fallback.
+Deux identités déjà prouvées au même niveau suffisent à établir l'ambiguïté.
+Review expose six candidats comparables au plus et signale les candidats non
+exposés. Images, dates, popularités et positions de réponse ne prouvent rien.
 
 Avant chaque niveau, `CandidateCompatibility` applique symétriquement le type,
 OVA et pré-sérialisation. Le filtre éditorial de taxonomie n’intervient jamais
@@ -276,15 +258,16 @@ ici et ne peut donc pas fabriquer une identité.
 `CERTAIN` conserve la référence exacte dans la tâche de résolution déjà
 réclamée et passe directement à son étape d’hydratation.
 `AMBIGUOUS` met la Review en attente avec sa révision et les motifs.
-`NO_MATCH` conserve la source et l’artefact, maintient une Review
-`status = no-match` avec ses motifs et ne crée aucune `Work`.
+`NO_MATCH` complet conserve la source/artefact et crée une Review pending
+NOT_FOUND actionnable, sans Work. Seul le choix humain écrit no-match.
 Une décision humaine exige la révision courante et un candidat appartenant à
 l’ensemble autorisé. Une décision obsolète échoue en conflit.
 
 ### 9. Hydrater par identifiant exact
 
 L’hydratation demande la fiche par couple `(provider, externalId)`, valide une
-projection bornée, puis écrit `Work` et le lien Review dans une transaction.
+projection bornée, puis écrit Work, lien direct FavoriteSource→Work et reçu dans une transaction;
+une Review éventuelle est mise à jour, jamais créée pour un succès.
 Elle ne relance pas une recherche de titre. Les enrichissements Agenda ou
 média deviennent des tâches distinctes afin qu’un échec secondaire ne remette
 pas en cause l’identité acquise.
@@ -296,7 +279,7 @@ ne modifie jamais la décision d’identité. Les caches locaux expirent après 
 plus 24 heures pour un résultat positif et 15 minutes pour une absence.
 
 Une taxonomie bloquée ne rejoint pas la bibliothèque et n’est jamais proposée
-comme candidat manuel. La Review devient `no-match` avec le diagnostic
+comme candidat manuel. La résolution devient `UNSUPPORTED`, hors cloche, avec le diagnostic
 `BLOCKED_CONTENT_TAXONOMY`; le reçu d’hydratation conserve uniquement les
 libellés brut et normalisé nécessaires à l’audit local.
 
@@ -317,7 +300,7 @@ change ni l’identité ni la progression calculées par le parser favori.
 Les cas d’usage locaux construisent ensuite :
 
 - Bibliothèque à partir de la bibliothèque, des `Work` et progressions locales;
-- Review à partir des entrées pending et de leurs preuves;
+- Review à partir des seules pending AMBIGUOUS/NOT_FOUND et de leurs preuves;
 - Agenda à partir des entrées locales dans la semaine demandée;
 - WebBridge à partir de ces projections sérialisées et validées.
 
@@ -394,7 +377,7 @@ central ne décide silencieusement entre deux analyses.
 | `L-01…L-05` | analyseur de langue local facultatif | oracle d’enrichissement |
 | `F-01…F-02` | compatibilité candidat | oracle de décision |
 | `C-01…C-02` | taxonomie post-hydratation | oracle de projection |
-| `X-01…X-02` | adaptateur MangaDex futur et garde de progression commune | `X-01` exclu, `X-02` commun testé |
+| `X-01…X-02` | adaptateur MangaDex exact et garde de progression commune | `X-01` et `X-02` requis |
 | `U-01…U-10` | éligibilité et preuves URL | oracle d’artefact |
 | `T-01…T-10` | segmentation et nettoyage du titre | oracle d’artefact |
 | `I-01…I-07` | construction d’identité | oracle d’artefact |
@@ -408,12 +391,12 @@ central ne décide silencieusement entre deux analyses.
 
 | Composant | Entrée → sortie | Limite | Échec et reprise | Idempotence | Preuve minimale |
 | --- | --- | --- | --- | --- | --- |
-| Capture d’événement | événement API → commande | 1 événement, 64 Kio | valeur invalide en Review avec motif | bookmark ID + révision d’observation | tests des 4 événements et installation |
+| Capture d’événement | événement API → commande | 1 événement, 64 Kio | valeur invalide en diagnostic hors cloche | bookmark ID + révision d’observation | tests des 4 événements et installation |
 | Inventaire | enfants de dossier → tranches d’observations | 100 feuilles/tranche | checkpoint puis reprise | session + pile + curseur | grand arbre, dossier unique large, suspension |
 | Qualification | observation → admissible/rejet | 1 | fail-closed | fonction pure | cas U-08/U-09/U-10 |
 | Preuve URL | admissible → `SourceEvidence` | 32 preuves, 16 aliases | preuve générique ou rejet | fonction pure | U-01 à U-07 |
 | Parser | brut + preuves → artefact | 64 Kio, 64 transformations, 32 diagnostics | motif stable, aucune exception opaque | empreinte sémantique | matrice P à R + oracle profond |
-| Import | artefact → source, Review, tâche | 100/transaction | rollback transactionnel | IDs source/review + empreinte | relecture et décision existante |
+| Import | artefact → source et tâche sans Review | 100/transaction | rollback transactionnel | ID source + empreinte | relecture et décision existante |
 | Claim | tâches dues → tâches réservées | 8/20 s, claim 60 s | expiration durable | clé unique d’effet | deux workers, lanes isolées, claim expiré |
 | Transport | requête publique → enveloppe complète | 20 candidats, 64 Kio, 8 s | tronqué fail-closed, erreur typée | clé tâche + requête | timeout, 403, 429, JSON invalide, page manquante |
 | Matcher | artefact + candidats → décision | 20 | ambiguïté explicite | fonction pure | permutations et égalités |
@@ -467,7 +450,7 @@ point de vue métier grâce aux clés uniques, révisions et upserts transaction
 | Condition | Décision | Reprise |
 | --- | --- | --- |
 | URL invalide ou non HTTP(S) | ignorée avec motif | nouvelle observation seulement |
-| identité manquante ou opaque | Review ou `NO_MATCH` selon le contrat | décision humaine ou nouvelle preuve |
+| identité média non prouvée | UNSUPPORTED avec motif | nouvelle preuve locale |
 | plusieurs identités au même niveau | `AMBIGUOUS` | Review, jamais premier résultat |
 | 429 | tâche `RETRY_AT` | `Retry-After` ou rate reset validé, sinon 60 s |
 | 403 fournisseur | indisponibilité longue | nouvelle tentative au plus tôt dans 1 h |
@@ -502,8 +485,8 @@ dossier ne relance pas un fournisseur.
 
 ### Suppression navigateur
 
-La source est marquée détachée après vérification de l’événement. La bibliothèque
-et la progression restent intactes. Une réapparition avec le même identifiant
+La source est marquée détachée après vérification de l’événement. La présence active est recalculée; les œuvres et la progression historique
+restent conservées. Une réapparition avec le même identifiant
 réactive la source sans perdre l’historique.
 
 ### Suspension et mode hors ligne
@@ -525,8 +508,8 @@ Les versions Dexie v6 à v8 sont additives au-dessus de v5 dans
 `favoriteResolutionTasks`; v7 ajoute le journal, les checkpoints et les marques
 d’inventaire; v8 ajoute cadence fournisseur, reçus et candidats Review. La tâche porte la lane
 `routing`, une clé d’idempotence unique et l’index composé défini plus haut.
-Source, Review, artefact et première tâche `READY` sont écrits dans la même
-transaction. Aucun store existant n’est supprimé ou renommé. Le checkpoint
+L'ancien import v6–v8 écrivait source, Review, artefact et tâche ensemble.
+La correction v3 conserve source/artefact/tâche atomiques sans créer de Review. Aucun store existant n’est supprimé ou renommé. Le checkpoint
 d’inventaire reste une étape ultérieure; la base séparée des notifications
 n’est ni migrée ni utilisée par le resolver.
 
@@ -572,7 +555,7 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
 | helpers concurrents | un seul artefact canonique versionné | égalité profonde du corpus |
 | arbre complet aplati en mémoire | parcours `getChildren`, tranches et checkpoint | reprise testée sans rematérialiser l’arbre |
 | import seulement à l’installation | quatre événements + réconciliation | tests création/changement/déplacement/suppression |
-| favori traité comme autorité | commande d’import vers IndexedDB | suppression sans cascade |
+| autorité navigateur perdue | présence/progression navigateur restaurées | détachement sans cascade |
 | type manga par défaut | `UNKNOWN` jusqu’à une preuve | U-02 et routage séparé |
 | protocole ou origine réécrits | URL brute préservée | U-10 |
 | premier résultat ou popularité | unicité par niveau | permutations sans changement de décision |
@@ -581,7 +564,7 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
 | file générique scannée avec `toArray()` | outbox atomique et claims par index/lanes | coût du claim indépendant de la taille totale |
 | ensemble fournisseur tronqué | `complete`/`truncated` interdit un faux `CERTAIN` | candidat compatible caché après la limite |
 | données brutes perdues | artefact immuable avec provenance | audit de chaque transformation |
-| no-match masqué | Review ou `NO_MATCH` explicite | états UI et motifs stables |
+| no-match masqué | NOT_FOUND pending puis no-match humain | états UI et motifs stables |
 | hydratation couplée au matching | tâche par ID exact | replay sans recherche de titre |
 
 ## Vie privée, sécurité et observabilité
@@ -600,7 +583,11 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
 - une contribution collective reste opt-in, révocable et séparée de la
   résolution automatique conformément à l’ADR-0033.
 
-## Ordre de livraison
+## Ordre de livraison historique remplacé
+
+Les huit étapes du [plan v3](favorite-resolution-correction-plan.md) sont
+l'ordre d'exécution approuvé. Les vagues ci-dessous décrivent l'ancien chantier,
+pas une autorisation concurrente.
 
 Chaque vague est un pas fonctionnel indépendant, migré, testé et committé.
 
@@ -636,7 +623,7 @@ Cloudflare ou un déploiement restent des opérations séparément approuvées.
   état final; une tranche ancienne ne remplace jamais une observation récente.
 - **Parsing** : les 82 cas de la spécification et l’artefact complet restent
   déterministes; 77 résultats sont conservés, quatre sont corrigés et `X-01`
-  reste hors gate tant que son adaptateur est absent.
+  doit désormais être couvert par l'adaptateur MangaDex exact.
 - **Résolution** : ID explicite, URL officielle, titre exact, saison, mots
   réordonnés, distance bornée, égalité et no-match.
 - **Fournisseurs** : timeout, offline, 403, 429, 5xx, mauvaise origine,
@@ -654,7 +641,7 @@ Cloudflare ou un déploiement restent des opérations séparément approuvées.
   et 20 secondes par réveil, claims indexés sans `toArray()` global, réponses à
   temps borné, compaction et taille de bundle surveillée.
 - **Protections supplémentaires** : 64 Kio puis 64 Kio + 1 pour l’observation,
-  candidat compatible masqué après la limite, rollback des quatre écritures de
+  candidat compatible masqué après la limite, rollback des trois écritures de
   l’outbox, 10 000 tâches terminales sans scan global et compaction/reprise du
   reçu technique.
 
@@ -681,7 +668,11 @@ git diff --check
 Les commandes non pertinentes à une vague peuvent rester hors de son test
 ciblé, mais `npm run verify` devient obligatoire avant l’activation complète.
 
-## Audit de validité du 2026-09-07
+## Audit historique du 2026-09-07 — ne prouve pas la parité
+
+L'audit de correction du 2026-09-08 invalide toute conclusion de reproduction
+complète issue des seuls tests synthétiques ci-dessous. Les quatre fondations
+et l'oracle réel restent à corriger/vérifier selon Progress.
 
 L’audit du code, des tests et des migrations confirme les frontières
 domaine/application/adaptateurs, le parser et le matcher sans I/O, l’outbox v8
@@ -703,8 +694,8 @@ La reconstruction est terminée seulement quand :
 - tout événement favori atteint un état terminal ou une reprise datée;
 - chaque transformation est visible dans un artefact local versionné;
 - le parser et le matcher sont purs et couverts par la matrice canonique;
-- l’oracle prouve 77 conservations, quatre corrections et l’exclusion de
-  `X-01`, sans réponse fournisseur vivante;
+- l'oracle synthétique couvre les 82 cas dont MangaDex X-01; l'oracle privé
+  réel lu seul compare chaque résultat et ne laisse aucun écart inexpliqué;
 - l’inventaire, les fournisseurs et les projections respectent leurs bornes;
 - une suspension à n’importe quel checkpoint converge sans doublon métier;
 - les migrations préservent toutes les données v1 à v5 sans remise à zéro;

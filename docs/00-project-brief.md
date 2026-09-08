@@ -9,7 +9,7 @@
 - Users: one reader first; maintainers operate releases and the optional public
   service.
 - In scope: a Chromium/Firefox extension, local library and progress, bookmarks
-  as import or optional projection, agenda and notifications, a reconstructible
+  as authority for presence and observed progress, agenda and notifications, a reconstructible
   public catalogue, optimized cover delivery, and optional encrypted recovery.
 - Out of scope for v1: accounts, private library synchronization, payments,
   social graph, general-purpose web application, microservices, queues, and
@@ -25,13 +25,14 @@
 
 - Expected usage and traffic: initially single-user local workloads; the public
   API must scale horizontally but remains optional and non-blocking.
-- Data and lifecycle: IndexedDB is the sole active authority for the private
-  library, progress, agenda, and durable tasks. D1 stores only the normalized
-  public catalogue. R2 stores rights-approved cover masters. Export/import is
+- Data and lifecycle: browser bookmarks own presence and observed progress;
+  IndexedDB owns private transactional artifacts, works, decisions, agenda and
+  tasks. D1 adds a minimal owner-scoped key/public-ID index through the Worker
+  alongside the existing separate public catalogue. R2 stores rights-approved cover masters. Export/import is
   always available; encrypted cloud recovery is opt-in.
 - Integrations: WebExtension active-tab context, bookmarks, alarms,
   notifications, storage and messaging APIs; browser sync for a bounded
-  non-secret recovery envelope;
+  snapshot of provider IDs only;
   optional Cloudflare Workers, D1, R2 and Images through owned adapters.
 - Team and ownership: one product owner working step-by-step with agents; every
   mutation and operational action requires scoped approval.
@@ -49,8 +50,7 @@
   is below 1.5 MB compressed; public API p95 target is below 300 ms excluding
   third-party calls.
 - Security: least-privilege manifest permissions, strict CSP, no remotely hosted
-  extension code, validated messages and API payloads, secrets only in provider
-  environments, and no sensitive values in logs.
+  extension code, validated messages and API payloads, opaque installation secrets only in trusted extension storage.local, and no sensitive values in logs.
 - Reliability: local features work offline; migrations are atomic and tested;
   export/import is the v1 recovery path; cloud failures degrade only optional
   public features.
@@ -88,8 +88,8 @@ not become runtime dependencies of Tobirink.
 - Storage: Dexie-backed IndexedDB behind `StoragePort`; `storage.local` only for
   bootstrap, technical preferences and a five-entry, thirty-day, non-authoritative
   popup continuation cache; `storage.sync` only for a bounded
-  recovery envelope; D1 for indexed catalogue rows and explicitly consented
-  public-ID associations; R2 for image objects and encrypted backup blobs.
+  provider-ID snapshot; D1 for separate catalogue rows and consented
+  normalized-key/owner/public-ID associations; R2 for image objects and encrypted backup blobs.
   Domain code cannot import any provider.
 - Tests: Vitest for domain and contracts, Vitest Browser Mode for UI, Playwright
   for Chromium extension journeys, Firefox packaging smoke with `web-ext`, and
@@ -111,8 +111,10 @@ not become runtime dependencies of Tobirink.
 
 FavLib remains an intact functional reference and rollback artifact only.
 TobiRink starts with a new extension identity, a new IndexedDB name, and new
-Cloudflare resource names. It never reads, migrates, or reuses FavLib local
-databases, identifiers, D1 bindings, R2 buckets, or private projections.
+Cloudflare resource names. Product runtime never reads, migrates, or reuses FavLib local databases,
+identifiers, D1 bindings, R2 buckets, or private projections. The approved
+validation oracle alone reads the local FavLib database read-only outside the
+repository; private rows never enter Git, logs, CI or shared test artifacts.
 Existing browser HTTP(S) bookmarks may be imported as fresh sources on first
 launch. Preview, cutover, and rollback keep the two products isolated; a
 rollback restores the previous site or Worker artifact without converting or
@@ -127,8 +129,8 @@ questions, trade-offs, and research anchors used to make these decisions.
   extension views without contacting a remote service.
 - Browser and provider code cannot cross the declared import boundaries; all
   external payloads and extension messages are validated.
-- A collective contribution is opt-in and contains only public identifiers,
-  a nonce and its decision time; it never contains a title, URL, library or
+- A collective contribution is opt-in and contains only a normalized-key fingerprint, media type, public identifiers,
+  versions, a nonce and owner authentication; it never contains a title, URL, library or
   progress value and can be revoked locally with its dedicated secret.
 - Storage migration, export, import, cache reconstruction, encrypted recovery,
   extension rollback, and optional Worker rollback have executable verification

@@ -280,3 +280,14 @@
 ## Débloquer la matérialisation sans supprimer l’historique — DONE
 
 - [x] **Porter la borne des objectifs de 40 à 48** — DONE _(evidence: 52 tests Progress passent; dépassement 48 refusé sans écriture., ADR/docs/diff et Archify internal showcase 9/9 passent; historique conservé.)_
+
+## Corriger intégralement FavLib → TobiRink selon la doctrine 3267de2 — ACTIVE
+
+- [x] **Documentation canonique historique et plan complet** — DONE _(evidence: Plan canonique v3 et 30 écarts: doctrine 3267de2, autorités, sync, Worker SQL, migrations et oracle réel; ADR 0025/0033/0034/0037 alignés., validate:docs, validate:decisions et validate:coherence passent; toutes les vues produit Archify showcase 9/9 sans erreur/avertissement; git diff --check passe., Aucun code produit modifié; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue.)_
+- [ ] **Autorités et contrats de résolution versionnés** — PENDING
+- [ ] **Parsing, routage et fournisseurs déterministes** — PENDING
+- [ ] **Snapshot sync fragmenté et reconstruction** — PENDING
+- [ ] **Collectif Worker/D1 SQL owner-scoped** — PENDING
+- [ ] **Migration additive et Review actionnable** — PENDING
+- [ ] **Oracle FavLib réel en lecture seule** — PENDING
+- [ ] **Validation complète et préparation locale de publication** — PENDING
