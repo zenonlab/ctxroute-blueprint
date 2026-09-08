@@ -5,7 +5,7 @@
 <key>CFBundleExecutable</key><string>WallpaperConnector</string>
 <key>CFBundleName</key><string>Wallpaper Connector PoC 2</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleVersion</key><string>4</string>
 <key>CFBundleShortVersionString</key><string>0.2.0</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
 <key>NSHighResolutionCapable</key><true/>

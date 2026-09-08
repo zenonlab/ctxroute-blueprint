@@ -95,8 +95,8 @@ ou les boutons AppKit du connecteur ne suffisent pas à sélectionner la stack g
 
 ## Ordre de la prochaine discussion
 
-La prochaine session exécute le plan L1–L3 après initialisation. Elle compare
-les composants sans ROM ; l'adoption
+Le dépôt est initialisé. La prochaine étape corrige et qualifie le PoC2 macOS
+(transport, lancement exclusif, entrée) ; elle ne relance pas L1. L'adoption
 définitive des formats d'ingestion dépend cependant de la preuve d'extraction.
 La séparation locale est acquise dans
 [ADR-0032](decisions/ADR-0032-local-conversion-and-theme-distribution.md).
@@ -171,6 +171,5 @@ de l'application. Les versions et preuves d'installation figurent dans la
 
 Les décisions acquises sont consignées dans
 [ADR-0029](decisions/ADR-0029-product-framing.md).
-Les choix de production restent ouverts. `npm run initialize` doit précéder
-le code, après report et validation des décisions expérimentales L1–L3 ; ne pas
-attendre le choix définitif du terminal ou du moteur pour initialiser ce périmètre.
+Les choix de production restent ouverts. L'initialisation expérimentale est terminée ;
+ne pas réexécuter `npm run initialize`. Le périmètre courant est ADR-0049 à ADR-0052.

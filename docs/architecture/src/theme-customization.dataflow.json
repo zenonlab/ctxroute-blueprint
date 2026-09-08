@@ -23,7 +23,7 @@
     { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "objets · rigs · états · menus", "stage": 3, "row": 0, "width": 170 },
     { "id": "capabilities", "type": "security", "label": "Courtier de capacités", "sublabel": "support · consentement · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "animation · matériaux · effets", "stage": 4, "row": 0, "width": 160 },
-    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "menus · contrôles système", "stage": 4, "row": 1, "width": 160 },
+    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "2 boutons · menu contextuel", "stage": 4, "row": 1, "width": 160 },
     { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
   ],
   "flows": [

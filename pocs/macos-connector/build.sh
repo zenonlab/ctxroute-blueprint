@@ -18,13 +18,14 @@ for connector_bundle in "$connector_app" "$connector_extension"; do
   cp "$connector_source/Native/Bridge/LICENSE" "$connector_bundle/Contents/Resources/Phosphene-LICENSE"
 done
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
+  "$connector_source/Sources/ThemeModel/LaunchPolicy.swift"
   "$connector_source/Sources/SceneRenderer/Scene.swift"
   "$connector_source/Sources/ConnectorTransport/Mailbox.swift")
 connector_flags=(-sdk "$connector_sdk" -target "$connector_arch-apple-macos26.0"
   -swift-version 6 -warnings-as-errors -parse-as-library -O
   -module-cache-path "$connector_base/module-cache")
 env -u SDKROOT xcrun swiftc "${connector_flags[@]}" "${connector_shared[@]}" \
-  "$connector_source/App/Main.swift" -o "$connector_app/Contents/MacOS/WallpaperConnector"
+  "$connector_source"/App/*.swift -o "$connector_app/Contents/MacOS/WallpaperConnector"
 "$connector_app/Contents/MacOS/WallpaperConnector" --thumbnails "$connector_extension/Contents/Resources"
 env -u SDKROOT xcrun swiftc "${connector_flags[@]}" -module-name WallpaperProvider \
   -import-objc-header "$connector_source/Native/Bridge/WallpaperExtension-Bridging-Header.h" \

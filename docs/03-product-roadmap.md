@@ -1,6 +1,6 @@
 # Feuille de route produit — progression par preuves
 
-État au 8 septembre 2026 : **dépôt initialisé, PoC macOS 1 gelé, PoC macOS 2 spécifié**.
+État au 8 septembre 2026 : **dépôt initialisé, PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté, non qualifié**.
 E2 n'est pas validée ; L2/L3 et E3–E6 restent non démarrées.
 Le [plan L1–L3](05-poc-start-plan.md) et
 [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) fixent le premier périmètre.
@@ -101,7 +101,8 @@ le brief avant code, conformément à AGENTS.md. E1 peut sélectionner un périm
 expérimental minimal, sans prétendre adopter les extensions futures : elles
 restent hors de ce périmètre et requièrent leur ADR avant introduction.
 Ne pas attendre le benchmark d'E2 pour définir ce qui autorise à écrire E2.
-Le dépôt reste aujourd'hui `template` ; aucune initialisation n'est effectuée ici.
+Le dépôt est `initialized`. Ces prérequis sont historiques ; ne pas recommencer
+l'initialisation et ne pas relancer le PoC1 pour ajouter des fonctions produit.
 
 Précision ADR-0042 : les seuils initiaux n'interdisent pas une baseline exploratoire
 ou un diagnostic fonctionnel L1/L2. Geler les budgets énergétiques après cette
@@ -132,14 +133,16 @@ Un seuil dépassé reste un échec même si les tests fonctionnels passent.
 Les [tests de remplacement R01–R08](architecture/module-contracts.md#tests-de-remplacement)
 complètent ces scénarios aux échéances indiquées ; ils ne sont pas exécutés ici.
 Un module optionnel ajouté après qualification exige de rejouer les mesures
-impactées. Les tests du dépôt actuel prouvent seulement le socle documentaire.
+impactées. Les tests Node prouvent le socle documentaire ; les tests Swift du PoC2
+prouvent des invariants locaux, pas les gestes natifs ni la consommation du produit.
 
 ## Prochaine action
 
-Terminer l'initialisation du périmètre expérimental, puis L1 sur MAC-01 : sonde
-native en fenêtre et desktop passif séparés. Ensuite L2 contrôleur sans GPU et
-L3 scène Rust/wgpu. Pas de nouvelle discussion générale de stack ni de ROM requise.
-Les premières mesures établissent la baseline ; geler les budgets avant comparaison.
+Qualifier le transport et le lancement exclusif du PoC2 sur MAC-01, puis ses gestes
+natifs et son énergie. Le contrôle App Group reste bloqué avec la signature ad hoc.
+D1 prépare séparément deux boutons principaux et les gestes de personnalisation ;
+il ne remplace pas la qualification native. Ni nouveau PoC, ni changement de moteur,
+ni terminal ou ROM ne sont requis pour corriger ces frontières.
 
 Schéma workflow en français ; interface fixe du visualiseur en anglais (repli
 Archify). HTML généré : `dist/architecture/product-roadmap.workflow.html`.

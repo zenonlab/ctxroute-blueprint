@@ -102,7 +102,11 @@ et des éléments système. Le thème peut changer son apparence, sa disposition
 animation, son état replié et même sa position. Il ne recode pas le comportement des
 capacités standard.
 
-Le socle initial expose :
+La présentation par défaut expose seulement deux boutons : `theme.audio.muted`
+et `desktop.items.visible`. Les autres capacités restent dans le panneau contextuel
+de personnalisation, pas sur une seconde barre de diagnostics. Les gestes suivent
+[le contrat d'interaction](theme-interactions.md).
+Le catalogue des capacités, distinct de leur présentation, comprend :
 
 | Contrôle | Portée | Garantie |
 | --- | --- | --- |
@@ -145,7 +149,8 @@ chemin ou liée à une commande native brute.
 L'auteur garde le dernier mot : il peut réorganiser, remplacer la représentation ou
 déclarer un retrait explicite. Ce retrait est visible dans le manifeste et dans la
 review ; il ne peut pas être produit silencieusement par omission. Les thèmes officiels
-conservent au minimum audio, mouvement, verrouillage, profil énergétique et réglages.
+conservent l'accès à audio, mouvement, verrouillage, profil énergétique et réglages,
+sans imposer leur présence permanente dans le coin de l'écran.
 
 ## Symbiose avec un jeu sans fusion des contenus
 
@@ -226,10 +231,10 @@ partagent pas leurs types d'UI ou leur cycle de vie natif.
 
 Le dataflow Archify passe le profil `showcase` avec 9 contrôles sur 9, sans erreur
 ni avertissement. Le contrôle visuel passe à 1440×900, 1600×1000, 1920×1080 et
-2048×1320 en clair et sombre. La capture sombre 1440×900 a été inspectée : étapes,
+2048×1320 en clair et sombre. Les captures sombres 1440×900 et 2048×1320 ont été inspectées : étapes,
 branches publique/privée et sorties de présentation sont lisibles sans collision.
 Source SHA-256 :
-`bb74f68927eb3a44d9f64a47d760738e32c506598cef3f7666f5e249fc7901f0`.
+`715cee444c1936a234db8d0d28b83e3c4b472993319f9203e490e8b6bcbc4202`.
 Artefact SHA-256 :
-`dc98a7cffd7ee389ccd0fc2c719527bdf42f4c53ad73096a82433b63fc03add6`.
+`00ce0674493fa077fc0fd8feaae4effffc79de130f2158776983729e014a3636`.
 Les libellés sont en français ; l'interface fixe du viewer reste en anglais.

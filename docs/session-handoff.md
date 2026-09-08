@@ -2,6 +2,23 @@
 
 ## État courant — nettoyage demandé le 8 septembre 2026
 
+Correctifs de revue en source : préflight anti-coexistence, tests de transport sans
+notifications globales, conservation de quittance 30 secondes, diagnostic explicite
+du transport non disponible sans Team ID, CI Swift et contrats de gestes D1-14–16.
+Brief et roadmap sont réalignés : dépôt initialisé, PoC1 gelé, PoC2 incomplet.
+Le nouveau build doit être qualifié séparément ; ne pas confondre code corrigé et
+version installée. Aucun ancien mécanisme de clic ou de préférence Finder réutilisé.
+Sans identité adaptée, M2-06 reste bloqué ; les gestes D1 ne sont pas implémentés.
+Le diagnostic compilé `--check` a retourné 2 avec le motif de signature, et
+`--preflight-install` a retourné 2 en identifiant les deux providers résiduels.
+Ces refus sont attendus ; ils ne sont pas une réussite du transport natif.
+Vérification des correctifs : 9 XCTest, build Swift 6 avec catalogue Apple 3 thèmes,
+signatures/plists et `npm run verify` passent. Build final non installé :
+`dist/pocs/macos-connector/build.bzAcpO/Wallpaper Connector PoC 2.app`.
+Diagramme de personnalisation : showcase 9/9, containment quatre résolutions,
+captures sombres 1440×900 et 2048×1320 inspectées. Les preuves natives d'interaction
+et d'énergie restent manquantes ; aucun succès fonctionnel n'est déduit de ce gate.
+
 Les trois compagnons ont été arrêtés après vérification de leur chemin exécutable :
 `WallpaperConnector`, `NativeWallpaperProbeHost` et `SurfaceProbe`. Le panneau
 « Commandes de l’objet » provenait de `Wallpaper Desktop PoC`, pas du PoC2.

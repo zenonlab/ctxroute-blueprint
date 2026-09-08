@@ -9,6 +9,27 @@ imports sont détaillés dans l'[architecture de personnalisation](theme-customi
 
 ## Ce que le produit doit permettre
 
+### Gestes par défaut — demande utilisateur du 8 septembre 2026
+
+- clic gauche confirmé sur un objet : lancer l'action locale approuvée ou ouvrir
+  la session/application associée ; aucune fenêtre de personnalisation automatique ;
+- clic droit sur un objet : ouvrir son unique panneau de personnalisation
+  (apparence, ressource, animation et association d'action) ;
+- clic droit dans une zone vide du thème : ouvrir le panneau d'ajout d'un bouton
+  ou personnage à cette position ; annuler ne crée aucun objet ;
+- deux commandes principales en haut à gauche : mute du thème et visibilité des
+  fichiers ; les autres options sont dans la personnalisation.
+
+Ce comportement ne s'applique qu'à une entrée autorisée par le connecteur. Une icône
+Finder superposée conserve tous ses gestes, y compris son menu contextuel. Une cible
+inconnue n'est jamais considérée comme une zone vide. Un glisser ou un geste annulé
+ne lance rien. Le clic droit ne lance pas l'action du clic gauche. Les raccourcis
+d'accessibilité offrent les mêmes opérations. Une personnalisation modifie une
+association approuvée, pas une commande arbitraire déduite du nom d'un objet.
+Ces gestes sont requis pour D1 et le raccord natif ; ils ne sont pas encore livrés
+par le renderer passif du PoC2. Les exemples programmables ci-dessous décrivent des
+liaisons possibles, pas un remplacement implicite de ces gestes par défaut.
+
 Les « icônes » du thème peuvent être des objets, une partie de géométrie, un
 portrait, un sprite ou un bouton. Elles ne sont pas limitées aux raccourcis
 Explorer/Finder. Ceux-ci restent des éléments natifs distincts à respecter
@@ -60,7 +81,7 @@ au contrôle, pas chaque sommet ou frame. Les panneaux lisent l'état accepté e
 
 ### Exemple de parcours, indépendant d'un jeu
 
-1. L'utilisateur sélectionne un objet `console`; une règle ouvre son panneau.
+1. L'utilisateur ouvre explicitement le panneau d'un objet `console` par une liaison configurée.
 2. Le bouton `activer` demande l'animation de `porte` et l'effet de `lampe`.
 3. Le contrôle accepte les actions compatibles ; l'hôte commence leur exécution.
 4. Le panneau affiche « en cours » à partir du résultat accepté, pas du clic brut.

@@ -127,6 +127,20 @@ compté ensemble.
 
 ## Conditions de sortie
 
+### Correctifs de revue — état courant
+
+Le modèle conserve la dernière quittance 30 secondes ; les publications sans action
+ne l'effacent plus. Les mailboxes de test ont des notifications inactives par défaut.
+Le préflight refuse les compagnons historiques, les providers historiques et les
+providers PoC2 d'un autre paquet ; l'installation refuse aussi un provider PoC2 actif.
+Aucun processus n'est arrêté implicitement. Les builds ad hoc annoncent explicitement
+le transport indisponible avant accès au groupe ; ils ne demandent pas de changer de
+fond pour résoudre une erreur de signature. Le contrôle natif M2-06 reste à qualifier.
+Le manifeste accepte un sous-ensemble ordonné de contrôles, sans accorder leurs
+capacités. Les fixtures préparent seulement audio et fichiers en haut à gauche.
+Les gestes de lancement/personnalisation/ajout restent à implémenter selon D1-14–16.
+Les tableaux datés ci-dessous sont historiques, pas un verdict courant de livraison.
+
 ### Preuves de la première tranche — 8 septembre 2026
 
 | Critère | État réellement démontré |

@@ -27,7 +27,8 @@
       "type": "object", "required": ["placement", "items"],
       "properties": {
         "placement": {"const": "top_left"},
-        "items": {"const": ["motion", "audio", "interaction", "desktop", "settings"]}
+        "items": {"type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true,
+          "items": {"enum": ["motion", "audio", "interaction", "desktop", "settings", "profile", "overlay"]}}
       }
     }
   },

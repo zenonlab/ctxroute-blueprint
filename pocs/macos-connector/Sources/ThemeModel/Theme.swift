@@ -63,7 +63,9 @@ public struct Theme: Codable, Equatable, Sendable {
               Set(theme.objects.map(\.id)).count == theme.objects.count,
               theme.objects.allSatisfy({ validID($0.id) && validColor($0.color) && (0..<1).contains($0.phase) }),
               theme.system_controls.placement == "top_left",
-              theme.system_controls.items == ["motion", "audio", "interaction", "desktop", "settings"]
+              (1...7).contains(theme.system_controls.items.count),
+              Set(theme.system_controls.items).count == theme.system_controls.items.count,
+              theme.system_controls.items.allSatisfy({ ["motion", "audio", "interaction", "desktop", "settings", "profile", "overlay"].contains($0) })
         else { throw ModelError.invalid("manifest invariant") }
         return theme
     }
@@ -120,10 +122,21 @@ public struct Session: Sendable {
     public private(set) var state = ThemeState()
     private var recent: [UUID: Receipt] = [:]
     private var order: [UUID] = []
+    private var lastReceipt: Receipt?
+    private var receiptTime: Date?
     public init(themeID: String, instance: UUID = UUID()) {
         self.themeID = themeID; self.instance = instance
     }
     public mutating func apply(_ command: Command, now: Date = Date()) -> Receipt {
+        let receipt = evaluate(command, now: now)
+        lastReceipt = receipt; receiptTime = now
+        return receipt
+    }
+    public func receipt(now: Date = Date()) -> Receipt? {
+        guard let receiptTime, (0...30).contains(now.timeIntervalSince(receiptTime)) else { return nil }
+        return lastReceipt
+    }
+    private mutating func evaluate(_ command: Command, now: Date) -> Receipt {
         if let receipt = recent[command.command_id] {
             return receipt.command == command ? receipt : reject(command, "id conflict")
         }
@@ -156,9 +169,9 @@ public struct ProviderStatus: Codable, Sendable {
     public let state: ThemeState
     public let surfaces: Int
     public let receipt: Receipt?
-    public init(session: Session, surfaces: Int, receipt: Receipt? = nil) {
+    public init(session: Session, surfaces: Int, receipt: Receipt? = nil, now: Date = Date()) {
         theme_id = session.themeID; instance = session.instance; generation = session.generation
-        state = session.state; self.surfaces = surfaces; self.receipt = receipt
+        state = session.state; self.surfaces = surfaces; self.receipt = receipt ?? session.receipt(now: now)
     }
 }
 

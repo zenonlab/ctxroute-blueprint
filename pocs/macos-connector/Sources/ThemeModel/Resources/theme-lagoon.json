@@ -14,5 +14,5 @@
     {"id": "pearl.d", "color": "27BAA1", "phase": 0.6},
     {"id": "pearl.e", "color": "A3D6FA", "phase": 0.8}
   ],
-  "system_controls": {"placement": "top_left", "items": ["motion", "audio", "interaction", "desktop", "settings"]}
+  "system_controls": {"placement": "top_left", "items": ["audio", "desktop"]}
 }

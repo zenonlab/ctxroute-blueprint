@@ -1,6 +1,6 @@
 # Vision produit — bureau et terminal ludiques
 
-État : PoC macOS 1 gelé, PoC macOS 2 spécifié, 8 septembre 2026. Nom de travail : Wallpaper.
+État : PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté et non qualifié, 8 septembre 2026. Nom de travail : Wallpaper.
 Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
 Le dépôt est initialisé ; une [sonde native isolée](pocs/macos-surface.md) est implémentée.
 Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
@@ -59,8 +59,9 @@ thème est entièrement stylisable tout en gardant composants, focus et actions
 sémantiques. Les boutons provisoires du PoC macOS ne définissent pas le design final.
 
 Une étagère de contrôles fait partie du thème dès sa création, en haut à gauche par
-défaut et entièrement stylisable : mute du thème, pause des animations, verrouillage
-des interactions, profil énergétique, panneaux et réglages. La visibilité des fichiers
+défaut et entièrement stylisable : deux boutons visibles, mute du thème et fichiers
+du bureau. Pause, verrouillage, profil énergétique et autres réglages restent
+accessibles dans la personnalisation, sans encombrer le menu principal. La visibilité des fichiers
 du bureau utilise la même intention dans tous les thèmes, mais reste une capacité du
 connecteur OS avec état confirmé et récupération native. Elle n'est jamais appliquée
 automatiquement au chargement.

@@ -17,12 +17,18 @@ les helpers. Elle rapporte le delta face au bureau natif, sur au moins cinq pass
 après préchauffage. La permission refusée et la cible d'entrée inconnue font partie
 du chemin nominal de test, pas uniquement des erreurs.
 
-Après M2-01, la preuve [D1](pocs/theme-design-poc.md) ajoute treize critères portant sur
+Après M2-01, la preuve [D1](pocs/theme-design-poc.md) ajoute seize critères portant sur
 la fidélité du rig, le partage de ressources sans partage d'état, le menu stylé et
 accessible, la chaîne bouton-animation-UI, les fallbacks, l'export sans asset privé
 et l'invalidation énergétique. Elle vérifie aussi l'étagère système personnalisable,
 les actions locales portables et l'état confirmé d'une capacité desktop simulée. Le
 renderer n'est pas adopté avant cette scène représentative.
+
+La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
+Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,
+extension, catalogue Apple et signatures). `npm run verify` ne remplace aucun
+de ces contrôles produit. Les tests de transport utilisent des signaux injectés,
+inactifs par défaut, et ne réveillent pas une extension installée.
 
 Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
 reprise ; compilation native avec avertissements bloquants, puis smoke AppKit

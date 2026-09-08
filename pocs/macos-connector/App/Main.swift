@@ -5,9 +5,9 @@ import UniformTypeIdentifiers
 @main @MainActor enum ConnectorMain {
     static func main() throws {
         if CommandLine.arguments.contains("--check") {
-            let theme = try Theme.load()
-            let mailbox = try Mailbox.shared()
-            print("manifest=\(theme.theme_id) group=\(mailbox.directory.path)")
+            _ = try Theme.catalog()
+            do { _ = try Mailbox.shared(); print("manifest=valid transport=unconfirmed (provider receipt required)") }
+            catch { print("manifest=valid transport=unavailable: \(error.localizedDescription)"); exit(2) }
             return
         }
         if CommandLine.arguments.count == 3, ["--thumbnail", "--thumbnails"].contains(CommandLine.arguments[1]) {
@@ -29,13 +29,27 @@ import UniformTypeIdentifiers
             }
             return
         }
+        if CommandLine.arguments.contains("--preflight-install") {
+            do { try Preflight.check(installing: true); print("preflight=passed") }
+            catch { print(error.localizedDescription); exit(2) }
+            return
+        }
         let app = NSApplication.shared
         if let id = Bundle.main.bundleIdentifier,
            let existing = NSRunningApplication.runningApplications(withBundleIdentifier: id)
             .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
+            guard existing.bundleURL?.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL else {
+                print("Lancement refusé : une autre version du connecteur est déjà ouverte. Aucun processus arrêté."); exit(2)
+            }
             existing.activate(options: []); return
         }
         app.setActivationPolicy(.regular)
+        do { try Preflight.check(installing: false) }
+        catch {
+            let alert = NSAlert(); alert.messageText = "Lancement refusé"
+            alert.informativeText = error.localizedDescription
+            alert.runModal(); return
+        }
         let delegate = try ConnectorApp(themes: Theme.catalog()); app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }
@@ -46,6 +60,7 @@ import UniformTypeIdentifiers
     var theme: Theme { themes[themePicker.indexOfSelectedItem >= 0 ? themePicker.indexOfSelectedItem : 0] }
     let themePicker = NSPopUpButton()
     let mailbox: Mailbox?
+    let transportFailure: String?
     var window: NSWindow!
     var signal: WakeSignal?
     var observed: ProviderStatus?
@@ -54,7 +69,12 @@ import UniformTypeIdentifiers
     let statusLabel = NSTextField(wrappingLabelWithString: "Le provider doit être sélectionné dans les réglages Fond d’écran.")
     var pauseButton: NSButton!
     var effectButton: NSButton!
-    init(themes: [Theme]) { self.themes = themes; mailbox = try? Mailbox.shared(); super.init() }
+    init(themes: [Theme]) {
+        self.themes = themes
+        do { mailbox = try Mailbox.shared(); transportFailure = nil }
+        catch { mailbox = nil; transportFailure = error.localizedDescription }
+        super.init()
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 560),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
@@ -87,7 +107,7 @@ import UniformTypeIdentifiers
         let menu = NSMenu(); let appMenu = NSMenuItem(); menu.addItem(appMenu)
         let submenu = NSMenu(); submenu.addItem(withTitle: "Quitter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenu.submenu = submenu; NSApp.mainMenu = menu
-        signal = WakeSignal(Mailbox.statusSignal) { [weak self] in self?.receive() }
+        if mailbox != nil { signal = WakeSignal(Mailbox.statusSignal) { [weak self] in self?.receive() } }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.refreshAndProbe() }
         }
@@ -127,7 +147,7 @@ import UniformTypeIdentifiers
         do { observed = try mailbox?.status()?.theme(theme.theme_id) } catch { observed = nil }
         setEnabled(false)
         if observed?.theme_id == theme.theme_id { send(.inspect) }
-        else { statusLabel.stringValue = mailbox == nil ? "Transport App Group indisponible." : "Provider sans état confirmé : choisir un thème dans les Réglages ou vérifier son diagnostic." }
+        else { statusLabel.stringValue = transportFailure ?? "Aucun état reçu. Provider absent ou publication inaccessible : vérifier le diagnostic avant de changer le fond." }
     }
     func send(_ action: ThemeAction) {
         guard pending == nil, let mailbox, let observed, observed.theme_id == theme.theme_id else { return }

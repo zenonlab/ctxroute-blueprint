@@ -38,9 +38,9 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     init() {
         themes = (try? Theme.catalog()) ?? []
         sessions = Dictionary(uniqueKeysWithValues: themes.map { ($0.theme_id, Session(themeID: $0.theme_id)) })
-        mailbox = try? Mailbox.shared()
-        if mailbox == nil { extensionLog("App Group unavailable; wallpaper remains independent of app controls") }
-        signal = WakeSignal(Mailbox.commandSignal) { [weak self] in self?.receive() }
+        do { mailbox = try Mailbox.shared() }
+        catch { mailbox = nil; extensionLog("App Group unavailable: \(error.localizedDescription)") }
+        if mailbox != nil { signal = WakeSignal(Mailbox.commandSignal) { [weak self] in self?.receive() } }
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
                      NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification] {

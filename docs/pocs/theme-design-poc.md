@@ -49,6 +49,9 @@ Aucun asset commercial n'est nécessaire pour réussir D1.
 | D1-11 | audio, motion, interactions et profil énergétique agissent dans le runtime sans commande OS brute |
 | D1-12 | contrôle desktop simulé suit pending/quittance/refus et ne ment jamais sur son état |
 | D1-13 | étagère déplacée/restylée reste dans la safe area et accessible ; retrait exige une déclaration explicite |
+| D1-14 | clic gauche lance uniquement l'association approuvée ; clic droit personnalise sans lancement |
+| D1-15 | clic droit dans le vide ajoute ; annulation sans mutation ; cible native/inconnue jamais interceptée |
+| D1-16 | seulement mute et fichiers visibles par défaut ; options avancées accessibles par personnalisation |
 
 ## Hors périmètre
 

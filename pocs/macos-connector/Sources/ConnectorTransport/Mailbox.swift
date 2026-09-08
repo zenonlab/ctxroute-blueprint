@@ -1,31 +1,54 @@
 import Foundation
+import Security
 #if SWIFT_PACKAGE
 import ThemeModel
 #endif
 
 /// Experimental local transport. Signals are hints; all authority is in bounded files.
+public enum TransportError: Error, LocalizedError {
+    case signingRequired, groupUnavailable
+    public var errorDescription: String? {
+        switch self {
+        case .signingRequired: "Contrôle indisponible : signature Apple avec Team ID requise pour éprouver l’App Group. Changer le fond ne corrige pas cette erreur."
+        case .groupUnavailable: "Transport App Group inaccessible. Vérifier la signature et les droits des deux bundles."
+        }
+    }
+}
+
 public struct Mailbox: Sendable {
     public static let group = "group.org.wallpaperthemes.connectorpoc2"
     public static let commandSignal = "org.wallpaperthemes.connectorpoc2.command"
     public static let statusSignal = "org.wallpaperthemes.connectorpoc2.status"
     public let directory: URL
-    public init(directory: URL) throws {
+    private let onSignal: @Sendable (String) -> Void
+    /// Standalone/test mailboxes have no system-wide side effects.
+    public init(directory: URL, onSignal: @escaping @Sendable (String) -> Void = { _ in }) throws {
         self.directory = directory
+        self.onSignal = onSignal
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
     }
     public static func shared() throws -> Mailbox {
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var information: CFDictionary?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
+              SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
+              SecCodeCopySigningInformation(staticCode, [], &information) == errSecSuccess,
+              let values = information as? [String: Any],
+              let team = values[kSecCodeInfoTeamIdentifier as String] as? String, !team.isEmpty
+        else { throw TransportError.signingRequired }
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
-        else { throw ModelError.invalid("App Group unavailable") }
-        return try Mailbox(directory: container.appendingPathComponent("Connector-v1", isDirectory: true))
+        else { throw TransportError.groupUnavailable }
+        return try Mailbox(directory: container.appendingPathComponent("Connector-v1", isDirectory: true), onSignal: Self.signal)
     }
     public func command() throws -> Command? { try read("command.json") }
     public func status() throws -> CatalogStatus? { try read("status.json") }
     public func write(_ command: Command) throws {
-        try write(command, name: "command.json"); Self.signal(Self.commandSignal)
+        try write(command, name: "command.json"); onSignal(Self.commandSignal)
     }
     public func write(_ status: CatalogStatus) throws {
-        try write(status, name: "status.json"); Self.signal(Self.statusSignal)
+        try write(status, name: "status.json"); onSignal(Self.statusSignal)
     }
     private func read<T: Decodable>(_ name: String) throws -> T? {
         let url = directory.appendingPathComponent(name)

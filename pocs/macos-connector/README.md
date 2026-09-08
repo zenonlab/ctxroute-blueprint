@@ -6,7 +6,17 @@ ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
 
 ## Statut et limites
 
-Le code compile avec Swift 6 strict ; les cinq tests XCTest passent. Les deux
+Correctifs de revue : commandes et quittances testées, dernière quittance conservée
+30 secondes par thème même lors d'une publication de surface. Les mailboxes de tests
+n'émettent plus de notifications système ; seul `shared()` les active.
+Sans Team ID, `--check` retourne le code 2 avec un diagnostic de signature, sans
+accéder au groupe. Une signature avec Team ID reste à qualifier dans les deux
+processus : elle ne garantit pas à elle seule des droits App Group fonctionnels.
+Le nouveau build n'est pas installé automatiquement ; les apps historiques doivent
+rester arrêtées. Aucune interface interactive, audio ou toggle Finder n'est livrée
+par ce correctif. Les deux contrôles du manifeste restent des déclarations pour D1.
+
+Le code compile avec Swift 6 strict ; les neuf tests XCTest passent. Les deux
 bundles sont signés ad hoc et leur manifeste embarqué est identique. Ce résultat
 n'est **pas** une qualification du wallpaper dans WallpaperAgent : activation,
 Spaces, animation visible, commandes interprocessus et énergie restent à vérifier
@@ -67,7 +77,8 @@ des shims seuls n'aurait pas détecté ce problème.
 
 L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 
-- `--check` : valide le manifeste et l'accès au répertoire App Group ;
+- `--check` : valide le manifeste et le prérequis de signature du transport ; ne prouve jamais une quittance du provider ;
+- `--preflight-install` : refuse compagnons et providers concurrents sans les arrêter ;
 - `--thumbnail <chemin.png>` : exporte la fixture, sans animer ni ouvrir une fenêtre ;
 - `--thumbnails <répertoire>` : exporte une vignette par thème du catalogue ;
 - `--smoke <chemin.png>` : ouvre le seul panneau, capture son contenu et quitte ;
@@ -84,8 +95,9 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
    suivi du chemin exact du `.app` construit. L'installation vise
    `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app` ; une version
    précédente est déplacée dans `dist/pocs/macos-connector/replaced.*/previous-app.disabled`,
-   jamais supprimée. Le script refuse une app encore ouverte et vérifie signature
-   et catalogue avant remplacement.
+   jamais supprimée. Le script refuse les compagnons et providers encore actifs
+   et vérifie signature et catalogue avant remplacement. Un provider chargé doit
+   être retiré après sélection explicite d'un autre fond, pas en arrêtant Finder.
 2. Ouvrir cette app. Si le provider n'apparaît pas dans les Réglages Fond d'écran,
    enregistrer **son chemin exact** avec `pluginkit -a` sur
    `Contents/Extensions/WallpaperProvider.appex`, puis rouvrir les Réglages.
@@ -106,8 +118,10 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
 7. Superposer une icône Finder à un objet : aucun clic de thème ne doit partir,
    puisque l'entrée du wallpaper est volontairement passive.
 
-Ne pas lancer plusieurs versions de cette nouvelle identité en même temps. Aucun
-test ne nécessite d'arrêter WallpaperAgent, Finder ou l'ancien PoC.
+Ne pas lancer plusieurs versions en même temps. Le préflight de l'app refuse les
+anciens compagnons/providers et les providers issus d'un autre paquet. Les binaires
+historiques déjà installés n'acquièrent pas rétroactivement cette protection : leur
+retrait reste nécessaire. Aucun test ne nécessite d'arrêter WallpaperAgent ou Finder.
 
 Pour revenir : sélectionner un autre wallpaper dans les Réglages puis quitter
 l'app. Pour désenregistrer, utiliser `pluginkit -r` sur le chemin exact de l'extension.

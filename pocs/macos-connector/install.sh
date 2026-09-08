@@ -10,10 +10,7 @@ connector_identity="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$co
 test "$connector_identity" = org.wallpaperthemes.connectorpoc2
 codesign --verify --deep --strict "$connector_source"
 bash "$connector_root/pocs/macos-connector/test-native.sh" "$connector_source"
-if pgrep -x WallpaperConnector >/dev/null; then
-  echo 'Quit Wallpaper Connector before installation. No process was stopped.' >&2
-  exit 1
-fi
+"$connector_source/Contents/MacOS/WallpaperConnector" --preflight-install
 mkdir -p "$HOME/Applications/Wallpaper Themes" "$connector_root/dist/pocs/macos-connector"
 if test -e "$connector_destination"; then
   connector_backup="$(mktemp -d "$connector_root/dist/pocs/macos-connector/replaced.XXXXXX")"

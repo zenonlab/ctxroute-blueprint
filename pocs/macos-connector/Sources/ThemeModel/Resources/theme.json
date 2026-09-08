@@ -14,6 +14,6 @@
   ],
   "system_controls": {
     "placement": "top_left",
-    "items": ["motion", "audio", "interaction", "desktop", "settings"]
+    "items": ["audio", "desktop"]
   }
 }

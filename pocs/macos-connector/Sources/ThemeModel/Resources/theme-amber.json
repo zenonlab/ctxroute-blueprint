@@ -12,5 +12,5 @@
     {"id": "stone.b", "color": "EF8348", "phase": 0.333},
     {"id": "stone.c", "color": "C3573A", "phase": 0.666}
   ],
-  "system_controls": {"placement": "top_left", "items": ["motion", "audio", "interaction", "desktop", "settings"]}
+  "system_controls": {"placement": "top_left", "items": ["audio", "desktop"]}
 }

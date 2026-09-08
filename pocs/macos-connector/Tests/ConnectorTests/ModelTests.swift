@@ -4,6 +4,54 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testTransportNotificationsAreInjectedAfterWritesOnly() throws {
+        let recorder = SignalRecorder()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let box = try Mailbox(directory: root, onSignal: { recorder.append($0) })
+        let session = Session(themeID: "test")
+        try box.write(Command(theme: "test", instance: session.instance, generation: 0, action: .inspect))
+        try box.write(CatalogStatus(themes: [ProviderStatus(session: session, surfaces: 0)]))
+        _ = try box.command(); _ = try box.status()
+        XCTAssertEqual(recorder.values, [Mailbox.commandSignal, Mailbox.statusSignal])
+        // Default test mailbox must never invoke this notifier or a system notifier.
+        let isolated = try Mailbox(directory: root.appendingPathComponent("isolated"))
+        try isolated.write(CatalogStatus(themes: []))
+        XCTAssertEqual(recorder.values.count, 2)
+    }
+    func testReceiptSurvivesLifecyclePublicationAndExpires() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        var session = Session(themeID: "test")
+        let command = Command(theme: "test", instance: session.instance, generation: 0, action: .pause, now: now)
+        let receipt = session.apply(command, now: now)
+        for count in [2, 1, 0, 2] {
+            XCTAssertEqual(ProviderStatus(session: session, surfaces: count, now: now.addingTimeInterval(10)).receipt, receipt)
+        }
+        XCTAssertNil(ProviderStatus(session: session, surfaces: 2, now: now.addingTimeInterval(31)).receipt)
+        XCTAssertNil(ProviderStatus(session: Session(themeID: "test"), surfaces: 2, now: now).receipt)
+        XCTAssertEqual(session.generation, 1)
+    }
+    func testControlPresentationIsNotCapabilityAuthorization() throws {
+        let theme = try Theme.load()
+        XCTAssertEqual(theme.system_controls.items, ["audio", "desktop"])
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(theme)) as? [String: Any])
+        for items in [["desktop", "audio"], ["settings"]] {
+            json["system_controls"] = ["placement": "top_left", "items": items]
+            XCTAssertNoThrow(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
+        }
+        for items in [["shell"], ["audio", "audio"], []] {
+            json["system_controls"] = ["placement": "top_left", "items": items]
+            XCTAssertThrowsError(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
+        }
+    }
+    func testConcurrentPrototypePolicy() {
+        let app = "/Applications/Wallpaper Connector PoC 2.app"
+        let provider = app + "/Contents/Extensions/WallpaperProvider.appex/Contents/MacOS/WallpaperProvider"
+        let old = "/Applications/Old.app/Contents/MacOS/SurfaceProbe"
+        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, provider], installing: false, appPath: app), [old])
+        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, provider], installing: true, appPath: app), [old, provider])
+        XCTAssertTrue(LaunchPolicy.conflicts(paths: ["/System/Library/CoreServices/WallpaperAgent.app/Contents/MacOS/WallpaperAgent"], installing: true, appPath: app).isEmpty)
+        XCTAssertEqual(LaunchPolicy.conflicts(paths: [provider], installing: false, appPath: "/Other.app"), [provider])
+    }
     func testManifestAndInvalidInputs() throws {
         let theme = try Theme.load()
         XCTAssertEqual(theme.objects.count, 4)
@@ -90,4 +138,11 @@ final class ModelTests: XCTestCase {
             }
         }
     }
+}
+
+private final class SignalRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [String] = []
+    var values: [String] { lock.withLock { recorded } }
+    func append(_ value: String) { lock.withLock { recorded.append(value) } }
 }

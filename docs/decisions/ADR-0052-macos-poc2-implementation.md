@@ -37,6 +37,15 @@ génération, identité d'instance, état et quittance sont typés et relus ; un
 expire et une seule est en vol. Sans accès au groupe partagé, annoncer indisponible.
 Ce transport local expérimental n'est pas une adoption de production.
 
+Correctif de revue : la construction ad hoc ne qualifie pas l'accès App Group.
+Sans Team ID, le transport partagé est explicitement indisponible, sans tentative
+de contournement. Une identité présente ne vaut pas preuve d'accès du provider.
+Les mailboxes de tests n'émettent aucune notification Darwin par défaut ; seul
+`shared()` active les signaux système. Chaque session conserve sa dernière quittance
+30 secondes afin qu'une publication de cycle de surface ne l'efface pas.
+Installation et lancement refusent les compagnons historiques encore actifs ;
+un provider historique chargé est signalé comme conflit, jamais arrêté implicitement.
+
 Complément multithème : le catalogue énumère des manifestes embarqués, validés et
 uniquement locaux. Une session d'état est isolée par `theme_id` ; une surface
 WallpaperID garde son CAContext et remplace son arbre lors d'un changement de choix.
