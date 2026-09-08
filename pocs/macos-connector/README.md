@@ -7,6 +7,19 @@ classification conservatrice du fond Finder ; aucun réglage Finder automatique.
 
 ## Personnalisation locale — 8 septembre 2026
 
+Correctif du filtre Finder : l'élément directement pointé doit correspondre à
+`AXGroup → AXScrollArea → AXApplication`, signature mesurée dans le premier PoC
+([preuve](../../docs/pocs/macos-native-wallpaper.md)). L'ancien filtre exigeait
+`AXScrollArea` et rejetait cette cible avant le hit-test du thème. Une icône
+`AXImage`, un groupe dans une fenêtre ou une application tierce restent refusés ;
+aucune remontée depuis une icône vers un ancêtre admissible. Les rectangles des
+enfants gardent la priorité, et les erreurs AX restent non interactives.
+`test-native.sh` compile le vrai adaptateur et vérifie neuf cas de hiérarchie,
+sans lire ni manipuler le bureau. Ce test ne remplace pas la qualification native.
+Le lancement explicite `--diagnostics` trace au maximum 32 décisions de capture,
+filtrage et émission d'intention ; aucune coordonnée, aucun nom de fichier ou ID
+d'objet n'est journalisé. Le lancement normal n'active pas ces traces.
+
 Voir [ADR-0054](../../docs/decisions/ADR-0054-macos-theme-interaction.md).
 Le clic **droit** ouvre une fenêtre de personnalisation centrée, pas une barre à
 droite : nom, couleur, taille et application locale associée. Le clic gauche ouvre

@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import ApplicationServices
 import QuartzCore
+import os
 
 /// No overlay window, keyboard interception, frame polling or permission prompt.
 @MainActor final class DesktopInput {
@@ -12,6 +13,7 @@ import QuartzCore
     private var screensAwake = true
     private var sessionActive = true
     private var lifecycleObservers: [NSObjectProtocol] = []
+    private var traceBudget = CommandLine.arguments.contains("--diagnostics") ? 32 : 0
     var catalog: CatalogStatus?
     var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)?
     var installed: Bool { port.map { CGEvent.tapIsEnabled(tap: $0) } ?? false }
@@ -60,10 +62,11 @@ import QuartzCore
                     return input.consume(type, event)
                 }
                 return consumed ? nil : Unmanaged.passUnretained(event)
-            }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return }
+            }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else { trace("tap-create-failed"); return }
         port = tap; source = CFMachPortCreateRunLoopSource(nil, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        trace(installed ? "tap-enabled" : "tap-disabled")
     }
     func stop() {
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
@@ -72,6 +75,7 @@ import QuartzCore
     }
     private func consume(_ type: CGEventType, _ event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            trace("tap-disabled-by-system")
             router.detach(); captured = false; return false
         }
         if type == .leftMouseDragged || type == .rightMouseDragged {
@@ -81,6 +85,7 @@ import QuartzCore
         let down = type == .leftMouseDown || type == .rightMouseDown
         let button: PointerButton = type == .leftMouseDown || type == .leftMouseUp ? .left : .right
         guard screensAwake, sessionActive, AXIsProcessTrusted(), let (theme, layout, point) = target(at: event.location) else {
+            if down { trace("no-authorized-surface") }
             router.cancel()
             if !down {
                 let result = router.end(button: button, point: ScenePoint(x: 0, y: 0), hit: .unknown,
@@ -93,6 +98,7 @@ import QuartzCore
         let hit: SceneHit = FinderBackground.contains(event.location)
             ? ThemeLayout.hit(point, theme: theme, width: layout.width, height: layout.height,
                 elapsed: layout.time(at: CACurrentMediaTime())) : .native
+        if down { trace(hit == .native ? "finder-rejected" : "finder-background-accepted") }
         if down {
             if router.scene != layout.id || gestureTheme != theme.theme_id {
                 router.replaceScene(layout.id, objectIDs: Set(theme.objects.map(\.id)))
@@ -106,10 +112,17 @@ import QuartzCore
         let result = router.end(button: button, point: point, hit: hit, scene: layout.id, inputAuthorized: true)
         if result.consumed { captured = false }
         if let intent = result.intent {
+            trace("intent-dispatched")
             // UI activation and XPC are deliberately outside the tap callback.
             Task { @MainActor [weak self] in self?.onIntent?(intent, theme, layout) }
         }
         return result.consumed
+    }
+    private func trace(_ decision: String) {
+        guard traceBudget > 0 else { return }
+        traceBudget -= 1
+        // Fixed decision codes only: no coordinates, object IDs or desktop data.
+        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "input").notice("\(decision, privacy: .public)")
     }
     private func target(at point: CGPoint) -> (Theme, SurfaceLayout, ScenePoint)? {
         guard let catalog else { return nil }
@@ -132,9 +145,12 @@ import QuartzCore
     }
 }
 
-/// Conservative structural candidate: Finder's top-level desktop scroll area,
-/// not a Finder window, icon or descendant. Native qualification remains required.
-@MainActor private enum FinderBackground {
+/// Measured macOS desktop: AXGroup -> AXScrollArea -> AXApplication.
+/// Never promote an icon or a Finder window by walking upward to a matching group.
+@MainActor enum FinderBackground {
+    static func matches(bundle: String?, roles: [String]) -> Bool {
+        bundle == "com.apple.finder" && roles == [kAXGroupRole, kAXScrollAreaRole, kAXApplicationRole]
+    }
     static func contains(_ point: CGPoint) -> Bool {
         let started = CACurrentMediaTime()
         let system = AXUIElementCreateSystemWide()
@@ -144,13 +160,21 @@ import QuartzCore
               let target else { return false }
         AXUIElementSetMessagingTimeout(target, 0.003)
         var pid: pid_t = 0
-        guard AXUIElementGetPid(target, &pid) == .success,
-              NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.finder",
-              attribute(target, kAXRoleAttribute) as? String == kAXScrollAreaRole,
-              let parentValue = attribute(target, kAXParentAttribute),
-              CFGetTypeID(parentValue) == AXUIElementGetTypeID() else { return false }
-        let parent = unsafeDowncast(parentValue, to: AXUIElement.self)
-        guard attribute(parent, kAXRoleAttribute) as? String == kAXApplicationRole,
+        guard AXUIElementGetPid(target, &pid) == .success else { return false }
+        let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+        guard bundle == "com.apple.finder" else { return false }
+        var roles: [String] = [], current = target
+        for index in 0..<3 {
+            guard CACurrentMediaTime() - started < 0.018,
+                  let role = attribute(current, kAXRoleAttribute) as? String else { return false }
+            roles.append(role)
+            if index < 2 {
+                guard let parent = attribute(current, kAXParentAttribute),
+                      CFGetTypeID(parent) == AXUIElementGetTypeID() else { return false }
+                current = unsafeDowncast(parent, to: AXUIElement.self)
+            }
+        }
+        guard matches(bundle: bundle, roles: roles),
               let children = attribute(target, kAXChildrenAttribute) as? [AXUIElement], children.count <= 256 else { return false }
         for child in children {
             guard CACurrentMediaTime() - started < 0.018,
@@ -159,6 +183,8 @@ import QuartzCore
             var origin = CGPoint.zero, size = CGSize.zero
             guard AXValueGetValue(unsafeDowncast(positionValue, to: AXValue.self), .cgPoint, &origin),
                   AXValueGetValue(unsafeDowncast(sizeValue, to: AXValue.self), .cgSize, &size),
+                  origin.x.isFinite, origin.y.isFinite, size.width.isFinite, size.height.isFinite,
+                  size.width >= 0, size.height >= 0,
                   !CGRect(origin: origin, size: size).contains(point) else { return false }
         }
         return CACurrentMediaTime() - started < 0.020

@@ -1,5 +1,35 @@
 # Reprise de session — Wallpaper
 
+## Correctif Finder candidat — 8 septembre 2026, 19:47
+
+Cause localisée : `FinderBackground` exigeait directement AXScrollArea alors que
+la mesure documentée du premier PoC est AXGroup → AXScrollArea → AXApplication.
+Le filtre reconnaît désormais cette chaîne exacte, sans promouvoir les descendants
+d'icônes ; les enfants et leurs rectangles conservent la priorité. Neuf cas purs
+testent fond, icône, fenêtre, application tierce et signatures inconnues.
+Traces limitées à 32 codes fixes en mode explicite `--diagnostics` seulement.
+
+Candidat `build.g9pTbH` : build strict, signatures et catalogue natif passent ;
+31 XCTest passent ; `npm run verify` passe (code 0, log `/tmp/wallpaper-finder-verify.log`).
+**Installé à 19:49 après intervention utilisateur** : les deux premières tentatives
+étaient refusées car macOS recréait le provider. L'utilisateur a ensuite confirmé
+le choix temporaire d'un fond Apple. Le provider restant PID 92964 a été arrêté,
+le préflight a réussi, et l'ancien paquet a été conservé dans
+`dist/pocs/macos-connector/replaced.zr4JcI/previous-app.disabled`.
+Aucune suppression ni arrêt de service Apple. Agent corrigé PID 26766, job
+`agent.ZxiHIQ`, lancé avec diagnostic temporaire pour tracer les gestes.
+Journal : `Startup diagnostics=true accessibility=false` ; signature ad hoc modifiée.
+Une nouvelle confirmation est demandée pour renouveler uniquement l'autorisation
+du binaire corrigé. Ne pas reconstruire ensuite. Aucun clic réel validé sur ce build.
+Audit : code/tests et installation conformes ; autorisation et qualification native
+manquantes. AGENTS, CLAUDE et hooks inchangés. Le gate exige une annotation Archify
+pour le filtre : topologie inchangée, tag « Filtre Finder à qualifier ».
+Showcase 9/9, zéro erreur/avertissement ; source SHA-256
+`ce7da6751c15818f03ef0106c5de40b25e65d6262051c595ad33c320fa539f48`, HTML SHA-256
+`0d4b87c4b019452aeee4a09cf6c0e2677269e42694a7d3394a78adea6285cb73`.
+Containment quatre résolutions clair/sombre validé ; captures sombres 1440×900 et
+2048×1320 inspectées. Interface fixe du viewer en anglais, contenu rédigé en français.
+
 ## Permission renouvelée — 8 septembre 2026, 19:38
 
 Après accord explicite (« go ») et authentification macOS réalisée par l'utilisateur,
