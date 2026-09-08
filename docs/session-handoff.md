@@ -1,5 +1,34 @@
 # Reprise de session — Wallpaper
 
+## Installation effective — 8 septembre 2026, 19:30
+
+Le candidat `build.QjikMP` est maintenant **installé** dans
+`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
+Cette preuve remplace le statut « Non installé » des étapes historiques ci-dessous.
+Le job agent a été arrêté et seul notre provider PID 72851, identifié par son
+exécutable installé, a reçu SIGTERM. Le préflight normal a ensuite réussi.
+Aucun processus Finder ou WallpaperAgent Apple n'a été arrêté.
+L'ancien paquet est conservé dans
+`dist/pocs/macos-connector/replaced.oHAMYe/previous-app.disabled` ; aucune suppression.
+
+Relance normale sans diagnostic : agent PID 85230, job `agent.DOOvFJ`.
+Le journal à 19:30:35 indique **`accessibility=false`** : les clics restent bloqués.
+À 19:30:50, le nouveau provider PID 85385 initialise deux surfaces natives et
+applique `configure`, génération 1. L'agent confirme la quittance correspondante.
+La quittance affiche toutefois `surfaces=0` : elle ne constitue pas une preuve
+de rendu visible ou de géométrie interactive correctement reçue par l'agent.
+Ne pas annoncer une validation visuelle ou des gestes à partir de ces seuls logs.
+
+Une confirmation distincte est en attente pour retirer uniquement l'entrée
+Accessibilité périmée de Wallpaper Connector Agent et réajouter le binaire installé.
+Aucune permission n'a été modifiée dans cette étape. Conserver ce même binaire
+pendant la qualification ; ne pas reconstruire après une nouvelle autorisation.
+Prochaine action : accord pour renouveler cette entrée, puis vérifier le démarrage
+`accessibility=true` et tester les gestes réels avec priorité aux icônes Finder.
+Le toggle fichiers demeure incomplet (ouvre les Réglages) et les fixtures audio
+sont silencieuses. La structure séparée ne vaut pas validation fonctionnelle.
+Cette étape ne change ni le code ni les frontières : aucun diagramme à modifier.
+
 ## Demande courante — boutons carrés Lucide, 8 septembre 2026
 
 L'utilisateur rejette le résultat interactif et demande uniquement des icônes dans
