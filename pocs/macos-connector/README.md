@@ -23,7 +23,7 @@ natives ou inconnues ne sont jamais capturées au début d'un geste. Le raccord
 aux événements macOS et l'exécution autorisée des intentions restent absents.
 Les tests synthétiques ne prouvent donc pas la priorité Finder sur le vrai bureau.
 
-Le code compile avec Swift 6 strict ; les 17 tests XCTest passent. Les deux
+Le code compile avec Swift 6 strict ; les 19 tests XCTest passent. Les deux
 bundles sont signés ad hoc et leur manifeste embarqué est identique. Ce résultat
 n'est **pas** une qualification du wallpaper dans WallpaperAgent : activation,
 Spaces, animation visible, commandes interprocessus et énergie restent à vérifier
@@ -73,6 +73,20 @@ Depuis la racine du dépôt :
 swift test --package-path pocs/macos-connector --scratch-path dist/pocs/macos-connector/swift-build
 bash pocs/macos-connector/build.sh
 ```
+
+Le mode ci-dessus reste ad hoc et sans transport partagé. Pour préparer une preuve
+signée, choisir une identité existante avec `security find-identity -v -p codesigning`,
+puis passer son empreinte SHA-1 (40 caractères hexadécimaux) et son Team ID :
+`bash pocs/macos-connector/build.sh --sign <empreinte> <TEAMID>`.
+Les chevrons désignent des arguments à remplacer, pas une commande prête à exécuter.
+L'identité doit être disponible dans le trousseau ; le script ne crée/importera aucun
+certificat. Le Team ID obtenu après signature est vérifié dans les deux bundles.
+Le groupe signé est `<TEAMID>.org.wallpaperthemes.connectorpoc2`, selon la
+[convention macOS documentée par Apple](https://developer.apple.com/documentation/xcode/accessing-app-group-containers).
+Le runtime exige exactement ce groupe dans ses droits signés. Aucun repli ad hoc
+en cas d'erreur et aucune migration automatique du groupe expérimental précédent.
+Le chemin signé reste non éprouvé sur cette machine faute d'identité disponible :
+seule une quittance réelle du provider pourra qualifier M2-06.
 
 Le build affiche le chemin du nouveau `.app` dans `dist/pocs/macos-connector/build.*`.
 Il ne remplace aucun build, n'installe rien et ne change pas le wallpaper actif.

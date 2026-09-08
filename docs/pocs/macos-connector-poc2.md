@@ -148,7 +148,12 @@ pour éviter de transmettre un événement orphelin. Le connecteur doit requalif
 la cible et l'autorisation aux deux extrémités ; `unknown` ne vaut jamais `empty`.
 Le routage n'est pas branché au provider : aucun tap, lancement d'app, éditeur,
 audio ou réglage Finder n'est activé par ces tests. M2-04/05 et D1 natif restent
-non qualifiés. Le total courant est 17 XCTest, sans notifications système de test.
+non qualifiés. Le total courant est 19 XCTest, sans notifications système de test.
+Le build accepte désormais `--sign <empreinte SHA-1> <TEAMID>` ; arguments incomplets,
+identité absente ou signature incohérente sont des erreurs, sans repli ad hoc.
+Le groupe macOS préfixé par le Team ID est généré dans les droits des deux bundles
+et vérifié dans les droits signés par le runtime. Le succès de ce chemin signé reste
+non testé faute d'identité disponible ; il ne lève pas encore le blocage M2-06.
 Cette implémentation reste dans le modèle existant : aucun contrat de transport,
 dépendance ou frontière ne change. Le dataflow de personnalisation précise seulement
 que la composition du thème possède aussi la politique de gestes.

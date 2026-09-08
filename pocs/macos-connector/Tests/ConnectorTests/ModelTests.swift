@@ -4,6 +4,33 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testBuildRejectsIncompleteOrMalformedSigningArguments() throws {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("build.sh")
+        for args in [["--sign"], ["--unknown"], ["--sign", "not-a-fingerprint", "AB123CD456"],
+                     ["--sign", String(repeating: "0", count: 40), "../other"]] {
+            let process = Process(); let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = [script.path] + args
+            process.standardOutput = output; process.standardError = output
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            XCTAssertEqual(process.terminationStatus, 2)
+            XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("no build created"))
+        }
+    }
+    func testSharedGroupMustMatchSignedTeamExactly() throws {
+        let group = "AB123CD456.org.wallpaperthemes.connectorpoc2"
+        XCTAssertEqual(try Mailbox.sharedGroup(team: "AB123CD456", entitlements: [group]), group)
+        for team in ["", "adhoc", "../escape", "ab123cd456", "AB123CD456\n"] {
+            XCTAssertThrowsError(try Mailbox.sharedGroup(team: team, entitlements: [group]))
+        }
+        for groups in [[], ["group.org.wallpaperthemes.connectorpoc2"],
+                       ["ZZ123CD456.org.wallpaperthemes.connectorpoc2"], [group, group]] {
+            XCTAssertThrowsError(try Mailbox.sharedGroup(team: "AB123CD456", entitlements: groups))
+        }
+    }
     func testTransportNotificationsAreInjectedAfterWritesOnly() throws {
         let recorder = SignalRecorder()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

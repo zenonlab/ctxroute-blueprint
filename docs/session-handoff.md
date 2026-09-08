@@ -1,6 +1,30 @@
 # Reprise de session — Wallpaper
 
-## État courant — nettoyage demandé le 8 septembre 2026
+## État courant — préparation de signature, 8 septembre 2026
+
+Défaut corrigé : `build.sh` imposait l'ad hoc et le groupe était figé. Le mode
+`--sign <empreinte SHA-1> <TEAMID>` sélectionne explicitement une identité existante,
+génère le même groupe macOS préfixé par le Team ID dans les deux bundles et vérifie
+leurs signatures. `Mailbox.shared()` vérifie le groupe dans les droits signés.
+Aucun nouveau droit, serveur, overlay ou contournement de sandbox ajouté.
+
+19 XCTest passent, dont cohérence groupe/équipe et refus des paramètres de signature.
+Le refus d'une identité absente a aussi été vérifié (code 2, aucun repli).
+Build ad hoc non installé : `dist/pocs/macos-connector/build.bJZCc6/Wallpaper Connector PoC 2.app`.
+Compilation stricte, catalogue Apple trois thèmes, signatures/plists passent.
+Le chemin signé et la preuve bouton → animation native restent BLOQUÉS faute
+d'identité valide disponible. Ne pas confondre cette préparation avec M2-06 validé.
+Une question sur l'identité Apple disponible a été envoyée ; aucun secret demandé.
+Audit de clôture : CONFORME — périmètre et doctrine inchangés, aucun fichier supprimé,
+aucun réglage/permission OS modifié ; revue du diff, 19 XCTest et build ad hoc réussis.
+`npm run verify` sort à 0. Schéma connecteurs livré (showcase 9/9 sans erreur ni
+avertissement), containment quatre résolutions et captures sombres 1440×900/2048×1320
+inspectées ; les reçus SHA-256 figurent dans `architecture/platform-connectors.md`.
+MANQUE — signature Apple effective, quittance et animation natives ; le trousseau
+confirme toujours zéro identité valide. Les deux anciennes extensions subsistent,
+aucun compagnon n'est relancé. N/A — nouveau service/dépendance ou conversion ROM.
+
+## Historique — nettoyage et politique de gestes, 8 septembre 2026
 
 Correctifs de revue en source : préflight anti-coexistence, tests de transport sans
 notifications globales, conservation de quittance 30 secondes, diagnostic explicite

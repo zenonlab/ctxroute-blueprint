@@ -40,6 +40,14 @@ Ce transport local expérimental n'est pas une adoption de production.
 Correctif de revue : la construction ad hoc ne qualifie pas l'accès App Group.
 Sans Team ID, le transport partagé est explicitement indisponible, sans tentative
 de contournement. Une identité présente ne vaut pas preuve d'accès du provider.
+Le build accepte une identité explicitement choisie (empreinte SHA-1) et son Team ID,
+vérifie sa présence avant compilation et contrôle la signature obtenue dans chaque
+bundle. Le groupe macOS est alors `<TEAMID>.org.wallpaperthemes.connectorpoc2` ;
+le runtime vérifie ce même groupe dans ses droits signés avant accès. Le mode ad hoc
+reste destiné aux tests sans transport ; aucun repli ad hoc après échec de signature.
+Cette convention macOS sans profil de groupe est documentée par
+[Apple](https://developer.apple.com/documentation/xcode/accessing-app-group-containers).
+Elle ne garantit ni l'acquisition du provider privé ni l'accès partagé à l'exécution.
 Les mailboxes de tests n'émettent aucune notification Darwin par défaut ; seul
 `shared()` active les signaux système. Chaque session conserve sa dernière quittance
 30 secondes afin qu'une publication de cycle de surface ne l'efface pas.
