@@ -99,12 +99,13 @@ pas inventé en modifiant silencieusement l'expérience de l'auteur.
 
 Le chemin retenu par [ADR-0048](../decisions/ADR-0048-native-wallpaper-dynamic-object-plane.md)
 sépare le wallpaper natif complet et le calcul de hit-test. L'extension possède tous
-les pixels du décor et des objets ainsi que leurs animations. Lors d'un clic global
-observé passivement, le compagnon évalue la même fonction de transformation au temps
-monotone courant puis teste les coordonnées, sans posséder de second état de course.
+les pixels du décor et des objets ainsi que leurs animations. Lors d'un clic global,
+le compagnon évalue la même fonction de transformation au temps monotone courant puis
+teste les coordonnées, sans posséder de second état de course. Son `CGEventTap` actif
+supprime uniquement un clic confirmé sur un objet ; les autres événements sont inchangés.
 Aucune fenêtre ne suit les objets et une grande surcouche plein écran est interdite.
 
-Le moniteur est suspendu avec la session ou les écrans sans faire disparaître ni
+Le tap est suspendu avec la session ou les écrans sans faire disparaître ni
 recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection
 d'un sous-maillage 3D utilise la même identité stable. La nature du renderer ne
 change ni les liaisons de session, ni l'ordre de formation, ni les intentions UI.

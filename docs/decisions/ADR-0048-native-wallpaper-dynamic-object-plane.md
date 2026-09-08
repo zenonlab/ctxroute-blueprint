@@ -32,9 +32,8 @@ Retenir deux plans aux responsabilités asymétriques :
 
 1. l'extension wallpaper possède le rendu visible, la piste, les véhicules et leurs
    animations ; aucun pixel d'objet n'est dessiné par le compagnon ;
-2. un processus compagnon installe seulement un moniteur global passif des clics,
-   évalue le hit-test à l'instant de l'événement et ouvre le panneau natif demandé
-   après sélection ;
+2. un processus compagnon installe un `CGEventTap` actif, évalue le hit-test à
+   l'instant de l'événement et ouvre le panneau natif demandé après sélection ;
 3. le thème définit une fonction déterministe contenant identité, position et
    orientation normalisées. Le wallpaper possède l'animation ; le compagnon évalue
    seulement la projection au temps monotone courant et reproduit la progression
@@ -45,9 +44,10 @@ Retenir deux plans aux responsabilités asymétriques :
 5. en mode wallpaper natif, aucune fenêtre ne suit les objets. Le moniteur est retiré
    lors de la veille, d'une session inactive ou de l'arrêt du compagnon. Le fond natif
    reste géré par macOS ;
-6. le moniteur ne consomme ni ne réinjecte l'événement système. Aucune fenêtre
-   transparente plein écran et aucun polling d'entrée n'est ajouté. Les exigences
-   réelles de confidentialité macOS restent à qualifier sur une installation propre.
+6. le tap retourne `nil` uniquement pour un clic confirmé sur un objet afin d'empêcher
+   l'action « cliquer sur le fond pour afficher le bureau ». Tous les autres événements
+   sont restitués inchangés. Aucune fenêtre transparente plein écran et aucun polling
+   d'entrée n'est ajouté ; ce mode exige l'autorisation Accessibilité macOS.
 
 Le mode `desktop --split-input --overlay-only` matérialise la partie hit-test sans
 redessiner le fond, les objets ou des fenêtres mobiles. Le mode `desktop --split-input` historique reste une sonde
@@ -61,11 +61,11 @@ Leur rendu futur est remplaçable sans changer la logique de formation. Le POC a
 utilise quatre véhicules vectoriels originaux rendus par Core Animation dans
 l'extension ; aucun asset de jeu.
 
-Le moniteur passif voit aussi un clic destiné à une icône Finder. Tant que le compagnon
-ne sait pas exclure une icône superposée, il peut déclencher simultanément l'action du
-wallpaper et celle de Finder. Le test valide architecture, déterminisme et absence de
-fenêtre mobile ; il ne qualifie pas encore la priorité d'une icône native, les droits
-de confidentialité, Mission Control, Spaces réels ou le multi-écran.
+Le tap actif supprimerait aussi un clic destiné à une icône Finder superposée. Tant
+que le compagnon ne sait pas exclure cette icône avant de consommer l'événement, le
+wallpaper prendrait incorrectement la priorité. Le test valide architecture,
+déterminisme et absence de fenêtre mobile ; il ne qualifie pas encore la priorité
+d'une icône native, Mission Control, Spaces réels ou le multi-écran.
 
 Le POC empaquette encore deux fixtures adaptées à leurs schémas respectifs :
 `interactive-theme.json` pour l'extension et `formation-theme.json` pour la sonde.
@@ -74,5 +74,5 @@ n'est pas une source unique vérifiée. La production devra générer les deux v
 un manifeste canonique ou leur appliquer un contrôle de cohérence au packaging.
 
 Une qualification OS ultérieure devra ajouter le filtrage des fenêtres et icônes
-prioritaires, puis mesurer le coût au repos du moniteur passif. Si macOS exige une
-permission que le produit refuse de demander, l'interaction devra devenir modale.
+prioritaires, puis mesurer le coût au repos du tap actif. Si l'utilisateur refuse
+l'autorisation Accessibilité, l'interaction reste désactivée et le wallpaper continue.

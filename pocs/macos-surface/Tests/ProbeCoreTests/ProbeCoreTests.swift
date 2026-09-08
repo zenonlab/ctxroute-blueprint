@@ -192,6 +192,17 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertLessThan(distances.map { abs($0 - average) }.max()!, average * 0.02)
     }
 
+    func testFormationHitTestSelectsOnlyCurrentObjectBounds() throws {
+        let engine = FormationEngine(theme: try decodedFormationTheme())
+        let object = engine.snapshot(phaseSeconds: 1.25).objects[2]
+        XCTAssertEqual(engine.hitTest(normalizedX: object.centerX, normalizedY: object.centerY,
+                                      halfWidth: 0.04, halfHeight: 0.04,
+                                      phaseSeconds: 1.25), object.id)
+        XCTAssertNil(engine.hitTest(normalizedX: 0.5, normalizedY: 0.5,
+                                    halfWidth: 0.01, halfHeight: 0.01,
+                                    phaseSeconds: 1.25))
+    }
+
     func testFormationThemeRejectsDuplicateIdentity() {
         let invalid = Data("""
         {"schemaVersion":1,"track":{"centerX":0.5,"centerY":0.5,"radiusX":0.3,"radiusY":0.2,"periodSeconds":4},

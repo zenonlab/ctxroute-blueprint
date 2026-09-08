@@ -102,6 +102,20 @@ public struct FormationEngine: Sendable {
         }
         return FormationSnapshot(phaseSeconds: safePhase, objects: objects)
     }
+
+    public func hitTest(normalizedX: Double, normalizedY: Double,
+                        halfWidth: Double, halfHeight: Double,
+                        phaseSeconds: Double) -> String? {
+        guard normalizedX.isFinite, normalizedY.isFinite,
+              halfWidth.isFinite, halfHeight.isFinite,
+              halfWidth > 0, halfHeight > 0 else { return nil }
+        return snapshot(phaseSeconds: phaseSeconds).objects.compactMap { object -> (String, Double)? in
+            let deltaX = abs(object.centerX - normalizedX)
+            let deltaY = abs(object.centerY - normalizedY)
+            guard deltaX <= halfWidth, deltaY <= halfHeight else { return nil }
+            return (object.id, hypot(deltaX / halfWidth, deltaY / halfHeight))
+        }.min { $0.1 < $1.1 }?.0
+    }
 }
 
 /// Mirrors Core Animation's paced traversal of an ellipse without querying its presentation layer.

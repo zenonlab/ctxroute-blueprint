@@ -6,8 +6,8 @@ Après constat que la première couche AppKit dessinait les véhicules devant Fi
 la version 11 déplace tous leurs pixels dans `InteractiveDiagnostic`, au sein de
 l'extension native. Le thème externe décrit une piste elliptique et quatre véhicules
 de sessions ; Core Animation possède leurs trajectoires, orientations et pause.
-Le compagnon séparé ne doit fournir que des hit-boxes transparentes synchronisées
-sur l'uptime monotone et un panneau natif après sélection.
+Le compagnon séparé ne dessine aucun objet : son `CGEventTap` synchronisé sur l'uptime
+monotone effectue le hit-test au clic et ouvre un panneau natif après sélection.
 
 Les validations isolées passent : 18 contrôles d'asset, 21 contrôles de calques
 incluant les quatre animations, trois snapshots 1200×780 distincts et 19 contrôles
