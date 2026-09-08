@@ -2,6 +2,7 @@ import { createCatalogueApp } from './catalogue/catalogue-routes';
 import { createCoverMediaApp } from './media/cover-routes';
 import { createPublicReleaseApp } from './releases/public-release-routes';
 import { createCollectiveReviewApp } from './reviews/collective-routes';
+import { createFavoriteCollectiveApp } from './reviews/favorite-collective-routes';
 import { createWorkerServices, type WorkerRuntime } from './composition';
 import { Hono } from 'hono';
 
@@ -17,6 +18,7 @@ app.use('*', async (context, next) => {
 });
 app.route('/', createCatalogueApp());
 app.route('/', createCollectiveReviewApp());
+app.route('/', createFavoriteCollectiveApp());
 app.route('/', createCoverMediaApp());
 app.route('/', createPublicReleaseApp());
 app.notFound((context) => {

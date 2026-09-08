@@ -67,6 +67,15 @@ rejet. Lookup groupé indexé, owner prioritaire, aucun N+1 ou scan non borné.
 
 ## Conséquences
 
+Le protocole de résolution v2 reste distinct des anciennes associations v1.
+La migration 0004 ajoute des tables préfixées `favorite_`; le retour au Worker
+précédent laisse ces tables intactes. Chaque owner conserve un choix courant
+par empreinte et média, et un journal versionné de décisions lié aux reçus.
+Des compteurs d'identités confirmées sont entretenus dans le même batch que
+les choix personnels, pour borner les lookups indépendamment du nombre de
+propriétaires. Un conflit entre identités confirmées produit un MISS partagé,
+sans écraser un choix personnel. Aucun calcul de popularité ne résout ce conflit.
+
 Le [plan canonique v3](../systems/favorite-resolution-correction-plan.md)
 définit les tables logiques, requêtes, index et migrations. Les tests locaux
 prouvent isolation, anti-rejeu, quotas, concurrence et plans SQL. Révocation

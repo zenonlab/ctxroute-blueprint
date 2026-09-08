@@ -56,7 +56,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync : IDs fragmentés, digest puis manifeste; reprise locale de publication/hydratation. Lookup HTTP owner-scoped avant recherche."
+        "note": "Sync : IDs et manifeste vérifiés. HTTP v2 : lots de 50 clés, choix owner, confirmations distinctes et reçus SQL atomiques."
       }
     ]
   },

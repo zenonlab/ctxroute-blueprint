@@ -43,7 +43,7 @@ type CollectiveIdentity =
   | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND' }
   | { readonly kind: 'RESOLVED'; readonly candidate: ProviderCandidate; readonly references: readonly FavoritePublicReference[]; readonly scope: 'owner' | 'shared' };
 
-export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollectiveLookupPort | undefined, artifact: FavoriteParseArtifact, hydration: FavoriteProviderHydrationPorts): Promise<CollectiveIdentity> {
+export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollectiveLookupPort | undefined, artifact: FavoriteParseArtifact, hydration: FavoriteProviderHydrationPorts, ownerOnly = false): Promise<CollectiveIdentity> {
   if (port === undefined) return { kind: 'MISS' };
   try {
     const key = await favoriteCollectiveKey(artifact);
@@ -51,6 +51,7 @@ export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollective
     const result = results[0];
     if (result?.fingerprint !== key.fingerprint) throw new Error('Collective lookup correlation failed.');
     if (result.kind === 'MISS') return { kind: 'MISS' };
+    if (ownerOnly && result.scope !== 'owner') return { kind: 'MISS' };
     const priorities = result.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
     const provider = priorities.find((value) => result.references.some((reference) => reference.provider === value));
     const reference = result.references.find((value) => value.provider === provider);

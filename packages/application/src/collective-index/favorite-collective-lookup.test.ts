@@ -12,6 +12,13 @@ const unused = { hydrate: async () => { throw new Error('unrouted provider'); } 
 const hydration = { anilist: { hydrate: async () => candidate }, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused };
 
 describe('minimal collective lookup boundary', () => {
+  it('allows only an owner preference to settle a local ambiguity', async () => {
+    const key = await favoriteCollectiveKey(artifact);
+    const references = [{ provider: 'anilist' as const, externalId: '1' }];
+    const port = { lookup: async () => [{ fingerprint: key.fingerprint, kind: 'FOUND' as const, scope: 'shared' as const, mediaKind: 'ANIME' as const, references }] };
+    expect(await resolveFavoriteCollectiveIdentity(port, artifact, hydration, true)).toEqual({ kind: 'MISS' });
+    expect(await resolveFavoriteCollectiveIdentity(port, artifact, hydration)).toMatchObject({ kind: 'RESOLVED', scope: 'shared' });
+  });
   it('hashes title, type and season without sending private fields', async () => {
     const key = await favoriteCollectiveKey(artifact);
     expect(key).toEqual({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u), mediaKind: 'ANIME', parserVersion: artifact.parserVersion, siteRulesVersion: artifact.sourceAdapterVersion });

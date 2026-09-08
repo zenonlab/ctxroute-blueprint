@@ -149,12 +149,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const local = await readLocalFavoriteIdentity(dependencies.storage, artifact, matchQuery);
-  if (local.kind === 'AMBIGUOUS') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
-      candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, recordedAt: dependencies.now(),
-    });
-    return 'completed';
-  }
   if (local.kind === 'MATCH') {
     const cachedAt = local.work.hydration?.hydratedAt;
     const fresh = freshHydration(cachedAt, dependencies.now());
@@ -183,7 +177,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     return 'completed';
   }
-  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration);
+  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS');
   if (collective.kind === 'RETRYABLE') return retryClaim(dependencies, task, token, new Date(Math.max(collective.retryAt ?? 0, timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs)).toISOString());
   if (collective.kind === 'REVIEW_REQUIRED') {
     await persistFavoriteResolutionCompletion(dependencies, task, token, collective, `review:collective-${collective.reason.toLowerCase()}`);
@@ -192,6 +186,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   if (collective.kind === 'RESOLVED') {
     if (hasExactBlockedProviderTaxonomy(collective.candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, collective.candidate, undefined, { references: collective.references });
+    return 'completed';
+  }
+  if (local.kind === 'AMBIGUOUS') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
+      candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, recordedAt: dependencies.now(),
+    });
     return 'completed';
   }
   const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);

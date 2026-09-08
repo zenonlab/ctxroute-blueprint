@@ -1,6 +1,7 @@
 import {
   CloudflareCoverImageAdapter,
   D1CollectiveIndexAdapter,
+  D1FavoriteCollectiveAdapter,
   D1PublicCatalogueAdapter,
   R2CoverMasterReadAdapter,
   R2PublicReleaseObjectAdapter,
@@ -8,6 +9,7 @@ import {
 } from '@tobirink/adapters-cloudflare';
 import type {
   CollectiveIndexDependencies,
+  FavoriteCollectiveServicePort,
   CoverImageRenderPort,
   CoverMasterReadPort,
   PublicCatalogueReadPort,
@@ -17,6 +19,7 @@ import type { CloudPolicy } from './cloud-policy';
 import { cloudPolicy } from './cloud-policy';
 
 export interface WorkerServices {
+  favoriteCollective: FavoriteCollectiveServicePort;
   catalogue: PublicCatalogueReadPort;
   collective: CollectiveIndexDependencies & { dailyQuota: number };
   coverImages: CoverImageRenderPort;
@@ -39,6 +42,7 @@ function dailyQuota(value: string): number {
 
 export function createWorkerServices(bindings: Env): WorkerServices {
   return {
+    favoriteCollective: new D1FavoriteCollectiveAdapter(bindings.COLLECTIVE_DB),
     catalogue: new D1PublicCatalogueAdapter(bindings.COLLECTIVE_DB),
     collective: {
       clock: { now: () => new Date().toISOString() },

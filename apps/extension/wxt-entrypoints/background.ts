@@ -13,6 +13,8 @@ import {
   WebExtensionQuickPreferencesAdapter,
   WebExtensionProviderIdentitySyncAdapter,
   WebExtensionProviderIdentitySyncStateAdapter,
+  WebExtensionFavoriteOwnerStateAdapter,
+  HttpFavoriteCollectiveAdapter,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
@@ -28,6 +30,7 @@ import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } f
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
+import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -50,6 +53,7 @@ export default defineBackground({
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
+    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(browser.storage.local, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
     const identitySync = new WebExtensionProviderIdentitySyncAdapter(browser.storage.sync, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
       checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
@@ -59,11 +63,12 @@ export default defineBackground({
       storage: privateStorage.storage,
       sync: identitySync,
     });
-    const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
+      beforeInventory: async () => { await ownerRuntime?.maintain().catch(() => undefined); },
+      collective: ownerRuntime,
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
@@ -72,7 +77,7 @@ export default defineBackground({
       identityRecovery,
       now,
       outbox: resolutionOutbox,
-      sourceAdapters: favoriteSourceAdapters,
+      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
     });
@@ -106,6 +111,18 @@ export default defineBackground({
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
       const parsed = extensionMessageSchema.safeParse(value);
       if (!parsed.success) return { error: 'invalid-message', ok: false };
+      if (parsed.data.type === 'owner.action') {
+        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
+        if (ownerRuntime === undefined) return { ok: true, status: 'unavailable' };
+        try {
+          const action = parsed.data.action;
+          if (action.kind === 'enable') await ownerRuntime.enable();
+          if (action.kind === 'revoke') await ownerRuntime.revoke();
+          if (action.kind === 'redeem') await ownerRuntime.redeem(action.invitation);
+          if (action.kind === 'pair') return { ok: true, status: await ownerRuntime.status(), invitation: await ownerRuntime.pair() };
+          return { ok: true, status: await ownerRuntime.status() };
+        } catch { return { ok: false, error: 'owner-operation-unavailable' }; }
+      }
       if (parsed.data.type === 'webbridge.handshake') {
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }

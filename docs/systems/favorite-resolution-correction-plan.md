@@ -255,6 +255,45 @@ de migration. Le binding D1 existe uniquement dans la composition Worker.
 Le code d'authentification est testé avec secrets synthétiques; l'utilisation
 de credentials réels reste une opération explicitement autorisée séparément.
 
+Implémentation v2 : `/v2/favorites/owners`, `/pairings/redeem`, `/batches` et
+`/rules` sous le même préfixe. L'extension propose un consentement décoché,
+une invitation à usage unique de cinq minutes et une révocation de tous les
+appareils. Seule sa page options peut émettre ces commandes; WebBridge ne
+connaît ni cette API locale ni les credentials. Le Worker conserve seulement
+les empreintes de tokens de 32 octets aléatoires; 16 installations au plus
+peuvent être appairées à un propriétaire. Les invitations consommées et les
+décisions historiques ne sont pas supprimées.
+
+La migration `0004_favorite_owner_resolution.sql` sépare `favorite_owners`,
+`favorite_installations`, `favorite_pairings`, `favorite_keys`,
+`favorite_choices`, `favorite_confirmations`, `favorite_receipts`,
+`favorite_decisions`, `favorite_daily_quotas` et `favorite_site_rules`.
+Les triggers maintiennent les compteurs de confirmations dans le batch du
+choix. Un upsert automatique ne remplace jamais un choix humain confirmé.
+La clé SQL dérive de la version de normalisation, du média et de l'empreinte;
+les versions parser/règles restent une provenance dans la clé et le journal,
+sans cloisonner une même identité selon le site d'origine du favori.
+Le lookup consulte un choix personnel ou au plus deux identités partagées
+actives via index couvrant. Plusieurs identités actives interdisent le choix
+partagé, même si l'une a plus de confirmations. Un choix owner peut résoudre
+une ambiguïté locale; un résultat partagé ne la départage pas.
+
+Un lot de 50 clés utilise cinq statements D1, lectures d'authentification et
+de reçu comprises; sa projection est calculée dans le même batch que le nonce.
+Les tests mesurent les rows_read et vérifient les plans d'index. Les champs
+additionnels privés, cookies de session et corps de plus de 64 Kio sont refusés.
+Le lecteur HTTP borne aussi les flux sans Content-Length avant assemblage.
+
+Le background prépare les lookups par pages de 50 sources et conserve leur
+cache privé : MISS 15 minutes, FOUND 24 heures, 10 000 clés au maximum.
+Les changements de choix invalident la clé concernée. Son outbox local garde
+nonce et commande avant effet; activation, appairage, contribution et révocation
+reprennent après redémarrage. Les règles validées restent utilisables hors ligne.
+Les règles publiées en SQL sont vérifiées par SHA-256; leur publication reste
+une opération de la gate, sans route de mutation de schéma ou de règles.
+Le rollback opérationnel rétablit le Worker précédent et laisse la migration
+additive en place, sans DROP ni perte du catalogue existant.
+
 ## Versions et migration locale
 
 Versions indépendantes : schéma d'export, stockage, parser, progression,

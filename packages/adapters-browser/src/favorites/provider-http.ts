@@ -64,8 +64,20 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
     if (contentType !== undefined && contentType !== 'application/json' && !contentType.endsWith('+json')) throw new Error('Favorite provider response must be JSON.');
     const declaredLength = Number(response.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
-    const text = await response.text();
-    if (new TextEncoder().encode(text).length > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
+    const reader = response.body?.getReader();
+    if (reader === undefined) throw new Error('Favorite provider response has no body.');
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let text = ''; let bytes = 0;
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        bytes += chunk.value.byteLength;
+        if (bytes > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      text += decoder.decode();
+    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
     return Object.freeze({ digest: digestText(text), value: schema.parse(JSON.parse(text)) });
   } finally {
     clearTimeout(timer);

@@ -2,6 +2,7 @@ import { defineConfig } from 'wxt';
 import extensionPackage from './package.json' with { type: 'json' };
 
 const siteOrigin = process.env.WXT_PUBLIC_SITE_ORIGIN?.trim();
+if (siteOrigin && (new URL(siteOrigin).protocol !== 'https:' || new URL(siteOrigin).origin !== siteOrigin)) throw new Error('WXT_PUBLIC_SITE_ORIGIN must be an exact HTTPS origin.');
 const externallyConnectableMatches = siteOrigin ? [`${siteOrigin}/*`] : [];
 
 const extensionIcons = {
@@ -32,6 +33,7 @@ export default defineConfig({
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',
+      ...externallyConnectableMatches,
     ],
     icons: extensionIcons,
     name: 'Tobirink',

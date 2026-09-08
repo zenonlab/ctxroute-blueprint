@@ -6,6 +6,7 @@ import type { BookmarkMutation } from '@tobirink/adapters-browser';
 import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
 
 export interface FavoriteResolutionRuntimeDependencies {
+  readonly beforeInventory?: () => Promise<void>;
   readonly collective?: FavoriteCollectiveLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
@@ -43,6 +44,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let mutationQueued = false;
   const runOnce = () => dependencies.ensureReady()
     .then(async () => {
+        await dependencies.beforeInventory?.();
         const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
         const checkpoint = stored?.status === 'active'
           ? stored

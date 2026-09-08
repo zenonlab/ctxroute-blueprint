@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
 
 describe('FavoriteProviderRateGate', () => {
+  it('cancels an oversized chunked body before buffering the entire response', async () => {
+    const cancel = vi.fn(); let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({ pull(controller) { pulls += 1; controller.enqueue(new Uint8Array(40000)); }, cancel });
+    await expect(readFavoriteProviderJson(async () => new Response(body), 'https://fixtures.tobirink.invalid/provider', {}, z.strictObject({}))).rejects.toThrow('too large');
+    expect(cancel).toHaveBeenCalledOnce(); expect(pulls).toBeLessThanOrEqual(3);
+  });
   it('Q-06 persists the exact next reservation before the provider effect', async () => {
     let stored = 12_000;
     let current = 10_000;

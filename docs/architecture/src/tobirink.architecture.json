@@ -29,7 +29,7 @@
           "worker",
           "d1"
         ],
-        "note": "Le Worker possède seul D1. Lookup owner-scoped, confirmations distinctes, requêtes préparées et bornées."
+        "note": "Worker seul sur D1 : HTTP v2, owners/installations, reçus et règles; SQL préparé, batches atomiques, lookup borné."
       },
       {
         "id": "presentation",

@@ -16,6 +16,7 @@ const generatedManifestSchema = z.object({
   }).optional(),
   content_security_policy: z.object({ extension_pages: z.string() }),
   host_permissions: z.array(z.string()).optional(),
+  externally_connectable: z.object({ matches: z.array(z.string()) }),
   icons: z.record(z.string(), z.string()),
   manifest_version: z.number(),
   permissions: z.array(z.string()),
@@ -42,6 +43,7 @@ describe('extension security boundary', () => {
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',
+      ...value.externally_connectable.matches,
     ]);
     expect(value.permissions?.every((permission) => allowed.has(permission))).toBe(true);
     expect(value.permissions).toEqual(expect.arrayContaining(['activeTab', 'alarms', 'bookmarks', 'notifications', 'storage']));

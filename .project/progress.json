@@ -5905,7 +5905,7 @@
         {
           "id": "step-5",
           "title": "Collectif Worker/D1 SQL owner-scoped",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Worker seul détenteur D1; SQL préparé et batch borné; tables additives séparées du catalogue",
             "Owners opaques/installations appairées, clés empreintes, IDs publics, conflits, confirmations owners distincts, nonces et reçus",
@@ -5947,7 +5947,13 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'feat(worker): restore owner-scoped collective resolution'"
           ],
-          "evidence": []
+          "evidence": [
+            "Migration additive 0004: owners/installations appairées, clés normalisées, choix privés, confirmations owner-distinctes, nonces/reçus, quotas et règles. Catalogue historique conservé; Worker seul binding D1.",
+            "HTTP v2 strict et SQL préparé: lookup 50 clés en cinq statements, moins de 500 rows_read en test; index couvrants, conflit sans vote, priorité humaine, versions de sites sans cloisonnement de clé.",
+            "Worker 32/32 dont neuf tests D1: isolation, deux appareils une voix, appairage expiré/consommé, rejeu/concurrence/quota, rollback batch, données minimisées, règles digest. Sécurité extension 8/8 et Worker 13/13.",
+            "Extension 107/107 dont consentement UI et cinq reprises propriétaire; application 248/248; adapters-browser 53/53, Cloudflare 20/20, infra 17/17. Builds Chrome/Firefox et Workbench passent.",
+            "Typecheck, lint, anti-slop, docs/ADR et Archify validés; aucune opération Cloudflare distante. Checks installés, oracle réel et publication restent étapes suivantes."
+          ]
         },
         {
           "id": "step-6",
