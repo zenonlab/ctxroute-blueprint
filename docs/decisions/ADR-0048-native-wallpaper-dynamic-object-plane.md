@@ -36,8 +36,9 @@ Retenir deux plans aux responsabilités asymétriques :
    non activantes et le panneau natif demandé après sélection ;
 3. le thème définit une fonction déterministe contenant identité, position et
    orientation normalisées. Le wallpaper possède l'animation ; le compagnon évalue
-   seulement la projection au temps monotone courant et ne maintient aucun second
-   état de simulation ;
+   seulement la projection au temps monotone courant et reproduit la progression
+   curviligne `paced` de Core Animation par une table immuable de longueur d'arc. Il
+   ne maintient aucun second état de simulation ;
 4. le thème décrit les objets, couleurs, piste et slots dans une ressource externe
    validée ; aucune règle propre à un jeu n'entre dans le cœur ;
 5. en mode wallpaper natif, le plan dynamique reste prêt sous les fenêtres normales

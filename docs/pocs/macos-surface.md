@@ -15,6 +15,8 @@ Le mode `--overlay-only` ne crée aucune surface de fond visible. Quatre véhicu
 originaux sont décrits dans une ressource JSON, puis un solveur pur calcule leurs
 positions et orientations sur une ellipse à partir d'une phase unique. Leur ordre
 reste déterministe et les deux plans ne possèdent jamais deux horloges concurrentes.
+La projection reproduit la progression curviligne `paced` du chemin Core Animation ;
+une progression angulaire naïve dérivait auparavant hors des véhicules visibles.
 
 Chaque objet possède une petite `NSPanel` non activante qui ne dessine aucun pixel.
 Cela borne la zone de clic au véhicule au lieu de couvrir l'écran d'une vitre

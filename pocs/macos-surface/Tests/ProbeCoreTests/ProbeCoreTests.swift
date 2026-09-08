@@ -180,6 +180,18 @@ final class ProbeCoreTests: XCTestCase {
         }
     }
 
+    func testFormationUsesPacedEllipseLikeNativeCoreAnimation() throws {
+        let engine = FormationEngine(theme: try decodedFormationTheme())
+        let steps = (0...64).map { step in
+            engine.snapshot(phaseSeconds: Double(step) / 64 * 4).objects[0]
+        }
+        let distances = zip(steps, steps.dropFirst()).map {
+            hypot($0.centerX - $1.centerX, $0.centerY - $1.centerY)
+        }
+        let average = distances.reduce(0, +) / Double(distances.count)
+        XCTAssertLessThan(distances.map { abs($0 - average) }.max()!, average * 0.02)
+    }
+
     func testFormationThemeRejectsDuplicateIdentity() {
         let invalid = Data("""
         {"schemaVersion":1,"track":{"centerX":0.5,"centerY":0.5,"radiusX":0.3,"radiusY":0.2,"periodSeconds":4},

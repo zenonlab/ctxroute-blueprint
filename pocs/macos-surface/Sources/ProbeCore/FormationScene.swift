@@ -71,14 +71,22 @@ public struct FormationSnapshot: Equatable, Sendable {
 /// Pure, deterministic formation solver. Render surfaces never run their own simulation.
 public struct FormationEngine: Sendable {
     public let theme: FormationTheme
+    private let pacedEllipses: [PacedEllipse]
 
-    public init(theme: FormationTheme) { self.theme = theme }
+    public init(theme: FormationTheme) {
+        self.theme = theme
+        self.pacedEllipses = theme.objects.map { object in
+            PacedEllipse(radiusX: theme.track.radiusX + object.laneOffset,
+                         radiusY: theme.track.radiusY + object.laneOffset * 0.7)
+        }
+    }
 
     public func snapshot(phaseSeconds: Double) -> FormationSnapshot {
         let safePhase = phaseSeconds.isFinite ? phaseSeconds : 0
-        let baseAngle = safePhase / theme.track.periodSeconds * 2 * Double.pi
-        let objects = theme.objects.map { object in
-            let angle = baseAngle - object.trailingOffset
+        let baseProgress = safePhase / theme.track.periodSeconds
+        let objects = theme.objects.enumerated().map { index, object in
+            let trailingProgress = object.trailingOffset / (2 * Double.pi)
+            let angle = pacedEllipses[index].angle(at: baseProgress - trailingProgress)
             let radiusX = theme.track.radiusX + object.laneOffset
             let radiusY = theme.track.radiusY + object.laneOffset * 0.7
             let tangentX = -radiusX * sin(angle)
@@ -93,5 +101,39 @@ public struct FormationEngine: Sendable {
             )
         }
         return FormationSnapshot(phaseSeconds: safePhase, objects: objects)
+    }
+}
+
+/// Mirrors Core Animation's paced traversal of an ellipse without querying its presentation layer.
+/// The lookup table is immutable and built once; snapshots only perform a binary search.
+private struct PacedEllipse: Sendable {
+    private static let segmentCount = 1_024
+    private let cumulativeLengths: [Double]
+
+    init(radiusX: Double, radiusY: Double) {
+        var lengths = [Double](repeating: 0, count: Self.segmentCount + 1)
+        var previous = CGPoint(x: radiusX, y: 0)
+        for index in 1...Self.segmentCount {
+            let angle = Double(index) / Double(Self.segmentCount) * 2 * Double.pi
+            let point = CGPoint(x: radiusX * cos(angle), y: radiusY * sin(angle))
+            lengths[index] = lengths[index - 1] + hypot(point.x - previous.x, point.y - previous.y)
+            previous = point
+        }
+        let total = lengths[Self.segmentCount]
+        self.cumulativeLengths = lengths.map { $0 / total }
+    }
+
+    func angle(at progress: Double) -> Double {
+        var normalized = progress.truncatingRemainder(dividingBy: 1)
+        if normalized < 0 { normalized += 1 }
+        var lower = 0
+        var upper = Self.segmentCount
+        while lower + 1 < upper {
+            let middle = (lower + upper) / 2
+            if cumulativeLengths[middle] <= normalized { lower = middle } else { upper = middle }
+        }
+        let span = cumulativeLengths[upper] - cumulativeLengths[lower]
+        let fraction = span > 0 ? (normalized - cumulativeLengths[lower]) / span : 0
+        return (Double(lower) + fraction) / Double(Self.segmentCount) * 2 * Double.pi
     }
 }
