@@ -1,5 +1,60 @@
 # Reprise de session — Wallpaper
 
+## Relance et permission périmée — 8 septembre 2026, 19:06
+
+Le même build installé `zCjZT3` a été relancé sans diagnostic ni reconstruction.
+Relance à 19:06 : PID 17807, job `agent.fSn6xg`. Après l'essai d'installation
+ci-dessous, le même paquet est relancé par le job `agent.8d6lwo`.
+Aucun service Apple arrêté.
+Les Réglages montrent maintenant `Wallpaper Connector Agent` **on**, mais le
+journal de démarrage indique encore `accessibility=false`.
+Preuve TCC explicite : `Failed to match existing code requirement`, ancienne
+exigence `478df1f9667818d0408bc6cd65dce834db61c082`, binaire installé
+`b1d2dc6a6823b10a93f0e32a03a7e4338998563f` (confirmé par `codesign -dr -`).
+Ce n'est donc plus une simple case décochée. L'ajout du chemin installé par le
+bouton Ajouter, puis la désactivation/réactivation de cette seule permission,
+n'ont pas renouvelé l'exigence : même refus après relance à 19:06:40.
+
+Une confirmation distincte a été demandée pour **retirer l'entrée périmée puis
+réajouter immédiatement le même agent installé**. Ne pas supprimer cette entrée
+sans réponse, ni modifier directement TCC, ni emprunter l'identité du PoC1.
+Aucun fichier ou entrée n'a été supprimé ; les autres droits restent inchangés.
+L'inspection Finder échoue `cgWindowNotFound` ; les Réglages renvoient aussi des
+erreurs intermittentes `noWindowsAvailable`/ScreenCaptureKit `-3811`.
+Le catalogue affiche toujours Orbite, Lagon et Ambre, ce dernier sélectionné ;
+aucune nouvelle sélection ni preuve de clic bureau n'a été obtenue.
+Le provider `WallpaperProvider` PID 72851 reste présent et n'a pas été redémarré.
+Sa présence seule ne prouve ni une nouvelle quittance ni le rendu actif.
+Prochaine action : renouveler l'entrée avec accord, vérifier **dans le processus**
+`accessibility=true`, puis qualifier boutons/clic droit et priorité Finder.
+### Correctif ABI découvert pendant la relance
+
+Le journal de `WallpaperProvider` à 19:07:41 révèle une seconde anomalie :
+`isChoiceDownloadedWith:reply:` refuse un message, car le bloc reçu attend un
+`NSNumber` alors que le pont déclare un `BOOL`. Le pont Objective-C et son handler
+Swift ont été corrigés ensemble vers `NSNumber?`. Cela ne touche ni le contrat
+produit ni la topologie. Le gate de commit requiert néanmoins une trace pour la
+signature modifiée : le schéma existant porte l'annotation macOS `ABI à qualifier`.
+Archify : showcase 9/9, zéro erreur/avertissement, containment quatre résolutions,
+captures sombres 1440×900 et 2048×1320 inspectées. UI fixe du viewer en anglais.
+
+Build candidat `build.yTrzh9` : compilation stricte, catalogue Apple trois thèmes
+et signatures passent. `cmp` confirme que l'agent est identique à celui installé,
+y compris son exigence `b1d2dc6a6823b10a93f0e32a03a7e4338998563f`.
+**Non installé** : le préflight refuse le provider courant encore actif ; aucun
+paquet remplacé. L'agent installé zCjZT3 a été relancé après ce refus. La transition
+via les Réglages reste non exécutée à cause des erreurs de contrôle UI. Ne pas
+annoncer l'ABI corrigée en production tant que le candidat n'est pas installé et
+qu'une nouvelle sélection ne confirme pas l'absence du rejet XPC.
+
+Vérification du correctif : 30 XCTest, zéro échec ; build strict/catalogue/signatures
+passent. Le cache Swift de cette passe a été déplacé sous `dist/pocs/macos-connector/`
+sans suppression. `npm run verify` final passe (code 0) ; une passe précédente
+a été relancée après une course avec ce déplacement du cache pendant le scan.
+Audit doctrine : CONFORME pour le delta local, la documentation
+des preuves et la préservation du paquet ; MANQUE pour installation/gestes natifs ;
+N/A pour une nouvelle architecture. AGENTS, CLAUDE et hooks restent inchangés.
+
 ## État courant — comparaison PoC1 et reprise des gestes, 8 septembre 2026
 
 Dernière demande : comparer le PoC1, corriger les boutons et continuer en autonomie.

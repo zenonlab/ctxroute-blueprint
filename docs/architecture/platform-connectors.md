@@ -201,6 +201,10 @@ Le diagramme situe les gestes, la modale et le XPC signé dans le connecteur mac
 le diagnostic à la demande ; les gestes sont implémentés mais restent non qualifiés.
 L'édition utilise la même frontière de commande, avec configuration validée et
 quittance avant sauvegarde locale, selon ADR-0054.
+L'annotation macOS `ABI à qualifier` rappelle que la signature du bloc XPC natif
+`isChoiceDownloadedWith:reply:` doit être requalifiée après correction vers NSNumber.
+Le contrôle de commit exige cette trace pour une signature modifiée ; aucune
+nouvelle couche ni frontière produit n'a été ajoutée.
 
-SHA-256 de la source : `9b240e790b292c17c2fe33bb997de5f649b98d740305b75bf820916513dcb408`.
-SHA-256 de l'artefact : `748a9952cc32b0fe63864659fedeb4b0e904c9adb6180664492afa518ef8acb0`.
+SHA-256 de la source : `335f9a38048e35d71694f686c6e6cc8c1ab8af37a73365a3c4447ae877308b91`.
+SHA-256 de l'artefact : `452d35aac79ca51c71108d26ef00da882f3d31dc604ad5d9f51e9affa2694c04`.

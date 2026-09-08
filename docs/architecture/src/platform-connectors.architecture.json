@@ -17,7 +17,7 @@
     { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "2D/3D · animation · hit-test", "pos": [380, 215], "size": [240, 90] },
     { "id": "connector-api", "type": "security", "label": "Contrat connecteur", "sublabel": "Surface · entrée · cycle · capacités", "pos": [700, 215], "size": [240, 90] },
     { "id": "terminal", "type": "external", "label": "Terminal indépendant", "sublabel": "Sessions ↔ états et intentions", "pos": [1140, 110], "size": [220, 90] },
-    { "id": "mac", "type": "frontend", "label": "Connecteur macOS", "sublabel": "Gestes · modale · XPC signé", "pos": [110, 420], "size": [210, 90] },
+    { "id": "mac", "type": "frontend", "label": "Connecteur macOS", "sublabel": "Gestes · modale · XPC signé", "tag": "ABI à qualifier", "pos": [110, 420], "size": [210, 90] },
     { "id": "windows", "type": "frontend", "label": "Connecteur Windows", "sublabel": "Win32 · Explorer", "pos": [370, 420], "size": [210, 90] },
     { "id": "wayland", "type": "frontend", "label": "Connecteur Wayland", "sublabel": "layer-shell qualifié", "pos": [630, 420], "size": [210, 90] },
     { "id": "gnome", "type": "frontend", "label": "Connecteur GNOME", "sublabel": "extension ou mode dégradé", "pos": [890, 420], "size": [210, 90] },

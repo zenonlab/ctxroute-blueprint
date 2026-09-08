@@ -58,6 +58,18 @@ Ne pas reconstruire après une autorisation puis attribuer l'échec aux calques.
 Aucune ancienne identité privilégiée, exception TCC ou signature affaiblie n'est
 réutilisée pour éviter le consentement.
 
+Qualification du 8 septembre, 19:06 : l'interrupteur Accessibilité peut être **on**
+alors que TCC refuse le code courant (`Failed to match existing code requirement`).
+L'ajout du chemin et un cycle off/on n'ont pas renouvelé cette exigence lors du
+test. Ne pas confondre état des Réglages et résultat `AXIsProcessTrusted()`.
+Le renouvellement par retrait/réajout de l'entrée nécessite un accord explicite.
+
+Autre défaut observé dans le journal natif : `isChoiceDownloadedWith:reply:` doit
+répondre avec `NSNumber`, pas `BOOL`, sur le macOS testé. Le pont et le handler
+sont corrigés ; le build `yTrzh9` passe compilation/catalogue/signatures, mais son
+installation et la nouvelle sélection réelle restent à qualifier. Le préflight
+refuse de remplacer le paquet tant que le provider courant est actif.
+
 ## Historique — XPC natif, 8 septembre 2026
 
 Le transport actif est désormais **XPC signé en mémoire**, selon

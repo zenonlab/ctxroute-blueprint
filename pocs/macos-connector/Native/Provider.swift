@@ -241,7 +241,7 @@ final class WallpaperXPCHandler: NSObject, WallpaperExtensionXPCProtocol {
     func removeChoiceRequest(withChoiceRequest r: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(Self.unsupported) }
     func selectedChoicesDidChange(for id: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(nil) }
     func invokeContextMenuAction(withMenuItemID m: Any?, groupItemID g: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(Self.unsupported) }
-    func isChoiceDownloaded(with id: Any?, reply: @escaping @Sendable (Bool, Error?) -> Void) { reply(true, nil) }
+    func isChoiceDownloaded(with id: Any?, reply: @escaping @Sendable (NSNumber?, Error?) -> Void) { reply(NSNumber(value: true), nil) }
     func download(withChoiceID id: Any?, reply: @escaping (Error?) -> Void) -> Any? { reply(Self.unsupported); return nil }
     func pauseDownload(for id: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(Self.unsupported) }
     func cancelDownload(for id: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(Self.unsupported) }
