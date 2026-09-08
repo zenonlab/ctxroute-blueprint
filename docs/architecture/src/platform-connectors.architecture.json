@@ -14,7 +14,7 @@
     { "id": "theme", "type": "database", "label": "Catalogue de thèmes", "sublabel": "Packages · scènes · identités", "pos": [80, 110], "size": [220, 90] },
     { "id": "contract", "type": "backend", "label": "Contrat de thème", "sublabel": "Schéma versionné · identités stables", "pos": [380, 75], "size": [240, 90] },
     { "id": "core", "type": "backend", "label": "Cœur sémantique", "sublabel": "État · transitions · intentions", "pos": [700, 75], "size": [240, 90] },
-    { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "2D/3D · animation · hit-test", "pos": [380, 215], "size": [240, 90] },
+    { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "2D/3D · animation · hit-test", "tag": "Icônes Lucide natives", "pos": [380, 215], "size": [240, 90] },
     { "id": "connector-api", "type": "security", "label": "Contrat connecteur", "sublabel": "Surface · entrée · cycle · capacités", "pos": [700, 215], "size": [240, 90] },
     { "id": "terminal", "type": "external", "label": "Terminal indépendant", "sublabel": "Sessions ↔ états et intentions", "pos": [1140, 110], "size": [220, 90] },
     { "id": "mac", "type": "frontend", "label": "Connecteur macOS", "sublabel": "Gestes · modale · XPC signé", "tag": "ABI à qualifier", "pos": [110, 420], "size": [210, 90] },

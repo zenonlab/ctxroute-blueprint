@@ -22,6 +22,14 @@ aucun volume système ne change. `Fichiers…` ouvre le réglage macOS, **pas un
 qualifié**. Le menu de récupération du connecteur permet aussi l'édition d'un objet.
 Aucun panneau ne s'ouvre au lancement normal.
 
+Présentation corrigée : deux boutons carrés 40×40, espace 8 points, icônes seules
+24×24 adaptées de [Lucide 0.468.0](https://github.com/lucide-icons/lucide/tree/0.468.0/icons).
+`volume-x`/`volume-2` suivent l'état muet du thème ; `files` reste neutre tant que
+l'état Finder n'est pas observé. Tracés CAShapeLayer, pas de WebView, police d'icônes
+ou chargement réseau. Licence dans chaque paquet signé. La zone de clic provient
+du même `ThemeLayout.control` que le dessin. Le test vérifie les dimensions, l'écart,
+l'absence de texte, l'échelle Retina et les deux états audio.
+
 `ThemeLayout` partage les 128 segments de trajectoire entre animation et hit-test.
 Chaque surface publie son écran, sa taille, son horloge et son état actif, sans
 polling par trame. Deux surfaces natives du même écran ne sont acceptées que si

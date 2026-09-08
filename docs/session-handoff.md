@@ -1,5 +1,34 @@
 # Reprise de session — Wallpaper
 
+## Demande courante — boutons carrés Lucide, 8 septembre 2026
+
+L'utilisateur rejette le résultat interactif et demande uniquement des icônes dans
+des carrés pour le son et les fichiers. Aucune permission n'a été modifiée dans
+cette étape ; aucune confirmation de retrait/réajout TCC n'a été reçue.
+
+Build candidat `build.QjikMP` : boutons 40×40 en haut à gauche, espace 8 points,
+icônes 24×24 adaptées de Lucide 0.468.0. Tracés natifs CAShapeLayer et licence dans
+les trois bundles, sans nouvelle bibliothèque runtime ni fenêtre superposée.
+31 XCTest passent ; build strict, catalogue Apple et signatures passent. Le PNG
+Orbite produit par le vrai renderer a été inspecté : les deux icônes sont présentes
+sans libellé. Cela prouve la présentation hors écran, pas les clics du bureau.
+
+**Non installé** : l'inspection montre Orbite sélectionné ; les tentatives de
+transition temporaire vers le fond natif Noir sont refusées `cannotClickOffscreenElement`
+ou signalent une fenêtre modifiée. Aucune transition confirmée, aucun service arrêté.
+Ne pas recommencer les mêmes clics en boucle ni remplacer le paquet actif en force.
+Le source `DesktopInput` reste inchangé ; les blocages précédents (TCC et priorité
+Finder à qualifier) restent ouverts. Le bouton fichiers ouvre encore les Réglages,
+ce n'est pas le show/hide effectif demandé. Ne pas présenter cette tranche comme
+une réparation complète des interactions.
+
+Audit : CONFORME pour les 31 tests, le build signé, la licence embarquée, le rendu
+hors écran et `npm run verify` (code 0). MANQUE : installation, preuve native des
+clics et toggle Finder. Aucun hook, AGENTS ou CLAUDE modifié. Archify showcase 9/9,
+zéro erreur/avertissement ; quatre résolutions sans débordement, captures sombres
+1440×900 et 2048×1320 inspectées. L'UI fixe du viewer reste anglaise. Le schéma situe
+les icônes dans l'hôte existant, sans nouvelle frontière d'exécution.
+
 ## Relance et permission périmée — 8 septembre 2026, 19:06
 
 Le même build installé `zCjZT3` a été relancé sans diagnostic ni reconstruction.

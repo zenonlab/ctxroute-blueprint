@@ -12,7 +12,7 @@ import ThemeModel
     private let ring = CAShapeLayer()
     private let motion = CALayer()
     private var dots: [CALayer] = []
-    private var controls: [CATextLayer] = []
+    private var controls: [CALayer] = []
     private var animationStart: Double = 0
     private var previousSize = CGSize.zero
     private var previousScale: CGFloat = 0
@@ -38,12 +38,15 @@ import ThemeModel
             motion.addSublayer(dot); dots.append(dot)
         }
         for item in theme.system_controls.items {
-            let control = CATextLayer(); control.name = "control.\(item)"
-            control.string = item == "audio" ? "Son coupé" : item == "desktop" ? "Fichiers…" : item
-            control.fontSize = 13; control.alignmentMode = .center
-            control.foregroundColor = Self.color("FFFFFF")
-            control.backgroundColor = Self.color("18283F"); control.cornerRadius = 10
-            control.borderWidth = 1; control.borderColor = Self.color(theme.accent).copy(alpha: 0.5)
+            let control = CALayer(); control.name = "control.\(item)"
+            control.backgroundColor = Self.color("18283F").copy(alpha: 0.92); control.cornerRadius = 6
+            control.borderWidth = 1; control.borderColor = Self.color("FFFFFF").copy(alpha: 0.16)
+            let icon = CAShapeLayer(); icon.name = item == "audio" ? "lucide.volume-x" : "lucide.files"
+            icon.path = Self.controlIcon(audio: item == "audio", muted: true)
+            icon.fillColor = nil; icon.strokeColor = Self.color("FFFFFF")
+            icon.lineWidth = 2; icon.lineCap = .round; icon.lineJoin = .round
+            icon.frame = CGRect(x: 8, y: 8, width: 24, height: 24)
+            control.addSublayer(icon)
             root.addSublayer(control); controls.append(control)
         }
     }
@@ -58,6 +61,7 @@ import ThemeModel
             let rect = ThemeLayout.control(index)
             control.frame = CGRect(x: rect.x, y: size.height - rect.y - rect.height, width: rect.width, height: rect.height)
             control.contentsScale = scale
+            control.sublayers?.forEach { $0.contentsScale = scale }
         }
         let orbit = CGRect(x: size.width * 0.2, y: size.height * 0.24,
                            width: size.width * 0.6, height: size.height * 0.52)
@@ -99,7 +103,10 @@ import ThemeModel
         }
         ring.strokeColor = Self.color(theme.accent).copy(alpha: state.highlighted ? 0.85 : 0.2)
         for control in controls where control.name == "control.audio" {
-            control.string = state.muted ? "Son coupé" : "Son activé"
+            if let icon = control.sublayers?.first as? CAShapeLayer {
+                icon.name = state.muted ? "lucide.volume-x" : "lucide.volume-2"
+                icon.path = Self.controlIcon(audio: true, muted: state.muted)
+            }
         }
         CATransaction.commit(); updates += 1
     }
@@ -113,6 +120,54 @@ import ThemeModel
     public var isPaused: Bool { motion.speed == 0 }
     public var objectIDs: [String] { dots.compactMap(\.name) }
     public var hasObjectAnimations: Bool { dots.contains { !($0.animationKeys() ?? []).isEmpty } }
+    /// Native path adaptation of Lucide 0.468.0 volume-x, volume-2 and files.
+    /// See Packaging/Lucide-LICENSE. No browser, font icon or per-frame image decode.
+    private static func controlIcon(audio: Bool, muted: Bool) -> CGPath {
+        let path = CGMutablePath()
+        if audio {
+            path.move(to: CGPoint(x: 11, y: 4.702))
+            path.addQuadCurve(to: CGPoint(x: 9.797, y: 4.204), control: CGPoint(x: 11, y: 3.706))
+            path.addLine(to: CGPoint(x: 6.413, y: 7.587))
+            path.addQuadCurve(to: CGPoint(x: 5.416, y: 8), control: CGPoint(x: 6, y: 8))
+            path.addLine(to: CGPoint(x: 3, y: 8))
+            path.addQuadCurve(to: CGPoint(x: 2, y: 9), control: CGPoint(x: 2, y: 8))
+            path.addLine(to: CGPoint(x: 2, y: 15))
+            path.addQuadCurve(to: CGPoint(x: 3, y: 16), control: CGPoint(x: 2, y: 16))
+            path.addLine(to: CGPoint(x: 5.416, y: 16))
+            path.addQuadCurve(to: CGPoint(x: 6.413, y: 16.413), control: CGPoint(x: 6, y: 16))
+            path.addLine(to: CGPoint(x: 9.797, y: 19.797))
+            path.addQuadCurve(to: CGPoint(x: 11, y: 19.298), control: CGPoint(x: 11, y: 20.295))
+            path.closeSubpath()
+            if muted {
+                path.move(to: CGPoint(x: 22, y: 9)); path.addLine(to: CGPoint(x: 16, y: 15))
+                path.move(to: CGPoint(x: 16, y: 9)); path.addLine(to: CGPoint(x: 22, y: 15))
+            } else {
+                path.move(to: CGPoint(x: 16, y: 9))
+                path.addArc(center: CGPoint(x: 12, y: 12), radius: 5,
+                    startAngle: -atan2(3, 4), endAngle: atan2(3, 4), clockwise: false,
+                    transform: .identity)
+                path.move(to: CGPoint(x: 19.364, y: 18.364))
+                path.addArc(center: CGPoint(x: 13, y: 12), radius: 9,
+                    startAngle: .pi / 4, endAngle: -.pi / 4, clockwise: true)
+            }
+        } else {
+            path.move(to: CGPoint(x: 20, y: 7)); path.addLine(to: CGPoint(x: 17, y: 7))
+            path.addQuadCurve(to: CGPoint(x: 15, y: 5), control: CGPoint(x: 15, y: 7))
+            path.addLine(to: CGPoint(x: 15, y: 2))
+            path.move(to: CGPoint(x: 9, y: 18))
+            path.addQuadCurve(to: CGPoint(x: 7, y: 16), control: CGPoint(x: 7, y: 18))
+            path.addLine(to: CGPoint(x: 7, y: 4))
+            path.addQuadCurve(to: CGPoint(x: 9, y: 2), control: CGPoint(x: 7, y: 2))
+            path.addLine(to: CGPoint(x: 16, y: 2)); path.addLine(to: CGPoint(x: 20, y: 6))
+            path.addLine(to: CGPoint(x: 20, y: 16))
+            path.addQuadCurve(to: CGPoint(x: 18, y: 18), control: CGPoint(x: 20, y: 18)); path.closeSubpath()
+            path.move(to: CGPoint(x: 3, y: 7.6)); path.addLine(to: CGPoint(x: 3, y: 20.4))
+            path.addQuadCurve(to: CGPoint(x: 4.6, y: 22), control: CGPoint(x: 3, y: 22))
+            path.addLine(to: CGPoint(x: 14.4, y: 22))
+        }
+        var flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 24)
+        return path.copy(using: &flip) ?? path
+    }
     public static func color(_ hex: String) -> CGColor {
         let value = UInt32(hex, radix: 16) ?? 0
         return CGColor(red: CGFloat((value >> 16) & 255) / 255,

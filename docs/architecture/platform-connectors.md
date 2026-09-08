@@ -205,6 +205,9 @@ L'annotation macOS `ABI à qualifier` rappelle que la signature du bloc XPC nati
 `isChoiceDownloadedWith:reply:` doit être requalifiée après correction vers NSNumber.
 Le contrôle de commit exige cette trace pour une signature modifiée ; aucune
 nouvelle couche ni frontière produit n'a été ajoutée.
+L'hôte de scène porte également l'annotation des icônes Lucide natives : tracés
+statiques dans le renderer existant et géométrie partagée avec le hit-test, sans
+nouvel overlay. Cette présentation ne qualifie pas la capture de clics macOS.
 
-SHA-256 de la source : `335f9a38048e35d71694f686c6e6cc8c1ab8af37a73365a3c4447ae877308b91`.
-SHA-256 de l'artefact : `452d35aac79ca51c71108d26ef00da882f3d31dc604ad5d9f51e9affa2694c04`.
+SHA-256 de la source : `df1ed06c5c752965d4785cf27e597a875d1befa7c6869966d514b6de6e73acd8`.
+SHA-256 de l'artefact : `7404eab7bcc78494637f745d40d4d8fc8a74304a62058c29cb5c01e66b9b165c`.

@@ -1,6 +1,7 @@
 import XCTest
 import ThemeModel
 import SceneRenderer
+import QuartzCore
 
 final class CustomizationTests: XCTestCase {
     func testDuplicateDesktopSurfacesRequireSemanticConsensus() throws {
@@ -46,7 +47,8 @@ final class CustomizationTests: XCTestCase {
     func testShelfAndMovingHitGeometry() throws {
         let theme = try Theme.load()
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 30, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .control(.audio))
-        XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 170, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .control(.desktopItems))
+        XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 80, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .control(.desktopItems))
+        XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 68, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .empty)
         for time in [0.0, 0.4, 6.1, 17.2, 24.0, 100.0] {
             let point = ThemeLayout.position(theme.objects[0], theme: theme, width: 800, height: 500, elapsed: time)
             XCTAssertEqual(ThemeLayout.hit(point, theme: theme, width: 800, height: 500, elapsed: time), .object(theme.objects[0].id))
@@ -72,6 +74,28 @@ final class CustomizationTests: XCTestCase {
         XCTAssertEqual(replacement.layout(id: UUID(), display: 1, interactive: true).elapsed, 12.5, accuracy: 0.02)
         replacement.resize(CGSize(width: 1000, height: 700))
         XCTAssertEqual(replacement.layout(id: UUID(), display: 1, interactive: true).elapsed, 12.5, accuracy: 0.02)
+    }
+    @MainActor func testSquareIconControlsMatchHitRegionsAndMuteState() throws {
+        let scene = Scene(theme: try Theme.load())
+        scene.resize(CGSize(width: 800, height: 500), scale: 2)
+        let controls = (scene.root.sublayers ?? []).filter { $0.name?.hasPrefix("control.") == true }
+        XCTAssertEqual(controls.count, 2)
+        for (index, control) in controls.enumerated() {
+            let hit = ThemeLayout.control(index)
+            XCTAssertEqual(control.frame, CGRect(x: hit.x, y: 500 - hit.y - hit.height, width: 40, height: 40))
+            XCTAssertFalse(control is CATextLayer)
+            XCTAssertEqual(control.sublayers?.count, 1)
+            let icon = try XCTUnwrap(control.sublayers?.first as? CAShapeLayer)
+            XCTAssertFalse(try XCTUnwrap(icon.path).isEmpty)
+            XCTAssertEqual(icon.frame, CGRect(x: 8, y: 8, width: 24, height: 24))
+            XCTAssertEqual(icon.contentsScale, 2)
+        }
+        XCTAssertEqual(controls[0].sublayers?.first?.name, "lucide.volume-x")
+        var state = ThemeState(); state.muted = false; scene.apply(state)
+        XCTAssertEqual(controls[0].sublayers?.first?.name, "lucide.volume-2")
+        state.muted = true; scene.apply(state)
+        XCTAssertEqual(controls[0].sublayers?.first?.name, "lucide.volume-x")
+        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.files")
     }
     func testLocalStoreDoesNotModifyOriginalAndRejectsInvalidFile() throws {
         // Deliberately retain bounded fixtures; repository policy forbids automatic deletion.

@@ -45,6 +45,7 @@ cp "$connector_source/Packaging/Extension.plist" "$connector_extension/Contents/
 for connector_bundle in "$connector_app" "$connector_extension"; do
   cp "$connector_source"/Sources/ThemeModel/Resources/*.json "$connector_bundle/Contents/Resources/"
   cp "$connector_source/Native/Bridge/LICENSE" "$connector_bundle/Contents/Resources/Phosphene-LICENSE"
+  cp "$connector_source/Packaging/Lucide-LICENSE" "$connector_bundle/Contents/Resources/Lucide-LICENSE"
 done
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift"
@@ -66,6 +67,7 @@ mkdir -p "$connector_agent/Contents/MacOS" "$connector_agent/Contents/Resources"
 cp "$connector_app/Contents/MacOS/WallpaperConnector" "$connector_agent/Contents/MacOS/WallpaperConnector"
 cp "$connector_app/Contents/Info.plist" "$connector_agent/Contents/Info.plist"
 cp "$connector_app/Contents/Resources/"*.json "$connector_agent/Contents/Resources/"
+cp "$connector_source/Packaging/Lucide-LICENSE" "$connector_agent/Contents/Resources/Lucide-LICENSE"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier org.wallpaperthemes.connectorpoc2.agent' "$connector_agent/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleName Wallpaper Connector Agent' "$connector_agent/Contents/Info.plist"
 codesign --sign "$connector_identity" --entitlements "$connector_stage/App.entitlements" "$connector_agent"

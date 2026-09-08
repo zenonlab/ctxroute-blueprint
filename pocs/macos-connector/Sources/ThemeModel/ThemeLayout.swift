@@ -10,7 +10,7 @@ public struct LayoutRect: Equatable, Sendable {
 /// Coordinates are local top-left points. Renderer and input share this geometry.
 public enum ThemeLayout {
     public static func control(_ index: Int) -> LayoutRect {
-        LayoutRect(x: 24 + Double(index) * 140, y: 56, width: 132, height: 38)
+        LayoutRect(x: 24 + Double(index) * 48, y: 56, width: 40, height: 40)
     }
     public static func position(_ object: Theme.Object, theme: Theme, width: Double, height: Double,
                                 elapsed: Double) -> ScenePoint {
