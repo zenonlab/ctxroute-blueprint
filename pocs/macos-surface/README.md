@@ -22,8 +22,9 @@ le comportement produit validé. Le premier clic est accepté sans activation de
 fenêtre ; son routage réel reste à éprouver. `split_mouse_downs` distingue les
 événements souris reçus des actions programmatiques du smoke.
 Avec un wallpaper natif déjà actif, `desktop --split-input --overlay-only --duration 180`
-ne redessine ni le fond ni les véhicules : il affiche uniquement le plan de hit-test
-transparent. Les zones sont retirées lorsque Finder n'est plus au premier plan. La ressource
+ne redessine ni le fond ni les véhicules et ne déplace aucune fenêtre invisible. Il
+observe passivement le clic, calcule la position courante et ouvre le panneau seulement
+si le point touche un objet. La ressource
 `Resources/formation-theme.json` décrit piste, slots, identités et couleurs ; le
 solveur générique conserve l'ordre et calcule les orientations dans les virages.
 `--export-still` crée notre image PNG à côté de la .app, sans changer le fond système.

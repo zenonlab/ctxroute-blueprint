@@ -18,11 +18,10 @@ reste déterministe et les deux plans ne possèdent jamais deux horloges concurr
 La projection reproduit la progression curviligne `paced` du chemin Core Animation ;
 une progression angulaire naïve dérivait auparavant hors des véhicules visibles.
 
-Chaque objet possède une petite `NSPanel` non activante qui ne dessine aucun pixel.
-Cela borne la zone de clic au véhicule au lieu de couvrir l'écran d'une vitre
-transparente. Le plan reste prêt sous les fenêtres applicatives normales pour accepter
-le premier clic sur le bureau ; il est masqué si l'écran dort ou si la session devient
-inactive. La projection s'arrête via la garde de visibilité. Le
+Le mode overlay n'utilise plus de `NSPanel` mobile par objet. Un moniteur global passif
+observe uniquement les clics, calcule la position courante puis applique un hit-test
+de `112×70` autour du véhicule. Il ne consomme pas le clic système. Le moniteur est
+retiré si l'écran dort ou si la session devient inactive. Le
 wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rechargé.
 
 ```sh

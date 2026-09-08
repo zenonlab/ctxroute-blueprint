@@ -56,6 +56,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var spacesNotifications = 0
     var schedulingSource = "suspended"
     var selectedObjectID: String?
+    var globalMouseMonitor: Any?
     var finderFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder"
 
     init(options: ProbeOptions, formationTheme: FormationTheme) {
@@ -87,6 +88,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         updateVisibility()
         refreshUI()
+        if options.overlayOnly && !options.smoke { installGlobalClickMonitor() }
         if options.exportStill { exportContinuityImage() }
         schedule(after: options.duration, selector: #selector(deadlineReached))
         if options.smoke {
@@ -126,7 +128,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 window.orderFrontRegardless()
             }
             if options.splitInput {
-                splitControls = SplitDesktopControls(theme: formationTheme, target: self,
+                splitControls = SplitDesktopControls(theme: formationTheme, usesObjectWindows: !options.overlayOnly,
+                    target: self,
                     open: #selector(openDynamicObject(_:)),
                     effect: #selector(toggleEffect), pause: #selector(togglePause), close: #selector(closePanel))
             }
@@ -165,10 +168,40 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func openObject() { state.openPanel(); refreshUI() }
     @objc func openDynamicObject(_ sender: DynamicObjectButton) {
-        selectedObjectID = sender.objectID
-        splitControls?.select(sender.objectID)
+        selectDynamicObject(sender.objectID)
+    }
+
+    private func selectDynamicObject(_ objectID: String) {
+        selectedObjectID = objectID
+        splitControls?.select(objectID)
         state.openPanel()
         refreshUI()
+    }
+
+    private func installGlobalClickMonitor() {
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            let location = NSEvent.mouseLocation
+            Task { @MainActor [weak self] in self?.handleGlobalClick(at: location) }
+        }
+    }
+
+    private func handleGlobalClick(at location: NSPoint) {
+        guard options.overlayOnly, displaysAwake, sessionActive, window.frame.contains(location) else { return }
+        let frame = window.frame
+        let snapshot = formationEngine.snapshot(phaseSeconds: ProcessInfo.processInfo.systemUptime)
+        let hit = snapshot.objects.min { left, right in
+            let leftPoint = NSPoint(x: frame.minX + frame.width * left.centerX,
+                                    y: frame.minY + frame.height * left.centerY)
+            let rightPoint = NSPoint(x: frame.minX + frame.width * right.centerX,
+                                     y: frame.minY + frame.height * right.centerY)
+            return hypot(leftPoint.x - location.x, leftPoint.y - location.y) <
+                hypot(rightPoint.x - location.x, rightPoint.y - location.y)
+        }
+        guard let hit else { return }
+        let center = NSPoint(x: frame.minX + frame.width * hit.centerX,
+                             y: frame.minY + frame.height * hit.centerY)
+        guard abs(center.x - location.x) <= 56, abs(center.y - location.y) <= 35 else { return }
+        selectDynamicObject(hit.id)
     }
     @objc func closePanel() { state.closePanel(); refreshUI() }
     @objc func toggleAnimation() { state.toggleAnimation(); refreshUI() }
@@ -276,6 +309,11 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func syncAnimationTimer() {
+        if options.overlayOnly {
+            animationTimer?.invalidate()
+            animationTimer = nil
+            return
+        }
         if state.shouldAnimate && animationTimer == nil {
             lastTick = ProcessInfo.processInfo.systemUptime
             let timer = Timer(timeInterval: ProbeStyle.frameInterval, target: self,
@@ -354,7 +392,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 splitControls.setDesktopExposed(true)
                 splitControls.update(snapshot: formationEngine.snapshot(phaseSeconds: state.phaseSeconds), desktop: window)
                 smokeChecks["formation_has_four_objects"] = splitControls.objectButtons.count == 4
-                    && splitControls.visibleObjectCount == 4
+                    && splitControls.visibleObjectCount == (options.overlayOnly ? 0 : 4)
                 splitControls.objectButton.performClick(nil)
                 smokeChecks["split_selects_object"] = selectedObjectID == formationTheme.objects[0].id
                 smokeChecks["split_opens_panel"] = state.panelOpen && splitControls.controlsWindow.isVisible
@@ -434,12 +472,15 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func finish(reason: String, code: Int32) -> Never {
         finishing = true
         let timerActiveBeforeCleanup = animationTimer != nil
+        let globalMouseMonitorInstalled = globalMouseMonitor != nil
         animationTimer?.invalidate()
         animationTimer = nil
         scheduledTimers.forEach { $0.invalidate() }
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         desktopMenu?.remove()
+        if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        globalMouseMonitor = nil
         splitControls?.hide()
         let receipt: [String: Any] = [
             "schema_version": 1, "poc": "macos-surface-l1", "mode": options.mode.rawValue,
@@ -455,13 +496,14 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "spaces_notifications": spacesNotifications, "desktop_restorations": desktopRestorations,
             "hides_on_deactivate": window?.hidesOnDeactivate ?? false,
             "layer_backed": renderedScene.wantsLayer,
-            "input_policy": options.overlayOnly ? "native-wallpaper-object-overlay" :
+            "input_policy": options.overlayOnly ? "passive-global-click-monitor" :
                 (options.splitInput ? "split-widget-experiment" : (options.mode == .desktop ? "explicit-menu-only" : "window")),
             "overlay_only": options.overlayOnly,
             "split_mouse_downs": splitControls?.mouseDowns ?? 0,
             "split_object_count": splitControls?.objectButtons.count ?? 0,
             "split_visible_object_count": splitControls?.visibleObjectCount ?? 0,
             "selected_object_id": selectedObjectID ?? "none",
+            "global_mouse_monitor": globalMouseMonitorInstalled,
             "split_panel_open": state.panelOpen,
             "continuity_image": stillName ?? "not-requested",
             "system_wallpaper_modified": false,

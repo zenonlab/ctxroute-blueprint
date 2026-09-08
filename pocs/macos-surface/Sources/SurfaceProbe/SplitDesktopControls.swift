@@ -14,6 +14,7 @@ final class SplitDesktopControls {
     let status = NSTextField(labelWithString: "")
     private(set) var desktopExposed = false
     private(set) var selectedObjectID: String?
+    private let usesObjectWindows: Bool
 
     var objectButton: DynamicObjectButton { objectButtons[0] }
     var mouseDowns: Int {
@@ -22,8 +23,9 @@ final class SplitDesktopControls {
     }
     var visibleObjectCount: Int { objectWindows.filter(\.isVisible).count }
 
-    init(theme: FormationTheme, target: AnyObject, open: Selector,
+    init(theme: FormationTheme, usesObjectWindows: Bool = true, target: AnyObject, open: Selector,
          effect: Selector, pause: Selector, close: Selector) {
+        self.usesObjectWindows = usesObjectWindows
         objectWindows = theme.objects.map { _ in InputProbePanel(background: .clear) }
         objectButtons = theme.objects.map { object in
             DynamicObjectButton(objectID: object.id, label: object.label,
@@ -96,7 +98,9 @@ final class SplitDesktopControls {
 
     private func syncVisibility(panelOpen: Bool) {
         guard desktopExposed else { hide(); return }
-        for window in objectWindows where !window.isVisible { window.orderFrontRegardless() }
+        if usesObjectWindows {
+            for window in objectWindows where !window.isVisible { window.orderFrontRegardless() }
+        }
         if panelOpen {
             if !controlsWindow.isVisible { controlsWindow.orderFrontRegardless() }
         } else if controlsWindow.isVisible { controlsWindow.orderOut(nil) }
