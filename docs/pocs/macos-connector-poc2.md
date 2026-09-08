@@ -138,7 +138,20 @@ le transport indisponible avant accès au groupe ; ils ne demandent pas de chang
 fond pour résoudre une erreur de signature. Le contrôle natif M2-06 reste à qualifier.
 Le manifeste accepte un sous-ensemble ordonné de contrôles, sans accorder leurs
 capacités. Les fixtures préparent seulement audio et fichiers en haut à gauche.
-Les gestes de lancement/personnalisation/ajout restent à implémenter selon D1-14–16.
+La politique pure des gestes D1-14–16 est implémentée dans `GestureRouter` :
+elle produit seulement des intentions, après relâchement confirmé. Huit tests
+couvrent distinction gauche/droite, vide connu, priorité native, contrôles,
+glisser annulé, permission perdue, scène remplacée et événements incohérents.
+Le seuil de glisser est exprimé en points logiques locaux (4 par défaut), pas
+en pixels globaux. Un geste capturé puis annulé conserve son relâchement associé
+pour éviter de transmettre un événement orphelin. Le connecteur doit requalifier
+la cible et l'autorisation aux deux extrémités ; `unknown` ne vaut jamais `empty`.
+Le routage n'est pas branché au provider : aucun tap, lancement d'app, éditeur,
+audio ou réglage Finder n'est activé par ces tests. M2-04/05 et D1 natif restent
+non qualifiés. Le total courant est 17 XCTest, sans notifications système de test.
+Cette implémentation reste dans le modèle existant : aucun contrat de transport,
+dépendance ou frontière ne change. Le dataflow de personnalisation précise seulement
+que la composition du thème possède aussi la politique de gestes.
 Les tableaux datés ci-dessous sont historiques, pas un verdict courant de livraison.
 
 ### Preuves de la première tranche — 8 septembre 2026

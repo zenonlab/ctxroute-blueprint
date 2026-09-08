@@ -20,7 +20,7 @@
     { "id": "importer", "type": "backend", "label": "Pipeline d'import", "sublabel": "valide · convertit · trace", "stage": 1, "row": 2, "width": 150 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "capacités · licences · versions", "stage": 2, "row": 0, "width": 160 },
     { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets et dépendances", "stage": 2, "row": 2, "width": 160 },
-    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "objets · rigs · états · menus", "stage": 3, "row": 0, "width": 170 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "rigs · états · gestes · menus", "stage": 3, "row": 0, "width": 170 },
     { "id": "capabilities", "type": "security", "label": "Courtier de capacités", "sublabel": "support · consentement · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "animation · matériaux · effets", "stage": 4, "row": 0, "width": 160 },
     { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "2 boutons · menu contextuel", "stage": 4, "row": 1, "width": 160 },

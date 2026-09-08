@@ -8,7 +8,24 @@ du transport non disponible sans Team ID, CI Swift et contrats de gestes D1-14�
 Brief et roadmap sont réalignés : dépôt initialisé, PoC1 gelé, PoC2 incomplet.
 Le nouveau build doit être qualifié séparément ; ne pas confondre code corrigé et
 version installée. Aucun ancien mécanisme de clic ou de préférence Finder réutilisé.
-Sans identité adaptée, M2-06 reste bloqué ; les gestes D1 ne sont pas implémentés.
+Sans identité et droits adaptés, M2-06 reste bloqué. La politique de gestes D1 est
+maintenant implémentée et testée isolément (`GestureRouter`, 8 tests), sans raccord
+natif ni exécution d'action. Total : 17 XCTest. Ne pas annoncer des clics fonctionnels.
+Les dernières modifications restent internes au modèle. Le gate exige une preuve
+de placement pour les nouveaux modules : le dataflow de personnalisation précise
+la responsabilité « gestes » dans la composition, sans nouvelle frontière.
+Build de cette tranche, non installé :
+`dist/pocs/macos-connector/build.v6Mjzm/Wallpaper Connector PoC 2.app`.
+Compilation stricte, catalogue Apple trois thèmes, signatures et plists passent.
+Le contrôle du trousseau confirme toujours zéro identité valide ; les deux extensions
+historiques ci-dessous restent chargées, sans compagnon. Aucun réglage OS modifié.
+Audit de clôture de cette tranche : CONFORME pour périmètre PoC2, absence de
+suppression, doctrine et hooks inchangés, tests et documentation. `npm run verify`
+sort à 0 : 262 tests Node passent, 1 ignoré, 0 échec ; 3 tests CRG passent,
+audit npm sans vulnérabilité et diagrammes valides. Le sensor conserve 11 WARN,
+sans ERROR/UNSAFE ; ce n'est pas un rapport sans avertissement.
+MANQUE : preuve native du transport, des gestes et des capacités audio/Finder.
+N/A : nouvel ADR, aucune frontière ou dépendance modifiée.
 Le diagnostic compilé `--check` a retourné 2 avec le motif de signature, et
 `--preflight-install` a retourné 2 en identifiant les deux providers résiduels.
 Ces refus sont attendus ; ils ne sont pas une réussite du transport natif.

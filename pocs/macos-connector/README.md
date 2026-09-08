@@ -16,7 +16,14 @@ Le nouveau build n'est pas installé automatiquement ; les apps historiques doiv
 rester arrêtées. Aucune interface interactive, audio ou toggle Finder n'est livrée
 par ce correctif. Les deux contrôles du manifeste restent des déclarations pour D1.
 
-Le code compile avec Swift 6 strict ; les neuf tests XCTest passent. Les deux
+La politique pure `GestureRouter` traduit les gestes en intentions : ouverture à
+gauche, personnalisation à droite, ajout sur vide confirmé et deux contrôles.
+Elle annule les glissers, scènes périmées et permissions perdues ; les cibles
+natives ou inconnues ne sont jamais capturées au début d'un geste. Le raccord
+aux événements macOS et l'exécution autorisée des intentions restent absents.
+Les tests synthétiques ne prouvent donc pas la priorité Finder sur le vrai bureau.
+
+Le code compile avec Swift 6 strict ; les 17 tests XCTest passent. Les deux
 bundles sont signés ad hoc et leur manifeste embarqué est identique. Ce résultat
 n'est **pas** une qualification du wallpaper dans WallpaperAgent : activation,
 Spaces, animation visible, commandes interprocessus et énergie restent à vérifier

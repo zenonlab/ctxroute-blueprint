@@ -1,7 +1,8 @@
 # Interactions programmables : scène, objets et interface
 
 État : intention produit et règles sémantiques révisées, 8 septembre 2026.
-Aucun moteur d'interactions, widget ou langage de thème implémenté.
+Politique de gestes pure implémentée dans le modèle du PoC2, sans raccord natif.
+Aucun widget, exécuteur d'actions ou langage de thème implémenté.
 Voir [ADR-0039](../decisions/ADR-0039-programmable-theme-interactions.md),
 les [contrats C0–C6](module-contracts.md) et le
 [schéma runtime](src/runtime-infrastructure.architecture.json). L'apparence et les

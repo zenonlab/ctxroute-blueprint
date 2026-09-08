@@ -234,7 +234,9 @@ ni avertissement. Le contrôle visuel passe à 1440×900, 1600×1000, 1920×1080
 2048×1320 en clair et sombre. Les captures sombres 1440×900 et 2048×1320 ont été inspectées : étapes,
 branches publique/privée et sorties de présentation sont lisibles sans collision.
 Source SHA-256 :
-`715cee444c1936a234db8d0d28b83e3c4b472993319f9203e490e8b6bcbc4202`.
+`411d2117c6c0c37915a5b20aa681bb99ec2e6605b332dbed96b97558c49caee0`.
 Artefact SHA-256 :
-`00ce0674493fa077fc0fd8feaae4effffc79de130f2158776983729e014a3636`.
+`11dddffbc223fc7dc9590091628449d2cf2c7d8bbea4f7989ec9f002d9182a30`.
+Le modèle de gestes réside dans la composition du thème ; ce repère de responsabilité
+ne signifie pas que le raccord natif ou le courtier d'actions est livré.
 Les libellés sont en français ; l'interface fixe du viewer reste en anglais.
