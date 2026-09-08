@@ -1,5 +1,44 @@
 # Reprise de session — Wallpaper
 
+## f8cQnv installé — 8 septembre 2026, 21:37
+
+Installation autonome demandée. Les clics Réglages échouaient (offscreen/noWindows).
+`pluginkit -e ignore` seul n'empêchait pas WallpaperAgent de recréer le provider ;
+tentative refusée par le préflight, élection `default` et ancien agent restaurés.
+Seconde préparation : arrêt du job exact, désinscription de l'ancien provider,
+désinscription LaunchServices, ancien paquet déplacé hors du chemin installé dans
+`dist/pocs/macos-connector/update-hold.5EYqh8/previous-app.disabled`, puis arrêt du
+provider PID 17798. Retour arrière prévu si le nouveau paquet n'était pas copié.
+Préflight **passé**, installation f8cQnv terminée, pas de suppression. Signature
+deep/strict et égalité du binaire installé/candidat vérifiées. Ne pas reconstruire.
+
+Agent persistant initial PID 17973 : accessibility=false. Passage en diagnostic :
+premier bootstrap échoue avec code 5 après bootout ; service ensuite absent, second
+start réussi PID **18091**. Deux starts identiques gardent ce PID. La transition
+de configuration de lancement reste à durcir ; ne pas affirmer une fiabilité totale.
+Provider **18055** actif après réouverture via le bouton natif du connecteur puis
+sélection Ambre. Diagnostic Ambre : **2 surfaces**, commandes XPC confirmées.
+Les 0 surfaces du diagnostic Orbite correspondaient à un thème différent, pas à
+l'absence du provider. Aucun clic sur le décor encore qualifié.
+
+Accord utilisateur reçu : « acord granted » pour renouveler uniquement TCC de
+Wallpaper Connector Agent. La sélection AX par clic tombait sur une mauvaise ligne ;
+aucun retrait effectué sur cette ligne. Navigation clavier contrôlée jusqu'à la
+ligne Wallpaper Connector Agent, puis Supprimer. Authentification native réalisée
+par l'utilisateur, ancienne entrée retirée, puis ajout de l'agent au chemin installé
+exact (URL vérifiée dans le sélecteur), interrupteur on. Aucun autre droit modifié.
+Relance du même binaire via launchd : PID **18303**, 21:44:10 **accessibility=true**
+et **tap-enabled**. Reconnexion XPC épinglée au provider 18055 observée à 21:44:36
+(reprise différée de 30 secondes). Les clics avant cette reconnexion peuvent être
+refusés faute de catalogue ; ce délai n'est pas une promesse de reprise instantanée.
+Diagnostic masqué sans quitter l'agent. Computer Use refuse le bureau Finder avec
+`cgWindowNotFound` ; une question demande clic son puis clic droit personnage pour
+corréler les traces réelles. Fichiers : qualification des deux sens encore requise.
+Le plist persistant sur disque est remis sans `--diagnostics` pour le prochain login,
+sans redémarrer le job actuel : celui-ci conserve ses traces bornées pour le test.
+Skill Computer Use employé ; aucune modification du code, des contrats ou diagrammes
+pendant cette installation. État produit : **PoC non validé**.
+
 ## Récupération de capture — candidat du 8 septembre 2026, 21:23
 
 Demande : conserver les zones invisibles synchronisées du PoC1 et vérifier les
