@@ -1,5 +1,41 @@
 # Reprise de session — Wallpaper
 
+## Fichiers du bureau — correctif candidat, 8 septembre 2026
+
+**Retour utilisateur : les interactions fonctionnent sur g9pTbH**, sauf le bouton
+Fichiers. Ce dernier ouvrait seulement les Réglages. PoC1 inspecté : CFPreferences
+`CreateDesktop`, puis arrêt/reprise Finder. Non repris car le PoC2 nécessite une
+cible AX Finder positive pour les clics ; aucun overlay n'a été ajouté.
+
+Candidat **build.VaWZIK**, construit avec `build.sh --development`, pas installé.
+`DesktopItems` écrit `StandardHideDesktopIcons` dans WindowManager, relit l'état,
+signale les erreurs et refuse Stage Manager actif ou CreateDesktop=false. Toggle
+et réaffichage explicite dans le menu natif Orbite, indépendants du wallpaper.
+Ni fichiers déplacés/supprimés, ni arrêt Finder/Dock, ni polling, ni nouveau XPC.
+Le PoC1 et le filtre d'entrée désormais fonctionnel restent intacts.
+
+Preuves : 31 XCTest ; 9 cas injectés DesktopItems + 9 cas Finder ; catalogue natif
+3 thèmes ; compilation Swift 6 stricte et signatures valides. Sur MAC-01, la case
+native « Sur le bureau » suit StandardHideDesktopIcons (1 → 0 → 1), puis suit une
+écriture directe vers 0. État initial rétabli : StandardHideDesktopIcons=0,
+CreateDesktop=1, même Finder PID 26219. Pas de preuve du cycle visuel complet par
+le bouton du candidat ni de conservation du hit-test après masquage.
+
+L'app installée demeure g9pTbH, agent PID 27652 autorisé : ne pas la remplacer à
+chaud. Prochaine étape : sélectionner temporairement un fond Apple, installer
+VaWZIK via le préflight normal, renouveler TCC avec accord utilisateur si nécessaire,
+puis geler ce binaire et qualifier masquer/réafficher depuis le bouton et le menu.
+Ne pas annoncer le correctif déployé avant cette étape.
+
+Schéma architecture : showcase 9/9 sans erreur/avertissement ; source SHA-256
+`aa72d887cc5496fd31632c4f4bb7f810bd5fc739c5463f4c84f6be035da621a3`, HTML SHA-256
+`d10454b8ee3a271a50eaded13e792fd416396aca6885220da655e0fe8a0d3051`.
+Containment validé sur quatre résolutions, clair/sombre ; captures sombres 1440×900
+et 2048×1320 inspectées. Viewer fixe en anglais.
+`npm run verify` passe (code 0, `/tmp/wallpaper-desktop-items-verify.log`).
+Audit doctrine : AGENTS/CLAUDE/hooks inchangés ; portée native locale, pas de nouvelle
+dépendance. Preuve fonctionnelle manquante : installation et clics du candidat.
+
 ## Build corrigé autorisé — 8 septembre 2026, 19:59
 
 Après accord explicite et authentifications réalisées par l'utilisateur, seule

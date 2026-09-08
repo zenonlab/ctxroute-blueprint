@@ -7,6 +7,7 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         do { try run() } catch { extensionLog("native-catalog=FAIL \(error)"); exit(EXIT_FAILURE) }
     }
     static func run() throws {
+        try testDesktopItems()
         let background = ["AXGroup", "AXScrollArea", "AXApplication"]
         guard FinderBackground.matches(bundle: "com.apple.finder", roles: background) else {
             throw ModelError.invalid("measured Finder background rejected")

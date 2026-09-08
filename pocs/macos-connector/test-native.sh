@@ -10,6 +10,8 @@ env -u SDKROOT xcrun swiftc -swift-version 6 -warnings-as-errors -parse-as-libra
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift" \
   "$connector_source/Sources/ThemeModel/GestureRouter.swift" \
   "$connector_source/App/DesktopInput.swift" \
+  "$connector_source/App/DesktopItems.swift" \
+  "$connector_source/Tests/DesktopItemsTests.swift" \
   "$connector_source/Native/Bridge/CodableShims.swift" \
   "$connector_source/Native/Catalog.swift" "$connector_source/Tests/NativeCatalog.swift" \
   -o "$connector_output"

@@ -3,7 +3,35 @@
 Une app AppKit de contrôle, une extension wallpaper native, un catalogue original.
 Pas de fenêtre de décor superposée, de terminal PTY, de ROM ou de WebView.
 Le PoC1 reste intact. Les gestes macOS sont soumis à Accessibilité et à une
-classification conservatrice du fond Finder ; aucun réglage Finder automatique.
+classification conservatrice du fond Finder ; aucun réglage modifié au lancement.
+
+## Fichiers du bureau — correctif du 8 septembre 2026
+
+L'utilisateur confirme les interactions du build installé `g9pTbH`, sauf le bouton
+Fichiers : celui-ci ouvrait seulement les Réglages. Le correctif raccorde cette
+intention à `App/DesktopItems.swift`, dans l'agent, sans nouveau message XPC.
+Il modifie `com.apple.WindowManager/StandardHideDesktopIcons` via CFPreferences,
+uniquement après clic. L'état est relu avant chaque bascule et après synchronisation.
+Le menu Orbite dispose d'un toggle et d'une commande **Réafficher les fichiers du
+bureau**, indépendants du hit-test du wallpaper. Aucun fichier n'est lu, déplacé,
+supprimé ni modifié. Aucun redémarrage Finder/Dock ni polling n'est ajouté.
+
+Le PoC1 utilisait `CreateDesktop` puis redémarrait Finder, comme le fait
+[OnlySwitch](https://github.com/jacklandrin/OnlySwitch/blob/main/Modules/Sources/Switches/ShellCommandDefine.swift).
+Ce chemin n'est pas repris : retirer le bureau Finder peut retirer la cible AX
+positive nécessaire aux clics du PoC2. Le nouveau réglage reste une préférence
+macOS non contractuelle, qualifiée seulement sur MAC-01 : la case native « Sur le
+bureau » est passée de 1 à 0 puis 1 lors de l'essai ; une écriture directe a aussi
+mis cette case à 0. `CreateDesktop` est resté à 1 ; Finder n'a pas été redémarré.
+Affichage initial rétabli. Cela confirme le réglage, **pas encore le cycle visuel
+masquer/réafficher par le bouton du nouveau paquet** ni la conservation du hit-test.
+
+Si Stage Manager est actif ou si un autre outil a déjà mis `CreateDesktop=false`,
+l'action échoue explicitement et le diagnostic propose les Réglages : elle ne
+change pas ces politiques à l'insu de l'utilisateur. Les neuf cas injectés de
+`test-native.sh` couvrent bascules, restauration, changement externe, refus de
+synchronisation, absence de quittance et ces deux restrictions. L'icône reste
+neutre : le réglage observé n'est pas une preuve d'état visuel du compositeur.
 
 ## Personnalisation locale — 8 septembre 2026
 
@@ -31,8 +59,9 @@ quittance ; Annuler avant envoi ne modifie rien. Les ressources signées restent
 
 Le provider peint les deux contrôles du manifeste dans ses calques natifs. `Son`
 modifie uniquement l'état muet du thème : les fixtures restent silencieuses et
-aucun volume système ne change. `Fichiers…` ouvre le réglage macOS, **pas un toggle
-qualifié**. Le menu de récupération du connecteur permet aussi l'édition d'un objet.
+aucun volume système ne change. `Fichiers` appelle le contrôleur macOS ci-dessus ;
+la qualification visuelle du nouveau paquet reste requise.
+Le menu de récupération du connecteur permet aussi l'édition d'un objet.
 Aucun panneau ne s'ouvre au lancement normal.
 
 Présentation corrigée : deux boutons carrés 40×40, espace 8 points, icônes seules

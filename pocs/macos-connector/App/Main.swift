@@ -92,7 +92,7 @@ import ApplicationServices
     }
 }
 
-@MainActor final class ConnectorApp: NSObject, NSApplicationDelegate {
+@MainActor final class ConnectorApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let themes: [Theme]
     var theme: Theme { themes[themePicker.indexOfSelectedItem >= 0 ? themePicker.indexOfSelectedItem : 0] }
     let themePicker = NSPopUpButton()
@@ -104,6 +104,8 @@ import ApplicationServices
     var timeout: Task<Void, Never>?
     let editor = CustomizationModal()
     let input = DesktopInput()
+    let desktopItems = DesktopItems()
+    var desktopItemsMenuItem: NSMenuItem?
     let store = ThemeStore(directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("org.wallpaperthemes.connectorpoc2/themes", isDirectory: true))
     var restoredInstances: Set<UUID> = []
@@ -141,7 +143,7 @@ import ApplicationServices
         stack.addArrangedSubview(controls)
         statusLabel.font = .systemFont(ofSize: 13); stack.addArrangedSubview(statusLabel)
         let capabilities = NSTextField(wrappingLabelWithString:
-            "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : réglage macOS, toggle non qualifié.")
+            "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : bureau standard, sans redémarrage Finder.")
         capabilities.textColor = .secondaryLabelColor; stack.addArrangedSubview(capabilities)
         stack.addArrangedSubview(NSButton(title: "Choisir ce fond dans macOS…", target: self, action: #selector(wallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers dans Réglages…", target: self, action: #selector(desktopSettings)))
@@ -164,6 +166,11 @@ import ApplicationServices
         interactionItem.target = self
         let editItem = statusMenu.addItem(withTitle: "Personnaliser un objet…", action: #selector(editFirstObject), keyEquivalent: "")
         editItem.target = self
+        desktopItemsMenuItem = statusMenu.addItem(withTitle: "Afficher / masquer les fichiers du bureau", action: #selector(toggleDesktopItems), keyEquivalent: "")
+        desktopItemsMenuItem?.target = self
+        let restoreItem = statusMenu.addItem(withTitle: "Réafficher les fichiers du bureau", action: #selector(showDesktopItems), keyEquivalent: "")
+        restoreItem.target = self
+        statusMenu.delegate = self
         statusMenu.addItem(.separator())
         statusMenu.addItem(withTitle: "Quitter le connecteur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         statusItem?.menu = statusMenu
@@ -216,6 +223,26 @@ import ApplicationServices
     }
     @objc func wallpaperSettings() { open("x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") }
     @objc func desktopSettings() { open("x-apple.systempreferences:com.apple.Desktop-Settings.extension") }
+    func menuWillOpen(_ menu: NSMenu) {
+        guard let visible = try? desktopItems.isVisible() else {
+            desktopItemsMenuItem?.title = "Fichiers du bureau : réglage indisponible"
+            return
+        }
+        desktopItemsMenuItem?.title = visible ? "Masquer les fichiers du bureau" : "Afficher les fichiers du bureau"
+    }
+    @objc func toggleDesktopItems() { changeDesktopItems(restore: false) }
+    @objc func showDesktopItems() { changeDesktopItems(restore: true) }
+    private func changeDesktopItems(restore: Bool) {
+        do {
+            let visible = try restore ? desktopItems.setVisible(true) : desktopItems.toggle()
+            statusLabel.stringValue = visible ? "Réglage enregistré : fichiers affichés." : "Réglage enregistré : fichiers masqués. Réaffichage disponible dans le menu Orbite."
+        } catch {
+            // Recovery is accessible without a wallpaper hit-test or a permission prompt.
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            statusLabel.stringValue = "Réglage non confirmé. Vérifiez Bureau et Dock (Stage Manager ou ancien masquage Finder)."
+        }
+    }
     @objc func interactionSettings() {
         input.requestPermission()
     }
@@ -235,7 +262,7 @@ import ApplicationServices
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         case .toggle(.audio):
             send(transport.status?.theme(theme.theme_id)?.state.muted == false ? .mute : .unmute, target: theme.theme_id)
-        case .toggle(.desktopItems): desktopSettings()
+        case .toggle(.desktopItems): toggleDesktopItems()
         }
     }
     private func open(_ value: String) {

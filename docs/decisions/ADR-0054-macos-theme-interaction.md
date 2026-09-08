@@ -8,6 +8,7 @@ scope:
   - docs/architecture/theme-customization.md
   - docs/session-handoff.md
 review: on-change
+revised: true
 ---
 # ADR-0054 — Gestes, modale et personnalisation locale du PoC2
 
@@ -56,4 +57,11 @@ le code ou déduit de la signature ad hoc. Le classifier Finder est un candidat
 structurel conservateur, pas une garantie publique Apple ; les tests réels restent
 requis. Une surface sans écran associé ou ambiguë échoue ouverte vers macOS.
 Les fixtures n'ont pas de piste audio ; mute est un état du thème. Le contrôle
-Fichiers ouvre les Réglages tant que le toggle OS n'est pas qualifié.
+Fichiers appelle désormais un contrôleur local de `StandardHideDesktopIcons`
+(WindowManager), sans redémarrer Finder ni modifier `CreateDesktop`. Aucun ajout
+au contrat XPC : c'est une action de l'agent. La préférence est relue à chaque
+action ; un échec d'écriture ou de confirmation est signalé. Le menu natif conserve
+un réaffichage explicite indépendant de la capture des clics. Stage Manager actif
+ou bureau Finder désactivé par un autre outil : refus, avec accès aux Réglages.
+La case native a suivi l'écriture sur MAC-01, mais le cycle visuel complet depuis
+le bouton du nouveau paquet et les clics après masquage restent à qualifier.
