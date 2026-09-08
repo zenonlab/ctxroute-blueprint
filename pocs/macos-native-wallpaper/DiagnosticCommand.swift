@@ -4,7 +4,7 @@ import Foundation
 // Darwin notifications are not authenticated: never use this channel for privileges.
 enum DiagnosticCommand: String, CaseIterable, Sendable {
     case showPanel, hidePanel, pause, resume, effectOn, effectOff, reset
-    static let prefix = "org.wallpaperthemes.nativeprobe.interactive.visual."
+    static let prefix = "org.wallpaperthemes.nativeprobe.controls.visual."
     var notification: String { Self.prefix + rawValue }
     init?(notification: String) {
         guard notification.hasPrefix(Self.prefix) else { return nil }

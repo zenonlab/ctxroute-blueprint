@@ -142,7 +142,10 @@ enum InteractiveDiagnostic {
             let anchorFrame = anchor.normalizedFrame
             object.frame = CGRect(x: root.bounds.width * anchorFrame.x, y: root.bounds.height * anchorFrame.y,
                 width: root.bounds.width * anchorFrame.width, height: root.bounds.height * anchorFrame.height)
-            if let action = theme.action(id: anchor.actionID) { object.opacity = isSelected(action.command) ? 1 : 0.78 }
+            object.opacity = 1
+            if let action = theme.action(id: anchor.actionID) {
+                object.borderWidth = isSelected(action.command) ? 5 : 2
+            }
             if let label = object.sublayers?.first as? CATextLayer {
                 label.frame = CGRect(x: 6, y: max(0, (object.bounds.height - 22) / 2),
                     width: max(0, object.bounds.width - 12), height: 22)

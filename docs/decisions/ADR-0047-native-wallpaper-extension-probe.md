@@ -40,6 +40,8 @@ isolé du PoC et vérifie identités, versions de catalogue, point d'extension,
 assets, signature et entitlement sandbox. Cette porte ne lance aucun binaire et
 ne transforme donc pas une conformité de structure en preuve d'admission ou de
 rendu par macOS.
+Chaque invariant emploie un refus explicite : sur Bash 3.2, une expression
+`[[ ... ]]` fausse ne suffit pas ici à garantir l'arrêt par `errexit`.
 
 ## Consequences
 
@@ -86,6 +88,21 @@ associe la mauvaise tuile au nouveau groupe et empêche de qualifier le lancemen
 Une modification du contrat de catalogue augmente aussi `CFBundleVersion` pour
 que LaunchServices et WallpaperAgent ne réutilisent pas le modèle en cache d'un
 binaire antérieur portant la même identité et la même version.
+La correction de visibilité des ancres produit ainsi la version 8 : toutes les
+ancres restent opaques et l'état actif est indiqué par une bordure renforcée,
+sans masquer les autres objets du décor.
+Le lancement réel de cette version montre cependant que le modèle de choix reste
+mis en cache sous l'identité précédente. La version 9 utilise donc le provider
+`org.wallpaperthemes.nativeprobe.controls.extension` et le groupe
+`native-wallpaper-controls`. Cette identité distincte fait apparaître
+`Balayage interactif` et déclenche le lancement XPC de la nouvelle extension sans
+supprimer l'ancien choix. Elle ne vaut pas encore preuve d'activation du fond.
+
+Sur macOS 26.2, la pression de cette tuile via l'action Accessibilité fait planter
+le panneau Apple dans `AccessibilityButtonModifier` avant tout `ACQUIRE` de notre
+extension. La qualification doit employer un clic utilisateur physique et
+contrôler ensuite le provider inscrit dans `Index.plist`; un test AX ne peut pas
+être présenté comme équivalent sur cette version du système.
 
 Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
 dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.

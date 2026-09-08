@@ -41,7 +41,7 @@ if [[ "${1:-}" == --package ]]; then
   # AppExtension.main registers the implementation; NSExtensionMain hosts its loop.
   probe_linker=(-Xlinker -e -Xlinker _NSExtensionMain)
   (cd "$probe_root" && node pocs/macos-native-wallpaper/package.mjs "$probe_stage")
-  grep -q 'GroupID(id: "native-wallpaper-interactive")' \
+  grep -q 'GroupID(id: "native-wallpaper-controls")' \
     "$probe_stage/PhospheneExtension/SettingsProvider.swift"
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticLibrary.swift")
   probe_sources+=("$probe_root/pocs/macos-native-wallpaper/DiagnosticCommand.swift")
@@ -69,8 +69,12 @@ if [[ "${1:-}" == --package ]]; then
     "$probe_extension/Contents/MacOS" "$probe_extension/Contents/Resources"
   cp "$probe_root/pocs/macos-native-wallpaper/Host-Info.plist" "$probe_app/Contents/Info.plist"
   cp "$probe_root/pocs/macos-native-wallpaper/Extension-Info.plist" "$probe_extension/Contents/Info.plist"
-  [[ "$(plutil -extract CFBundleVersion raw "$probe_app/Contents/Info.plist")" == 7 ]]
-  [[ "$(plutil -extract CFBundleVersion raw "$probe_extension/Contents/Info.plist")" == 7 ]]
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_app/Contents/Info.plist")" == 9 ]] || {
+    echo 'Unexpected host catalog version.' >&2; exit 66;
+  }
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_extension/Contents/Info.plist")" == 9 ]] || {
+    echo 'Unexpected extension catalog version.' >&2; exit 66;
+  }
   cp "$probe_stage/NativeWallpaperProbe" "$probe_extension/Contents/MacOS/NativeWallpaperProbe"
   cp "$probe_stage/LICENSE" "$probe_app/Contents/Resources/Phosphene-LICENSE"
   cp "$probe_root/pocs/macos-native-wallpaper/interactive-theme.json" "$probe_app/Contents/Resources/interactive-theme.json"

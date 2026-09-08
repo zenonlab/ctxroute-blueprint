@@ -3,10 +3,10 @@
   "diagram_type": "architecture",
   "meta": { "title": "Essai natif — intégration à qualifier", "quality_profile": "showcase", "viewBox": [1280, 760] },
   "components": [
-    { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection par utilisateur", "pos": [40, 110], "size": [230, 80] },
-    { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système Apple", "pos": [520, 110], "size": [240, 80] },
-    { "id": "package-gate", "type": "security", "label": "Gate paquet", "sublabel": "16 contrôles · sans lancement", "pos": [750, 20], "size": [190, 70] },
-    { "id": "extension", "type": "backend", "label": "Extension diagnostic", "sublabel": "Phosphene · XPC privé", "pos": [1010, 110], "size": [230, 80] },
+    { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Catalogue cache · clic manuel", "pos": [40, 110], "size": [230, 80] },
+    { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Provider v9 lancé", "pos": [520, 110], "size": [240, 80] },
+    { "id": "package-gate", "type": "security", "label": "Gate paquet", "sublabel": "18 contrôles · sans lancement", "pos": [750, 20], "size": [190, 70] },
+    { "id": "extension", "type": "backend", "label": "Extension diagnostic", "sublabel": "Provider controls · XPC privé", "pos": [1010, 110], "size": [230, 80] },
     { "id": "animation", "type": "backend", "label": "Visuels interactifs", "sublabel": "Calques · panneau · effets", "pos": [1010, 530], "size": [230, 80] },
     { "id": "controls", "type": "frontend", "label": "Compagnon local", "sublabel": "Boutons AppKit explicites", "pos": [40, 320], "size": [230, 80] },
     { "id": "priority", "type": "security", "label": "Priorité Finder", "sublabel": "AX optionnel · refus par défaut", "pos": [40, 430], "size": [190, 70] },
@@ -18,7 +18,7 @@
   ],
   "boundaries": [{ "kind": "region", "label": "Paquet .app / .appex", "wraps": ["extension"], "pad": 20 }],
   "connections": [
-    { "from": "picker", "to": "host", "label": "choix du fond" },
+    { "from": "picker", "to": "host", "label": "catalogue puis choix" },
     { "from": "host", "to": "extension", "label": "cycle de vie XPC" },
     { "from": "package-gate", "to": "extension", "label": "qualifie le bundle", "variant": "security", "labelAt": [1000, 16] },
     { "from": "extension", "to": "animation", "label": "diagnostic visuel", "labelDy": 24 },

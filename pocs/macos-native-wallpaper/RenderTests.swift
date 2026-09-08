@@ -27,6 +27,8 @@ enum RenderTests {
             let anchorLayers = root.sublayers!.filter { $0.name?.hasPrefix("interactive.anchor.") == true && $0.name?.contains("label") == false }
             precondition(anchorLayers.count == theme.anchors.count)
             precondition(anchorLayers.allSatisfy { root.bounds.contains($0.frame) })
+            precondition(anchorLayers.allSatisfy { $0.opacity == 1 })
+            precondition(anchorLayers.first { $0.name == "interactive.anchor.terminal-object" }?.borderWidth == 5)
             InteractiveDiagnostic.receive(.pause)
             let pausedTime = sweep.timeOffset
             precondition(sweep.speed == 0)
@@ -49,6 +51,6 @@ enum RenderTests {
             let smallPanel = small.sublayers!.first { $0.name == "interactive.panel" }!
             precondition(smallPanel.frame.minX >= 0 && smallPanel.frame.maxX <= small.bounds.maxX)
         }
-        print("PASS: 15 layer checks; direct dispatch only, no wallpaper registration or UI window")
+        print("PASS: 17 layer checks; direct dispatch only, no wallpaper registration or UI window")
     }
 }

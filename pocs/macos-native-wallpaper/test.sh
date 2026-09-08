@@ -39,5 +39,9 @@ xcrun swiftc -swift-version 6 -parse-as-library -D WALLPAPER_NATIVE_DIAGNOSTIC \
   "$probe_source/DiagnosticTheme.swift" "$probe_source/SnapshotTests.swift" \
   "$probe_tests/PhospheneExtension/ColorDiag.swift" \
   -o "$probe_tests/snapshot"
-"$probe_tests/snapshot" "$probe_source/interactive-theme.json" "$probe_tests/interactive-preview.png"
+if "$probe_tests/snapshot" >/dev/null 2>&1; then
+  echo 'Snapshot renderer accepted missing arguments.' >&2
+  exit 1
+fi
+"$probe_tests/snapshot" "$probe_source/interactive-theme.json" "$probe_tests/theme-states"
 echo "Isolated test artifacts retained: $probe_tests"

@@ -2,20 +2,23 @@
 
 ## Build interactif séparé — 8 septembre 2026
 
-L'utilisateur confirme l'animation du build 3. Son processus PID 12860 reste
-intact. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.Zl05p9/Native Wallpaper Probe.app`.
-Identités indépendantes `org.wallpaperthemes.nativeprobe.interactive` et
-`org.wallpaperthemes.nativeprobe.interactive.extension`, version 7. Signature et
-plist validées. Hôte enregistré par
-`lsregister -f`, extension par `pluginkit -a` ; le fond actif n'a pas été changé
-et ce nouveau binaire n'a pas encore été lancé. L'ancien compagnon build 5
-`compile.Bbw4WZ` reste le seul processus hôte interactif observé au moment de
-cette mise à jour ; il ne lit pas le dernier manifeste.
+L'utilisateur confirme l'animation du build 3. Son ancien processus d'extension
+a été arrêté le 8 septembre pour isoler le test suivant, sans supprimer son
+paquet. Le dernier paquet préparé est
+`dist/pocs/macos-native-wallpaper/compile.PKkhnQ/Native Wallpaper Probe.app`.
+Identités indépendantes `org.wallpaperthemes.nativeprobe.controls` et
+`org.wallpaperthemes.nativeprobe.controls.extension`, version 9. Signature et
+plist validées. Hôte enregistré par `lsregister -f`, extension par `pluginkit -a`.
+Le compagnon et l'extension ont été lancés ; le fond actif reste toutefois le
+choix build 3 dans `Index.plist`, car l'activation v9 n'a pas encore réussi.
+Les anciens compagnons `compile.g74ecK` (PID 43344) et `compile.Bbw4WZ`
+(PID 72671) restent les processus hôtes interactifs observés au moment de cette
+mise à jour ; ils ne lisent pas le dernier manifeste. Aucun ancien fichier n'a
+été supprimé.
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin Zl05p9** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin PKkhnQ** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -50,9 +53,10 @@ Dans le contexte de développement déjà autorisé, une sonde ponctuelle sans n
 de fichiers observe le fond Finder comme
 `AXGroup → AXScrollArea → AXApplication` et les icônes comme
 `AXImage → AXGroup → AXScrollArea → AXApplication`. Cette mesure prouve que les
-deux cibles sont distinguables sur cette session macOS 26.2 ; elle ne qualifie
-pas encore le binaire Zl05p9, dont la confiance AX propre reste inconnue tant
-qu'il n'est pas lancé. Aucune signature n'est donc promue en production.
+deux cibles sont distinguables sur cette session macOS 26.2. PKkhnQ est
+désormais lancé, mais la pression AX de sa tuile fait planter le panneau Apple
+avant l'acquisition d'une surface ; aucune signature n'est donc promue en
+production.
 
 `interactive-theme.json` constitue le premier asset de composition partagé par
 l'hôte et l'extension. Son schéma compagnon fixe l'identité, les couleurs, la
@@ -72,21 +76,21 @@ L'absence de récepteur doit laisser le compagnon utilisable sans attendre.
 
 Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 22
 assertions commandes/états, 14 assertions d'asset, 6 assertions de hit-testing,
-8 assertions de priorité macOS et 15 assertions sur les calques (pause
+8 assertions de priorité macOS et 17 assertions sur les calques (pause
 idempotente, reprise, effet, reset, panneau unique, contrôles et ancres bornés,
-taille réduite), soit 65 contrôles.
+ancres toujours visibles, sélection soulignée et taille réduite), soit 67 contrôles.
 Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.Zl05p9`
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.PKkhnQ`
 réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
 Son hôte porte le SHA-256
-`fee63b2b5e84fd29ae0cb52718f1c738e992eb3e82ea62981ff586895dd89ff3` et son
-extension `f33adb10ceedb2493e0f9cfe8cddce7d90def88e2b6cce042d7a29a1345bdcaa`.
+`399391e7ccc8fd5238d4c7e0433df5e4bf192b2446a2da4ee47cb1c413326e2c` et son
+extension `12ff651d1f9fe560bb159111d77c3da1409e2a40ad55bce112d7377d9e71c72a`.
 LaunchServices et pluginkit référencent ce chemin unique pour l'identité
-interactive ; l'ancien enregistrement ZJRqMF a été retiré sans supprimer son
-paquet. Aucun processus Zl05p9 n'est observé après l'enregistrement : il n'a pas
-été lancé et le fond actif n'a pas été modifié.
+`controls` ; les anciens enregistrements interactifs ont été retirés sans
+supprimer leurs paquets. Le compagnon PID 77803 et l'extension PID 77832 ont été
+observés depuis PKkhnQ après interrogation du catalogue par macOS.
 
 Le candidat g74ecK a été lancé et sa fenêtre AppKit, ses sept boutons ainsi que
 l'état « demande envoyée » ont été observés. Les Réglages ont affiché le groupe
@@ -98,37 +102,64 @@ groupes portant le même identifiant ; la copie amont réutilisait en effet
 `native-wallpaper-interactive`, mais conservait `CFBundleVersion` 6. Une lecture
 des Réglages après réenregistrement montrait encore le modèle mis en cache.
 Zl05p9 conserve le groupe propre, passe le couple hôte/extension à la version 7
-et vérifie ces deux invariants pendant le build. Il est compilé et enregistré,
-mais pas encore lancé ni sélectionné ; il ne faut donc pas annoncer que le
-catalogue ou le défaut visuel est résolu.
+et vérifie ces deux invariants pendant le build. Il a été compilé et enregistré,
+mais pas sélectionné, puis retiré du registre sans supprimer son paquet. ny9wmI
+introduit ensuite le catalogue version 8 et révèle deux défauts du premier gate
+Bash. sZMB0b est le premier assemblage version 8 à terminer toute la chaîne avec
+les 18 contrôles corrigés et la visibilité stable des ancres. Son lancement a
+confirmé que le choix actif restait lié à l'ancien provider build 3. PKkhnQ
+emploie donc une nouvelle identité provider/groupe et la version 9 pour isoler
+le cache sans supprimer le choix historique.
 
 `verify-package.sh` permet de rejouer la qualification statique sur un paquet
-déjà construit sans l'exécuter. Zl05p9 passe ses 16 contrôles : emplacement isolé,
+déjà construit sans l'exécuter. PKkhnQ passe ses 18 contrôles : emplacement isolé,
 binaires présents, plist, identités, versions, extension point, manifeste et
-schéma, nom/UUID de scène, identifiant de groupe compilé, signatures et sandbox.
+schéma identiques entre l'hôte et l'extension, miniature 480×270, nom/UUID de
+scène, identifiant de groupe compilé, signatures et sandbox.
 Le vérificateur refuse un chemin extérieur au répertoire de builds du PoC et
 exige que la sandbox soit l'unique entitlement de l'extension.
-Le snapshot reste une image de diagnostic fixe et ne reflète pas les nouveaux
-états interactifs : transitions, mise en veille et énergie restent à qualifier.
-Le même test produit une capture PNG 1200×780 hors écran ; sa revue visuelle
-confirme le panneau, les sept contrôles et les trois ancres sans troncature.
+Le gate emploie des refus explicites, car Bash 3.2 ne propage pas `errexit` pour
+une expression `[[ ... ]]` fausse dans cet environnement. Le paquet version 7
+est désormais refusé avec le code 66 ; un chemin extérieur reste refusé avec 65.
+Après enregistrement puis lancement de sZMB0b, Réglages Système affichait encore
+`Native Wallpaper Interactive → Balayage diagnostic` et `Index.plist` pointait
+vers nXn2Mw. Le nouvel identifiant v9 a forcé une seconde interrogation :
+Réglages affiche alors une entrée indépendante `Balayage interactif` et lance
+l'extension PKkhnQ. Cela qualifie la découverte du provider, pas son activation.
+Un `sky.click` par index Accessibilité sur la nouvelle tuile fait planter
+`com.apple.Wallpaper-Settings.extension` PID 77876 dans
+`AccessibilityButtonModifier` / `accessibilityPerformPress`, rapport
+`Wallpaper-2026-09-08-015333.ips`. Aucune trame `ACQUIRE` du renderer n'est
+observée et `Index.plist` reste inchangé : ce crash appartient au chemin de
+pression AX du panneau Apple, avant la création de surface. Les clics coordonnés
+de l'automatisation n'ont pas activé la tuile. La sélection manuelle v9 reste la
+preuve suivante ; ne pas confondre ce défaut d'automatisation avec un échec du
+renderer.
+La miniature du catalogue reste une image de diagnostic fixe et ne prouve pas
+les nouveaux états interactifs : transport, mise en veille et énergie restent
+à qualifier. Le test hors écran produit trois captures PNG 1200×780 : repos, panneau
+actif, puis panneau avec animation en pause et effet actif. Le test exige trois
+fichiers valides et byte-à-byte distincts ; leur revue visuelle confirme les
+transitions, les sept contrôles et les trois ancres sans troncature. Les ancres
+restent opaques dans tous les états ; une bordure renforcée indique l'objet actif
+sans faire disparaître les autres objets du décor.
 `npm run verify` réussit également ; syntaxes Bash/Node et diff vérifiés.
 AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
 
-Archify architecture : 9/9 showcase, zéro erreur/avertissement, deux corrections
-ciblées de placement/routage. Source SHA-256
-`040f1ea6f0e2329b04f74dab0ff9be358506e9996bc770d075ad0f687ae41504` ; HTML
-`e8cb008650a6cdc7c4f2189a4d2a072b3e345d4099f74c4f79d282ddf8dbfbd6`.
+Archify architecture : 9/9 showcase, zéro erreur/avertissement. Source SHA-256
+`feb63eced5f18ba139fcbb86833c166d8f4f1a1ffff58b14c2647d5505da4776` ; HTML
+`d6419d66cb2ec653bfba4184ceba33ee368ea7294b00a2969657f9a0511c414c`.
 Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
 tailles sans débordement, capture sombre 2048×1320 inspectée : hiérarchie,
-relations, gate statique et libellés lisibles, sans collision visible. Revue visuelle réussie
-après deux corrections ciblées de placement/routage. Libellés français, interface fixe du
-visualiseur en anglais.
+relations, gate statique, cache de catalogue et libellés lisibles, sans collision
+visible. Libellés français, interface fixe du visualiseur en anglais.
 
 ## Paquet animé précédent conservé
 
-Le paquet actuellement enregistré et relancé est
+Le paquet historiquement enregistré et relancé lors de cette preuve était
 `dist/pocs/macos-native-wallpaper/compile.nXn2Mw/Native Wallpaper Probe.app` (build 3).
+Son extension n'est plus enregistrée ni active depuis l'isolation de v9 ; ses
+fichiers restent conservés.
 Le build 4 `compile.aGAdKG` reste conservé mais non enregistré après le retour
 ciblé ci-dessous ; ne pas le réenregistrer pendant la qualification visuelle.
 Ouvrir cette application dans Finder, puis cliquer « Ouvrir les réglages ».

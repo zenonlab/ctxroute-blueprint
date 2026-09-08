@@ -48,9 +48,16 @@ Commandes existantes : `npm run setup`, `npm run validate`,
 Le PoC wallpaper natif ajoute
 `bash pocs/macos-native-wallpaper/verify-package.sh <paquet.app>` : ce contrôle
 post-build vérifie le périmètre du chemin, les identités et versions des deux
-bundles, l'extension point Apple, les assets, les signatures et le seul
+bundles, l'extension point Apple, l'identité des assets entre hôte et extension,
+la miniature 480×270, les signatures et le seul
 entitlement sandbox autorisé. Il ne lance ni l'hôte ni l'extension et ne prouve
 donc pas le rendu dans WallpaperAgent.
+Le parcours macOS sépare désormais quatre preuves : présence du provider dans
+pluginkit, lancement XPC lors du chargement du catalogue, écriture du provider
+dans `Index.plist` après sélection, puis création/rendu de la surface. Sur macOS
+26.2, ne pas automatiser la sélection par `accessibilityPerformPress` : le panneau
+Apple plante avant l'appel au renderer. Une sélection physique et la lecture
+postérieure de `Index.plist` sont requises.
 Les résultats réellement obtenus sont consignés dans la
 [note de reprise](session-handoff.md).
 

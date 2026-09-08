@@ -11,7 +11,7 @@ function replaceOnce(text, from, to) {
 for (const name of readdirSync(join(directory, 'PhospheneExtension'))) {
   if (!name.endsWith('.swift')) continue;
   const path = resolve(directory, 'PhospheneExtension', name);
-  let source = readFileSync(path, 'utf8').replaceAll('glass.kagerou.phosphene', 'org.wallpaperthemes.nativeprobe.interactive');
+  let source = readFileSync(path, 'utf8').replaceAll('glass.kagerou.phosphene', 'org.wallpaperthemes.nativeprobe.controls');
   if (name === 'ColorDiag.swift') {
     source = replaceOnce(source, '    CATransaction.flush()',
       '    CATransaction.flush()\n    InteractiveDiagnostic.attach(to: rootLayer)');
@@ -39,7 +39,7 @@ for (const name of readdirSync(join(directory, 'PhospheneExtension'))) {
   if (name === 'SettingsProvider.swift') {
     source = replaceOnce(source, 'Phosphene \\u{2014} Video Wallpapers', 'Native Wallpaper Interactive');
     source = replaceOnce(source, 'let groupID = GroupID(id: "video-wallpapers")',
-      'let groupID = GroupID(id: "native-wallpaper-interactive")');
+      'let groupID = GroupID(id: "native-wallpaper-controls")');
   }
   if (name === 'CallerValidation.swift') {
     if (source.split('            return true').length !== 4) throw new Error('Caller guards changed');
