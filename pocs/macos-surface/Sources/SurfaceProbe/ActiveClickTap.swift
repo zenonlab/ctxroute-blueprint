@@ -25,6 +25,7 @@ final class ActiveClickTap: @unchecked Sendable {
     var isTrusted: Bool { AXIsProcessTrusted() }
 
     func install(promptForAccessibility: Bool) -> Bool {
+        if isInstalled { return true }
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         guard AXIsProcessTrustedWithOptions([promptKey: promptForAccessibility] as CFDictionary) else {
             return false

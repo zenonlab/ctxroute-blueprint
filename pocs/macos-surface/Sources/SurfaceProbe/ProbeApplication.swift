@@ -189,10 +189,18 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func installActiveClickTap() {
         NotificationCenter.default.addObserver(self, selector: #selector(activeObjectHit(_:)),
                                                name: .wallpaperObjectHit, object: nil)
-        let tap = ActiveClickTap(engine: formationEngine, screenFrame: window.frame)
-        activeClickTap = tap
-        let installed = tap.install(promptForAccessibility: true)
+        activeClickTap = ActiveClickTap(engine: formationEngine, screenFrame: window.frame)
+        ensureActiveClickTap(promptForAccessibility: true)
+    }
+
+    private func ensureActiveClickTap(promptForAccessibility: Bool) {
+        guard options.overlayOnly, !options.smoke, let tap = activeClickTap, !tap.isInstalled else { return }
+        let installed = tap.install(promptForAccessibility: promptForAccessibility)
         FileHandle.standardError.write(Data("Active click tap: \(installed ? "installed" : "permission-required")\n".utf8))
+        if installed {
+            tap.setEnabled(displaysAwake && sessionActive)
+            syncTapExclusions()
+        }
     }
 
     @objc private func activeObjectHit(_ notification: Notification) {
@@ -246,6 +254,9 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
             finderFrontmost = app.bundleIdentifier == "com.apple.finder"
         }
+        // Returning from Privacy & Security is an event-driven opportunity to acquire
+        // a permission granted while this process was already running. No polling.
+        ensureActiveClickTap(promptForAccessibility: false)
         updateVisibility()
     }
     @objc private func spaceChanged() { spacesNotifications += 1; restoreDesktop() }

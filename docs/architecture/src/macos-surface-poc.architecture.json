@@ -8,7 +8,7 @@
     { "id": "projection", "type": "backend", "label": "Projection compagnon", "sublabel": "Bundle stable · temps monotone", "pos": [820, 220], "size": [240, 80] },
     { "id": "visibility", "type": "backend", "label": "Visibilité bureau", "sublabel": "Masque le hit-test", "pos": [1090, 220], "size": [150, 80] },
     { "id": "wallpaper", "type": "frontend", "label": "Wallpaper natif complet", "sublabel": "Décor et objets animés", "pos": [220, 430], "size": [240, 80] },
-    { "id": "objects", "type": "security", "label": "CGEventTap filtré", "sublabel": "Consomme seulement un impact", "pos": [820, 430], "size": [240, 80] },
+    { "id": "objects", "type": "security", "label": "CGEventTap filtré", "sublabel": "Reprise TCC événementielle", "pos": [820, 430], "size": [240, 80] },
     { "id": "panel", "type": "frontend", "label": "HUD + menu WP", "sublabel": "Checkbox redondante", "pos": [1090, 430], "size": [150, 80] },
     { "id": "finder-control", "type": "backend", "label": "Contrôleur Finder", "sublabel": "Préférence + kickstart", "pos": [980, 640], "size": [240, 70] },
     { "id": "desktop", "type": "external", "label": "Bureau macOS", "sublabel": "Finder · fichiers inchangés", "pos": [520, 640], "size": [240, 80] }

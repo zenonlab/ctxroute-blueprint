@@ -49,6 +49,9 @@ Le lanceur assemble le compagnon au chemin stable
 `desktop.*` restent des preuves historiques. Le chemin stable évite une cause de perte
 d'autorisation Accessibilité ; faute d'identité de développement, une modification du
 binaire signé ad hoc peut néanmoins demander une nouvelle autorisation macOS.
+Si l'autorisation est accordée pendant que le compagnon fonctionne, le retour depuis
+Réglages déclenche une nouvelle tentative d'installation du tap sur l'événement
+d'activation d'application. Aucun minuteur ni polling de permission n'est maintenu.
 
 ```sh
 sh pocs/macos-surface/probe.sh test

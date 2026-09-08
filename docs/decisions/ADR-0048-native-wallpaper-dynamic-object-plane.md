@@ -66,6 +66,9 @@ Retenir deux plans aux responsabilités asymétriques :
     changer de localisation TCC à chaque lancement. Comme le build local reste signé ad
     hoc, tout changement de son exécutable peut imposer une nouvelle autorisation
     Accessibilité ; aucune tentative de contournement n'est permise.
+11. une autorisation accordée pendant l'exécution est reprise sans redémarrage : à la
+    prochaine notification d'activation d'application, le compagnon réessaie une fois
+    d'installer le tap sans afficher de prompt. Aucun polling de TCC n'est autorisé.
 
 Le mode `desktop --split-input --overlay-only` matérialise la partie hit-test sans
 redessiner le fond, les objets ou des fenêtres mobiles. Le mode `desktop --split-input` historique reste une sonde

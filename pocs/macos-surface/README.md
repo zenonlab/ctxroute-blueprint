@@ -95,7 +95,9 @@ Avec `desktop`, une application locale est assemblée au chemin stable
 `dist/pocs/macos-surface/stable/Wallpaper Desktop PoC.app`, puis lancée en
 arrière-plan par macOS. Cette stabilité évite de changer de localisation TCC à chaque
 lancement. Le build reste signé ad hoc : modifier l'exécutable peut exiger de renouveler
-l'autorisation Accessibilité. Le dossier conserve `receipt.json` et `stderr.log`. Le lanceur attend sa fin et
+l'autorisation Accessibilité. Après une autorisation accordée pendant l'exécution, le
+retour depuis Réglages réessaie le tap à la prochaine activation d'application, sans
+polling. Le dossier conserve `receipt.json` et `stderr.log`. Le lanceur attend sa fin et
 reprend le code du reçu ; l'absence de reçu échoue. Un Ctrl-C du lanceur `open`
 ne garantit pas l'arrêt de l'application : elle garde sa durée limite propre.
 Le bundle est de développement, non notarié, jamais installé dans Applications.
