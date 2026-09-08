@@ -48,27 +48,32 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         }
         print("agent-launch-policy=PASS cases=7 (no job changed)")
         try testDesktopItems()
-        let background = ["AXGroup", "AXScrollArea", "AXApplication"]
-        guard FinderBackground.matches(bundle: "com.apple.finder", roles: background) else {
-            throw ModelError.invalid("measured Finder background rejected")
+        let backgrounds = [
+            ["AXGroup", "AXScrollArea", "AXApplication"],
+            ["AXGroup", "AXGroup", "AXScrollArea", "AXGroup", "AXApplication"],
+            ["AXScrollArea", "AXGroup", "AXApplication"]
+        ]
+        guard backgrounds.allSatisfy({ FinderBackground.matches(bundle: "com.apple.finder", roles: $0) }) else {
+            throw ModelError.invalid("qualified Finder background rejected")
         }
         for (bundle, roles) in [
             ("com.apple.finder", ["AXImage", "AXGroup", "AXScrollArea"]),
             ("com.apple.finder", ["AXGroup", "AXScrollArea", "AXWindow"]),
-            ("com.apple.finder", ["AXScrollArea", "AXApplication"]),
             ("com.apple.finder", ["AXButton", "AXGroup", "AXScrollArea"]),
+            ("com.apple.finder", ["AXStaticText", "AXGroup", "AXScrollArea", "AXApplication"]),
             ("com.apple.finder", ["AXGroup", "AXGroup", "AXApplication"]),
+            ("com.apple.finder", ["AXGroup", "AXScrollArea"]),
             ("com.apple.finder", []),
-            ("com.example.app", background)
+            ("com.example.app", backgrounds[0])
         ] {
             guard !FinderBackground.matches(bundle: bundle, roles: roles) else {
                 throw ModelError.invalid("native or unknown target accepted")
             }
         }
-        guard !FinderBackground.matches(bundle: nil, roles: background) else {
+        guard !FinderBackground.matches(bundle: nil, roles: backgrounds[0]) else {
             throw ModelError.invalid("unknown process accepted")
         }
-        print("finder-hierarchy=PASS cases=9 (pure policy, not desktop qualification)")
+        print("finder-hierarchy=PASS cases=12 (pure policy, not desktop qualification)")
         guard CommandLine.arguments.count == 2,
               let bundle = Bundle(path: CommandLine.arguments[1]) else { throw ModelError.invalid("bundle argument") }
         guard dlopen("/System/Library/PrivateFrameworks/WallpaperExtensionKit.framework/WallpaperExtensionKit", RTLD_NOW) != nil

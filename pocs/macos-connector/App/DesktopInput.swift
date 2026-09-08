@@ -176,7 +176,16 @@ import os
 /// Never promote an icon or a Finder window by walking upward to a matching group.
 @MainActor enum FinderBackground {
     static func matches(bundle: String?, roles: [String]) -> Bool {
-        bundle == "com.apple.finder" && roles == [kAXGroupRole, kAXScrollAreaRole, kAXApplicationRole]
+        guard bundle == "com.apple.finder", let first = roles.first,
+              first == kAXGroupRole || first == kAXScrollAreaRole,
+              roles.last == kAXApplicationRole,
+              roles.contains(kAXScrollAreaRole) else { return false }
+        // A Finder window, icon, label or control always remains native. The
+        // desktop background itself can gain intermediary AXGroup ancestors
+        // across macOS versions, so its chain must not be fixed to three nodes.
+        let nativeRoles: Set<String> = [kAXWindowRole, kAXImageRole, kAXButtonRole,
+                                        kAXStaticTextRole]
+        return roles.allSatisfy { !nativeRoles.contains($0) }
     }
     static func contains(_ point: CGPoint) -> Bool {
         let started = CACurrentMediaTime()
@@ -191,30 +200,16 @@ import os
         let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
         guard bundle == "com.apple.finder" else { return false }
         var roles: [String] = [], current = target
-        for index in 0..<3 {
+        for _ in 0..<8 {
             guard CACurrentMediaTime() - started < 0.018,
                   let role = attribute(current, kAXRoleAttribute) as? String else { return false }
             roles.append(role)
-            if index < 2 {
-                guard let parent = attribute(current, kAXParentAttribute),
-                      CFGetTypeID(parent) == AXUIElementGetTypeID() else { return false }
-                current = unsafeDowncast(parent, to: AXUIElement.self)
-            }
+            if role == kAXApplicationRole { break }
+            guard let parent = attribute(current, kAXParentAttribute),
+                  CFGetTypeID(parent) == AXUIElementGetTypeID() else { return false }
+            current = unsafeDowncast(parent, to: AXUIElement.self)
         }
-        guard matches(bundle: bundle, roles: roles),
-              let children = attribute(target, kAXChildrenAttribute) as? [AXUIElement], children.count <= 256 else { return false }
-        for child in children {
-            guard CACurrentMediaTime() - started < 0.018,
-                  let positionValue = attribute(child, kAXPositionAttribute), CFGetTypeID(positionValue) == AXValueGetTypeID(),
-                  let sizeValue = attribute(child, kAXSizeAttribute), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return false }
-            var origin = CGPoint.zero, size = CGSize.zero
-            guard AXValueGetValue(unsafeDowncast(positionValue, to: AXValue.self), .cgPoint, &origin),
-                  AXValueGetValue(unsafeDowncast(sizeValue, to: AXValue.self), .cgSize, &size),
-                  origin.x.isFinite, origin.y.isFinite, size.width.isFinite, size.height.isFinite,
-                  size.width >= 0, size.height >= 0,
-                  !CGRect(origin: origin, size: size).contains(point) else { return false }
-        }
-        return CACurrentMediaTime() - started < 0.020
+        return matches(bundle: bundle, roles: roles) && CACurrentMediaTime() - started < 0.020
     }
     private static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
         AXUIElementSetMessagingTimeout(element, 0.003)

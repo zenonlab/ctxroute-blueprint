@@ -44,15 +44,19 @@ Le filtre Finder, la géométrie, les permissions et le transport restent inchan
 La fenêtre native restée ouverte a été observée pendant le défaut ; cette correction
 ne constitue pas à elle seule une qualification des clics sur objets animés.
 
-Correctif du filtre Finder : l'élément directement pointé doit correspondre à
-`AXGroup → AXScrollArea → AXApplication`, signature mesurée dans le premier PoC
-([preuve](../../docs/pocs/macos-native-wallpaper.md)). L'ancien filtre exigeait
-`AXScrollArea` et rejetait cette cible avant le hit-test du thème. Une icône
-`AXImage`, un groupe dans une fenêtre ou une application tierce restent refusés ;
-aucune remontée depuis une icône vers un ancêtre admissible. Les rectangles des
-enfants gardent la priorité, et les erreurs AX restent non interactives.
-`test-native.sh` compile le vrai adaptateur et vérifie neuf cas de hiérarchie,
-sans lire ni manipuler le bureau. Ce test ne remplace pas la qualification native.
+Correctif du filtre Finder : l'élément directement pointé doit être le fond
+`AXGroup` ou `AXScrollArea`, puis rejoindre `AXApplication` à travers une ascendance
+contenant `AXScrollArea`, signature issue du premier PoC
+([preuve](../../docs/pocs/macos-native-wallpaper.md)). Les groupes intermédiaires
+varient selon la version de macOS et sont admis. Une chaîne contenant `AXWindow`,
+ou dont la cible est `AXImage`, `AXStaticText` ou `AXButton`, reste refusée ; aucune
+remontée depuis une icône vers un ancêtre admissible. Le précédent parcours de tous
+les enfants Finder sous une échéance de 20 ms a été retiré : son temps dépendait du
+nombre d'icônes et pouvait rejeter le fond avant le hit-test du thème. Le hit-test AX
+direct conserve la priorité du descendant natif et les erreurs restent non
+interactives. `test-native.sh` compile le vrai adaptateur et vérifie douze cas de
+hiérarchie, sans lire ni manipuler le bureau. Ce test ne remplace pas la qualification
+native de l'icône superposée.
 Le lancement explicite `--diagnostics` trace au maximum 32 décisions de capture,
 filtrage et émission d'intention ; aucune coordonnée, aucun nom de fichier ou ID
 d'objet n'est journalisé. Le lancement normal n'active pas ces traces.

@@ -22,6 +22,7 @@ ci-summary.md
 coverage/
 dist/
 build/
+pocs/macos-connector/.build/
 .env
 .env.*
 !.env.example

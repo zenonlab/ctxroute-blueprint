@@ -33,6 +33,12 @@ scène de production devra fournir des formes d'interaction explicites adaptées
 sprites, maillages 3D, boutons et collisions importés.
 L'agent reçoit seulement les gestes autorisés : une icône, une fenêtre ou une cible
 AX inconnue garde la priorité. Un glisser n'est jamais converti en clic.
+Le fond Finder est qualifié par l'élément AX directement pointé et son ascendance,
+pas par une énumération de tous les enfants du bureau. La cible doit être un groupe
+ou une zone de défilement Finder, atteindre l'application Finder, contenir une zone
+de défilement et ne traverser aucune fenêtre. Les rôles natifs d'icône, libellé et
+bouton sont refusés dès le premier élément. Cette politique reste fermée en cas
+d'erreur ou de chaîne inconnue et évite un coût variable avec le nombre d'icônes.
 
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
@@ -60,7 +66,8 @@ Le [tap Core Graphics](https://developer.apple.com/documentation/coregraphics/cg
 ne remplace pas l'autorisation système. Aucun consentement TCC n'est accordé par
 le code ou déduit de la signature ad hoc. Le classifier Finder est un candidat
 structurel conservateur, pas une garantie publique Apple ; les tests réels restent
-requis. Une surface sans écran associé ou ambiguë échoue ouverte vers macOS.
+requis, en particulier avec une icône exactement superposée à une ancre. Une surface
+sans écran associé ou ambiguë échoue ouverte vers macOS.
 Les fixtures n'ont pas de piste audio ; mute est un état du thème. Le contrôle
 Fichiers appelle désormais un contrôleur local de `StandardHideDesktopIcons`
 (WindowManager), sans redémarrer Finder ni modifier `CreateDesktop`. Aucun ajout

@@ -1,5 +1,21 @@
 # Reprise de session — Wallpaper
 
+## Qualification du filtre Finder — 8 septembre 2026, 22:35
+
+Les clics réels à 22:29 atteignaient le tap mais produisaient `finder-rejected`
+avant tout hit-test objet. Le proxy 112×70 n'était donc pas en cause. Le filtre
+énumérait chaque enfant du fond Finder avec une limite globale de 20 ms ; son coût
+variable pouvait fermer l'entrée sur un bureau valide.
+
+Le candidat `build.t16fIT` remplace ce scan par une qualification de l'élément AX
+direct et de son ascendance, bornée à huit niveaux. Il accepte les variantes de fond
+`AXGroup`/`AXScrollArea` qui rejoignent `AXApplication`, refuse `AXWindow`, `AXImage`,
+`AXStaticText`, `AXButton`, les autres applications et toute erreur. 34 XCTest et
+les 12 cas du test natif passent. Signature locale stable et exigence désignée
+compatibles avec l'installation courante. Candidat non encore installé : le provider
+actif PID 78992 doit d'abord être retiré proprement en sélectionnant un fond Apple ;
+aucun arrêt forcé de Finder, WallpaperAgent ou du provider n'a été effectué.
+
 ## Proxy d'interaction restauré depuis le PoC1 — 8 septembre 2026, 22:13
 
 Audit demandé après constat d'une structure « brouillon ». Le rendu PoC2 est bien
