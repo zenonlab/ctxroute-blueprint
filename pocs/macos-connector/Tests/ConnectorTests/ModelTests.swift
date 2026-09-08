@@ -4,6 +4,21 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testRestartRejectsInvalidArgumentsBeforeChangingJobs() throws {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("restart-agent.sh")
+        for args: [String] in [[], ["unused.app", "--diagnostics"]] {
+            let process = Process(); let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = [script.path] + args
+            process.standardOutput = output; process.standardError = output
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            XCTAssertEqual(process.terminationStatus, 2)
+            XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("Usage: restart-agent.sh"))
+        }
+    }
     func testNativeWireRoundTripAndBounds() throws {
         let command = Command(theme: "test", instance: UUID(), generation: 3, action: .pause)
         XCTAssertEqual(try NativeWire.decode(Command.self, from: NativeWire.encode(command)), command)

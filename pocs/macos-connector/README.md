@@ -35,7 +35,9 @@ démarrage à la prochaine ouverture de session promis. L'agent reste sans fenê
 diagnostic à la demande dans la barre des menus. Ajouter `--diagnostics` à la commande
 ci-dessus uniquement pour ouvrir ce panneau technique lors d'un test. Le lanceur
 extérieur sans argument demande seulement le démarrage du job déjà enregistré.
-Ses anciens `--check` et `--probe-mailbox` sont des sondes App Group, **pas un état XPC**.
+`--check` vérifie le manifeste, les trois signatures et l'épinglage de l'agent sans
+accéder à l'App Group. Il ne prouve jamais la présence du provider : son résultat
+reste `provider=unconfirmed`. Seul `--probe-mailbox` conserve la sonde historique.
 Les anciens `--diagnostics`/`--smoke` s'appliquent au binaire agent avec `--agent`,
 pas au lanceur extérieur. Le build normal suffit pour XPC ad hoc ; `--development`
 ne sert plus qu'à autoriser les sondes historiques de groupe local.
@@ -48,7 +50,19 @@ launchctl bootout gui/$(id -u)/org.wallpaperthemes.connectorpoc2.agent
 
 L'installation refuse un job encore enregistré et conserve l'ancien paquet.
 Fermer le diagnostic ne quitte pas l'agent. Le provider reste indépendant.
-Swift 6 strict, signature et catalogue natif passent ; le total est de 23 XCTest.
+Swift 6 strict, signature et catalogue natif passent ; le total est de 24 XCTest.
+
+Pour redémarrer sans panneau et sans arrêter le provider :
+
+```sh
+bash pocs/macos-connector/restart-agent.sh '/Users/hazenawsky/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app'
+```
+
+Le script valide la signature et le chemin du job avant tout arrêt. Un job provenant
+d'un autre paquet est refusé ; aucun fichier supprimé ni préférence Finder modifiée.
+La reconnexion du provider peut prendre 30 secondes. Le log de démarrage distingue
+le mode diagnostic, l'autorisation Accessibilité du processus et l'absence actuelle
+d'adaptateur de clics ; aucune permission n'est demandée automatiquement.
 
 ## Historique du transport App Group et limites de la première tranche
 

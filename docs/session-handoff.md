@@ -1,6 +1,40 @@
 # Reprise de session — Wallpaper
 
-## État courant — transport natif débloqué, 8 septembre 2026
+## État courant — redémarrage et diagnostic, 8 septembre 2026, 18:08
+
+Build `build.LGtR5e` installé à la même destination ; précédent conservé dans
+`dist/pocs/macos-connector/replaced.VsCv0Q/previous-app.disabled`. Aucun fichier
+supprimé, aucun arrêt de Finder/WallpaperAgent ni changement de préférences Finder.
+Agent relancé sans diagnostic, PID 96273 ; provider PID 85622, deux surfaces et
+inspection/quittance révision 1 à 18:08:17. Le catalogue a nécessité une nouvelle
+inscription `pluginkit -a` puis fermeture/réouverture réelle des Réglages Système.
+L'inscription venait de disparaître après le remplacement : ne pas se fier à la
+seule sortie immédiate d'installation. Aucun clic sur une icône de thème n'a été simulé.
+
+`restart-agent.sh <app>` valide signature et chemin du job avant arrêt/recréation,
+sans toucher au provider. Test réel : un paquet différent est refusé ; le paquet
+installé redémarre sans panneau. Le nouveau `--check` valide les trois signatures,
+le manifeste et l'épinglage XPC ; il n'ouvre plus l'ancien App Group. Il affiche
+`provider=unconfirmed`, jamais un faux état vivant. Le build exécute ce contrôle.
+
+Preuve de permission : log `Startup diagnostics=false accessibility=false
+desktop-input=not-implemented`. L'ancien consentement utilisateur ne constitue donc
+pas une autorisation effective de cet agent. Aucune demande de permission automatique.
+**Reste à implémenter : les deux boutons et les gestes du bureau.** L'autorisation
+seule ne les fera pas fonctionner. La priorité Finder et l'effet animé visible
+ne sont pas qualifiés par les reçus. Ne pas annoncer « tout fonctionne ».
+Ce correctif reste dans les composants existants : pas de nouvelle frontière,
+dépendance ou permission accordée. Le gate de commit exige un placement du script :
+le diagramme connecteurs précise la reprise isolée de l'agent, sans nouvelle topologie.
+
+Audit : CONFORME — compilation stricte, contrôle XPC du paquet ad hoc, 24 XCTest,
+`npm run verify` code 0, refus réel du redémarrage d'un autre paquet, revue du diff
+et doctrine/hooks inchangés. MANQUE — deux contrôles, adaptateur de clics et preuve
+visuelle/énergétique. Archify : showcase 9/9, zéro erreur/avertissement, containment
+quatre résolutions et captures sombres 1440×900/2048×1320 inspectées.
+N/A — nouvelle topologie, migration de données ou dépendance.
+
+## Historique — transport natif débloqué, 8 septembre 2026
 
 Demande produit inchangée : aucune modal de connecteur au lancement ; deux contrôles
 en haut à gauche ; gauche = ouvrir/lancer ; droite = personnaliser, ou ajouter sur

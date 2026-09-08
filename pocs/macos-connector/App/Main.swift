@@ -2,10 +2,25 @@ import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 import os
+import ApplicationServices
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
-        if CommandLine.arguments.contains("--check") || CommandLine.arguments.contains("--probe-mailbox") {
+        if CommandLine.arguments == [CommandLine.arguments[0], "--check"] {
+            _ = try Theme.catalog()
+            let app = NativeWire.appBundle
+            let agent = app.appendingPathComponent("Contents/Library/LoginItems/Wallpaper Connector Agent.app")
+            let provider = app.appendingPathComponent("Contents/Extensions/WallpaperProvider.appex")
+            _ = try NativeWire.requirement(for: app)
+            let expected = try NativeWire.requirement(for: agent)
+            _ = try NativeWire.requirement(for: provider)
+            let pin = try String(contentsOf: provider.appendingPathComponent("Contents/Resources/agent-requirement.txt"),
+                encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard pin == expected else { throw ModelError.invalid("Packaged agent signature pin mismatch") }
+            print("manifest=valid xpc-peers=valid provider=unconfirmed desktop-input=not-implemented")
+            return
+        }
+        if CommandLine.arguments.contains("--probe-mailbox") {
             _ = try Theme.catalog()
             print("transport-mode=\(Mailbox.developmentEnabled ? "local-ad-hoc" : "strict")")
             do {
@@ -96,6 +111,8 @@ import os
         super.init()
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+            "Startup diagnostics=\(CommandLine.arguments.contains("--diagnostics")) accessibility=\(AXIsProcessTrusted()) desktop-input=not-implemented")
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 560),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Wallpaper Connector · PoC 2"

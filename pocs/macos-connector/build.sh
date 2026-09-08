@@ -101,4 +101,5 @@ for connector_manifest in "$connector_source"/Sources/ThemeModel/Resources/*.jso
   cmp "$connector_app/Contents/Resources/$connector_name" "$connector_extension/Contents/Resources/$connector_name"
   cmp "$connector_app/Contents/Resources/$connector_name" "$connector_agent/Contents/Resources/$connector_name"
 done
+"$connector_app/Contents/MacOS/WallpaperConnector" --check
 echo "$connector_app"
