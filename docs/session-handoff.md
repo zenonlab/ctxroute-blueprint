@@ -1,5 +1,23 @@
 # Reprise de session — Wallpaper
 
+## Permission renouvelée — 8 septembre 2026, 19:38
+
+Après accord explicite (« go ») et authentification macOS réalisée par l'utilisateur,
+l'entrée Accessibilité de **Wallpaper Connector Agent uniquement** a été retirée,
+puis réajoutée via le chemin du paquet installé. Aucun fichier supprimé, aucun
+autre droit modifié. La sélection initiale erronée de Codex Computer Use a été
+détectée et corrigée au clavier avant toute suppression.
+
+Le même build QjikMP, sans reconstruction, a été relancé avec `restart-agent.sh`.
+Job `agent.YabCOR`, PID 9522 ; journal à 19:38:21 :
+`Startup diagnostics=false accessibility=true desktop-input=capability-gated`.
+Le blocage TCC est donc levé dans le processus réel, pas seulement dans les Réglages.
+Les statuts `accessibility=false` et confirmation en attente ci-dessous sont historiques.
+Le contrôle UI de l'agent installé expire ; pas de preuve automatisée de clic bureau.
+Le journal consulté après relance ne montre pas encore de nouvelle quittance XPC.
+La réception des layouts, le filtrage Finder et les gestes restent à qualifier :
+ne pas confondre autorisation et succès fonctionnel. Aucun code ou diagramme changé.
+
 ## Installation effective — 8 septembre 2026, 19:30
 
 Le candidat `build.QjikMP` est maintenant **installé** dans
