@@ -48,7 +48,6 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         }
         print("agent-launch-policy=PASS cases=7 (no job changed)")
         try testDesktopItems()
-        try testControlInputPlaneProjection()
         let backgrounds = [
             ["AXGroup", "AXScrollArea", "AXApplication"],
             ["AXGroup", "AXGroup", "AXScrollArea", "AXGroup", "AXApplication"],
@@ -80,6 +79,8 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         guard dlopen("/System/Library/PrivateFrameworks/WallpaperExtensionKit.framework/WallpaperExtensionKit", RTLD_NOW) != nil
         else { throw ModelError.invalid("private framework") }
         let themes = try Theme.catalog(bundle: bundle)
+        guard let firstTheme = themes.first else { throw ModelError.invalid("empty theme catalog") }
+        try testDesktopInputSnapshot(theme: firstTheme)
         guard let result = makeCatalog(bundle: bundle) else { throw ModelError.invalid("Apple catalog decoding") }
         print("native-catalog=PASS themes=\(themes.count) type=\(type(of: result))")
     }

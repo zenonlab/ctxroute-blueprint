@@ -189,6 +189,18 @@ Ces essais ne garantissent pas la survie à l'arrêt du propriétaire PTY, à un
 global, à une déconnexion utilisateur ou au redémarrage. Un superviseur détaché
 serait un besoin séparé ; il ne fait pas survivre un processus à un reboot.
 
+## B-E — Observation émulée hors ligne
+
+| Cas | Action | Preuve attendue |
+| --- | --- | --- |
+| E6-A | Exécuter cinq fois un core/version, état, inputs et nombre de frames épinglés sur une fixture libre | mêmes hashes vidéo, audio et traces ; divergences expliquées ; réseau coupé et quotas actifs |
+| E6-B | Corréler une variable ou un objet connu entre lecteur statique et observateur spécialisé | provenance, version, adresse/identité et niveau de capacité consignés ; limites de l'observateur listées |
+| E6-C | Arrêter tout outil de conversion puis lancer le résultat | scène et interactions fonctionnent selon le manifeste ; aucun émulateur, ROM ouverte ou donnée privée dans le package |
+
+Un échec E6-A retire le qualificatif déterministe. Un échec E6-B réduit seulement la
+capacité de l'adaptateur. Un échec E6-C bloque ce chemin car la frontière runtime est
+violée. Aucun test n'utilise une ROM commerciale dans le dépôt.
+
 ## Preuves, décisions et critères de sortie
 
 Chaque compte rendu doit contenir : identifiant B-*, date, opérateur, commits des

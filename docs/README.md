@@ -22,6 +22,7 @@ périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 7. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
 8. [PoC macOS 1](pocs/macos-surface.md) : résultats et limites historiques.
 9. [Note de reprise](session-handoff.md) : état d'exécution local.
+10. [Recherche interaction macOS et observation émulée](research/macos-interaction-and-emulator-boundary.md) : preuves primaires, architecture retenue et essais E6.
 
 ## Séparer produit et outillage
 

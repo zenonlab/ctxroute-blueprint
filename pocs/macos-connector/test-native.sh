@@ -9,6 +9,7 @@ env -u SDKROOT xcrun swiftc -swift-version 6 -warnings-as-errors -parse-as-libra
   "$connector_source/Sources/ThemeModel/Theme.swift" \
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift" \
   "$connector_source/Sources/ThemeModel/GestureRouter.swift" \
+  "$connector_source/App/DesktopEventTap.swift" \
   "$connector_source/App/DesktopInput.swift" \
   "$connector_source/App/ControlInputPlane.swift" \
   "$connector_source/App/DesktopItems.swift" \

@@ -146,21 +146,17 @@ ne qualifient ni TCC ni les clics réels. Le PoC reste **non validé** jusque-l�
 Cette réparation est interne à l'adaptateur ; contrats inchangés. Le diagramme
 annote seulement « Reprise à qualifier », sans modification de sa topologie.
 
-`pocs/macos-surface/Sources/SurfaceProbe/SplitDesktopControls.swift` utilisait des
-`NSPanel` transparents placés au-dessus des icônes, avec `acceptsFirstMouse=true`.
-Le décor était dans le provider ; ces petites fenêtres recevaient les clics. Leur
-qualification déclarait `icon-overlap-not-supported`. Les recopier rendrait certains
-clics possibles, mais réintroduirait la superposition et les conflits Finder.
-L'autre chemin, `ActiveClickTap`, utilisait déjà Accessibilité et un tap actif.
+Le PoC1 avait deux solutions concurrentes : des `NSPanel` transparents capables de
+recevoir certains clics mais placés dans le Z-order applicatif, et un tap actif.
+L'inspection WindowServer du PoC2 a démontré que les micro-fenêtres pouvaient passer
+devant Chrome au niveau Core Graphics 0. Elles sont donc rejetées, y compris pour
+les deux contrôles fixes.
 
-Le PoC2 reprend désormais ce principe uniquement pour les deux contrôles système
-fixes : deux micro-fenêtres transparentes de 40×40 points, sans pixel ni panneau
-visible, suivent exactement les hit-boxes rendues par le provider. Elles restent
-sous les applications normales et isolent le clic du geste macOS « afficher le
-bureau ». Le tap global exclut leurs rectangles et reste seul responsable des
-objets mobiles et du clic droit sur le vide. Une icône Finder superposée à l'une de
-ces deux zones réservées n'est pas supportée dans ce PoC ; aucune priorité universelle
-n'est revendiquée.
+Le PoC2 utilise maintenant un seul tap actif pour les boutons, objets mobiles et
+clic droit vide. La géométrie est un instantané immuable ; aucun `NSWindow` d'entrée
+n'est créé. Le callback retourne `nil` uniquement pour un geste qualifié sur le fond
+Finder et laisse toute cible native ou inconnue à macOS. Le cycle du tap vit sur un
+thread dédié, se réarme après désactivation et expose son état dans le diagnostic.
 
 Élément réutilisé : reprise événementielle depuis `NSWorkspace` (changement d'app,
 Space, veille et session), plutôt que depuis l'activation du seul agent invisible.

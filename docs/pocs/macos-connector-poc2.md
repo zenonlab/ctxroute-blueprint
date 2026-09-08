@@ -88,19 +88,16 @@ la persistance des préférences ci-dessus reste à implémenter.
 
 ## Politique d'entrée
 
-Le mode par défaut est passif. Les objets mobiles et le clic droit sur le vide deviennent
-interactifs seulement si toutes les conditions sont vraies : permission obtenue, tap
-actif, bureau visible, cible supérieure classifiée comme fond Finder autorisé, ancre
-actuelle confirmée et génération de scène identique. Les deux contrôles système fixes
-utilisent à la place des micro-fenêtres AppKit transparentes exactement alignées sur
-leurs hit-boxes ; elles n'exigent pas le tap et celui-ci exclut leurs rectangles.
+Le mode par défaut est passif. Les contrôles fixes, les objets mobiles et le clic droit
+sur le vide deviennent interactifs seulement si toutes les conditions sont vraies :
+permission obtenue, tap actif, bureau visible, cible supérieure classifiée comme fond
+Finder autorisé, ancre actuelle confirmée et génération de scène identique. Ils passent
+tous par le même routeur de geste. Aucune fenêtre AppKit proxy n'est créée.
 
 Une icône, une fenêtre, une cible Accessibility inconnue, une erreur AX ou l'absence
 de permission produit un refus ouvert : l'événement original continue et aucune action
-de thème n'est exécutée. Les régions des deux contrôles fixes sont réservées et ne
-garantissent pas l'accès à une icône Finder superposée. Le PoC2 doit tester séparément
-une icône native superposée à une ancre de scène ; un clic programmatique sur un bouton
-AppKit ne suffit pas à qualifier les gestes réels.
+de thème n'est exécutée. Le PoC2 doit tester séparément une icône native superposée à
+chaque type de cible ; un test de géométrie ne suffit pas à qualifier les gestes réels.
 
 ## Politique énergétique
 
@@ -120,7 +117,7 @@ compté ensemble.
 | M2-01 | Manifeste | une source canonique ; app et wallpaper produisent les mêmes identités et paramètres |
 | M2-02 | Présentation | un seul panneau logique visible et actionnable |
 | M2-03 | Cycle natif | activation, changement de Space, veille/reprise et redémarrage Finder sans second décor |
-| M2-04 | Entrée sûre | ancre avec icône Finder superposée prioritaire ; contrôles réservés isolés du geste de fond ; autres zones actionnables ou refusées explicitement |
+| M2-04 | Entrée sûre | icône Finder superposée prioritaire ; contrôles, objets et vide passent par un routeur unique ; autres zones actionnables ou refusées explicitement |
 | M2-05 | TCC | refus, octroi, révocation et reprise donnent un état exact sans polling |
 | M2-06 | Cohérence | commandes idempotentes, quittances corrélées, messages périmés ignorés |
 | M2-07 | Énergie | baseline et delta mesurés pour statique, animé, masqué et app connecteur fermée |

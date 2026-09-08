@@ -26,12 +26,11 @@ ouvre une modale de personnalisation, jamais un panneau placé à droite de l'é
 Le provider conserve le rendu natif et peint les deux contrôles dans son arbre de
 calques. Il publie la géométrie et l'horloge de chaque surface pour un hit-test CPU
 partageant exactement la construction des trajectoires. Aucun polling de rendu.
-Les contrôles système fixes sont toutefois possédés en entrée par de petites fenêtres
-AppKit transparentes de la taille exacte de leur hit-box. Elles ne dessinent aucun
-pixel, ne couvrent jamais l'écran entier, restent sous les applications normales et
-appellent directement l'intention du contrôle. Le tap global exclut ces rectangles :
-un même geste ne peut donc atteindre à la fois le contrôle et le fond Finder.
-Cette exception ne s'étend pas aux objets mobiles, qui restent calculés par le tap.
+Une seule voie d'entrée traite contrôles fixes, objets mobiles et clic droit vide :
+un `CGEventTap` actif sur un thread et une CFRunLoop dédiés. L'agent ne crée aucune
+fenêtre AppKit proxy. Le tap supprime uniquement l'appui, le drag éventuel et le
+relâchement d'un geste dont la surface, la cible et le fond Finder sont qualifiés.
+Une erreur, une ambiguïté ou une cible native laisse l'événement original à macOS.
 Dans ce PoC, les objets simples conservent le proxy invisible éprouvé par le PoC1
 (minimum 112×70 points) et la cible la plus proche gagne en cas de recouvrement.
 Le proxy n'est pas un `CALayer` interactif ni une fenêtre superposée. Le contrat de
@@ -45,9 +44,9 @@ ou une zone de défilement Finder, atteindre l'application Finder, contenir une 
 de défilement et ne traverser aucune fenêtre. Les rôles natifs d'icône, libellé et
 bouton sont refusés dès le premier élément. Cette politique reste fermée en cas
 d'erreur ou de chaîne inconnue et évite un coût variable avec le nombre d'icônes.
-Une icône Finder placée dans la hit-box d'un contrôle fixe n'est pas qualifiée dans
-ce PoC : la zone du contrôle est réservée par le thème. Le connecteur doit annoncer
-cette restriction au lieu de revendiquer une priorité Finder universelle.
+Une icône Finder placée dans la hit-box d'un contrôle garde donc la priorité. Cette
+propriété doit encore être éprouvée manuellement sur le paquet signé exact ; elle
+n'est jamais déduite des seuls tests de géométrie.
 
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
@@ -68,7 +67,11 @@ Le contrat XPC ajoute des configurations validées et des instantanés géométr
 bornés. Les types Apple ne sortent pas du connecteur. L'accès global aux événements
 reste soumis à TCC, jamais accordé automatiquement. La revue réelle doit couvrir
 icône superposée, glisser, changement de Space, annulation de modale et reconnexion.
-Cette tranche n'est pas un importeur 3D/ROM ni un terminal PTY complet.
+Cette tranche n'est pas un importeur 3D/ROM ni un terminal PTY complet. Le tap se
+réarme après désactivation système, reconstruit son instantané lors des changements
+d'applications, d'écrans, de Space et de session, et publie son état dans le
+diagnostic. Le hit-test AX synchrone est borné mais demeure une limite du PoC à
+mesurer avant production.
 
 ## Limites de la preuve
 

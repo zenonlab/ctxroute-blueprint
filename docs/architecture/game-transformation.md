@@ -399,6 +399,21 @@ pas un pipeline général capable de convertir toutes les mécaniques de tout je
 Avant adoption, figer les versions étudiées et examiner couverture, dépendances,
 licences et compatibilité des outils avec le projet.
 
+## Observation émulée optionnelle
+
+Lorsque les lecteurs statiques ne suffisent pas à relier données et comportement,
+le convertisseur peut lancer un observateur émulé local et borné. Ce chemin suit
+[ADR-0056](../decisions/ADR-0056-emulator-assisted-offline-observation.md) et le
+[rapport contradictoire](../research/macos-interaction-and-emulator-boundary.md) :
+runner Libretro générique, observateurs Dolphin/MAME ou scripts headless spécialisés,
+versions et entrées épinglées, réseau interdit, résultats reproductibles et capacités
+qualifiées. L'émulateur n'entre jamais dans le runtime ni dans le package partagé.
+
+Une trace de rendu ne prouve pas une collision ou un algorithme de bot. Une relation
+est `verified` seulement si elle est reproductible ; une logique de formation conçue
+pour le thème est `adapted`. Le test final arrête émulateur et convertisseur puis
+relance le wallpaper avec la seule bibliothèque locale matérialisée.
+
 ## Questions pour la suite
 
 Le mode ambiant, la conservation des données et la conversion progressive sont

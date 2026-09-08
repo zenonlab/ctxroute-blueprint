@@ -1,5 +1,19 @@
 # Reprise de session — Wallpaper
 
+## État courant — tap unifié sans fenêtre d'entrée, 9 septembre 2026
+
+Les micro-fenêtres AppKit ont été retirées : elles étaient de vraies fenêtres de
+niveau Core Graphics 0 et pouvaient passer devant les applications. Contrôles,
+objets et clic droit vide passent désormais par un `CGEventTap` actif sur thread
+dédié, un instantané géométrique sans fenêtre et le même routeur de gestes. Le
+diagnostic installé a observé deux surfaces provider et `Accessibilité accordée ·
+tap actif`. Les tests natifs et le build signé passent ; les gestes B-O01 à B-O08
+sur le paquet final restent la qualification manuelle obligatoire avant validation.
+
+La frontière émulateur est actée par ADR-0056 : observation locale optionnelle et
+hors ligne, jamais runtime. Le rapport sourcé et les essais E6-A à E6-C sont dans
+`docs/research/macos-interaction-and-emulator-boundary.md`.
+
 ## Qualification du filtre Finder — 8 septembre 2026, 22:35
 
 Les clics réels à 22:29 atteignaient le tap mais produisaient `finder-rejected`

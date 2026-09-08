@@ -1,20 +1,17 @@
-import AppKit
+import Foundation
 
-@MainActor func testControlInputPlaneProjection() throws {
-    let control = LayoutRect(x: 24, y: 56, width: 40, height: 40)
-    let primary = ControlInputPlane.projection(control: control,
-        quartzDisplay: CGRect(x: 0, y: 0, width: 1512, height: 982),
-        appKitScreen: CGRect(x: 0, y: 0, width: 1512, height: 982))
-    guard primary.quartz == CGRect(x: 24, y: 56, width: 40, height: 40),
-          primary.appKit == CGRect(x: 24, y: 886, width: 40, height: 40) else {
-        throw ModelError.invalid("primary control input projection")
+func testDesktopInputSnapshot(theme: Theme) throws {
+    let layout = SurfaceLayout(id: UUID(), theme: theme.theme_id, display: 7,
+        width: 1512, height: 982, capturedAt: 10, elapsed: 2, running: false, interactive: true)
+    let snapshot = DesktopInputSnapshot(surfaces: [DesktopInputSurface(theme: theme, layout: layout,
+        quartzBounds: CGRect(x: 0, y: 0, width: 1512, height: 982))], finderPID: 42)
+    guard let (resolvedTheme, resolvedLayout, point) = snapshot.target(at: CGPoint(x: 44, y: 76), now: 12),
+          resolvedTheme == theme, resolvedLayout.id == layout.id,
+          point == ScenePoint(x: 44, y: 76),
+          ThemeLayout.hit(point, theme: theme, width: layout.width, height: layout.height,
+            elapsed: layout.time(at: 12)) == .control(.audio),
+          snapshot.target(at: CGPoint(x: 1513, y: 76), now: 12) == nil else {
+        throw ModelError.invalid("desktop input snapshot projection")
     }
-    let secondary = ControlInputPlane.projection(control: control,
-        quartzDisplay: CGRect(x: -1920, y: 120, width: 1920, height: 1080),
-        appKitScreen: CGRect(x: -1920, y: -98, width: 1920, height: 1080))
-    guard secondary.quartz == CGRect(x: -1896, y: 176, width: 40, height: 40),
-          secondary.appKit == CGRect(x: -1896, y: 886, width: 40, height: 40) else {
-        throw ModelError.invalid("secondary control input projection")
-    }
-    print("control-input-plane=PASS cases=2 (pure coordinate projection; no window shown)")
+    print("desktop-input-snapshot=PASS cases=2 (pure geometry; no window shown)")
 }

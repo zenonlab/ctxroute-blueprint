@@ -8,7 +8,8 @@
   },
   "components": [
     { "id": "game", "type": "external", "label": "Jeu local", "sublabel": "ROM, fichiers ou projet", "pos": [40, 90], "size": [220, 80] },
-    { "id": "readers", "type": "backend", "label": "Préparation assistée IA", "sublabel": "Lecteurs et liens vérifiés", "pos": [520, 90], "size": [230, 80] },
+    { "id": "readers", "type": "backend", "label": "Préparation assistée IA", "sublabel": "Lecteurs et liens vérifiés", "pos": [390, 90], "size": [220, 80] },
+    { "id": "observer", "type": "backend", "label": "Observation émulée", "sublabel": "Locale · bornée · optionnelle", "pos": [700, 90], "size": [220, 80] },
     { "id": "library", "type": "database", "label": "Bibliothèque locale", "sublabel": "Données canoniques privées", "pos": [1010, 90], "size": [250, 80] },
     { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Notre logique et nos créations", "pos": [40, 280], "size": [250, 80] },
     { "id": "composition", "type": "backend", "label": "Composition validée", "sublabel": "Contrôleurs et données utiles", "pos": [1010, 440], "size": [250, 80] },
@@ -16,7 +17,9 @@
   ],
   "connections": [
     { "id": "read", "from": "game", "to": "readers", "label": "interpréter" },
-    { "id": "preserve", "from": "readers", "to": "library", "label": "conserver les liens" },
+    { "id": "observe", "from": "readers", "to": "observer", "label": "cas non résolus" },
+    { "id": "preserve-static", "from": "readers", "to": "library", "label": "preuves statiques", "fromSide": "bottom", "toSide": "left", "via": [[500, 210], [960, 210], [960, 130]], "labelAt": [740, 206] },
+    { "id": "preserve-observed", "from": "observer", "to": "library", "label": "traces qualifiées" },
     { "id": "select", "from": "library", "to": "composition", "label": "matérialiser par scène", "labelAt": [1135, 300] },
     { "id": "execute", "from": "composition", "to": "runtime", "label": "vérifier les capacités" },
     { "id": "recipe", "from": "recipes", "to": "composition", "label": "résoudre les références locales" }

@@ -110,6 +110,7 @@ import ApplicationServices
     var confirmedInstances: Set<UUID> = []
     var completion: ((Bool) -> Void)?
     let statusLabel = NSTextField(wrappingLabelWithString: "Le provider doit être sélectionné dans les réglages Fond d’écran.")
+    let inputStatusLabel = NSTextField(wrappingLabelWithString: "Entrée : diagnostic en attente.")
     var pauseButton: NSButton!
     var effectButton: NSButton!
     init(themes: [Theme]) {
@@ -140,6 +141,9 @@ import ApplicationServices
         for button in [pauseButton!, effectButton!] { button.bezelStyle = .rounded; controls.addArrangedSubview(button) }
         stack.addArrangedSubview(controls)
         statusLabel.font = .systemFont(ofSize: 13); stack.addArrangedSubview(statusLabel)
+        inputStatusLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        inputStatusLabel.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(inputStatusLabel)
         let capabilities = NSTextField(wrappingLabelWithString:
             "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : bureau standard, avec rechargement ciblé de Finder.")
         capabilities.textColor = .secondaryLabelColor; stack.addArrangedSubview(capabilities)
@@ -174,6 +178,7 @@ import ApplicationServices
         statusItem?.menu = statusMenu
         transport.onChange = { [weak self] in self?.receive() }
         input.onIntent = { [weak self] intent, theme, layout in self?.interact(intent, theme: theme, layout: layout) }
+        input.onStatus = { [weak self] state, trusted in self?.showInputStatus(state, trusted: trusted) }
         editor.onSave = { [weak self] configuration in
             guard let self else { return }
             send(.configure, configuration: configuration, target: configuration.theme_id) { [weak self] applied in
@@ -244,6 +249,20 @@ import ApplicationServices
     }
     @objc func interactionSettings() {
         input.requestPermission()
+    }
+    private func showInputStatus(_ state: DesktopTapState, trusted: Bool) {
+        let permission = trusted ? "Accessibilité accordée" : "Accessibilité refusée"
+        let runtime: String
+        switch state {
+        case .active: runtime = "tap actif"
+        case .rearmed: runtime = "tap réarmé après interruption"
+        case .permissionMissing: runtime = "tap non créé"
+        case .creationFailed: runtime = "création du tap refusée"
+        case .disabled: runtime = "tap désactivé par macOS"
+        case .stopped: runtime = "tap arrêté"
+        }
+        inputStatusLabel.stringValue = "Entrée : \(permission) · \(runtime)"
+        inputStatusLabel.textColor = state == .active || state == .rearmed ? .systemGreen : .systemOrange
     }
     @objc func editFirstObject() {
         guard let current = transport.status?.themes.first(where: { $0.surfaces > 0 })?.configuration,
