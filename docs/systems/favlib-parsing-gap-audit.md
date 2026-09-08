@@ -5,10 +5,11 @@
 Ce document est le préalable obligatoire à toute nouvelle modification du
 parser, de la résolution, de Review ou des projections privées TobiRink.
 
-L'affirmation précédente selon laquelle la reproduction fonctionnelle était
-terminée était incorrecte. Les tests présents prouvent des contrats isolés sur
-des données synthétiques ; ils ne prouvent ni la fidélité complète à FavLib, ni
-le comportement observé sur l'inventaire réel de l'utilisateur.
+L'affirmation précédente selon laquelle la résolution était terminée était
+incorrecte. Les tests présents prouvaient des contrats isolés mais ne couvraient
+pas encore les quatre fondations décrites ci-dessous. L'objectif est un contrat
+TobiRink stable, pas la fidélité complète à FavLib ni l'exploitation de
+l'inventaire privé de l'utilisateur.
 
 Cet audit ne modifie aucun code produit, aucune donnée IndexedDB, aucun favori,
 aucune ressource Cloudflare et aucun déploiement. Il décrit les changements à
@@ -16,7 +17,7 @@ effectuer avant de reprendre l'implémentation.
 
 Révisions inspectées :
 
-- Doctrine FavLib normative : `3267de2`, `CLAUDE.md` et ADR 0087;
+- Doctrine FavLib historique inspectée : `3267de2`, `CLAUDE.md` et ADR 0087;
 - FavLib `43325f7bc584` : observation secondaire du runtime récent, non normative;
 - TobiRink : `302806b7eab4`, branche
   `chore/tobirink-live-resolution-deployment` ;
@@ -29,13 +30,14 @@ Révisions inspectées :
 Les sources FavLib ne sont pas toutes cohérentes entre elles. L'ordre
 d'autorité retenu pour cet audit est :
 
-1. demande utilisateur du 2026-09-08 et doctrine `3267de2` (`CLAUDE.md`, ADR 0087);
+1. contrat TobiRink approuvé et décisions utilisateur du 2026-09-08;
    favoris = présence/progression, IndexedDB = transactions privées, sync = IDs,
    D1 = clé normalisée/owner/IDs via Worker exclusivement;
-2. les tests déterministes des packages `metadata` et `apps/extension` ;
-3. `packages/metadata/src/bookmark-parser.ts` ;
-4. `packages/metadata/src/browser-resolver.ts` ;
-5. le runtime IndexedDB/MV3 de l'extension ;
+2. doctrine historique `3267de2`, utilisée seulement pour identifier des
+   comportements à accepter, corriger ou rejeter;
+3. les tests déterministes des packages `metadata` et `apps/extension` ;
+4. `packages/metadata/src/bookmark-parser.ts` ;
+5. `packages/metadata/src/browser-resolver.ts` et le runtime IndexedDB/MV3 ;
 6. les helpers historiques de `packages/metadata/src/index.ts` seulement
    lorsqu'ils ne contredisent pas les sources précédentes.
 
@@ -45,8 +47,8 @@ Les autorités TobiRink comparées sont les ADR 0034 et 0037, les deux documents
 
 ## Verdict
 
-La pipeline TobiRink actuelle n'est pas une reproduction valide du résultat
-FavLib.
+La pipeline TobiRink auditée à cette date ne satisfaisait pas encore son propre
+contrat de résolution.
 
 Les deux défauts qui expliquent directement l'observation actuelle sont :
 
@@ -225,7 +227,7 @@ Pour la recherche :
 
 Kitsu est l'extension produit désormais approuvée : fallback après NO_MATCH
 complet, jamais arbitre d'une panne ou ambiguïté principale. MangaDex garde
-son rôle exact/sorties. Ces choix ne sont pas une preuve de parité observée.
+son rôle exact/sorties. Ces choix appartiennent au contrat TobiRink.
 
 ### 7. Transport, cadence et cache
 
@@ -516,9 +518,9 @@ Cas obligatoires :
 - vérification que la cloche ne contient jamais les tâches en cours, retries,
   erreurs fournisseur ou sources unsupported.
 
-Les tests synthétiques restent nécessaires et reproductibles, conformément à
-la doctrine FavLib. Ils ne devront plus être présentés comme une validation de
-production réelle. Aucune donnée personnelle ne doit être ajoutée au dépôt.
+Les tests synthétiques restent nécessaires et reproductibles. La préparation
+de production ajoute les validations navigateur, Worker/D1, sécurité, quotas,
+reprise et packaging. Aucune donnée personnelle ne doit être ajoutée au dépôt.
 
 ## Traçabilité des règles auditées
 
@@ -570,5 +572,5 @@ La reproduction ne pourra être déclarée terminée que lorsque :
   séparément ;
 - aucun déploiement n'a lieu avant la revue et l'approbation de ces changements.
 
-À ce stade, ces conditions ne sont pas remplies. Le projet ne doit donc pas
-être qualifié de reproduction FavLib achevée.
+À la date de cet audit, ces conditions n'étaient pas remplies. Progress porte
+les preuves de leur correction sans déclarer FavLib comme dépendance ou oracle.

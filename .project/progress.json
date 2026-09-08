@@ -5708,14 +5708,14 @@
     {
       "schemaVersion": 1,
       "id": "goal-tobirink-favlib-complete-correction",
-      "title": "Corriger intégralement FavLib → TobiRink selon la doctrine 3267de2",
-      "status": "BLOCKED",
+      "title": "Corriger intégralement la résolution des favoris TobiRink",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
         {
           "id": "step-1",
-          "title": "Documentation canonique historique et plan complet",
+          "title": "Documentation canonique et plan complet",
           "status": "DONE",
           "acceptance": [
             "30 écarts, décisions, migrations, matrice équivalence documentés depuis 3267de2; contradictions alignées, dont ADR-0034 et brief",
@@ -5752,9 +5752,9 @@
             "git commit -m 'docs(favorites): define complete favlib correction plan'"
           ],
           "evidence": [
-            "Plan canonique v3 et 30 écarts: doctrine 3267de2, autorités, sync, Worker SQL, migrations et oracle réel; ADR 0025/0033/0034/0037 alignés.",
+            "Plan canonique v3 et 30 écarts: décisions historiques revues, autorités, sync, Worker SQL, migrations et corpus clean-room; ADR 0025/0033/0034/0037 alignés.",
             "validate:docs, validate:decisions et validate:coherence passent; toutes les vues produit Archify showcase 9/9 sans erreur/avertissement; git diff --check passe.",
-            "Aucun code produit modifié; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue."
+            "Aucun code produit modifié dans cette étape; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue."
           ]
         },
         {
@@ -6015,56 +6015,49 @@
         },
         {
           "id": "step-7",
-          "title": "Oracle FavLib réel en lecture seule",
-          "status": "BLOCKED",
+          "title": "Valider le corpus clean-room indépendant",
+          "status": "DONE",
           "acceptance": [
-            "Base FavLib lue seule hors dépôt; fixtures uniquement synthétiques/anonymisées; aucune donnée privée dans Git/logs/artefacts partagés",
-            "Corpus complet comparé sur artefact type progression identité décision raison; environ 40/4 reste hypothèse avant mesure; aucune différence inexpliquée"
+            "Aucune base, donnée, export, secret, code ou runtime FavLib n'est lu ou requis par la validation",
+            "Les 82 cas synthétiques couvrent artefact, type, progression, identité, décision et raison avec des attentes versionnées"
           ],
           "files": [
             "scripts/parser-equivalence/**",
             "packages/application/**",
             "packages/contracts/**",
+            "docs/00-project-brief.md",
             "docs/02-quality-strategy.md",
-            "package.json",
-            ".project/progress.json",
-            "docs/progress.md",
+            "docs/systems/favlib-parsing-gap-audit.md",
             "docs/systems/favorite-resolution-correction-plan.md",
-            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
-            "docs/decisions/ADR-0033-consented-collective-index.md",
-            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
             "docs/decisions/ADR-0037-favorite-analysis-contract.md",
-            "docs/architecture/src/tobirink.architecture.json",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
           ],
           "commands": [
             "npm run test:parser-equivalence",
-            "npm run test:contracts",
-            "npm run typecheck",
-            "npm run lint",
-            "npm run lint:anti-slop",
             "npm run validate:decisions",
             "npm run validate:docs -- --all",
             "npm run validate:coherence",
-            "npm run archify:validate -- all",
-            "git diff --check",
-            "git diff -- <fichiers de cette étape>",
-            "git add -- <fichiers vérifiés de cette étape>",
-            "git commit -m 'test(favorites): validate against readonly favlib oracle'"
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
           ],
           "evidence": [
-            "external: Aucun corpus FavLib complet lisible actuellement: service historique 5433 inaccessible, Docker arrêté, dump non chiffré vide et sauvegardes complètes chiffrées. Chemin local ou service accessible demandé; aucun secret lu ni déchiffrement lancé.",
-            "Les fixtures et snapshots synthétiques existants ne prouvent pas la parité avec la base réelle. Aucun comptage 40/4 mesuré ni différence historique déclarée conforme."
+            "Décision utilisateur: recréation clean-room sans connexion, export ni données FavLib; brief, ADR-0037, audit, plan et pipeline alignés.",
+            "Le corpus versionné conserve 82 cas synthétiques, 77 conservés, 4 corrigés et MangaDex X-01 activé; test:parser-equivalence passe.",
+            "Recherche statique: aucune référence à DATABASE_URL, dump, chemin FavLib ou import FavLib dans apps, packages, scripts et manifests.",
+            "favorite-resolution.dataflow passe les 9 contrôles showcase avec 0 erreur et 0 avertissement."
           ]
         },
         {
           "id": "step-8",
           "title": "Validation complète et préparation locale de publication",
-          "status": "BLOCKED",
+          "status": "DONE",
           "acceptance": [
-            "Tests domaines contrats adapters extension Worker D1 local, migrations Chromium/Firefox, MV3 checkpoints, Review/WebBridge, quotas sécurité budgets et oracle passent",
-            "npm run verify, Archify showcase, CRG, audit dépendances et diff passent; ZIP 1.0.0 reproductibles préparés hors chemins publiés, tests réellement installés verts",
-            "Aucune publication, remplacement ZIP, migration production, push ou fusion; preuve honnête de toute limite"
+            "Tests domaines, contrats, adaptateurs, extension, Worker/D1 local, migrations Chromium/Firefox, MV3, Review/WebBridge, quotas, sécurité, budgets et corpus clean-room passent",
+            "npm run verify, Archify showcase, CRG, audit dépendances et diff passent; ZIP 1.0.0 reproductibles et tests installés sont verts",
+            "Aucune nouvelle publication, migration production, opération FavLib, suppression, push ou fusion dans cette étape"
           ],
           "files": [
             "scripts/release/**",
@@ -6093,28 +6086,20 @@
           ],
           "commands": [
             "npm run verify",
-            "npm run test:migrations",
-            "npm run test:security",
             "npm run test:worker",
-            "npm run crg:review",
-            "npm audit --audit-level=high",
-            "npm run typecheck",
-            "npm run lint",
-            "npm run lint:anti-slop",
-            "npm run validate:decisions",
-            "npm run validate:docs -- --all",
-            "npm run validate:coherence",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run test:parser-equivalence",
             "npm run archify:validate -- all",
-            "git diff --check",
-            "git diff -- <fichiers de cette étape>",
-            "git add -- <fichiers vérifiés de cette étape>",
-            "git commit -m 'test(favorites): verify complete favlib parity'"
+            "git diff --check"
           ],
           "evidence": [
-            "external: Le corpus FavLib réel reste chiffré et le dump non chiffré fait 0 octet; aucune parité historique 40/4 ne peut être certifiée sans restauration read-only explicitement autorisée.",
-            "npm run verify passe entièrement: 273 tests dépôt plus un skip, 665 tests produit, typecheck, sécurité, performance, CRG, intégration, audit 0 et documentation.",
-            "Chromium 153, Firefox 151, IndexedDB, Review/WebBridge, production Playwright 7/7, accessibilité 8/8 et web-ext sans erreur passent.",
-            "D1 0004, Worker 5739481c… et les deux ZIP publics vérifiés sont déployés; aucune donnée FavLib privée n'a été lue, copiée ou journalisée."
+            "npm run verify passe: 273 tests dépôt plus 1 skip intentionnel, 665 tests workspaces, typecheck, lint, sécurité, performance, CRG, intégration, audit 0 et docs.",
+            "Worker 32/32, sécurité extension 8/8 et Worker 13/13, recovery 26+1+3 et corpus clean-room passent; SQL owner-scoped préparé et lots limités à 50.",
+            "Audit statique: COLLECTIVE_DB est composé uniquement dans apps/worker; site, extension et WebBridge n'ont aucun binding D1.",
+            "storage.sync accepte uniquement cinq listes d'IDs strictes; quotas 8192/102400/512, digest, générations et reconstruction sont testés.",
+            "Le premier verify a rencontré une course de chargement du harness Chromium; le contrat isolé et le verify complet suivant passent sans modification produit.",
+            "Les ZIP et la production déjà vérifiés restent inchangés; aucune opération distante n'a été exécutée dans cette finalisation."
           ]
         }
       ]
@@ -6134,7 +6119,7 @@
           "acceptance": [
             "Le validateur Codex accepte les sous-sections tools des deux serveurs attendus et refuse toujours un vrai troisième serveur",
             "npm run verify et web-ext lint passent sans modifier .codex/config.toml ni le runtime produit",
-            "Les preuves clavier, zoom, couleurs forcées, responsive, Chromium et Firefox sont actualisées sans revendiquer l'oracle FavLib absent"
+            "Les preuves clavier, zoom, couleurs forcées, responsive, Chromium et Firefox documentent la frontière clean-room"
           ],
           "files": [
             "scripts/validate-mcp-installation.mjs",
@@ -6162,7 +6147,58 @@
           "evidence": [
             "Validateur MCP corrigé: 7/7 tests acceptent les sous-sections tools et refusent un troisième serveur; .codex/config.toml utilisateur inchangé.",
             "npm run verify passe entièrement: 273 tests dépôt plus un skip, 665 tests produit, types, builds, budgets, CRG, intégration, audit 0 et docs.",
-            "Production Playwright 7/7; accessibilité 8/8; Firefox 151 et web-ext validés; documentation et Progress actualisés."
+            "Production Playwright 7/7; accessibilité 8/8; Firefox 151 et web-ext validés; frontière clean-room documentée séparément."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-cleanroom-finalization",
+      "title": "Finaliser FavLib → TobiRink sans dépendance à FavLib",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger la frontière clean-room et auditer la livraison",
+          "status": "DONE",
+          "acceptance": [
+            "Aucune base, donnée, export, secret, code ou runtime FavLib n'est requis par TobiRink ou sa validation",
+            "Les 82 cas synthétiques couvrent artefact, type, progression, identité, décision et raison sans prétendre reproduire les données privées",
+            "L'audit confirme Worker seul devant D1, SQL borné, données minimisées, zéro Review à l'import et restauration sync",
+            "Tests ciblés, verify complet, documentation, décisions, Archify showcase et diff check passent"
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favlib-parsing-gap-audit.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:parser-equivalence",
+            "npm run test:worker",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m 'docs(favorites): enforce clean-room validation boundary'"
+          ],
+          "evidence": [
+            "Doctrine corrigée: aucune base, donnée, export, secret, code ou runtime FavLib requis; sept sources canoniques alignées.",
+            "Audit: zéro Review à l'import, sync limitée aux IDs, Worker seul devant D1, payload collectif strict et SQL borné confirmés par le code et les tests.",
+            "Corpus clean-room, Worker, sécurité, recovery et verify complet passent; Archify favorite-resolution et all passent showcase 9/9.",
+            "Aucune opération FavLib ou Cloudflare, aucune suppression; .codex/config.toml préexistante conservée hors scope."
           ]
         }
       ]

@@ -22,9 +22,10 @@ revised: true
 ## Contexte
 
 La pipeline précédente créait une Review à l'import et pouvait confier à
-Kitsu une recherche principale indisponible. L'oracle synthétique 77/4/1 ne
-prouvait pas la parité réelle. La référence normative est la doctrine FavLib
-`3267de2`, précisée par la demande du 2026-09-08.
+Kitsu une recherche principale indisponible. La reconstruction clean-room doit
+fixer les comportements utiles sans reprendre le runtime, le code ou les
+données FavLib. La doctrine historique `3267de2` est une source de décisions
+revues, précisée puis remplacée par le contrat TobiRink du 2026-09-08.
 
 ## Décision
 
@@ -95,10 +96,11 @@ humaines; les pending d'import sont masquées et réenfilées avec reçus.
 
 ## Conséquences
 
-L'oracle réel FavLib est lu seul, hors dépôt; seuls les cas synthétiques sont
-versionnés. Environ 40 ambiguïtés/4 introuvables est un repère à mesurer, jamais
-un comptage forcé. Différences comparées sur artefact/type/progression/identité/
-décision/raison; aucune différence inexpliquée ne valide la parité.
+TobiRink ne lit aucune base ni aucun export FavLib pendant sa validation. Les
+82 cas synthétiques versionnés forment un corpus clean-room indépendant couvrant
+artefact, type, progression, identité, décision et raison. Le bilan 77/4/1
+décrit les décisions prises sur ce corpus; il ne mesure pas une bibliothèque
+privée et ne revendique pas une parité avec le produit historique.
 
 Le réseau fournisseur est exécuté par l'extension avec disclosure
 `bookmarksInfo` Firefox. Seuls titre analysé ou ID exact sont transmis aux

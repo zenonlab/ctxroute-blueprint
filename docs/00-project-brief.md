@@ -112,9 +112,10 @@ not become runtime dependencies of Tobirink.
 FavLib remains an intact functional reference and rollback artifact only.
 TobiRink starts with a new extension identity, a new IndexedDB name, and new
 Cloudflare resource names. Product runtime never reads, migrates, or reuses FavLib local databases,
-identifiers, D1 bindings, R2 buckets, or private projections. The approved
-validation oracle alone reads the local FavLib database read-only outside the
-repository; private rows never enter Git, logs, CI or shared test artifacts.
+identifiers, D1 bindings, R2 buckets, or private projections. Validation never
+connects to a FavLib database or consumes a FavLib export. Historical behavior
+is represented only by reviewed, synthetic clean-room fixtures; private rows
+never enter Git, logs, CI or shared test artifacts.
 Existing browser HTTP(S) bookmarks may be imported as fresh sources on first
 launch. Preview, cutover, and rollback keep the two products isolated; a
 rollback restores the previous site or Worker artifact without converting or

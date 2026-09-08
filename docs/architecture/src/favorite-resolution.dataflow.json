@@ -328,11 +328,11 @@
   "cards": [
     {
       "dot": "emerald",
-      "title": "Contrats et oracle",
+      "title": "Contrats clean-room",
       "items": [
         "Règles pures versionnées et 30 écarts documentés",
-        "Oracle FavLib réel lu seul, jamais copié dans Git",
-        "Les tests synthétiques ne prouvent pas la parité réelle"
+        "82 cas synthétiques couvrent la résolution déterministe",
+        "Aucune base, donnée ou exécution FavLib n’est requise"
       ]
     },
     {

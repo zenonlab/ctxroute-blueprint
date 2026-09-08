@@ -668,11 +668,12 @@ git diff --check
 Les commandes non pertinentes à une vague peuvent rester hors de son test
 ciblé, mais `npm run verify` devient obligatoire avant l’activation complète.
 
-## Audit historique du 2026-09-07 — ne prouve pas la parité
+## Audit historique du 2026-09-07 — source de cas clean-room
 
-L'audit de correction du 2026-09-08 invalide toute conclusion de reproduction
-complète issue des seuls tests synthétiques ci-dessous. Les quatre fondations
-et l'oracle réel restent à corriger/vérifier selon Progress.
+L'audit de correction du 2026-09-08 remplace la recherche de parité avec FavLib
+par un contrat TobiRink indépendant. Les observations historiques servent à
+concevoir des cas synthétiques; aucune base, donnée ou exécution FavLib n'entre
+dans la validation.
 
 L’audit du code, des tests et des migrations confirme les frontières
 domaine/application/adaptateurs, le parser et le matcher sans I/O, l’outbox v8
@@ -694,8 +695,8 @@ La reconstruction est terminée seulement quand :
 - tout événement favori atteint un état terminal ou une reprise datée;
 - chaque transformation est visible dans un artefact local versionné;
 - le parser et le matcher sont purs et couverts par la matrice canonique;
-- l'oracle synthétique couvre les 82 cas dont MangaDex X-01; l'oracle privé
-  réel lu seul compare chaque résultat et ne laisse aucun écart inexpliqué;
+- le corpus synthétique couvre les 82 cas dont MangaDex X-01 et toute divergence
+  exige une décision versionnée;
 - l’inventaire, les fournisseurs et les projections respectent leurs bornes;
 - une suspension à n’importe quel checkpoint converge sans doublon métier;
 - les migrations préservent toutes les données v1 à v5 sans remise à zéro;

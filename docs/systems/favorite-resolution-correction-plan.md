@@ -4,7 +4,8 @@
 
 Contrat cible v3, approuvé le 2026-09-08. Sa documentation ne constitue pas
 une preuve d'implémentation. Progress conserve la validation de chaque étape.
-La parité réelle reste non démontrée tant que l'oracle privé complet ne passe pas.
+La conformité est démontrée par les contrats TobiRink, le corpus clean-room et
+les validations d'intégration; elle ne dépend d'aucune base FavLib.
 
 Référence historique : commit Git `3267de2`, notamment `CLAUDE.md` et
 `docs/adr/0087-architecture-locale-favoris-resolution-agenda.md`. Le dernier
@@ -15,7 +16,7 @@ additives. Aucun code FavLib n'est porté ou exécuté dans TobiRink.
 
 Ce contrat remplace les prescriptions contradictoires des versions 1/2 de
 la spécification et de la pipeline. Les règles pures de parsing et les 82 cas
-de la spécification restent une base de traçabilité, pas un oracle réel validé.
+de la spécification constituent le corpus de régression clean-room.
 
 ## Autorités et frontières
 
@@ -382,7 +383,7 @@ Les identifiants G sont conservés depuis l'audit pour ne pas perdre la traçabi
 | G-07 | progression pagination; panne retryable sans boucle page 1 | 3 |
 | G-08 | requête cloche par état actionnable uniquement | 6 |
 | G-09 | résultats explicites séparés de la tâche technique | 2,6 |
-| G-10 | versions et oracle de tous les comportements historiques | 3,7 |
+| G-10 | versions et corpus clean-room des comportements retenus | 3,7 |
 | G-11 | règles déclaratives Worker et routes Anime-Sama | 3,5 |
 | G-12 | aliases avec preuve d'identité/provenance | 3 |
 | G-13 | langue locale reste enrichissement facultatif sans arbitrage | 3,7 |
@@ -397,14 +398,14 @@ Les identifiants G sont conservés depuis l'audit pour ne pas perdre la traçabi
 | G-22 | actions manuelles validées, révision/type/domaine vérifiés | 6 |
 | G-23 | grand inventaire, plusieurs réveils, mutation concurrente | 8 |
 | G-24 | doctrine 3267de2, ADR/spec/pipeline/Archify cohérents | 1 |
-| G-25 | oracle réel privé lu seul et synthétiques indépendants | 7 |
-| G-26 | preuves unitaires/oracle/installation/production distinctes | 7,8 |
+| G-25 | corpus synthétique indépendant, sans accès aux données FavLib | 7 |
+| G-26 | preuves unitaires/corpus/installation/production distinctes | 7,8 |
 | G-27 | migration additive reçue, décisions humaines préservées | 6 |
 | G-28 | favoris autorité présence/progression; sync IDs/reconstruction | 2,4 |
 | G-29 | liens ordinaires hors cloche, source jamais supprimée | 3,6 |
 | G-30 | collectif clé/owner/IDs, isolation, anti-rejeu, SQL borné | 5 |
 
-## Équivalence et oracle réel
+## Contrat de régression clean-room
 
 | Dimension | Comparaison | Différence admissible |
 | --- | --- | --- |
@@ -415,15 +416,13 @@ Les identifiants G sont conservés depuis l'audit pour ne pas perdre la traçabi
 | Décision | resolved/ambigu/not-found/unsupported/retryable/no-match humain | états techniques reclassés explicitement |
 | Raison | niveau de preuve et conflit | aucun écart inexpliqué |
 
-La base FavLib est consultée en lecture seule hors dépôt. Aucun titre, URL,
-export privé ou résultat individuel n'entre dans Git, logs, CI ou captures
-partagées. Les fixtures synthétiques reproduisent des formes, pas la bibliothèque.
-Un rapport privé local garde cause et résultat de chaque différence. Le bilan
-« environ 40 ambiguïtés, 4 introuvables » est une référence utilisateur à mesurer,
-pas une assertion que l'on force. Le bilan synthétique 77/4/1 est historique;
-MangaDex X-01 rejoint désormais la validation. Aucune différence non expliquée
-ne passe; une divergence finale non couverte par une décision approuvée exige
-l'accord utilisateur.
+Aucune base, aucun export, aucun titre privé et aucune URL FavLib ne sont lus
+par la validation. Les 82 fixtures synthétiques reproduisent uniquement les
+formes et décisions revues nécessaires au contrat TobiRink. Le bilan 77/4/1
+classe ces cas synthétiques; le repère historique « environ 40 ambiguïtés,
+4 introuvables » n'est ni une cible ni un critère d'acceptation. MangaDex X-01
+rejoint désormais la validation. Toute divergence du corpus doit être expliquée
+par une décision versionnée.
 
 ## Exécution, validation et publication
 
@@ -432,18 +431,19 @@ Deux corrections de fixtures sont explicites : U-04 injecte désormais une
 preuve d'ID AniList exact; S-04 conserve le titre précédant `season4`, plutôt
 que de prendre ce marqueur pour le titre. Les tests de routage et de reprise
 exécutent séparément l'import, les adaptateurs et les transactions. Ce snapshot
-ne prouve pas la parité avec la base privée, réservée à l'étape 7.
+prouve le contrat synthétique; les tests navigateur et Worker vérifient ensuite
+son intégration réelle dans TobiRink.
 
 Huit étapes dans Progress, chacune avec fichiers, commandes, critères et commit :
 documentation; contrats; parser/fournisseurs; sync; Worker SQL; migration/Review;
-oracle privé; vérification complète. La documentation est validée et committée
+corpus clean-room; vérification complète. La documentation est validée et committée
 avant tout code produit. Les corrections restent dans les périmètres approuvés.
 
 Commandes documentaires : `npm run validate:decisions`,
 `npm run validate:docs -- --all`, `npm run validate:coherence`,
 `npm run archify:validate -- all`, `git diff --check`.
 Puis tests domain/application/contracts/adapters/extension/Worker, migrations
-IndexedDB Chromium/Firefox, D1 local, quotas, sécurité, MV3, oracle, Review et
+IndexedDB Chromium/Firefox, D1 local, quotas, sécurité, MV3, corpus, Review et
 WebBridge; budgets mémoire/requêtes/SQL/temps; `npm run verify`, CRG et audit
 dépendances. Aucune installation de dépendance n'est autorisée implicitement.
 

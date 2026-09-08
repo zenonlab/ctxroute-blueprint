@@ -95,9 +95,9 @@ browser or `workerd` test when platform behavior is the risk.
   `test:parser-equivalence` exige en plus un test sémantique exécuté pour chacun
   des 82 identifiants, vérifie l’unicité de leurs attentes et maintient le bilan
   historique 77 conservés / 4 corrigés / `X-01` futur comme référence initiale.
-  Le plan v3 active X-01 MangaDex et exige en plus l'oracle privé réel lu seul;
-  aucune différence inexpliquée sur identité/type/progression/décision/raison
-  n'est acceptée.
+  Le plan v3 active X-01 MangaDex. Le corpus clean-room couvre explicitement
+  identité, type, progression, décision et raison sans connexion, export ou
+  donnée FavLib.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.
@@ -128,9 +128,10 @@ browser or `workerd` test when platform behavior is the risk.
 The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
 at import, NOT_FOUND actionability, human-only no-match, owner isolation,
 distinct-owner confirmations, anti-replay batches, indexed SQL, MV3 checkpoints,
-additive migrations and installed Chromium/Firefox evidence. Private oracle
-counts are measured, never forced to the approximate 40/4 reference. No
-production parity is claimed from synthetic tests alone.
+additive migrations and installed Chromium/Firefox evidence. The synthetic
+clean-room corpus tests the reviewed behavior contract without depending on
+FavLib data. Production readiness additionally requires installed-browser,
+Worker/D1, recovery, security, quota and packaging evidence.
 
 ## Inherited tooling boundary
 
