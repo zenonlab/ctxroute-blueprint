@@ -50,7 +50,19 @@ import os
     }
 
     func install() {
-        guard port == nil, AXIsProcessTrusted() else { return }
+        let trusted = AXIsProcessTrusted()
+        guard trusted, screensAwake, sessionActive else { return }
+        if let port {
+            if CFMachPortIsValid(port) {
+                let wasEnabled = CGEvent.tapIsEnabled(tap: port)
+                let restored = Self.restoreExistingTap(trusted: trusted, awake: screensAwake,
+                    active: sessionActive, isEnabled: { CGEvent.tapIsEnabled(tap: port) },
+                    enable: { CGEvent.tapEnable(tap: port, enable: true) })
+                if !wasEnabled { trace(restored ? "tap-reenabled" : "tap-reenable-failed") }
+                return
+            }
+            stop()
+        }
         let events: [CGEventType] = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
                                      .leftMouseDragged, .rightMouseDragged]
         let mask = events.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
@@ -73,10 +85,25 @@ import os
         if let port { CFMachPortInvalidate(port) }
         port = nil; source = nil; captured = false; router.detach()
     }
+    /// Shared recovery path; injected operations let tests verify retry and refusal
+    /// without creating an event tap or changing the user's permissions.
+    static func restoreExistingTap(trusted: Bool, awake: Bool, active: Bool,
+                                   isEnabled: () -> Bool, enable: () -> Void) -> Bool {
+        guard trusted, awake, active else { return false }
+        if !isEnabled() { enable() }
+        return isEnabled()
+    }
     private func consume(_ type: CGEventType, _ event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             trace("tap-disabled-by-system")
-            router.detach(); captured = false; return false
+            router.detach(); captured = false
+            // No AX queries or reinstall inside the time-sensitive callback.
+            // A stopped agent must not be resurrected by an already queued task.
+            Task { @MainActor [weak self] in
+                guard let self, self.port != nil else { return }
+                self.install()
+            }
+            return false
         }
         if type == .leftMouseDragged || type == .rightMouseDragged {
             if captured { router.cancel() }

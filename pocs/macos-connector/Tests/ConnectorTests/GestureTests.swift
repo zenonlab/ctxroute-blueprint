@@ -70,6 +70,23 @@ final class GestureTests: XCTestCase {
             XCTAssertFalse(router.begin(button: .right, point: point, hit: .control(control), scene: scene, inputAuthorized: true))
         }
     }
+    func testTapInterruptionDropsOldGestureButNextClickWorks() {
+        for button in [PointerButton.left, .right] {
+            var router = makeRouter()
+            XCTAssertTrue(router.begin(button: button, point: point, hit: .object("car.a"),
+                scene: scene, inputAuthorized: true))
+            router.detach() // Same reset used when the native tap is disabled.
+            let stale = router.end(button: button, point: point, hit: .object("car.a"),
+                scene: scene, inputAuthorized: true)
+            XCTAssertNil(stale.intent)
+            XCTAssertFalse(stale.consumed)
+            XCTAssertTrue(router.begin(button: button, point: point, hit: .object("car.a"),
+                scene: scene, inputAuthorized: true))
+            XCTAssertEqual(router.end(button: button, point: point, hit: .object("car.a"),
+                scene: scene, inputAuthorized: true).intent,
+                button == .left ? .activate("car.a") : .customize("car.a"))
+        }
+    }
     func testStaleInvalidUnpairedAndOverlappingEvents() {
         var router = makeRouter()
         XCTAssertFalse(router.begin(button: .left, point: point, hit: .object("car.a"), scene: UUID(), inputAuthorized: true))

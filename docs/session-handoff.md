@@ -1,5 +1,35 @@
 # Reprise de session — Wallpaper
 
+## Récupération de capture — candidat du 8 septembre 2026, 21:23
+
+Demande : conserver les zones invisibles synchronisées du PoC1 et vérifier les
+références open source. Régression corrigée dans DesktopInput : un port existant
+désactivé bloquait toute reprise ; la notification système n'appelait pas enable.
+Réactivation différée hors callback, contrôlée par TCC/session/veille, idempotente,
+et recréation d'un port invalide. Pas de nouveau calque ni de modification du
+filtre Finder. Références et limites dans le README : Apple tapEnable, skhd,
+Phosphene (provider existant), Plash (code actuel non publié).
+
+Candidat **build.f8cQnv**, build signé terminé (exit 0), deep/strict vérifié et
+requirement lié au certificat local `8F422B938988AFF3A82FD871B42A66CAE13F865F`.
+17 cas de récupération injectée, 7 lanceur, 9 fichiers, 9 Finder et 3 thèmes passent.
+32 XCTest passent, dont interruption de geste puis nouveau clic gauche/droit.
+Ces tests ne créent pas de tap ni de geste natif. **PoC non validé**.
+Gate final `npm run verify` : exit 0, `/tmp/wallpaper-tap-recovery-final-verify.log`.
+Premier passage : dépassement du budget de latence du hook PreToolUse. Cache Swift
+créé par le test sans scratch-path conservé (déplacé, non supprimé) dans
+`dist/pocs/macos-connector/swift-test-cache-recovery`. Employer désormais la commande
+README avec `--scratch-path`. Aucun seuil de vérification modifié.
+
+Non installé : Computer Use observe encore **Ambre statique — PoC 2**. Une question
+demande à l'utilisateur de laisser Noir sélectionné pour la migration propre.
+Ancien VaWZIK inchangé, aucun arrêt forcé du provider, aucune modification TCC.
+Installer f8cQnv, pas BdNKFb qui n'a pas cette reprise ; autoriser ensuite le paquet
+installé, puis qualifier les boutons, fichiers dans les deux sens, Spaces et veille.
+Ne pas reconstruire ce candidat après autorisation. Correction interne : frontières
+inchangées ; le gate impose une annotation Archify « Reprise à qualifier ».
+AGENTS, CLAUDE et hooks audités, inchangés.
+
 ## Démarrage durable et signature locale — 8 septembre 2026
 
 Demande utilisateur : arrêter les régressions de clics à chaque relance/mise à jour.

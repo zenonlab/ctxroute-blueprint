@@ -88,6 +88,37 @@ Le reste de ce document conserve explicitement les états historiques antérieur
 
 ### Comparaison ciblée avec le PoC1
 
+Correctif de récupération du 8 septembre 2026 : `ActiveClickTap` réactivait un tap
+désactivé, contrairement au premier `DesktopInput` du PoC2. Celui-ci vérifie désormais
+l'état réel du port : actif = aucune réinstallation ; valide mais désactivé = une
+tentative de réactivation avec vérification ; invalide = nettoyage puis création.
+Les notifications de désactivation annulent le geste et programment cette reprise
+hors du callback. Une tâche déjà programmée ne recrée pas un port après `stop()`.
+La reprise exige toujours Accessibilité, écran éveillé et session active ; aucun
+prompt automatique, polling, changement du filtre Finder ou nouveau calque.
+Les 17 cas injectés du test natif vérifient les autorisations, l'idempotence et le
+refus du système, sans fabriquer d'événements souris ni modifier TCC.
+
+Sources primaires revérifiées pour ce correctif :
+
+- [Apple, tapEnable](https://developer.apple.com/documentation/coregraphics/cgevent/tapenable(tap:enable:))
+  documente la réactivation des taps désactivés.
+- [skhd, key_handler](https://github.com/asmvik/skhd/blob/master/src/skhd.c)
+  réactive le tap pour les deux notifications de désactivation. Référence de
+  mécanisme, pas de gestion des icônes de bureau ; aucun code C importé.
+- [Phosphene](https://github.com/kageroumado/phosphene) reste la référence déjà
+  réutilisée pour le provider natif, pas une preuve de routage des clics de nos objets.
+- [Plash](https://github.com/sindresorhus/Plash) annonce ne plus publier son code
+  source : ne pas le présenter comme une brique actuelle intégrable.
+
+Qualification nécessaire sur le même binaire installé et autorisé : clic son,
+clic droit objet, clic droit vide, masquer/réafficher les fichiers, priorité d'une
+icône Finder superposée, changement de Space, veille/reprise et relance de l'agent.
+La récupération après désactivation native reste à observer : les tests injectés
+ne qualifient ni TCC ni les clics réels. Le PoC reste **non validé** jusque-là.
+Cette réparation est interne à l'adaptateur ; contrats inchangés. Le diagramme
+annote seulement « Reprise à qualifier », sans modification de sa topologie.
+
 `pocs/macos-surface/Sources/SurfaceProbe/SplitDesktopControls.swift` utilisait des
 `NSPanel` transparents placés au-dessus des icônes, avec `acceptsFirstMouse=true`.
 Le décor était dans le provider ; ces petites fenêtres recevaient les clics. Leur
