@@ -28,7 +28,7 @@ Le wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rech
 
 Le panneau ne suit plus le véhicule. Il est ancré en haut à droite du bureau et n'est
 repositionné que si la géométrie d'écran change. Les identifiants de diagnostic ne
-sont plus affichés. Il contient un bouton explicite **Masquer/Afficher les fichiers**.
+sont plus affichés. Il contient un interrupteur coché **Fichiers du bureau**.
 Cette action modifie la préférence Finder non documentée `CreateDesktop`, puis demande
 à Finder de se relancer. Elle ne déplace et ne supprime aucun fichier. Ce raccord reste
 isolé, réversible, non exécuté par les smokes et à requalifier sur chaque macOS.

@@ -7,10 +7,10 @@ import ProbeCore
 final class SplitDesktopControls {
     let objectWindows: [InputProbePanel]
     let objectButtons: [DynamicObjectButton]
-    let controlsWindow = InputProbePanel(background: ProbeStyle.surface)
+    let controlsWindow = InputProbePanel(background: ProbeStyle.surface, acceptsKeyInput: true)
     let effectButton = FirstClickButton(title: "Halo", target: nil, action: nil)
     let pauseButton = FirstClickButton(title: "Pause", target: nil, action: nil)
-    let desktopItemsButton = FirstClickButton(title: "Masquer les fichiers", target: nil, action: nil)
+    let desktopItemsButton = FirstClickButton(title: "Fichiers du bureau", target: nil, action: nil)
     let closeButton = FirstClickButton(title: "Fermer", target: nil, action: nil)
     let status = NSTextField(labelWithString: "")
     private(set) var desktopExposed = false
@@ -45,7 +45,11 @@ final class SplitDesktopControls {
                                  (desktopItemsButton, desktopItems), (closeButton, close)] {
             button.target = target
             button.action = action
-            button.bezelStyle = .rounded
+            if button === desktopItemsButton {
+                button.setButtonType(.switch)
+            } else {
+                button.bezelStyle = .rounded
+            }
             button.setAccessibilityLabel(button.title)
         }
         controlsWindow.title = "Commandes de l’objet"
@@ -110,6 +114,7 @@ final class SplitDesktopControls {
         }
         if panelOpen {
             if !controlsWindow.isVisible { controlsWindow.orderFrontRegardless() }
+            if !controlsWindow.isKeyWindow { controlsWindow.makeKey() }
         } else if controlsWindow.isVisible { controlsWindow.orderOut(nil) }
     }
 
@@ -159,7 +164,10 @@ final class DynamicObjectButton: FirstClickButton {
 
 @MainActor
 final class InputProbePanel: NSPanel {
-    init(background: NSColor) {
+    private let acceptsKeyInput: Bool
+
+    init(background: NSColor, acceptsKeyInput: Bool = false) {
+        self.acceptsKeyInput = acceptsKeyInput
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
@@ -173,7 +181,7 @@ final class InputProbePanel: NSPanel {
         isOpaque = background != .clear
         backgroundColor = background
     }
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { acceptsKeyInput }
     override var canBecomeMain: Bool { false }
 }
 

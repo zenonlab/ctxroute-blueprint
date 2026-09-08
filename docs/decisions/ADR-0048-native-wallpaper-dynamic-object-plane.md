@@ -76,7 +76,7 @@ d'une icône native, Mission Control, Spaces réels ou le multi-écran.
 
 `CreateDesktop` n'est pas un contrat public Apple. Une rupture sur une version future
 de macOS doit désactiver uniquement ce bouton, sans affecter le wallpaper, les objets
-ou les fichiers. La valeur courante décide toujours du libellé Masquer/Afficher.
+ou les fichiers. La valeur courante décide toujours de l'état coché de l'interrupteur.
 
 Le POC empaquette encore deux fixtures adaptées à leurs schémas respectifs :
 `interactive-theme.json` pour l'extension et `formation-theme.json` pour la sonde.

@@ -30,7 +30,7 @@ Accessibilité. La ressource
 solveur générique conserve l'ordre et calcule les orientations dans les virages.
 Le panneau d'objet est fixe en haut à droite : aucune fenêtre ne poursuit un véhicule.
 Sa zone est exclue du hit-test global, afin qu'un véhicule situé derrière un bouton ne
-reçoive pas le même clic. Le bouton « Masquer/Afficher les fichiers » bascule la
+reçoive pas le même clic. L'interrupteur « Fichiers du bureau » bascule la
 préférence Finder non documentée `CreateDesktop`, puis demande la relance de Finder.
 Il ne déplace et ne supprime aucun fichier ; le smoke ne l'actionne jamais.
 Apple ne documente pas cette clé comme API publique : cette capacité est donc un

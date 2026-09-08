@@ -293,8 +293,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ui?.panel.isHidden = !state.panelOpen
         splitControls?.update(snapshot: snapshot, desktop: window)
         splitControls?.refresh(state)
-        splitControls?.desktopItemsButton.title = finderDesktopItems.itemsAreVisible
-            ? "Masquer les fichiers" : "Afficher les fichiers"
+        splitControls?.desktopItemsButton.state = finderDesktopItems.itemsAreVisible ? .on : .off
         syncTapExclusions()
         ui?.animationButton.title = state.animationRequested ? "Arrêter l’animation" : "Animer"
         ui?.effectButton.title = state.effectEnabled ? "Retirer le halo" : "Activer le halo"
@@ -406,7 +405,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 smokeChecks["split_closes_panel"] = !state.panelOpen && !splitControls.controlsWindow.isVisible
                 smokeChecks["split_first_click_policy"] = splitControls.objectButton.acceptsFirstMouse(for: nil)
                     && splitControls.objectWindows.allSatisfy { !$0.canBecomeKey } && splitControls.mouseDowns == 0
-                smokeChecks["finder_toggle_is_explicit"] = !splitControls.desktopItemsButton.title.isEmpty
+                smokeChecks["finder_toggle_is_explicit"] = splitControls.desktopItemsButton.state ==
+                    (finderDesktopItems.itemsAreVisible ? .on : .off)
                 splitControls.setDesktopExposed(false)
                 smokeChecks["split_hides_off_desktop"] = splitControls.visibleObjectCount == 0
                     && !splitControls.controlsWindow.isVisible
