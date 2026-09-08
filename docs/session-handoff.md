@@ -17,8 +17,20 @@ un UUID dans `access-probe.json`, sans accéder aux données Finder.
 Le provider réel reste NON QUALIFIÉ : les sondes CLI ne tournent pas dans WallpaperAgent.
 
 Inspection des Réglages : « Ambre statique — PoC 2 » sélectionné, tous espaces activé.
-Aucun changement appliqué. Accord demandé pour passer temporairement sur un fond
-macOS standard, installer ce build local puis sélectionner Orbite ; réponse attendue.
+L'utilisateur a donné son accord pour passer temporairement sur un fond macOS
+standard, installer ce build local puis sélectionner Orbite. Ne pas redemander cet
+accord. La tentative d'exécution est bloquée par le contrôle UI : l'arbre
+d'accessibilité et la capture affichent le bouton « Noir », mais les clics renvoient
+`cannotClickOffscreenElement` ou `noWindowsAvailable`. Les essais par coordonnées,
+mise au premier plan et raccourci de fermeture n'ont pas confirmé de changement.
+Ambre reste le dernier fond observé ; aucun remplacement ni lancement du nouveau
+compagnon n'est confirmé. Ne pas déduire une action réussie d'une capture seule.
+Le préflight retourne encore 2 avec `NativeWallpaperProbe, WallpaperProvider`.
+Le CLI local `--probe-mailbox` retourne 0, mais toujours `provider=unconfirmed`.
+Prochaine action : sélectionner manuellement un fond macOS standard et quitter
+Réglages Système si le contrôle UI reste indisponible ; vérifier ensuite les
+processus, installer le build local préservant l'ancien paquet, sélectionner Orbite
+et qualifier une quittance corrélée avec une action visiblement appliquée.
 Ne pas réinstaller par-dessus les deux anciens providers encore chargés et ne pas
 arrêter WallpaperAgent/Finder. Ne pas réclamer un certificat pour ce mode local.
 Audit final : CONFORME — 21 XCTest, builds local et strict, `npm run verify` à 0,
@@ -27,7 +39,10 @@ diff contrôlé, doctrine/hooks inchangés et aucune suppression. Le build stric
 Archify connecteurs : showcase 9/9, zéro erreur/avertissement, containment quatre
 résolutions ; captures sombres 1440×900 et 2048×1320 inspectées. Reçus dans
 `architecture/platform-connectors.md`. MANQUE — échange avec le provider natif
-et action visible, après accord de remplacement. N/A — nouvelle dépendance/service.
+et action visible, après déblocage du contrôle UI (accord déjà reçu).
+Les 21 XCTest ont été relancés après cette tentative : zéro échec. Aucun code,
+contrat, diagramme, hook ou réglage Finder n'a changé pendant cette tentative.
+N/A — nouvelle dépendance/service ou nouvelle frontière architecturale.
 
 ## Historique — préparation de signature, 8 septembre 2026
 
