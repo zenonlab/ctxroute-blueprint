@@ -29,6 +29,11 @@ installé, puis qualifier les boutons, fichiers dans les deux sens, Spaces et ve
 Ne pas reconstruire ce candidat après autorisation. Correction interne : frontières
 inchangées ; le gate impose une annotation Archify « Reprise à qualifier ».
 AGENTS, CLAUDE et hooks audités, inchangés.
+Archify : showcase 9/9, zéro erreur/avertissement ; quatre tailles clair/sombre
+sans débordement, captures sombres 1440×900 et 2048×1320 inspectées. Viewer fixe anglais.
+Source SHA256 `c14a25f3dfc529c79abd488d2a0b33a8a8ed82f83f302c0a55094900ab5c1a92` ;
+HTML `dist/architecture/platform-connectors.architecture.html`, SHA256
+`c8e04e35d40171b9b45d5346a1825781198271cb34e9a6cbff9314136aed617b`.
 
 ## Démarrage durable et signature locale — 8 septembre 2026
 
