@@ -17,7 +17,13 @@ import UniformTypeIdentifiers
     var isVisible: Bool { panel?.isVisible == true }
 
     func present(theme: Theme, objectID: String?, point: ScenePoint? = nil, width: Double = 1, height: Double = 1) {
-        if isVisible { panel?.makeKeyAndOrderFront(nil); return }
+        // A second context click recalls the existing draft, even behind another
+        // app or on another Space. Never replace unsaved values implicitly.
+        if draft != nil, let panel {
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         var value = theme
         if let objectID, let index = value.objects.firstIndex(where: { $0.id == objectID }) {
             objectIndex = index
@@ -40,6 +46,7 @@ import UniformTypeIdentifiers
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = objectID == nil ? "Ajouter un objet" : "Personnaliser l’objet"
         window.isReleasedWhenClosed = false; window.delegate = self
+        window.collectionBehavior.insert(.moveToActiveSpace)
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
         name.placeholderString = "Nom"; name.setAccessibilityLabel("Nom de l’objet")

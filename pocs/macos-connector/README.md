@@ -35,6 +35,15 @@ neutre : le réglage observé n'est pas une preuve d'état visuel du compositeur
 
 ## Personnalisation locale — 8 septembre 2026
 
+Correction du verrou d'édition : une fenêtre de personnalisation déjà ouverte
+n'interdit plus les lancements ni les deux contrôles fixes. Un nouveau clic droit
+rappelle le brouillon existant et active son application, sans remplacer les valeurs
+non enregistrées ; la fenêtre peut rejoindre le Space actif. Pour éditer un autre
+objet ou en ajouter un, terminer d'abord le brouillon par Enregistrer ou Annuler.
+Le filtre Finder, la géométrie, les permissions et le transport restent inchangés.
+La fenêtre native restée ouverte a été observée pendant le défaut ; cette correction
+ne constitue pas à elle seule une qualification des clics sur objets animés.
+
 Correctif du filtre Finder : l'élément directement pointé doit correspondre à
 `AXGroup → AXScrollArea → AXApplication`, signature mesurée dans le premier PoC
 ([preuve](../../docs/pocs/macos-native-wallpaper.md)). L'ancien filtre exigeait

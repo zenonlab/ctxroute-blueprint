@@ -250,7 +250,8 @@ import ApplicationServices
         editor.present(theme: current, objectID: object.id)
     }
     func interact(_ intent: InteractionIntent, theme: Theme, layout: SurfaceLayout) {
-        guard !editor.isVisible, transport.status?.theme(theme.theme_id)?.configuration == theme else { return }
+        // An open draft owns only editing, not the whole desktop action router.
+        guard transport.status?.theme(theme.theme_id)?.configuration == theme else { return }
         switch intent {
         case .customize(let id): editor.present(theme: theme, objectID: id)
         case .add(let point): editor.present(theme: theme, objectID: nil, point: point, width: layout.width, height: layout.height)

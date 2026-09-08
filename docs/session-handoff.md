@@ -1,5 +1,29 @@
 # Reprise de session — Wallpaper
 
+## Verrou de personnalisation corrigé — 8 septembre 2026, 22:05
+
+L'utilisateur confirme les deux boutons fixes de f8cQnv, mais décrit des objets
+intermittents. Inspection native : `Personnaliser l’objet` restait ouverte ; le
+guard global `!editor.isVisible` de `interact` rejetait alors toutes les intentions.
+Ce guard est retiré, pas celui de validité du thème. `present` rappelle le brouillon
+existant en activant l'app, sans réinitialisation ; fenêtre `moveToActiveSpace`.
+Un autre objet attend Enregistrer/Annuler du brouillon courant. Aucun changement
+du hit-test, du tap, de TCC, de XPC ou des frontières : diagramme inchangé.
+
+Build signé **XgZtUb** installé, ancien f8cQnv conservé dans
+`dist/pocs/macos-connector/modal-update.proHVj/previous-app.disabled`. Préflight
+passé, même exigence de certificat vérifiée. Agent persistant **84656**, démarrage
+normal sans diagnostic, **accessibility=true**. Ambre resélectionné par Computer Use :
+provider **44892**, deux surfaces natives créées et quittance configure observées.
+Pas de modification de droits ni du réglage Fichiers. Le contrôle GUI ne parvient
+pas à inspecter l'agent sans fenêtre (timeout) : test de gestes demandé à l'utilisateur.
+
+32 XCTest existants passent, compilation Swift 6 stricte, tests natifs injectés et
+signature deep/strict passent ; `npm run verify` exit 0. Logs `/tmp/wallpaper-modal-`
+`tests.log`, `build.log`, `install.log`, `verify.log`. Ces tests ne prouvent pas la
+régression GUI résolue : rappel du brouillon, boutons pendant édition, fermeture /
+réouverture et clics sur objets animés restent à qualifier. **PoC non validé**.
+
 ## f8cQnv installé — 8 septembre 2026, 21:37
 
 Installation autonome demandée. Les clics Réglages échouaient (offscreen/noWindows).
