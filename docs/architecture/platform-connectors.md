@@ -1,0 +1,176 @@
+# Architecture cible — thèmes unifiés et connecteurs OS séparés
+
+État au 8 septembre 2026 : **architecture retenue pour préparer le PoC macOS 2**.
+Décision : [ADR-0049](../decisions/ADR-0049-platform-connectors-and-macos-poc2.md).
+Le [diagramme Archify](src/platform-connectors.architecture.json) décrit les
+frontières produit ; il ne signifie pas que les connecteurs sont déjà qualifiés.
+
+## Décision structurante
+
+Le produit n'est pas un wallpaper multiplateforme construit sur une fenêtre
+universelle. Il est composé de deux niveaux :
+
+1. un modèle de thème portable décrit ce que la création veut afficher et faire ;
+2. un connecteur natif distinct traduit ces intentions vers les mécanismes réels de
+   Windows, macOS ou de chaque famille Linux.
+
+Les thèmes, identités d'objets, comportements, panneaux, actions, sessions et règles
+énergétiques restent communs. L'ancrage, le cycle de vie de surface, les permissions,
+le routage des entrées et la distribution sont propres à la plateforme.
+
+Cette séparation est obligatoire : les différences entre WorkerW, AppKit et le
+provider Wallpaper, Wayland layer-shell, GNOME Shell et X11 ne sont pas des détails
+d'implémentation interchangeables.
+
+## Frontières de responsabilité
+
+| Domaine | Propriétaire | Contenu autorisé | Contenu interdit |
+| --- | --- | --- | --- |
+| Package de thème | Créateur et contrat portable | scène, ressources autorisées, objets, états, actions typées, fallbacks | API OS, chemin privé, asset ROM redistribué |
+| Cœur de thème | Commun à tous les OS | validation, identités, graphe sémantique, transitions déterministes, intentions | `NSWindow`, `HWND`, `wl_surface`, TCC |
+| Hôte de scène | Backend remplaçable | rendu 2D/3D, animation, hit-test géométrique, invalidation | décision de permission ou priorité des icônes |
+| Connecteur OS | Une implémentation par famille | surface native, écrans, espaces, visibilité, énergie, entrée, permissions | règle propre à un jeu ou copie du manifeste |
+| Terminal et sessions | Processus indépendant | PTY, grille, état de session, focus demandé | ownership du wallpaper ou ressources du jeu |
+| Convertisseur local | Outil froid et optionnel | lecture locale, dérivés privés, recettes de liaison | présence dans le runtime ou redistribution automatique |
+
+Le cœur publie des intentions comme `OpenPanel`, `SelectSession`, `SetEffect` ou
+`RequestExternalAction`. Le connecteur répond par un résultat typé : exécuté,
+refusé, permission manquante, capacité absente ou état indéterminé. Un thème ne
+reçoit jamais directement une primitive native.
+
+## Contrat commun des connecteurs
+
+Le contrat conceptuel minimal comporte cinq groupes de capacités :
+
+- `Surface`: créer, attacher, redimensionner, suspendre et détruire une surface ;
+- `Visibility`: annoncer visible, masqué, verrouillé, endormi ou inconnu ;
+- `Input`: passif, survol, région interactive ou interaction modale ;
+- `SystemAction`: présenter un panneau, focaliser une session ou demander une action
+  explicitement autorisée ;
+- `Lifecycle`: installation, activation, reprise, mise à jour et diagnostic.
+
+Chaque capacité est négociée à l'activation du thème. Une capacité absente ne doit
+jamais être simulée silencieusement. Le thème choisit un fallback déclaré, ou le
+connecteur refuse uniquement la fonction concernée.
+
+Le format de ce contrat doit rester indépendant du langage et versionné par schéma.
+Le PoC2 peut utiliser des types Swift générés ou écrits localement sans décider que
+le cœur portable de production sera en Swift. Rust reste candidat pour le cœur et le
+rendu partagés ; aucune FFI Rust/Swift n'est introduite avant que la frontière soit
+prouvée par le PoC2.
+
+## Connecteurs prévus
+
+### macOS
+
+Application native de contrôle et adaptateur Wallpaper séparé. Swift/AppKit est le
+choix expérimental du PoC2, car la preuve existante dépend d'interfaces Objective-C,
+Core Animation, Core Graphics et du cycle de vie Apple. Le provider wallpaper observé
+est une interface privée/non garantie : sa faisabilité locale n'est ni une promesse
+App Store ni une garantie sur une future version de macOS.
+
+Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
+signature et packaging. L'observation globale des clics est une capacité optionnelle.
+Sans classification certaine de la cible Finder, il ne consomme aucun clic.
+
+### Windows
+
+Connecteur Win32 dédié. Il doit qualifier WorkerW/Explorer sur les versions ciblées,
+sans considérer `WS_EX_TRANSPARENT` ou `HTTRANSPARENT` comme une garantie générale
+de traversée interprocessus. L'interactivité directe reste conditionnée par une preuve
+de priorité des icônes et du bureau natif.
+
+### Linux Wayland layer-shell
+
+Connecteur pour les compositeurs qui exposent le protocole requis. Une surface passive
+emploie une région d'entrée explicitement vide ; `set_input_region(NULL)` ne signifie
+pas vide. Les capacités d'occlusion et de workspace sont annoncées uniquement si le
+compositeur fournit les protocoles nécessaires.
+
+### GNOME Wayland
+
+Connecteur séparé, potentiellement constitué d'une extension GNOME Shell et d'un
+processus partagé. Sans extension qualifiée, le support reste dégradé : image statique
+ou fenêtre de prévisualisation. Il ne partage pas artificiellement l'implémentation du
+connecteur layer-shell.
+
+### Linux X11
+
+Connecteur de compatibilité fondé sur les primitives X11/EWMH/XShape effectivement
+disponibles. Il est testé et versionné séparément du chemin Wayland.
+
+## Une seule composition et une seule surface de contrôle
+
+Le PoC1 possède actuellement deux représentations de panneau : un panneau décoratif
+rendu dans l'extension wallpaper et un panneau AppKit du compagnon qui reçoit les
+actions. Cette duplication a servi à prouver séparément le rendu natif et le contrôle,
+mais elle crée deux vérités visuelles et deux cycles de vie. Elle est interdite dans
+le PoC2.
+
+Un thème déclare un **panneau logique unique**. Le connecteur choisit une présentation :
+
+- panneau de scène, si le chemin d'entrée qualifié peut l'actionner correctement ;
+- panneau natif de l'application, pour réglages, permissions et récupération ;
+- présentation modale explicite si l'OS ne permet pas une interaction sûre derrière
+  les icônes.
+
+Deux présentations simultanées ne sont autorisées que si le thème demande explicitement
+un miroir et si elles partagent le même état canonique. Les réglages du connecteur ne
+sont pas dessinés comme des objets du décor.
+
+## Ce que le PoC1 apporte, et ce qu'il n'apporte pas
+
+Éléments conservés comme connaissances ou composants à réévaluer :
+
+- inscription et chargement observés d'un provider wallpaper macOS ;
+- décor et objets réellement dessinés dans le plan natif du wallpaper ;
+- formation déterministe, progression curviligne et hit-test calculé au temps monotone ;
+- invalidation événementielle, suspension veille/session et continuité des identités ;
+- protocole commande/quittance et reprise TCC déclenchée par événement ;
+- tests de package, de scène, de commandes et de runtime.
+
+Éléments qui ne passent pas automatiquement en production :
+
+- les deux manifests `interactive-theme.json` et `formation-theme.json` ;
+- les deux panneaux et les contrôles dupliqués ;
+- les notifications Darwin comme transport final ;
+- les bundles temporaires, signatures ad hoc et réenregistrements manuels ;
+- le `CGEventTap` qui consomme un clic sans priorité Finder prouvée ;
+- la préférence Finder privée `CreateDesktop` comme action portable ;
+- les fenêtres, menus et modes de diagnostic accumulés dans la sonde.
+
+Le code du PoC1 est gelé comme banc historique. Le PoC2 ne le forkera pas en bloc :
+chaque élément réutilisé devra avoir un propriétaire, une interface et un test ciblé.
+
+## Invariants de l'architecture cible
+
+1. Un package de thème ne contient aucune API ni logique propre à un OS.
+2. Une identité d'objet ou de session reste stable d'un connecteur à l'autre.
+3. Un connecteur peut disparaître sans invalider le format des thèmes.
+4. Le wallpaper fonctionne sans terminal ; le terminal fonctionne sans wallpaper.
+5. Aucun flux PTY brut ne traverse le protocole du wallpaper.
+6. Le rendu au repos ne soumet aucune trame sans invalidation, sous réserve des
+   contraintes observées du compositeur.
+7. Une entrée native prioritaire gagne toujours sur une ancre du thème.
+8. Une permission refusée dégrade une capacité, jamais le décor entier.
+9. La ROM, les dérivés privés et le convertisseur restent hors du package partageable.
+10. La compatibilité est publiée par OS, version, environnement et capacité ; « tous
+    les OS » n'est jamais déduit d'une seule abstraction de fenêtre.
+
+## Prochaine preuve
+
+Construire uniquement le [PoC macOS 2](../pocs/macos-connector-poc2.md) à partir
+d'un manifeste canonique et d'une seule surface de contrôle. Les connecteurs Windows
+et Linux ne commencent qu'après stabilisation du contrat commun, sans réutiliser les
+primitives macOS.
+
+## Validation documentaire
+
+Le diagramme Archify passe le profil `showcase` avec 9 contrôles sur 9, sans erreur
+ni avertissement. Le contrôle visuel automatisé passe à 1440×900, 1600×1000,
+1920×1080 et 2048×1320 en clair et sombre. La capture sombre 1440×900 a été inspectée
+manuellement : limites, libellés et relations sont lisibles, sans collision observée.
+L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
+
+SHA-256 de la source : `fa28dedc2f8fe1a0b2b9f049a5728d6a0d88c74ff4b5bdd16179214807d0b140`.
+SHA-256 de l'artefact : `d78eb744a60af77a4e231d80653c05c3e32501db56173a119844fe961415357b`.

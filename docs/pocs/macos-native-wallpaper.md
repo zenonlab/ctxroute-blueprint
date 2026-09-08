@@ -1,5 +1,11 @@
 # Sonde native macOS — paquet local de test
 
+> **Gelé le 8 septembre 2026.** Ce paquet démontre le chargement et le rendu d'un
+> provider local, mais son panneau dessiné dans le décor coexiste avec le panneau
+> AppKit du compagnon. Cette duplication est une limite connue du PoC1. Le PoC2 repart
+> d'un manifeste canonique et d'un panneau logique unique ; voir
+> [la spécification](macos-connector-poc2.md).
+
 ## Version 12 — scène épurée, 8 septembre 2026
 
 La version 12 retire les trois ancres purement diagnostiques « Objet terminal »,

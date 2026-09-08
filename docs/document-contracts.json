@@ -3,6 +3,22 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "platform-connectors",
+      "kind": "architecture-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/platform-connectors.architecture.json",
+      "narrative": "docs/architecture/platform-connectors.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
+      "id": "macos-connector-poc2",
+      "kind": "product-test-protocol",
+      "format": "markdown",
+      "source": "docs/pocs/macos-connector-poc2.md",
+      "requiredSections": ["But", "Livrable borné", "Stack expérimentale", "Règle du panneau unique", "Critères d'acceptation", "Conditions de sortie", "Ordre d'implémentation"]
+    },
+    {
       "id": "macos-surface-poc",
       "kind": "architecture-ir",
       "audience": "product",

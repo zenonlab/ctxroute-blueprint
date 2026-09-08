@@ -6,15 +6,15 @@
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "L1: Swift 6, observed compiler 6.3.2; later L2-L3: Rust candidate, not installed by L1. Node.js is governance tooling only.",
-    "runtime": "L1: standalone macOS AppKit process, local SDK 26.5; deployment target macOS 14, qualified only on MAC-01 macOS 26.2.",
-    "frontend": "L1: native AppKit and CoreGraphics; interactive diagnostic window or passive desktop. Optional --split-input tests separate widget panels above icons, not product-qualified.",
-    "backend": "None for L1: no service, IPC, PTY, game reader or LLM runtime.",
-    "storage": "L1: memory-only scene; build artifacts and optional own-view snapshots in ignored dist/pocs/macos-surface; bounded stdout summary.",
-    "deployment": "L1: manual local SwiftPM build and launch; no installer, autostart, shell settings or wallpaper preference writes.",
-    "observability": "L1: bounded diagnostic summary with draw/tick/action counters and monotonic durations, no private terminal or desktop capture.",
-    "security": "L1: no external input files, commands, network or global hooks; wallpaper surface remains passive. Optional split-input panels accept local clicks above icons. Optional still export writes only own-view PNG; no system wallpaper changes. Swift compiler/tests complement lexical-only Sensor coverage.",
-    "performance": "L1: no animation timer at rest or paused, 30 Hz maximum requested animation rate, finite lifetime up to 600 seconds; energy verdict deferred to measured baseline."
+    "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. Rust remains a candidate for the portable core and renderer; no production language is frozen. Node.js is governance tooling only.",
+    "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
+    "frontend": "PoC2 uses one authoritative control surface at a time: native connector UI for settings and permissions, theme panel as one logical presentation. The two PoC1 decor/control panels are historical and must not be carried forward.",
+    "backend": "PoC2 has no server, PTY, game reader or LLM runtime. App and wallpaper communicate through a bounded typed connector protocol; XPC versus App Group transport remains an experiment.",
+    "storage": "PoC2 has one canonical JSON theme fixture, minimal connector preferences and reconstructible artifacts under ignored dist/. No ROM, terminal content or private filenames are stored.",
+    "deployment": "PoC2: local stable bundle identities, explicit install/activation and documented rollback; no autostart or product installer yet. The private Apple wallpaper provider path remains experimental and is not an App Store claim.",
+    "observability": "PoC2: bounded capability, lifecycle, command/receipt and render counters without terminal content, filenames or desktop capture; every proof is dated and tied to MAC-01.",
+    "security": "PoC2 defaults to passive input. Global click handling is enabled only with TCC permission and positive Finder-background classification; unknown targets fail open to macOS. No shell, network, ROM, IA or converter is in scope.",
+    "performance": "PoC2 uses event invalidation, no timer for static scenes, and measured incremental energy against the native desktop across all related processes; no numerical budget is claimed before the benchmark."
   },
   "commands": {
     "test": "npm run test:coverage",
@@ -80,6 +80,7 @@
   ],
   "architecture": {
     "documents": [
+      "docs/architecture/src/platform-connectors.architecture.json",
       "docs/architecture/src/macos-native-wallpaper.architecture.json",
       "docs/architecture/src/macos-surface-poc.architecture.json",
       "docs/architecture/src/product-roadmap.workflow.json",

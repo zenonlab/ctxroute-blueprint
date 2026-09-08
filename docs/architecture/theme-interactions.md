@@ -1,6 +1,6 @@
 # Interactions programmables : scène, objets et interface
 
-État : intention produit et règles sémantiques acceptées, 7 septembre 2026.
+État : intention produit et règles sémantiques révisées, 8 septembre 2026.
 Aucun moteur d'interactions, widget ou langage de thème implémenté.
 Voir [ADR-0039](../decisions/ADR-0039-programmable-theme-interactions.md),
 les [contrats C0–C6](module-contracts.md) et le
@@ -79,6 +79,12 @@ L'UI fait partie du produit : panneaux, boutons, listes, onglets, sliders,
 champs de saisie, menus et états de chargement/erreur. Le thème définit apparence,
 disposition, données affichées et comportements, en réutilisant les composants
 UI choisis plutôt qu'en réécrivant systématiquement leur interaction de base.
+
+Un panneau possède une identité logique et un état uniques. Le connecteur choisit sa
+présentation selon les capacités OS ; il ne crée pas simultanément une copie décorative
+et une copie native actionnable. Le PoC macOS 1 a précisément révélé ce défaut avec un
+panneau rendu par l'extension et un panneau AppKit du compagnon. Cette structure est
+historique et interdite par [ADR-0049](../decisions/ADR-0049-platform-connectors-and-macos-poc2.md).
 
 Trois représentations sont à distinguer :
 

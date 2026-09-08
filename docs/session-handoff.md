@@ -1,5 +1,15 @@
 # Reprise de session — Wallpaper
 
+Mise à jour du 8 septembre 2026 : le PoC macOS 1 est gelé. Son dernier état comporte
+deux représentations de panneau, deux fixtures et plusieurs chemins de diagnostic ;
+ils restent utiles comme preuves mais ne forment pas l'application cible.
+
+La nouvelle référence est l'[architecture des connecteurs](architecture/platform-connectors.md).
+Le prochain travail est le [PoC macOS 2](pocs/macos-connector-poc2.md) : app connecteur
+native, adaptateur wallpaper séparé, manifeste canonique et panneau logique unique.
+Ne pas poursuivre `pocs/macos-surface/` ou `pocs/macos-native-wallpaper/` pour y ajouter
+des fonctions produit. Aucun code PoC2 n'est encore créé.
+
 Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolément.
 
 ## Reprise actuelle — qualification native

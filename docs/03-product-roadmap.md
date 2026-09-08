@@ -1,6 +1,6 @@
 # Feuille de route produit — progression par preuves
 
-État au 7 septembre 2026 : **dépôt initialisé, E1 à compléter, sonde L1 partiellement éprouvée**.
+État au 8 septembre 2026 : **dépôt initialisé, PoC macOS 1 gelé, PoC macOS 2 spécifié**.
 E2 n'est pas validée ; L2/L3 et E3–E6 restent non démarrées.
 Le [plan L1–L3](05-poc-start-plan.md) et
 [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) fixent le premier périmètre.
@@ -12,6 +12,11 @@ Voir [ADR-0036](decisions/ADR-0036-evidence-first-roadmap.md) et le
 La review de modularité est précisée par [ADR-0037](decisions/ADR-0037-replaceable-module-contracts.md)
 et les [contrats C0–C6](architecture/module-contracts.md) : préserver les données
 et tester le remplacement des modules, sans promettre une migration gratuite.
+
+[ADR-0049](decisions/ADR-0049-platform-connectors-and-macos-poc2.md) ajoute un jalon
+de correction à E2 : reconstruire un connecteur macOS borné depuis un manifeste
+canonique et une seule surface de contrôle. Les PoCs Windows/Linux suivront comme
+connecteurs indépendants derrière le même contrat, pas comme branches du code AppKit.
 
 ## Règles de progression
 

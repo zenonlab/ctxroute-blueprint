@@ -1,10 +1,13 @@
 # Vision produit — bureau et terminal ludiques
 
-État : expérimentation L1, 7 septembre 2026. Nom de travail : Wallpaper.
+État : PoC macOS 1 gelé, PoC macOS 2 spécifié, 8 septembre 2026. Nom de travail : Wallpaper.
 Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
 Le dépôt est initialisé ; une [sonde native isolée](pocs/macos-surface.md) est implémentée.
 Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
-Il ne constitue pas une adoption de production ; L1 reste partiellement validé.
+Il ne constitue pas une adoption de production. Le PoC1 a fourni des preuves utiles
+mais a trop divergé, notamment avec deux représentations de panneau. La nouvelle
+[architecture des connecteurs](architecture/platform-connectors.md) et
+[ADR-0049](decisions/ADR-0049-platform-connectors-and-macos-poc2.md) font foi.
 
 Les audits sont consolidés dans la [synthèse sourcée](research/architecture-audit-synthesis.md).
 Le [protocole expérimental](04-experimental-protocol.md) prépare les preuves avant
@@ -42,6 +45,12 @@ fonction multijoueur. Un personnage est une représentation interchangeable :
 son identité visuelle ne doit pas devenir l'identité technique de la session.
 
 ## Modes et modularité
+
+Les créations sont portables ; les intégrations système ne le sont pas. Un contrat
+commun décrit scène, objets, comportements, panneaux et intentions. macOS, Windows,
+Wayland layer-shell, GNOME et X11 possèdent des connecteurs distincts qui annoncent
+leurs capacités réelles. Aucun type de fenêtre ou permission OS ne fuit dans le thème.
+Cette structure vise une expérience cohérente, pas une fausse parité universelle.
 
 Les [interactions programmables](architecture/theme-interactions.md) couvrent
 objets, géométrie, boutons et panneaux : un objet ouvre une UI, ses contrôles

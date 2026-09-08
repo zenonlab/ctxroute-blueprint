@@ -1,9 +1,13 @@
 # Infrastructure locale et organisation du produit
 
-État : architecture de référence proposée le 7 septembre 2026 ; responsabilités
+État : architecture de référence révisée le 8 septembre 2026 ; responsabilités
 formalisées, hypothèses techniques à comparer, aucune dépendance
 produit tierce installée. Le dépôt est initialisé ; la [sonde L1](../pocs/macos-surface.md)
-est un package autonome, pas l'implémentation du runtime ci-dessous.
+est gelée comme preuve, pas l'implémentation du runtime ci-dessous.
+La frontière actuelle est définie par les
+[connecteurs OS séparés](platform-connectors.md) et [ADR-0049](../decisions/ADR-0049-platform-connectors-and-macos-poc2.md) :
+le thème et son état sont communs, tandis que surface, entrées, permissions et cycle
+de vie appartiennent à un connecteur par famille d'environnement.
 Le [plan L1–L3](../05-poc-start-plan.md) fixe maintenant les choix expérimentaux :
 sonde OS indépendante, contrôleur sans GPU puis candidat de rendu. Les assemblages
 de production ci-dessous ne sont toujours pas des dépendances adoptées.
@@ -25,6 +29,11 @@ fournit une [abstraction graphique portable](https://wgpu.rs/), pas l'ancrage
 desktop ni un moteur de scènes complet. Aucun gain énergétique n'est encore mesuré.
 
 ## Découpage des responsabilités
+
+« Adaptateur de bureau » désigne désormais un contrat, pas une implémentation unique.
+macOS, Windows, Wayland layer-shell, GNOME et X11 possèdent des modules et des gates
+de qualification indépendants. Ils peuvent partager des fixtures, schémas et tests de
+contrat, jamais une hypothèse implicite sur la hiérarchie des fenêtres.
 
 Les [corrections des audits](../research/architecture-audit-synthesis.md) et le
 [protocole comparatif](../04-experimental-protocol.md) complètent cette proposition.

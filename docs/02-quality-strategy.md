@@ -1,5 +1,22 @@
 # Stratégie qualité
 
+## Gate du PoC macOS 2
+
+Le PoC1 est gelé ; ses tests empêchent une régression historique mais ne constituent
+pas le gate de la nouvelle application. Le PoC2 suit M2-01 à M2-10 définis dans
+[sa spécification](pocs/macos-connector-poc2.md#critères-dacceptation).
+
+La qualité est vérifiée en quatre niveaux : modèle pur et manifeste canonique ;
+contrat commande/quittance et générations ; package/identités/cycle de vie ; gestes
+macOS réels. Les clics programmatiques ne qualifient ni Finder, ni Spaces, ni Mission
+Control. La revue visuelle doit confirmer qu'il n'existe qu'un panneau logique et
+aucun plan de décor devant Finder.
+
+Toute mesure énergétique additionne l'app connecteur, WallpaperAgent, l'extension et
+les helpers. Elle rapporte le delta face au bureau natif, sur au moins cinq passes
+après préchauffage. La permission refusée et la cible d'entrée inconnue font partie
+du chemin nominal de test, pas uniquement des erreurs.
+
 Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
 reprise ; compilation native avec avertissements bloquants, puis smoke AppKit
 à durée finie. Les gestes Finder restent une preuve manuelle distincte.

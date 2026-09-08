@@ -1,6 +1,10 @@
 # Décisions techniques — expérimentation puis adoption
 
-Aucune stack de production n'est sélectionnée au 7 septembre 2026.
+Aucune stack de production n'est sélectionnée au 8 septembre 2026.
+Le [PoC macOS 1](pocs/macos-surface.md) est gelé. [ADR-0049](decisions/ADR-0049-platform-connectors-and-macos-poc2.md)
+retient une architecture commune par contrat et des connecteurs natifs séparés.
+Le [PoC macOS 2](pocs/macos-connector-poc2.md) utilise Swift/AppKit et Core Animation
+pour isoler la preuve macOS ; ce choix n'adopte pas Swift comme cœur portable.
 Le [plan de démarrage](05-poc-start-plan.md) sélectionne toutefois les outils des
 PoCs : Swift/AppKit pour sonder macOS, Rust pour les contrôleurs, puis wgpu/WGSL
 et winit pour le candidat de rendu. Ce choix borné remplace le report général
@@ -46,6 +50,23 @@ Pour chaque candidat : source officielle et version examinée, maintenance,
 licence, OS réellement supportés, personnalisation, qualité du terminal,
 accès aux assets, consommation mesurée, coût d'intégration et limites.
 Une recommandation doit être reliée à un parcours utilisateur et à une preuve.
+
+## Décisions de frontière après le PoC macOS 1
+
+| Sujet | Décision actuelle | Reste ouvert |
+| --- | --- | --- |
+| Thèmes | manifeste canonique et contrat indépendant du langage/OS | schéma public final et format binaire éventuel |
+| Plateformes | connecteur distinct pour macOS, Windows, Wayland layer-shell, GNOME et X11 | versions minimales et capacités qualifiées |
+| macOS PoC2 | Swift 6, AppKit/Core Animation, app connecteur et adaptateur wallpaper séparés | transport XPC/App Group, API de distribution viable |
+| UI | un panneau logique ; une seule présentation active | scène interactive ou app selon preuve d'entrée |
+| Rendu partagé | interface d'hôte de scène sans type backend | wgpu, moteur existant ou assemblage spécialisé |
+| Terminal | processus et cycle de vie indépendants | stack native ou WebView après benchmark |
+| Entrée | passive par défaut, refus ouvert sur cible ambiguë | interaction directe par plateforme après test natif |
+
+Le provider Apple utilisé par la preuve est privé et instable. Son fonctionnement
+local ne suffit pas pour choisir le canal de distribution. Le bouton Finder
+`CreateDesktop`, les notifications Darwin et les signatures ad hoc restent des
+instruments de PoC, pas des technologies du produit.
 
 ## Questions et preuves à obtenir
 

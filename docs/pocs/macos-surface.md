@@ -1,5 +1,11 @@
 # L1 — Sonde de surface macOS
 
+> **Gelé le 8 septembre 2026.** Ce PoC est une archive de preuves, pas la base de
+> l'application. Il contient encore deux sources de manifeste et deux représentations
+> de panneau issues d'expériences successives. Aucun nouveau comportement produit ne
+> doit y être ajouté. La suite est le [PoC macOS 2](macos-connector-poc2.md), régi par
+> [ADR-0049](../decisions/ADR-0049-platform-connectors-and-macos-poc2.md).
+
 État au 8 septembre 2026 : implémenté, qualification L1 partielle.
 Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
