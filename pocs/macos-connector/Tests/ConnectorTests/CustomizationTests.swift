@@ -55,6 +55,16 @@ final class CustomizationTests: XCTestCase {
         }
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: -1, y: 0), theme: theme, width: 800, height: 500, elapsed: 0), .unknown)
     }
+    func testObjectsKeepTheGenerousInvisibleTargetsProvenByPoC1() throws {
+        let theme = try Theme.load(resource: "theme-amber")
+        let center = ThemeLayout.position(theme.objects[0], theme: theme, width: 800, height: 500, elapsed: 0)
+        XCTAssertEqual(ThemeLayout.minimumObjectHitWidth, 112)
+        XCTAssertEqual(ThemeLayout.minimumObjectHitHeight, 70)
+        XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: center.x + 50, y: center.y + 30),
+            theme: theme, width: 800, height: 500, elapsed: 0), .object(theme.objects[0].id))
+        XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: center.x + 57, y: center.y),
+            theme: theme, width: 800, height: 500, elapsed: 0), .empty)
+    }
     @MainActor func testLayoutClockPauseAndFixedObjects() throws {
         var theme = try Theme.load()
         theme.objects[0].x = 0.3; theme.objects[0].y = 0.7

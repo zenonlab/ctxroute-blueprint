@@ -42,7 +42,7 @@ final class GestureTests: XCTestCase {
         XCTAssertTrue(result.consumed); XCTAssertNil(result.intent)
     }
     func testPermissionLossNativeOverlapAndTargetChangeAtReleaseCancel() {
-        for hit in [SceneHit.native, .unknown, .object("car.b"), .empty] {
+        for hit in [SceneHit.native, .unknown, .object("car.b")] {
             var router = makeRouter()
             _ = router.begin(button: .left, point: point, hit: .object("car.a"), scene: scene, inputAuthorized: true)
             XCTAssertNil(router.end(button: .left, point: point, hit: hit, scene: scene, inputAuthorized: true).intent)
@@ -50,6 +50,16 @@ final class GestureTests: XCTestCase {
         var router = makeRouter()
         _ = router.begin(button: .right, point: point, hit: .object("car.a"), scene: scene, inputAuthorized: true)
         XCTAssertNil(router.end(button: .right, point: point, hit: .object("car.a"), scene: scene, inputAuthorized: false).intent)
+    }
+    func testObjectCapturedOnDownSurvivesSceneMotionBeforeRelease() {
+        for button in [PointerButton.left, .right] {
+            var router = makeRouter()
+            XCTAssertTrue(router.begin(button: button, point: point, hit: .object("car.a"),
+                scene: scene, inputAuthorized: true))
+            let result = router.end(button: button, point: point, hit: .empty,
+                scene: scene, inputAuthorized: true)
+            XCTAssertEqual(result.intent, button == .left ? .activate("car.a") : .customize("car.a"))
+        }
     }
     func testSceneReplacementAndExplicitCancelKeepBalancedRelease() {
         var router = makeRouter()

@@ -9,6 +9,12 @@ public struct LayoutRect: Equatable, Sendable {
 
 /// Coordinates are local top-left points. Renderer and input share this geometry.
 public enum ThemeLayout {
+    // PoC proxy for sparse scene objects. The production scene contract will
+    // supply explicit 2D/3D interaction shapes; tiny visual geometry must not
+    // become the only clickable area in the native connector.
+    public static let minimumObjectHitWidth = 112.0
+    public static let minimumObjectHitHeight = 70.0
+
     public static func control(_ index: Int) -> LayoutRect {
         LayoutRect(x: 24 + Double(index) * 48, y: 56, width: 40, height: 40)
     }
@@ -33,11 +39,20 @@ public enum ThemeLayout {
             if control == "audio" { return .control(.audio) }
             if control == "desktop" { return .control(.desktopItems) }
         }
-        for object in theme.objects.reversed() {
+        let objectHits = theme.objects.enumerated().compactMap { index, object -> (Int, String, Double)? in
             let center = position(object, theme: theme, width: width, height: height, elapsed: elapsed)
-            let radius = (object.size ?? 44) / 2
-            if hypot(point.x - center.x, point.y - center.y) <= radius { return .object(object.id) }
+            let visualHalfSize = (object.size ?? 44) / 2
+            let halfWidth = max(visualHalfSize, minimumObjectHitWidth / 2)
+            let halfHeight = max(visualHalfSize, minimumObjectHitHeight / 2)
+            let dx = abs(point.x - center.x), dy = abs(point.y - center.y)
+            guard dx <= halfWidth, dy <= halfHeight else { return nil }
+            return (index, object.id, hypot(dx / halfWidth, dy / halfHeight))
         }
+        // Nearest target wins. Equal targets preserve the visual stacking rule:
+        // the last object in the manifest is on top.
+        if let nearest = objectHits.min(by: {
+            $0.2 == $1.2 ? $0.0 > $1.0 : $0.2 < $1.2
+        }) { return .object(nearest.1) }
         return .empty
     }
 }

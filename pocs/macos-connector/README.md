@@ -82,6 +82,12 @@ du même `ThemeLayout.control` que le dessin. Le test vérifie les dimensions, l
 l'absence de texte, l'échelle Retina et les deux états audio.
 
 `ThemeLayout` partage les 128 segments de trajectoire entre animation et hit-test.
+Les objets conservent aussi le proxy de clic invisible du PoC1, au minimum 112×70
+points autour du centre ; le plus proche gagne si ces zones se chevauchent. Le clic
+reste capturé par le tap global, pas par un calque ou une fenêtre devant Finder.
+Un objet capturé au bouton enfoncé reste la cible si sa propre animation le fait
+sortir de la zone avant le relâchement, mais une icône/fenêtre native apparue entre
+les deux annule toujours l'action. Le mouvement physique du pointeur annule aussi.
 Chaque surface publie son écran, sa taille, son horloge et son état actif, sans
 polling par trame. Deux surfaces natives du même écran ne sont acceptées que si
 leurs hit-tests désignent le même objet/contrôle/vide dans le même thème ; sinon

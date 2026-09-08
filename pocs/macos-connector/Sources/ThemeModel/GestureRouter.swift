@@ -80,11 +80,11 @@ public struct GestureRouter: Sendable {
         capture = nil
         guard !active.cancelled, inputAuthorized, self.scene == scene, active.scene == scene,
               point.isFinite, active.start.distance(to: point) <= dragThreshold,
-              active.hit == hit, isKnown(hit) else {
+              compatibleRelease(active.hit, hit), isKnown(active.hit) else {
             return GestureResult(consumed: true, intent: nil)
         }
         let intent: InteractionIntent
-        switch hit {
+        switch active.hit {
         case .object(let id): intent = button == .left ? .activate(id) : .customize(id)
         case .empty: intent = .add(point)
         case .control(let control): intent = .toggle(control)
@@ -97,6 +97,15 @@ public struct GestureRouter: Sendable {
         case .native, .unknown: false
         case .object(let id): objectIDs.contains(id)
         case .empty, .control: true
+        }
+    }
+    private func compatibleRelease(_ captured: SceneHit, _ current: SceneHit) -> Bool {
+        switch (captured, current) {
+        // A scene object may move away while the physical pointer stays still.
+        // Finder/native priority is still revalidated at release by DesktopInput.
+        case (.object(let first), .object(let second)): first == second
+        case (.object, .empty): true
+        default: captured == current
         }
     }
 }

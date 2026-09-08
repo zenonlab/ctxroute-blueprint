@@ -1,5 +1,43 @@
 # Reprise de session — Wallpaper
 
+## Proxy d'interaction restauré depuis le PoC1 — 8 septembre 2026, 22:13
+
+Audit demandé après constat d'une structure « brouillon ». Le rendu PoC2 est bien
+un arbre `CALayer` hébergé par le provider natif ; ces calques ne reçoivent aucun
+clic. L'agent fait un hit-test CPU séparé après classification AX du fond Finder.
+Régression trouvée : le PoC1 utilisait une cible invisible 112×70 points autour de
+chaque véhicule, tandis que le PoC2 exigeait le disque visible de 44 points.
+
+Le proxy minimal 112×70 est restauré dans `ThemeLayout`, sans fenêtre superposée.
+En cas de recouvrement, la cible normalisée la plus proche gagne, puis l'ordre visuel
+du manifeste. L'objet capturé au mouse-down survit à son propre déplacement jusqu'au
+mouse-up ; déplacement physique, autre objet, icône/fenêtre native, perte TCC ou
+changement de scène annulent toujours l'action. Les contrôles fixes gardent leurs
+zones exactes et restent prioritaires. La production devra remplacer ce défaut PoC
+par des formes explicites 2D/3D/UI issues du thème ou des collisions importées.
+
+Build signé **pVyWks** installé ; version précédente conservée dans
+`dist/pocs/macos-connector/hit-proxy-update.YmZbeI/previous-app.disabled`. Même
+exigence de certificat et égalité du binaire installé vérifiées. Agent persistant
+PID **94169**, démarrage normal et `accessibility=true`. Provider PID **78992** lancé
+après réouverture des Réglages ; deux surfaces créées à 22:13:36. Plusieurs actions
+mute/unmute réelles ont ensuite reçu leurs quittances sur deux surfaces, preuve que
+les contrôles fixes du paquet installé restent actifs. Les Réglages ont aussi été
+manipulés concurremment : aucune permission ou préférence Finder modifiée.
+
+34 XCTest passent, dont cible étendue et mouvement entre les deux phases du geste.
+Build, tests natifs, préflight, signature deep/strict et `npm run verify` passent.
+Tests réels encore
+requis : clic gauche/droit au bord du proxy, priorité d'une icône superposée, surface
+après resélection, Spaces et veille. **PoC non validé** tant que ces gestes ne sont
+pas observés sur le paquet installé.
+
+ADR-0054 et diagramme produit mis à jour. Archify showcase 9/9, zéro erreur ou
+avertissement ; confinement quatre tailles clair/sombre passé. Captures 1440×900
+sombre et 2048×1320 claire inspectées, lisibles sans chevauchement. Viewer fixe en
+anglais. Source SHA256 `04fb4e4048c9b93bffac948ad088ba7542d8ea18e91f4c71e90e7c93a9a619c2` ;
+HTML SHA256 `b37db4dbba807c6cd1b8096e32109440d3493b391061c27c71e303efa04f7bfe`.
+
 ## Verrou de personnalisation corrigé — 8 septembre 2026, 22:05
 
 L'utilisateur confirme les deux boutons fixes de f8cQnv, mais décrit des objets

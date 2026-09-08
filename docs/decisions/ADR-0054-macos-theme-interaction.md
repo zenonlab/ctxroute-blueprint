@@ -26,6 +26,11 @@ ouvre une modale de personnalisation, jamais un panneau placé à droite de l'é
 Le provider conserve le rendu natif et peint les deux contrôles dans son arbre de
 calques. Il publie la géométrie et l'horloge de chaque surface pour un hit-test CPU
 partageant exactement la construction des trajectoires. Aucun polling de rendu.
+Dans ce PoC, les objets simples conservent le proxy invisible éprouvé par le PoC1
+(minimum 112×70 points) et la cible la plus proche gagne en cas de recouvrement.
+Le proxy n'est pas un `CALayer` interactif ni une fenêtre superposée. Le contrat de
+scène de production devra fournir des formes d'interaction explicites adaptées aux
+sprites, maillages 3D, boutons et collisions importés.
 L'agent reçoit seulement les gestes autorisés : une icône, une fenêtre ou une cible
 AX inconnue garde la priorité. Un glisser n'est jamais converti en clic.
 
