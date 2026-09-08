@@ -5,6 +5,7 @@ scope:
   - docs/architecture/theme-interactions.md
   - docs/architecture/src/macos-surface-poc.architecture.json
 review: on-change
+revised: true
 ---
 # ADR-0048 — Fond natif persistant et plan d’objets dynamique
 
@@ -39,8 +40,10 @@ Retenir deux plans aux responsabilités asymétriques :
    état de simulation ;
 4. le thème décrit les objets, couleurs, piste et slots dans une ressource externe
    validée ; aucune règle propre à un jeu n'entre dans le cœur ;
-5. le plan dynamique est retiré lorsque Finder n'est plus au premier plan, lors de
-   la veille ou d'une session inactive. Le fond natif reste géré par macOS ;
+5. en mode wallpaper natif, le plan dynamique reste prêt sous les fenêtres normales
+   afin que le premier clic sur un objet dégagé fonctionne sans activation préalable
+   de Finder. Il est retiré lors de la veille ou d'une session inactive. Le fond
+   natif reste géré par macOS ;
 6. chaque fenêtre d'objet est sa propre région de clic. Aucune fenêtre transparente
    plein écran, hook global, permission Accessibilité ou polling d'entrée n'est ajouté.
 
@@ -68,7 +71,8 @@ Elles portent actuellement les mêmes identités et paramètres de formation, ma
 n'est pas une source unique vérifiée. La production devra générer les deux vues depuis
 un manifeste canonique ou leur appliquer un contrôle de cohérence au packaging.
 
-Le signal « Finder au premier plan » est volontairement conservateur : il peut
-afficher les objets devant une fenêtre Finder. Une qualification OS ultérieure
-devra décider entre détection plus précise, zones réservées ou mode interactif
-explicite, sans réintroduire de surveillance globale intrusive.
+Le niveau `normal - 1` maintient les hit-boxes sous les fenêtres applicatives normales,
+mais ce comportement doit encore être qualifié avec Stage Manager, Mission Control,
+Spaces et les fenêtres système utilisant des niveaux atypiques. Une qualification OS
+ultérieure devra décider entre cette politique, des zones réservées ou un mode
+interactif explicite, sans réintroduire de surveillance globale intrusive.

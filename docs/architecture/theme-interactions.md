@@ -106,8 +106,9 @@ transparente distincte par objet
 réduit la région qui peut intercepter une entrée ; une grande surcouche plein écran
 est interdite pour ce chemin.
 
-Le plan de hit-test peut disparaître dès que le bureau n'est plus exposé sans faire
-disparaître ni recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection
+Le plan de hit-test reste sous les fenêtres applicatives normales pour accepter le
+premier clic sur une zone dégagée du bureau. Il est suspendu avec la session ou les
+écrans sans faire disparaître ni recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection
 d'un sous-maillage 3D utilise la même identité stable. La nature du renderer ne
 change ni les liaisons de session, ni l'ordre de formation, ni les intentions UI.
 

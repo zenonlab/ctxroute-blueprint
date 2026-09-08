@@ -18,8 +18,9 @@ reste déterministe et les deux plans ne possèdent jamais deux horloges concurr
 
 Chaque objet possède une petite `NSPanel` non activante qui ne dessine aucun pixel.
 Cela borne la zone de clic au véhicule au lieu de couvrir l'écran d'une vitre
-transparente. Le plan entier est masqué si Finder quitte le premier plan, si l'écran dort ou si la
-session devient inactive ; la simulation s'arrête via la garde de visibilité. Le
+transparente. Le plan reste prêt sous les fenêtres applicatives normales pour accepter
+le premier clic sur le bureau ; il est masqué si l'écran dort ou si la session devient
+inactive. La projection s'arrête via la garde de visibilité. Le
 wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rechargé.
 
 ```sh

@@ -236,8 +236,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let appKitVisible = window.occlusionState.contains(.visible) && !window.isMiniaturized
         if options.mode == .desktop {
             if options.overlayOnly {
-                schedulingSource = finderFrontmost && displaysAwake && sessionActive
-                    ? "finder-frontmost-overlay" : "suspended"
+                schedulingSource = displaysAwake && sessionActive ? "overlay-ready-below-apps" : "suspended"
             } else {
                 schedulingSource = DesktopActivity.source(ordered: window.isVisible,
                     activeSpace: window.isOnActiveSpace, appKitVisible: appKitVisible,
@@ -245,8 +244,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     awake: displaysAwake, sessionActive: sessionActive)
             }
             state.visibility = schedulingSource == "suspended" ? .notVisible : .visible
-            let dynamicPlaneExposed = options.splitInput && finderFrontmost && displaysAwake && sessionActive &&
-                (options.overlayOnly || (window.isVisible && window.isOnActiveSpace))
+            let dynamicPlaneExposed = options.splitInput && displaysAwake && sessionActive &&
+                (options.overlayOnly || (finderFrontmost && window.isVisible && window.isOnActiveSpace))
             splitControls?.setDesktopExposed(dynamicPlaneExposed)
         } else {
             state.visibility = appKitVisible ? .visible : .notVisible
