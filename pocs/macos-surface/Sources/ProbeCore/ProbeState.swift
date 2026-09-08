@@ -60,7 +60,7 @@ public struct ProbeState: Sendable {
     @discardableResult
     public mutating func advance(by delta: Double) -> Bool {
         guard shouldAnimate, delta.isFinite, delta > 0 else { return false }
-        phaseSeconds = (phaseSeconds + min(delta, 0.1)).truncatingRemainder(dividingBy: 4)
+        phaseSeconds = (phaseSeconds + min(delta, 0.1)).truncatingRemainder(dividingBy: 3_600)
         ticks += 1
         return true
     }

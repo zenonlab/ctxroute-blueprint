@@ -95,6 +95,22 @@ une saisie sûre » doivent être qualifiées séparément via C5.
 Une représentation non supportée donne un diagnostic ; un repli doit être déclaré,
 pas inventé en modifiant silencieusement l'expérience de l'auteur.
 
+### Projection macOS à deux plans
+
+Le chemin retenu par [ADR-0048](../decisions/ADR-0048-native-wallpaper-dynamic-object-plane.md)
+sépare le wallpaper natif complet et le plan de hit-test. L'extension possède tous
+les pixels du décor et des objets ainsi que leurs animations. Le compagnon évalue
+la même fonction de transformation au temps monotone courant, uniquement pour placer
+des zones de clic transparentes, sans posséder de second état de course. Une fenêtre
+transparente distincte par objet
+réduit la région qui peut intercepter une entrée ; une grande surcouche plein écran
+est interdite pour ce chemin.
+
+Le plan de hit-test peut disparaître dès que le bureau n'est plus exposé sans faire
+disparaître ni recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection
+d'un sous-maillage 3D utilise la même identité stable. La nature du renderer ne
+change ni les liaisons de session, ni l'ordre de formation, ni les intentions UI.
+
 L'ouverture d'un panneau ne doit pas démarrer le terminal pour héberger l'UI du
 wallpaper seul. À l'inverse, afficher un véritable shell dans un panneau exige
 le composant terminal et son contrat C4 : ne pas réimplémenter une grille VT avec

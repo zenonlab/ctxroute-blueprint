@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "track": {
+    "centerX": 0.50,
+    "centerY": 0.50,
+    "radiusX": 0.34,
+    "radiusY": 0.24,
+    "periodSeconds": 4.0
+  },
+  "objects": [
+    { "id": "session-alpha", "label": "Alpha", "colorHex": "#32D6C5", "laneOffset": -0.045, "trailingOffset": 0.00 },
+    { "id": "session-beta", "label": "Beta", "colorHex": "#FFB547", "laneOffset": 0.045, "trailingOffset": 0.08 },
+    { "id": "session-gamma", "label": "Gamma", "colorHex": "#A78BFA", "laneOffset": -0.045, "trailingOffset": 0.18 },
+    { "id": "session-delta", "label": "Delta", "colorHex": "#FF6B7A", "laneOffset": 0.045, "trailingOffset": 0.26 }
+  ]
+}

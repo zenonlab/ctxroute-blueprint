@@ -7,7 +7,7 @@ let package = Package(
     products: [.executable(name: "SurfaceProbe", targets: ["SurfaceProbe"])],
     targets: [
         .target(name: "ProbeCore"),
-        .executableTarget(name: "SurfaceProbe", dependencies: ["ProbeCore"]),
+        .executableTarget(name: "SurfaceProbe", dependencies: ["ProbeCore"], resources: [.copy("Resources")]),
         .testTarget(name: "ProbeCoreTests", dependencies: ["ProbeCore"])
     ]
 )

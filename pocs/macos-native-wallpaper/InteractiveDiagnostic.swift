@@ -75,6 +75,37 @@ enum InteractiveDiagnostic {
         if let existing = root.sublayers?.first(where: { $0.name == "interactive.panel" }) {
             panel = existing
         } else {
+            let track = CAShapeLayer()
+            track.name = "interactive.race-track"
+            track.fillColor = CGColor(gray: 0, alpha: 0)
+            track.lineWidth = 8
+            track.strokeColor = color(theme.track.color)
+            root.addSublayer(track)
+            for vehicle in theme.vehicles {
+                let object = CALayer()
+                object.name = "interactive.vehicle.\(vehicle.id)"
+                object.bounds = CGRect(x: 0, y: 0, width: 72, height: 42)
+                object.cornerRadius = 13
+                object.backgroundColor = color(vehicle.color)
+                object.borderColor = CGColor(gray: 1, alpha: 0.82)
+                object.borderWidth = 2
+                for wheelFrame in [CGRect(x: 5, y: -4, width: 16, height: 9),
+                                   CGRect(x: 51, y: -4, width: 16, height: 9),
+                                   CGRect(x: 5, y: 37, width: 16, height: 9),
+                                   CGRect(x: 51, y: 37, width: 16, height: 9)] {
+                    let wheel = CALayer()
+                    wheel.frame = wheelFrame
+                    wheel.cornerRadius = 3
+                    wheel.backgroundColor = CGColor(gray: 0.04, alpha: 0.9)
+                    object.addSublayer(wheel)
+                }
+                let cockpit = CALayer()
+                cockpit.frame = CGRect(x: 27, y: 10, width: 22, height: 22)
+                cockpit.cornerRadius = 11
+                cockpit.backgroundColor = CGColor(gray: 1, alpha: 0.78)
+                object.addSublayer(cockpit)
+                root.addSublayer(object)
+            }
             panel = CALayer()
             panel.name = "interactive.panel"
             panel.cornerRadius = 18
@@ -155,12 +186,66 @@ enum InteractiveDiagnostic {
                     width: max(0, object.bounds.width - 12), height: 22)
             }
         }
+        if let track = root.sublayers?.first(where: { $0.name == "interactive.race-track" }) as? CAShapeLayer {
+            let rect = trackRect(root: root, laneOffset: 0, theme: theme)
+            track.path = CGPath(ellipseIn: rect, transform: nil)
+        }
+        for vehicle in theme.vehicles {
+            guard let object = root.sublayers?.first(where: { $0.name == "interactive.vehicle.\(vehicle.id)" }) else {
+                continue
+            }
+            let path = CGPath(ellipseIn: trackRect(root: root, laneOffset: vehicle.laneOffset, theme: theme),
+                              transform: nil)
+            let rect = trackRect(root: root, laneOffset: vehicle.laneOffset, theme: theme)
+            let angle = -vehicle.trailingOffset
+            object.position = CGPoint(x: rect.midX + rect.width / 2 * cos(angle),
+                                      y: rect.midY + rect.height / 2 * sin(angle))
+            if object.animation(forKey: "interactive.vehicle.motion") == nil {
+                let motion = CAKeyframeAnimation(keyPath: "position")
+                motion.path = path
+                motion.calculationMode = .paced
+                motion.rotationMode = .rotateAuto
+                motion.duration = theme.track.periodSeconds
+                motion.repeatCount = .infinity
+                let now = object.convertTime(CACurrentMediaTime(), from: nil)
+                let trailingTime = vehicle.trailingOffset / (2 * Double.pi) * theme.track.periodSeconds
+                var elapsed = (now - trailingTime).truncatingRemainder(dividingBy: theme.track.periodSeconds)
+                if elapsed < 0 { elapsed += theme.track.periodSeconds }
+                motion.beginTime = now - elapsed
+                motion.isRemovedOnCompletion = false
+                object.add(motion, forKey: "interactive.vehicle.motion")
+            }
+            setPaused(state.paused, layer: object)
+            object.borderWidth = state.effectEnabled ? 6 : 2
+        }
         CATransaction.commit()
         CATransaction.flush()
     }
 
     private static func color(_ value: DiagnosticTheme.Color) -> CGColor {
         CGColor(red: value.red, green: value.green, blue: value.blue, alpha: value.alpha)
+    }
+
+    private static func trackRect(root: CALayer, laneOffset: Double, theme: DiagnosticTheme) -> CGRect {
+        let track = theme.track
+        return CGRect(x: root.bounds.width * (track.centerX - track.radiusX - laneOffset),
+                      y: root.bounds.height * (track.centerY - track.radiusY - laneOffset * 0.7),
+                      width: root.bounds.width * (track.radiusX + laneOffset) * 2,
+                      height: root.bounds.height * (track.radiusY + laneOffset * 0.7) * 2)
+    }
+
+    private static func setPaused(_ paused: Bool, layer: CALayer) {
+        if paused && layer.speed != 0 {
+            let time = layer.convertTime(CACurrentMediaTime(), from: nil)
+            layer.speed = 0
+            layer.timeOffset = time
+        } else if !paused && layer.speed == 0 {
+            let time = layer.timeOffset
+            layer.speed = 1
+            layer.timeOffset = 0
+            layer.beginTime = 0
+            layer.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) - time
+        }
     }
 
     private static func isSelected(_ command: DiagnosticCommand) -> Bool {

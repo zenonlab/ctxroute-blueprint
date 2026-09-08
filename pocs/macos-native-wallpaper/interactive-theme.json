@@ -10,6 +10,20 @@
     "effectColor": { "red": 1.0, "green": 0.85, "blue": 0.1, "alpha": 1.0 },
     "effectWidth": 12.0
   },
+  "track": {
+    "centerX": 0.50,
+    "centerY": 0.50,
+    "radiusX": 0.34,
+    "radiusY": 0.24,
+    "periodSeconds": 4.0,
+    "color": { "red": 0.72, "green": 0.92, "blue": 0.88, "alpha": 0.55 }
+  },
+  "vehicles": [
+    { "id": "session-alpha", "label": "Alpha", "color": { "red": 0.20, "green": 0.84, "blue": 0.77, "alpha": 1.0 }, "laneOffset": -0.045, "trailingOffset": 0.00 },
+    { "id": "session-beta", "label": "Beta", "color": { "red": 1.00, "green": 0.71, "blue": 0.28, "alpha": 1.0 }, "laneOffset": 0.045, "trailingOffset": 0.08 },
+    { "id": "session-gamma", "label": "Gamma", "color": { "red": 0.65, "green": 0.55, "blue": 0.98, "alpha": 1.0 }, "laneOffset": -0.045, "trailingOffset": 0.18 },
+    { "id": "session-delta", "label": "Delta", "color": { "red": 1.00, "green": 0.42, "blue": 0.48, "alpha": 1.0 }, "laneOffset": 0.045, "trailingOffset": 0.26 }
+  ],
   "panel": {
     "title": "Panneau du décor",
     "normalizedFrame": { "x": 0.32, "y": 0.38, "width": 0.36, "height": 0.24 },

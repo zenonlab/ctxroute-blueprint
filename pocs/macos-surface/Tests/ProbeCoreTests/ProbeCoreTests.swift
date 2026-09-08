@@ -9,6 +9,7 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertFalse(options.smoke)
         XCTAssertFalse(options.splitInput)
         XCTAssertFalse(options.exportStill)
+        XCTAssertFalse(options.overlayOnly)
         XCTAssertFalse(ProbeState(interactive: true).shouldAnimate)
     }
 
@@ -19,7 +20,9 @@ final class ProbeCoreTests: XCTestCase {
             ["--exec", "anything"], ["--mode", "window", "--mode", "desktop"],
             ["--smoke", "--smoke"], ["--snapshot"], ["--mode", "desktop", "--smoke", "--snapshot"],
             ["--smoke", "--duration", "3"], ["--split-input"], ["--export-still"],
-            ["--mode", "desktop", "--split-input", "--split-input"]
+            ["--mode", "desktop", "--split-input", "--split-input"],
+            ["--overlay-only"], ["--mode", "desktop", "--overlay-only"],
+            ["--mode", "desktop", "--split-input", "--overlay-only", "--export-still"]
         ] {
             XCTAssertThrowsError(try ProbeOptions.parse(arguments), "\(arguments)")
         }
@@ -33,6 +36,7 @@ final class ProbeCoreTests: XCTestCase {
         let split = try ProbeOptions.parse(["--mode", "desktop", "--split-input", "--export-still"])
         XCTAssertTrue(split.splitInput)
         XCTAssertTrue(split.exportStill)
+        XCTAssertTrue(try ProbeOptions.parse(["--mode", "desktop", "--split-input", "--overlay-only"]).overlayOnly)
     }
 
     func testPassiveStateRejectsEveryLocalAction() {
@@ -83,7 +87,7 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertTrue(state.advance(by: 500))
         XCTAssertEqual(state.phaseSeconds, 0.1)
         for _ in 0..<1000 { state.advance(by: 0.1) }
-        XCTAssertTrue((0..<4).contains(state.phaseSeconds))
+        XCTAssertTrue((0..<3_600).contains(state.phaseSeconds))
     }
 
     func testPanelAndEffectDoNotRequireAnimation() {
@@ -150,5 +154,54 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertTrue(state.advance(by: 0.03))
         XCTAssertTrue(state.effectEnabled)
         XCTAssertTrue(state.animationRequested)
+    }
+
+    func testFormationSnapshotIsDeterministicAndKeepsIdentityOrder() throws {
+        let theme = try decodedFormationTheme()
+        let engine = FormationEngine(theme: theme)
+        let first = engine.snapshot(phaseSeconds: 1.25)
+        XCTAssertEqual(first, engine.snapshot(phaseSeconds: 1.25))
+        XCTAssertEqual(first.objects.map(\.id), theme.objects.map(\.id))
+        XCTAssertTrue(first.objects.allSatisfy {
+            $0.centerX.isFinite && $0.centerY.isFinite && $0.headingRadians.isFinite
+        })
+    }
+
+    func testFormationObjectsRemainSeparatedAroundCurve() throws {
+        let engine = FormationEngine(theme: try decodedFormationTheme())
+        for phase in stride(from: 0.0, through: 4.0, by: 0.1) {
+            let objects = engine.snapshot(phaseSeconds: phase).objects
+            for left in objects.indices {
+                for right in objects.indices where right > left {
+                    XCTAssertGreaterThan(hypot(objects[left].centerX - objects[right].centerX,
+                                               objects[left].centerY - objects[right].centerY), 0.025)
+                }
+            }
+        }
+    }
+
+    func testFormationThemeRejectsDuplicateIdentity() {
+        let invalid = Data("""
+        {"schemaVersion":1,"track":{"centerX":0.5,"centerY":0.5,"radiusX":0.3,"radiusY":0.2,"periodSeconds":4},
+         "objects":[
+           {"id":"same","label":"A","colorHex":"#112233","laneOffset":0,"trailingOffset":0},
+           {"id":"same","label":"B","colorHex":"#445566","laneOffset":0.04,"trailingOffset":0.1}
+         ]}
+        """.utf8)
+        XCTAssertThrowsError(try FormationTheme.decode(invalid)) { error in
+            XCTAssertEqual(error as? FormationThemeError, .invalidObjectIdentity)
+        }
+    }
+
+    private func decodedFormationTheme() throws -> FormationTheme {
+        try FormationTheme.decode(Data("""
+        {"schemaVersion":1,"track":{"centerX":0.5,"centerY":0.5,"radiusX":0.34,"radiusY":0.24,"periodSeconds":4},
+         "objects":[
+           {"id":"alpha","label":"Alpha","colorHex":"#32D6C5","laneOffset":-0.045,"trailingOffset":0},
+           {"id":"beta","label":"Beta","colorHex":"#FFB547","laneOffset":0.045,"trailingOffset":0.08},
+           {"id":"gamma","label":"Gamma","colorHex":"#A78BFA","laneOffset":-0.045,"trailingOffset":0.18},
+           {"id":"delta","label":"Delta","colorHex":"#FF6B7A","laneOffset":0.045,"trailingOffset":0.26}
+         ]}
+        """.utf8))
     }
 }

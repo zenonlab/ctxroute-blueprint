@@ -25,6 +25,21 @@ struct DiagnosticTheme: Decodable, Sendable {
         let normalizedFrame: NormalizedFrame
         let color: Color
     }
+    struct Track: Decodable, Sendable {
+        let centerX: Double
+        let centerY: Double
+        let radiusX: Double
+        let radiusY: Double
+        let periodSeconds: Double
+        let color: Color
+    }
+    struct Vehicle: Decodable, Sendable {
+        let id: String
+        let label: String
+        let color: Color
+        let laneOffset: Double
+        let trailingOffset: Double
+    }
     struct Action: Decodable, Sendable {
         let id: String
         let label: String
@@ -44,6 +59,8 @@ struct DiagnosticTheme: Decodable, Sendable {
     let displayName: String
     let background: Color
     let sweep: Sweep
+    let track: Track
+    let vehicles: [Vehicle]
     let panel: Panel
     let actions: [Action]
     let anchors: [Anchor]
@@ -63,7 +80,8 @@ struct DiagnosticTheme: Decodable, Sendable {
 
     func validate() throws {
         guard schemaVersion == 1, !themeID.isEmpty, !displayName.isEmpty else { throw ThemeError.invalidIdentity }
-        let colors = [background, sweep.color, sweep.effectColor, panel.color]
+        let colors = [background, sweep.color, sweep.effectColor, panel.color, track.color]
+            + vehicles.map(\.color)
         guard colors.allSatisfy({ $0.components.allSatisfy { $0.isFinite && (0...1).contains($0) } }) else {
             throw ThemeError.invalidColor
         }
@@ -73,6 +91,20 @@ struct DiagnosticTheme: Decodable, Sendable {
               frame.x + frame.width <= 1, frame.y + frame.height <= 1 else { throw ThemeError.invalidFrame }
         guard sweep.durationSeconds.isFinite, sweep.durationSeconds > 0,
               sweep.effectWidth.isFinite, sweep.effectWidth >= 0 else { throw ThemeError.invalidSweep }
+        guard track.centerX.isFinite, track.centerY.isFinite,
+              track.radiusX.isFinite, track.radiusY.isFinite, track.periodSeconds.isFinite,
+              track.centerX >= 0, track.centerX <= 1, track.centerY >= 0, track.centerY <= 1,
+              track.radiusX > 0, track.radiusY > 0, track.periodSeconds >= 1,
+              track.centerX - track.radiusX >= 0, track.centerX + track.radiusX <= 1,
+              track.centerY - track.radiusY >= 0, track.centerY + track.radiusY <= 1 else {
+            throw ThemeError.invalidTrack
+        }
+        guard (1...8).contains(vehicles.count), Set(vehicles.map(\.id)).count == vehicles.count,
+              vehicles.allSatisfy({ !$0.id.isEmpty && !$0.label.isEmpty &&
+                  $0.laneOffset.isFinite && abs($0.laneOffset) <= 0.15 &&
+                  $0.trailingOffset.isFinite && abs($0.trailingOffset) <= 0.35 }) else {
+            throw ThemeError.invalidVehicles
+        }
         guard actions.count == DiagnosticCommand.allCases.count,
               Set(actions.map(\.id)).count == actions.count,
               Set(actions.map(\.command)) == Set(DiagnosticCommand.allCases),
@@ -115,7 +147,8 @@ struct DiagnosticTheme: Decodable, Sendable {
     func action(id: String) -> Action? { actions.first { $0.id == id } }
 
     enum ThemeError: Error {
-        case missingAsset, invalidIdentity, invalidColor, invalidFrame, invalidSweep, invalidActions, invalidAnchors
+        case missingAsset, invalidIdentity, invalidColor, invalidFrame, invalidSweep, invalidTrack,
+             invalidVehicles, invalidActions, invalidAnchors
     }
 }
 

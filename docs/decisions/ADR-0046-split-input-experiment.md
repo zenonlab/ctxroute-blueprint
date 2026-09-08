@@ -5,6 +5,7 @@ scope:
   - docs/architecture/src/macos-surface-poc.architecture.json
   - .project/project-config.json
 review: on-change
+revised: true
 ---
 # ADR-0046 — Essai explicite de couche interactive distincte
 
@@ -47,3 +48,7 @@ Critères : premier clic réel → panneau ; commandes → changement visible ; 
 de travail non activée par nos contrôles ; mesure distincte des transitions réelles.
 Superposition d'icône : limitation connue, interdit de déclarer le mode conforme.
 Le mode passif antérieur reste disponible. Aucun choix de moteur 3D ou terminal.
+
+ADR-0048 affine cet essai avec plusieurs objets décrits hors code, un snapshot de
+formation unique et un mode `--overlay-only` destiné à se superposer au wallpaper
+natif sans redessiner le fond. La limitation de priorité des icônes reste inchangée.

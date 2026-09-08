@@ -29,15 +29,20 @@ enum RenderTests {
             precondition(anchorLayers.allSatisfy { root.bounds.contains($0.frame) })
             precondition(anchorLayers.allSatisfy { $0.opacity == 1 })
             precondition(anchorLayers.first { $0.name == "interactive.anchor.terminal-object" }?.borderWidth == 5)
+            let vehicles = root.sublayers!.filter { $0.name?.hasPrefix("interactive.vehicle.") == true }
+            precondition(vehicles.count == theme.vehicles.count)
+            precondition(vehicles.allSatisfy { $0.animation(forKey: "interactive.vehicle.motion") != nil })
             InteractiveDiagnostic.receive(.pause)
             let pausedTime = sweep.timeOffset
             precondition(sweep.speed == 0)
+            precondition(vehicles.allSatisfy { $0.speed == 0 })
             InteractiveDiagnostic.receive(.pause)
             precondition(sweep.timeOffset == pausedTime)
             InteractiveDiagnostic.receive(.effectOn)
             precondition(sweep.borderWidth == theme.sweep.effectWidth && sweep.speed == 0)
             InteractiveDiagnostic.receive(.resume)
             precondition(sweep.speed == 1 && sweep.timeOffset == 0)
+            precondition(vehicles.allSatisfy { $0.speed == 1 && $0.timeOffset == 0 })
             let resumedAt = sweep.beginTime
             InteractiveDiagnostic.receive(.resume)
             precondition(sweep.beginTime == resumedAt)
@@ -51,6 +56,6 @@ enum RenderTests {
             let smallPanel = small.sublayers!.first { $0.name == "interactive.panel" }!
             precondition(smallPanel.frame.minX >= 0 && smallPanel.frame.maxX <= small.bounds.maxX)
         }
-        print("PASS: 17 layer checks; direct dispatch only, no wallpaper registration or UI window")
+        print("PASS: 21 layer checks including native vehicles; no wallpaper registration or UI window")
     }
 }

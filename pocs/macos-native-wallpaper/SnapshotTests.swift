@@ -42,7 +42,9 @@ enum SnapshotTests {
                 let anchors = root.sublayers?.filter {
                     $0.name?.hasPrefix("interactive.anchor.") == true && $0.name?.contains("label") == false
                 } ?? []
+                let vehicles = root.sublayers?.filter { $0.name?.hasPrefix("interactive.vehicle.") == true } ?? []
                 guard anchors.count == theme.anchors.count, anchors.allSatisfy({ !$0.isHidden && $0.opacity > 0 }),
+                      vehicles.count == theme.vehicles.count,
                       panel.isHidden == !state.1 else { throw SnapshotError.invalidState }
                 sweep.removeAllAnimations()
                 sweep.bounds.size.width = CGFloat(width) * 0.58

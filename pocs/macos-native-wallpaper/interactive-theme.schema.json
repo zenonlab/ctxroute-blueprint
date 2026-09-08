@@ -4,7 +4,7 @@
   "title": "Native wallpaper probe theme",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "themeID", "sceneID", "displayName", "background", "sweep", "panel", "actions", "anchors"],
+  "required": ["schemaVersion", "themeID", "sceneID", "displayName", "background", "sweep", "track", "vehicles", "panel", "actions", "anchors"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "themeID": { "type": "string", "minLength": 1 },
@@ -20,6 +20,36 @@
         "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
         "effectColor": { "$ref": "#/$defs/color" },
         "effectWidth": { "type": "number", "minimum": 0 }
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["centerX", "centerY", "radiusX", "radiusY", "periodSeconds", "color"],
+      "properties": {
+        "centerX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "centerY": { "type": "number", "minimum": 0, "maximum": 1 },
+        "radiusX": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 },
+        "radiusY": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.5 },
+        "periodSeconds": { "type": "number", "minimum": 1 },
+        "color": { "$ref": "#/$defs/color" }
+      }
+    },
+    "vehicles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "color", "laneOffset", "trailingOffset"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "color": { "$ref": "#/$defs/color" },
+          "laneOffset": { "type": "number", "minimum": -0.15, "maximum": 0.15 },
+          "trailingOffset": { "type": "number", "minimum": -0.35, "maximum": 0.35 }
+        }
       }
     },
     "panel": {

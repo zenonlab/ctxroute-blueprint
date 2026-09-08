@@ -15,12 +15,17 @@ sh pocs/macos-surface/probe.sh desktop --duration 60
 Le fond demande maintenant l'animation ; il reste transparent aux clics.
 Le menu **WP** dans la barre macOS donne Pause/Reprendre, Animation, Halo et Arrêter.
 Les clics sur l'objet du fond ne sont pas activés : ils restent à qualifier face à Finder.
-Variante d'essai uniquement : `desktop --split-input --export-still --duration 180`.
-Elle place un objet cliquable fixe à gauche et son panneau au-dessus des icônes,
+Variante d'essai uniquement : `desktop --split-input --duration 180`.
+Elle place quatre zones cliquables en formation et leur panneau au-dessus des icônes,
 sous les applications. Une icône superposée n'a PAS la priorité : ce n'est pas
 le comportement produit validé. Le premier clic est accepté sans activation de
 fenêtre ; son routage réel reste à éprouver. `split_mouse_downs` distingue les
 événements souris reçus des actions programmatiques du smoke.
+Avec un wallpaper natif déjà actif, `desktop --split-input --overlay-only --duration 180`
+ne redessine ni le fond ni les véhicules : il affiche uniquement le plan de hit-test
+transparent. Les zones sont retirées lorsque Finder n'est plus au premier plan. La ressource
+`Resources/formation-theme.json` décrit piste, slots, identités et couleurs ; le
+solveur générique conserve l'ordre et calcule les orientations dans les virages.
 `--export-still` crée notre image PNG à côté de la .app, sans changer le fond système.
 Ces deux options exigent le mode desktop ; l'export exige le lancement en .app.
 La fenêtre et sa couche de dessin sont conservées aux changements de Space/réveil.

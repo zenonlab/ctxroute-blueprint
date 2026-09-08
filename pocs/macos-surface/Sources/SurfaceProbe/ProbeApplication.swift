@@ -15,8 +15,9 @@ enum ProbeApplication {
         }
         do {
             let options = try ProbeOptions.parse(arguments)
+            let formationTheme = try FormationAssetLoader.load()
             let application = NSApplication.shared
-            let delegate = ProbeDelegate(options: options)
+            let delegate = ProbeDelegate(options: options, formationTheme: formationTheme)
             application.delegate = delegate
             withExtendedLifetime(delegate) { application.run() }
         } catch {
@@ -29,6 +30,8 @@ enum ProbeApplication {
 @MainActor
 final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let options: ProbeOptions
+    let formationTheme: FormationTheme
+    let formationEngine: FormationEngine
     var state: ProbeState
     var window: NSWindow!
     var ui: ProbeUI?
@@ -52,10 +55,13 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var desktopRestorations = 0
     var spacesNotifications = 0
     var schedulingSource = "suspended"
+    var selectedObjectID: String?
     var finderFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder"
 
-    init(options: ProbeOptions) {
+    init(options: ProbeOptions, formationTheme: FormationTheme) {
         self.options = options
+        self.formationTheme = formationTheme
+        self.formationEngine = FormationEngine(theme: formationTheme)
         // Desktop controls are explicit menu actions; the surface itself ignores input.
         self.state = ProbeState(interactive: true, animate: options.mode == .desktop)
     }
@@ -106,17 +112,23 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.isOpaque = true
             scene.isDesktop = true
             scene.usesFixedAnchor = options.splitInput
+            scene.formationTheme = formationTheme
             scene.wantsLayer = true
             scene.layerContentsRedrawPolicy = .onSetNeedsDisplay
             window.contentView = scene
-            // Front of the desktop level, not front of normal applications.
-            // This does not activate the app or change the key window.
-            window.orderFrontRegardless()
+            if options.overlayOnly {
+                // Coordinate/lifecycle owner only. The native wallpaper remains the sole background.
+                window.alphaValue = 0
+                window.orderOut(nil)
+            } else {
+                // Front of the desktop level, not front of normal applications.
+                // This does not activate the app or change the key window.
+                window.orderFrontRegardless()
+            }
             if options.splitInput {
-                splitControls = SplitDesktopControls(target: self, open: #selector(openObject),
+                splitControls = SplitDesktopControls(theme: formationTheme, target: self,
+                    open: #selector(openDynamicObject(_:)),
                     effect: #selector(toggleEffect), pause: #selector(togglePause), close: #selector(closePanel))
-                splitControls?.place(relativeTo: window, anchor: scene.fixedAnchor)
-                splitControls?.show()
             }
         } else {
             NSApp.setActivationPolicy(.regular)
@@ -136,6 +148,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.backgroundColor = ProbeStyle.surface
+        renderedScene.formationTheme = formationTheme
     }
 
     private func bindControls(_ controls: ProbeUI) {
@@ -151,6 +164,12 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc func openObject() { state.openPanel(); refreshUI() }
+    @objc func openDynamicObject(_ sender: DynamicObjectButton) {
+        selectedObjectID = sender.objectID
+        splitControls?.select(sender.objectID)
+        state.openPanel()
+        refreshUI()
+    }
     @objc func closePanel() { state.closePanel(); refreshUI() }
     @objc func toggleAnimation() { state.toggleAnimation(); refreshUI() }
     @objc func toggleEffect() { state.toggleEffect(); refreshUI() }
@@ -205,9 +224,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard options.mode == .desktop, !finishing, displaysAwake, sessionActive else { return }
         desktopRestorations += 1
         // Reorder the retained window; never replace the scene or reset its phase.
-        window.orderFrontRegardless()
-        splitControls?.place(relativeTo: window, anchor: scene.fixedAnchor)
-        splitControls?.show()
+        if !options.overlayOnly { window.orderFrontRegardless() }
         updateVisibility()
         refreshUI()
     }
@@ -218,11 +235,19 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let previous = state.visibility
         let appKitVisible = window.occlusionState.contains(.visible) && !window.isMiniaturized
         if options.mode == .desktop {
-            schedulingSource = DesktopActivity.source(ordered: window.isVisible,
-                activeSpace: window.isOnActiveSpace, appKitVisible: appKitVisible,
-                finderFrontmost: finderFrontmost,
-                awake: displaysAwake, sessionActive: sessionActive)
+            if options.overlayOnly {
+                schedulingSource = finderFrontmost && displaysAwake && sessionActive
+                    ? "finder-frontmost-overlay" : "suspended"
+            } else {
+                schedulingSource = DesktopActivity.source(ordered: window.isVisible,
+                    activeSpace: window.isOnActiveSpace, appKitVisible: appKitVisible,
+                    finderFrontmost: finderFrontmost,
+                    awake: displaysAwake, sessionActive: sessionActive)
+            }
             state.visibility = schedulingSource == "suspended" ? .notVisible : .visible
+            let dynamicPlaneExposed = options.splitInput && finderFrontmost && displaysAwake && sessionActive &&
+                (options.overlayOnly || (window.isVisible && window.isOnActiveSpace))
+            splitControls?.setDesktopExposed(dynamicPlaneExposed)
         } else {
             state.visibility = appKitVisible ? .visible : .notVisible
         }
@@ -230,10 +255,14 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func refreshUI() {
+        let snapshotPhase = options.overlayOnly ? ProcessInfo.processInfo.systemUptime : state.phaseSeconds
+        let snapshot = formationEngine.snapshot(phaseSeconds: snapshotPhase)
         renderedScene.state = state
+        renderedScene.formationSnapshot = snapshot
         renderedScene.needsDisplay = true
         invalidations += 1
         ui?.panel.isHidden = !state.panelOpen
+        splitControls?.update(snapshot: snapshot, desktop: window)
         splitControls?.refresh(state)
         ui?.animationButton.title = state.animationRequested ? "Arrêter l’animation" : "Animer"
         ui?.effectButton.title = state.effectEnabled ? "Retirer le halo" : "Activer le halo"
@@ -323,12 +352,21 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case 1:
             smokeChecks["animation_requested"] = state.animationRequested
             if let splitControls {
+                splitControls.setDesktopExposed(true)
+                splitControls.update(snapshot: formationEngine.snapshot(phaseSeconds: state.phaseSeconds), desktop: window)
+                smokeChecks["formation_has_four_objects"] = splitControls.objectButtons.count == 4
+                    && splitControls.visibleObjectCount == 4
                 splitControls.objectButton.performClick(nil)
+                smokeChecks["split_selects_object"] = selectedObjectID == formationTheme.objects[0].id
                 smokeChecks["split_opens_panel"] = state.panelOpen && splitControls.controlsWindow.isVisible
                 splitControls.closeButton.performClick(nil)
                 smokeChecks["split_closes_panel"] = !state.panelOpen && !splitControls.controlsWindow.isVisible
                 smokeChecks["split_first_click_policy"] = splitControls.objectButton.acceptsFirstMouse(for: nil)
-                    && !splitControls.objectWindow.canBecomeKey && splitControls.mouseDowns == 0
+                    && splitControls.objectWindows.allSatisfy { !$0.canBecomeKey } && splitControls.mouseDowns == 0
+                splitControls.setDesktopExposed(false)
+                smokeChecks["split_hides_off_desktop"] = splitControls.visibleObjectCount == 0
+                    && !splitControls.controlsWindow.isVisible
+                splitControls.setDesktopExposed(true)
             }
         case 2:
             menu.performActionForItem(at: 2)
@@ -352,7 +390,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             menu.performActionForItem(at: 3)
             smokeChecks["menu_animation_stop"] = !state.animationRequested && animationTimer == nil
         default:
-            let passed = smokeChecks.count == (options.splitInput ? 12 : 9) && smokeChecks.values.allSatisfy { $0 }
+            let passed = smokeChecks.count == (options.splitInput ? 15 : 9) && smokeChecks.values.allSatisfy { $0 }
             finish(reason: "desktop-handler-smoke", code: passed ? 0 : 1)
         }
     }
@@ -418,8 +456,13 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "spaces_notifications": spacesNotifications, "desktop_restorations": desktopRestorations,
             "hides_on_deactivate": window?.hidesOnDeactivate ?? false,
             "layer_backed": renderedScene.wantsLayer,
-            "input_policy": options.splitInput ? "split-widget-experiment" : (options.mode == .desktop ? "explicit-menu-only" : "window"),
+            "input_policy": options.overlayOnly ? "native-wallpaper-object-overlay" :
+                (options.splitInput ? "split-widget-experiment" : (options.mode == .desktop ? "explicit-menu-only" : "window")),
+            "overlay_only": options.overlayOnly,
             "split_mouse_downs": splitControls?.mouseDowns ?? 0,
+            "split_object_count": splitControls?.objectButtons.count ?? 0,
+            "split_visible_object_count": splitControls?.visibleObjectCount ?? 0,
+            "selected_object_id": selectedObjectID ?? "none",
             "split_panel_open": state.panelOpen,
             "continuity_image": stillName ?? "not-requested",
             "system_wallpaper_modified": false,

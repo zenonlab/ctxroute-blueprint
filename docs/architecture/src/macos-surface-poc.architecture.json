@@ -1,20 +1,25 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "PoC macOS — sonde autonome", "quality_profile": "showcase", "viewBox": [1280, 760] },
+  "meta": { "title": "PoC macOS — objets rendus dans le wallpaper", "quality_profile": "showcase", "viewBox": [1280, 760] },
   "components": [
-    { "id": "operator", "type": "external", "label": "Lancement manuel", "sublabel": "CLI ou .app via macOS", "pos": [40, 110], "size": [230, 80] },
-    { "id": "surface", "type": "frontend", "label": "Surface AppKit", "sublabel": "Fond et export image", "pos": [520, 110], "size": [240, 80] },
-    { "id": "native", "type": "external", "label": "Bureau macOS", "sublabel": "Finder et compositeur", "pos": [1010, 110], "size": [230, 80] },
-    { "id": "controls", "type": "frontend", "label": "Contrôles explicites", "sublabel": "Zone de clic optionnelle", "pos": [40, 530], "size": [230, 80] },
-    { "id": "state", "type": "backend", "label": "État de sonde", "sublabel": "Pause, animation et dessin", "pos": [520, 530], "size": [240, 80] },
-    { "id": "receipt", "type": "database", "label": "Reçu de diagnostic", "sublabel": "Compteurs, pas de watts", "pos": [1010, 530], "size": [230, 80] }
+    { "id": "theme", "type": "database", "label": "Contrat de thème", "sublabel": "Deux fixtures POC à unifier", "pos": [520, 40], "size": [240, 80] },
+    { "id": "controller", "type": "backend", "label": "Animation native", "sublabel": "Le wallpaper possède le mouvement", "pos": [220, 220], "size": [240, 80] },
+    { "id": "projection", "type": "backend", "label": "Projection compagnon", "sublabel": "Même contrat · temps monotone", "pos": [820, 220], "size": [240, 80] },
+    { "id": "visibility", "type": "backend", "label": "Visibilité bureau", "sublabel": "Masque le hit-test", "pos": [1090, 220], "size": [150, 80] },
+    { "id": "wallpaper", "type": "frontend", "label": "Wallpaper natif complet", "sublabel": "Décor et objets animés", "pos": [220, 430], "size": [240, 80] },
+    { "id": "objects", "type": "frontend", "label": "Plan de hit-test", "sublabel": "Transparent, aucun pixel d’objet", "pos": [820, 430], "size": [240, 80] },
+    { "id": "panel", "type": "frontend", "label": "Panneau contextuel", "sublabel": "Actions de l’objet", "pos": [1090, 430], "size": [150, 80] },
+    { "id": "desktop", "type": "external", "label": "Bureau macOS", "sublabel": "Finder et compositeur", "pos": [520, 640], "size": [240, 80] }
   ],
   "connections": [
-    { "from": "operator", "to": "surface", "label": "arguments validés" },
-    { "from": "surface", "to": "native", "label": "surface native" },
-    { "from": "controls", "to": "state", "label": "intention locale" },
-    { "from": "state", "to": "surface", "label": "invalidation bornée" },
-    { "from": "state", "to": "receipt", "label": "résumé de fin" }
+    { "from": "theme", "to": "controller" },
+    { "from": "theme", "to": "projection" },
+    { "from": "controller", "to": "wallpaper", "label": "dessine et anime", "labelAt": [340, 365] },
+    { "from": "projection", "to": "objects", "label": "place les hit-boxes", "labelAt": [940, 365] },
+    { "from": "objects", "to": "panel", "label": "clic ciblé", "labelAt": [1075, 420] },
+    { "from": "visibility", "to": "projection" },
+    { "from": "wallpaper", "to": "desktop" },
+    { "from": "objects", "to": "desktop" }
   ]
 }

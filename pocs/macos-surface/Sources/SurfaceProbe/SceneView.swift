@@ -7,6 +7,8 @@ final class SceneView: NSView {
     var selectObject: (() -> Void)?
     var isDesktop = false
     var usesFixedAnchor = false
+    var formationTheme: FormationTheme?
+    var formationSnapshot: FormationSnapshot?
     var fixedAnchor: NSRect { NSRect(x: 80, y: bounds.midY, width: 180, height: 64) }
     private(set) var drawCount = 0
 
@@ -23,22 +25,36 @@ final class SceneView: NSView {
         drawCount += 1
         ProbeStyle.surface.setFill()
         bounds.fill()
-        let route = NSBezierPath(roundedRect: bounds.insetBy(dx: ProbeStyle.margin, dy: 70),
-                                 xRadius: 32, yRadius: 32)
+        let routeRect: NSRect
+        if let track = formationTheme?.track {
+            routeRect = NSRect(x: bounds.width * (track.centerX - track.radiusX),
+                               y: bounds.height * (track.centerY - track.radiusY),
+                               width: bounds.width * track.radiusX * 2,
+                               height: bounds.height * track.radiusY * 2)
+        } else {
+            routeRect = bounds.insetBy(dx: ProbeStyle.margin, dy: 70)
+        }
+        let route = usesFixedAnchor ? NSBezierPath(ovalIn: routeRect)
+            : NSBezierPath(roundedRect: routeRect, xRadius: 32, yRadius: 32)
         ProbeStyle.track.setStroke()
         route.lineWidth = 2
         route.stroke()
-        if state.effectEnabled {
+        if usesFixedAnchor, let formationSnapshot {
+            NSColor.black.withAlphaComponent(0.16).setFill()
+            for object in formationSnapshot.objects {
+                let center = NSPoint(x: bounds.width * object.centerX, y: bounds.height * object.centerY)
+                NSBezierPath(ovalIn: NSRect(x: center.x - 30, y: center.y - 13,
+                                            width: 60, height: 26)).fill()
+            }
+        } else if state.effectEnabled {
             ProbeStyle.accent.withAlphaComponent(0.15).setFill()
             NSBezierPath(ovalIn: objectRect.insetBy(dx: -14, dy: -14)).fill()
         }
-        ProbeStyle.accent.setFill()
-        NSBezierPath(roundedRect: objectRect, xRadius: ProbeStyle.radius, yRadius: ProbeStyle.radius).fill()
-        if usesFixedAnchor {
-            let x = bounds.midX + sin(state.phaseSeconds * .pi / 2) * 100
-            NSBezierPath(ovalIn: NSRect(x: x, y: bounds.midY, width: 24, height: 24)).fill()
+        if !usesFixedAnchor {
+            ProbeStyle.accent.setFill()
+            NSBezierPath(roundedRect: objectRect, xRadius: ProbeStyle.radius, yRadius: ProbeStyle.radius).fill()
         }
-        let label = usesFixedAnchor ? "Essai widgets · objet à gauche · priorité des icônes NON garantie"
+        let label = usesFixedAnchor ? "Fond persistant · véhicules sur plan dynamique · priorité des icônes NON garantie"
             : (isDesktop ? "Fond animé · contrôles dans le menu WP" : "Objet de test · clic ou bouton ci-dessous")
         (label as NSString).draw(at: NSPoint(x: ProbeStyle.margin, y: ProbeStyle.margin),
                                 withAttributes: [.font: ProbeStyle.body, .foregroundColor: ProbeStyle.text])

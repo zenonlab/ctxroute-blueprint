@@ -11,6 +11,8 @@ enum ThemeTests {
         precondition(Set(theme.actions.map(\.command)) == Set(DiagnosticCommand.allCases))
         precondition(theme.actions.allSatisfy { $0.normalizedFrame.x + $0.normalizedFrame.width <= 1 })
         precondition(theme.anchors.count == 3)
+        precondition(theme.vehicles.count == 4)
+        precondition(theme.track.periodSeconds == 4)
         precondition(theme.panel.normalizedFrame.x + theme.panel.normalizedFrame.width <= 1)
 
         let original = try String(contentsOf: source, encoding: .utf8)
@@ -22,7 +24,9 @@ enum ThemeTests {
             original.replacingOccurrences(of: "\"command\": \"reset\"", with: "\"command\": \"pause\""),
             original.replacingOccurrences(of: "\"x\": 0.28, \"y\": 0.01", with: "\"x\": 0.80, \"y\": 0.01"),
             original.replacingOccurrences(of: "\"x\": 0.28, \"y\": 0.01", with: "\"x\": 0.04, \"y\": 0.14"),
-            original.replacingOccurrences(of: "\"actionID\": \"reset\"", with: "\"actionID\": \"unknown\"")
+            original.replacingOccurrences(of: "\"actionID\": \"reset\"", with: "\"actionID\": \"unknown\""),
+            original.replacingOccurrences(of: "\"radiusX\": 0.34", with: "\"radiusX\": 0.60"),
+            original.replacingOccurrences(of: "\"id\": \"session-beta\"", with: "\"id\": \"session-alpha\"")
         ]
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("wallpaper-theme-tests-\(UUID().uuidString)")
@@ -36,6 +40,6 @@ enum ThemeTests {
                 preconditionFailure("Invalid fixture \(index) was accepted")
             } catch {}
         }
-        print("PASS: 14 theme asset checks; invalid identity, color, frame, duration, actions and anchors rejected")
+        print("PASS: 18 theme asset checks; invalid identity, color, track, vehicles, actions and anchors rejected")
     }
 }

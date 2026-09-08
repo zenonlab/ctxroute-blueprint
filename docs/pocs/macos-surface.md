@@ -5,7 +5,47 @@ Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
 montre uniquement cette sonde ; aucun lien au terminal ou à l'ingestion.
 
-## Essai actuel — deux plans (ADR-0046)
+## Essai actuel — wallpaper natif et plan d'objets (ADR-0048)
+
+[ADR-0048](../decisions/ADR-0048-native-wallpaper-dynamic-object-plane.md) retient
+la seconde architecture, corrigée après inspection visuelle : le wallpaper natif
+dessine le fond **et tous les objets** ; un compagnon transparent projette seulement
+leurs zones de hit-test et le panneau demandé.
+Le mode `--overlay-only` ne crée aucune surface de fond visible. Quatre véhicules
+originaux sont décrits dans une ressource JSON, puis un solveur pur calcule leurs
+positions et orientations sur une ellipse à partir d'une phase unique. Leur ordre
+reste déterministe et les deux plans ne possèdent jamais deux horloges concurrentes.
+
+Chaque objet possède une petite `NSPanel` non activante qui ne dessine aucun pixel.
+Cela borne la zone de clic au véhicule au lieu de couvrir l'écran d'une vitre
+transparente. Le plan entier est masqué si Finder quitte le premier plan, si l'écran dort ou si la
+session devient inactive ; la simulation s'arrête via la garde de visibilité. Le
+wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rechargé.
+
+```sh
+sh pocs/macos-surface/probe.sh test
+sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --duration 180
+sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --smoke --duration 6
+```
+
+Preuves automatisées du 8 septembre 2026 : 14 tests XCTest réussis. Ils couvrent
+le décodage/validation du thème, le déterminisme, l'ordre stable et une séparation
+minimale des quatre objets sur 41 positions de la courbe. Le smoke overlay réussit
+15 assertions : quatre surfaces, sélection d'identité, ouverture/fermeture du
+panneau, politique de premier clic, masquage complet du plan dynamique et handlers
+de pause/veille. Son reçu rapporte `input_policy: native-wallpaper-object-overlay`,
+`overlay_only: true` et `window_ordered_visible: false` pour la fenêtre de fond.
+Les clics sont programmatiques et Finder n'était pas au premier plan ; ce résultat
+ne prétend donc pas prouver le clic matériel, l'animation visible ou la priorité
+d'une icône native superposée.
+
+La fixture et les formes de véhicules sont originales. Elles démontrent le contrat
+générique attendu pour un thème de course ; elles ne contiennent aucun asset ou
+algorithme propriétaire de Mario Kart. Un futur adaptateur local pourra mapper les
+objets autorisés d'un jeu sur ces identités sans intégrer le contenu de la ROM au
+package partageable.
+
+## Essai historique — deux plans (ADR-0046)
 
 Le retour utilisateur invalide l'expérience de la version ADR-0045 : apparence
 superposée, disparition aux transitions et absence de clics sur le décor.

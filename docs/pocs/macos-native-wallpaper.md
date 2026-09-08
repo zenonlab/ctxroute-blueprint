@@ -1,5 +1,29 @@
 # Sonde native macOS — paquet local de test
 
+## Version 11 — véhicules dans le wallpaper, 8 septembre 2026
+
+Après constat que la première couche AppKit dessinait les véhicules devant Finder,
+la version 11 déplace tous leurs pixels dans `InteractiveDiagnostic`, au sein de
+l'extension native. Le thème externe décrit une piste elliptique et quatre véhicules
+de sessions ; Core Animation possède leurs trajectoires, orientations et pause.
+Le compagnon séparé ne doit fournir que des hit-boxes transparentes synchronisées
+sur l'uptime monotone et un panneau natif après sélection.
+
+Les validations isolées passent : 18 contrôles d'asset, 21 contrôles de calques
+incluant les quatre animations, trois snapshots 1200×780 distincts et 19 contrôles
+du package signé. Le build final est
+`dist/pocs/macos-native-wallpaper/compile.znNVe4/Native Wallpaper Probe.app`.
+Il est enregistré et sa tuile apparaît dans Réglages. Computer Use n'a pas réussi
+à presser cette tuile (`cannotClickOffscreenElement`, puis `noWindowsAvailable`) :
+la sélection et le rendu composé de **ce build final** ne sont pas revendiqués.
+
+Le build intermédiaire `compile.FF4Nag`, qui contenait déjà le rendu natif des
+véhicules avant l'alignement final de l'horloge, a été lancé par WallpaperAgent et
+a créé deux contextes 1512×982. Sa revue hors écran montre la piste et les véhicules.
+Le clic matériel, la correspondance exacte des hit-boxes et la priorité d'une icône
+Finder superposée restent des preuves manuelles. La version 10 ci-dessous demeure
+historique et son chemin n'est plus le provider enregistré.
+
 ## Build interactif séparé — 8 septembre 2026
 
 L'utilisateur confirme l'animation du build 3. Son ancien processus d'extension
