@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createFavoriteSource, createLibrary, createReview, createWork, favoriteSourceId, libraryId, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { readLocalReviewCandidates } from './read-local-review-candidates';
 
 describe('readLocalReviewCandidates', () => {
+  it('keeps a terminal not-found actionable without reading unrelated library entries', async () => {
+    const storage = new MemoryStoragePort();
+    const review = createReview({ id: reviewId('review_notfound'), reason: 'NOT_FOUND', sourceLabel: 'Source', status: 'pending', title: 'Synthetic missing title' });
+    await storage.putReview(review);
+    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'missing', folderPath: [], id: favoriteSourceId('source_notfound'), importedAt: '2026-09-08T00:00:00.000Z', order: 0, resolution: { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, reviewId: review.id, title: review.title, url: 'https://reader.example/missing' }));
+    const libraryRead = vi.spyOn(storage, 'getLibrary').mockRejectedValue(new Error('Unrelated library unavailable'));
+
+    await expect(readLocalReviewCandidates(storage, { libraryId: libraryId('library_unrelated'), reviewId: review.id })).resolves.toMatchObject({ candidates: [], reason: 'NOT_FOUND', state: 'ready' });
+    expect(libraryRead).not.toHaveBeenCalled();
+  });
+
   it('returns only title matches backed by a resolved local HTTP source', async () => {
     const storage = new MemoryStoragePort();
     const library = libraryId('library_candidates');

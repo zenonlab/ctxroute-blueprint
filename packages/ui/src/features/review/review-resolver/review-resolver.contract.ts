@@ -24,6 +24,10 @@ export interface ReviewCandidate {
 }
 
 export interface ReviewItem {
+  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | undefined;
+  matchLevel?: string | undefined;
+  provenance?: string | undefined;
+  totalCandidates?: number | undefined;
   candidates: readonly ReviewCandidate[];
   id: string;
   position?: number;
@@ -36,6 +40,7 @@ export interface ReviewItem {
 }
 
 export type ReviewDecision =
+  | { kind: 'defer'; revision: string }
   | { candidateId: string; kind: 'candidate'; revision: string }
   | { kind: 'manual'; revision: string; source: 'id' | 'url'; value: string }
   | { kind: 'none'; revision: string };

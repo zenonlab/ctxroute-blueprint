@@ -66,6 +66,13 @@ export interface FavoriteProviderRateCheckpoint {
 }
 
 export interface FavoriteResolutionReceipt {
+  correction?: {
+    readonly schemaVersion: 1;
+    readonly source: FavoriteSource;
+    readonly review?: Review;
+    readonly artifact?: FavoriteParseArtifactRecord;
+    readonly task?: DurableTask;
+  };
   versions?: FavoriteResolutionVersions;
   completedAt: string;
   effectDigest: string;
@@ -75,6 +82,9 @@ export interface FavoriteResolutionReceipt {
 }
 
 export interface FavoriteReviewCandidateSet {
+  matchLevel?: string;
+  provenance?: string;
+  totalCandidates?: number;
   candidates: readonly ProviderCandidate[];
   digest: string;
   recordedAt: string;
@@ -128,6 +138,9 @@ export function assertAgendaEntryListQuery(query: AgendaEntryListQuery): void {
 }
 
 export interface ReviewListQuery {
+  actionableOnly?: boolean;
+  after?: { availableAt: string; id: ReviewId };
+  availableBefore?: string;
   limit: number;
   status: ReviewStatus;
 }
@@ -146,6 +159,7 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 }
 
 export interface StorageReadPort {
+  readFavoriteResolutionCounts(): Promise<{ processing: number; retryable: number; unsupported: number }>;
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;

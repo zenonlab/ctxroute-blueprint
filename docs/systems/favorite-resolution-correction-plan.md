@@ -311,7 +311,12 @@ Les pending artificielles sont archivées logiquement hors cloche; sources,
 Reviews et décisions restent présentes. Reparse et nouvelle tâche utilisent
 la version corrigée et une clé idempotente distincte.
 
-Chaque tranche de 100 au plus écrit transformations et reçu/cursor ensemble.
+Chaque tranche de 100 au plus écrit transformations et reçus ensemble.
+L'import reprend le curseur d'inventaire existant : correction, état précédent,
+nouvel artefact et tâche sont écrits dans sa transaction de 100 favoris au plus.
+Le reçu par source rend la reprise idempotente si l'inventaire s'interrompt
+avant son prochain checkpoint. Une Review historique reste dans sa table;
+son ancien lien est conservé dans le reçu lorsque la source est réenfilée.
 Un crash reprend au reçu sans refaire les décisions humaines. Les décisions
 automatiques invalidées appartiennent seulement à l'allowlist des versions
 fautives constatées; une version inconnue n'est pas invalidée par comparaison
@@ -323,6 +328,10 @@ down-migration destructrice. Les tests travaillent sur copies synthétiques.
 
 Cloche = ambiguïtés et introuvables terminaux actionnables seulement.
 Traitement en cours, panne et unsupported ont des états distincts hors cloche.
+Les paramètres de l'extension affichent ces trois compteurs issus des index de
+sources observées. Aucun lien ordinaire ne devient une entrée de Review pour
+expliquer son exclusion; les compteurs restent privés et se rafraîchissent à
+la demande, sans requête fournisseur.
 Afficher raison, provenance, niveau de matching et six candidats comparables
 au plus, avec indication si d'autres candidats existent. Choix, ID/source
 manuel exact, report et confirmation no-match relisent la révision avant commit.
@@ -330,6 +339,33 @@ Un ID public manuel peut être hydraté sans exiger sa présence préalable en
 bibliothèque. Un report garde la décision ouverte sans fabriquer de no-match.
 Toute décision finale met à jour source, Work éventuelle, Review et reçu dans
 la même transaction. Les liens ordinaires restent hors cloche.
+Le site transmet les motifs, la provenance et le niveau de preuve reçus du
+WebBridge au composant partagé. Le report conserve la commande `defer`; il
+n'est jamais traduit en confirmation `none`. Un test avec le vrai provider
+WebBridge et des réponses de transport synthétiques vérifie ce raccord.
+
+La sélection utilise le jeu de candidats effectivement comparé, conservé dans
+IndexedDB. Une suggestion fournisseur peut créer la fiche locale lors du choix
+humain; sa présence préalable en bibliothèque n'est pas une condition. La
+révision inclut la résolution et le jeu comparé. Une hydratation manuelle se
+prépare hors transaction, puis la transaction relit cette révision avant effet.
+Une recherche terminée sans candidat est actionnable, jamais présentée comme
+une panne fournisseur. Les champs additifs de Review restent importables avec
+les exports antérieurs; les lignes archivées ne sont pas supprimées.
+IndexedDB v12 ajoute l'index composé statut/échéance/ID. La cloche parcourt cet
+index par pages de 100, avec un curseur échéance/ID et une échéance de lecture
+fixe, jusqu'à obtenir 100 cas actionnables ou atteindre la fin. Les anciennes
+lignes liées à une source retirée ou en traitement ne masquent pas les suivantes.
+La mémoire reste bornée à une page et au résultat. Les Reviews terminales
+en attente deviennent disponibles; le report humain écrit une échéance à
+24 heures, préservée dans l'export. Une saisie `fournisseur:identifiant` ou une
+URL fournisseur exacte utilise les ports d'hydratation et leur cadence; un ID
+nu reste limité à une identité locale unique pour ne pas deviner son fournisseur.
+La validation installée utilise un profil Chromium isolé et les commandes CDP
+du navigateur. Elle vérifie l'import réel d'un lien exclu, zéro ligne Review
+créée et l'affichage de l'état local. Sans origine de site configurée, aucun
+content script n'est enregistré dans le manifeste. Chrome 140 est le minimum
+déclaré pour la restriction native des zones de stockage utilisées.
 
 ## Matrice des 30 écarts
 

@@ -40,6 +40,10 @@ Import atomique source/artefact/tâche, aucune Review créée. Source→Work dir
 Review optionnelle. Résultats stricts : RESOLVED, REVIEW_REQUIRED avec
 AMBIGUOUS ou NOT_FOUND, UNSUPPORTED, RETRYABLE. Seul l'humain confirme no-match.
 La cloche affiche uniquement les ambiguïtés et introuvables actionnables.
+Le choix humain accepte une identité du jeu effectivement comparé, même sans
+fiche préalable en bibliothèque. Le commit relit la révision, crée la fiche et
+ses aliases explicitement confirmés, et lie la source atomiquement. Un résultat
+NOT_FOUND terminé garde la saisie manuelle et la confirmation no-match actives.
 
 Ordre : ID/URL exact, règle origine/route, artefact/aliases, fiche locale
 hydratée, lookup owner-scoped via Worker, recherche fournisseur locale,

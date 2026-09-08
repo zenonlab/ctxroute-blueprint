@@ -17,6 +17,8 @@ import { useLocalReviewNavigation } from './use-local-review-navigation';
 import { useQuickPreferences } from './use-quick-preferences';
 import { CollectiveSettings } from '../entrypoints/options/CollectiveSettings';
 import { useFavoriteOwner } from './use-favorite-owner';
+import { ResolutionStatus } from '../entrypoints/options/ResolutionStatus';
+import { useResolutionStatus } from './use-resolution-status';
 
 export type ExtensionSurfaceName = 'agenda' | 'library' | 'options' | 'popup' | 'review';
 
@@ -123,7 +125,8 @@ function AgendaSurface() {
 function OptionsSurface() {
   const settings = useLocalOrganizerSettings();
   const owner = useFavoriteOwner();
-  return <><Settings {...settings} /><CollectiveSettings {...owner} /></>;
+  const resolution = useResolutionStatus();
+  return <><Settings {...settings} /><ResolutionStatus {...resolution} /><CollectiveSettings {...owner} /></>;
 }
 
 function PopupSurface() {

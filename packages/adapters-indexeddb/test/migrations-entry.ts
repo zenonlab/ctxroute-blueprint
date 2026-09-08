@@ -2,7 +2,9 @@ import Dexie from 'dexie';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
-import { TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { importFavoriteSources, readReviewQueue } from '@tobirink/application';
+import { createFavoriteSource, createReview, favoriteSourceId, reviewId } from '@tobirink/domain';
 
 async function deleteDatabase(name: string): Promise<void> {
   await Dexie.delete(name);
@@ -100,6 +102,7 @@ async function seedVersion8(name: string, version = 8): Promise<void> {
     libraries: '&id', organizer: '&id', progress: '&id, workId, kind', reminders: '&id, agendaEntryId, channel',
     reviews: '&id, status, matchedWorkId', works: version >= 10 ? '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys' : '&id, mediaKind, preferredTitle',
   });
+  if (version >= 11) database.version(version).stores({ providerIdentityRecovery: '&id' });
   await database.table('works').bulkAdd(versionThree.works);
   await database.table('reviews').add(resolvedReview);
   await database.table('favoriteSources').add(favoriteSource);
@@ -107,6 +110,7 @@ async function seedVersion8(name: string, version = 8): Promise<void> {
 }
 
 async function verifySuccessfulMigration(name: string, seed: (databaseName: string) => Promise<void>, expectedSources = 0): Promise<void> {
+  document.body.dataset.phase = name;
   await seed(name);
   const database = new TobirinkDatabase(name);
   const migrated = await database.works.toArray();
@@ -120,13 +124,14 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 11 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 12 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   database.close();
 }
 
 async function verifyInterruptedMigration(name: string): Promise<void> {
+  document.body.dataset.phase = 'interrupted-v2';
   await seedVersion1(name);
   const interrupted = new Dexie(name);
   interrupted.version(1).stores({ works: '&id, mediaKind, title' });
@@ -149,6 +154,54 @@ async function verifyInterruptedMigration(name: string): Promise<void> {
   if (JSON.stringify(records) !== JSON.stringify(before.works)) throw new Error('Interrupted migration published partial state.');
 }
 
+async function verifyReviewCorrection(name: string): Promise<void> {
+  document.body.dataset.phase = 'review-v11-seed';
+  await seedVersion8(name, 11);
+  const legacy = new Dexie(name);
+  await legacy.open();
+  const pending = Array.from({ length: 150 }, (_, index) => ({ id: `review_legacy_${index.toString().padStart(6, '0')}`, sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic legacy' }));
+  await legacy.table('reviews').bulkAdd([...pending, { id: 'review_zz_terminal', reason: 'NOT_FOUND', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic terminal' }]);
+  await legacy.table('reviews').add({ id: 'review_4_3432', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic voyager' });
+  await legacy.table('favoriteSources').add({ ...favoriteSource, bookmarkId: '42', id: 'source_4_3432', reviewId: 'review_4_3432', title: 'Synthetic voyager', url: 'https://reader.example/manga/voyager' });
+  legacy.close();
+  const storage = new DexieStoragePort(name);
+  document.body.dataset.phase = 'review-v12-index';
+  const visible = await storage.listReviews({ actionableOnly: true, limit: 100, status: 'pending' });
+  if (visible.length !== 1 || visible[0]?.id !== 'review_zz_terminal') throw new Error('Legacy pending rows starved the terminal Review index.');
+  document.body.dataset.phase = 'review-correction-import';
+  try {
+    await importFavoriteSources([
+      { bookmarkId: '42', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic voyager', url: 'https://reader.example/manga/voyager' },
+      { bookmarkId: 'invalid', folderPath: [], order: -1, state: 'eligible', title: 'Invalid fixture', url: 'https://reader.example/manga/invalid' },
+    ], storage, '2026-09-08T00:00:00.000Z');
+    throw new Error('Invalid batch unexpectedly committed.');
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes('non-negative')) throw error;
+  }
+  if (await storage.getFavoriteResolutionReceipt('source_4_3432:correction-v1')) throw new Error('Correction receipt escaped rollback.');
+  if ((await storage.database.favoriteSources.get('source_4_3432'))?.reviewId !== 'review_4_3432') throw new Error('Correction source escaped rollback.');
+  await importFavoriteSources([{ bookmarkId: '42', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic voyager', url: 'https://reader.example/manga/voyager' }], storage, '2026-09-08T00:00:00.000Z');
+  const receipt = await storage.getFavoriteResolutionReceipt('source_4_3432:correction-v1');
+  if (receipt?.correction?.review?.id !== 'review_4_3432') throw new Error('Correction did not preserve the legacy Review.');
+  if ((await storage.database.favoriteSources.get('source_4_3432'))?.reviewId !== undefined) throw new Error('Artificial Review remained linked.');
+  if (!await storage.database.reviews.get('review_4_3432')) throw new Error('Correction removed the historical Review.');
+  const counts = await storage.readFavoriteResolutionCounts();
+  if (counts.processing !== 1 || counts.retryable !== 0 || counts.unsupported !== 0) throw new Error('Indexed processing counts included unobserved legacy records.');
+  document.body.dataset.phase = 'review-queue-pagination';
+  for (let index = 0; index < 100; index += 1) {
+    await storage.putReview(createReview({ availableAt: '1970-01-01T00:00:00.000Z', id: reviewId(`review_orphan_${index.toString().padStart(6, '0')}`), reason: 'NOT_FOUND', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic orphan' }));
+  }
+  const actionable = createReview({ availableAt: '1970-01-02T00:00:00.000Z', id: reviewId('review_page_actionable'), reason: 'NOT_FOUND', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic actionable' });
+  await storage.putReview(actionable);
+  await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'page', folderPath: [], id: favoriteSourceId('source_page_actionable'), importedAt: '2026-09-08T00:00:00.000Z', order: 0, resolution: { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, reviewId: actionable.id, title: actionable.title, url: 'https://reader.example/actionable' }));
+  const queue = await readReviewQueue(storage);
+  if (queue.items.length !== 1 || queue.items[0]?.id !== actionable.id) throw new Error('Indexed queue lost the actionable entry beyond an orphan page.');
+  storage.database.close();
+  const reopened = new DexieStoragePort(name);
+  if (JSON.stringify(await reopened.getFavoriteResolutionReceipt(receipt.id)) !== JSON.stringify(receipt)) throw new Error('Correction receipt did not survive reopening.');
+  reopened.database.close();
+}
+
 const versionOneName = `tobirink-migration-v1-${Date.now()}`;
 const versionTwoName = `tobirink-migration-v2-${Date.now()}`;
 const versionThreeName = `tobirink-migration-v3-${Date.now()}`;
@@ -158,6 +211,7 @@ const versionEightName = `tobirink-migration-v8-${Date.now()}`;
 const versionNineName = `tobirink-migration-v9-${Date.now()}`;
 const versionTenName = `tobirink-migration-v10-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
+const reviewCorrectionName = `tobirink-migration-review-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
@@ -168,11 +222,12 @@ try {
   await verifySuccessfulMigration(versionNineName, (name) => seedVersion8(name, 9), 1);
   await verifySuccessfulMigration(versionTenName, (name) => seedVersion8(name, 10), 1);
   await verifyInterruptedMigration(interruptedName);
+  await verifyReviewCorrection(reviewCorrectionName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
 } catch (error) {
   document.body.dataset.status = 'failed';
-  document.body.textContent = error instanceof Error ? error.message : String(error);
+  document.body.textContent = `${document.body.dataset.phase}: ${error instanceof Error ? error.message : String(error)}`;
 } finally {
   await deleteDatabase(versionOneName);
   await deleteDatabase(versionTwoName);

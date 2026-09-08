@@ -68,6 +68,10 @@ const webAgendaReadRequestSchema = z.object({
 });
 
 export const webReviewSnapshotSchema = z.object({
+  reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
+  matchLevel: boundedText(100).optional(),
+  provenance: boundedText(100).optional(),
+  totalCandidates: z.number().int().min(0).max(1000).optional(),
   candidates: z.array(z.object({
     candidateId: boundedText(128),
     mediaKind: z.enum(['anime', 'manga']),
@@ -86,6 +90,7 @@ export const webReviewDecisionCommandSchema = z.object({
     z.object({ kind: z.literal('candidate'), workId: workIdSchema }).strict(),
     z.object({ kind: z.literal('manual'), source: z.enum(['id', 'url']), value: boundedText(2048) }).strict(),
     z.object({ kind: z.literal('none') }).strict(),
+    z.object({ kind: z.literal('defer') }).strict(),
   ]),
   reviewId: z.string().regex(/^review_[a-z0-9][a-z0-9_-]{5,}$/u),
   revision: boundedText(256),

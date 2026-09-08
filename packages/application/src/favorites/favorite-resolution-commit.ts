@@ -75,7 +75,8 @@ export async function persistFavoriteResolutionCompletion(
         if (source.presence !== 'observed') throw new Error('STALE_PRIVATE_REFERENCE');
         const id = source.reviewId ?? reviewId(`review_${source.id.slice('source_'.length)}`);
         await session.putReview(createReview({ id, reason: resolution.reason, sourceLabel: source.url, status: 'pending', title: source.title }));
-        if (candidateSet) await session.putFavoriteReviewCandidateSet({ ...candidateSet, reviewId: id });
+        const compared = candidateSet ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };
+        await session.putFavoriteReviewCandidateSet({ ...compared, reviewId: id });
         updated = createFavoriteSource({ ...updated, reviewId: id });
       }
       await session.putFavoriteSource(updated);

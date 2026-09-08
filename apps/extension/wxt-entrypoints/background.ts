@@ -63,7 +63,7 @@ export default defineBackground({
       storage: privateStorage.storage,
       sync: identitySync,
     });
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
@@ -130,6 +130,12 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
+      if (parsed.data.type === 'favorite.status.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, counts: await privateStorage.storage.readFavoriteResolutionCounts() };
+        } catch { return { ok: false, error: 'favorite-status-unavailable' }; }
+      }
       if (parsed.data.type === 'review.queue.read') {
         try {
           await privateStorage.ensureReady();
@@ -149,7 +155,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.decision.write') {
         try {
           await privateStorage.ensureReady();
-          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data);
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, providerPorts);
           return { ok: true, status: review.status };
         } catch (error) {
           return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };

@@ -22,6 +22,20 @@ import { createMemoryFavoriteResolutionSession } from './memory-favorite-resolut
 
 type RecordMap<T> = Map<string, T>;
 
+function readReviews(reviews: RecordMap<Review>, query: Parameters<StoragePort['listReviews']>[0]): readonly Review[] {
+  const { actionableOnly, after, availableBefore = new Date().toISOString(), limit, status } = query;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
+  if (after !== undefined && !actionableOnly) throw new TypeError('Review cursor requires the actionable index.');
+  return [...reviews.values()].filter((review) => review.status === status && (!actionableOnly || review.reason !== undefined && review.availableAt !== undefined && review.availableAt <= availableBefore && (after === undefined || review.availableAt > after.availableAt || review.availableAt === after.availableAt && review.id > after.id)))
+    .sort((left, right) => (actionableOnly ? (left.availableAt ?? '').localeCompare(right.availableAt ?? '') : 0) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+    .slice(0, limit);
+}
+
+function resolutionCounts(sources: RecordMap<FavoriteSource>) {
+  const observed = [...sources.values()].filter((source) => source.presence === 'observed');
+  return { processing: observed.filter((source) => source.resolution === undefined).length, retryable: observed.filter((source) => source.resolution?.kind === 'RETRYABLE').length, unsupported: observed.filter((source) => source.resolution?.kind === 'UNSUPPORTED').length };
+}
+
 interface MemoryState {
   agenda: RecordMap<AgendaEntry>;
   favoriteSources: RecordMap<FavoriteSource>;
@@ -78,6 +92,7 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
     getFavoriteInventoryMark: async (bookmarkId) => { requireStore('favoriteInventoryMarks'); return state.favoriteInventoryMarks.get(bookmarkId); },
     getFavoriteProviderRateCheckpoint: async (provider) => { requireStore('favoriteProviderRateCheckpoints'); return state.favoriteProviderRateCheckpoints.get(provider); },
     getFavoriteResolutionReceipt: async (id) => { requireStore('favoriteResolutionReceipts'); return state.favoriteResolutionReceipts.get(id); },
+    readFavoriteResolutionCounts: async () => { requireStore('favoriteSources'); return resolutionCounts(state.favoriteSources); },
     getFavoriteReviewCandidateSet: async (reviewId) => { requireStore('favoriteReviewCandidateSets'); return state.favoriteReviewCandidateSets.get(reviewId); },
     getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); return state.agenda.get(id); },
     getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); return state.favoriteSources.get(id); },
@@ -115,13 +130,9 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, limit);
     },
-    listReviews: async ({ limit, status }) => {
+    listReviews: async (query) => {
       requireStore('reviews');
-      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
-      return [...state.reviews.values()]
-        .filter((review) => review.status === status)
-        .sort((left, right) => left.id.localeCompare(right.id))
-        .slice(0, limit);
+      return readReviews(state.reviews, query);
     },
     listReviewsByWorkId: async (query) => {
       requireStore('reviews');
@@ -191,6 +202,7 @@ export class MemoryStoragePort implements StoragePort {
   getFavoriteInventoryMark: StoragePort['getFavoriteInventoryMark'] = (bookmarkId) => this.session().getFavoriteInventoryMark(bookmarkId);
   getFavoriteProviderRateCheckpoint: StoragePort['getFavoriteProviderRateCheckpoint'] = (provider) => this.session().getFavoriteProviderRateCheckpoint(provider);
   getFavoriteResolutionReceipt: StoragePort['getFavoriteResolutionReceipt'] = (id) => this.session().getFavoriteResolutionReceipt(id);
+  readFavoriteResolutionCounts: StoragePort['readFavoriteResolutionCounts'] = () => this.session().readFavoriteResolutionCounts();
   getFavoriteReviewCandidateSet: StoragePort['getFavoriteReviewCandidateSet'] = (reviewId) => this.session().getFavoriteReviewCandidateSet(reviewId);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);

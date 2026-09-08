@@ -5958,7 +5958,7 @@
         {
           "id": "step-6",
           "title": "Migration additive et Review actionnable",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Décisions humaines conservées; anciennes pending masquées sans suppression, tâches réenfilées et reçus reprenables",
             "Seules versions automatiques fautives invalidées; Review distingue ambigu/introuvable/en cours/panne/unsupported et actions humaines complètes"
@@ -5979,7 +5979,8 @@
             "docs/decisions/ADR-0034-favorite-source-authority.md",
             "docs/decisions/ADR-0037-favorite-analysis-contract.md",
             "docs/architecture/src/tobirink.architecture.json",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "apps/web/app/components/SiteShell.tsx"
           ],
           "commands": [
             "npm run test:migrations",
@@ -6000,7 +6001,15 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'fix(review): show only actionable resolution failures'"
           ],
-          "evidence": []
+          "evidence": [
+            "Migration v12 et correction d’import transactionnelle avec reçus/before-images: anciennes pending conservées hors cloche, décisions humaines/versions inconnues préservées; rollback et reprise validés Chromium et Firefox 151.",
+            "Candidats comparés sélectionnables, hydratation manuelle exacte avec relecture de révision, report 24h, confirmation no-match et compteurs hors cloche; application 259, extension 112, UI 126 et Workbench 12 passent. La lecture des candidats terminaux ne dépend plus de la bibliothèque.",
+            "Chromium 153 installé en profil isolé: import ordinaire exclu, panne fournisseur réessayable, zéro Review créée et état local UI vérifiés. Builds sans site corrigés, Chrome minimum 140; sécurité extension 8 et Worker 13 passent.",
+            "Raccord SiteShell.tsx approuvé et appliqué: motifs et report transmis au site; test du vrai WebBridge avec transport synthétique, 12 tests Workbench et 9 tests web, typecheck et lint passent.",
+            "Pagination Review corrigée: curseur échéance/ID exclusif et pages de 100 jusqu’à 100 cas actionnables. Test après 100 sources en traitement et test IndexedDB après 100 orphelines passent dans Chromium et Firefox 151.",
+            "Validation globale essayée: npm run verify bloque sur la configuration MCP Codex préexistante conservée. Suites produit séparées, budgets existants et audit dépendances passent; oracle réel non encore accessible. Archify all, docs, types, anti-slop et diff revalidés.",
+            "CRG exécuté: risque 0,60, 105 lacunes de couverture signalées par le graphe; les suites comportementales citées constituent les preuves de cette étape, sans prétendre à une couverture exhaustive."
+          ]
         },
         {
           "id": "step-7",

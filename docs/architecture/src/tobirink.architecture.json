@@ -146,7 +146,7 @@
       "id": "ui",
       "type": "frontend",
       "label": "UI extension",
-      "sublabel": "Bibliothèque / Review / Agenda",
+      "sublabel": "Review paginée / état local hors cloche",
       "pos": [
         430,
         640

@@ -27,7 +27,8 @@ export default defineConfig({
       extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
     },
     description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
-    externally_connectable: { matches: externallyConnectableMatches },
+    externally_connectable: siteOrigin ? { matches: externallyConnectableMatches } : undefined,
+    minimum_chrome_version: browser === 'chrome' ? '140' : undefined,
     host_permissions: [
       'https://api.mangadex.org/*',
       'https://api.mangaupdates.com/*',

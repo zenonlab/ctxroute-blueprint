@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createFavoriteSource, createLibrary, createReview, createWork, favoriteSourceId, libraryId, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { localReviewRevisionPort } from './read-review-candidates';
 import { recordReviewDecision } from './record-review-decision';
+import { importFavoriteSources } from './import-favorite-sources';
+import { readLocalReviewCandidates } from './read-local-review-candidates';
 
 async function fixture() {
   const storage = new MemoryStoragePort();
@@ -25,6 +27,54 @@ async function fixture() {
 }
 
 describe('recordReviewDecision', () => {
+  it('defers a terminal Review without creating no-match and rejects a replay of its old revision', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-08T10:00:00.000Z'));
+    try {
+      const { library, review, storage } = await fixture();
+      const terminal = createReview({ ...review, reason: 'NOT_FOUND' });
+      await storage.putReview(terminal);
+      const source = await storage.findFavoriteSourceByReviewId(review.id);
+      if (!source) throw new Error('Expected source.');
+      const terminalSource = createFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' } });
+      await storage.putFavoriteSource(terminalSource);
+      const revision = await localReviewRevisionPort.createRevision({ review: terminal, source: terminalSource });
+      const input = { decision: { kind: 'defer' as const }, libraryId: library.id, reviewId: review.id, revision };
+      expect(await recordReviewDecision(storage, input)).toMatchObject({ availableAt: '2026-09-09T10:00:00.000Z', status: 'pending' });
+      expect(await storage.listReviews({ actionableOnly: true, limit: 100, status: 'pending' })).toEqual([]);
+      await expect(recordReviewDecision(storage, input)).rejects.toThrow(/conflict/u);
+      vi.setSystemTime(new Date('2026-09-09T10:00:00.000Z'));
+      expect(await storage.listReviews({ actionableOnly: true, limit: 100, status: 'pending' })).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('selects an actually compared provider candidate absent from the library and rejects an obsolete set', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ bookmarkId: '42', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic voyager', url: 'https://reader.example/voyager' }], storage, '2026-09-08T00:00:00.000Z');
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const id = reviewId('review_compared');
+    await storage.putReview(createReview({ id, reason: 'AMBIGUOUS', sourceLabel: source.url, status: 'pending', title: source.title }));
+    await storage.putFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: id });
+    const candidate = { canonicalUrl: 'https://anilist.co/anime/123', externalId: '123', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic voyager 1999'] };
+    const set = { candidates: [candidate], digest: 'compared-v1', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: id };
+    await storage.putFavoriteReviewCandidateSet(set);
+    const library = libraryId('library_compared');
+    const snapshot = await readLocalReviewCandidates(storage, { libraryId: library, reviewId: id });
+    const selected = snapshot.candidates[0];
+    if (!selected) throw new Error('Expected candidate.');
+    expect(await storage.getWork(selected.work.id)).toBeUndefined();
+    const input = { decision: { kind: 'candidate' as const, workId: selected.work.id }, libraryId: library, reviewId: id, revision: snapshot.revision };
+    await storage.putFavoriteReviewCandidateSet({ ...set, digest: 'compared-v2' });
+    await expect(recordReviewDecision(storage, input)).rejects.toThrow(/conflict/u);
+    expect(await storage.getWork(selected.work.id)).toBeUndefined();
+    const current = await readLocalReviewCandidates(storage, { libraryId: library, reviewId: id });
+    await recordReviewDecision(storage, { ...input, revision: current.revision });
+    expect(await storage.getFavoriteSource(source.id)).toMatchObject({ matchedWorkId: selected.work.id, resolution: { kind: 'RESOLVED' } });
+    expect(await storage.getLibrary(library)).toMatchObject({ workIds: [selected.work.id] });
+    expect(await storage.getWork(selected.work.id)).toMatchObject({ hydration: { candidate } });
+  });
+
   it('atomically resolves a fresh local candidate', async () => {
     const { library, review, revision, storage, work } = await fixture();
     await expect(recordReviewDecision(storage, { decision: { kind: 'candidate', workId: work.id }, libraryId: library.id, reviewId: review.id, revision })).resolves.toMatchObject({ matchedWorkId: work.id, status: 'resolved' });

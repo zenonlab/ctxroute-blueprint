@@ -26,10 +26,11 @@ function isState(value: string): value is ReviewResolverState {
   return reviewResolverStates.some((state) => state === value);
 }
 
-function ReviewResolverDemo({ state }: { state: ReviewResolverState }) {
+function ReviewResolverDemo({ state, notFound }: { state: ReviewResolverState; notFound: boolean }) {
   const [result, setResult] = useState<ReviewDecision | null>(null);
   const [position, setPosition] = useState(1);
-  const currentItem = state === 'partial' ? { ...item, candidates: [], position } : { ...item, position };
+  const currentItem = notFound ? { ...item, candidates: [], position, reason: 'NOT_FOUND' as const }
+    : state === 'partial' ? { ...item, candidates: [], position } : { ...item, position, reason: 'AMBIGUOUS' as const };
   return (
     <section className={styles.preview}>
       <ReviewResolver
@@ -54,9 +55,9 @@ const reviewResolverPreview = definePreview({
   category: 'Métier',
   level: 'domain',
   purpose: 'Résoudre un favori ambigu sans transformer la source en carte candidate.',
-  variants: ['candidate-only'],
+  variants: ['candidate-only', 'not-found'],
   states: [...reviewResolverStates],
-  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file sans candidats en état partiel'],
+  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file sans candidats en état partiel', 'introuvable terminal avec saisie manuelle et report'],
   sources: [
     { label: 'API publique', path: 'features/review/review-resolver/index.ts' },
     { label: 'Contrat', path: 'features/review/review-resolver/review-resolver.contract.ts' },
@@ -74,7 +75,7 @@ const reviewResolverPreview = definePreview({
     'Le format étroit conserve deux cartes sans débordement horizontal',
   ],
   usage: `import { ReviewResolver } from '@tobirink/ui';`,
-  render: ({ state }) => <ReviewResolverDemo key={state} state={isState(state) ? state : 'ready'} />,
+  render: ({ state, variant }) => <ReviewResolverDemo key={`${state}:${variant}`} notFound={variant === 'not-found'} state={isState(state) ? state : 'ready'} />,
 });
 
 export default reviewResolverPreview;

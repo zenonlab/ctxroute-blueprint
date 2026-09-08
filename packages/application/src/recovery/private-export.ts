@@ -67,7 +67,7 @@ const workSchema = z.strictObject({
 });
 const librarySchema = z.strictObject({ id: z.string(), workIds: z.array(z.string()) });
 const progressSchema = z.strictObject({ id: z.string(), kind: z.enum(['chapter', 'episode']), maximum: z.number().optional(), value: z.number(), workId: z.string() });
-const reviewSchema = z.strictObject({ decisionOrigin: z.enum(['human', 'automatic']).optional(), reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(), id: z.string(), matchedWorkId: z.string().optional(), sourceLabel: z.string(), status: z.enum(['pending', 'resolved', 'no-match']), title: z.string() });
+const reviewSchema = z.strictObject({ availableAt: z.iso.datetime().optional(), decisionOrigin: z.enum(['human', 'automatic']).optional(), reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(), id: z.string(), matchedWorkId: z.string().optional(), sourceLabel: z.string(), status: z.enum(['pending', 'resolved', 'no-match']), title: z.string() });
 const agendaSchema = z.strictObject({ availability: z.enum(['confirmed', 'estimated', 'official', 'unavailable']), id: z.string(), occursAt: z.string().optional(), releaseLabel: z.string(), workId: z.string() });
 const reminderSchema = z.strictObject({ agendaEntryId: z.string(), channel: z.enum(['badge', 'native']), enabled: z.boolean(), id: z.string(), leadMinutes: z.number() });
 const favoriteSourceSchema = z.strictObject({
@@ -122,6 +122,7 @@ function materializeSnapshot(input: z.infer<typeof snapshotSchema>): PrivateSnap
     reminders: input.reminders.map((item) => createReminder({ ...item, agendaEntryId: agendaEntryId(item.agendaEntryId), id: reminderId(item.id) })),
     reviews: input.reviews.map((item) => {
       const review: Review = { id: reviewId(item.id), sourceLabel: item.sourceLabel, status: item.status, title: item.title };
+      if (item.availableAt !== undefined) review.availableAt = item.availableAt;
       if (item.matchedWorkId !== undefined) review.matchedWorkId = workId(item.matchedWorkId);
       if (item.reason !== undefined) review.reason = item.reason;
       if (item.decisionOrigin !== undefined) review.decisionOrigin = item.decisionOrigin;

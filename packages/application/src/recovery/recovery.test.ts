@@ -6,6 +6,14 @@ import { createPrivateExport, importPrivateExport, validatePrivateExport } from 
 const empty = { agenda: [], favoriteSources: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
 
 describe('private recovery', () => {
+  it('preserves a deferred actionable Review through export and import', async () => {
+    const review = createReview({ availableAt: '2026-09-09T10:00:00.000Z', id: reviewId('review_deferred'), reason: 'NOT_FOUND', sourceLabel: 'Synthetic source', status: 'pending', title: 'Synthetic voyager' });
+    const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, reviews: [review] }), '2026-09-08T10:00:00.000Z');
+    const restored = new MemoryRecoveryStore(empty);
+    await importPrivateExport(JSON.stringify(value), restored, 'replace-private-state');
+    expect((await restored.readSnapshot()).reviews).toEqual([review]);
+  });
+
   it('creates and validates a versioned export', async () => {
     const review = createReview({ id: reviewId('review_exported'), sourceLabel: 'reader.example', status: 'pending', title: 'Titre privé' });
     const source = createFavoriteSource({ bookmarkId: 'bookmark-exported', folderPath: ['Lectures'], id: favoriteSourceId('source_exported'), importedAt: '2026-09-04T09:00:00.000Z', order: 0, reviewId: review.id, title: 'Titre privé', url: 'https://reader.example/private' });

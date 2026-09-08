@@ -122,5 +122,13 @@ export class TobirinkDatabase extends Dexie {
       works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys',
     });
     this.version(11).stores({ providerIdentityRecovery: '&id' });
+    this.version(12).stores({
+      reviews: '&id, status, matchedWorkId, [status+availableAt+id]',
+      favoriteSources: '&id, &bookmarkId, reviewId, importedAt, matchedWorkId, presence, [presence+resolution.kind]',
+    }).upgrade(async (transaction) => {
+      await transaction.table<Review>('reviews').toCollection().modify((review) => {
+        if (review.reason !== undefined && review.status === 'pending' && review.availableAt === undefined) review.availableAt = '1970-01-01T00:00:00.000Z';
+      });
+    });
   }
 }
