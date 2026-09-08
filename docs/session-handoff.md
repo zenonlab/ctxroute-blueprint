@@ -1,6 +1,41 @@
 # Reprise de session — Wallpaper
 
-## État courant — mode local sans certificat, 8 septembre 2026
+## État courant — redémarrage propre, 8 septembre 2026
+
+À la demande « clean tout redémarre aux propres », contrôle préalable des Réglages :
+`webzenon.background` sélectionné, et non plus Ambre. Les anciens providers
+27759 et 49294 ont été arrêtés par SIGTERM après vérification de leurs exécutables.
+Aucun arrêt de Finder/WallpaperAgent ni changement des préférences Finder.
+
+Le build local `build.By7pIs` est maintenant installé dans
+`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
+Installation : signature valide, catalogue Apple trois thèmes PASS, préflight PASS.
+L'ancien paquet PoC2 est conservé dans
+`dist/pocs/macos-connector/replaced.QgAkhP/previous-app.disabled`.
+L'extension historique `org.wallpaperthemes.nativeprobe.controls.extension` a été
+désenregistrée ; son app est conservée dans
+`dist/pocs/macos-connector/retired.TX2w2g/Native Wallpaper Interactive.disabled`.
+Aucun fichier supprimé. Ne pas relancer ces archives.
+
+Contrôle après relance : un compagnon installé (79609), un provider installé (79777),
+aucun `NativeWallpaperProbe` ni `SurfaceProbe`. Une seule inscription du provider
+PoC2 observée, aucune inscription de l'ancienne extension `controls`.
+Le connecteur reste ouvert avec ses commandes désactivées, sans faux succès.
+Orbite n'est pas confirmé sélectionné : les actions UI sur le catalogue restent
+peu fiables ; le dernier fond confirmé reste `webzenon.background`.
+
+**Blocage natif désormais observé, et non supposé** : le nouveau provider écrit
+`Cannot publish provider status`. Le journal kernel du 8 septembre à 16:56:00
+confirme `WallpaperProvider(79777) deny(1) file-write-create` pour
+`group.org.wallpaperthemes.connectorpoc2.local/Connector-v1/status.json`.
+La sonde CLI locale réussit toujours ; elle ne prouve pas l'accès sous WallpaperAgent.
+Ne pas annoncer le transport local qualifié, ni déduire qu'un certificat est la
+seule solution. Prochaine étape : résoudre ce refus de publication sans retirer
+la sandbox, puis obtenir une quittance et une action visible du vrai provider.
+Ce nettoyage ne modifie ni code, ni contrat, ni diagramme. L'ancien état ci-dessous
+décrit la préparation, pas l'installation actuelle.
+
+## Historique — mode local sans certificat, 8 septembre 2026
 
 L'utilisateur n'a pas de certificat Apple et a demandé le mode de développement.
 `bash pocs/macos-connector/build.sh --development` compile un mode ad hoc explicite
