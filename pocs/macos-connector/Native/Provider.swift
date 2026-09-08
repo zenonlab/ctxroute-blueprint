@@ -3,7 +3,7 @@ import ExtensionFoundation
 import IOSurface
 import os
 
-func extensionLog(_ text: String) { Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "provider").info("\(text, privacy: .public)") }
+func extensionLog(_ text: String) { Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "provider").notice("\(text, privacy: .public)") }
 func traceLog(_ text: String) { extensionLog(text) }
 
 @main final class ConnectorExtension: NSObject, AppExtension {
@@ -22,11 +22,12 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     static let shared = Provider()
     struct Surface {
         let context: CAContext
-        let scene: Scene
+        var scene: Scene
+        var themeID: String
         var suspended: Bool
     }
-    let theme: Theme?
-    var session: Session
+    let themes: [Theme]
+    var sessions: [String: Session]
     var surfaces: [UUID: Surface] = [:]
     let mailbox: Mailbox?
     var signal: WakeSignal?
@@ -35,9 +36,10 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     var sleeping: Bool { screenSleeping || sessionInactive }
     var teardown: [UUID: Task<Void, Never>] = [:]
     init() {
-        theme = try? Theme.load()
-        session = Session(themeID: theme?.theme_id ?? "invalid")
+        themes = (try? Theme.catalog()) ?? []
+        sessions = Dictionary(uniqueKeysWithValues: themes.map { ($0.theme_id, Session(themeID: $0.theme_id)) })
         mailbox = try? Mailbox.shared()
+        if mailbox == nil { extensionLog("App Group unavailable; wallpaper remains independent of app controls") }
         signal = WakeSignal(Mailbox.commandSignal) { [weak self] in self?.receive() }
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
@@ -57,23 +59,39 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         publish()
     }
     func publish(_ receipt: Receipt? = nil) {
-        do { try mailbox?.write(ProviderStatus(session: session, surfaces: surfaces.count, receipt: receipt)) }
+        do {
+            let states = themes.compactMap { theme -> ProviderStatus? in
+                guard let session = sessions[theme.theme_id] else { return nil }
+                return ProviderStatus(session: session,
+                    surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count,
+                    receipt: receipt?.command.theme_id == theme.theme_id ? receipt : nil)
+            }
+            try mailbox?.write(CatalogStatus(themes: states))
+        }
         catch { extensionLog("Cannot publish provider status") }
     }
     func receive() {
         do {
             guard let command = try mailbox?.command() else { publish(); return }
+            guard var session = sessions[command.theme_id] else { return }
             let receipt = session.apply(command)
+            sessions[command.theme_id] = session
             if receipt.status == .applied { apply() }
             publish(receipt)
         } catch { extensionLog("Invalid command rejected") }
     }
     func apply() {
-        for surface in surfaces.values { surface.scene.apply(session.state, suspended: sleeping || surface.suspended) }
+        for surface in surfaces.values {
+            guard let state = sessions[surface.themeID]?.state else { continue }
+            surface.scene.apply(state, suspended: sleeping || surface.suspended)
+        }
         CATransaction.flush()
     }
     func acquire(_ incoming: Incoming) -> AnyObject? {
-        guard let theme,
+        guard let configuration = named(incoming.request, "configuration") as? Data,
+              let themeID = String(data: configuration, encoding: .utf8),
+              let theme = themes.first(where: { $0.theme_id == themeID }),
+              let session = sessions[themeID],
               let id = field(incoming.id, type: UUID.self),
               let size = named(incoming.request, "size") as? CGSize,
               size.width.isFinite, size.height.isFinite,
@@ -83,6 +101,11 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         let scale = (named(incoming.request, "scaleFactor") as? CGFloat) ?? 1
         guard scale.isFinite, (0.5...4).contains(scale) else { return nil }
         if var existing = surfaces[id] {
+            if existing.themeID != themeID {
+                existing.scene = Scene(theme: theme); existing.themeID = themeID
+                existing.scene.resize(size, scale: scale)
+                existing.context.layer = existing.scene.root
+            }
             existing.suspended = false; surfaces[id] = existing
             existing.scene.resize(size, scale: scale); apply(); publish()
             extensionLog("Reused native surface")
@@ -95,7 +118,7 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         let scene = Scene(theme: theme); scene.resize(size, scale: scale)
         scene.apply(session.state, suspended: sleeping)
         context.layer = scene.root
-        surfaces[id] = Surface(context: context, scene: scene, suspended: false)
+        surfaces[id] = Surface(context: context, scene: scene, themeID: themeID, suspended: false)
         CATransaction.flush(); publish()
         extensionLog("Created native surface count=\(surfaces.count)")
         return createRemoteContextXPC(contextId: context.contextId)
@@ -124,7 +147,9 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         }
     }
     func snapshot(_ incoming: Incoming) -> AnyObject? {
-        guard let theme else { return nil }
+        guard let id = field(incoming.id, type: UUID.self),
+              let active = surfaces[id], let theme = themes.first(where: { $0.theme_id == active.themeID }),
+              let session = sessions[active.themeID] else { return nil }
         let size = CGSize(width: 480, height: 270)
         guard let surface = IOSurface(properties: [.width: 480, .height: 270,
             .bytesPerElement: 4, .bytesPerRow: 1920, .allocSize: 518400,
@@ -181,6 +206,7 @@ final class WallpaperXPCHandler: NSObject, WallpaperExtensionXPCProtocol {
     }
     func provideSettingsViewModels(withContentTypes types: Any?, reply: @escaping @Sendable (Any?, Error?) -> Void) {
         Task { @MainActor in
+            Provider.shared.publish()
             let result = makeCatalog(); reply(result, result == nil ? Self.unsupported : nil)
         }
     }

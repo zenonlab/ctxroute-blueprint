@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "theme_id": "org.wallpaperthemes.poc2.amber",
+  "display_name": "Ambre statique — PoC 2",
+  "panel_id": "theme.controls",
+  "background": "32180D",
+  "accent": "FFA34D",
+  "motion_path": "still",
+  "period_seconds": 24,
+  "objects": [
+    {"id": "stone.a", "color": "FFE4A6", "phase": 0.0},
+    {"id": "stone.b", "color": "EF8348", "phase": 0.333},
+    {"id": "stone.c", "color": "C3573A", "phase": 0.666}
+  ],
+  "system_controls": {"placement": "top_left", "items": ["motion", "audio", "interaction", "desktop", "settings"]}
+}

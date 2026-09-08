@@ -10,6 +10,7 @@
     "panel_id": {"$ref": "#/$defs/id"},
     "background": {"$ref": "#/$defs/color"},
     "accent": {"$ref": "#/$defs/color"},
+    "motion_path": {"enum": ["orbit", "wave", "still"]},
     "period_seconds": {"type": "number", "minimum": 4, "maximum": 120},
     "objects": {
       "type": "array", "minItems": 1, "maxItems": 8,

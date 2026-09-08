@@ -10,17 +10,23 @@ import UniformTypeIdentifiers
             print("manifest=\(theme.theme_id) group=\(mailbox.directory.path)")
             return
         }
-        if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--thumbnail" {
-            let scene = Scene(theme: try Theme.load()); scene.resize(CGSize(width: 480, height: 270))
-            guard let context = CGContext(data: nil, width: 480, height: 270, bitsPerComponent: 8,
-                bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-                let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: CommandLine.arguments[2]) as CFURL,
-                    UTType.png.identifier as CFString, 1, nil) else { throw ModelError.invalid("thumbnail") }
-            scene.root.render(in: context)
-            guard let image = context.makeImage() else { throw ModelError.invalid("image") }
-            CGImageDestinationAddImage(destination, image, nil)
-            guard CGImageDestinationFinalize(destination) else { throw ModelError.invalid("PNG") }
+        if CommandLine.arguments.count == 3, ["--thumbnail", "--thumbnails"].contains(CommandLine.arguments[1]) {
+            let all = CommandLine.arguments[1] == "--thumbnails"
+            for theme in try all ? Theme.catalog() : [Theme.load()] {
+                let destinationURL = all
+                    ? URL(fileURLWithPath: CommandLine.arguments[2]).appendingPathComponent(theme.theme_id + ".png")
+                    : URL(fileURLWithPath: CommandLine.arguments[2])
+                let scene = Scene(theme: theme); scene.resize(CGSize(width: 480, height: 270))
+                guard let context = CGContext(data: nil, width: 480, height: 270, bitsPerComponent: 8,
+                    bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                    let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL,
+                        UTType.png.identifier as CFString, 1, nil) else { throw ModelError.invalid("thumbnail") }
+                scene.root.render(in: context)
+                guard let image = context.makeImage() else { throw ModelError.invalid("image") }
+                CGImageDestinationAddImage(destination, image, nil)
+                guard CGImageDestinationFinalize(destination) else { throw ModelError.invalid("PNG") }
+            }
             return
         }
         let app = NSApplication.shared
@@ -30,13 +36,15 @@ import UniformTypeIdentifiers
             existing.activate(options: []); return
         }
         app.setActivationPolicy(.regular)
-        let delegate = try ConnectorApp(theme: Theme.load()); app.delegate = delegate
+        let delegate = try ConnectorApp(themes: Theme.catalog()); app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }
 }
 
 @MainActor final class ConnectorApp: NSObject, NSApplicationDelegate {
-    let theme: Theme
+    let themes: [Theme]
+    var theme: Theme { themes[themePicker.indexOfSelectedItem >= 0 ? themePicker.indexOfSelectedItem : 0] }
+    let themePicker = NSPopUpButton()
     let mailbox: Mailbox?
     var window: NSWindow!
     var signal: WakeSignal?
@@ -46,18 +54,22 @@ import UniformTypeIdentifiers
     let statusLabel = NSTextField(wrappingLabelWithString: "Le provider doit être sélectionné dans les réglages Fond d’écran.")
     var pauseButton: NSButton!
     var effectButton: NSButton!
-    init(theme: Theme) { self.theme = theme; mailbox = try? Mailbox.shared(); super.init() }
+    init(themes: [Theme]) { self.themes = themes; mailbox = try? Mailbox.shared(); super.init() }
     func applicationDidFinishLaunching(_ notification: Notification) {
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 470),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 560),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Wallpaper Connector · PoC 2"
         window.isReleasedWhenClosed = false
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.edgeInsets = NSEdgeInsets(top: 28, left: 28, bottom: 28, right: 28)
-        let title = NSTextField(labelWithString: theme.display_name); title.font = .systemFont(ofSize: 26, weight: .semibold)
+        let title = NSTextField(labelWithString: "Wallpaper Connector"); title.font = .systemFont(ofSize: 26, weight: .semibold)
         let subtitle = NSTextField(wrappingLabelWithString: "Une scène native. Un seul panneau de contrôle.")
         subtitle.textColor = .secondaryLabelColor
         stack.addArrangedSubview(title); stack.addArrangedSubview(subtitle)
+        themePicker.addItems(withTitles: themes.map(\.display_name))
+        themePicker.target = self; themePicker.action = #selector(changeControlTheme)
+        stack.addArrangedSubview(NSTextField(labelWithString: "Thème à contrôler (le fond se choisit dans macOS)"))
+        stack.addArrangedSubview(themePicker)
         let controls = NSStackView(); controls.orientation = .horizontal; controls.spacing = 12
         pauseButton = NSButton(title: "Suspendre", target: self, action: #selector(pause))
         effectButton = NSButton(title: "Accentuer", target: self, action: #selector(effect))
@@ -107,12 +119,15 @@ import UniformTypeIdentifiers
     @objc func pause() { send(observed?.state.paused == true ? .resume : .pause) }
     @objc func effect() { send(observed?.state.highlighted == true ? .unhighlight : .highlight) }
     @objc func check() { refreshAndProbe() }
+    @objc func changeControlTheme() {
+        pending = nil; timeout?.cancel(); observed = nil; refreshAndProbe()
+    }
     func refreshAndProbe() {
         guard pending == nil else { return }
-        do { observed = try mailbox?.status() } catch { observed = nil }
+        do { observed = try mailbox?.status()?.theme(theme.theme_id) } catch { observed = nil }
         setEnabled(false)
         if observed?.theme_id == theme.theme_id { send(.inspect) }
-        else { statusLabel.stringValue = mailbox == nil ? "Transport App Group indisponible." : "Provider absent : sélectionner Orbite dans les réglages Fond d’écran." }
+        else { statusLabel.stringValue = mailbox == nil ? "Transport App Group indisponible." : "Provider sans état confirmé : choisir un thème dans les Réglages ou vérifier son diagnostic." }
     }
     func send(_ action: ThemeAction) {
         guard pending == nil, let mailbox, let observed, observed.theme_id == theme.theme_id else { return }
@@ -130,7 +145,7 @@ import UniformTypeIdentifiers
         }
     }
     func receive() {
-        guard let result = try? mailbox?.status(), result.theme_id == theme.theme_id else { return }
+        guard let result = try? mailbox?.status()?.theme(theme.theme_id) else { return }
         observed = result
         guard let pending else {
             // A status publication alone does not prove current liveness.
@@ -146,5 +161,8 @@ import UniformTypeIdentifiers
         setEnabled(result.surfaces > 0)
         statusLabel.stringValue = "Confirmé par le provider · \(result.surfaces) surface(s) · révision \(result.generation)"
     }
-    func setEnabled(_ enabled: Bool) { pauseButton?.isEnabled = enabled; effectButton?.isEnabled = enabled }
+    func setEnabled(_ enabled: Bool) {
+        pauseButton?.isEnabled = enabled && theme.motion_path != "still"
+        effectButton?.isEnabled = enabled
+    }
 }

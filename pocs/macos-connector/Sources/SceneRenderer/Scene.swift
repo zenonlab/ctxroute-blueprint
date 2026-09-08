@@ -18,7 +18,8 @@ import ThemeModel
     public init(theme: Theme) {
         self.theme = theme
         root.addSublayer(background); root.addSublayer(ring); root.addSublayer(motion)
-        background.colors = [Self.color(theme.background), Self.color("233856")]
+        background.colors = [Self.color(theme.background), Self.color(theme.accent).copy(alpha: 0.22) ?? Self.color(theme.accent)]
+        root.backgroundColor = Self.color(theme.background)
         background.startPoint = CGPoint(x: 0, y: 0); background.endPoint = CGPoint(x: 1, y: 1)
         ring.fillColor = nil; ring.strokeColor = Self.color(theme.accent).copy(alpha: 0.2)
         ring.lineWidth = 2
@@ -37,15 +38,17 @@ import ThemeModel
         background.frame = root.bounds; motion.frame = root.bounds; ring.frame = root.bounds
         let orbit = CGRect(x: size.width * 0.2, y: size.height * 0.24,
                            width: size.width * 0.6, height: size.height * 0.52)
-        ring.path = CGPath(ellipseIn: orbit, transform: nil)
+        ring.path = theme.motion_path == "wave" ? nil : CGPath(ellipseIn: orbit, transform: nil)
         for (index, dot) in dots.enumerated() {
             let phase = theme.objects[index].phase
             let samples = (0...128).map { step -> NSValue in
                 let angle = (Double(step) / 128 + phase) * 2 * Double.pi
-                return NSValue(point: CGPoint(x: orbit.midX + cos(angle) * orbit.width / 2,
-                                               y: orbit.midY + sin(angle) * orbit.height / 2))
+                let x = orbit.midX + cos(angle) * orbit.width / 2
+                let y = orbit.midY + sin(angle * (theme.motion_path == "wave" ? 2 : 1)) * orbit.height / 2
+                return NSValue(point: CGPoint(x: x, y: y))
             }
             dot.position = samples[0].pointValue
+            if theme.motion_path == "still" { continue }
             let animation = CAKeyframeAnimation(keyPath: "position")
             animation.values = samples; animation.duration = theme.period_seconds
             animation.repeatCount = .infinity; animation.beginTime = 0
@@ -67,6 +70,9 @@ import ThemeModel
             motion.beginTime = motion.convertTime(CACurrentMediaTime(), from: nil) - time
         }
         ring.lineWidth = state.highlighted ? 5 : 2
+        for dot in dots {
+            dot.borderColor = Self.color("FFFFFF"); dot.borderWidth = state.highlighted ? 3 : 0
+        }
         ring.strokeColor = Self.color(theme.accent).copy(alpha: state.highlighted ? 0.85 : 0.2)
         CATransaction.commit(); updates += 1
     }

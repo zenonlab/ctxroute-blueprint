@@ -47,8 +47,8 @@ final class ModelTests: XCTestCase {
         try box.write(command)
         XCTAssertEqual(try box.command(), command)
         let receipt = session.apply(command)
-        try box.write(ProviderStatus(session: session, surfaces: 2, receipt: receipt))
-        XCTAssertEqual(try box.status()?.receipt, receipt)
+        try box.write(CatalogStatus(themes: [ProviderStatus(session: session, surfaces: 2, receipt: receipt)]))
+        XCTAssertEqual(try box.status()?.theme("test")?.receipt, receipt)
         try Data(repeating: 1, count: 20_000).write(to: root.appendingPathComponent("command.json"))
         XCTAssertThrowsError(try box.command())
     }
@@ -70,5 +70,24 @@ final class ModelTests: XCTestCase {
         scene.apply(state); XCTAssertFalse(scene.isPaused)
         scene.resize(CGSize(width: 1200, height: 800))
         XCTAssertEqual(scene.root.sublayers?.count, children)
+    }
+    @MainActor func testCatalogAndIndependentThemeStates() throws {
+        let themes = try Theme.catalog()
+        XCTAssertEqual(themes.count, 3)
+        XCTAssertEqual(Set(themes.map(\.theme_id)).count, 3)
+        var first = Session(themeID: themes[0].theme_id)
+        let second = Session(themeID: themes[1].theme_id)
+        _ = first.apply(Command(theme: first.themeID, instance: first.instance, generation: 0, action: .pause))
+        XCTAssertTrue(first.state.paused); XCTAssertFalse(second.state.paused)
+        let status = CatalogStatus(themes: [ProviderStatus(session: first, surfaces: 1), ProviderStatus(session: second, surfaces: 1)])
+        XCTAssertFalse(try XCTUnwrap(status.theme(second.themeID)).state.paused)
+        XCTAssertNil(status.theme("unknown"))
+        for theme in themes {
+            let scene = Scene(theme: theme); scene.resize(CGSize(width: 800, height: 500))
+            XCTAssertEqual(scene.objectIDs, theme.objects.map(\.id))
+            if theme.motion_path == "still" {
+                XCTAssertTrue(scene.root.sublayers?.last?.sublayers?.allSatisfy { $0.animationKeys() == nil } == true)
+            }
+        }
     }
 }

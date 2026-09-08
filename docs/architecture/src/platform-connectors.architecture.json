@@ -11,7 +11,7 @@
     { "kind": "region", "label": "Connecteurs natifs qualifiés séparément", "wraps": ["mac", "windows", "wayland", "gnome", "x11"] }
   ],
   "components": [
-    { "id": "theme", "type": "database", "label": "Package de thème", "sublabel": "Scène · objets · actions · fallbacks", "pos": [80, 110], "size": [220, 90] },
+    { "id": "theme", "type": "database", "label": "Catalogue de thèmes", "sublabel": "Packages · scènes · identités", "pos": [80, 110], "size": [220, 90] },
     { "id": "contract", "type": "backend", "label": "Contrat de thème", "sublabel": "Schéma versionné · identités stables", "pos": [380, 75], "size": [240, 90] },
     { "id": "core", "type": "backend", "label": "Cœur sémantique", "sublabel": "État · transitions · intentions", "pos": [700, 75], "size": [240, 90] },
     { "id": "scene", "type": "frontend", "label": "Hôte de scène", "sublabel": "2D/3D · animation · hit-test", "pos": [380, 215], "size": [240, 90] },

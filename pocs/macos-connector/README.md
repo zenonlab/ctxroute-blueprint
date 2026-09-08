@@ -1,19 +1,19 @@
 # Connecteur macOS — PoC 2
 
-Une app AppKit de contrôle, une extension wallpaper native, un manifeste original.
+Une app AppKit de contrôle, une extension wallpaper native, un catalogue original.
 Pas de fenêtre de décor superposée, de terminal, de ROM, de WebView, de hook souris
 ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
 
 ## Statut et limites
 
-Le code compile avec Swift 6 strict ; les quatre tests XCTest passent. Les deux
+Le code compile avec Swift 6 strict ; les cinq tests XCTest passent. Les deux
 bundles sont signés ad hoc et leur manifeste embarqué est identique. Ce résultat
 n'est **pas** une qualification du wallpaper dans WallpaperAgent : activation,
 Spaces, animation visible, commandes interprocessus et énergie restent à vérifier
 sur la session graphique. L'app ne confirme une action qu'après réception d'une
 quittance du provider ; un fichier d'état ancien ne prouve pas sa présence.
 
-Build testé le 8 septembre : `dist/pocs/macos-connector/build.IEzf9z/Wallpaper Connector PoC 2.app`.
+Build multithème du 8 septembre : `dist/pocs/macos-connector/build.jFuo52/Wallpaper Connector PoC 2.app`.
 Smoke : une fenêtre et `panel_id=theme.controls`. Inspection macOS réelle effectuée :
 libellés lisibles, boutons de scène désactivés quand le provider est absent ; clic
 « Vérifier la connexion » sans faux succès. La capture interne `--smoke` ne restitue
@@ -38,7 +38,11 @@ des interfaces privées : ni stabilité Apple ni distribution App Store garantie
 | `Packaging` | identités et droits des deux bundles |
 | `Tests` | modèle, idempotence, transport fichiers et arbre de calques |
 
-Le provider possède l'état en mémoire pour toutes ses surfaces. L'app envoie des
+Le provider possède une session d'état par `theme_id`, partagée seulement entre les
+surfaces du même thème. Une acquisition porte le choix dans `descriptor.configuration`.
+Lors d'un changement, le CAContext de ce WallpaperID est conservé et son arbre est
+remplacé, pas empilé. Un aperçu d'un autre thème ne modifie pas cette scène.
+L'app envoie des
 intentions, pas des mutations directes. Redémarrer le provider remet la fixture à
 son état initial avec une nouvelle identité d'instance ; aucune persistance de
 préférences n'est revendiquée. Plusieurs processus providers simultanés ne sont
@@ -56,11 +60,16 @@ bash pocs/macos-connector/build.sh
 Le build affiche le chemin du nouveau `.app` dans `dist/pocs/macos-connector/build.*`.
 Il ne remplace aucun build, n'installe rien et ne change pas le wallpaper actif.
 Il utilise uniquement le SDK Apple et les fichiers versionnés ; aucun téléchargement.
+Le build exécute aussi `test-native.sh <app>` : décodage du catalogue par
+`WallpaperSettingsViewModelsXPC` du macOS hôte. Le test a reproduit l'échec initial
+(`sortID`, puis `shouldHideItemLabels` manquants), désormais corrigé. Une compilation
+des shims seuls n'aurait pas détecté ce problème.
 
 L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 
 - `--check` : valide le manifeste et l'accès au répertoire App Group ;
 - `--thumbnail <chemin.png>` : exporte la fixture, sans animer ni ouvrir une fenêtre ;
+- `--thumbnails <répertoire>` : exporte une vignette par thème du catalogue ;
 - `--smoke <chemin.png>` : ouvre le seul panneau, capture son contenu et quitte ;
 - sans argument : ouvre le connecteur.
 
@@ -71,16 +80,25 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
 
 ## Installation et qualification manuelles
 
-1. Copier le `.app` construit dans un emplacement utilisateur stable (Applications).
-   Ne pas écraser une ancienne installation ; la conserver avant remplacement.
+1. Quitter l'app connecteur, puis exécuter `bash pocs/macos-connector/install.sh`
+   suivi du chemin exact du `.app` construit. L'installation vise
+   `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app` ; une version
+   précédente est déplacée dans `dist/pocs/macos-connector/replaced.*/previous-app.disabled`,
+   jamais supprimée. Le script refuse une app encore ouverte et vérifie signature
+   et catalogue avant remplacement.
 2. Ouvrir cette app. Si le provider n'apparaît pas dans les Réglages Fond d'écran,
    enregistrer **son chemin exact** avec `pluginkit -a` sur
    `Contents/Extensions/WallpaperProvider.appex`, puis rouvrir les Réglages.
    Cet enregistrement utilise une interface expérimentale et peut être refusé.
-3. Choisir « Orbite » dans « Wallpaper Connector — PoC2 ». Observer les quatre
+3. Choisir un thème dans « Wallpaper Connector — PoC 2 » (groupe parfois tout en bas).
+   Orbite : quatre objets sur ellipse ; Lagon : cinq objets sur une trajectoire en
+   huit ; Ambre statique : trois objets immobiles, aucune animation créée.
+   Chaque choix possède son manifeste et sa vignette. Observer les
    objets colorés. L'extension est alors hébergée par macOS, pas par l'app.
-4. Dans l'app, « Vérifier la connexion », puis Suspendre/Reprendre et
+4. Dans l'app, sélectionner **le même thème à contrôler**, « Vérifier la connexion », puis Suspendre/Reprendre et
    Accentuer/Atténuer. Vérifier visuellement l'effet et la quittance corrélée.
+   Le sélecteur de l'app ne remplace pas le wallpaper : ce rôle reste aux Réglages.
+   Suspendre est indisponible sur Ambre, qui n'a aucune animation.
 5. Fermer l'app : le wallpaper doit continuer. Revenir : un seul panneau doit exister.
 6. Tester Spaces, Mission Control, verrouillage et veille/reprise. Le provider
    conserve une surface invalidée 15 secondes avant libération pour permettre
@@ -103,11 +121,19 @@ demandée. Fichiers Finder : lien vers le réglage natif, **pas de toggle automa
 Les actions système universelles, UI stylée, import 3D et rig restent dans D1.
 
 Le canal App Group contient seulement `command.json` et `status.json` (16 KiB max),
+ce dernier contient une enveloppe `schema_version: 1, themes: [...]`. Un état de
+l'ancienne tranche monothème est ignoré, jamais pris pour un état confirmé.
 permissions locales restreintes. Une commande comporte instance, génération, UUID
 et expiration à cinq secondes. Dédoublonnage des 32 dernières commandes. Le signal
 Darwin ne contient aucune commande. Les fichiers ne constituent pas une frontière
 contre un processus malveillant du même utilisateur ; aucune exécution shell, URL
 arbitraire ou lecture d'asset fournie par un message n'est permise.
+
+Le macOS hôte a journalisé un refus de groupe protégé lié à la signature ad hoc.
+Un chemin retourné par `containerURL` dans l'app ne prouve pas l'accès sandbox de
+l'extension. Le wallpaper peut être proposé même si ce transport est indisponible ;
+le fonctionnement des boutons exige une quittance réelle et reste distinct de
+l'affichage du catalogue. Aucun contournement TCC ni droit supplémentaire n'est appliqué.
 
 ## Réutilisation et preuves
 

@@ -20,11 +20,11 @@ public struct Mailbox: Sendable {
         return try Mailbox(directory: container.appendingPathComponent("Connector-v1", isDirectory: true))
     }
     public func command() throws -> Command? { try read("command.json") }
-    public func status() throws -> ProviderStatus? { try read("status.json") }
+    public func status() throws -> CatalogStatus? { try read("status.json") }
     public func write(_ command: Command) throws {
         try write(command, name: "command.json"); Self.signal(Self.commandSignal)
     }
-    public func write(_ status: ProviderStatus) throws {
+    public func write(_ status: CatalogStatus) throws {
         try write(status, name: "status.json"); Self.signal(Self.statusSignal)
     }
     private func read<T: Decodable>(_ name: String) throws -> T? {

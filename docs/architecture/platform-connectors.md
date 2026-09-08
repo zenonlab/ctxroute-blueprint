@@ -189,5 +189,5 @@ manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et rel
 sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-SHA-256 de la source : `8a459e7b395d9e47418e434306e7c3201e204296de95ebcdbd514f0814ee6f13`.
-SHA-256 de l'artefact : `5af1820f54d739bcc72bc6ad5501968e0dfcea86655a29729ca53b7a081bb4ca`.
+SHA-256 de la source : `99e62197bedc232f664705dfff8545e9c45b5b3c843e2ec5b3dcab8f35b63962`.
+SHA-256 de l'artefact : `e1e860d9bdff37e3e195fa15ac987a135d9ab93847d6f581885254deae8dc7a4`.

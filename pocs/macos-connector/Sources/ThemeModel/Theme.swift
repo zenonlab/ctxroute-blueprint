@@ -16,20 +16,38 @@ public struct Theme: Codable, Equatable, Sendable {
     public let panel_id: String
     public let background: String
     public let accent: String
+    public let motion_path: String?
     public let period_seconds: Double
     public let objects: [Object]
     public let system_controls: Controls
 
-    public static func load(bundle: Bundle? = nil) throws -> Theme {
+    public static func load(bundle: Bundle? = nil, resource: String = "theme") throws -> Theme {
         #if SWIFT_PACKAGE
         let source = bundle ?? Bundle.module
         #else
         let source = bundle ?? Bundle.main
         #endif
-        guard let url = source.url(forResource: "theme", withExtension: "json") else {
+        guard resource.range(of: "^[a-z-]+$", options: .regularExpression) != nil,
+              let url = source.url(forResource: resource, withExtension: "json") else {
             throw ModelError.invalid("manifest missing")
         }
         return try decode(Data(contentsOf: url))
+    }
+
+    public static func catalog(bundle: Bundle? = nil) throws -> [Theme] {
+        #if SWIFT_PACKAGE
+        let source = bundle ?? Bundle.module
+        #else
+        let source = bundle ?? Bundle.main
+        #endif
+        guard let url = source.url(forResource: "catalog", withExtension: "json") else { throw ModelError.invalid("catalog missing") }
+        let data = try Data(contentsOf: url)
+        guard data.count <= 4096 else { throw ModelError.invalid("catalog size") }
+        let names = try JSONDecoder().decode([String].self, from: data)
+        guard (1...8).contains(names.count) else { throw ModelError.invalid("catalog count") }
+        let themes = try names.map { try load(bundle: source, resource: $0) }
+        guard Set(themes.map(\.theme_id)).count == themes.count else { throw ModelError.invalid("duplicate theme") }
+        return themes
     }
 
     public static func decode(_ data: Data) throws -> Theme {
@@ -40,6 +58,7 @@ public struct Theme: Codable, Equatable, Sendable {
               (1...80).contains(theme.display_name.count),
               (4...120).contains(theme.period_seconds),
               validColor(theme.background), validColor(theme.accent),
+              [nil, "orbit", "wave", "still"].contains(theme.motion_path),
               (1...8).contains(theme.objects.count),
               Set(theme.objects.map(\.id)).count == theme.objects.count,
               theme.objects.allSatisfy({ validID($0.id) && validColor($0.color) && (0..<1).contains($0.phase) }),
@@ -140,5 +159,15 @@ public struct ProviderStatus: Codable, Sendable {
     public init(session: Session, surfaces: Int, receipt: Receipt? = nil) {
         theme_id = session.themeID; instance = session.instance; generation = session.generation
         state = session.state; self.surfaces = surfaces; self.receipt = receipt
+    }
+}
+
+public struct CatalogStatus: Codable, Sendable {
+    public let schema_version: Int
+    public let themes: [ProviderStatus]
+    public init(themes: [ProviderStatus]) { schema_version = 1; self.themes = themes }
+    public func theme(_ id: String) -> ProviderStatus? {
+        guard schema_version == 1, themes.count <= 8 else { return nil }
+        return themes.first { $0.theme_id == id }
     }
 }

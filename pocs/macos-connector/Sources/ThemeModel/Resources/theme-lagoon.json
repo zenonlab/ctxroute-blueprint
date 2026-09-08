@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "theme_id": "org.wallpaperthemes.poc2.lagoon",
+  "display_name": "Lagon — PoC 2",
+  "panel_id": "theme.controls",
+  "background": "032D35",
+  "accent": "4CF3C5",
+  "motion_path": "wave",
+  "period_seconds": 12,
+  "objects": [
+    {"id": "pearl.a", "color": "A5FFE1", "phase": 0.0},
+    {"id": "pearl.b", "color": "4AD9E8", "phase": 0.2},
+    {"id": "pearl.c", "color": "E4FFD9", "phase": 0.4},
+    {"id": "pearl.d", "color": "27BAA1", "phase": 0.6},
+    {"id": "pearl.e", "color": "A3D6FA", "phase": 0.8}
+  ],
+  "system_controls": {"placement": "top_left", "items": ["motion", "audio", "interaction", "desktop", "settings"]}
+}

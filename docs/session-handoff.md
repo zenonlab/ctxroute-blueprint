@@ -9,12 +9,18 @@ Le travail actuel est le [PoC macOS 2](pocs/macos-connector-poc2.md) : app conne
 native, adaptateur wallpaper séparé, manifeste canonique et panneau logique unique.
 Ne pas poursuivre `pocs/macos-surface/` ou `pocs/macos-native-wallpaper/` pour y ajouter
 des fonctions produit. La première tranche est dans `pocs/macos-connector/` :
-Foundation, Core Animation, app AppKit et extension native. Quatre XCTest passent,
-build macOS 26 Swift 6 signé ad hoc ; App Group accessible depuis le binaire signé.
-Identité séparée `org.wallpaperthemes.connectorpoc2`. Le fond actif n'a pas été changé.
+Foundation, Core Animation, app AppKit et extension native. Cinq XCTest passent,
+build macOS 26 Swift 6 signé ad hoc. Correction du catalogue : champs privés `sortID`
+et `shouldHideItemLabels`, test de décodage Apple intégré au build. Trois thèmes visibles
+dans les Réglages : Orbite, Lagon, Ambre statique ; build 3 installé dans
+`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
+Identité séparée `org.wallpaperthemes.connectorpoc2`. Orbite observé sélectionné par
+l'utilisateur ; acquisition native par WallpaperAgent confirmée. Le contrôle distant
+reste BLOQUÉ : refus sandbox de `status.json` dans l'App Group sans Team ID valide.
+Ne plus déduire l'accès de l'extension à partir d'un `containerURL` obtenu dans l'app.
 L'entrée reste passive, audio absent, toggle Finder indisponible avec accès aux
-Réglages. Prochaine action : sélectionner la nouvelle extension et qualifier M2-03,
-M2-06 et M2-10 en session graphique. Ne pas confondre compilation et preuve d'ancrage.
+Réglages. Prochaine action : résoudre le transport/signature, puis qualifier M2-03,
+M2-06 et M2-10 en session graphique. Ne pas confondre catalogue, acquisition et animation.
 
 La personnalisation est cadrée séparément dans
 [l'architecture de thème](architecture/theme-customization.md) et

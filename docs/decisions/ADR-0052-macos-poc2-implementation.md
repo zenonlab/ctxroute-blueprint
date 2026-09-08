@@ -8,6 +8,7 @@ scope:
   - docs/README.md
   - docs/session-handoff.md
 review: on-change
+revised: true
 ---
 # ADR-0052 — Implémentation isolée du connecteur macOS 2
 
@@ -35,6 +36,15 @@ réveil Darwin sans payload. Le signal ne transporte ni action ni autorité. Com
 génération, identité d'instance, état et quittance sont typés et relus ; une commande
 expire et une seule est en vol. Sans accès au groupe partagé, annoncer indisponible.
 Ce transport local expérimental n'est pas une adoption de production.
+
+Complément multithème : le catalogue énumère des manifestes embarqués, validés et
+uniquement locaux. Une session d'état est isolée par `theme_id` ; une surface
+WallpaperID garde son CAContext et remplace son arbre lors d'un changement de choix.
+Le fichier d'état contient une enveloppe versionnée `themes`, pas un état global
+qui serait modifié par un aperçu d'un autre thème. L'app choisit le thème à contrôler ;
+seuls les Réglages macOS déterminent le wallpaper affecté à un écran/Space.
+Le build doit vérifier le décodage du catalogue par les vraies classes Apple avant
+installation ; les champs requis privés ne sont pas déduits des seuls shims Swift.
 
 Une seule fenêtre de contrôles dans l'app ; aucun panneau copié dans le wallpaper.
 Le renderer est passif. Visibilité Finder et entrée globale restent indisponibles

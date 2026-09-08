@@ -5,7 +5,7 @@
 <key>CFBundleExecutable</key><string>WallpaperProvider</string>
 <key>CFBundleName</key><string>Wallpaper Connector — PoC 2</string>
 <key>CFBundlePackageType</key><string>XPC!</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>CFBundleShortVersionString</key><string>0.2.0</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
 <key>EXAppExtensionAttributes</key><dict>

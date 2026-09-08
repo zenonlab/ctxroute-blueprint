@@ -143,7 +143,28 @@ compté ensemble.
 | M2-10 | capture du panneau et vignette séparées de la revue du vrai bureau, encore requise |
 | M2-11 | repli vers Réglages macOS ; toggle Finder indisponible, critère de lecture/confirmation non satisfait |
 
-Les quatre tests XCTest ne constituent pas onze critères validés. La tranche livrée
+### Correctif du catalogue et tranche multithème — 8 septembre, 15:00
+
+Le catalogue initial échouait dans le vrai décodeur Apple : `sortID` et
+`shouldHideItemLabels` absents. Corrigé et couvert par `test-native.sh`, maintenant
+appelé par le build. Les trois entrées Orbite, Lagon, Ambre statique ont été observées
+dans Réglages Système > Fond d'écran > Wallpaper Connector — PoC 2.
+Le build 3 est installé dans `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
+L'ancienne installation est conservée dans `dist/pocs/macos-connector/replaced.9w0TMf/previous-app.disabled`.
+Le provider précédent a été redémarré seul ; aucun service Apple n'a été arrêté.
+
+Orbite était sélectionné dans la session pendant la vérification. Le nouveau provider
+a été lancé par WallpaperAgent et a créé deux CAContext natifs. Cela prouve acquisition
+et catalogue, pas encore animation, absence de flash ou changement entre les trois scènes.
+Cinq XCTest passent, dont catalogue et indépendance des états par thème.
+
+Blocage M2-06 réel : `containermanagerd` rejette le groupe protégé sans Team ID valide ;
+la sandbox journalise `deny file-write-create .../Connector-v1/status.json`.
+L'app ne reçoit donc aucune quittance. Aucune suppression de sandbox, nouvelle
+permission ou signature fictive n'a été appliquée. Le choix d'une identité de signature
+appropriée ou d'un autre transport doit être résolu avant de qualifier les boutons.
+
+Les cinq tests XCTest ne constituent pas onze critères validés. La tranche livrée
 permet de commencer la qualification, elle ne clôt pas M2. Le provider repose sur
 les interfaces privées Apple héritées d'une révision épinglée de Phosphene ; aucune
 garantie publique Apple n'est ajoutée par le découpage du code.
