@@ -1,5 +1,31 @@
 # Reprise de session — Wallpaper
 
+## État courant — nettoyage demandé le 8 septembre 2026
+
+Les trois compagnons ont été arrêtés après vérification de leur chemin exécutable :
+`WallpaperConnector`, `NativeWallpaperProbeHost` et `SurfaceProbe`. Le panneau
+« Commandes de l’objet » provenait de `Wallpaper Desktop PoC`, pas du PoC2.
+Aucun processus de ces trois compagnons ne subsiste au contrôle après arrêt.
+Aucun LaunchAgent utilisateur correspondant ni service correspondant dans
+`launchctl list` n'a été trouvé. Les extensions natives PoC1 et PoC2 restent
+chargées par macOS : ne pas annoncer un retrait complet des wallpapers.
+
+Aucun fichier, build ou réglage Finder n'a été supprimé/modifié. Aucun service
+Apple n'a été arrêté. Ne relancer aucun ancien prototype automatiquement.
+Le remplacement du fond expérimental par un fond macOS uni a été proposé à
+l'utilisateur ; son accord reste attendu avant modification des Réglages.
+Le retrait des extensions et l'archivage des applications installées restent à faire
+après remplacement du fond ; les chemins ci-dessous décrivent l'historique.
+
+La demande d'interface reste non implémentée : deux commandes discrètes en haut
+à gauche (son du thème, fichiers bureau), clic gauche pour lancer l'action liée,
+clic droit sur objet pour personnaliser, clic droit dans le vide pour ajouter.
+Les icônes Finder doivent conserver la priorité. Le PoC2 passif et son transport
+App Group bloqué ne constituent pas encore cette interface.
+Ce nettoyage d'exécution ne change aucun contrat ni diagramme d'architecture.
+
+## Historique technique — ne constitue pas une consigne de relancement
+
 Mise à jour du 8 septembre 2026 : le PoC macOS 1 est gelé. Son dernier état comporte
 deux représentations de panneau, deux fixtures et plusieurs chemins de diagnostic ;
 ils restent utiles comme preuves mais ne forment pas l'application cible.
