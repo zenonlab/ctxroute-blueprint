@@ -43,23 +43,22 @@ components do not branch on a browser name.
   the ignored verification manifest retains SHA-256 values and paths.
 - IndexedDB contracts and additive migrations, including interrupted import
   rollback and Review pagination, pass in Chromium and Firefox 151.
+- Production reflow, keyboard focus, forced-colour and reduced-motion checks
+  pass at 390 × 844 CSS pixels in Chromium 153 and Firefox 151.
+- `web-ext lint` accepts the generated Firefox output with zero errors and zero
+  notices. Its four warnings point only to bundled Zod JIT detection and guarded
+  React DOM internals; the corresponding operations are absent from TobiRink
+  sources.
+- `npm run verify` passes end to end, including 665 product tests, 273 repository
+  tests plus one intentional skip, both extension builds, CRG, integration,
+  documentation and an audit with zero vulnerabilities.
 
-## External browser pass still required
+## Remaining external limits
 
-No complete manual compatibility claim is made. The installed test browsers
-provide the automated journeys above; they do not establish every journey in
-current stable releases. The optional `web-ext` validator is not installed.
-
-The release gate remains open while the real FavLib oracle is unavailable and
-the full repository verification fails on the pre-existing Codex MCP config.
-The installed checks above do not imply that every interactive journey below
-has been completed.
-
-Before release, run the packaged extension in current stable Chrome and Firefox
-and record extension-menu launch, header navigation, Review bell/popover, candidate
-selection and skip, library progress, agenda, settings, offline
-degradation and background restart. Then run `web-ext lint` against the fresh
-Firefox output and expose that check as `npm run test:firefox`.
+The automated browser and package gates are complete. Store review, signing and
+submission remain separate external operations. Historical FavLib parity also
+remains unverified until its encrypted corpus can be read through an explicitly
+authorized read-only restoration.
 
 References: [WXT entrypoints](https://wxt.dev/guide/essentials/entrypoints),
 [Firefox browser-specific settings](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings),

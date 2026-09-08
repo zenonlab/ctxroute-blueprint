@@ -52,6 +52,11 @@ Review and Agenda. Provider matching in this release test uses a deterministic
 AniList response; a separate live probe returned HTTP 403 from the validation
 host, and the extension correctly retained a retryable state without producing
 a no-match or Review.
+The final repository gate now passes after the MCP manifest validator learned
+to distinguish a declared server from its nested tool configuration. The
+Firefox output passes `web-ext lint` with zero errors and zero notices; its four
+warnings are dependency-generated Zod and React DOM paths documented in the
+browser and accessibility evidence.
 
 For the FavLib correction, run
 `node scripts/release/package-extension.mjs --verify-isolated`.

@@ -68,9 +68,10 @@ test('desktop Workbench renders real bridge projections and navigation', async (
   expect(consoleErrors).toEqual([]);
 });
 
-test('Library keeps filters in the URL and remains bounded on mobile', async ({ page }) => {
+test('Library keeps filters, reflow, focus and accessibility media modes on mobile', async ({ page }) => {
   await installBridge(page);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await page.goto('/library?search=%C5%93uvre&facet=anime');
   await expect(page.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__libraryReads)).toBe(1);
@@ -78,7 +79,9 @@ test('Library keeps filters in the URL and remains bounded on mobile', async ({ 
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.keyboard.press('Tab');
-  expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+  await expect(page.locator(':focus-visible')).toHaveCount(1);
+  expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches && matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+  await expect(page.locator('a[data-variant="library"]').first()).toHaveCSS('transition-duration', '0s');
 });
 
 test('connected empty Library matches the Workbench empty surface', async ({ page }) => {
