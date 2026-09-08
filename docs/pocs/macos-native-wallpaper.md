@@ -1,5 +1,21 @@
 # Sonde native macOS — paquet local de test
 
+## Version 12 — scène épurée, 8 septembre 2026
+
+La version 12 retire les trois ancres purement diagnostiques « Objet terminal »,
+« Orbe lumineux » et « Borne reset ». Elles n'appartenaient pas au modèle de course
+et donnaient l'impression que le package contenait déjà un terminal. Le wallpaper
+conserve la piste, les quatre véhicules, leurs animations et les effets internes.
+Le schéma accepte maintenant une liste d'ancres vide ; les actions du panneau restent
+disponibles au compagnon sans produire d'objets décoratifs artificiels.
+
+Preuves isolées : 16 contrôles d'asset, 6 contrôles de hit-test, 21 contrôles de
+calques, trois rendus distincts et 19 contrôles du package signé. Le build préparé est
+`dist/pocs/macos-native-wallpaper/compile.tKxmve/Native Wallpaper Probe.app`.
+Il est enregistré, mais WallpaperAgent n'a pas remplacé automatiquement le provider
+v11 déjà sélectionné. La sélection du provider v12 dans Réglages macOS reste donc une
+étape manuelle avant de revendiquer son rendu composé.
+
 ## Version 11 — véhicules dans le wallpaper, 8 septembre 2026
 
 Après constat que la première couche AppKit dessinait les véhicules devant Finder,

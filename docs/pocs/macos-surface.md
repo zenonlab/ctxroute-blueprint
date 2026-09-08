@@ -1,6 +1,6 @@
 # L1 — Sonde de surface macOS
 
-État au 7 septembre 2026 : implémenté, qualification L1 partielle.
+État au 8 septembre 2026 : implémenté, qualification L1 partielle.
 Décision : [ADR-0043](../decisions/ADR-0043-isolated-macos-surface-poc.md).
 Le [schéma produit](../architecture/src/macos-surface-poc.architecture.json)
 montre uniquement cette sonde ; aucun lien au terminal ou à l'ingestion.
@@ -20,10 +20,21 @@ une progression angulaire naïve dérivait auparavant hors des véhicules visibl
 
 Le mode overlay n'utilise plus de `NSPanel` mobile par objet. Un `CGEventTap` actif
 calcule la position courante au clic puis applique un hit-test de `112×70` autour du
-véhicule. Seul un impact confirmé est consommé, empêchant macOS d'exécuter aussi
-« afficher le bureau » ; tout autre clic est transmis. Le tap est désactivé si l'écran
-dort ou si la session devient inactive. Il exige l'autorisation Accessibilité. Le
-wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rechargé.
+véhicule. L'appui et le relâchement d'un impact confirmé sont consommés ensemble.
+Le rectangle du panneau natif est exclu du hit-test global : ses boutons restent
+prioritaires même lorsqu'un véhicule passe derrière eux. Le tap est désactivé si
+l'écran dort ou si la session devient inactive. Il exige l'autorisation Accessibilité.
+Le wallpaper Apple qualifié séparément par ADR-0047 n'est ni arrêté ni rechargé.
+
+Le panneau ne suit plus le véhicule. Il est ancré en haut à droite du bureau et n'est
+repositionné que si la géométrie d'écran change. Les identifiants de diagnostic ne
+sont plus affichés. Il contient un bouton explicite **Masquer/Afficher les fichiers**.
+Cette action modifie la préférence Finder non documentée `CreateDesktop`, puis demande
+à Finder de se relancer. Elle ne déplace et ne supprime aucun fichier. Ce raccord reste
+isolé, réversible, non exécuté par les smokes et à requalifier sur chaque macOS.
+[Les réglages Finder publics documentés par Apple](https://support.apple.com/guide/mac-help/change-finder-settings-on-mac-mchlp2803/mac)
+n'exposent que l'affichage des appareils connectés sur le bureau, pas un interrupteur
+public pour tous les fichiers.
 
 ```sh
 sh pocs/macos-surface/probe.sh test
@@ -31,12 +42,13 @@ sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --duration 1
 sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --smoke --duration 6
 ```
 
-Preuves automatisées du 8 septembre 2026 : 14 tests XCTest réussis. Ils couvrent
+Preuves automatisées du 8 septembre 2026 : 16 tests XCTest réussis. Ils couvrent
 le décodage/validation du thème, le déterminisme, l'ordre stable et une séparation
 minimale des quatre objets sur 41 positions de la courbe. Le smoke overlay réussit
-15 assertions : quatre surfaces, sélection d'identité, ouverture/fermeture du
+16 assertions : quatre surfaces, sélection d'identité, ouverture/fermeture du
 panneau, politique de premier clic, masquage complet du plan dynamique et handlers
-de pause/veille. Son reçu rapporte `input_policy: native-wallpaper-object-overlay`,
+de pause/veille. Il vérifie le contrôle Finder sans l'actionner. Son reçu rapporte
+`input_policy: active-filtered-event-tap`,
 `overlay_only: true` et `window_ordered_visible: false` pour la fenêtre de fond.
 Les clics sont programmatiques et Finder n'était pas au premier plan ; ce résultat
 ne prétend donc pas prouver le clic matériel, l'animation visible ou la priorité

@@ -28,7 +28,7 @@ enum RenderTests {
             precondition(anchorLayers.count == theme.anchors.count)
             precondition(anchorLayers.allSatisfy { root.bounds.contains($0.frame) })
             precondition(anchorLayers.allSatisfy { $0.opacity == 1 })
-            precondition(anchorLayers.first { $0.name == "interactive.anchor.terminal-object" }?.borderWidth == 5)
+            precondition(anchorLayers.isEmpty)
             let vehicles = root.sublayers!.filter { $0.name?.hasPrefix("interactive.vehicle.") == true }
             precondition(vehicles.count == theme.vehicles.count)
             precondition(vehicles.allSatisfy { $0.animation(forKey: "interactive.vehicle.motion") != nil })

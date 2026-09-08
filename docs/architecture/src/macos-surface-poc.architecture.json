@@ -9,8 +9,8 @@
     { "id": "visibility", "type": "backend", "label": "Visibilité bureau", "sublabel": "Masque le hit-test", "pos": [1090, 220], "size": [150, 80] },
     { "id": "wallpaper", "type": "frontend", "label": "Wallpaper natif complet", "sublabel": "Décor et objets animés", "pos": [220, 430], "size": [240, 80] },
     { "id": "objects", "type": "security", "label": "CGEventTap filtré", "sublabel": "Consomme seulement un impact", "pos": [820, 430], "size": [240, 80] },
-    { "id": "panel", "type": "frontend", "label": "Panneau contextuel", "sublabel": "Actions de l’objet", "pos": [1090, 430], "size": [150, 80] },
-    { "id": "desktop", "type": "external", "label": "Bureau macOS", "sublabel": "Finder et compositeur", "pos": [520, 640], "size": [240, 80] }
+    { "id": "panel", "type": "frontend", "label": "HUD natif fixe", "sublabel": "Actions + affichage Finder", "pos": [1090, 430], "size": [150, 80] },
+    { "id": "desktop", "type": "external", "label": "Bureau macOS", "sublabel": "Finder · fichiers inchangés", "pos": [520, 640], "size": [240, 80] }
   ],
   "connections": [
     { "from": "theme", "to": "controller" },
@@ -18,6 +18,7 @@
     { "from": "controller", "to": "wallpaper", "label": "dessine et anime", "labelAt": [340, 365] },
     { "from": "projection", "to": "objects", "label": "teste au clic", "labelAt": [940, 365] },
     { "from": "objects", "to": "panel", "label": "clic ciblé", "labelAt": [1075, 420] },
+    { "from": "panel", "to": "desktop", "label": "bascule affichage", "variant": "dashed", "fromSide": "bottom", "toSide": "right", "via": [[1165, 590], [780, 590], [780, 680]], "labelAt": [970, 586] },
     { "from": "visibility", "to": "projection" },
     { "from": "wallpaper", "to": "desktop" },
     { "from": "objects", "to": "desktop" }

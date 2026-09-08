@@ -41,13 +41,20 @@ Retenir deux plans aux responsabilités asymétriques :
    ne maintient aucun second état de simulation ;
 4. le thème décrit les objets, couleurs, piste et slots dans une ressource externe
    validée ; aucune règle propre à un jeu n'entre dans le cœur ;
-5. en mode wallpaper natif, aucune fenêtre ne suit les objets. Le moniteur est retiré
+5. en mode wallpaper natif, aucune fenêtre ne suit les objets. Le panneau est un HUD
+   natif fixe en haut à droite, repositionné seulement avec la géométrie d'écran ; sa
+   région est exclue du hit-test global afin qu'un objet passant derrière ne reçoive
+   jamais le clic de ses boutons. Le moniteur est retiré
    lors de la veille, d'une session inactive ou de l'arrêt du compagnon. Le fond natif
    reste géré par macOS ;
-6. le tap retourne `nil` uniquement pour un clic confirmé sur un objet afin d'empêcher
+6. le tap retourne `nil` pour l'appui et le relâchement d'un clic confirmé sur un objet afin d'empêcher
    l'action « cliquer sur le fond pour afficher le bureau ». Tous les autres événements
-   sont restitués inchangés. Aucune fenêtre transparente plein écran et aucun polling
-   d'entrée n'est ajouté ; ce mode exige l'autorisation Accessibilité macOS.
+   sont restitués inchangés ;
+7. masquer les fichiers du bureau est une action locale séparée et explicite. Le POC
+   isole l'accès à la préférence Finder non documentée `CreateDesktop`, demande ensuite
+   la relance de Finder, et ne déplace ni ne supprime les fichiers. Aucun smoke ne
+   déclenche cette mutation. Aucune fenêtre transparente plein écran et aucun polling
+   d'entrée n'est ajouté ; le tap exige l'autorisation Accessibilité macOS.
 
 Le mode `desktop --split-input --overlay-only` matérialise la partie hit-test sans
 redessiner le fond, les objets ou des fenêtres mobiles. Le mode `desktop --split-input` historique reste une sonde
@@ -66,6 +73,10 @@ que le compagnon ne sait pas exclure cette icône avant de consommer l'événeme
 wallpaper prendrait incorrectement la priorité. Le test valide architecture,
 déterminisme et absence de fenêtre mobile ; il ne qualifie pas encore la priorité
 d'une icône native, Mission Control, Spaces réels ou le multi-écran.
+
+`CreateDesktop` n'est pas un contrat public Apple. Une rupture sur une version future
+de macOS doit désactiver uniquement ce bouton, sans affecter le wallpaper, les objets
+ou les fichiers. La valeur courante décide toujours du libellé Masquer/Afficher.
 
 Le POC empaquette encore deux fixtures adaptées à leurs schémas respectifs :
 `interactive-theme.json` pour l'extension et `formation-theme.json` pour la sonde.

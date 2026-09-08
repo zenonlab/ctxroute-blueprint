@@ -8,7 +8,7 @@ enum HitTestingTests {
         let bounds = CGRect(x: 0, y: 0, width: 1200, height: 780)
         let terminalPoint = CGPoint(x: 156, y: 109)
         precondition(DiagnosticHitTesting.command(at: terminalPoint, rootBounds: bounds,
-            theme: theme, panelOpen: false, nativeContentHasPriority: false) == .showPanel)
+            theme: theme, panelOpen: false, nativeContentHasPriority: false) == nil)
         precondition(DiagnosticHitTesting.command(at: terminalPoint, rootBounds: bounds,
             theme: theme, panelOpen: false, nativeContentHasPriority: true) == nil)
         precondition(DiagnosticHitTesting.command(at: CGPoint(x: 600, y: 700), rootBounds: bounds,
@@ -24,6 +24,6 @@ enum HitTestingTests {
             theme: theme, panelOpen: false, nativeContentHasPriority: false) == nil)
         precondition(DiagnosticHitTesting.command(at: CGPoint(x: -1, y: -1), rootBounds: bounds,
             theme: theme, panelOpen: true, nativeContentHasPriority: false) == nil)
-        print("PASS: 6 hit-testing checks; native desktop content always suppresses theme intent")
+        print("PASS: 6 hit-testing checks; removed diagnostic anchors emit no theme intent")
     }
 }

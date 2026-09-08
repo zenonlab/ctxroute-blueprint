@@ -10,7 +10,7 @@ enum ThemeTests {
         precondition(theme.actions.count == 7)
         precondition(Set(theme.actions.map(\.command)) == Set(DiagnosticCommand.allCases))
         precondition(theme.actions.allSatisfy { $0.normalizedFrame.x + $0.normalizedFrame.width <= 1 })
-        precondition(theme.anchors.count == 3)
+        precondition(theme.anchors.isEmpty)
         precondition(theme.vehicles.count == 4)
         precondition(theme.track.periodSeconds == 4)
         precondition(theme.panel.normalizedFrame.x + theme.panel.normalizedFrame.width <= 1)
@@ -23,8 +23,6 @@ enum ThemeTests {
             original.replacingOccurrences(of: "\"durationSeconds\": 2.5", with: "\"durationSeconds\": 0"),
             original.replacingOccurrences(of: "\"command\": \"reset\"", with: "\"command\": \"pause\""),
             original.replacingOccurrences(of: "\"x\": 0.28, \"y\": 0.01", with: "\"x\": 0.80, \"y\": 0.01"),
-            original.replacingOccurrences(of: "\"x\": 0.28, \"y\": 0.01", with: "\"x\": 0.04, \"y\": 0.14"),
-            original.replacingOccurrences(of: "\"actionID\": \"reset\"", with: "\"actionID\": \"unknown\""),
             original.replacingOccurrences(of: "\"radiusX\": 0.34", with: "\"radiusX\": 0.60"),
             original.replacingOccurrences(of: "\"id\": \"session-beta\"", with: "\"id\": \"session-alpha\"")
         ]
@@ -40,6 +38,6 @@ enum ThemeTests {
                 preconditionFailure("Invalid fixture \(index) was accepted")
             } catch {}
         }
-        print("PASS: 18 theme asset checks; invalid identity, color, track, vehicles, actions and anchors rejected")
+        print("PASS: 16 theme asset checks; empty anchors accepted; invalid identity, color, track, vehicles and actions rejected")
     }
 }

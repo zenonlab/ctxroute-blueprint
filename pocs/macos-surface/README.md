@@ -28,6 +28,13 @@ objet, afin d'éviter l'action macOS concurrente. Ce mode demande l'autorisation
 Accessibilité. La ressource
 `Resources/formation-theme.json` décrit piste, slots, identités et couleurs ; le
 solveur générique conserve l'ordre et calcule les orientations dans les virages.
+Le panneau d'objet est fixe en haut à droite : aucune fenêtre ne poursuit un véhicule.
+Sa zone est exclue du hit-test global, afin qu'un véhicule situé derrière un bouton ne
+reçoive pas le même clic. Le bouton « Masquer/Afficher les fichiers » bascule la
+préférence Finder non documentée `CreateDesktop`, puis demande la relance de Finder.
+Il ne déplace et ne supprime aucun fichier ; le smoke ne l'actionne jamais.
+Apple ne documente pas cette clé comme API publique : cette capacité est donc un
+adaptateur expérimental macOS, pas une garantie portable du produit.
 `--export-still` crée notre image PNG à côté de la .app, sans changer le fond système.
 Ces deux options exigent le mode desktop ; l'export exige le lancement en .app.
 La fenêtre et sa couche de dessin sont conservées aux changements de Space/réveil.
@@ -53,9 +60,10 @@ il teste la conservation de surface/état, pas le mouvement réel du compositeur
 Le rendu des contrôles natifs dans cette capture hors écran peut être incomplet ;
 elle ne remplace pas l'inspection d'une fenêtre visible.
 
-La surface bureau ignore entièrement la souris, ne devient ni fenêtre clé ni fenêtre
+La surface de fond ignore entièrement la souris, ne devient ni fenêtre clé ni fenêtre
 principale et ne demande pas d'activation. Son menu reçoit des actions explicites.
-Il ne modifie ni fond système, ni Finder, ni permissions, ni démarrage de session.
+Seul le bouton Finder explicite modifie sa préférence d'affichage réversible ; aucune
+modification n'a lieu au lancement, pendant les tests ou sans clic utilisateur.
 
 Le pacing accepte la visibilité AppKit ; sinon, il utilise le repli déclaré
 « Finder au premier plan + surface ordonnée sur Space actif ». Ce repli n'est pas

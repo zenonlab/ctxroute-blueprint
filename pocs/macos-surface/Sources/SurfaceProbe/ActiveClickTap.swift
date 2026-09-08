@@ -11,8 +11,10 @@ final class ActiveClickTap: @unchecked Sendable {
     private let engine: FormationEngine
     private let lock = NSLock()
     private var screenFrame: CGRect
+    private var exclusionFrames: [CGRect] = []
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
+    private var suppressNextLeftMouseUp = false
 
     init(engine: FormationEngine, screenFrame: CGRect) {
         self.engine = engine
@@ -27,7 +29,8 @@ final class ActiveClickTap: @unchecked Sendable {
         guard AXIsProcessTrustedWithOptions([promptKey: promptForAccessibility] as CFDictionary) else {
             return false
         }
-        let mask = CGEventMask(1) << CGEventType.leftMouseDown.rawValue
+        let mask = (CGEventMask(1) << CGEventType.leftMouseDown.rawValue) |
+            (CGEventMask(1) << CGEventType.leftMouseUp.rawValue)
         guard let created = CGEvent.tapCreate(tap: .cgAnnotatedSessionEventTap,
                                               place: .headInsertEventTap,
                                               options: .defaultTap,
@@ -48,6 +51,10 @@ final class ActiveClickTap: @unchecked Sendable {
 
     func update(screenFrame: CGRect) { lock.withLock { self.screenFrame = screenFrame } }
 
+    /// AppKit-coordinate rectangles owned by native controls. Their events must never
+    /// be reclassified as wallpaper-object hits, even when a vehicle passes behind them.
+    func update(exclusionFrames: [CGRect]) { lock.withLock { self.exclusionFrames = exclusionFrames } }
+
     func setEnabled(_ enabled: Bool) {
         guard let current = lock.withLock({ port }) else { return }
         CGEvent.tapEnable(tap: current, enable: enabled)
@@ -63,13 +70,25 @@ final class ActiveClickTap: @unchecked Sendable {
     }
 
     fileprivate func objectHit(at quartzLocation: CGPoint, phaseSeconds: TimeInterval) -> String? {
-        let frame = lock.withLock { screenFrame }
+        let (frame, exclusions) = lock.withLock { (screenFrame, exclusionFrames) }
         let location = CGPoint(x: quartzLocation.x, y: frame.maxY - quartzLocation.y + frame.minY)
         guard frame.contains(location) else { return nil }
+        guard !exclusions.contains(where: { $0.contains(location) }) else { return nil }
         return engine.hitTest(normalizedX: (location.x - frame.minX) / frame.width,
                               normalizedY: (location.y - frame.minY) / frame.height,
                               halfWidth: 56 / frame.width, halfHeight: 35 / frame.height,
                               phaseSeconds: phaseSeconds)
+    }
+
+    fileprivate func consumeMouseUpIfNeeded() -> Bool {
+        lock.withLock {
+            defer { suppressNextLeftMouseUp = false }
+            return suppressNextLeftMouseUp
+        }
+    }
+
+    fileprivate func markMouseDown(consumed: Bool) {
+        lock.withLock { suppressNextLeftMouseUp = consumed }
     }
 }
 
@@ -81,11 +100,18 @@ private func activeClickTapCallback(proxy: CGEventTapProxy, type: CGEventType, e
         tap.setEnabled(true)
         return Unmanaged.passUnretained(event)
     }
-    guard type == .leftMouseDown,
-          let objectID = tap.objectHit(at: event.location,
-                                       phaseSeconds: ProcessInfo.processInfo.systemUptime) else {
+    if type == .leftMouseUp {
+        return tap.consumeMouseUpIfNeeded() ? nil : Unmanaged.passUnretained(event)
+    }
+    guard type == .leftMouseDown else {
         return Unmanaged.passUnretained(event)
     }
+    guard let objectID = tap.objectHit(at: event.location,
+                                      phaseSeconds: ProcessInfo.processInfo.systemUptime) else {
+        tap.markMouseDown(consumed: false)
+        return Unmanaged.passUnretained(event)
+    }
+    tap.markMouseDown(consumed: true)
     OperationQueue.main.addOperation {
         NotificationCenter.default.post(name: .wallpaperObjectHit, object: objectID)
     }

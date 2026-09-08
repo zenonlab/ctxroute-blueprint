@@ -10,22 +10,25 @@ final class SplitDesktopControls {
     let controlsWindow = InputProbePanel(background: ProbeStyle.surface)
     let effectButton = FirstClickButton(title: "Halo", target: nil, action: nil)
     let pauseButton = FirstClickButton(title: "Pause", target: nil, action: nil)
+    let desktopItemsButton = FirstClickButton(title: "Masquer les fichiers", target: nil, action: nil)
     let closeButton = FirstClickButton(title: "Fermer", target: nil, action: nil)
     let status = NSTextField(labelWithString: "")
     private(set) var desktopExposed = false
     private(set) var selectedObjectID: String?
     private let usesObjectWindows: Bool
+    private let labelsByID: [String: String]
 
     var objectButton: DynamicObjectButton { objectButtons[0] }
     var mouseDowns: Int {
         objectButtons.reduce(0) { $0 + $1.mouseDowns } +
-            [effectButton, pauseButton, closeButton].reduce(0) { $0 + $1.mouseDowns }
+            [effectButton, pauseButton, desktopItemsButton, closeButton].reduce(0) { $0 + $1.mouseDowns }
     }
     var visibleObjectCount: Int { objectWindows.filter(\.isVisible).count }
 
     init(theme: FormationTheme, usesObjectWindows: Bool = true, target: AnyObject, open: Selector,
-         effect: Selector, pause: Selector, close: Selector) {
+         effect: Selector, pause: Selector, desktopItems: Selector, close: Selector) {
         self.usesObjectWindows = usesObjectWindows
+        self.labelsByID = Dictionary(uniqueKeysWithValues: theme.objects.map { ($0.id, $0.label) })
         objectWindows = theme.objects.map { _ in InputProbePanel(background: .clear) }
         objectButtons = theme.objects.map { object in
             DynamicObjectButton(objectID: object.id, label: object.label,
@@ -38,14 +41,15 @@ final class SplitDesktopControls {
             window.contentView = button
             button.autoresizingMask = [.width, .height]
         }
-        for (button, action) in [(effectButton, effect), (pauseButton, pause), (closeButton, close)] {
+        for (button, action) in [(effectButton, effect), (pauseButton, pause),
+                                 (desktopItemsButton, desktopItems), (closeButton, close)] {
             button.target = target
             button.action = action
             button.bezelStyle = .rounded
             button.setAccessibilityLabel(button.title)
         }
         controlsWindow.title = "Commandes de l’objet"
-        let buttons = NSStackView(views: [effectButton, pauseButton, closeButton])
+        let buttons = NSStackView(views: [effectButton, pauseButton, desktopItemsButton, closeButton])
         buttons.spacing = 12
         let stack = NSStackView(views: [status, buttons])
         stack.orientation = .vertical
@@ -66,10 +70,13 @@ final class SplitDesktopControls {
             objectButtons[index].headingRadians = object.headingRadians
             objectButtons[index].needsDisplay = true
         }
-        if let selectedObjectID,
-           let selectedIndex = snapshot.objects.firstIndex(where: { $0.id == selectedObjectID }) {
-            let origin = objectWindows[selectedIndex].frame.origin
-            controlsWindow.setFrame(NSRect(x: origin.x, y: origin.y - 116, width: 320, height: 100), display: true)
+        let panelSize = NSSize(width: 470, height: 112)
+        let desktopFrame = desktop.frame
+        let panelFrame = NSRect(x: desktopFrame.maxX - panelSize.width - 24,
+                                y: desktopFrame.maxY - panelSize.height - 48,
+                                width: panelSize.width, height: panelSize.height)
+        if controlsWindow.frame != panelFrame {
+            controlsWindow.setFrame(panelFrame, display: true)
         }
         syncVisibility(panelOpen: controlsWindow.isVisible)
     }
@@ -85,8 +92,8 @@ final class SplitDesktopControls {
     }
 
     func refresh(_ state: ProbeState) {
-        let selected = selectedObjectID ?? "aucun"
-        let label = "Objet : \(selected) · clics : \(mouseDowns) · halo : \(state.effectEnabled ? "oui" : "non")"
+        let selected = selectedObjectID.flatMap { labelsByID[$0] } ?? "Aucune sélection"
+        let label = "\(selected) · effet : \(state.effectEnabled ? "actif" : "inactif")"
         if status.stringValue != label { status.stringValue = label }
         pauseButton.title = state.paused ? "Reprendre" : "Pause"
         for button in objectButtons {

@@ -57,6 +57,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var schedulingSource = "suspended"
     var selectedObjectID: String?
     var activeClickTap: ActiveClickTap?
+    let finderDesktopItems = FinderDesktopItemsController()
     var finderFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder"
 
     init(options: ProbeOptions, formationTheme: FormationTheme) {
@@ -131,7 +132,8 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 splitControls = SplitDesktopControls(theme: formationTheme, usesObjectWindows: !options.overlayOnly,
                     target: self,
                     open: #selector(openDynamicObject(_:)),
-                    effect: #selector(toggleEffect), pause: #selector(togglePause), close: #selector(closePanel))
+                    effect: #selector(toggleEffect), pause: #selector(togglePause),
+                    desktopItems: #selector(toggleDesktopItems), close: #selector(closePanel))
             }
         } else {
             NSApp.setActivationPolicy(.regular)
@@ -195,6 +197,10 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func toggleAnimation() { state.toggleAnimation(); refreshUI() }
     @objc func toggleEffect() { state.toggleEffect(); refreshUI() }
     @objc func togglePause() { state.togglePause(); refreshUI() }
+    @objc func toggleDesktopItems() {
+        if !finderDesktopItems.toggle() { NSSound.beep() }
+        refreshUI()
+    }
     @objc func quit() { finish(reason: "user", code: 0) }
     @objc func deadlineReached() { finish(reason: "deadline", code: options.smoke ? 1 : 0) }
 
@@ -270,6 +276,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let dynamicPlaneExposed = options.splitInput && displaysAwake && sessionActive &&
                 (options.overlayOnly || (finderFrontmost && window.isVisible && window.isOnActiveSpace))
             splitControls?.setDesktopExposed(dynamicPlaneExposed)
+            syncTapExclusions()
         } else {
             state.visibility = appKitVisible ? .visible : .notVisible
         }
@@ -286,6 +293,9 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ui?.panel.isHidden = !state.panelOpen
         splitControls?.update(snapshot: snapshot, desktop: window)
         splitControls?.refresh(state)
+        splitControls?.desktopItemsButton.title = finderDesktopItems.itemsAreVisible
+            ? "Masquer les fichiers" : "Afficher les fichiers"
+        syncTapExclusions()
         ui?.animationButton.title = state.animationRequested ? "Arrêter l’animation" : "Animer"
         ui?.effectButton.title = state.effectEnabled ? "Retirer le halo" : "Activer le halo"
         ui?.pauseButton.title = state.paused ? "Reprendre" : "Pause"
@@ -296,6 +306,12 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         ui?.status.stringValue = "Ticks : \(state.ticks) · pause : \(state.paused) · visibilité AppKit : \(state.visibility.rawValue)\nRéduction des animations : \(state.reducedMotion) · arrêt automatique : \(Int(options.duration)) s"
         syncAnimationTimer()
+    }
+
+    private func syncTapExclusions() {
+        activeClickTap?.update(exclusionFrames: splitControls.map {
+            $0.controlsWindow.isVisible ? [$0.controlsWindow.frame] : []
+        } ?? [])
     }
 
     private func syncAnimationTimer() {
@@ -390,6 +406,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 smokeChecks["split_closes_panel"] = !state.panelOpen && !splitControls.controlsWindow.isVisible
                 smokeChecks["split_first_click_policy"] = splitControls.objectButton.acceptsFirstMouse(for: nil)
                     && splitControls.objectWindows.allSatisfy { !$0.canBecomeKey } && splitControls.mouseDowns == 0
+                smokeChecks["finder_toggle_is_explicit"] = !splitControls.desktopItemsButton.title.isEmpty
                 splitControls.setDesktopExposed(false)
                 smokeChecks["split_hides_off_desktop"] = splitControls.visibleObjectCount == 0
                     && !splitControls.controlsWindow.isVisible
@@ -417,7 +434,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             menu.performActionForItem(at: 3)
             smokeChecks["menu_animation_stop"] = !state.animationRequested && animationTimer == nil
         default:
-            let passed = smokeChecks.count == (options.splitInput ? 15 : 9) && smokeChecks.values.allSatisfy { $0 }
+            let passed = smokeChecks.count == (options.splitInput ? 16 : 9) && smokeChecks.values.allSatisfy { $0 }
             finish(reason: "desktop-handler-smoke", code: passed ? 0 : 1)
         }
     }

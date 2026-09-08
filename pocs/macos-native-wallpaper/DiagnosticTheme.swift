@@ -119,7 +119,7 @@ struct DiagnosticTheme: Decodable, Sendable {
             }
         }
         let actionIDs = Set(actions.map(\.id))
-        guard !anchors.isEmpty, Set(anchors.map(\.id)).count == anchors.count,
+        guard Set(anchors.map(\.id)).count == anchors.count,
               anchors.allSatisfy({ !$0.id.isEmpty && !$0.label.isEmpty
                   && actionIDs.contains($0.actionID) && Self.isValid($0.normalizedFrame) }) else {
             throw ThemeError.invalidAnchors

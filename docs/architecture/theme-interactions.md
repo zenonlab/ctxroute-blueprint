@@ -102,8 +102,16 @@ sépare le wallpaper natif complet et le calcul de hit-test. L'extension possèd
 les pixels du décor et des objets ainsi que leurs animations. Lors d'un clic global,
 le compagnon évalue la même fonction de transformation au temps monotone courant puis
 teste les coordonnées, sans posséder de second état de course. Son `CGEventTap` actif
-supprime uniquement un clic confirmé sur un objet ; les autres événements sont inchangés.
-Aucune fenêtre ne suit les objets et une grande surcouche plein écran est interdite.
+supprime l'appui et le relâchement d'un clic confirmé sur un objet ; les autres événements
+sont inchangés. Aucune fenêtre ne suit les objets et une grande surcouche plein écran
+est interdite. Le panneau natif de la sonde est un HUD fixe ; sa région possède la
+priorité sur les objets mobiles du thème.
+
+Une action d'affichage Finder peut être exposée comme bouton local réversible, mais
+demeure une capacité de l'adaptateur macOS et non une commande portable du langage de
+thème. L'implémentation actuelle utilise la préférence non documentée `CreateDesktop` :
+elle ne doit jamais être déclenchée au chargement ou par un test automatisé, et sa
+défaillance ne doit pas toucher aux fichiers.
 
 Le tap est suspendu avec la session ou les écrans sans faire disparaître ni
 recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection

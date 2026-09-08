@@ -69,10 +69,10 @@ if [[ "${1:-}" == --package ]]; then
     "$probe_extension/Contents/MacOS" "$probe_extension/Contents/Resources"
   cp "$probe_root/pocs/macos-native-wallpaper/Host-Info.plist" "$probe_app/Contents/Info.plist"
   cp "$probe_root/pocs/macos-native-wallpaper/Extension-Info.plist" "$probe_extension/Contents/Info.plist"
-  [[ "$(plutil -extract CFBundleVersion raw "$probe_app/Contents/Info.plist")" == 11 ]] || {
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_app/Contents/Info.plist")" == 12 ]] || {
     echo 'Unexpected host catalog version.' >&2; exit 66;
   }
-  [[ "$(plutil -extract CFBundleVersion raw "$probe_extension/Contents/Info.plist")" == 11 ]] || {
+  [[ "$(plutil -extract CFBundleVersion raw "$probe_extension/Contents/Info.plist")" == 12 ]] || {
     echo 'Unexpected extension catalog version.' >&2; exit 66;
   }
   cp "$probe_stage/NativeWallpaperProbe" "$probe_extension/Contents/MacOS/NativeWallpaperProbe"

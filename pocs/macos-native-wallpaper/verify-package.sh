@@ -44,8 +44,8 @@ require_equal "$(plutil -extract CFBundleIdentifier raw "$host_plist")" \
   org.wallpaperthemes.nativeprobe.controls 'unexpected host bundle identity'
 require_equal "$(plutil -extract CFBundleIdentifier raw "$extension_plist")" \
   org.wallpaperthemes.nativeprobe.controls.extension 'unexpected extension bundle identity'
-require_equal "$(plutil -extract CFBundleVersion raw "$host_plist")" 11 'unexpected host catalog version'
-require_equal "$(plutil -extract CFBundleVersion raw "$extension_plist")" 11 'unexpected extension catalog version'
+require_equal "$(plutil -extract CFBundleVersion raw "$host_plist")" 12 'unexpected host catalog version'
+require_equal "$(plutil -extract CFBundleVersion raw "$extension_plist")" 12 'unexpected extension catalog version'
 require_equal "$(plutil -extract EXAppExtensionAttributes.EXExtensionPointIdentifier raw "$extension_plist")" \
   com.apple.wallpaper 'unexpected extension point'
 [[ -f "$theme_asset" && -f "$schema_asset" && -f "$host_theme_asset" && -f "$host_schema_asset" ]] || \
