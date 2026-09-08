@@ -36,9 +36,24 @@ isolé, réversible, non exécuté par les smokes et à requalifier sur chaque m
 n'exposent que l'affichage des appareils connectés sur le bureau, pas un interrupteur
 public pour tous les fichiers.
 
+Le mode manuel `--persistent` ne programme aucune échéance d'arrêt. Il est réservé au
+bureau hors smoke et export, et se termine explicitement depuis **WP → Arrêter le fond**.
+Le mode borné reste utilisé par tous les tests automatisés.
+Le menu **WP → Fichiers du bureau** duplique volontairement la checkbox du panneau :
+il reste disponible comme voie de récupération si Finder est masqué ou redémarre mal.
+Chaque bascule resynchronise la préférence puis redémarre le service Finder de la
+session utilisateur via `launchctl kickstart` ; aucun fichier n'est déplacé ou supprimé.
+
+Le lanceur assemble le compagnon au chemin stable
+`dist/pocs/macos-surface/stable/Wallpaper Desktop PoC.app`. Les anciens répertoires
+`desktop.*` restent des preuves historiques. Le chemin stable évite une cause de perte
+d'autorisation Accessibilité ; faute d'identité de développement, une modification du
+binaire signé ad hoc peut néanmoins demander une nouvelle autorisation macOS.
+
 ```sh
 sh pocs/macos-surface/probe.sh test
 sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --duration 180
+sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --persistent
 sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --smoke --duration 6
 ```
 
@@ -80,7 +95,7 @@ sh pocs/macos-surface/probe.sh desktop --split-input --export-still --duration 1
 sh pocs/macos-surface/probe.sh desktop --split-input --export-still --smoke --duration 6
 ```
 
-L'export capture seulement notre vue dans `desktop.*/continuity-UUID.png`, à côté
+L'export capture seulement notre vue dans `stable/continuity-UUID.png`, à côté
 de la .app. Il n'applique aucun réglage macOS. Il exclut les panneaux interactifs,
 les fenêtres tierces et les icônes Finder. Il prépare une image de transition,
 sans résoudre les transitions tant que l'image n'est pas appliquée et éprouvée.

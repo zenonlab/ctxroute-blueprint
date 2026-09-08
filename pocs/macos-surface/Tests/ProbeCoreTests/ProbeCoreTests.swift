@@ -10,6 +10,7 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertFalse(options.splitInput)
         XCTAssertFalse(options.exportStill)
         XCTAssertFalse(options.overlayOnly)
+        XCTAssertFalse(options.persistent)
         XCTAssertFalse(ProbeState(interactive: true).shouldAnimate)
     }
 
@@ -20,6 +21,7 @@ final class ProbeCoreTests: XCTestCase {
             ["--exec", "anything"], ["--mode", "window", "--mode", "desktop"],
             ["--smoke", "--smoke"], ["--snapshot"], ["--mode", "desktop", "--smoke", "--snapshot"],
             ["--smoke", "--duration", "3"], ["--split-input"], ["--export-still"],
+            ["--persistent"], ["--mode", "desktop", "--persistent", "--smoke"],
             ["--mode", "desktop", "--split-input", "--split-input"],
             ["--overlay-only"], ["--mode", "desktop", "--overlay-only"],
             ["--mode", "desktop", "--split-input", "--overlay-only", "--export-still"]
@@ -33,6 +35,7 @@ final class ProbeCoreTests: XCTestCase {
         XCTAssertEqual(try ProbeOptions.parse(["--duration", "600"]).duration, 600)
         XCTAssertTrue(try ProbeOptions.parse(["--smoke", "--snapshot", "--duration", "4"]).snapshot)
         XCTAssertTrue(try ProbeOptions.parse(["--mode", "desktop", "--smoke"]).smoke)
+        XCTAssertTrue(try ProbeOptions.parse(["--mode", "desktop", "--persistent"]).persistent)
         let split = try ProbeOptions.parse(["--mode", "desktop", "--split-input", "--export-still"])
         XCTAssertTrue(split.splitInput)
         XCTAssertTrue(split.exportStill)

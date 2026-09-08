@@ -12,9 +12,12 @@ disponibles au compagnon sans produire d'objets décoratifs artificiels.
 Preuves isolées : 16 contrôles d'asset, 6 contrôles de hit-test, 21 contrôles de
 calques, trois rendus distincts et 19 contrôles du package signé. Le build préparé est
 `dist/pocs/macos-native-wallpaper/compile.tKxmve/Native Wallpaper Probe.app`.
-Il est enregistré, mais WallpaperAgent n'a pas remplacé automatiquement le provider
-v11 déjà sélectionné. La sélection du provider v12 dans Réglages macOS reste donc une
-étape manuelle avant de revendiquer son rendu composé.
+Une copie locale stable est installée dans
+`~/Applications/Wallpaper Themes/Native Wallpaper Interactive.app`. Après
+réenregistrement du provider et rafraîchissement de Réglages/WallpaperAgent, la section
+**Native Wallpaper Interactive** et sa tuile **Balayage interactif** ont été observées
+et la tuile est sélectionnée. L'extension active provient de cette copie stable ; les
+chemins temporaires de compilation ne constituent plus la source enregistrée.
 
 ## Version 11 — véhicules dans le wallpaper, 8 septembre 2026
 

@@ -1,5 +1,6 @@
 import AppKit
 import CoreFoundation
+import Darwin
 
 /// Reversible adapter around Finder's undocumented CreateDesktop preference.
 /// It never moves or deletes a desktop item; Finder alone changes their presentation.
@@ -17,9 +18,17 @@ final class FinderDesktopItemsController {
         let target = !itemsAreVisible
         CFPreferencesSetAppValue(preferenceKey, target as CFBoolean, applicationID)
         guard CFPreferencesAppSynchronize(applicationID) else { return false }
-        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else {
-            return true
+        restartFinder()
+        return true
+    }
+
+    private func restartFinder() {
+        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first?.terminate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["kickstart", "-k", "gui/\(getuid())/com.apple.Finder"]
+            do { try process.run() } catch { NSSound.beep() }
         }
-        return finder.terminate()
     }
 }

@@ -55,6 +55,17 @@ Retenir deux plans aux responsabilités asymétriques :
    la relance de Finder, et ne déplace ni ne supprime les fichiers. Aucun smoke ne
    déclenche cette mutation. Aucune fenêtre transparente plein écran et aucun polling
    d'entrée n'est ajouté ; le tap exige l'autorisation Accessibilité macOS.
+8. l'essai manuel peut activer `--persistent` : aucune échéance automatique n'est alors
+   programmée et l'arrêt demeure explicite dans le menu WP. Smokes, exports et fenêtre
+   de diagnostic restent obligatoirement bornés.
+9. la bascule expérimentale `CreateDesktop` est exposée à la fois dans le panneau et
+   dans le menu WP. Après synchronisation de la préférence, le compagnon redémarre le
+   service Finder de la session avec `launchctl kickstart` ; le menu WP constitue la
+   voie de récupération si le panneau n'est pas accessible.
+10. le compagnon de test utilise un chemin de bundle stable sous `dist/` afin de ne pas
+    changer de localisation TCC à chaque lancement. Comme le build local reste signé ad
+    hoc, tout changement de son exécutable peut imposer une nouvelle autorisation
+    Accessibilité ; aucune tentative de contournement n'est permise.
 
 Le mode `desktop --split-input --overlay-only` matérialise la partie hit-test sans
 redessiner le fond, les objets ou des fenêtres mobiles. Le mode `desktop --split-input` historique reste une sonde

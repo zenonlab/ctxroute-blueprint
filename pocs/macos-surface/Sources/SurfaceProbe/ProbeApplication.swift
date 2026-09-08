@@ -83,15 +83,21 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             observeDesktopLifecycle()
             desktopMenu = DesktopMenu(target: self, pause: #selector(togglePause),
                                       animation: #selector(toggleAnimation), effect: #selector(toggleEffect),
-                                      quit: #selector(quit), duration: options.duration, readState: { [weak self] in
+                                      desktopItems: #selector(toggleDesktopItems),
+                                      quit: #selector(quit), duration: options.duration,
+                                      persistent: options.persistent, readState: { [weak self] in
                 self?.state ?? ProbeState(interactive: false)
+            }, readDesktopItems: { [weak self] in
+                self?.finderDesktopItems.itemsAreVisible ?? true
             })
         }
         updateVisibility()
         refreshUI()
         if options.overlayOnly && !options.smoke { installActiveClickTap() }
         if options.exportStill { exportContinuityImage() }
-        schedule(after: options.duration, selector: #selector(deadlineReached))
+        if !options.persistent {
+            schedule(after: options.duration, selector: #selector(deadlineReached))
+        }
         if options.smoke {
             for (index, delay) in [0.25, 0.5, 1.2, 1.6, 2.2, 2.5, 3.2].enumerated() {
                 schedule(after: delay, selector: #selector(smokeStep(_:)), userInfo: index)
@@ -390,7 +396,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         switch step {
         case 0:
             smokeChecks["desktop_ignores_input"] = window.ignoresMouseEvents && !window.canBecomeKey
-            smokeChecks["menu_available"] = menu.numberOfItems == 6
+            smokeChecks["menu_available"] = menu.numberOfItems == 7
         case 1:
             smokeChecks["animation_requested"] = state.animationRequested
             if let splitControls {
@@ -507,6 +513,7 @@ final class ProbeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "input_policy": options.overlayOnly ? "active-filtered-event-tap" :
                 (options.splitInput ? "split-widget-experiment" : (options.mode == .desktop ? "explicit-menu-only" : "window")),
             "overlay_only": options.overlayOnly,
+            "persistent": options.persistent,
             "split_mouse_downs": splitControls?.mouseDowns ?? 0,
             "split_object_count": splitControls?.objectButtons.count ?? 0,
             "split_visible_object_count": splitControls?.visibleObjectCount ?? 0,

@@ -12,14 +12,16 @@ public struct ProbeOptions: Sendable {
     public let splitInput: Bool
     public let exportStill: Bool
     public let overlayOnly: Bool
+    public let persistent: Bool
 
     public static let usage = """
-    SurfaceProbe [--mode window|desktop] [--duration 1...600] [--smoke] [--snapshot]
+    SurfaceProbe [--mode window|desktop] [--duration 1...600] [--persistent] [--smoke] [--snapshot]
     Défaut : fenêtre statique, arrêt après 60 s. Smoke : durée minimale 4 s.
     --snapshot : capture de notre vue seule, uniquement avec --smoke.
     Mode desktop : animé selon activité, clics via menu WP uniquement, sans focus du fond.
     --split-input : essai desktop avec objets cliquables AU-DESSUS des icônes.
     --overlay-only : avec --split-input, conserve le wallpaper natif et n'affiche que les objets.
+    --persistent : bureau uniquement, reste actif jusqu'à « Arrêter le fond ».
     --export-still : export PNG local via la .app desktop, sans changer le fond système.
     """
 
@@ -33,7 +35,7 @@ public struct ProbeOptions: Sendable {
                 throw OptionError.invalid("Option répétée : \(key)")
             }
             switch key {
-            case "--smoke", "--snapshot", "--split-input", "--export-still", "--overlay-only":
+            case "--smoke", "--snapshot", "--split-input", "--export-still", "--overlay-only", "--persistent":
                 flags.insert(key)
             case "--mode", "--duration":
                 index += 1
@@ -62,14 +64,19 @@ public struct ProbeOptions: Sendable {
         let splitInput = flags.contains("--split-input")
         let exportStill = flags.contains("--export-still")
         let overlayOnly = flags.contains("--overlay-only")
+        let persistent = flags.contains("--persistent")
         guard mode == .desktop || (!splitInput && !exportStill) else {
             throw OptionError.invalid("Split input et export still sont réservés au bureau")
         }
         guard !overlayOnly || (mode == .desktop && splitInput && !exportStill) else {
             throw OptionError.invalid("Overlay only exige le mode desktop et split input, sans export still")
         }
+        guard !persistent || (mode == .desktop && !smoke && !exportStill) else {
+            throw OptionError.invalid("Persistent exige le bureau sans smoke ni export")
+        }
         return Self(mode: mode, duration: duration, smoke: smoke, snapshot: snapshot,
-                    splitInput: splitInput, exportStill: exportStill, overlayOnly: overlayOnly)
+                    splitInput: splitInput, exportStill: exportStill, overlayOnly: overlayOnly,
+                    persistent: persistent)
     }
 }
 

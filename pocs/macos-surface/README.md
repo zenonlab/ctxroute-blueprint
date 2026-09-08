@@ -33,6 +33,15 @@ Sa zone est exclue du hit-test global, afin qu'un véhicule situé derrière un 
 reçoive pas le même clic. L'interrupteur « Fichiers du bureau » bascule la
 préférence Finder non documentée `CreateDesktop`, puis demande la relance de Finder.
 Il ne déplace et ne supprime aucun fichier ; le smoke ne l'actionne jamais.
+La même bascule existe dans **WP → Fichiers du bureau** comme commande de secours.
+Le contrôleur redémarre explicitement le service Finder de la session utilisateur via
+`launchctl kickstart` après chaque changement.
+Pour un essai manuel qui ne disparaît pas après dix minutes, ajouter `--persistent`.
+Ce mode reste actif jusqu'à l'action **Arrêter le fond** du menu WP :
+
+```sh
+sh pocs/macos-surface/probe.sh desktop --split-input --overlay-only --persistent
+```
 Apple ne documente pas cette clé comme API publique : cette capacité est donc un
 adaptateur expérimental macOS, pas une garantie portable du produit.
 `--export-still` crée notre image PNG à côté de la .app, sans changer le fond système.
@@ -82,9 +91,11 @@ ne garantit pas ce répertoire. Les caches système du compilateur ne sont pas
 une frontière de sécurité. Aucun nettoyage automatique n'est effectué.
 
 Le reçu JSON final va sur stdout ; les logs de build vont sur stderr.
-Avec `desktop`, une application locale est assemblée dans un dossier `desktop.*`
-unique sous `dist/pocs/macos-surface/`, puis lancée en arrière-plan par macOS.
-Ce dossier conserve `receipt.json` et `stderr.log`. Le lanceur attend sa fin et
+Avec `desktop`, une application locale est assemblée au chemin stable
+`dist/pocs/macos-surface/stable/Wallpaper Desktop PoC.app`, puis lancée en
+arrière-plan par macOS. Cette stabilité évite de changer de localisation TCC à chaque
+lancement. Le build reste signé ad hoc : modifier l'exécutable peut exiger de renouveler
+l'autorisation Accessibilité. Le dossier conserve `receipt.json` et `stderr.log`. Le lanceur attend sa fin et
 reprend le code du reçu ; l'absence de reçu échoue. Un Ctrl-C du lanceur `open`
 ne garantit pas l'arrêt de l'application : elle garde sa durée limite propre.
 Le bundle est de développement, non notarié, jamais installé dans Applications.

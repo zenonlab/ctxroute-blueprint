@@ -32,15 +32,19 @@ case "$poc_action" in
   test) poc_swift test ;;
   desktop)
     poc_swift build >&2
-    poc_launch=$(mktemp -d "$poc_output/desktop.XXXXXX")
+    # Keep one bundle location so TCC does not see a different app path each run.
+    # A changed ad-hoc-signed executable may still require renewed authorization.
+    poc_launch="$poc_output/stable"
     poc_bundle="$poc_launch/Wallpaper Desktop PoC.app"
     mkdir -p "$poc_bundle/Contents/MacOS"
     cp "$poc_root/Info.plist" "$poc_bundle/Contents/Info.plist"
     cp "$poc_output/build/release/SurfaceProbe" "$poc_bundle/Contents/MacOS/SurfaceProbe"
+    poc_started=$(date +%s)
     printf 'Desktop launch diagnostics: %s\n' "$poc_launch" >&2
     /usr/bin/open -g -n -W --stdout "$poc_launch/receipt.json" --stderr "$poc_launch/stderr.log" \
       "$poc_bundle" --args --mode desktop "$@"
-    if [ -s "$poc_launch/receipt.json" ]; then
+    poc_receipt_mtime=$(stat -f %m "$poc_launch/receipt.json" 2>/dev/null || printf '0')
+    if [ -s "$poc_launch/receipt.json" ] && [ "$poc_receipt_mtime" -ge "$poc_started" ]; then
       /bin/cat "$poc_launch/receipt.json"
       poc_exit=$(/usr/bin/plutil -extract exit_code raw -o - "$poc_launch/receipt.json")
       case "$poc_exit" in
