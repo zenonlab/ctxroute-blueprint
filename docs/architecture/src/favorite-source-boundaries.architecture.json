@@ -51,7 +51,7 @@
     { "id": "mangaUpdatesContract", "from": "mangaUpdatesAdapter", "to": "sourceContract", "label": "ID MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[920, 554], [920, 304]], "labelAt": [955, 520] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Autorité", "items": ["Favoris : présence et progression observée", "SourceEvidence ne devient jamais un identifiant de Work"] },
+    { "dot": "emerald", "title": "Autorité", "items": ["Favoris : présence et progression observée", "FavoriteSource : Work direct, Review optionnelle, résultat versionné"] },
     { "dot": "cyan", "title": "Modularité", "items": ["Application possède la sélection pure", "Règles exactes versionnées, distribuées par Worker"] },
     { "dot": "rose", "title": "Sécurité", "items": ["Extraction locale sans code distant", "Mauvaise origine ou conflit ne produit aucun ID"] }
   ]

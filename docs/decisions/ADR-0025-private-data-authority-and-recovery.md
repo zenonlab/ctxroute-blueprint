@@ -51,6 +51,10 @@ Accès réservé au background et aux contextes extension de confiance.
 Reset : rescan favoris, lecture sync, hydratation exacte, aliases, parsing,
 résolution. Les IDs ne reconstruisent pas tout l'historique privé. Les exports
 versionnés et backups chiffrés restent distincts, compatibles et facultatifs.
+Le format d'export privé v4 conserve le lien Work direct, le résultat et ses
+versions, ainsi que le motif et l'origine d'une Review. Les formats v1, v2 et
+v3 restent importables. IndexedDB v9 ajoute uniquement l'index `matchedWorkId`
+des sources; les lignes historiques et leurs liens Review sont conservés.
 Les anciennes enveloppes sync ne sont plus produites; leur retrait n'est pas
 une suppression automatique. Les formats AES-GCM/PBKDF2 existants restent
 inchangés : déchiffrement et validation complète avant remplacement confirmé.

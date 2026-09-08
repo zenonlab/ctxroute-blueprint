@@ -1,11 +1,9 @@
 import {
   createFavoriteObservation,
   createFavoriteSource,
-  createReview,
   favoriteSourceId,
-  reviewId,
 } from '@tobirink/domain';
-import type { FavoriteSourceId, ReviewId } from '@tobirink/domain';
+import type { FavoriteSourceId } from '@tobirink/domain';
 import { createDurableTask, encodeFavoriteResolutionTaskPayload } from '../tasks';
 import { createFavoriteParseArtifactRecord } from '../ports/storage-port';
 import { parseFavoriteObservation } from '../favorites/favorite-parser';
@@ -34,10 +32,6 @@ function sourceIdentity(bookmarkId: string): FavoriteSourceId {
   return favoriteSourceId(`source_${encodedBookmarkIdentity(bookmarkId)}`);
 }
 
-function reviewIdentity(bookmarkId: string): ReviewId {
-  return reviewId(`review_${encodedBookmarkIdentity(bookmarkId)}`);
-}
-
 function resolutionTaskIdentity(bookmarkId: string): string {
   return `favorite-resolution_${encodedBookmarkIdentity(bookmarkId)}`;
 }
@@ -52,23 +46,19 @@ export async function importFavoriteSources(
 
   for (let offset = 0; offset < eligible.length; offset += favoriteImportBatchSize) {
     const batch = eligible.slice(offset, offset + favoriteImportBatchSize);
-    await storage.transaction(['favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources', 'reviews'], async (session) => {
+    await storage.transaction(['favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources'], async (session) => {
       for (const favorite of batch) {
         const id = sourceIdentity(favorite.bookmarkId);
         const existingSource = await session.getFavoriteSource(id);
         const existingArtifact = existingSource === undefined ? undefined : await session.getFavoriteParseArtifact(id);
-        const linkedReviewId = existingSource?.reviewId ?? reviewIdentity(favorite.bookmarkId);
-        const existingReview = await session.getReview(linkedReviewId);
-        const review = createReview(existingReview
-          ? { ...existingReview, sourceLabel: favorite.url, title: favorite.title }
-          : { id: linkedReviewId, sourceLabel: favorite.url, status: 'pending', title: favorite.title });
         const source = createFavoriteSource({
+          ...existingSource,
           bookmarkId: favorite.bookmarkId,
           folderPath: favorite.folderPath,
           id,
           importedAt: existingSource?.importedAt ?? importedAt,
           order: favorite.order,
-          reviewId: review.id,
+          presence: 'observed',
           title: favorite.title,
           url: favorite.url,
         });
@@ -85,16 +75,15 @@ export async function importFavoriteSources(
         });
         const evidence = extractFavoriteSourceEvidence({ sourceKey: source.id, title: favorite.title, url: favorite.url }, sourceAdapters);
         const artifact = parseFavoriteObservation(observation, evidence);
-        await session.putReview(review);
         await session.putFavoriteSource(source);
-        await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord({ artifact, recordedAt: importedAt, reviewId: review.id, sourceId: source.id }));
+        await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord({ artifact, recordedAt: importedAt, sourceId: source.id }));
         if (existingArtifact?.artifact.semanticFingerprint !== artifact.semanticFingerprint) {
           await session.putFavoriteResolutionTask(createDurableTask({
             id: resolutionTaskIdentity(favorite.bookmarkId),
             idempotencyKey: `favorite-resolution:${source.id}:${artifact.semanticFingerprint}`,
             kind: 'favorite-resolution',
             lane: 'routing',
-            payload: encodeFavoriteResolutionTaskPayload({ reviewId: review.id, semanticFingerprint: artifact.semanticFingerprint, sourceId: source.id }),
+            payload: encodeFavoriteResolutionTaskPayload({ semanticFingerprint: artifact.semanticFingerprint, sourceId: source.id }),
           }));
         }
       }

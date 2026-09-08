@@ -69,16 +69,17 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     if (!agendaIds.has(reminder.agendaEntryId)) throw new Error(`Reminder ${reminder.id} references a missing agenda entry.`);
   }
   for (const source of validFavoriteSources) {
-    if (!reviewIds.has(source.reviewId)) throw new Error(`Favorite source ${source.id} references a missing review.`);
+    if (source.matchedWorkId !== undefined && !workIds.has(source.matchedWorkId)) throw new Error('Favorite source references a missing work.');
+    if (source.reviewId !== undefined && !reviewIds.has(source.reviewId)) throw new Error(`Favorite source ${source.id} references a missing review.`);
   }
   for (const record of validFavoriteArtifacts) {
-    if (!sourceIds.has(record.sourceId) || !reviewIds.has(record.reviewId)) throw new Error(`Favorite artifact ${record.sourceId} references missing private data.`);
+    if (!sourceIds.has(record.sourceId) || (record.reviewId !== undefined && !reviewIds.has(record.reviewId))) throw new Error(`Favorite artifact ${record.sourceId} references missing private data.`);
   }
   for (const task of validFavoriteResolutionTasks) {
     if (task.kind !== 'favorite-resolution') throw new Error(`Unexpected favorite resolution task kind ${task.kind}.`);
     const payload = parseFavoriteResolutionTaskPayload(task.payload);
     const artifact = validFavoriteArtifacts.find((record) => record.sourceId === payload.sourceId);
-    if (!sourceIds.has(payload.sourceId) || !reviewIds.has(payload.reviewId) || artifact?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error(`Favorite resolution task ${task.id} references stale private data.`);
+    if (!sourceIds.has(payload.sourceId) || (payload.reviewId !== undefined && !reviewIds.has(payload.reviewId)) || artifact?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error(`Favorite resolution task ${task.id} references stale private data.`);
   }
   for (const receipt of favoriteResolutionReceipts) {
     if (!sourceIds.has(receipt.sourceId) || !receipt.idempotencyKey.trim() || !receipt.effectDigest.trim()) throw new Error(`Favorite resolution receipt ${receipt.id} is invalid.`);

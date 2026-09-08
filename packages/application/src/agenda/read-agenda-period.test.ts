@@ -51,4 +51,16 @@ describe('readAgendaPeriod', () => {
     await expect(readAgendaPeriod(storage, { from: '2026-09-07T00:00:00.000Z', to: '2026-09-14T00:00:00.000Z' })).resolves.toEqual({ items: [], missingWorkIds: [] });
     await expect(readAgendaPeriod(storage, { from: 'invalid', to: '2026-09-14T00:00:00.000Z' })).rejects.toThrow(/canonical ISO/u);
   });
+
+  it('opens an automatically resolved favorite without a Review', async () => {
+    const storage = new MemoryStoragePort();
+    const id = workId('work_direct-agenda');
+    await storage.putWork(createWork({ externalReferences: [], id, mediaKind: 'anime', preferredTitle: 'Synthetic anime' }));
+    await storage.putAgendaEntry(createAgendaEntry({ availability: 'official', id: agendaEntryId('agenda_direct'), occursAt: '2026-09-09T10:00:00.000Z', releaseLabel: 'Episode 1', workId: id }));
+    const source = createFavoriteSource({ bookmarkId: 'direct-agenda', folderPath: [], id: favoriteSourceId('source_direct-agenda'), importedAt: '2026-09-05T20:00:00.000Z', matchedWorkId: id, order: 0, resolution: { kind: 'RESOLVED' }, title: 'Synthetic anime', url: 'https://example.org/anime/title' });
+    await storage.putFavoriteSource(source);
+    const snapshot = await readAgendaPeriod(storage, { from: '2026-09-07T00:00:00.000Z', to: '2026-09-14T00:00:00.000Z' });
+    expect(snapshot.items[0]?.source).toEqual(source);
+    expect(await storage.listReviewsByWorkId({ limit: 100, workId: id })).toEqual([]);
+  });
 });

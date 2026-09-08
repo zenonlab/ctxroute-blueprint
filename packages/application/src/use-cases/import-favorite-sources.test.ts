@@ -16,15 +16,16 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
-  it('atomically creates a private source and pending Review', async () => {
+  it('atomically creates a private source and task without any Review', async () => {
     const storage = new MemoryStoragePort();
     await expect(importFavoriteSources([favorite, { ...favorite, bookmarkId: 'ignored', state: 'ignored' }], storage, importedAt))
       .resolves.toEqual({ ignored: 1, imported: 1 });
 
     const [source] = await storage.listFavoriteSources({ limit: 10 });
     expect(source).toMatchObject({ bookmarkId: '42', folderPath: ['Lectures', 'Manga'], importedAt, order: 3 });
-    expect(source && await storage.getReview(source.reviewId)).toMatchObject({ status: 'pending', title: favorite.title });
-    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt, reviewId: source?.reviewId });
+    expect(source?.reviewId).toBeUndefined();
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
+    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt });
     const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     expect(task).toMatchObject({ availableAt: '1970-01-01T00:00:00.000Z', kind: 'favorite-resolution', state: 'READY' });
     expect(task?.payload).toContain(source?.id);
@@ -36,16 +37,18 @@ describe('importFavoriteSources', () => {
     const [initial] = await storage.listFavoriteSources({ limit: 1 });
     if (!initial) throw new Error('Expected imported source.');
     const work = createWork({ externalReferences: [], id: workId('work_frieren140'), mediaKind: 'manga', preferredTitle: 'Frieren' });
-    await storage.transaction(['works', 'reviews'], async (session) => {
+    const humanReviewId = reviewId('review_human1');
+    await storage.transaction(['works', 'reviews', 'favoriteSources'], async (session) => {
       await session.putWork(work);
-      await session.putReview(createReview({ id: initial.reviewId, matchedWorkId: work.id, sourceLabel: initial.url, status: 'resolved', title: initial.title }));
+      await session.putReview(createReview({ decisionOrigin: 'human', id: humanReviewId, matchedWorkId: work.id, sourceLabel: initial.url, status: 'resolved', title: initial.title }));
+      await session.putFavoriteSource({ ...initial, reviewId: humanReviewId });
     });
 
     const initialTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     await importFavoriteSources([{ ...favorite, folderPath: ['À lire'], order: 0, title: 'Frieren', url: 'https://reader.example/frieren' }], storage, '2026-09-06T01:00:00.000Z');
     const [updated] = await storage.listFavoriteSources({ limit: 1 });
     expect(updated).toMatchObject({ folderPath: ['À lire'], importedAt, order: 0, title: 'Frieren' });
-    expect(updated && await storage.getReview(updated.reviewId)).toMatchObject({ matchedWorkId: work.id, status: 'resolved', title: 'Frieren' });
+    expect(await storage.getReview(humanReviewId)).toMatchObject({ decisionOrigin: 'human', matchedWorkId: work.id, status: 'resolved', title: initial.title });
     const revisedTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     expect(revisedTask).toMatchObject({ state: 'READY' });
     expect(revisedTask?.idempotencyKey).not.toBe(initialTask?.idempotencyKey);

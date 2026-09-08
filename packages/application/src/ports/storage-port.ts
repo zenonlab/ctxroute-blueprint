@@ -3,6 +3,7 @@ import type {
   AgendaEntry,
   AgendaEntryId,
   FavoriteSource,
+  FavoriteResolutionVersions,
   FavoriteSourceId,
   Library,
   LibraryId,
@@ -49,6 +50,7 @@ export interface FavoriteProviderRateCheckpoint {
 }
 
 export interface FavoriteResolutionReceipt {
+  versions?: FavoriteResolutionVersions;
   completedAt: string;
   effectDigest: string;
   id: string;
@@ -66,14 +68,15 @@ export interface FavoriteReviewCandidateSet {
 export interface FavoriteParseArtifactRecord {
   artifact: FavoriteParseArtifact;
   recordedAt: string;
-  reviewId: ReviewId;
+  reviewId?: ReviewId;
   sourceId: FavoriteSourceId;
 }
 
 export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRecord): FavoriteParseArtifactRecord {
   const recordedAt = new Date(input.recordedAt);
   if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
-  return Object.freeze({ ...input, artifact: createFavoriteParseArtifact(input.artifact), reviewId: reviewId(input.reviewId), sourceId: favoriteSourceId(input.sourceId) });
+  const record = { ...input, artifact: createFavoriteParseArtifact(input.artifact), sourceId: favoriteSourceId(input.sourceId) };
+  return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });
 }
 
 export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
@@ -144,6 +147,7 @@ export interface StorageReadPort {
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
   listReviews(query: ReviewListQuery): Promise<readonly Review[]>;
   listReviewsByWorkId(query: ReviewMatchListQuery): Promise<readonly Review[]>;
+  listFavoriteSourcesByWorkId(query: ReviewMatchListQuery): Promise<readonly FavoriteSource[]>;
 }
 
 export interface StorageWritePort {

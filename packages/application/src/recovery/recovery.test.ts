@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFavoriteSource, createOrganizerConfiguration, createReview, favoriteSourceId, reviewId } from '@tobirink/domain';
+import { createFavoriteSource, createOrganizerConfiguration, createReview, createWork, favoriteSourceId, reviewId, workId } from '@tobirink/domain';
 import { MemoryRecoveryStore } from '../../../contracts/src/export/memory-recovery-store';
 import { createPrivateExport, importPrivateExport, validatePrivateExport } from './private-export';
 
@@ -11,7 +11,7 @@ describe('private recovery', () => {
     const source = createFavoriteSource({ bookmarkId: 'bookmark-exported', folderPath: ['Lectures'], id: favoriteSourceId('source_exported'), importedAt: '2026-09-04T09:00:00.000Z', order: 0, reviewId: review.id, title: 'Titre privé', url: 'https://reader.example/private' });
     const organizer = createOrganizerConfiguration({ folders: [{ conditions: { mediaTypes: ['MANGA'] }, id: 'manga', name: 'Manga' }], updatedAt: '2026-09-04T09:30:00.000Z' });
     const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, favoriteSources: [source], organizer, reviews: [review] }), '2026-09-04T10:00:00.000Z');
-    expect(value.version).toBe(3);
+    expect(value.version).toBe(4);
     expect(value.favoriteSources).toEqual([source]);
     expect(value.organizer).toEqual(organizer);
     expect(validatePrivateExport(JSON.stringify(value))).toEqual(value);
@@ -20,7 +20,7 @@ describe('private recovery', () => {
   it('validates everything and requires confirmation before atomic replacement', async () => {
     const store = new MemoryRecoveryStore(empty);
     const value = await createPrivateExport(store, '2026-09-04T10:00:00.000Z');
-    await expect(importPrivateExport(JSON.stringify({ ...value, version: 4 }), store, 'replace-private-state')).rejects.toThrow();
+    await expect(importPrivateExport(JSON.stringify({ ...value, version: 5 }), store, 'replace-private-state')).rejects.toThrow();
     await expect(importPrivateExport(JSON.stringify(value), store, 'no')).rejects.toThrow('confirmation');
     await importPrivateExport(JSON.stringify(value), store, 'replace-private-state');
     expect(store.replaceCount).toBe(1);
@@ -54,5 +54,22 @@ describe('private recovery', () => {
     };
 
     expect(validatePrivateExport(JSON.stringify(legacy)).favoriteSources[0]?.presence).toBe('observed');
+  });
+
+  it('round-trips a direct resolved source without Review and rejects missing identities', async () => {
+    const work = createWork({ externalReferences: [{ externalId: '1', provider: 'anilist' }], id: workId('work_direct'), mediaKind: 'anime', preferredTitle: 'Synthetic title' });
+    const source = createFavoriteSource({ bookmarkId: 'direct', folderPath: [], id: favoriteSourceId('source_direct'), importedAt: '2026-09-04T09:00:00.000Z', matchedWorkId: work.id, order: 0, resolution: { kind: 'RESOLVED' }, resolutionVersions: { decision: 1, matcher: 'test-1', parser: 'test-1', receipt: 1, schema: 1, siteRules: 'test-1' }, title: work.preferredTitle, url: 'https://example.org/anime/1' });
+    const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, favoriteSources: [source], works: [work] }), '2026-09-04T10:00:00.000Z');
+    expect(validatePrivateExport(JSON.stringify(value)).favoriteSources).toEqual([source]);
+    expect(value.reviews).toEqual([]);
+    expect(() => validatePrivateExport(JSON.stringify({ ...value, works: [] }))).toThrow('missing work');
+    expect(() => validatePrivateExport(JSON.stringify({ ...value, favoriteSources: [{ ...source, reviewId: 'review_missing' }] }))).toThrow('missing review');
+    expect(() => validatePrivateExport(JSON.stringify({ ...value, favoriteSources: [{ ...source, resolution: { kind: 'RESOLVED', reason: 'NOT_FOUND' } }] }))).toThrow();
+  });
+
+  it('preserves actionable NOT_FOUND and human no-match through version 3 recovery', () => {
+    const review = createReview({ decisionOrigin: 'human', id: reviewId('review_notfound'), reason: 'NOT_FOUND', sourceLabel: 'https://example.org/title', status: 'no-match', title: 'Synthetic title' });
+    const legacy = { ...empty, exportedAt: '2026-09-04T10:00:00.000Z', format: 'tobirink-private-export', reviews: [review], version: 3 };
+    expect(validatePrivateExport(JSON.stringify(legacy)).reviews).toEqual([review]);
   });
 });

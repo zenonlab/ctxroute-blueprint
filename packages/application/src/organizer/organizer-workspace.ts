@@ -68,13 +68,14 @@ export async function readOrganizerPreview(
     let incomplete = needsUnavailableMetadata(validated.folders);
 
     for (const source of sources) {
-      const review = await session.getReview(source.reviewId);
-      if (review?.status !== 'resolved' || review.matchedWorkId === undefined) {
+      const review = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
+      const matchedWorkId = source.matchedWorkId ?? review?.matchedWorkId;
+      if (matchedWorkId === undefined) {
         incomplete = true;
         contexts.push({ bookmarkId: source.bookmarkId, recognized: false });
         continue;
       }
-      const work = await session.getWork(review.matchedWorkId);
+      const work = await session.getWork(matchedWorkId);
       if (work === undefined) {
         incomplete = true;
         contexts.push({ bookmarkId: source.bookmarkId, recognized: false });

@@ -131,6 +131,14 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, query.limit);
     },
+    listFavoriteSourcesByWorkId: async (query) => {
+      requireStore('favoriteSources');
+      assertReviewMatchListQuery(query);
+      return [...state.favoriteSources.values()]
+        .filter((source) => source.matchedWorkId === query.workId)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .slice(0, query.limit);
+    },
     putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); state.agenda.set(entry.id, entry); },
     putFavoriteBookmarkMutation: async (mutation) => { requireStore('favoriteBookmarkMutations'); state.favoriteBookmarkMutations.set(mutation.bookmarkId, mutation); },
     putFavoriteInventoryCheckpoint: async (checkpoint) => { requireStore('favoriteInventoryCheckpoints'); state.favoriteInventoryCheckpoints.set(checkpoint.id, checkpoint); },
@@ -142,7 +150,7 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
       requireStore('favoriteSources');
       const duplicate = [...state.favoriteSources.values()].find((record) => record.bookmarkId === source.bookmarkId && record.id !== source.id);
       if (duplicate) throw new Error('A bookmark may belong to only one favorite source.');
-      const duplicateReview = [...state.favoriteSources.values()].find((record) => record.reviewId === source.reviewId && record.id !== source.id);
+      const duplicateReview = [...state.favoriteSources.values()].find((record) => source.reviewId !== undefined && record.reviewId === source.reviewId && record.id !== source.id);
       if (duplicateReview) throw new Error('A Review may belong to only one favorite source.');
       state.favoriteSources.set(source.id, source);
     },
@@ -184,6 +192,7 @@ export class MemoryStoragePort implements StoragePort {
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
+  listFavoriteSourcesByWorkId: StoragePort['listFavoriteSourcesByWorkId'] = (query) => this.session().listFavoriteSourcesByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
   putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);

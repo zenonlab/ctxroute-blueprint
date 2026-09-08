@@ -50,6 +50,9 @@ export async function readLocalReviewCandidates(
 
   const found = await searchLocalLibrary(storage, { libraryId: input.libraryId, limit: 6, query: context.review.title });
   const localCandidates = (await Promise.all(found.items.map(async (work) => {
+    const sources = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: work.id });
+    const direct = sources.find((source) => source.presence === 'observed' && isHttpUrl(source.url));
+    if (direct) return Object.freeze({ sourceUrl: direct.url, work });
     const matches = await storage.listReviewsByWorkId({ limit: 100, workId: work.id });
     for (const match of matches) {
       const source = await storage.findFavoriteSourceByReviewId(match.id);

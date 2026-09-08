@@ -1,7 +1,7 @@
 export { createAgendaEntry } from './agenda';
 export type { AgendaAvailability, AgendaEntry } from './agenda';
 export { createFavoriteSource } from './favorite-source';
-export type { FavoriteSource, FavoriteSourceInput } from './favorite-source';
+export type { FavoriteResolutionResult, FavoriteResolutionVersions, FavoriteSource, FavoriteSourceInput } from './favorite-source';
 export { agendaEntryId, favoriteSourceId, libraryId, progressId, reminderId, reviewId, workId } from './identity';
 export type { AgendaEntryId, FavoriteSourceId, LibraryId, ProgressId, ReminderId, ReviewId, WorkId } from './identity';
 export { DomainInvariantError } from './invariant';

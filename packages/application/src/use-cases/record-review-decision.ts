@@ -29,8 +29,9 @@ async function resolveManualWork(
     for (const source of sources) {
       if (source.presence !== 'observed') continue;
       if (source.url !== decision.value.trim()) continue;
-      const review = await session.getReview(source.reviewId);
-      if (review?.matchedWorkId && allowed.has(review.matchedWorkId)) matches.push(review.matchedWorkId);
+      const review = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
+      const matchedWorkId = source.matchedWorkId ?? review?.matchedWorkId;
+      if (matchedWorkId && allowed.has(matchedWorkId)) matches.push(matchedWorkId);
     }
   }
   const unique = [...new Set(matches)];
@@ -39,6 +40,8 @@ async function resolveManualWork(
 }
 
 async function hasResolvedHttpSource(session: StorageSession, workId: WorkId): Promise<boolean> {
+  const sources = await session.listFavoriteSourcesByWorkId({ limit: 100, workId });
+  if (sources.some((source) => source.presence === 'observed' && /^https?:\/\//iu.test(source.url))) return true;
   const reviews = await session.listReviewsByWorkId({ limit: 100, workId });
   for (const review of reviews) {
     const source = await session.findFavoriteSourceByReviewId(review.id);
@@ -77,9 +80,9 @@ export async function recordReviewDecision(
       const titleMatches = candidateTitle.includes(title) || title.includes(candidateTitle);
       const candidateVerified = input.decision.kind === 'manual' || await hasResolvedHttpSource(session, selectedWorkId);
       if (!work || !library?.workIds.includes(work.id) || !titleMatches || !candidateVerified) throw new Error('Review candidate is no longer available.');
-      resolved = createReview({ ...review, matchedWorkId: work.id, status: 'resolved' });
+      resolved = createReview({ ...review, decisionOrigin: 'human', matchedWorkId: work.id, status: 'resolved' });
     } else {
-      resolved = createReview({ ...review, status: 'no-match' });
+      resolved = createReview({ ...review, decisionOrigin: 'human', status: 'no-match' });
     }
     await session.putReview(resolved);
     return resolved;

@@ -99,6 +99,12 @@ export class DexieStoragePort implements StoragePort {
           .map(createReview)
           .sort((left, right) => left.id.localeCompare(right.id));
       },
+      listFavoriteSourcesByWorkId: async (query) => {
+        requireStore('favoriteSources');
+        assertReviewMatchListQuery(query);
+        return (await this.database.favoriteSources.where('matchedWorkId').equals(query.workId).limit(query.limit).toArray())
+          .map(createFavoriteSource);
+      },
       putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); await this.database.agenda.put(createAgendaEntry(entry)); },
       putFavoriteBookmarkMutation: async (mutation) => { requireStore('favoriteBookmarkMutations'); await this.database.favoriteBookmarkMutations.put(Object.freeze({ ...mutation })); },
       putFavoriteInventoryCheckpoint: async (checkpoint) => { requireStore('favoriteInventoryCheckpoints'); await this.database.favoriteInventoryCheckpoints.put(Object.freeze({ ...checkpoint })); },
@@ -108,7 +114,7 @@ export class DexieStoragePort implements StoragePort {
       putFavoriteReviewCandidateSet: async (set) => { requireStore('favoriteReviewCandidateSets'); await this.database.favoriteReviewCandidateSets.put(Object.freeze({ ...set, candidates: Object.freeze([...set.candidates]) })); },
       putFavoriteSource: async (source: FavoriteSource) => {
         requireStore('favoriteSources');
-        const existing = await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
+        const existing = source.reviewId === undefined ? undefined : await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
         if (existing && existing.id !== source.id) throw new Error('A Review may belong to only one favorite source.');
         await this.database.favoriteSources.put(createFavoriteSource(source));
       },
@@ -143,6 +149,7 @@ export class DexieStoragePort implements StoragePort {
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
+  listFavoriteSourcesByWorkId: StoragePort['listFavoriteSourcesByWorkId'] = (query) => this.session().listFavoriteSourcesByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
   putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);

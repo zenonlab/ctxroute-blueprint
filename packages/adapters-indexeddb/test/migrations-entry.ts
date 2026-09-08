@@ -85,6 +85,27 @@ async function seedVersion5(name: string): Promise<void> {
   database.close();
 }
 
+async function seedVersion8(name: string): Promise<void> {
+  const database = new Dexie(name);
+  database.version(8).stores({
+    agenda: '&id, workId, occursAt, availability',
+    favoriteArtifacts: '&sourceId, reviewId, recordedAt, artifact.semanticFingerprint',
+    favoriteBookmarkMutations: '&bookmarkId, sequence, kind',
+    favoriteInventoryCheckpoints: '&id, status, sessionId', favoriteInventoryMarks: '&bookmarkId, sessionId',
+    favoriteProviderRateCheckpoints: '&provider, nextAllowedAt',
+    favoriteResolutionReceipts: '&id, &idempotencyKey, sourceId, completedAt',
+    favoriteResolutionTasks: '&id, &idempotencyKey, kind, lane, state, availableAt, [kind+lane+state+availableAt], [state+claimedAt]',
+    favoriteReviewCandidateSets: '&reviewId, recordedAt',
+    favoriteSources: '&id, &bookmarkId, reviewId, importedAt',
+    libraries: '&id', organizer: '&id', progress: '&id, workId, kind', reminders: '&id, agendaEntryId, channel',
+    reviews: '&id, status, matchedWorkId', works: '&id, mediaKind, preferredTitle',
+  });
+  await database.table('works').bulkAdd(versionThree.works);
+  await database.table('reviews').add(resolvedReview);
+  await database.table('favoriteSources').add(favoriteSource);
+  database.close();
+}
+
 async function verifySuccessfulMigration(name: string, seed: (databaseName: string) => Promise<void>, expectedSources = 0): Promise<void> {
   await seed(name);
   const database = new TobirinkDatabase(name);
@@ -99,7 +120,8 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 8 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 9 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   database.close();
 }
 
@@ -131,6 +153,7 @@ const versionTwoName = `tobirink-migration-v2-${Date.now()}`;
 const versionThreeName = `tobirink-migration-v3-${Date.now()}`;
 const versionFourName = `tobirink-migration-v4-${Date.now()}`;
 const versionFiveName = `tobirink-migration-v5-${Date.now()}`;
+const versionEightName = `tobirink-migration-v8-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
@@ -138,6 +161,7 @@ try {
   await verifySuccessfulMigration(versionThreeName, seedVersion3, 1);
   await verifySuccessfulMigration(versionFourName, seedVersion4, 1);
   await verifySuccessfulMigration(versionFiveName, seedVersion5, 1);
+  await verifySuccessfulMigration(versionEightName, seedVersion8, 1);
   await verifyInterruptedMigration(interruptedName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
@@ -150,5 +174,6 @@ try {
   await deleteDatabase(versionThreeName);
   await deleteDatabase(versionFourName);
   await deleteDatabase(versionFiveName);
+  await deleteDatabase(versionEightName);
   await deleteDatabase(interruptedName);
 }

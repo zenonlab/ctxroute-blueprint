@@ -1,9 +1,10 @@
-import { createReview } from '@tobirink/domain';
-import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, ProviderCandidateEnvelope, Review } from '@tobirink/domain';
+import { createFavoriteSource } from '@tobirink/domain';
+import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { parseFavoriteResolutionTaskPayload } from '../tasks';
+import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
-import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
+import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
+import { favoriteResolutionVersions } from './resolution-result-schema';
 import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, routeFavoriteProviderTiers } from './provider-ports';
@@ -46,39 +47,49 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   return Object.freeze([...new Set(titles)]);
 }
 
-function unresolvedReview(review: Review, status: 'no-match' | 'pending'): Review {
-  return createReview({ id: review.id, sourceLabel: review.sourceLabel, status, title: review.title });
-}
-
 async function retryClaim(
   dependencies: FavoriteResolutionRunnerDependencies,
   task: DurableTask,
   token: string,
   retryAt: string,
+  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
-  if (task.attempt >= favoriteResolutionAttemptLimit) {
-    await dependencies.outbox.block(task.id, token, 'AUTOMATIC_ATTEMPT_LIMIT');
-    return 'blocked';
-  }
-  await dependencies.outbox.retry(task.id, token, retryAt);
-  return 'retried';
+  const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
+  await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
+    const payload = parseFavoriteResolutionTaskPayload(task.payload);
+    const source = await session.getFavoriteSource(payload.sourceId);
+    const record = await session.getFavoriteParseArtifact(payload.sourceId);
+    const current = await session.getFavoriteResolutionTask(task.id);
+    if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
+      || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token) throw new Error('STALE_PRIVATE_REFERENCE');
+    await session.putFavoriteResolutionTask(exhausted ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT') : retryTask(current, token, retryAt));
+    await session.putFavoriteSource(createFavoriteSource({
+      ...source, resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : reason },
+      resolutionVersions: favoriteResolutionVersions(record.artifact),
+    }));
+  });
+  return exhausted ? 'blocked' : 'retried';
 }
 
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
-  const [source, record, review] = await Promise.all([
+  const [source, record] = await Promise.all([
     dependencies.storage.getFavoriteSource(payload.sourceId),
     dependencies.storage.getFavoriteParseArtifact(payload.sourceId),
-    dependencies.storage.getReview(payload.reviewId),
   ]);
-  if (source === undefined || record === undefined || review === undefined || record.reviewId !== payload.reviewId || record.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
+  if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
+  const previousReview = source.reviewId === undefined ? undefined : await dependencies.storage.getReview(source.reviewId);
+  if (previousReview !== undefined && previousReview.status !== 'pending') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'decision:preserved');
+    return 'completed';
+  }
   if (source.presence === 'detached') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, review, 'source:detached');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'DETACHED' }, 'source:detached');
     return 'completed';
   }
   const artifact = record.artifact;
   if (artifact.status !== 'parsed') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' }, 'unsupported:identity-missing');
     return 'completed';
   }
   const explicit = artifact.sourceEvidence.explicitProviderReference;
@@ -90,21 +101,20 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
       const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
       if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:explicit-reference-incompatible');
         return 'completed';
       }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
-      await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate);
       return 'completed';
     }
   }
   const titles = providerTitles(artifact);
   if (titles.length === 0) {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' }, 'unsupported:identity-missing');
     return 'completed';
   }
   let envelopes: readonly ProviderCandidateEnvelope[] | undefined;
@@ -133,17 +143,17 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   const outcome = matchFavoriteTitles(matchQuery, envelopes);
   if (outcome.kind === 'INCOMPLETE_CANDIDATE_SET') {
     const retryAt = new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString();
-    return retryClaim(dependencies, task, token, retryAt);
+    return retryClaim(dependencies, task, token, retryAt, 'INCOMPLETE_CANDIDATE_SET');
   }
   if (outcome.kind === 'AMBIGUOUS') {
     const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
-    const candidateSet = Object.freeze({ candidates: Object.freeze(candidates), digest: envelopes.map((envelope) => envelope.digest).join('|'), recordedAt: dependencies.now(), reviewId: review.id });
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), `review:${outcome.kind.toLowerCase()}`, undefined, candidateSet);
+    const candidateSet = Object.freeze({ candidates: Object.freeze(candidates), digest: envelopes.map((envelope) => envelope.digest).join('|'), recordedAt: dependencies.now() });
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${outcome.kind.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
   }
   if (outcome.kind === 'NO_MATCH') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:no-match');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:not-found');
     return 'completed';
   }
   const provider = outcome.matchedReference.provider;
@@ -156,11 +166,10 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
   if (hasExactBlockedProviderTaxonomy(candidate)) {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     return 'completed';
   }
-  const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
-  await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${provider}:${candidate.externalId}`, candidate);
+  await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${provider}:${candidate.externalId}`, candidate);
   return 'completed';
 }
 

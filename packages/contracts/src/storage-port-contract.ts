@@ -87,6 +87,20 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   }
   assert(duplicateReviewRejected, 'Review identity must be unique across favorite sources');
 
+  const { reviewId: _legacyReview, ...directSource } = source;
+  const direct = createFavoriteSource({ ...directSource, bookmarkId: 'bookmark-direct', id: favoriteSourceId('source_direct'), matchedWorkId: id, resolution: { kind: 'RESOLVED' } });
+  await storage.putFavoriteSource(direct);
+  await storage.putFavoriteSource(createFavoriteSource({ ...direct, bookmarkId: 'bookmark-direct-two', id: favoriteSourceId('source_direct-two') }));
+  assert((await storage.listFavoriteSourcesByWorkId({ limit: 1, workId: id }))[0]?.id === direct.id, 'direct Work source index is bounded and works without a Review');
+  assert((await storage.listFavoriteSourcesByWorkId({ limit: 2, workId: id })).length === 2, 'multiple sources without Review are preserved');
+  let sourceMatchLimitRejected = false;
+  try {
+    await storage.listFavoriteSourcesByWorkId({ limit: 101, workId: id });
+  } catch {
+    sourceMatchLimitRejected = true;
+  }
+  assert(sourceMatchLimitRejected, 'direct Work source listing must enforce its bound');
+
   let limitRejected = false;
   try {
     await storage.listFavoriteSources({ limit: 101 });

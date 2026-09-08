@@ -6,6 +6,7 @@ import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite-source-presence';
 import { runFavoriteResolutionSlice } from './favorite-resolution-runner';
+import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
@@ -46,7 +47,7 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
-  it('persists a hydrated Work, Review and committed effect atomically', async () => {
+  it('persists a hydrated Work and committed effect atomically without Review', async () => {
     const { outbox, storage, task } = await fixture();
     const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'search-1', provider: 'anilist', truncated: false });
     const result = await runFavoriteResolutionSlice({
@@ -62,10 +63,10 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:anilist:154587', state: 'COMMITTED' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source && await storage.getFavoriteResolutionReceipt(`${source.id}:favorite-resolution`)).toMatchObject({ effectDigest: 'resolved:anilist:154587', idempotencyKey: task.idempotencyKey });
-    const review = source && await storage.getReview(source.reviewId);
-    expect(review).toMatchObject({ status: 'resolved' });
-    expect(review?.matchedWorkId && await storage.getWork(review.matchedWorkId)).toMatchObject({ preferredTitle: 'Frieren' });
-    await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [review?.matchedWorkId] });
+    expect(source?.reviewId).toBeUndefined();
+    expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect(source?.matchedWorkId && await storage.getWork(source.matchedWorkId)).toMatchObject({ preferredTitle: 'Frieren' });
+    await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [source?.matchedWorkId] });
   });
 
   it('persists a retry after a recoverable provider failure', async () => {
@@ -81,6 +82,9 @@ describe('runFavoriteResolutionSlice', () => {
     });
     expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
   });
 
   it('uses one complete Kitsu fallback tier when AniList is unavailable', async () => {
@@ -168,7 +172,8 @@ describe('runFavoriteResolutionSlice', () => {
     });
 
     const [source] = await storage.listFavoriteSources({ limit: 1 });
-    expect(source && await storage.getReview(source.reviewId)).toMatchObject({ status: 'no-match' });
+    expect(source?.reviewId).toBeUndefined();
+    expect(source?.resolution).toEqual({ kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' });
     await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toBeUndefined();
   });
 
@@ -196,5 +201,32 @@ describe('runFavoriteResolutionSlice', () => {
     });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: '154587' }, { externalId: '154588' }], digest: 'ambiguous' });
+  });
+
+  it('keeps a terminal NOT_FOUND actionable instead of making a no-match decision', async () => {
+    const { outbox, storage } = await fixture();
+    const empty = createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'empty-primary', provider: 'anilist', truncated: false });
+    const fallback = createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'empty-fallback', provider: 'kitsu-anime', truncated: false });
+    await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => empty }, { search: async () => fallback }),
+      hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
+    });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toMatchObject([{ reason: 'NOT_FOUND', status: 'pending' }]);
+    expect(await storage.listReviews({ limit: 100, status: 'no-match' })).toEqual([]);
+  });
+
+  it('rejects an expired claim before writing a Work, source resolution or receipt', async () => {
+    const { storage, task } = await fixture();
+    const claimed = claimTask(task, 'expired-token', now, '2026-09-07T12:01:00.000Z');
+    await storage.putFavoriteResolutionTask(claimed);
+    await expect(persistFavoriteResolutionCompletion({ libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:01:00.000Z', storage }, claimed, 'expired-token', { kind: 'RESOLVED' }, 'resolved:anilist:154587', candidate)).rejects.toThrow('STALE_PRIVATE_REFERENCE');
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toBeUndefined();
+    expect(source && await storage.getFavoriteResolutionReceipt(`${source.id}:favorite-resolution`)).toBeUndefined();
+    expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
+    expect(await storage.getFavoriteResolutionTask(task.id)).toEqual(claimed);
   });
 });

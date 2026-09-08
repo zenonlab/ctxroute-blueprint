@@ -5758,7 +5758,7 @@
         {
           "id": "step-2",
           "title": "Autorités et contrats de résolution versionnés",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Review optionnelle à import; RESOLVED/REVIEW_REQUIRED avec AMBIGUOUS ou NOT_FOUND/UNSUPPORTED/RETRYABLE stricts",
             "Versions parser matcher règles décisions reçus; exports compatibles et migrations additives sans perte"
@@ -5797,7 +5797,11 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'refactor(favorites): restore authoritative resolution contracts'"
           ],
-          "evidence": []
+          "evidence": [
+            "Import transactionnel sans Review; lien Work direct, résultats stricts et versions, NOT_FOUND actionnable, décisions humaines préservées; export v4 compatible v1/v2/v3.",
+            "Application 187/187 puis runner 10/10 avec claim expiré; extension 97/97, domain 24/24, contracts 16/16, IndexedDB 2/2 et contrat Chromium passent.",
+            "Migration additive IndexedDB v9 depuis v1/v2/v3/v4/v5/v8 et interruption testées Chromium; typecheck global, lint, anti-slop, docs, ADR, Archify dataflow et source boundaries 9/9, diff check passent."
+          ]
         },
         {
           "id": "step-3",

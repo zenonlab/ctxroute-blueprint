@@ -2,6 +2,8 @@ import { createResolutionDecision, favoriteAliasLimit, providerCandidateLimit } 
 import type { FavoriteMatchMethod, ProviderCandidate, ProviderCandidateEnvelope, ProviderCandidateReference, ResolutionDecision } from '@tobirink/domain';
 import { isWithinFavoriteEditDistance, normalizeFavoriteTitle } from './title-normalization';
 
+export const favoriteMatcherVersion = 'favorite-matcher-v2';
+
 export interface FavoriteTitleMatchQuery {
   readonly blockedTaxonomy?: readonly string[];
   readonly explicitProviderReference?: ProviderCandidateReference;

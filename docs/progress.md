@@ -284,7 +284,7 @@
 ## Corriger intégralement FavLib → TobiRink selon la doctrine 3267de2 — ACTIVE
 
 - [x] **Documentation canonique historique et plan complet** — DONE _(evidence: Plan canonique v3 et 30 écarts: doctrine 3267de2, autorités, sync, Worker SQL, migrations et oracle réel; ADR 0025/0033/0034/0037 alignés., validate:docs, validate:decisions et validate:coherence passent; toutes les vues produit Archify showcase 9/9 sans erreur/avertissement; git diff --check passe., Aucun code produit modifié; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue.)_
-- [ ] **Autorités et contrats de résolution versionnés** — PENDING
+- [x] **Autorités et contrats de résolution versionnés** — DONE _(evidence: Import transactionnel sans Review; lien Work direct, résultats stricts et versions, NOT_FOUND actionnable, décisions humaines préservées; export v4 compatible v1/v2/v3., Application 187/187 puis runner 10/10 avec claim expiré; extension 97/97, domain 24/24, contracts 16/16, IndexedDB 2/2 et contrat Chromium passent., Migration additive IndexedDB v9 depuis v1/v2/v3/v4/v5/v8 et interruption testées Chromium; typecheck global, lint, anti-slop, docs, ADR, Archify dataflow et source boundaries 9/9, diff check passent.)_
 - [ ] **Parsing, routage et fournisseurs déterministes** — PENDING
 - [ ] **Snapshot sync fragmenté et reconstruction** — PENDING
 - [ ] **Collectif Worker/D1 SQL owner-scoped** — PENDING
