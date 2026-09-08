@@ -11,6 +11,7 @@ export const reviewDecisionMessageSchema = z.strictObject({
     z.strictObject({ kind: z.literal('candidate'), workId: workIdSchema }),
     z.strictObject({ kind: z.literal('manual'), source: z.enum(['id', 'url']), value: z.string().trim().min(1).max(500) }),
     z.strictObject({ kind: z.literal('none') }),
+    z.strictObject({ kind: z.literal('defer') }),
   ]),
   reviewId: reviewIdSchema,
   revision: z.string().min(1).max(100),
@@ -27,6 +28,10 @@ export const reviewQueueResponseSchema = z.discriminatedUnion('ok', [
 ]);
 export const reviewCandidatesResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({ ok: z.literal(true), snapshot: z.strictObject({
+    reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
+    matchLevel: z.string().min(1).max(100).optional(),
+    provenance: z.string().min(1).max(100).optional(),
+    totalCandidates: z.number().int().min(0).max(1000).optional(),
     candidates: z.array(z.strictObject({
       candidateId: workIdSchema,
       href: z.string().regex(/^https?:\/\/[^\s]+$/u),
@@ -43,7 +48,7 @@ export const reviewCandidatesResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({ error: z.string(), ok: z.literal(false) }),
 ]);
 export const reviewDecisionResponseSchema = z.discriminatedUnion('ok', [
-  z.strictObject({ ok: z.literal(true), status: z.enum(['no-match', 'resolved']) }),
+  z.strictObject({ ok: z.literal(true), status: z.enum(['no-match', 'resolved', 'pending']) }),
   z.strictObject({ error: z.enum(['conflict', 'unavailable']), ok: z.literal(false) }),
 ]);
 
@@ -62,6 +67,6 @@ export async function readReviewCandidatesMessage(reviewId: string): Promise<Ext
   return response.snapshot;
 }
 
-export async function writeReviewDecisionMessage(input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' }; reviewId: string; revision: string }): Promise<z.infer<typeof reviewDecisionResponseSchema>> {
+export async function writeReviewDecisionMessage(input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' | 'defer' }; reviewId: string; revision: string }): Promise<z.infer<typeof reviewDecisionResponseSchema>> {
   return reviewDecisionResponseSchema.parse(await browser.runtime.sendMessage({ ...input, type: 'review.decision.write', version }));
 }

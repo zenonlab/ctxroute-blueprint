@@ -4,6 +4,7 @@ export type DomainInvariantCode =
   | 'invalid-agenda-date'
   | 'invalid-datetime'
   | 'invalid-favorite-presence'
+  | 'invalid-favorite-resolution'
   | 'invalid-id'
   | 'invalid-number'
   | 'invalid-review-resolution'

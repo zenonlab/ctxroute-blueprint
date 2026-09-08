@@ -62,6 +62,10 @@ export function createLocalReviewNavigation(
   if (candidates.state === 'error' || candidates.state === 'conflict') return { count: items.length, resolver: { ...shared, state: candidates.state } };
   if (candidates.snapshot.reviewId !== source.id) return { count: items.length, resolver: { ...shared, state: 'loading' } };
   const item = {
+    reason: candidates.snapshot.reason,
+    matchLevel: candidates.snapshot.matchLevel,
+    provenance: candidates.snapshot.provenance,
+    totalCandidates: candidates.snapshot.totalCandidates,
     candidates: candidates.snapshot.candidates,
     id: source.id,
     position: index + 1,

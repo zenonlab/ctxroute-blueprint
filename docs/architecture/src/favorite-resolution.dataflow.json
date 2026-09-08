@@ -2,71 +2,337 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Tobirink — pipeline améliorée de résolution des favoris",
+    "title": "TobiRink — résolution et reconstruction v3",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
-    "viewBox": [1180, 800],
+    "viewBox": [
+      1180,
+      1070
+    ],
     "views": [
       {
         "id": "identity-proof",
         "label": "Preuve d’identité",
-        "focus": ["browserFavorites", "eligibility", "sourceEvidence", "parseArtifact", "titleMatcher"],
-        "note": "Le brut reste intact; URL, titre, saison et progression deviennent des preuves séparées et auditables."
+        "focus": [
+          "browserFavorites",
+          "eligibility",
+          "sourceEvidence",
+          "parseArtifact",
+          "titleMatcher"
+        ],
+        "note": "Règles versionnées : origine exacte et segments bornés, sans code distant. URL, titre, saison et progression restent séparés."
       },
       {
         "id": "durable-resolution",
         "label": "Résolution durable",
-        "focus": ["parseArtifact", "durableQueue", "providerAdapters", "titleMatcher", "reviewGate", "privateStore"],
-        "note": "Chaque effet fournisseur reprend depuis IndexedDB et toute ambiguïté rejoint Review sans sélection implicite."
+        "focus": [
+          "parseArtifact",
+          "durableQueue",
+          "providerAdapters",
+          "titleMatcher",
+          "reviewGate",
+          "privateStore"
+        ],
+        "note": "Anime et manga indépendants; Kitsu après NO_MATCH complet. Hydratation exacte et pagination reprenable dans IndexedDB."
       },
       {
         "id": "bounded-convergence",
         "label": "Convergence bornée",
-        "focus": ["bookmarkEvents", "sourceEvidence", "durableQueue", "providerAdapters", "privateStore"],
-        "note": "Inventaire getChildren, outbox et lectures locales sont bornés et reprennent depuis leurs checkpoints IndexedDB."
+        "focus": [
+          "sourceEvidence",
+          "durableQueue",
+          "providerAdapters",
+          "privateStore"
+        ],
+        "note": "IndexedDB : fiches Work, index privés d'aliases/titres et checkpoint de reconstruction. Inventaire et scans bornés."
+      },
+      {
+        "id": "recovery-collective",
+        "label": "Sync et collectif",
+        "focus": [
+          "syncedIds",
+          "sourceEvidence",
+          "durableQueue",
+          "collectiveWorker",
+          "collectiveD1"
+        ],
+        "note": "Sync : IDs et manifeste vérifiés. HTTP v2 : lots de 50 clés, choix owner, confirmations distinctes et reçus SQL atomiques."
       }
     ]
   },
   "stages": [
-    { "label": "Navigateur" },
-    { "label": "Qualification" },
-    { "label": "Analyse" },
-    { "label": "Résolution" },
-    { "label": "Autorité locale" }
+    {
+      "label": "Navigateur"
+    },
+    {
+      "label": "Qualification"
+    },
+    {
+      "label": "Analyse"
+    },
+    {
+      "label": "Résolution"
+    },
+    {
+      "label": "Autorité locale"
+    }
   ],
   "nodes": [
-    { "id": "browserFavorites", "type": "external", "label": "Favoris navigateur", "stage": 0, "row": 1, "width": 150, "tag": "getChildren · lots de 100" },
-    { "id": "bookmarkEvents", "type": "messagebus", "label": "Événements favoris", "stage": 0, "row": 4, "width": 150, "tag": "journal local par favori" },
-    { "id": "eligibility", "type": "security", "label": "Filtre d’éligibilité", "stage": 1, "row": 1, "width": 150, "tag": "U-08…U-10" },
-    { "id": "sourceEvidence", "type": "backend", "label": "Preuve de source", "stage": 1, "row": 4, "width": 150, "tag": "générique + AniList" },
-    { "id": "parseArtifact", "type": "backend", "label": "Artefact de parsing", "stage": 2, "row": 1, "width": 150, "tag": "L · T · I · S · R purs" },
-    { "id": "durableQueue", "type": "messagebus", "label": "Outbox résolution", "stage": 2, "row": 4, "width": 150, "tag": "8 tâches · compaction 30 j" },
-    { "id": "providerAdapters", "type": "external", "label": "Lanes fournisseur", "stage": 3, "row": 4, "width": 150, "tag": "paliers · Kitsu · déclaré" },
-    { "id": "titleMatcher", "type": "security", "label": "Décision d’identité", "stage": 3, "row": 1, "width": 150, "tag": "6 niveaux · F/C exacts" },
-    { "id": "reviewGate", "type": "frontend", "label": "Review locale", "stage": 4, "row": 4, "width": 150, "tag": "candidats persistés" },
-    { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "stage": 4, "row": 1, "width": 150, "tag": "preuves · reçus · autorité" }
+    {
+      "id": "browserFavorites",
+      "type": "external",
+      "label": "Favoris navigateur",
+      "stage": 0,
+      "row": 1,
+      "width": 150,
+      "tag": "présence / progression"
+    },
+    {
+      "id": "eligibility",
+      "type": "security",
+      "label": "Filtre d’éligibilité",
+      "stage": 1,
+      "row": 1,
+      "width": 150,
+      "tag": "U-08…U-10"
+    },
+    {
+      "id": "sourceEvidence",
+      "type": "backend",
+      "label": "Preuve de source",
+      "stage": 1,
+      "row": 4,
+      "width": 150,
+      "tag": "origine / route versionnée"
+    },
+    {
+      "id": "parseArtifact",
+      "type": "backend",
+      "label": "Artefact de parsing",
+      "stage": 2,
+      "row": 1,
+      "width": 150,
+      "tag": "L · T · I · S · R purs"
+    },
+    {
+      "id": "durableQueue",
+      "type": "messagebus",
+      "label": "Outbox résolution",
+      "stage": 2,
+      "row": 4,
+      "width": 150,
+      "tag": "8 tâches · compaction 30 j"
+    },
+    {
+      "id": "providerAdapters",
+      "type": "external",
+      "label": "Lanes fournisseur",
+      "stage": 3,
+      "row": 4,
+      "width": 150,
+      "tag": "primaire puis repli contrôlé"
+    },
+    {
+      "id": "titleMatcher",
+      "type": "security",
+      "label": "Décision d’identité",
+      "stage": 3,
+      "row": 1,
+      "width": 150,
+      "tag": "6 niveaux · F/C exacts"
+    },
+    {
+      "id": "reviewGate",
+      "type": "frontend",
+      "label": "Review locale",
+      "stage": 4,
+      "row": 4,
+      "width": 150,
+      "tag": "terminal / décision atomique"
+    },
+    {
+      "id": "privateStore",
+      "type": "database",
+      "label": "IndexedDB privé",
+      "stage": 4,
+      "row": 1,
+      "width": 150,
+      "tag": "preuves · reçus · autorité"
+    },
+    {
+      "id": "syncedIds",
+      "type": "database",
+      "label": "IDs storage.sync",
+      "stage": 0,
+      "row": 4,
+      "width": 150,
+      "tag": "fragments / digest"
+    },
+    {
+      "id": "collectiveWorker",
+      "type": "cloud",
+      "label": "Worker HTTP typé",
+      "stage": 1,
+      "row": 4,
+      "yOffset": 270,
+      "width": 150,
+      "tag": "clé hachée / owner"
+    },
+    {
+      "id": "collectiveD1",
+      "type": "database",
+      "label": "D1 collectif",
+      "stage": 2,
+      "row": 4,
+      "yOffset": 270,
+      "width": 150,
+      "tag": "IDs / choix / confirmations"
+    }
   ],
   "flows": [
-    { "from": "browserFavorites", "to": "eligibility", "label": "inventaire brut", "classification": "privé local", "variant": "security", "route": "straight", "labelAt": [208, 320] },
-    { "from": "bookmarkEvents", "to": "sourceEvidence", "label": "déclenche une convergence", "classification": "idempotent", "variant": "dashed", "labelAt": [208, 660] },
-    { "from": "eligibility", "to": "parseArtifact", "label": "brut + disposition URL", "classification": "fail-closed", "variant": "emphasis", "route": "straight", "labelAt": [423, 210] },
-    { "from": "sourceEvidence", "to": "parseArtifact", "label": "indices structurés", "classification": "provenance locale", "variant": "default" },
-    { "from": "parseArtifact", "to": "durableQueue", "label": "source + Review + tâche", "classification": "transaction atomique", "variant": "security", "labelAt": [575, 440] },
-    { "from": "durableQueue", "to": "providerAdapters", "label": "titre/ID déclaré · cadence", "classification": "bookmarksInfo borné", "variant": "dashed", "route": "straight", "labelAt": [620, 660] },
-    { "from": "providerAdapters", "to": "titleMatcher", "label": "candidats typés", "classification": "réponse bornée", "variant": "default", "labelAt": [760, 660] },
-    { "from": "parseArtifact", "to": "titleMatcher", "label": "aliases et preuves", "classification": "ordre déterministe", "variant": "emphasis", "route": "straight", "labelAt": [638, 320] },
-    { "from": "titleMatcher", "to": "privateStore", "label": "correspondance unique", "classification": "upsert idempotent", "variant": "security", "route": "straight", "labelAt": [853, 210] },
-    { "from": "titleMatcher", "to": "reviewGate", "label": "six candidats au plus", "classification": "aucun choix implicite", "variant": "dashed" },
-    { "from": "reviewGate", "to": "privateStore", "label": "décision confirmée", "classification": "révision vérifiée", "variant": "security", "labelAt": [960, 660] }
+    {
+      "from": "browserFavorites",
+      "to": "eligibility",
+      "label": "inventaire brut",
+      "classification": "privé local",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        208,
+        320
+      ]
+    },
+    {
+      "from": "eligibility",
+      "to": "parseArtifact",
+      "label": "brut + disposition URL",
+      "classification": "fail-closed",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        423,
+        210
+      ]
+    },
+    {
+      "from": "sourceEvidence",
+      "to": "parseArtifact",
+      "label": "indices structurés",
+      "classification": "provenance locale",
+      "variant": "default"
+    },
+    {
+      "from": "parseArtifact",
+      "to": "durableQueue",
+      "label": "source + artefact + tâche",
+      "classification": "transaction atomique",
+      "variant": "security",
+      "labelAt": [
+        575,
+        440
+      ]
+    },
+    {
+      "from": "durableQueue",
+      "to": "providerAdapters",
+      "label": "titre/ID déclaré · cadence",
+      "classification": "bookmarksInfo borné",
+      "variant": "dashed",
+      "route": "straight",
+      "labelAt": [
+        620,
+        660
+      ]
+    },
+    {
+      "from": "providerAdapters",
+      "to": "titleMatcher",
+      "label": "candidats typés",
+      "classification": "réponse bornée",
+      "variant": "default",
+      "labelAt": [
+        760,
+        660
+      ]
+    },
+    {
+      "from": "parseArtifact",
+      "to": "titleMatcher",
+      "label": "aliases et preuves",
+      "classification": "ordre déterministe",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        638,
+        320
+      ]
+    },
+    {
+      "from": "titleMatcher",
+      "to": "privateStore",
+      "label": "correspondance unique",
+      "classification": "upsert idempotent",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        853,
+        210
+      ]
+    },
+    {
+      "from": "titleMatcher",
+      "to": "reviewGate",
+      "label": "ambigu / introuvable",
+      "classification": "aucun choix implicite",
+      "variant": "dashed"
+    },
+    {
+      "from": "reviewGate",
+      "to": "privateStore",
+      "label": "décision confirmée",
+      "classification": "révision vérifiée",
+      "variant": "security",
+      "labelAt": [
+        960,
+        660
+      ]
+    },
+    {
+      "from": "syncedIds",
+      "to": "sourceEvidence",
+      "label": "hydratation / aliases",
+      "classification": "reconstruction locale",
+      "variant": "dashed",
+      "labelAt": [
+        208,
+        660
+      ]
+    },
+    {
+      "from": "durableQueue",
+      "to": "collectiveWorker",
+      "label": "lookup avant recherche",
+      "classification": "lot authentifié",
+      "variant": "security"
+    },
+    {
+      "from": "collectiveWorker",
+      "to": "collectiveD1",
+      "label": "SQL préparé",
+      "route": "straight",
+      "labelAt": [423, 946],
+      "classification": "batch indexé",
+      "variant": "security"
+    }
   ],
   "cards": [
     {
       "dot": "emerald",
-      "title": "Contrats et oracle",
+      "title": "Contrats clean-room",
       "items": [
-        "Le domaine possède les contrats immuables et bornés du pipeline",
-        "L’application possède le corpus synthétique et l’oracle profond",
-        "82 IDs lient snapshot profond et assertions sémantiques indépendantes"
+        "Règles pures versionnées et 30 écarts documentés",
+        "82 cas synthétiques couvrent la résolution déterministe",
+        "Aucune base, donnée ou exécution FavLib n’est requise"
       ]
     },
     {
@@ -82,11 +348,10 @@
       "dot": "cyan",
       "title": "Convergence MV3 bornée",
       "items": [
-        "Source, Review et tâche rejoignent la même transaction",
-        "Le curseur DFS, les reçus et les marques survivent aux suspensions",
-        "Les claims sont indexés par type, lane, état et échéance",
-        "Un ensemble fournisseur incomplet interdit toute résolution automatique",
-        "Un palier indisponible cède à Kitsu sans mélanger des ensembles partiels"
+        "Source, artefact et tâche atomiques sans Review à import",
+        "Curseurs, reçus et cadences survivent à MV3",
+        "Panne ou réponse incomplète reste RETRYABLE",
+        "Kitsu suit seulement NO_MATCH principal complet"
       ]
     }
   ]

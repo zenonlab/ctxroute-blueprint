@@ -10,6 +10,7 @@ import {
 } from '@tobirink/domain';
 import { createFavoriteParseArtifactRecord, parseFavoriteResolutionTaskPayload, restoreDurableTask } from '@tobirink/application';
 import type { TobirinkDatabase } from '../database';
+import { providerIdentityRecoveryRecordSchema } from '../recovery/provider-identity-recovery-state-adapter';
 
 export interface IntegrityReport {
   checkedRecords: number;
@@ -53,7 +54,7 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
 
   if (favoriteInventoryCheckpoints.length > 1) throw new Error('Favorite inventory contains more than one checkpoint.');
   for (const checkpoint of favoriteProviderRateCheckpoints) {
-    if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangaupdates'].includes(checkpoint.provider) || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
+    if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangadex', 'mangaupdates'].includes(checkpoint.provider) || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
   }
 
   for (const library of validLibraries) {
@@ -69,16 +70,17 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     if (!agendaIds.has(reminder.agendaEntryId)) throw new Error(`Reminder ${reminder.id} references a missing agenda entry.`);
   }
   for (const source of validFavoriteSources) {
-    if (!reviewIds.has(source.reviewId)) throw new Error(`Favorite source ${source.id} references a missing review.`);
+    if (source.matchedWorkId !== undefined && !workIds.has(source.matchedWorkId)) throw new Error('Favorite source references a missing work.');
+    if (source.reviewId !== undefined && !reviewIds.has(source.reviewId)) throw new Error(`Favorite source ${source.id} references a missing review.`);
   }
   for (const record of validFavoriteArtifacts) {
-    if (!sourceIds.has(record.sourceId) || !reviewIds.has(record.reviewId)) throw new Error(`Favorite artifact ${record.sourceId} references missing private data.`);
+    if (!sourceIds.has(record.sourceId) || (record.reviewId !== undefined && !reviewIds.has(record.reviewId))) throw new Error(`Favorite artifact ${record.sourceId} references missing private data.`);
   }
   for (const task of validFavoriteResolutionTasks) {
     if (task.kind !== 'favorite-resolution') throw new Error(`Unexpected favorite resolution task kind ${task.kind}.`);
     const payload = parseFavoriteResolutionTaskPayload(task.payload);
     const artifact = validFavoriteArtifacts.find((record) => record.sourceId === payload.sourceId);
-    if (!sourceIds.has(payload.sourceId) || !reviewIds.has(payload.reviewId) || artifact?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error(`Favorite resolution task ${task.id} references stale private data.`);
+    if (!sourceIds.has(payload.sourceId) || (payload.reviewId !== undefined && !reviewIds.has(payload.reviewId)) || artifact?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error(`Favorite resolution task ${task.id} references stale private data.`);
   }
   for (const receipt of favoriteResolutionReceipts) {
     if (!sourceIds.has(receipt.sourceId) || !receipt.idempotencyKey.trim() || !receipt.effectDigest.trim()) throw new Error(`Favorite resolution receipt ${receipt.id} is invalid.`);
@@ -87,8 +89,11 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     if (!reviewIds.has(set.reviewId) || set.candidates.length > 6 || !set.digest.trim()) throw new Error(`Favorite Review candidate set ${set.reviewId} is invalid.`);
   }
 
+  const recovery = await database.providerIdentityRecovery.limit(2).toArray();
+  if (recovery.length > 1) throw new Error('Provider identity recovery must have a single checkpoint.');
+  for (const record of recovery) providerIdentityRecoveryRecordSchema.parse(record);
   return {
-    checkedRecords: agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
+    checkedRecords: recovery.length + agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
     schemaVersion: database.verno,
   };
 }

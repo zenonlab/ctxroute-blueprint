@@ -36,6 +36,7 @@ export interface ReviewCandidatePort {
 }
 
 export interface ReviewRevisionInput {
+  candidateDigest?: string | undefined;
   review: Review;
   source: FavoriteSource;
 }

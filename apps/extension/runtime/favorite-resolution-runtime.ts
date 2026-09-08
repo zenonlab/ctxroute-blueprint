@@ -1,14 +1,18 @@
 import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import type { LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
+import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
 
 export interface FavoriteResolutionRuntimeDependencies {
+  readonly beforeInventory?: () => Promise<void>;
+  readonly collective?: FavoriteCollectiveLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
-  readonly hydration: Readonly<Record<ResolutionProvider, FavoriteProviderHydrationPort>>;
+  readonly hydration: FavoriteProviderHydrationPorts;
+  readonly identityRecovery?: ProviderIdentityRecoveryRuntime;
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;
@@ -40,6 +44,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let mutationQueued = false;
   const runOnce = () => dependencies.ensureReady()
     .then(async () => {
+        await dependencies.beforeInventory?.();
         const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
         const checkpoint = stored?.status === 'active'
           ? stored
@@ -63,7 +68,9 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
         }
         if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
+        if (dependencies.identityRecovery !== undefined && await dependencies.identityRecovery.prepare() !== 'READY') return;
         await runFavoriteResolutionSlice(dependencies);
+        await dependencies.identityRecovery?.publish();
     });
   return function reconcileFavorites(bookmarkMutation = false): Promise<void> {
     if (active !== undefined) {

@@ -17,6 +17,7 @@ export function normalizeFavoriteTitle(value: string): NormalizedFavoriteTitle {
     .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
     .toLowerCase()
+    .replace(/[×✕]/gu, ' x ')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
     .replace(/\s+/gu, ' ');
@@ -29,7 +30,8 @@ export function normalizeFavoriteTitle(value: string): NormalizedFavoriteTitle {
 }
 
 function editThreshold(left: string, right: string): number {
-  return Math.min(2, Math.floor(Math.max(left.length, right.length) / 8));
+  const length = Math.max(left.length, right.length);
+  return Math.min(left.length, right.length) < 5 ? 0 : Math.min(2, Math.max(1, Math.floor(length / 8)));
 }
 
 export function isWithinFavoriteEditDistance(left: string, right: string): boolean {

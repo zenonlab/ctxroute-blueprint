@@ -15,6 +15,7 @@ describe('reconcileFavoriteSourcePresence', () => {
     expect(sources.map((source) => [source.bookmarkId, source.presence])).toEqual([['first', 'detached'], ['second', 'observed']]);
     const detached = sources[0];
     if (detached === undefined) throw new Error('Expected detached source.');
-    await expect(storage.getReview(detached.reviewId)).resolves.toBeDefined();
+    await expect(storage.getFavoriteParseArtifact(detached.id)).resolves.toBeDefined();
+    expect(detached.reviewId).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 # Accessibility and responsive evidence
 
-Date: 2026-09-06
+Date: 2026-09-08
 
 ## Scope
 
@@ -10,7 +10,7 @@ component catalogue and is not part of the extension package.
 
 ## Automated evidence
 
-- The root `test:e2e` script currently runs 88 Vitest integration, contract and
+- The extension suite currently runs 112 Vitest integration, contract and
   vertical-flow tests. It does not start Chrome or Firefox; all browser-specific
   accessibility observations remain part of the manual record below.
 - `npm run test:a11y` renders all five product surfaces and verifies named landmarks,
@@ -66,7 +66,20 @@ Workbench test covers the explicit 390 px canvas. A Chromium layout measurement
 at its 500 px headless minimum reports matching 500 px document, body, preview
 and control widths, with no document-level horizontal overflow; direct CSS
 inspection confirms that the compact breakpoint applies through 390 px.
-Firefox, 200% zoom and forced-colour behaviour still require a dedicated run.
+The 2026-09-08 production pass adds a 390 × 844 CSS-pixel reflow check, which
+is narrower than the 640 CSS-pixel viewport produced by a 1280 px desktop at
+200% zoom. Chromium 153 and Firefox 151 both keep the document within that
+viewport. In both engines, Tab produces one visible focus target, forced-colour
+mode is active, reduced-motion media queries match and interactive transitions
+resolve to zero seconds. A visual Chromium capture of the download surface
+shows complete headings, descriptions and both browser actions without clipping
+or document-level horizontal overflow.
+
+The exact Firefox 1.0.0 output also passes `web-ext lint` with zero errors and
+zero notices. Four dependency-generated warnings remain: Zod probes JIT support
+with the `Function` constructor, while React DOM contains guarded internal
+`innerHTML` paths. Repository source inspection finds neither operation in
+TobiRink product sources; CSP still forbids evaluated extension-page code.
 
 When a browser is available, record these checks for the extension menu (360 px
 wide) and full pages (390 × 844 and 1280 × 800):

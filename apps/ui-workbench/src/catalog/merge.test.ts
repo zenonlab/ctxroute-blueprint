@@ -5,13 +5,14 @@ describe('catalogue discovery', () => {
   it('contains every planned UI objective without duplicate identifiers', () => {
     const ids = catalogue.map((item) => item.id);
 
-    expect(catalogue).toHaveLength(24);
+    expect(catalogue).toHaveLength(26);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain('review-decision-form');
     expect(ids).not.toContain('reminder-control');
     expect(ids).not.toContain('progress-control');
     expect(ids).toContain('member-navigation');
     expect(ids).toContain('review-resolver');
+    expect(ids).toContain('resolution-status');
     expect(ids).toContain('review');
     expect(ids).toContain('button');
     expect(catalogue.find((item) => item.id === 'popup')?.status).toBe('implemented');

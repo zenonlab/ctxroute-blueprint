@@ -8,6 +8,15 @@ import { WorkCard } from '../../library/work-card';
 import type { ReviewDecision, ReviewItem, ReviewResolverState } from './review-resolver.contract';
 import styles from './ReviewResolver.module.css';
 
+const matchLabels = new Map([
+  ['source-id', 'Identifiant exact'], ['source-url', 'Adresse exacte'], ['ordered-exact', 'Titre exact'],
+  ['explicit-season', 'Saison corroborée'], ['reordered-significant-words', 'Mêmes mots significatifs'],
+  ['bounded-edit-distance', 'Faible différence de titre'],
+]);
+const provenanceLabels = new Map([
+  ['local-alias', 'Alias local'], ['hydrated-title', 'Fiche locale'], ['provider-search', 'Recherche fournisseur'],
+]);
+
 export interface ReviewResolverProps {
   busy?: boolean;
   canNext: boolean;
@@ -53,16 +62,18 @@ export function ReviewResolver({
   const [manualOpen, setManualOpen] = useState(false);
   const [manualValue, setManualValue] = useState('');
   const [manualError, setManualError] = useState<string | null>(null);
+  const [confirmNoMatch, setConfirmNoMatch] = useState(false);
   const manualInputId = useId();
   const manualPanelId = useId();
   const manualErrorId = useId();
-  const candidatesDeferred = state === 'partial' && item?.candidates.length === 0;
+  const candidatesDeferred = state === 'partial' && item?.candidates.length === 0 && item.reason === undefined;
 
   useEffect(() => {
     setManualOpen(false);
     setManualValue('');
     setManualError(null);
-  }, [item?.id]);
+    setConfirmNoMatch(false);
+  }, [item?.id, item?.revision]);
 
   const submitManual = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -138,13 +149,15 @@ export function ReviewResolver({
 
   return (
     <section aria-busy={busy || undefined} className={styles.resolver}>
-      {state === 'partial' ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
+      {state === 'partial' && item.reason === undefined ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
+      {item.reason ? <Status tone="accent">{item.reason === 'NOT_FOUND' ? 'Aucune identité trouvée après recherche complète' : 'Plusieurs identités ou preuves contradictoires'}</Status> : null}
       {state === 'offline' ? <Status tone="warning">Hors ligne · les détails seront complétés à la reconnexion</Status> : null}
 
       <section aria-label="Contexte du favori" className={styles.sourceContext}>
         <div>
           <strong>{item.title}</strong>
           <span>{[item.sourceLabel, item.progress].filter(Boolean).join(' · ')}</span>
+          {item.provenance || item.matchLevel ? <span>{[item.provenance ? provenanceLabels.get(item.provenance) ?? 'Résolution locale' : undefined, item.matchLevel ? matchLabels.get(item.matchLevel) ?? 'Preuves contradictoires' : undefined].filter(Boolean).join(' · ')}</span> : null}
         </div>
         {item.sourceUrl ? (
           <div className={styles.sourceActions}>
@@ -192,6 +205,7 @@ export function ReviewResolver({
             </button>
           </div>
           {item.candidates.length === 0 ? <p className={styles.noCandidates}>Aucun candidat proposé par les sources disponibles.</p> : null}
+          {item.totalCandidates !== undefined && item.totalCandidates > item.candidates.length ? <p className={styles.noCandidates}>{item.candidates.length} candidats affichés sur {item.totalCandidates} identités comparées.</p> : null}
         </>
       )}
 
@@ -209,7 +223,7 @@ export function ReviewResolver({
                   setManualValue(event.target.value);
                   setManualError(null);
                 }}
-                placeholder="ID ou URL AniList / MangaUpdates"
+                placeholder="anilist:123 ou URL de la fiche fournisseur"
                 value={manualValue}
               />
               <Button busy={busy} icon="search" type="submit" variant="primary">Vérifier</Button>
@@ -219,14 +233,22 @@ export function ReviewResolver({
           <Button
             disabled={busy}
             icon="x"
-            onClick={() => onSubmitDecision({ kind: 'none', revision: item.revision })}
+            onClick={() => setConfirmNoMatch(true)}
             variant="secondary"
           >
             Aucune correspondance
           </Button>
+          {confirmNoMatch ? (
+            <section aria-label="Confirmer aucune correspondance">
+              <p>Confirmez que ce favori ne correspond à aucune œuvre. Cette décision restera enregistrée.</p>
+              <Button disabled={busy} onClick={() => onSubmitDecision({ kind: 'none', revision: item.revision })} variant="primary">Confirmer aucune correspondance</Button>
+              <Button disabled={busy} onClick={() => setConfirmNoMatch(false)} variant="quiet">Annuler</Button>
+            </section>
+          ) : null}
         </div>
       ) : null}
 
+      {item.reason ? <Button disabled={busy} onClick={() => onSubmitDecision({ kind: 'defer', revision: item.revision })} variant="quiet">Reporter de 24 heures</Button> : null}
       <nav aria-label="Navigation dans les Reviews" className={styles.reviewNavigation}>
         <Button
           aria-label="Review précédente"

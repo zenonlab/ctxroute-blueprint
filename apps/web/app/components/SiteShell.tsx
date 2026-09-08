@@ -29,6 +29,10 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
       title: candidate.title,
     })),
     id: review.reviewId,
+    reason: review.reason,
+    matchLevel: review.matchLevel,
+    provenance: review.provenance,
+    totalCandidates: review.totalCandidates,
     revision: review.revision,
     sourceLabel: 'Favori enregistré',
     title: review.title ?? 'Correspondance à vérifier',
@@ -39,7 +43,7 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
       ? { decision: { kind: 'candidate' as const, workId: decision.candidateId }, reviewId: review.reviewId, revision: decision.revision }
       : decision.kind === 'manual'
         ? { decision: { kind: 'manual' as const, source: decision.source, value: decision.value }, reviewId: review.reviewId, revision: decision.revision }
-        : { decision: { kind: 'none' as const }, reviewId: review.reviewId, revision: decision.revision };
+        : { decision: { kind: decision.kind }, reviewId: review.reviewId, revision: decision.revision };
     void decideReview(command);
   };
   const resolver: ReviewResolverProps = {

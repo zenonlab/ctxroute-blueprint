@@ -2,6 +2,7 @@ import { defineConfig } from 'wxt';
 import extensionPackage from './package.json' with { type: 'json' };
 
 const siteOrigin = process.env.WXT_PUBLIC_SITE_ORIGIN?.trim();
+if (siteOrigin && (new URL(siteOrigin).protocol !== 'https:' || new URL(siteOrigin).origin !== siteOrigin)) throw new Error('WXT_PUBLIC_SITE_ORIGIN must be an exact HTTPS origin.');
 const externallyConnectableMatches = siteOrigin ? [`${siteOrigin}/*`] : [];
 
 const extensionIcons = {
@@ -26,11 +27,14 @@ export default defineConfig({
       extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
     },
     description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
-    externally_connectable: { matches: externallyConnectableMatches },
+    externally_connectable: siteOrigin ? { matches: externallyConnectableMatches } : undefined,
+    minimum_chrome_version: browser === 'chrome' ? '140' : undefined,
     host_permissions: [
+      'https://api.mangadex.org/*',
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',
+      ...externallyConnectableMatches,
     ],
     icons: extensionIcons,
     name: 'Tobirink',

@@ -4,8 +4,9 @@ import { extractFavoriteProgression } from './progression-extraction';
 import { extractFavoriteSeason } from './season-extraction';
 import { normalizeFavoriteTitle } from './title-normalization';
 import { segmentFavoriteTitle } from './title-segmentation';
+import { favoriteMatcherVersion } from './provider-matcher';
 
-export const favoriteParserVersion = 'favorite-parser-v2.1';
+export const favoriteParserVersion = 'favorite-parser-v3';
 interface MutableFavoriteAlias { provenance: 'aligned-bookmark-segment' | 'stable-url-slug'; value: string }
 
 function fingerprint(parts: readonly string[]): string {
@@ -51,7 +52,7 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
   return reconciled;
 }
 
-export function parseFavoriteObservation(observation: FavoriteObservation, evidence: SourceEvidence, sourceAdapterVersion = 'source-adapter-v1'): FavoriteParseArtifact {
+export function parseFavoriteObservation(observation: FavoriteObservation, evidence: SourceEvidence, sourceAdapterVersion = `source-adapter-v2:${evidence.sourceAdapter}`): FavoriteParseArtifact {
   const titleAnalysis = segmentFavoriteTitle(observation.title, hostname(evidence));
   const seasonEvidence = extractFavoriteSeason(observation.title, evidence);
   const transformations = [...titleAnalysis.transformations];
@@ -66,11 +67,13 @@ export function parseFavoriteObservation(observation: FavoriteObservation, evide
     contractVersion: 2 as const,
     diagnostics,
     mediaKind: evidence.mediaKind,
+    matcherVersion: favoriteMatcherVersion,
     parserVersion: favoriteParserVersion,
+    progressionParserVersion: 'favorite-progression-v2',
     raw: { title: observation.title, url: observation.url },
     seasonEvidence,
     segments: titleAnalysis.segments,
-    semanticFingerprint: fingerprint([observation.title, observation.url, favoriteParserVersion, sourceAdapterVersion]),
+    semanticFingerprint: fingerprint([observation.title, observation.url, favoriteParserVersion, favoriteMatcherVersion, sourceAdapterVersion]),
     sourceAdapterVersion,
     sourceEvidence: evidence,
     status: identity === undefined ? 'identity-missing' as const : 'parsed' as const,

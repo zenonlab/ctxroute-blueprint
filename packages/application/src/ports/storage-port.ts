@@ -3,6 +3,7 @@ import type {
   AgendaEntry,
   AgendaEntryId,
   FavoriteSource,
+  FavoriteResolutionVersions,
   FavoriteSourceId,
   Library,
   LibraryId,
@@ -22,6 +23,8 @@ import type {
 } from '@tobirink/domain';
 import type { DurableTask } from '../tasks/task-state';
 import type { BookmarkInventoryCursor } from './capability-ports';
+import { favoriteSearchCheckpointSchema } from '../favorites/provider-search-checkpoint';
+import type { FavoriteSearchCheckpoint } from '../favorites/provider-search-checkpoint';
 
 export interface FavoriteInventoryCheckpoint {
   cursor?: BookmarkInventoryCursor;
@@ -29,6 +32,20 @@ export interface FavoriteInventoryCheckpoint {
   sessionId: string;
   startedAt: string;
   status: 'active' | 'complete';
+}
+
+export interface WorkIdentityQuery {
+  key: string;
+  kind: 'favorite-alias' | 'provider-title';
+  limit: number;
+}
+
+export interface WorkPageQuery { readonly afterId?: WorkId; readonly limit: number }
+
+export function assertWorkIdentityQuery(query: WorkIdentityQuery): void {
+  if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100) throw new RangeError('Work identity lookup limit must be between 1 and 100.');
+  if (query.key.trim().length === 0 || query.key.length > 2048) throw new RangeError('Work identity key must be non-empty and bounded.');
+  if (query.kind !== 'favorite-alias' && query.kind !== 'provider-title') throw new Error('Unsupported Work identity index.');
 }
 
 export interface FavoriteInventoryMark {
@@ -45,10 +62,18 @@ export interface FavoriteBookmarkMutation {
 
 export interface FavoriteProviderRateCheckpoint {
   nextAllowedAt: number;
-  provider: Extract<FavoriteProvider, 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangaupdates'>;
+  provider: FavoriteProvider;
 }
 
 export interface FavoriteResolutionReceipt {
+  correction?: {
+    readonly schemaVersion: 1;
+    readonly source: FavoriteSource;
+    readonly review?: Review;
+    readonly artifact?: FavoriteParseArtifactRecord;
+    readonly task?: DurableTask;
+  };
+  versions?: FavoriteResolutionVersions;
   completedAt: string;
   effectDigest: string;
   id: string;
@@ -57,6 +82,9 @@ export interface FavoriteResolutionReceipt {
 }
 
 export interface FavoriteReviewCandidateSet {
+  matchLevel?: string;
+  provenance?: string;
+  totalCandidates?: number;
   candidates: readonly ProviderCandidate[];
   digest: string;
   recordedAt: string;
@@ -66,17 +94,23 @@ export interface FavoriteReviewCandidateSet {
 export interface FavoriteParseArtifactRecord {
   artifact: FavoriteParseArtifact;
   recordedAt: string;
-  reviewId: ReviewId;
+  reviewId?: ReviewId;
   sourceId: FavoriteSourceId;
+  searchCheckpoints?: readonly FavoriteSearchCheckpoint[];
 }
 
 export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRecord): FavoriteParseArtifactRecord {
   const recordedAt = new Date(input.recordedAt);
   if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
-  return Object.freeze({ ...input, artifact: createFavoriteParseArtifact(input.artifact), reviewId: reviewId(input.reviewId), sourceId: favoriteSourceId(input.sourceId) });
+  const record = { ...input, artifact: createFavoriteParseArtifact(input.artifact), sourceId: favoriteSourceId(input.sourceId) };
+  if (input.searchCheckpoints !== undefined) {
+    if (input.searchCheckpoints.length > 4 || new Set(input.searchCheckpoints.map((item) => item.provider)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
+    record.searchCheckpoints = Object.freeze(input.searchCheckpoints.map((item) => favoriteSearchCheckpointSchema.parse(item)));
+  }
+  return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });
 }
 
-export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
+export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'providerIdentityRecovery', 'reminders', 'reviews', 'works'] as const;
 export type PrivateStoreName = (typeof privateStoreNames)[number];
 
 export interface FavoriteSourcePageQuery {
@@ -104,6 +138,9 @@ export function assertAgendaEntryListQuery(query: AgendaEntryListQuery): void {
 }
 
 export interface ReviewListQuery {
+  actionableOnly?: boolean;
+  after?: { availableAt: string; id: ReviewId };
+  availableBefore?: string;
   limit: number;
   status: ReviewStatus;
 }
@@ -122,6 +159,7 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 }
 
 export interface StorageReadPort {
+  readFavoriteResolutionCounts(): Promise<{ processing: number; retryable: number; unsupported: number }>;
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;
@@ -140,10 +178,13 @@ export interface StorageReadPort {
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
+  listWorks(query: WorkPageQuery): Promise<readonly Work[]>;
+  listWorksByIdentityKey(query: WorkIdentityQuery): Promise<readonly Work[]>;
   listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
   listReviews(query: ReviewListQuery): Promise<readonly Review[]>;
   listReviewsByWorkId(query: ReviewMatchListQuery): Promise<readonly Review[]>;
+  listFavoriteSourcesByWorkId(query: ReviewMatchListQuery): Promise<readonly FavoriteSource[]>;
 }
 
 export interface StorageWritePort {

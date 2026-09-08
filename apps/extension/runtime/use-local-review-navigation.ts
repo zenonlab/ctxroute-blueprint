@@ -46,7 +46,7 @@ export function useLocalReviewNavigation(activeId?: MemberNavigationItemId): Mem
       ? { kind: 'candidate' as const, workId: decision.candidateId }
       : decision.kind === 'manual'
         ? decision
-        : { kind: 'none' as const };
+        : { kind: decision.kind };
     void writeReviewDecisionMessage({ decision: localDecision, reviewId: selectedId, revision: decision.revision })
       .then((result) => {
         if (result.ok) setLoadKey((key) => key + 1);

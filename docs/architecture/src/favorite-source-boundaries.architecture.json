@@ -30,7 +30,7 @@
   "components": [
     { "id": "favoriteObservation", "type": "external", "label": "Observation favorite", "sublabel": "titre et URL bruts", "pos": [40, 270], "size": [150, 68], "tag": "privé local" },
     { "id": "eligibility", "type": "security", "label": "Qualification URL", "sublabel": "packages/application", "pos": [250, 270], "size": [160, 68], "tag": "HTTP(S) borné" },
-    { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "conflit fail-closed" },
+    { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "règles JSON versionnées" },
     { "id": "genericEvidence", "type": "backend", "label": "Preuve générique", "sublabel": "structure de route", "pos": [710, 120], "size": [160, 68], "tag": "type UNKNOWN permis" },
     { "id": "anilistAdapter", "type": "backend", "label": "Adaptateur AniList", "sublabel": "packages/adapters-browser", "pos": [710, 420], "size": [160, 68], "tag": "origine exacte" },
     { "id": "mangaUpdatesAdapter", "type": "backend", "label": "Adaptateur MangaUpdates", "sublabel": "packages/adapters-browser", "pos": [710, 520], "size": [160, 68], "tag": "/series/{id}" },
@@ -51,8 +51,8 @@
     { "id": "mangaUpdatesContract", "from": "mangaUpdatesAdapter", "to": "sourceContract", "label": "ID MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[920, 554], [920, 304]], "labelAt": [955, 520] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Autorité", "items": ["Le favori reste une observation", "SourceEvidence ne devient jamais un identifiant de Work"] },
-    { "dot": "cyan", "title": "Modularité", "items": ["Application possède la sélection pure", "adapters-browser possède les règles AniList"] },
-    { "dot": "rose", "title": "Sécurité", "items": ["Aucun réseau dans ce chemin", "Mauvaise origine ou conflit ne produit aucun ID"] }
+    { "dot": "emerald", "title": "Autorité", "items": ["Favoris : présence et progression observée", "FavoriteSource : Work direct, Review optionnelle, résultat versionné"] },
+    { "dot": "cyan", "title": "Modularité", "items": ["Application possède la sélection pure", "Règles exactes versionnées, distribuées par Worker"] },
+    { "dot": "rose", "title": "Sécurité", "items": ["Extraction locale sans code distant", "Mauvaise origine ou conflit ne produit aucun ID"] }
   ]
 }

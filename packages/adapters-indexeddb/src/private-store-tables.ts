@@ -17,6 +17,7 @@ export function privateStoreTables(database: TobirinkDatabase, stores: readonly 
     libraries: database.libraries,
     organizer: database.organizer,
     progress: database.progress,
+    providerIdentityRecovery: database.providerIdentityRecovery,
     reminders: database.reminders,
     reviews: database.reviews,
     works: database.works,

@@ -1,5 +1,5 @@
 import { readAgendaPeriod, readReviewQueue } from '@tobirink/application';
-import type { StoragePort } from '@tobirink/application';
+import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, Work, WorkId } from '@tobirink/domain';
 import type { WebAgendaPeriod, WebBootstrapSnapshot, WebLibraryPage, WebRequest, WebReviewSnapshot } from '@tobirink/contracts/web-bridge';
@@ -44,6 +44,10 @@ async function mapLibraryItem(storage: StoragePort, work: Work) {
 
 function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCandidateSnapshot>>): WebReviewSnapshot {
   return {
+    reason: snapshot.reason,
+    matchLevel: snapshot.matchLevel,
+    provenance: snapshot.provenance,
+    totalCandidates: snapshot.totalCandidates,
     candidates: snapshot.candidates.map((candidate) => ({ candidateId: candidate.candidateId, mediaKind: candidate.mediaType, sourceUrl: candidate.href, title: candidate.title, workId: workId(candidate.candidateId) })),
     context: 'local',
     reviewId: snapshot.reviewId,
@@ -52,7 +56,7 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
   };
 }
 
-export function createWebBridgeRequestHandler(storage: StoragePort): WebBridgeRequestHandler {
+export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
       const library = await storage.getLibrary(primaryLibraryId);
@@ -102,7 +106,7 @@ export function createWebBridgeRequestHandler(storage: StoragePort): WebBridgeRe
       return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id));
     }
     if (request.type === 'review.decision.write') {
-      await writeLocalReviewDecision(storage, primaryLibraryId, request.command);
+      await writeLocalReviewDecision(storage, primaryLibraryId, request.command, hydration);
       return { candidates: [], context: 'local' };
     }
     return { error: 'unsupported-web-request' };

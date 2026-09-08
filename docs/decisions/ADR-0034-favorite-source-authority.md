@@ -16,24 +16,25 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-05
-- Revised: 2026-09-06
+- Revised: 2026-09-08
 
 ## Context
 
 `Work` deliberately contains a provider-independent Tobirink identity, but the
 installed extension also needs the original bookmark URL, browser-folder order
-and import time to reopen a useful source and reconstruct Review. Keeping that
-information only in browser bookmarks would make the connector authoritative;
-putting it in `Work` would mix private navigation data with public identity.
+and import time to reopen a useful source and reconstruct resolution. Browser
+bookmarks own presence and observed progress; IndexedDB owns transactional
+records. Putting source data in `Work` would mix private navigation with public identity.
 
 ## Decision
 
 Add `FavoriteSource` as a private domain record stored in IndexedDB. It owns a
 Tobirink `source_*` identifier, the external bookmark identifier, raw title,
 HTTP(S) URL, folder path and sibling order, canonical import time, and the
-associated Review identifier. A Review remains the authority for resolution;
-its optional matched Work links the source to a stable work without making the
-bookmark identifier or URL a Work identity.
+optional Review identifier and direct matched Work identifier. Import never
+creates a Review. A versioned resolution record owns the automatic outcome;
+Review owns only actionable ambiguity/not-found and explicit human decisions.
+The bookmark identifier or URL never becomes a Work identity.
 
 The application storage port exposes bounded, stable-ID pagination for favorite
 sources. Dexie owns the versioned store and validates every record on reads and
@@ -48,7 +49,7 @@ interruption may leave completed batches visible; rerunning the idempotent
 import safely converges without deleting local records absent from bookmarks.
 
 The local Review queue is read through the existing `status` index with an
-explicit maximum of 100 rows. Only `pending` Reviews enter that snapshot;
+explicit maximum of 100 rows. Only terminal actionable `pending` Reviews with AMBIGUOUS or NOT_FOUND enter that snapshot;
 resolved and no-match decisions remain stored but are excluded. Reading the
 queue does not contact D1 or any metadata provider.
 
@@ -81,12 +82,14 @@ does not activate the dormant candidate adapter.
 
 Global search and the installed Review panel reuse a bounded local title query:
 at most 500 primary-library identifiers are inspected and at most 24 results or
-six Review candidates cross the message boundary. A Review candidate is shown
-only when a resolved local Review provides an HTTP(S) source that can verify it.
+six Review candidates cross the message boundary. A Review candidate is shown from the persisted comparable provider set and its
+provenance. It does not require an artificial resolved Review or a pre-existing
+library Work.
 Candidate, manual local identifier/source, and no-match decisions re-read the
-pending Review, its source, revision and selected Work inside one IndexedDB
-transaction. A stale revision, missing Work, non-library Work or ambiguous
-manual match fails closed. Previous and next only move the in-memory cursor.
+pending Review, its source, revision and exact selected identity inside one
+IndexedDB transaction. A manual public ID/source is hydrated exactly before
+commit; it need not already belong to the library. A stale revision, invalid
+identity or ambiguous manual match fails closed. Previous and next only move the in-memory cursor.
 The dormant HTTP candidate adapter remains uncomposed; no D1 call or host
 permission is introduced by local search.
 

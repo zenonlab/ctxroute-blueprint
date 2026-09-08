@@ -2,7 +2,7 @@ import { favoriteUrlByteLimit, utf8ByteLength } from '@tobirink/domain';
 import type { FavoriteUrlDisposition } from '@tobirink/domain';
 
 const utilitySegments = new Set([
-  'account', 'catalog', 'catalogue', 'genre', 'genres', 'index.html', 'index.php',
+  'account', 'genre', 'genres', 'index.html', 'index.php',
   'login', 'profile', 'search', 'settings', 'tag', 'tags',
 ]);
 const mediaSegments = new Set(['anime', 'manga', 'manhua', 'manhwa', 'webtoon']);
@@ -42,6 +42,7 @@ export function qualifyFavoriteUrl(rawUrl: string): FavoriteUrlQualification {
   if (rawSegments.length === 0) return rejected(rawUrl, 'ROOT_PAGE');
   const decodedSegments = rawSegments.map(decodeSegment);
   const normalizedSegments = decodedSegments.map((segment) => segment.toLowerCase());
+  if (normalizedSegments.length === 1 && ['catalog', 'catalogue'].includes(normalizedSegments[0] ?? '')) return rejected(rawUrl, 'UTILITY_PAGE');
   if (normalizedSegments.some((segment) => utilitySegments.has(segment))) return rejected(rawUrl, 'UTILITY_PAGE');
   if (normalizedSegments.includes('drama') && !normalizedSegments.some((segment) => mediaSegments.has(segment))) {
     return rejected(rawUrl, 'URL_IDENTITY_UNRESOLVED');

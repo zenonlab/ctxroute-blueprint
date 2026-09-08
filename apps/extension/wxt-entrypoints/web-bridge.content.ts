@@ -6,6 +6,7 @@ const siteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
 const pageBridgeMessageSchema = z.union([webHandshakeSchema, webRequestEnvelopeSchema]);
 
 export default defineContentScript({
+  registration: siteOrigin ? 'manifest' : 'runtime',
   matches: siteOrigin ? [`${siteOrigin}/*`] : [],
   runAt: 'document_start',
   main() {

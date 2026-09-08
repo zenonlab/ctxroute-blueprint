@@ -3,9 +3,13 @@
 [`src/tobirink.architecture.json`](src/tobirink.architecture.json) is the
 versioned product source of truth. It shows a local-first domain and application
 core surrounded by replaceable UI, browser, storage, and cloud adapters.
-IndexedDB is the sole private authority. Browser bookmarks import data and may
-receive an optional projection; browser sync holds only a bounded non-secret
-recovery envelope.
+Browser bookmarks own presence and observed progress; IndexedDB owns private
+transactions. Browser sync holds provider IDs only. The Worker alone owns D1
+and its prepared SQL; the site and WebBridge receive typed local projections.
+The main diagram focuses on the corrected favorite path and excludes all
+governance components. The [v3 plan](../systems/favorite-resolution-correction-plan.md)
+is normative for this correction; authored French labels use Archify's English
+viewer controls.
 
 Dependencies point inward. Domain code has no framework or provider imports.
 Application use cases depend on owned ports. WXT, React, Dexie, WebExtension
@@ -33,8 +37,8 @@ Review or the authoritative private IndexedDB records. Its bounded convergence
 view accompanies the implementation contract in
 [`favorite-resolution-rebuild-pipeline.md`](../systems/favorite-resolution-rebuild-pipeline.md):
 inventory slices, checkpoints, additive migration and exact-ID hydration are
-delivered without moving private authority out of IndexedDB. Resolution uses
-an outbox in the same private schema as each source and Review; indexed
+delivered with distinct browser-presence and IndexedDB-transaction authorities. Resolution uses
+an outbox in the same private schema as each source; no Review is created at import; indexed
 provider lanes claim bounded work, and incomplete candidate sets fail closed.
 The separate durable-task database remains the notification adapter and is not
 presented as an atomic resolution outbox. The first implementation wave places

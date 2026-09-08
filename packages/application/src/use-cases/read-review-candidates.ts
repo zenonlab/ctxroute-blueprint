@@ -29,10 +29,11 @@ function hashRevision(value: string, seed: number, backwards = false): string {
 }
 
 export const localReviewRevisionPort: ReviewRevisionPort = Object.freeze({
-  async createRevision({ review, source }: ReviewRevisionInput) {
+  async createRevision({ candidateDigest, review, source }: ReviewRevisionInput) {
     const payload = JSON.stringify([
       review.id,
       review.status,
+      review.availableAt ?? null,
       review.matchedWorkId ?? null,
       review.sourceLabel,
       review.title,
@@ -44,6 +45,9 @@ export const localReviewRevisionPort: ReviewRevisionPort = Object.freeze({
       source.presence,
       source.title,
       source.url,
+      source.resolution ?? null,
+      source.resolutionVersions ?? null,
+      candidateDigest ?? null,
     ]);
     return `review-v1-${hashRevision(payload, 0x811c9dc5)}${hashRevision(payload, 0x9e3779b9, true)}`;
   },

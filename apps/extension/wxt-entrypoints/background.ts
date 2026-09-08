@@ -2,6 +2,7 @@ import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, pa
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
+  mangaDexSourceAdapter,
   WebExtensionBookmarkEventAdapter,
   WebExtensionBookmarkImportAdapter,
   WebExtensionOrganizerAdapter,
@@ -10,8 +11,12 @@ import {
   WebExtensionNotificationAdapter,
   WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
+  WebExtensionProviderIdentitySyncAdapter,
+  WebExtensionProviderIdentitySyncStateAdapter,
+  WebExtensionFavoriteOwnerStateAdapter,
+  HttpFavoriteCollectiveAdapter,
 } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -23,6 +28,9 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
+import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
+import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -44,29 +52,47 @@ export default defineBackground({
     const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
-    const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter] as const;
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
+    const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
+    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(browser.storage.local, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
+    const identitySync = new WebExtensionProviderIdentitySyncAdapter(browser.storage.sync, identityAccessPolicy);
+    const identityRecovery = createProviderIdentityRecoveryRuntime({
+      checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
+      hydration: providerPorts,
+      now,
+      publisher: new ProviderIdentitySyncPublisher(identitySync, new WebExtensionProviderIdentitySyncStateAdapter(browser.storage.local, identityAccessPolicy), Date.now),
+      storage: privateStorage.storage,
+      sync: identitySync,
+    });
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
+      beforeInventory: async () => { await ownerRuntime?.maintain().catch(() => undefined); },
+      collective: ownerRuntime,
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
       hydration: providerPorts,
       libraryId: primaryLibraryId,
+      identityRecovery,
       now,
       outbox: resolutionOutbox,
-      sourceAdapters: favoriteSourceAdapters,
+      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
     });
     browser.runtime.onInstalled.addListener(async () => {
+      await ensureReminderAlarm();
       await privateStorage.ensureReady();
       await reconcileFavorites();
-      await ensureReminderAlarm();
       await resumeNotifications();
     });
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
+    browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
+        void reconcileFavorites(true).catch(() => undefined);
+      }
+    });
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
@@ -85,6 +111,18 @@ export default defineBackground({
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
       const parsed = extensionMessageSchema.safeParse(value);
       if (!parsed.success) return { error: 'invalid-message', ok: false };
+      if (parsed.data.type === 'owner.action') {
+        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
+        if (ownerRuntime === undefined) return { ok: true, status: 'unavailable' };
+        try {
+          const action = parsed.data.action;
+          if (action.kind === 'enable') await ownerRuntime.enable();
+          if (action.kind === 'revoke') await ownerRuntime.revoke();
+          if (action.kind === 'redeem') await ownerRuntime.redeem(action.invitation);
+          if (action.kind === 'pair') return { ok: true, status: await ownerRuntime.status(), invitation: await ownerRuntime.pair() };
+          return { ok: true, status: await ownerRuntime.status() };
+        } catch { return { ok: false, error: 'owner-operation-unavailable' }; }
+      }
       if (parsed.data.type === 'webbridge.handshake') {
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
@@ -92,6 +130,12 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
+      if (parsed.data.type === 'favorite.status.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, counts: await privateStorage.storage.readFavoriteResolutionCounts() };
+        } catch { return { ok: false, error: 'favorite-status-unavailable' }; }
+      }
       if (parsed.data.type === 'review.queue.read') {
         try {
           await privateStorage.ensureReady();
@@ -111,7 +155,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.decision.write') {
         try {
           await privateStorage.ensureReady();
-          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data);
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, providerPorts);
           return { ok: true, status: review.status };
         } catch (error) {
           return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };

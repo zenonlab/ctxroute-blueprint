@@ -87,6 +87,20 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   }
   assert(duplicateReviewRejected, 'Review identity must be unique across favorite sources');
 
+  const { reviewId: _legacyReview, ...directSource } = source;
+  const direct = createFavoriteSource({ ...directSource, bookmarkId: 'bookmark-direct', id: favoriteSourceId('source_direct'), matchedWorkId: id, resolution: { kind: 'RESOLVED' } });
+  await storage.putFavoriteSource(direct);
+  await storage.putFavoriteSource(createFavoriteSource({ ...direct, bookmarkId: 'bookmark-direct-two', id: favoriteSourceId('source_direct-two') }));
+  assert((await storage.listFavoriteSourcesByWorkId({ limit: 1, workId: id }))[0]?.id === direct.id, 'direct Work source index is bounded and works without a Review');
+  assert((await storage.listFavoriteSourcesByWorkId({ limit: 2, workId: id })).length === 2, 'multiple sources without Review are preserved');
+  let sourceMatchLimitRejected = false;
+  try {
+    await storage.listFavoriteSourcesByWorkId({ limit: 101, workId: id });
+  } catch {
+    sourceMatchLimitRejected = true;
+  }
+  assert(sourceMatchLimitRejected, 'direct Work source listing must enforce its bound');
+
   let limitRejected = false;
   try {
     await storage.listFavoriteSources({ limit: 101 });
@@ -136,4 +150,25 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     // Expected contract interruption.
   }
   assert((await storage.getWork(id))?.preferredTitle === 'Contract work', 'interrupted transaction rollback');
+
+  const hydrated = createWork({
+    ...work, externalReferences: [{ provider: 'mangaupdates', externalId: '123' }],
+    hydration: {
+      candidate: { provider: 'mangaupdates', externalId: '123', mediaKind: 'MANGA', preSerialization: false, titles: ['Contract work', 'Contract alias'] },
+      favoriteAliasKeys: ['["MANGA",null,"contract work"]', '["MANGA",2,"contract work"]'],
+      hydratedAt: '2026-09-08T00:00:00.000Z', matcherVersion: 'favorite-matcher-v3', providerTitleKeys: ['contract work', 'contract alias'],
+    },
+  });
+  await storage.putWork(hydrated);
+  assert((await storage.listWorksByIdentityKey({ key: '["MANGA",2,"contract work"]', kind: 'favorite-alias', limit: 1 }))[0]?.id === id, 'secondary alias multi-entry lookup');
+  assert((await storage.listWorksByIdentityKey({ key: 'contract alias', kind: 'provider-title', limit: 1 }))[0]?.id === id, 'secondary provider title multi-entry lookup');
+  assert((await storage.listWorksByIdentityKey({ key: '["MANGA",3,"contract work"]', kind: 'favorite-alias', limit: 1 })).length === 0, 'alias lookup preserves season identity');
+  let identityLimitRejected = false;
+  try { await storage.listWorksByIdentityKey({ key: 'contract work', kind: 'provider-title', limit: 101 }); } catch { identityLimitRejected = true; }
+  assert(identityLimitRejected, 'identity lookup must enforce its bound');
+  assert((await storage.listWorks({ limit: 1 }))[0]?.id === id, 'Work cursor returns the first bounded record');
+  assert((await storage.listWorks({ afterId: id, limit: 1 })).length === 0, 'Work cursor excludes its last record');
+  let workLimitRejected = false;
+  try { await storage.listWorks({ limit: 101 }); } catch { workLimitRejected = true; }
+  assert(workLimitRejected, 'Work cursor must enforce its bound');
 }

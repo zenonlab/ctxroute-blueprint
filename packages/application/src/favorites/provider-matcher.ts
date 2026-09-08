@@ -1,6 +1,9 @@
 import { createResolutionDecision, favoriteAliasLimit, providerCandidateLimit } from '@tobirink/domain';
 import type { FavoriteMatchMethod, ProviderCandidate, ProviderCandidateEnvelope, ProviderCandidateReference, ResolutionDecision } from '@tobirink/domain';
 import { isWithinFavoriteEditDistance, normalizeFavoriteTitle } from './title-normalization';
+import { readLabelledFavoriteSeason, stripFavoriteSeasonSuffix } from './season-extraction';
+
+export const favoriteMatcherVersion = 'favorite-matcher-v3';
 
 export interface FavoriteTitleMatchQuery {
   readonly blockedTaxonomy?: readonly string[];
@@ -19,6 +22,7 @@ interface PreparedTitle {
   readonly compact: string;
   readonly normalized: string;
   readonly significantKey: string;
+  readonly numbers: string;
 }
 
 interface PreparedCandidate {
@@ -45,7 +49,11 @@ function isOva(value?: string): boolean {
 }
 
 export function isProviderCandidateCompatible(query: FavoriteTitleMatchQuery, candidate: ProviderCandidate): boolean {
-  if (query.mediaKind !== undefined && query.mediaKind !== candidate.mediaKind) return false;
+  if (query.mediaKind !== undefined && query.mediaKind !== candidate.mediaKind) {
+    const mangaFamily = query.mediaKind === 'MANGA' && candidate.mediaKind !== 'ANIME';
+    const kitsuManga = query.mediaKind !== 'ANIME' && candidate.provider === 'kitsu-manga' && candidate.mediaKind === 'MANGA';
+    if (!mangaFamily && !kitsuManga) return false;
+  }
   if (query.sourceFormat !== undefined && isOva(query.sourceFormat) !== isOva(candidate.format)) return false;
   if (query.preSerialization !== undefined && query.preSerialization !== candidate.preSerialization) return false;
   return true;
@@ -58,6 +66,7 @@ function prepare(value: string): PreparedTitle {
     compact: normalized.compact,
     normalized: normalized.normalized,
     significantKey: [...normalized.significantTokens].sort().join('\u0000'),
+    numbers: (normalized.normalized.match(/\d+/gu) ?? []).join('|'),
   });
 }
 
@@ -75,6 +84,7 @@ function matchingReferences(sourceTitles: readonly PreparedTitle[], candidates: 
     const matched = item.titles.some((candidateTitle) => sourceTitles.some((sourceTitle) => {
       if (method === 'ordered-exact') return sourceTitle.normalized === candidateTitle.normalized || sourceTitle.compact === candidateTitle.compact;
       if (method === 'reordered-significant-words') return sourceTitle.significantKey.length > 0 && sourceTitle.significantKey === candidateTitle.significantKey;
+      if (sourceTitle.numbers !== candidateTitle.numbers) return false;
       return isWithinFavoriteEditDistance(sourceTitle.compact, candidateTitle.compact);
     }));
     if (matched) {
@@ -101,11 +111,17 @@ function directReferences(query: FavoriteTitleMatchQuery, candidates: readonly P
 
 function seasonReferences(sourceTitles: readonly PreparedTitle[], explicitSeason: number | undefined, candidates: readonly PreparedCandidate[]): readonly ProviderCandidateReference[] {
   if (explicitSeason === undefined) return Object.freeze([]);
-  const seasonSuffix = new RegExp(`\\s+(?:saison|season)\\s*${explicitSeason}\\s*$`, 'iu');
   const compatible = candidates
-    .filter((item) => item.candidate.season === explicitSeason)
-    .map((item) => Object.freeze({ candidate: item.candidate, titles: Object.freeze(item.candidate.titles.map((title) => prepare(title.replace(seasonSuffix, '')))) }));
-  return matchingReferences(sourceTitles, compatible, 'ordered-exact');
+    .filter((item) => corroboratesSeason(item.candidate, explicitSeason))
+    .map((item) => Object.freeze({ candidate: item.candidate, titles: Object.freeze(item.candidate.titles.map((title) => stripFavoriteSeasonSuffix(title, explicitSeason)).filter((title) => title.length > 0).map(prepare)) }));
+  const source = sourceTitles.map((title) => stripFavoriteSeasonSuffix(title.normalized, explicitSeason)).filter((title) => title.length > 0).map(prepare);
+  return matchingReferences(source, compatible, 'ordered-exact');
+}
+
+function corroboratesSeason(candidate: ProviderCandidate, season: number): boolean {
+  if (candidate.season !== undefined) return candidate.season === season;
+  const seasons = new Set(candidate.titles.map(readLabelledFavoriteSeason).filter((value) => value !== undefined));
+  return seasons.size === 1 && seasons.has(season);
 }
 
 function decisionFor(method: FavoriteMatchMethod, references: readonly ProviderCandidateReference[], envelopes: readonly ProviderCandidateEnvelope[]): ResolutionDecision | undefined {
@@ -119,13 +135,20 @@ function decisionFor(method: FavoriteMatchMethod, references: readonly ProviderC
 }
 
 export function matchFavoriteTitles(query: FavoriteTitleMatchQuery, envelopes: readonly ProviderCandidateEnvelope[]): FavoriteTitleMatchOutcome {
-  if (query.sourceTitles.length === 0) throw new TypeError('sourceTitles must contain at least one title.');
-  if (query.sourceTitles.length > favoriteAliasLimit) throw new RangeError(`sourceTitles accepts at most ${favoriteAliasLimit} titles.`);
   if (envelopes.length === 0) throw new TypeError('at least one provider envelope is required.');
   if (new Set(envelopes.map((envelope) => envelope.provider)).size !== envelopes.length) throw new TypeError('only one envelope per provider is allowed.');
   const candidateCount = envelopes.reduce((total, envelope) => total + envelope.candidates.length, 0);
   if (candidateCount > providerCandidateLimit) throw new RangeError(`matcher accepts at most ${providerCandidateLimit} candidates.`);
   if (envelopes.some((envelope) => !envelope.complete || envelope.truncated)) return Object.freeze({ kind: 'INCOMPLETE_CANDIDATE_SET' });
+  const evidence = inspectFavoriteTitleCandidates(query, envelopes.flatMap((envelope) => envelope.candidates));
+  return decisionFor(evidence.level, evidence.candidateReferences, envelopes)
+    ?? createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'bounded-edit-distance', reasons: ['no-candidate-at-any-level'] }, envelopes);
+}
+
+export function inspectFavoriteTitleCandidates(query: FavoriteTitleMatchQuery, input: readonly ProviderCandidate[]): Readonly<{ level: FavoriteMatchMethod; candidateReferences: readonly ProviderCandidateReference[] }> {
+  if (query.sourceTitles.length === 0) throw new TypeError('sourceTitles must contain at least one title.');
+  if (query.sourceTitles.length > favoriteAliasLimit) throw new RangeError(`sourceTitles accepts at most ${favoriteAliasLimit} titles.`);
+  if (input.length > providerCandidateLimit) throw new RangeError(`matcher accepts at most ${providerCandidateLimit} candidates.`);
   if (query.explicitSeason !== undefined && (!Number.isSafeInteger(query.explicitSeason) || query.explicitSeason <= 0)) throw new TypeError('explicitSeason must be a positive safe integer.');
   if (query.sourceCanonicalUrl !== undefined) {
     const parsed = new URL(query.sourceCanonicalUrl);
@@ -134,18 +157,20 @@ export function matchFavoriteTitles(query: FavoriteTitleMatchQuery, envelopes: r
   }
 
   const sourceTitles = Object.freeze(query.sourceTitles.map(prepare));
-  const candidates = Object.freeze(envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => isProviderCandidateCompatible(query, candidate)).map((candidate) => Object.freeze({ candidate, titles: Object.freeze(candidate.titles.map(prepare)) })));
+  const candidates = Object.freeze(input.filter((candidate) => isProviderCandidateCompatible(query, candidate)).map((candidate) => Object.freeze({ candidate, titles: Object.freeze(candidate.titles.map(prepare)) })));
+  const explicitSeason = query.explicitSeason;
+  const titleCandidates = explicitSeason === undefined ? candidates : candidates.filter((item) => corroboratesSeason(item.candidate, explicitSeason));
   const levels = [
     ['source-id', () => directReferences(query, candidates, 'source-id')],
     ['source-url', () => directReferences(query, candidates, 'source-url')],
-    ['ordered-exact', () => matchingReferences(sourceTitles, candidates, 'ordered-exact')],
+    ['ordered-exact', () => matchingReferences(sourceTitles, titleCandidates, 'ordered-exact')],
     ['explicit-season', () => seasonReferences(sourceTitles, query.explicitSeason, candidates)],
-    ['reordered-significant-words', () => matchingReferences(sourceTitles, candidates, 'reordered-significant-words')],
-    ['bounded-edit-distance', () => matchingReferences(sourceTitles, candidates, 'bounded-edit-distance')],
+    ['reordered-significant-words', () => matchingReferences(sourceTitles, titleCandidates, 'reordered-significant-words')],
+    ['bounded-edit-distance', () => matchingReferences(sourceTitles, titleCandidates, 'bounded-edit-distance')],
   ] as const;
   for (const [method, findReferences] of levels) {
-    const decision = decisionFor(method, findReferences(), envelopes);
-    if (decision !== undefined) return decision;
+    const candidateReferences = findReferences();
+    if (candidateReferences.length > 0) return Object.freeze({ candidateReferences, level: method });
   }
-  return createResolutionDecision({ candidateReferences: [], kind: 'NO_MATCH', level: 'bounded-edit-distance', reasons: ['no-candidate-at-any-level'] }, envelopes);
+  return Object.freeze({ candidateReferences: [], level: 'bounded-edit-distance' });
 }

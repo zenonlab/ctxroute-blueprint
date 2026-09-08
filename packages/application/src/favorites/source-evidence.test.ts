@@ -41,6 +41,10 @@ describe('favorite source evidence U-01…U-10', () => {
     expect(extractFavoriteSourceEvidence(input('U-03', 'https://fixtures.tobirink.invalid/manga/12345'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED', proofs: [] });
   });
 
+  it.each(['season4', 'season/4', 'saison-4/episode-12'])('preserves the identity preceding a labelled season route %s', (tail) => {
+    expect(extractFavoriteSourceEvidence(input('season-route', `https://fixtures.tobirink.invalid/anime/fixture-series/${tail}`))).toMatchObject({ canonicalUrl: 'https://fixtures.tobirink.invalid/anime/fixture-series', stableSlug: 'fixture-series', mediaKind: 'ANIME' });
+  });
+
   it('U-04 extracts an exact official provider ID before title evidence', () => {
     expect(extractFavoriteSourceEvidence(input('U-04', 'https://anilist.co/anime/1/fixture-u-04'), [anilistAdapter])).toMatchObject({ explicitProviderReference: { externalId: '1', provider: 'anilist' }, mediaKind: 'ANIME', sourceAdapter: 'anilist-url', strategy: 'exact-origin' });
   });

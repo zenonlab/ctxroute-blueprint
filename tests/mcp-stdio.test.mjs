@@ -44,6 +44,27 @@ test('Codex MCP validation enforces the bounded optional startup grace', () => {
   assert.match(result.errors.join('\n'), /3000 ms/u);
 });
 
+test('Codex MCP validation accepts tool configuration nested under an expected server', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-tool-config-'));
+  mkdirSync(join(fixture, '.codex'));
+  writeFileSync(join(fixture, '.mcp.json'), readFileSync(join(root, '.mcp.json')));
+  const config = `${readFileSync(join(root, '.codex/config.toml'), 'utf8')}\n[mcp_servers.ctxroute-progress.tools.progress_status]\napproval_mode = "approve"\n`;
+  writeFileSync(join(fixture, '.codex/config.toml'), config);
+  const result = validateMcpInstallation(fixture);
+  assert.equal(result.ok, true, result.errors.join('\n'));
+});
+
+test('Codex MCP validation still rejects an additional top-level server', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-extra-server-'));
+  mkdirSync(join(fixture, '.codex'));
+  writeFileSync(join(fixture, '.mcp.json'), readFileSync(join(root, '.mcp.json')));
+  const config = `${readFileSync(join(root, '.codex/config.toml'), 'utf8')}\n[mcp_servers.unapproved]\ncommand = "npm"\nargs = ["run", "unknown:mcp"]\ncwd = "."\n`;
+  writeFileSync(join(fixture, '.codex/config.toml'), config);
+  const result = validateMcpInstallation(fixture);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /exactly ctxroute-progress and code-review-graph/u);
+});
+
 test('a real stdio client lists and calls all Progress MCP tools', async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'progress-mcp-stdio-'));
   mkdirSync(join(fixture, '.project')); mkdirSync(join(fixture, 'docs'));

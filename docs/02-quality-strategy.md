@@ -15,7 +15,7 @@ in the same approved step that introduces its corresponding product surface.
 | Static web UI | required | Workbench routes, bridge states, URL filters, weekly rail and secondary pages | Vitest/jsdom plus Playwright at 1440×900 and 390×844 against the static export |
 | Extension E2E | required | Install, library update, progress, background wake-up, permissions, and recovery | Playwright Chromium journeys plus Firefox `web-ext` smoke |
 | Worker integration | required | Hono routes, D1 repository, prepared queries, pagination, validation, errors, and redaction | Cloudflare Vitest pool running in `workerd` against every migration |
-| Migration / recovery | required | IndexedDB upgrade, export/import, browser-sync recovery envelope, encrypted backup, interrupted operation, and rollback compatibility | Fixture matrix for every supported schema version |
+| Migration / recovery | required | IndexedDB upgrade, export/import, fragmented provider-ID sync snapshot, encrypted backup, interrupted operation, and rollback compatibility | Fixture matrix for every supported schema version |
 | Media pipeline | conditional | Rights policy, image decoding, normalization, fixed variants, quantization, object keys, and cache policy | Malformed-image fixtures, visual regression samples, metadata inspection, and R2 orphan audit |
 | Security | required | Permission budget, CSP, messages, imports, HTTP inputs, secrets, and dependencies | Threat-model review, negative fixtures, audit, and package inspection |
 | Accessibility | required | Keyboard, focus, names, contrast, reduced motion, zoom, and screen-reader semantics | Automated checks plus manual release review |
@@ -48,10 +48,11 @@ browser or `workerd` test when platform behavior is the risk.
 - The extension operates without the public API.
 - Provider requests contain only the parsed title or explicit provider ID;
   fixtures reject raw URLs, folders, progress, library and history fields.
-- IndexedDB remains the only active authority; bookmark deletion cannot delete
-  an entry, and repeated import or projection is idempotent.
-- `storage.sync` contains neither secrets nor the full library and rejects a
-  recovery envelope before it approaches browser item or aggregate quotas.
+- Browser bookmarks own presence and observed progress; IndexedDB owns private
+  transactions. Removal detaches a source without deleting historical data.
+- `storage.sync` contains only provider IDs and manifests; quotas include old
+  generations, keys and metadata. Corruption/interruption retains the last
+  validated snapshot. Chrome and Firefox reset journeys must pass.
 - An encrypted backup rejects tampering and a wrong passphrase without exposing
   plaintext or partially replacing local state.
 - `npm run test:recovery` performs real WebCrypto AES-GCM/PBKDF2 round trips,
@@ -69,11 +70,11 @@ browser or `workerd` test when platform behavior is the risk.
   and provider references, rejects malformed limits and cursors, treats query
   values as bound data, and never exposes a private identifier or URL.
 - Manifest permissions correspond to documented user flows. Host permissions
-  equal the three exact catalogue origins; wildcards beyond their path suffix
-  and additional origins fail the package test.
+  match the documented exact provider and Worker origins; no domain wildcard
+  or undocumented origin is accepted.
 - The packaged-Chrome Playwright journey unpacks the produced `1.0.0` ZIP into
   an isolated profile, creates a synthetic bookmark through the real extension,
-  proves Kitsu fallback persistence and production WebBridge rendering, then
+  proves Kitsu fallback after complete primary NO_MATCH and production WebBridge rendering, then
   reloads the private library offline without injecting a bridge mock.
 - Logs and CI artifacts redact URLs, titles, identifiers, payload bodies, and
   secrets unless a field is explicitly classified as safe.
@@ -93,7 +94,10 @@ browser or `workerd` test when platform behavior is the risk.
 - Le snapshot canonique des favoris garde la forme profonde; le gate
   `test:parser-equivalence` exige en plus un test sémantique exécuté pour chacun
   des 82 identifiants, vérifie l’unicité de leurs attentes et maintient le bilan
-  77 conservés / 4 corrigés / `X-01` futur.
+  historique 77 conservés / 4 corrigés / `X-01` futur comme référence initiale.
+  Le plan v3 active X-01 MangaDex. Le corpus clean-room couvre explicitement
+  identité, type, progression, décision et raison sans connexion, export ou
+  donnée FavLib.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.
@@ -118,6 +122,16 @@ browser or `workerd` test when platform behavior is the risk.
   snapshot adapter and Worker tests. It proves strict public fields, stable
   ordering, duplicate rejection, caller-independent output, bounded R2 reads,
   conditional caching and fallback to the last validated local snapshot.
+
+## Favorite correction acceptance
+
+The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
+at import, NOT_FOUND actionability, human-only no-match, owner isolation,
+distinct-owner confirmations, anti-replay batches, indexed SQL, MV3 checkpoints,
+additive migrations and installed Chromium/Firefox evidence. The synthetic
+clean-room corpus tests the reviewed behavior contract without depending on
+FavLib data. Production readiness additionally requires installed-browser,
+Worker/D1, recovery, security, quota and packaging evidence.
 
 ## Inherited tooling boundary
 

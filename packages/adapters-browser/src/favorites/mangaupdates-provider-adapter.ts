@@ -1,9 +1,9 @@
-import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy } from '@tobirink/application';
+import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery } from '@tobirink/application';
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteMediaKind, ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from './provider-http';
 import type { FavoriteProviderFetch } from './provider-http';
 
 export const mangaUpdatesApiOrigin = 'https://api.mangaupdates.com';
@@ -20,7 +20,7 @@ const mangaUpdatesSeriesSchema = z.object({
   url: z.url().optional(),
 }).passthrough();
 const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).passthrough();
-const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(20), total_hits: z.number().int().nonnegative().optional() }).passthrough();
+const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(20), total_hits: z.number().int().nonnegative() }).passthrough();
 type MangaUpdatesSeries = z.infer<typeof mangaUpdatesSeriesSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 
@@ -52,21 +52,23 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== 'mangaupdates') throw new TypeError('MangaUpdates adapter requires provider mangaupdates.');
+    const page = favoriteProviderPage(query.cursor);
     const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, `${seriesEndpoint}/search`, {
-      body: JSON.stringify({ page: 1, perpage: query.limit, search: query.titles[0] }),
+      body: JSON.stringify({ page, perpage: query.limit, search: query.titles[0] }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, mangaUpdatesSearchSchema));
     const candidates = response.value.results.map((result) => candidate(result.record));
     if (candidates.length > query.limit) throw new RangeError('MangaUpdates result exceeds the requested limit.');
-    const totalHits = response.value.total_hits ?? candidates.length;
-    const truncated = totalHits > candidates.length;
-    return createProviderCandidateEnvelope({ candidates, complete: !truncated, digest: response.digest, provider: 'mangaupdates', truncated });
+    const truncated = response.value.total_hits > (page - 1) * query.limit + candidates.length;
+    const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'mangaupdates' as const, truncated };
+    return createProviderCandidateEnvelope(truncated ? { ...envelope, nextCursor: String(page + 1) } : envelope);
   }
 
   async hydrate(reference: FavoriteProviderReference) {
-    if (reference.provider !== 'mangaupdates' || !/^[a-z0-9]+$/iu.test(reference.externalId)) throw new TypeError('MangaUpdates hydration requires a MangaUpdates reference.');
-    const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, `${seriesEndpoint}/${encodeURIComponent(reference.externalId)}`, { headers: { Accept: 'application/json' }, method: 'GET' }, mangaUpdatesSeriesSchema));
+    if (reference.provider !== 'mangaupdates' || !/^[1-9]\d{0,18}$/u.test(reference.externalId)) throw new TypeError('MangaUpdates hydration requires a numeric MangaUpdates reference.');
+    const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderIdentityJson(this.fetcher, `${seriesEndpoint}/${encodeURIComponent(reference.externalId)}`, { headers: { Accept: 'application/json' }, method: 'GET' }, mangaUpdatesSeriesSchema));
+    if (response === undefined) return undefined;
     const hydrated = candidate(response.value);
     if (hydrated.externalId !== reference.externalId) throw new Error('MangaUpdates hydration returned a different series identity.');
     return hydrated;

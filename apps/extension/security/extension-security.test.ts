@@ -16,6 +16,9 @@ const generatedManifestSchema = z.object({
   }).optional(),
   content_security_policy: z.object({ extension_pages: z.string() }),
   host_permissions: z.array(z.string()).optional(),
+  externally_connectable: z.object({ matches: z.array(z.string()).min(1) }).optional(),
+  content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })).optional(),
+  minimum_chrome_version: z.string().optional(),
   icons: z.record(z.string(), z.string()),
   manifest_version: z.number(),
   permissions: z.array(z.string()),
@@ -37,10 +40,13 @@ describe('extension security boundary', () => {
     const value = await loadManifest();
     const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
     expect(value.manifest_version).toBe(3);
+    if (_target === 'chrome-mv3') expect(value.minimum_chrome_version).toBe('140');
     expect(value.host_permissions ?? []).toEqual([
+      'https://api.mangadex.org/*',
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',
+      ...(value.externally_connectable?.matches ?? []),
     ]);
     expect(value.permissions?.every((permission) => allowed.has(permission))).toBe(true);
     expect(value.permissions).toEqual(expect.arrayContaining(['activeTab', 'alarms', 'bookmarks', 'notifications', 'storage']));

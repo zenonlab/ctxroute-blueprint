@@ -18,7 +18,7 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     const adapter = new MangaUpdatesFavoriteProviderAdapter(fetcher);
     await expect(adapter.hydrate({ externalId: '12345', provider: 'mangaupdates' })).resolves.toMatchObject({ externalId: '12345' });
     expect(fetcher).toHaveBeenCalledWith(`${mangaUpdatesApiOrigin}/v1/series/12345`, expect.objectContaining({ method: 'GET' }));
-    await expect(adapter.hydrate({ externalId: 'abc123', provider: 'mangaupdates' })).rejects.toThrow(/different series identity/u);
+    await expect(adapter.hydrate({ externalId: 'abc123', provider: 'mangaupdates' })).rejects.toThrow(/numeric/u);
     await expect(adapter.hydrate({ externalId: '../bad', provider: 'mangaupdates' })).rejects.toThrow();
   });
 });

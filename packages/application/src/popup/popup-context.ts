@@ -153,8 +153,9 @@ async function matchLocalPage(session: StorageSession, page: { title: string; ur
   const matchingSources = sources.filter((source) => source.presence === 'observed' && normalise(titleFromPage(source.title, source.url)) === titleKey);
   const workIds = new Set<Work['id']>();
   for (const source of matchingSources) {
-    const review = await session.getReview(source.reviewId);
-    if (review?.status === 'resolved' && review.matchedWorkId) workIds.add(review.matchedWorkId);
+    const review = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
+    const matchedWorkId = source.matchedWorkId ?? review?.matchedWorkId;
+    if (matchedWorkId !== undefined) workIds.add(matchedWorkId);
   }
   if (workIds.size !== 1) return undefined;
   const [matchedWorkId] = workIds;

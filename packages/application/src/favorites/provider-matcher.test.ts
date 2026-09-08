@@ -96,4 +96,19 @@ describe('deterministic favorite title matcher P-01…P-08', () => {
   it('rejects punctuation-only aliases instead of comparing empty keys', () => {
     expect(() => matchFavoriteTitles({ sourceTitles: ['---'] }, [envelope([])])).toThrow(/letter or number/u);
   });
+
+  it('keeps Hunter × Hunter editions ambiguous across typographic title variants', () => {
+    const editions = [candidate('1999', 'Hunter x Hunter'), candidate('2011', 'Hunter × Hunter')];
+    expect(matchFavoriteTitles({ sourceTitles: ['Hunter × Hunter'] }, [envelope(editions)])).toMatchObject({ kind: 'AMBIGUOUS', level: 'ordered-exact' });
+  });
+
+  it('accepts a unique minor typo but preserves intrinsic numbers and corroborated seasons', () => {
+    expect(matchFavoriteTitles({ sourceTitles: ['Frieran'] }, [envelope([candidate('1', 'Frieren')])])).toMatchObject({ kind: 'MATCH', level: 'bounded-edit-distance' });
+    expect(matchFavoriteTitles({ sourceTitles: ['Synthetic Number 20'] }, [envelope([candidate('1', 'Synthetic Number 21')])])).toMatchObject({ kind: 'NO_MATCH' });
+    expect(matchFavoriteTitles({ explicitSeason: 2, sourceTitles: ['Synthetic Journey'] }, [envelope([{ ...candidate('1', 'Synthetic Journey'), season: 1 }])])).toMatchObject({ kind: 'NO_MATCH' });
+  });
+
+  it('compares corroborated season suffixes in both titles without removing intrinsic numbers', () => {
+    expect(matchFavoriteTitles({ explicitSeason: 2, sourceTitles: ['Area 51 Saison 2'] }, [envelope([candidate('1', 'Area 51 2nd Season'), candidate('2', 'Area 52 2nd Season')])])).toMatchObject({ kind: 'MATCH', level: 'explicit-season', matchedReference: { externalId: '1' } });
+  });
 });

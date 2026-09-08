@@ -16,18 +16,82 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
-  it('atomically creates a private source and pending Review', async () => {
+  it('archives an artificial import Review with a before-image and resumes resolution once', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const id = reviewId(`review_${source.id.slice('source_'.length)}`);
+    const review = createReview({ id, sourceLabel: source.url, status: 'pending', title: source.title });
+    await storage.putReview(review);
+    await storage.putFavoriteSource({ ...source, reviewId: id });
+    const taskId = 'favorite-resolution_4_3432';
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    if (!task) throw new Error('Expected task.');
+    await storage.putFavoriteResolutionTask(commitTask(recordTaskEffect(claimTask(task, 'old', importedAt, '2026-09-06T00:01:00.000Z'), 'old', 'review:ambiguous'), 'old'));
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect((await storage.getFavoriteSource(source.id))?.reviewId).toBeUndefined();
+    expect(await storage.getReview(id)).toEqual(review);
+    expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY' });
+    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:correction-v1`);
+    expect(receipt).toMatchObject({ correction: { review, source: { reviewId: id }, task: { state: 'COMMITTED' } }, effectDigest: 'correction:import-pending' });
+    await importFavoriteSources([favorite], storage, '2026-09-06T02:00:00.000Z');
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:correction-v1`)).toEqual(receipt);
+  });
+
+  it.each(['resolved', 'no-match'] as const)('preserves a legacy %s decision with uncertain origin', async (status) => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const id = reviewId(`review_${source.id.slice('source_'.length)}`);
+    const base = { id, sourceLabel: source.url, status, title: source.title };
+    const review = createReview(status === 'resolved' ? { ...base, matchedWorkId: workId('work_legacy1') } : base);
+    await storage.putReview(review);
+    await storage.putFavoriteSource({ ...source, reviewId: id });
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getReview(id)).toEqual(review);
+    expect((await storage.getFavoriteSource(source.id))?.reviewId).toBe(id);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:correction-v1`)).toBeUndefined();
+  });
+
+  it('atomically creates a private source and task without any Review', async () => {
     const storage = new MemoryStoragePort();
     await expect(importFavoriteSources([favorite, { ...favorite, bookmarkId: 'ignored', state: 'ignored' }], storage, importedAt))
       .resolves.toEqual({ ignored: 1, imported: 1 });
 
     const [source] = await storage.listFavoriteSources({ limit: 10 });
     expect(source).toMatchObject({ bookmarkId: '42', folderPath: ['Lectures', 'Manga'], importedAt, order: 3 });
-    expect(source && await storage.getReview(source.reviewId)).toMatchObject({ status: 'pending', title: favorite.title });
-    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt, reviewId: source?.reviewId });
+    expect(source?.reviewId).toBeUndefined();
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
+    expect(source && await storage.getFavoriteParseArtifact(source.id)).toMatchObject({ artifact: { raw: { title: favorite.title, url: favorite.url } }, recordedAt: importedAt });
     const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     expect(task).toMatchObject({ availableAt: '1970-01-01T00:00:00.000Z', kind: 'favorite-resolution', state: 'READY' });
     expect(task?.payload).toContain(source?.id);
+  });
+
+  it.each([
+    { origin: 'automatic' as const, matcher: 'favorite-matcher-v2', invalidate: true },
+    { origin: 'human' as const, matcher: 'favorite-matcher-v2', invalidate: false },
+    { origin: 'automatic' as const, matcher: 'future-matcher-v90', invalidate: false },
+  ])('invalidates only known faulty automatic decisions: $origin / $matcher', async ({ origin, matcher, invalidate }) => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const work = createWork({ externalReferences: [{ externalId: '123', provider: 'anilist' }], id: workId('work_preserved'), mediaKind: 'anime', preferredTitle: 'Synthetic work' });
+    const id = reviewId('review_preserved');
+    const review = createReview({ decisionOrigin: origin, id, matchedWorkId: work.id, sourceLabel: source.url, status: 'resolved', title: source.title });
+    await storage.putWork(work);
+    await storage.putReview(review);
+    await storage.putFavoriteSource({ ...source, matchedWorkId: work.id, resolution: { kind: 'RESOLVED' }, resolutionVersions: { schema: 1, decision: 1, receipt: 1, parser: 'favorite-parser-v3', matcher, siteRules: 'source-adapter-v2:generic-url' }, reviewId: id });
+    await importFavoriteSources([favorite], storage, importedAt);
+    const updated = await storage.getFavoriteSource(source.id);
+    expect(updated?.reviewId).toBe(invalidate ? undefined : id);
+    expect(updated?.matchedWorkId).toBe(invalidate ? undefined : work.id);
+    expect(await storage.getReview(id)).toEqual(review);
+    expect(await storage.getWork(work.id)).toEqual(work);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:correction-v1`)).toEqual(invalidate ? expect.objectContaining({ effectDigest: 'correction:faulty-automatic' }) : undefined);
   });
 
   it('Q-02 creates a new semantic task revision while preserving import time and a resolved Review', async () => {
@@ -36,16 +100,18 @@ describe('importFavoriteSources', () => {
     const [initial] = await storage.listFavoriteSources({ limit: 1 });
     if (!initial) throw new Error('Expected imported source.');
     const work = createWork({ externalReferences: [], id: workId('work_frieren140'), mediaKind: 'manga', preferredTitle: 'Frieren' });
-    await storage.transaction(['works', 'reviews'], async (session) => {
+    const humanReviewId = reviewId('review_human1');
+    await storage.transaction(['works', 'reviews', 'favoriteSources'], async (session) => {
       await session.putWork(work);
-      await session.putReview(createReview({ id: initial.reviewId, matchedWorkId: work.id, sourceLabel: initial.url, status: 'resolved', title: initial.title }));
+      await session.putReview(createReview({ decisionOrigin: 'human', id: humanReviewId, matchedWorkId: work.id, sourceLabel: initial.url, status: 'resolved', title: initial.title }));
+      await session.putFavoriteSource({ ...initial, reviewId: humanReviewId });
     });
 
     const initialTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     await importFavoriteSources([{ ...favorite, folderPath: ['À lire'], order: 0, title: 'Frieren', url: 'https://reader.example/frieren' }], storage, '2026-09-06T01:00:00.000Z');
     const [updated] = await storage.listFavoriteSources({ limit: 1 });
     expect(updated).toMatchObject({ folderPath: ['À lire'], importedAt, order: 0, title: 'Frieren' });
-    expect(updated && await storage.getReview(updated.reviewId)).toMatchObject({ matchedWorkId: work.id, status: 'resolved', title: 'Frieren' });
+    expect(await storage.getReview(humanReviewId)).toMatchObject({ decisionOrigin: 'human', matchedWorkId: work.id, status: 'resolved', title: initial.title });
     const revisedTask = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     expect(revisedTask).toMatchObject({ state: 'READY' });
     expect(revisedTask?.idempotencyKey).not.toBe(initialTask?.idempotencyKey);

@@ -1,4 +1,4 @@
-import { AniListFavoriteProviderAdapter, FavoriteProviderRateGate, KitsuFavoriteProviderAdapter, MangaUpdatesFavoriteProviderAdapter } from '@tobirink/adapters-browser';
+import { AniListFavoriteProviderAdapter, FavoriteProviderRateGate, KitsuFavoriteProviderAdapter, MangaDexFavoriteProviderAdapter, MangaUpdatesFavoriteProviderAdapter } from '@tobirink/adapters-browser';
 import type { FavoriteProviderRateCheckpointPort } from '@tobirink/adapters-browser';
 
 export function createFavoriteProviderPorts(checkpoints: FavoriteProviderRateCheckpointPort) {
@@ -6,5 +6,6 @@ export function createFavoriteProviderPorts(checkpoints: FavoriteProviderRateChe
   const kitsuAnime = new KitsuFavoriteProviderAdapter('kitsu-anime', undefined, new FavoriteProviderRateGate('kitsu-anime', checkpoints));
   const kitsuManga = new KitsuFavoriteProviderAdapter('kitsu-manga', undefined, new FavoriteProviderRateGate('kitsu-manga', checkpoints));
   const mangaupdates = new MangaUpdatesFavoriteProviderAdapter(undefined, new FavoriteProviderRateGate('mangaupdates', checkpoints));
-  return Object.freeze({ anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': kitsuManga, mangaupdates });
+  const mangadex = new MangaDexFavoriteProviderAdapter(undefined, new FavoriteProviderRateGate('mangadex', checkpoints));
+  return Object.freeze({ anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': kitsuManga, mangadex, mangaupdates });
 }

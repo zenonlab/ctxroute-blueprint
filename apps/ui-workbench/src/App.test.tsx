@@ -12,7 +12,7 @@ describe('UI workbench', () => {
   it('navigates the complete plan and renders the matching preview', () => {
     render(<App />);
 
-    expect(screen.getByLabelText('24 éléments')).toBeTruthy();
+    expect(screen.getByLabelText('26 éléments')).toBeTruthy();
     fireEvent.change(catalogueSearch(), { target: { value: 'Review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Panneau Review' }));
 
@@ -128,6 +128,7 @@ describe('UI workbench', () => {
     expect(screen.getByText('Décision prête · manual')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Aucune correspondance' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmer aucune correspondance', exact: true }));
     expect(screen.getByText('Décision prête · none')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('État'), { target: { value: 'conflict' } });

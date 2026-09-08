@@ -1,8 +1,11 @@
-import { addWork, createLibrary, createWork, workId } from '@tobirink/domain';
-import type { LibraryId, ProviderCandidate, Review } from '@tobirink/domain';
+import { addWork, createFavoriteSource, createLibrary, createReview, createWork, reviewId, workId } from '@tobirink/domain';
+import type { ExternalReference, FavoriteResolutionResult, LibraryId, ProviderCandidate, WorkId } from '@tobirink/domain';
 import type { FavoriteReviewCandidateSet, StoragePort } from '../ports/storage-port';
 import { commitTask, parseFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
 import type { DurableTask } from '../tasks';
+import { favoriteResolutionResultSchema, favoriteResolutionVersions } from './resolution-result-schema';
+import { favoriteArtifactAliasKeys } from './local-favorite-identity';
+import { normalizeFavoriteTitle } from './title-normalization';
 
 interface FavoriteResolutionCommitDependencies {
   readonly libraryId: LibraryId;
@@ -10,7 +13,13 @@ interface FavoriteResolutionCommitDependencies {
   readonly storage: StoragePort;
 }
 
-export function favoriteCandidateWorkId(candidate: ProviderCandidate) {
+interface FavoriteResolvedIdentity {
+  readonly workId?: WorkId | undefined;
+  readonly hydratedAt?: string | undefined;
+  readonly references?: readonly ExternalReference[];
+}
+
+export function favoriteCandidateWorkId(candidate: Pick<ProviderCandidate, 'provider' | 'externalId'>) {
   const encoded = [...new TextEncoder().encode(`${candidate.provider}:${candidate.externalId}`)]
     .map((value) => value.toString(16).padStart(2, '0')).join('');
   return workId(`work_${encoded}`);
@@ -20,30 +29,63 @@ export async function persistFavoriteResolutionCompletion(
   dependencies: FavoriteResolutionCommitDependencies,
   task: DurableTask,
   token: string,
-  review: Review,
+  result: FavoriteResolutionResult,
   effect: string,
   candidate?: ProviderCandidate,
-  candidateSet?: FavoriteReviewCandidateSet,
+  candidateSet?: Omit<FavoriteReviewCandidateSet, 'reviewId'>,
+  identity?: FavoriteResolvedIdentity,
 ): Promise<void> {
-  const stores = candidate === undefined
-    ? candidateSet === undefined ? ['favoriteResolutionReceipts', 'favoriteResolutionTasks', 'reviews'] as const : ['favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'reviews'] as const
-    : ['favoriteResolutionReceipts', 'favoriteResolutionTasks', 'libraries', 'reviews', 'works'] as const;
-  await dependencies.storage.transaction(stores, async (session) => {
-    if (candidate !== undefined) {
-      const work = createWork({
-        externalReferences: [{ externalId: candidate.externalId, provider: candidate.provider }],
-        id: review.matchedWorkId ?? favoriteCandidateWorkId(candidate),
-        mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
-        preferredTitle: candidate.titles.find((title) => title.trim().length > 0) ?? review.title,
-      });
-      await session.putWork(work);
-      const library = await session.getLibrary(dependencies.libraryId) ?? createLibrary(dependencies.libraryId);
-      if (!library.workIds.includes(work.id)) await session.putLibrary(addWork(library, work.id));
-    }
-    if (candidateSet !== undefined) await session.putFavoriteReviewCandidateSet(candidateSet);
-    await session.putReview(review);
-    await session.putFavoriteResolutionTask(commitTask(recordTaskEffect(task, token, effect), token));
+  const resolution = favoriteResolutionResultSchema.parse(result);
+  await dependencies.storage.transaction([
+    'favoriteArtifacts', 'favoriteSources', 'favoriteResolutionReceipts',
+    'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'libraries', 'reviews', 'works',
+  ], async (session) => {
     const payload = parseFavoriteResolutionTaskPayload(task.payload);
-    await session.putFavoriteResolutionReceipt({ completedAt: dependencies.now(), effectDigest: effect, id: `${payload.sourceId}:favorite-resolution`, idempotencyKey: task.idempotencyKey, sourceId: payload.sourceId });
+    const source = await session.getFavoriteSource(payload.sourceId);
+    const record = await session.getFavoriteParseArtifact(payload.sourceId);
+    const currentTask = await session.getFavoriteResolutionTask(task.id);
+    if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
+      || currentTask?.claimToken !== token || currentTask.state !== 'CLAIMED'
+      || currentTask.idempotencyKey !== task.idempotencyKey
+      || currentTask.claimExpiresAt === undefined || currentTask.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
+    const existingReview = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
+    const protectedDecision = existingReview !== undefined && existingReview.status !== 'pending';
+    const versions = favoriteResolutionVersions(record.artifact);
+    if (!protectedDecision) {
+      let updated = createFavoriteSource({ ...source, resolution, resolutionVersions: versions });
+      if (resolution.kind === 'RESOLVED') {
+        if (!candidate || source.presence !== 'observed') throw new Error('RESOLVED_REQUIRES_CURRENT_CANDIDATE');
+        const id = identity?.workId ?? favoriteCandidateWorkId(candidate);
+        const previous = await session.getWork(id);
+        if (identity?.workId !== undefined && !previous?.externalReferences.some((reference) => reference.provider === candidate.provider && reference.externalId === candidate.externalId)) throw new Error('STALE_WORK_IDENTITY');
+        const favoriteAliasKeys = [...new Set([...(previous?.hydration?.matcherVersion === versions.matcher ? previous.hydration.favoriteAliasKeys : []), ...favoriteArtifactAliasKeys(record.artifact, candidate)])].slice(0, 64);
+        const work = createWork({
+          externalReferences: [...new Map([...(previous?.externalReferences ?? []), ...(identity?.references ?? []), { externalId: candidate.externalId, provider: candidate.provider }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()],
+          hydration: { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))] },
+          id,
+          mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
+          preferredTitle: candidate.titles.find((title) => title.trim().length > 0) ?? source.title,
+        });
+        await session.putWork(work);
+        const library = await session.getLibrary(dependencies.libraryId) ?? createLibrary(dependencies.libraryId);
+        if (!library.workIds.includes(work.id)) await session.putLibrary(addWork(library, work.id));
+        updated = createFavoriteSource({ ...updated, matchedWorkId: work.id });
+        if (existingReview) await session.putReview(createReview({ ...existingReview, decisionOrigin: 'automatic', matchedWorkId: work.id, status: 'resolved' }));
+      } else if (resolution.kind === 'REVIEW_REQUIRED') {
+        if (source.presence !== 'observed') throw new Error('STALE_PRIVATE_REFERENCE');
+        const id = source.reviewId ?? reviewId(`review_${source.id.slice('source_'.length)}`);
+        await session.putReview(createReview({ id, reason: resolution.reason, sourceLabel: source.url, status: 'pending', title: source.title }));
+        const compared = candidateSet ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };
+        await session.putFavoriteReviewCandidateSet({ ...compared, reviewId: id });
+        updated = createFavoriteSource({ ...updated, reviewId: id });
+      }
+      await session.putFavoriteSource(updated);
+    }
+    await session.putFavoriteResolutionTask(commitTask(recordTaskEffect(currentTask, token, effect), token));
+    await session.putFavoriteResolutionReceipt({
+      completedAt: dependencies.now(), effectDigest: protectedDecision ? 'decision:preserved' : effect,
+      id: `${payload.sourceId}:favorite-resolution`, idempotencyKey: task.idempotencyKey,
+      sourceId: payload.sourceId, versions,
+    });
   });
 }

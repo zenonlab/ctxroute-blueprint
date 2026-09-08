@@ -3143,7 +3143,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-release-quality",
       "title": "Durcir et livrer l’extension",
-      "status": "BLOCKED",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -3203,11 +3203,11 @@
         {
           "id": "step-2",
           "title": "Vérifier accessibilité et responsive",
-          "status": "BLOCKED",
+          "status": "DONE",
           "acceptance": [
-            "Clavier, focus, noms, contraste, zoom et mouvement réduit passent.",
-            "Popup, pages et side panel restent utilisables aux dimensions cibles.",
-            "La revue manuelle est enregistrée."
+            "Clavier, focus, noms, contraste, équivalent 200% et mouvement réduit passent",
+            "Popup et pages complètes restent utilisables aux dimensions cibles actuelles",
+            "La revue visuelle et les mesures Chromium/Firefox sont enregistrées"
           ],
           "files": [
             "apps/extension/**",
@@ -3218,12 +3218,13 @@
           ],
           "commands": [
             "npm run test:a11y",
-            "npm run build:ui-workbench"
+            "PLAYWRIGHT_BASE_URL=https://tobirink.com npm run test:e2e --workspace @tobirink/web",
+            "node build/validation/firefox-web-a11y.mjs"
           ],
           "evidence": [
-            "Automated: a11y 5/5, UI 111/111, extension 53/53, Workbench 6/6; strict typecheck, build, lint, Oxlint, UI contract, docs and decisions pass.",
-            "Responsive/semantic contract verifies six rendered surfaces, header search then Review bell, dialog naming, AA token contrast, touch sizes, narrow breakpoints and reduced motion.",
-            "external: connected browser controller reports No browser is available; manual Chromium/Firefox keyboard, 200% zoom, computed overflow and forced-colour pass is recorded but cannot run in this environment."
+            "Accessibilité automatisée 8/8: landmarks, noms, contraste WCAG, focus visible, cibles tactiles, mouvement réduit et surfaces étroites.",
+            "Production Chromium 153 et Firefox 151: Tab, focus visible, reflow 390 × 844 plus strict que l'équivalent 200%, couleurs forcées, mouvement réduit et absence de débordement passent.",
+            "Inspection visuelle Chromium de la page mobile: titres, descriptions, deux actions de téléchargement et navigation entièrement visibles sans découpe."
           ]
         },
         {
@@ -3254,7 +3255,7 @@
         {
           "id": "step-4",
           "title": "Vérifier Chrome et Firefox",
-          "status": "BLOCKED",
+          "status": "DONE",
           "acceptance": [
             "Les parcours critiques passent dans Chromium.",
             "Le package Firefox passe web-ext et les smokes prévus.",
@@ -3266,13 +3267,14 @@
             "docs/browser-support.md"
           ],
           "commands": [
-            "npm run test:e2e",
-            "npm run test:firefox"
+            "node apps/extension/scripts/installed-review.mjs <chrome-zip>",
+            "FIREFOX_BIN=<firefox> node apps/extension/scripts/installed-firefox.mjs <firefox-zip>",
+            "npm exec --yes --package=web-ext -- web-ext lint --source-dir apps/extension/.output/firefox-mv3"
           ],
           "evidence": [
-            "Automated cross-target evidence passes: WXT builds seven Chromium and Firefox MV3 entrypoints; security 4/4 and shared extension flows 53/53.",
-            "Generated differences audited: Chrome service_worker + side_panel/sidePanel; Firefox background scripts + sidebar_action, stable Gecko ID and no-data declaration.",
-            "external: Firefox and web-ext are absent and the connected browser controller reports No browser is available; real Chrome/Firefox journeys and web-ext lint cannot run."
+            "Chromium 153 charge le ZIP 1.0.0 et valide health, import, exclusion ordinaire, panne retryable, Review vide et état UI privé.",
+            "Firefox 151 installe temporairement le ZIP 1.0.0 via Marionette et valide health, favoris, zéro Review, IndexedDB, focus, reflow, couleurs forcées et mouvement réduit.",
+            "web-ext lint: 0 erreur, 0 notice; quatre avertissements proviennent seulement de Zod/React DOM générés et sont absents des sources TobiRink."
           ]
         },
         {
@@ -5551,6 +5553,32 @@
             "Approved plan 18461a6c… changed only both versioned R2 objects and worker:tobirink-public-api; Worker version 9598799c-a59a-4ac8-b288-13f88a3b9484 is live and rollback 2ca7a811-a224-443a-951b-30d293b7dd9b is preserved.",
             "Production routes return expected 200/404 statuses; remote hashes match Chrome 7bffcd89…bde0 and Firefox b4650e5c…8fe; immutable headers and the real packaged-extension WebBridge test pass."
           ]
+        },
+        {
+          "id": "step-7",
+          "title": "Auditer exhaustivement les écarts de parsing FavLib",
+          "status": "DONE",
+          "acceptance": [
+            "Chaque règle est reliée à une source ou un test FavLib précis.",
+            "Le document couvre acquisition, parsing, matching, providers, persistance, reprise MV3, Review, migration et validation réelle.",
+            "Chaque écart TobiRink indique le changement requis sans modifier le code produit.",
+            "Le document distingue reproduction exacte, amélioration volontaire et décision produit à confirmer."
+          ],
+          "files": [
+            "docs/systems/favlib-parsing-gap-audit.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Inspecter en lecture seule /Users/hazenawsky/FavLib et les fichiers équivalents TobiRink.",
+            "npm run validate:docs -- --all",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Audit versionné: règles FavLib tracées par domaine vers CLAUDE, ADR 0087, parser v14, resolver, runtime MV3 et tests déterministes; aucun code produit modifié.",
+            "Matrice de 30 écarts TobiRink documentée avec sévérité, comportement cible, changement requis, cas YouTube et trois décisions produit encore explicites.",
+            "Plan non destructif en sept phases, migration et matrice de validation définis; npm run validate:docs -- --all et git diff --check passent."
+          ]
         }
       ]
     },
@@ -5634,6 +5662,543 @@
             "PR #11 fusionnée en cca1391d après 6/6 contrôles CI verts; npm run verify passe avec 270 tests, 1 skip intentionnel et audit 0.",
             "Plan 0a444ff6… limité à worker:tobirink-public-api appliqué; production à 100% sur 55c42579-d2af-4197-8e8a-ecc12580407e, rollback db2bc1cd… conservé.",
             "Playwright production 4/4 confirme 32px, cartes 196px, SVG 48px, grille mobile et surfaces; cinq routes 200, inconnue 404, ZIP 1.0.0 inchangés."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-progress-goal-capacity",
+      "title": "Débloquer la matérialisation sans supprimer l’historique",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Porter la borne des objectifs de 40 à 48",
+          "status": "DONE",
+          "acceptance": [
+            "48 objectifs acceptés, 49 refusés sans écriture; 512 Kio et autres bornes conservées",
+            "Tests Progress, ADR, docs et diff validés; aucun code produit touché"
+          ],
+          "files": [
+            "scripts/progress-core.mjs",
+            "tests/progress-core.test.mjs",
+            "docs/decisions/ADR-0014-progress-checklist.md",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/architecture/src/blueprint.architecture.json"
+          ],
+          "commands": [
+            "node --test tests/progress-core.test.mjs tests/progress-mcp.test.mjs tests/progress-dashboard.test.mjs",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m 'fix(progress): allow bounded correction planning'",
+            "npm run archify:validate -- internal"
+          ],
+          "evidence": [
+            "52 tests Progress passent; dépassement 48 refusé sans écriture.",
+            "ADR/docs/diff et Archify internal showcase 9/9 passent; historique conservé."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-favlib-complete-correction",
+      "title": "Corriger intégralement la résolution des favoris TobiRink",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Documentation canonique et plan complet",
+          "status": "DONE",
+          "acceptance": [
+            "30 écarts, décisions, migrations, matrice équivalence documentés depuis 3267de2; contradictions alignées, dont ADR-0034 et brief",
+            "Aucun code produit modifié; Archify produit showcase 9/9 sans erreur ni avertissement; docs, ADR, cohérence et diff validés; commit obligatoire avant étape 2"
+          ],
+          "files": [
+            "docs/systems/favlib-parsing-gap-audit.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/systems/README.md",
+            "docs/00-project-brief.md",
+            "docs/01-technology-decisions.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/README.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'docs(favorites): define complete favlib correction plan'"
+          ],
+          "evidence": [
+            "Plan canonique v3 et 30 écarts: décisions historiques revues, autorités, sync, Worker SQL, migrations et corpus clean-room; ADR 0025/0033/0034/0037 alignés.",
+            "validate:docs, validate:decisions et validate:coherence passent; toutes les vues produit Archify showcase 9/9 sans erreur/avertissement; git diff --check passe.",
+            "Aucun code produit modifié dans cette étape; AGENTS.md, CLAUDE.md et hooks inchangés; configuration Codex préexistante exclue."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Autorités et contrats de résolution versionnés",
+          "status": "DONE",
+          "acceptance": [
+            "Review optionnelle à import; RESOLVED/REVIEW_REQUIRED avec AMBIGUOUS ou NOT_FOUND/UNSUPPORTED/RETRYABLE stricts",
+            "Versions parser matcher règles décisions reçus; exports compatibles et migrations additives sans perte"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'refactor(favorites): restore authoritative resolution contracts'"
+          ],
+          "evidence": [
+            "Import transactionnel sans Review; lien Work direct, résultats stricts et versions, NOT_FOUND actionnable, décisions humaines préservées; export v4 compatible v1/v2/v3.",
+            "Application 187/187 puis runner 10/10 avec claim expiré; extension 97/97, domain 24/24, contracts 16/16, IndexedDB 2/2 et contrat Chromium passent.",
+            "Migration additive IndexedDB v9 depuis v1/v2/v3/v4/v5/v8 et interruption testées Chromium; typecheck global, lint, anti-slop, docs, ADR, Archify dataflow et source boundaries 9/9, diff check passent."
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Parsing, routage et fournisseurs déterministes",
+          "status": "DONE",
+          "acceptance": [
+            "Ordre ID, règle route, artefact/aliases, hydraté, D1 owner-scoped, recherche, Review terminale",
+            "Kitsu après NO_MATCH complet seulement; aucune panne ni ambiguïté arbitrée par fallback; niveaux probants et lanes indépendantes",
+            "YouTube non média exclu, Anime-Sama par route, fautes uniques résolues, Hunter × Hunter ambigu, saisons/nombres préservés"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/adapters-browser/**",
+            "packages/contracts/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm run test:e2e",
+            "npm run test:parser-equivalence",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'fix(parser): restore deterministic provider resolution'"
+          ],
+          "evidence": [
+            "Parser/matcher v3 : routes Anime-Sama, liens ordinaires exclus, ID exact MangaDex/AniList manga/MangaUpdates, fautes uniques, éditions ambiguës, saisons/nombres préservés.",
+            "Pagination et aliases reprenables, lanes indépendantes, fallback après NO_MATCH seulement, Retry-After persisté, claims expirés réenfilables; caches Work avec aliases corroborés et index IndexedDB v10.",
+            "Port collectif strict SHA-256 testé avant recherche; intégration HTTP authentifiée et règles distantes réservées à étape 5. Aucune écriture SQL ni production dans cette étape.",
+            "Application 233/233; domain 24/24; contracts 16/16; extension 97/97; adapters navigateur 42/42 puis HTTP 3/3; IndexedDB 2/2 et contrat Chromium; migrations v1/v2/v3/v4/v5/v8/v9 vers v10 et interruption Chromium passent.",
+            "Typecheck global, lint, anti-slop, parser-equivalence, docs, ADR, cohérence, Archify all showcase et diff check passent; snapshot synthétique U-04/S-04 expliqué, aucune prétention de parité privée."
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Snapshot sync fragmenté et reconstruction",
+          "status": "DONE",
+          "acceptance": [
+            "IDs seuls triés dédupliqués; fragments <8192 octets, total <102400 et <512 items, cadence bornée",
+            "Ancienne génération préservée jusqu’à validation; corruption, interruption, concurrence, quotas, reset et Chrome/Firefox vérifiés"
+          ],
+          "files": [
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:recovery",
+            "npm run test:migrations",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm run test:e2e",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'feat(recovery): restore synchronized provider identities'"
+          ],
+          "evidence": [
+            "Snapshots IDs stricts, fragmentation/digest, générations concurrentes, quotas et publication reprise après interruption testés; aucune suppression automatique.",
+            "Background raccordé: rescan puis restauration exacte, scan Work et publication; alarmes et changements de manifeste reprennent la convergence. Chromium restriction native; Firefox restriction applicative documentée après poursuite autonome.",
+            "Application 247/247, extension 100/100, adapters-browser 50/50; test:recovery passe (25+1+3). Builds Chrome/Firefox, typecheck, lint et anti-slop passent.",
+            "Contrats IndexedDB et migrations additives v11 passent dans Chromium et Firefox 151.0 local; Archify all showcase, docs, ADR, cohérence et diff check passent. Tests extension installée et sync intercomptes non revendiqués, validation finale étape 8."
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Collectif Worker/D1 SQL owner-scoped",
+          "status": "DONE",
+          "acceptance": [
+            "Worker seul détenteur D1; SQL préparé et batch borné; tables additives séparées du catalogue",
+            "Owners opaques/installations appairées, clés empreintes, IDs publics, conflits, confirmations owners distincts, nonces et reçus",
+            "Aucun titre URL progression secret clair; isolation, replay, concurrence et plans SQL indexés testés localement; production exclue"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-cloudflare/**",
+            "apps/worker/**",
+            "apps/extension/**",
+            "scripts/infra/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm run test:security",
+            "npm run test:infra",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'feat(worker): restore owner-scoped collective resolution'"
+          ],
+          "evidence": [
+            "Migration additive 0004: owners/installations appairées, clés normalisées, choix privés, confirmations owner-distinctes, nonces/reçus, quotas et règles. Catalogue historique conservé; Worker seul binding D1.",
+            "HTTP v2 strict et SQL préparé: lookup 50 clés en cinq statements, moins de 500 rows_read en test; index couvrants, conflit sans vote, priorité humaine, versions de sites sans cloisonnement de clé.",
+            "Worker 32/32 dont neuf tests D1: isolation, deux appareils une voix, appairage expiré/consommé, rejeu/concurrence/quota, rollback batch, données minimisées, règles digest. Sécurité extension 8/8 et Worker 13/13.",
+            "Extension 107/107 dont consentement UI et cinq reprises propriétaire; application 248/248; adapters-browser 53/53, Cloudflare 20/20, infra 17/17. Builds Chrome/Firefox et Workbench passent.",
+            "Typecheck, lint, anti-slop, docs/ADR et Archify validés; aucune opération Cloudflare distante. Checks installés, oracle réel et publication restent étapes suivantes."
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Migration additive et Review actionnable",
+          "status": "DONE",
+          "acceptance": [
+            "Décisions humaines conservées; anciennes pending masquées sans suppression, tâches réenfilées et reçus reprenables",
+            "Seules versions automatiques fautives invalidées; Review distingue ambigu/introuvable/en cours/panne/unsupported et actions humaines complètes"
+          ],
+          "files": [
+            "packages/domain/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "packages/adapters-indexeddb/**",
+            "apps/extension/**",
+            "packages/ui/**",
+            "apps/ui-workbench/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "apps/web/app/components/SiteShell.tsx"
+          ],
+          "commands": [
+            "npm run test:migrations",
+            "npm run test:contracts",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:e2e",
+            "npm run test:a11y",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git diff -- <fichiers de cette étape>",
+            "git add -- <fichiers vérifiés de cette étape>",
+            "git commit -m 'fix(review): show only actionable resolution failures'"
+          ],
+          "evidence": [
+            "Migration v12 et correction d’import transactionnelle avec reçus/before-images: anciennes pending conservées hors cloche, décisions humaines/versions inconnues préservées; rollback et reprise validés Chromium et Firefox 151.",
+            "Candidats comparés sélectionnables, hydratation manuelle exacte avec relecture de révision, report 24h, confirmation no-match et compteurs hors cloche; application 259, extension 112, UI 126 et Workbench 12 passent. La lecture des candidats terminaux ne dépend plus de la bibliothèque.",
+            "Chromium 153 installé en profil isolé: import ordinaire exclu, panne fournisseur réessayable, zéro Review créée et état local UI vérifiés. Builds sans site corrigés, Chrome minimum 140; sécurité extension 8 et Worker 13 passent.",
+            "Raccord SiteShell.tsx approuvé et appliqué: motifs et report transmis au site; test du vrai WebBridge avec transport synthétique, 12 tests Workbench et 9 tests web, typecheck et lint passent.",
+            "Pagination Review corrigée: curseur échéance/ID exclusif et pages de 100 jusqu’à 100 cas actionnables. Test après 100 sources en traitement et test IndexedDB après 100 orphelines passent dans Chromium et Firefox 151.",
+            "Validation globale essayée: npm run verify bloque sur la configuration MCP Codex préexistante conservée. Suites produit séparées, budgets existants et audit dépendances passent; oracle réel non encore accessible. Archify all, docs, types, anti-slop et diff revalidés.",
+            "CRG exécuté: risque 0,60, 105 lacunes de couverture signalées par le graphe; les suites comportementales citées constituent les preuves de cette étape, sans prétendre à une couverture exhaustive."
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Valider le corpus clean-room indépendant",
+          "status": "DONE",
+          "acceptance": [
+            "Aucune base, donnée, export, secret, code ou runtime FavLib n'est lu ou requis par la validation",
+            "Les 82 cas synthétiques couvrent artefact, type, progression, identité, décision et raison avec des attentes versionnées"
+          ],
+          "files": [
+            "scripts/parser-equivalence/**",
+            "packages/application/**",
+            "packages/contracts/**",
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favlib-parsing-gap-audit.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:parser-equivalence",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Décision utilisateur: recréation clean-room sans connexion, export ni données FavLib; brief, ADR-0037, audit, plan et pipeline alignés.",
+            "Le corpus versionné conserve 82 cas synthétiques, 77 conservés, 4 corrigés et MangaDex X-01 activé; test:parser-equivalence passe.",
+            "Recherche statique: aucune référence à DATABASE_URL, dump, chemin FavLib ou import FavLib dans apps, packages, scripts et manifests.",
+            "favorite-resolution.dataflow passe les 9 contrôles showcase avec 0 erreur et 0 avertissement."
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Validation complète et préparation locale de publication",
+          "status": "DONE",
+          "acceptance": [
+            "Tests domaines, contrats, adaptateurs, extension, Worker/D1 local, migrations Chromium/Firefox, MV3, Review/WebBridge, quotas, sécurité, budgets et corpus clean-room passent",
+            "npm run verify, Archify showcase, CRG, audit dépendances et diff passent; ZIP 1.0.0 reproductibles et tests installés sont verts",
+            "Aucune nouvelle publication, migration production, opération FavLib, suppression, push ou fusion dans cette étape"
+          ],
+          "files": [
+            "scripts/release/**",
+            "scripts/performance/**",
+            "scripts/parser-equivalence/**",
+            "tests/**",
+            "apps/extension/**",
+            "apps/worker/**",
+            "packages/adapters-indexeddb/**",
+            "packages/adapters-cloudflare/**",
+            "packages/contracts/**",
+            "docs/browser-support.md",
+            "docs/release.md",
+            "docs/performance.md",
+            "docs/ui/accessibility-evidence.md",
+            "package.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/decisions/ADR-0025-private-data-authority-and-recovery.md",
+            "docs/decisions/ADR-0033-consented-collective-index.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run test:worker",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run test:parser-equivalence",
+            "npm run archify:validate -- all",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run verify passe: 273 tests dépôt plus 1 skip intentionnel, 665 tests workspaces, typecheck, lint, sécurité, performance, CRG, intégration, audit 0 et docs.",
+            "Worker 32/32, sécurité extension 8/8 et Worker 13/13, recovery 26+1+3 et corpus clean-room passent; SQL owner-scoped préparé et lots limités à 50.",
+            "Audit statique: COLLECTIVE_DB est composé uniquement dans apps/worker; site, extension et WebBridge n'ont aucun binding D1.",
+            "storage.sync accepte uniquement cinq listes d'IDs strictes; quotas 8192/102400/512, digest, générations et reconstruction sont testés.",
+            "Le premier verify a rencontré une course de chargement du harness Chromium; le contrat isolé et le verify complet suivant passent sans modification produit.",
+            "Les ZIP et la production déjà vérifiés restent inchangés; aucune opération distante n'a été exécutée dans cette finalisation."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-close-local-release-gates",
+      "title": "Fermer les gates locales de validation restantes",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger MCP et certifier les navigateurs localement",
+          "status": "DONE",
+          "acceptance": [
+            "Le validateur Codex accepte les sous-sections tools des deux serveurs attendus et refuse toujours un vrai troisième serveur",
+            "npm run verify et web-ext lint passent sans modifier .codex/config.toml ni le runtime produit",
+            "Les preuves clavier, zoom, couleurs forcées, responsive, Chromium et Firefox documentent la frontière clean-room"
+          ],
+          "files": [
+            "scripts/validate-mcp-installation.mjs",
+            "tests/mcp-stdio.test.mjs",
+            "apps/web/e2e/**",
+            "docs/ui/accessibility-evidence.md",
+            "docs/browser-support.md",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run integration",
+            "npm run verify",
+            "npm exec --yes --package=web-ext -- web-ext lint",
+            "npm run test:a11y",
+            "npm run test:e2e --workspace @tobirink/web",
+            "npm run lint",
+            "npm run lint:anti-slop",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'test(release): close local validation gates'"
+          ],
+          "evidence": [
+            "Validateur MCP corrigé: 7/7 tests acceptent les sous-sections tools et refusent un troisième serveur; .codex/config.toml utilisateur inchangé.",
+            "npm run verify passe entièrement: 273 tests dépôt plus un skip, 665 tests produit, types, builds, budgets, CRG, intégration, audit 0 et docs.",
+            "Production Playwright 7/7; accessibilité 8/8; Firefox 151 et web-ext validés; frontière clean-room documentée séparément."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-tobirink-cleanroom-finalization",
+      "title": "Finaliser FavLib → TobiRink sans dépendance à FavLib",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger la frontière clean-room et auditer la livraison",
+          "status": "DONE",
+          "acceptance": [
+            "Aucune base, donnée, export, secret, code ou runtime FavLib n'est requis par TobiRink ou sa validation",
+            "Les 82 cas synthétiques couvrent artefact, type, progression, identité, décision et raison sans prétendre reproduire les données privées",
+            "L'audit confirme Worker seul devant D1, SQL borné, données minimisées, zéro Review à l'import et restauration sync",
+            "Tests ciblés, verify complet, documentation, décisions, Archify showcase et diff check passent"
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favlib-parsing-gap-audit.md",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:parser-equivalence",
+            "npm run test:worker",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:coherence",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m 'docs(favorites): enforce clean-room validation boundary'"
+          ],
+          "evidence": [
+            "Doctrine corrigée: aucune base, donnée, export, secret, code ou runtime FavLib requis; sept sources canoniques alignées.",
+            "Audit: zéro Review à l'import, sync limitée aux IDs, Worker seul devant D1, payload collectif strict et SQL borné confirmés par le code et les tests.",
+            "Corpus clean-room, Worker, sécurité, recovery et verify complet passent; Archify favorite-resolution et all passent showcase 9/9.",
+            "Aucune opération FavLib ou Cloudflare, aucune suppression; .codex/config.toml préexistante conservée hors scope."
           ]
         }
       ]

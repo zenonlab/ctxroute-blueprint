@@ -1,4 +1,4 @@
-import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
@@ -31,6 +31,17 @@ import { TobirinkDatabase } from './database';
 import { createDexieFavoriteResolutionSession } from './favorite-resolution/dexie-favorite-resolution-session';
 import { privateStoreTables } from './private-store-tables';
 
+async function readReviews(database: TobirinkDatabase, query: Parameters<StoragePort['listReviews']>[0]): Promise<readonly Review[]> {
+  const { actionableOnly, after, availableBefore = new Date().toISOString(), limit, status } = query;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
+  if (after !== undefined && !actionableOnly) throw new TypeError('Review cursor requires the actionable index.');
+  const records = actionableOnly
+    ? await database.reviews.where(['status', 'availableAt', 'id']).between([status, after?.availableAt ?? '', after?.id ?? ''], [status, availableBefore, '\uffff'], after === undefined, true).limit(limit).toArray()
+    : await database.reviews.where('status').equals(status).limit(limit).toArray();
+  const reviews = records.map(createReview);
+  return actionableOnly ? reviews : reviews.sort((left, right) => left.id.localeCompare(right.id));
+}
+
 export class DexieStoragePort implements StoragePort {
   readonly database: TobirinkDatabase;
 
@@ -43,6 +54,15 @@ export class DexieStoragePort implements StoragePort {
       if (allowed && !allowed.has(store)) throw new Error(`Store ${store} is outside the transaction scope.`);
     };
     return {
+      readFavoriteResolutionCounts: async () => {
+        requireStore('favoriteSources');
+        return this.database.transaction('r', this.database.favoriteSources, async () => {
+          const table = this.database.favoriteSources;
+          const observed = await table.where('presence').equals('observed').count();
+          const counts = await Promise.all(['RESOLVED', 'REVIEW_REQUIRED', 'RETRYABLE', 'UNSUPPORTED'].map((kind) => table.where(['presence', 'resolution.kind']).equals(['observed', kind]).count()));
+          return { processing: Math.max(0, observed - counts.reduce((sum, count) => sum + count, 0)), retryable: counts[2] ?? 0, unsupported: counts[3] ?? 0 };
+        });
+      },
       ...createDexieFavoriteResolutionSession(this.database, requireStore),
       getFavoriteBookmarkMutation: async (bookmarkId) => { requireStore('favoriteBookmarkMutations'); return this.database.favoriteBookmarkMutations.get(bookmarkId); },
       getFavoriteInventoryCheckpoint: async () => { requireStore('favoriteInventoryCheckpoints'); return this.database.favoriteInventoryCheckpoints.get('favorite-inventory'); },
@@ -85,12 +105,9 @@ export class DexieStoragePort implements StoragePort {
           : this.database.favoriteSources.where('id').above(afterId);
         return (await collection.limit(limit).toArray()).map(createFavoriteSource);
       },
-      listReviews: async ({ limit, status }) => {
+      listReviews: async (query) => {
         requireStore('reviews');
-        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Review list limit must be an integer between 1 and 100.');
-        return (await this.database.reviews.where('status').equals(status).limit(limit).toArray())
-          .map(createReview)
-          .sort((left, right) => left.id.localeCompare(right.id));
+        return readReviews(this.database, query);
       },
       listReviewsByWorkId: async (query) => {
         requireStore('reviews');
@@ -98,6 +115,24 @@ export class DexieStoragePort implements StoragePort {
         return (await this.database.reviews.where('matchedWorkId').equals(query.workId).limit(query.limit).toArray())
           .map(createReview)
           .sort((left, right) => left.id.localeCompare(right.id));
+      },
+      listWorksByIdentityKey: async (query) => {
+        requireStore('works');
+        assertWorkIdentityQuery(query);
+        const index = query.kind === 'favorite-alias' ? 'hydration.favoriteAliasKeys' : 'hydration.providerTitleKeys';
+        return (await this.database.works.where(index).equals(query.key).limit(query.limit).toArray()).map(createWork);
+      },
+      listWorks: async ({ afterId, limit }) => {
+        requireStore('works');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Work page limit must be between 1 and 100.');
+        const collection = afterId === undefined ? this.database.works.orderBy('id') : this.database.works.where('id').above(afterId);
+        return (await collection.limit(limit).toArray()).map(createWork);
+      },
+      listFavoriteSourcesByWorkId: async (query) => {
+        requireStore('favoriteSources');
+        assertReviewMatchListQuery(query);
+        return (await this.database.favoriteSources.where('matchedWorkId').equals(query.workId).limit(query.limit).toArray())
+          .map(createFavoriteSource);
       },
       putAgendaEntry: async (entry: AgendaEntry) => { requireStore('agenda'); await this.database.agenda.put(createAgendaEntry(entry)); },
       putFavoriteBookmarkMutation: async (mutation) => { requireStore('favoriteBookmarkMutations'); await this.database.favoriteBookmarkMutations.put(Object.freeze({ ...mutation })); },
@@ -108,7 +143,7 @@ export class DexieStoragePort implements StoragePort {
       putFavoriteReviewCandidateSet: async (set) => { requireStore('favoriteReviewCandidateSets'); await this.database.favoriteReviewCandidateSets.put(Object.freeze({ ...set, candidates: Object.freeze([...set.candidates]) })); },
       putFavoriteSource: async (source: FavoriteSource) => {
         requireStore('favoriteSources');
-        const existing = await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
+        const existing = source.reviewId === undefined ? undefined : await this.database.favoriteSources.where('reviewId').equals(source.reviewId).first();
         if (existing && existing.id !== source.id) throw new Error('A Review may belong to only one favorite source.');
         await this.database.favoriteSources.put(createFavoriteSource(source));
       },
@@ -129,6 +164,7 @@ export class DexieStoragePort implements StoragePort {
   getFavoriteInventoryMark: StoragePort['getFavoriteInventoryMark'] = (bookmarkId) => this.session().getFavoriteInventoryMark(bookmarkId);
   getFavoriteProviderRateCheckpoint: StoragePort['getFavoriteProviderRateCheckpoint'] = (provider) => this.session().getFavoriteProviderRateCheckpoint(provider);
   getFavoriteResolutionReceipt: StoragePort['getFavoriteResolutionReceipt'] = (id) => this.session().getFavoriteResolutionReceipt(id);
+  readFavoriteResolutionCounts: StoragePort['readFavoriteResolutionCounts'] = () => this.session().readFavoriteResolutionCounts();
   getFavoriteReviewCandidateSet: StoragePort['getFavoriteReviewCandidateSet'] = (reviewId) => this.session().getFavoriteReviewCandidateSet(reviewId);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
@@ -139,10 +175,13 @@ export class DexieStoragePort implements StoragePort {
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
+  listWorks: StoragePort['listWorks'] = (query) => this.session().listWorks(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);
   listReviewsByWorkId: StoragePort['listReviewsByWorkId'] = (query) => this.session().listReviewsByWorkId(query);
+  listFavoriteSourcesByWorkId: StoragePort['listFavoriteSourcesByWorkId'] = (query) => this.session().listFavoriteSourcesByWorkId(query);
   putAgendaEntry: StoragePort['putAgendaEntry'] = (entry) => this.session().putAgendaEntry(entry);
   putFavoriteParseArtifact: StoragePort['putFavoriteParseArtifact'] = (record) => this.session().putFavoriteParseArtifact(record);
   putFavoriteResolutionTask: StoragePort['putFavoriteResolutionTask'] = (task) => this.session().putFavoriteResolutionTask(task);
@@ -163,7 +202,7 @@ export class DexieStoragePort implements StoragePort {
   async transaction<TResult>(stores: readonly PrivateStoreName[], operation: (session: StorageSession) => Promise<TResult>): Promise<TResult> {
     if (stores.length === 0) throw new Error('A storage transaction requires at least one store.');
     const allowed = new Set(stores);
-    return this.database.transaction('rw', privateStoreTables(this.database, stores), () => operation(this.session(allowed)));
+    return this.database.transaction('rw', privateStoreTables(this.database, stores), async () => operation(this.session(allowed)));
   }
 
   close() {

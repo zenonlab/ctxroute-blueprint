@@ -1,6 +1,6 @@
 # Extension performance evidence
 
-Date: 2026-09-04
+Date: 2026-09-08
 
 ## Budgets
 
@@ -26,6 +26,17 @@ latency; those measurements belong to the manual Chromium and Firefox release
 pass documented in `docs/ui/accessibility-evidence.md`.
 
 ## Recorded result
+
+The FavLib correction gate passes four performance checks. The isolated
+20-file Chrome ZIP is 273,208 bytes and the Firefox ZIP is 273,254 bytes;
+independent builds reproduce both archives exactly. These measurements cover
+the configured site origin and remain below the 1.5 MB package budget.
+
+The resolution runner checks its 20-second slice budget before claiming the
+next task. This is a cooperative scheduling bound, not an enforced deadline
+for an in-flight request or the complete inventory/recovery wake. A complete
+latency distribution on the real FavLib corpus is still unavailable and is
+not inferred from the installed synthetic journeys.
 
 The 2026-09-05 reference run passed all three checks. Local render timings are
 emitted by the reproducible gate for library, Review and agenda. The generated

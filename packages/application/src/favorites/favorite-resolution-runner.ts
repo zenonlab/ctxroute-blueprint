@@ -1,13 +1,19 @@
-import { createReview } from '@tobirink/domain';
-import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, ProviderCandidateEnvelope, Review } from '@tobirink/domain';
+import { createFavoriteSource } from '@tobirink/domain';
+import type { FavoriteParseArtifact, LibraryId, ProviderCandidate } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { parseFavoriteResolutionTaskPayload } from '../tasks';
+import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
+import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
+import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
-import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
+import { readLocalFavoriteIdentity } from './local-favorite-identity';
+import { favoriteResolutionVersions } from './resolution-result-schema';
+import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
-import { favoriteProviderPolicy, routeFavoriteProviderTiers } from './provider-ports';
-import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, ResolutionProvider } from './provider-ports';
+import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
+import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
+import { createFavoriteSearchCheckpointPort } from './provider-search-checkpoint';
+import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 
 export const favoriteResolutionSliceLimit = 8;
 export const favoriteResolutionWakeBudgetMs = 20_000;
@@ -17,8 +23,9 @@ export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
 export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 
 export interface FavoriteResolutionRunnerDependencies {
+  readonly collective?: FavoriteCollectiveLookupPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
-  readonly hydration: Readonly<Record<ResolutionProvider, FavoriteProviderHydrationPort>>;
+  readonly hydration: FavoriteProviderHydrationPorts;
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;
@@ -40,14 +47,16 @@ function timestamp(value: string): number {
   return parsed.valueOf();
 }
 
+function freshHydration(hydratedAt: string | undefined, now: string): boolean {
+  if (hydratedAt === undefined) return false;
+  const age = timestamp(now) - timestamp(hydratedAt);
+  return age >= 0 && age < favoriteProviderPolicy.positiveTtlMs;
+}
+
 function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   const titles = [artifact.displayTitle, ...(artifact.aliases ?? []).map((alias) => alias.value)]
     .filter((title): title is string => title !== undefined);
   return Object.freeze([...new Set(titles)]);
-}
-
-function unresolvedReview(review: Review, status: 'no-match' | 'pending'): Review {
-  return createReview({ id: review.id, sourceLabel: review.sourceLabel, status, title: review.title });
 }
 
 async function retryClaim(
@@ -55,112 +64,180 @@ async function retryClaim(
   task: DurableTask,
   token: string,
   retryAt: string,
+  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
-  if (task.attempt >= favoriteResolutionAttemptLimit) {
-    await dependencies.outbox.block(task.id, token, 'AUTOMATIC_ATTEMPT_LIMIT');
-    return 'blocked';
-  }
-  await dependencies.outbox.retry(task.id, token, retryAt);
-  return 'retried';
+  const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
+  await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
+    const payload = parseFavoriteResolutionTaskPayload(task.payload);
+    const source = await session.getFavoriteSource(payload.sourceId);
+    const record = await session.getFavoriteParseArtifact(payload.sourceId);
+    const current = await session.getFavoriteResolutionTask(task.id);
+    if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
+      || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
+      || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
+    await session.putFavoriteResolutionTask(exhausted ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT') : retryTask(current, token, retryAt));
+    await session.putFavoriteSource(createFavoriteSource({
+      ...source, resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : reason },
+      resolutionVersions: favoriteResolutionVersions(record.artifact),
+    }));
+  });
+  return exhausted ? 'blocked' : 'retried';
 }
 
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
-  const [source, record, review] = await Promise.all([
+  const [source, record] = await Promise.all([
     dependencies.storage.getFavoriteSource(payload.sourceId),
     dependencies.storage.getFavoriteParseArtifact(payload.sourceId),
-    dependencies.storage.getReview(payload.reviewId),
   ]);
-  if (source === undefined || record === undefined || review === undefined || record.reviewId !== payload.reviewId || record.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
+  if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
+  const previousReview = source.reviewId === undefined ? undefined : await dependencies.storage.getReview(source.reviewId);
+  if (previousReview !== undefined && previousReview.status !== 'pending') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'decision:preserved');
+    return 'completed';
+  }
   if (source.presence === 'detached') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, review, 'source:detached');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'DETACHED' }, 'source:detached');
     return 'completed';
   }
   const artifact = record.artifact;
-  if (artifact.status !== 'parsed') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+  if (artifact.status !== 'parsed' && artifact.sourceEvidence.explicitProviderReference === undefined) {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' }, 'unsupported:identity-missing');
     return 'completed';
   }
   const explicit = artifact.sourceEvidence.explicitProviderReference;
-  if (explicit !== undefined && (explicit.provider === 'anilist' || explicit.provider === 'mangaupdates')) {
+  if (explicit !== undefined) {
     const reference = { externalId: explicit.externalId, provider: explicit.provider } as const;
+    const hydration = dependencies.hydration[reference.provider];
+    if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
+    const cached = await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
+    const fresh = freshHydration(cached?.hydration?.hydratedAt, dependencies.now());
     let candidate: ProviderCandidate | undefined;
-    try { candidate = await dependencies.hydration[reference.provider].hydrate(reference); } catch { candidate = undefined; }
+    try { candidate = fresh ? cached?.hydration?.candidate : await hydration.hydrate(reference); } catch (error) {
+      const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+      return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
+    }
     if (candidate !== undefined) {
       if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
       const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
       if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:explicit-reference-incompatible');
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:explicit-reference-incompatible');
         return 'completed';
       }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
-      await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${reference.provider}:${reference.externalId}`, candidate);
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, { workId: cached?.id, hydratedAt: fresh ? cached?.hydration?.hydratedAt : undefined });
       return 'completed';
     }
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:explicit-id-not-found');
+    return 'completed';
   }
   const titles = providerTitles(artifact);
   if (titles.length === 0) {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), 'review:identity-missing');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' }, 'unsupported:identity-missing');
     return 'completed';
-  }
-  let envelopes: readonly ProviderCandidateEnvelope[] | undefined;
-  for (const providers of routeFavoriteProviderTiers(artifact.mediaKind)) {
-    const perProviderLimit = Math.floor(20 / providers.length);
-    try {
-      const tier = await Promise.all(providers.map((provider) => dependencies.candidates[provider].search({ limit: perProviderLimit, provider, titles })));
-      if (tier.every((envelope) => envelope.complete && !envelope.truncated)) {
-        envelopes = tier;
-        break;
-      }
-    } catch {
-      // A provider outage invalidates this complete tier; the next tier may proceed.
-    }
-  }
-  if (envelopes === undefined) {
-    const exponent = Math.max(0, task.attempt - 1);
-    const retryAt = new Date(timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** exponent))).toISOString();
-    return retryClaim(dependencies, task, token, retryAt);
   }
   const matchQuery: MutableFavoriteTitleMatchQuery = { sourceTitles: titles };
   if (artifact.sourceEvidence.explicitProviderReference !== undefined) matchQuery.explicitProviderReference = artifact.sourceEvidence.explicitProviderReference;
   if (artifact.season !== undefined) matchQuery.explicitSeason = artifact.season;
   if (artifact.mediaKind !== 'UNKNOWN') matchQuery.mediaKind = artifact.mediaKind;
   if (artifact.sourceEvidence.canonicalUrl !== undefined) matchQuery.sourceCanonicalUrl = artifact.sourceEvidence.canonicalUrl;
-  const outcome = matchFavoriteTitles(matchQuery, envelopes);
-  if (outcome.kind === 'INCOMPLETE_CANDIDATE_SET') {
-    const retryAt = new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString();
-    return retryClaim(dependencies, task, token, retryAt);
+  if (artifact.seasonEvidence?.conflict) {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:conflicting-season-evidence');
+    return 'completed';
   }
+  const local = await readLocalFavoriteIdentity(dependencies.storage, artifact, matchQuery);
+  if (local.kind === 'MATCH') {
+    const cachedAt = local.work.hydration?.hydratedAt;
+    const fresh = freshHydration(cachedAt, dependencies.now());
+    const hydration = dependencies.hydration[local.candidate.provider];
+    let candidate = fresh ? local.candidate : undefined;
+    if (!fresh) {
+      if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
+      try { candidate = await hydration.hydrate(local.candidate); } catch (error) {
+        const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+        return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
+      }
+    }
+    if (candidate === undefined) {
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:cached-id-not-found');
+    } else {
+      if (candidate.provider !== local.candidate.provider || candidate.externalId !== local.candidate.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      if (!isProviderCandidateCompatible(matchQuery, candidate)) {
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:cached-reference-incompatible');
+        return 'completed';
+      }
+      if (hasExactBlockedProviderTaxonomy(candidate)) {
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+      } else {
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${local.provenance}`, candidate, undefined, { workId: local.work.id, hydratedAt: fresh ? cachedAt : undefined });
+      }
+    }
+    return 'completed';
+  }
+  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS');
+  if (collective.kind === 'RETRYABLE') return retryClaim(dependencies, task, token, new Date(Math.max(collective.retryAt ?? 0, timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs)).toISOString());
+  if (collective.kind === 'REVIEW_REQUIRED') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, collective, `review:collective-${collective.reason.toLowerCase()}`);
+    return 'completed';
+  }
+  if (collective.kind === 'RESOLVED') {
+    if (hasExactBlockedProviderTaxonomy(collective.candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, collective.candidate, undefined, { references: collective.references });
+    return 'completed';
+  }
+  if (local.kind === 'AMBIGUOUS') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
+      candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
+    });
+    return 'completed';
+  }
+  const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
+  const lanes = await resolveFavoriteProviderLanes(dependencies.candidates, matchQuery, artifact.mediaKind, checkpoints);
+  if (lanes.kind === 'PAGE_PENDING') {
+    await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
+      const current = await session.getFavoriteResolutionTask(task.id);
+      if (current?.idempotencyKey !== task.idempotencyKey) throw new Error('STALE_PRIVATE_REFERENCE');
+      await session.putFavoriteResolutionTask(retryTask({ ...current, attempt: 0 }, token, new Date(timestamp(dependencies.now()) + 1_000).toISOString()));
+    });
+    return 'retried';
+  }
+  if (lanes.kind === 'RETRYABLE') {
+    const exponent = Math.max(0, task.attempt - 1);
+    const retryAt = new Date(Math.max(lanes.retryAt ?? 0, timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** exponent)))).toISOString();
+    return retryClaim(dependencies, task, token, retryAt, lanes.reason);
+  }
+  const { decision: outcome, envelopes } = lanes;
   if (outcome.kind === 'AMBIGUOUS') {
     const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
-    const candidateSet = Object.freeze({ candidates: Object.freeze(candidates), digest: envelopes.map((envelope) => envelope.digest).join('|'), recordedAt: dependencies.now(), reviewId: review.id });
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'pending'), `review:${outcome.kind.toLowerCase()}`, undefined, candidateSet);
+    const candidateSet = Object.freeze({ candidates: Object.freeze(candidates), digest: envelopes.map((envelope) => envelope.digest).join('|'), matchLevel: outcome.level, provenance: 'provider-search', totalCandidates: references.size, recordedAt: dependencies.now() });
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${outcome.kind.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
   }
   if (outcome.kind === 'NO_MATCH') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:no-match');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:not-found');
     return 'completed';
   }
   const provider = outcome.matchedReference.provider;
   if (provider === 'mangadex') throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
   let candidate: ProviderCandidate | undefined;
-  try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch { candidate = undefined; }
+  try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch (error) {
+    const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+    return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
+  }
   if (candidate === undefined) {
     const retryAt = new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString();
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
   if (hasExactBlockedProviderTaxonomy(candidate)) {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, unresolvedReview(review, 'no-match'), 'review:blocked-content-taxonomy');
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     return 'completed';
   }
-  const resolved = createReview({ ...review, matchedWorkId: favoriteCandidateWorkId(candidate), status: 'resolved' });
-  await persistFavoriteResolutionCompletion(dependencies, task, token, resolved, `resolved:${provider}:${candidate.externalId}`, candidate);
+  await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${provider}:${candidate.externalId}`, candidate);
   return 'completed';
 }
 
@@ -185,8 +262,15 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
       else if (result === 'retried') retried += 1;
       else blocked += 1;
     } catch (error) {
-      await dependencies.outbox.block(task.id, token, error instanceof Error ? error.message : 'UNKNOWN_RESOLUTION_FAILURE');
-      blocked += 1;
+      const changed = await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
+        const current = await session.getFavoriteResolutionTask(task.id);
+        if (current?.state !== 'CLAIMED' || current.claimToken !== token || current.idempotencyKey !== task.idempotencyKey
+          || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) return false;
+        await session.putFavoriteResolutionTask(blockTask(current, token, error instanceof Error ? error.message : 'UNKNOWN_RESOLUTION_FAILURE'));
+        return true;
+      });
+      if (changed) blocked += 1;
+      else break;
     }
   }
   await dependencies.outbox.compactCommitted?.({ before: new Date(startedAt - favoriteResolutionTaskRetentionMs).toISOString(), limit: favoriteResolutionSliceLimit });
