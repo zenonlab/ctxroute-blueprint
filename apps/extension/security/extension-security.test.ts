@@ -38,6 +38,7 @@ describe('extension security boundary', () => {
     const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
     expect(value.manifest_version).toBe(3);
     expect(value.host_permissions ?? []).toEqual([
+      'https://api.mangadex.org/*',
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',

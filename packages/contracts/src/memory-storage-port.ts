@@ -131,6 +131,11 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, query.limit);
     },
+    listWorks: async ({ afterId, limit }) => {
+      requireStore('works');
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Work page limit must be between 1 and 100.');
+      return [...state.works.values()].filter((work) => afterId === undefined || work.id > afterId).sort((left, right) => left.id < right.id ? -1 : left.id === right.id ? 0 : 1).slice(0, limit);
+    },
     listWorksByIdentityKey: async (query) => {
       requireStore('works');
       assertWorkIdentityQuery(query);
@@ -197,6 +202,7 @@ export class MemoryStoragePort implements StoragePort {
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
   listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
+  listWorks: StoragePort['listWorks'] = (query) => this.session().listWorks(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);

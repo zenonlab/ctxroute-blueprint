@@ -22,3 +22,4 @@ export * from './notifications';
 export * from './preferences/web-extension-quick-preferences-adapter';
 export * from './releases/web-extension-release-cache-adapter';
 export * from './popup';
+export * from './recovery/web-extension-provider-identity-sync-adapter';

@@ -1,4 +1,5 @@
 export { TobirinkDatabase } from './database';
+export { DexieProviderIdentityRecoveryStateAdapter } from './recovery/provider-identity-recovery-state-adapter';
 export { DexieStoragePort } from './dexie-storage-port';
 export { verifyDatabaseIntegrity } from './migrations';
 export type { IntegrityReport } from './migrations';

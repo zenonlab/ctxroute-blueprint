@@ -40,6 +40,8 @@ export interface WorkIdentityQuery {
   limit: number;
 }
 
+export interface WorkPageQuery { readonly afterId?: WorkId; readonly limit: number }
+
 export function assertWorkIdentityQuery(query: WorkIdentityQuery): void {
   if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100) throw new RangeError('Work identity lookup limit must be between 1 and 100.');
   if (query.key.trim().length === 0 || query.key.length > 2048) throw new RangeError('Work identity key must be non-empty and bounded.');
@@ -98,7 +100,7 @@ export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRe
   return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });
 }
 
-export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'reminders', 'reviews', 'works'] as const;
+export const privateStoreNames = ['agenda', 'favoriteArtifacts', 'favoriteBookmarkMutations', 'favoriteInventoryCheckpoints', 'favoriteInventoryMarks', 'favoriteProviderRateCheckpoints', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'favoriteSources', 'libraries', 'organizer', 'progress', 'providerIdentityRecovery', 'reminders', 'reviews', 'works'] as const;
 export type PrivateStoreName = (typeof privateStoreNames)[number];
 
 export interface FavoriteSourcePageQuery {
@@ -162,6 +164,7 @@ export interface StorageReadPort {
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
+  listWorks(query: WorkPageQuery): Promise<readonly Work[]>;
   listWorksByIdentityKey(query: WorkIdentityQuery): Promise<readonly Work[]>;
   listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;

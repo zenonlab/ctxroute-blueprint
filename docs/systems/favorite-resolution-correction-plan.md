@@ -168,6 +168,31 @@ aucun nettoyage des anciennes clés n'est lancé dans ce chantier sans accord
 sur les clés exactes. Tant que cet accord manque, conserver et suspendre les
 publications qui dépasseraient le budget.
 
+Les clés de fragments et manifestes contiennent génération et digest : deux
+installations ne peuvent écraser un contenu différent sous la même clé.
+Le lecteur valide chaque génération complète puis réunit leurs IDs, afin de
+préserver aussi les ajouts concurrents. Aucune suppression d'ID n'est inférée.
+Les générations incomplètes ou corrompues sont ignorées; les anciennes restent
+lisibles. Une publication conserve son payload d'IDs en attente dans local,
+réserve sa cadence avant chaque effet et écrit son manifeste en dernier.
+L'intervalle minimal de 2 100 ms borne également les écritures sur une heure
+glissante. Un scan Work et une hydratation de restauration reprennent par
+curseurs bornés; les fiches récupérées ne créent ni favori ni Review.
+Le checkpoint de scan/restauration appartient à IndexedDB v11, ajouté sans
+transformation des anciennes lignes. Un reset de cette base réinitialise donc
+sa reconstruction; une simple fiche fournisseur introuvable ne simule pas un
+reset. La cadence et la publication sync en attente restent dans storage.local.
+
+Le raccordement background conserve sync sur Firefox avec une restriction
+applicative explicitement sélectionnée à la compilation. Chromium exige
+`setAccessLevel`; une API présente mais défaillante interdit toujours l'accès.
+Les contrats IndexedDB et migrations v1/v2/v3/v4/v5/v8/v9/v10
+vers v11 passent dans Chromium et Firefox 151.0 de test. Le script
+`FIREFOX_BIN=<exécutable installé> node packages/adapters-indexeddb/scripts/firefox-contract.mjs`
+réutilise le Playwright déjà présent dans le workspace web; il ne télécharge
+aucun navigateur. Il teste IndexedDB dans des pages locales, pas une extension
+Firefox installée ni la synchronisation entre comptes réels.
+
 `TRUSTED_CONTEXTS` est appliqué lorsque disponible. Firefox impose la même
 frontière par architecture : aucun content script ne lit le storage, tous
 passent par messages typés au background. Les secrets, titres, URLs,

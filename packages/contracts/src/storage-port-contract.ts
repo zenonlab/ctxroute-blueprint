@@ -166,4 +166,9 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   let identityLimitRejected = false;
   try { await storage.listWorksByIdentityKey({ key: 'contract work', kind: 'provider-title', limit: 101 }); } catch { identityLimitRejected = true; }
   assert(identityLimitRejected, 'identity lookup must enforce its bound');
+  assert((await storage.listWorks({ limit: 1 }))[0]?.id === id, 'Work cursor returns the first bounded record');
+  assert((await storage.listWorks({ afterId: id, limit: 1 })).length === 0, 'Work cursor excludes its last record');
+  let workLimitRejected = false;
+  try { await storage.listWorks({ limit: 101 }); } catch { workLimitRejected = true; }
+  assert(workLimitRejected, 'Work cursor must enforce its bound');
 }

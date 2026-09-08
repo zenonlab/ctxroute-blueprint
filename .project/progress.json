@@ -5857,7 +5857,7 @@
         {
           "id": "step-4",
           "title": "Snapshot sync fragmenté et reconstruction",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "IDs seuls triés dédupliqués; fragments <8192 octets, total <102400 et <512 items, cadence bornée",
             "Ancienne génération préservée jusqu’à validation; corruption, interruption, concurrence, quotas, reset et Chrome/Firefox vérifiés"
@@ -5895,7 +5895,12 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'feat(recovery): restore synchronized provider identities'"
           ],
-          "evidence": []
+          "evidence": [
+            "Snapshots IDs stricts, fragmentation/digest, générations concurrentes, quotas et publication reprise après interruption testés; aucune suppression automatique.",
+            "Background raccordé: rescan puis restauration exacte, scan Work et publication; alarmes et changements de manifeste reprennent la convergence. Chromium restriction native; Firefox restriction applicative documentée après poursuite autonome.",
+            "Application 247/247, extension 100/100, adapters-browser 50/50; test:recovery passe (25+1+3). Builds Chrome/Firefox, typecheck, lint et anti-slop passent.",
+            "Contrats IndexedDB et migrations additives v11 passent dans Chromium et Firefox 151.0 local; Archify all showcase, docs, ADR, cohérence et diff check passent. Tests extension installée et sync intercomptes non revendiqués, validation finale étape 8."
+          ]
         },
         {
           "id": "step-5",

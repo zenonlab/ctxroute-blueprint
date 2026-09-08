@@ -76,5 +76,6 @@ export * from './agenda';
 export * from './popup';
 export * from './collective-index';
 export * from './recovery';
+export type { WorkPageQuery } from './ports/storage-port';
 export * from './organizer';
 export * from './favorites';

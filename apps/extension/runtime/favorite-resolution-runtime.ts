@@ -3,6 +3,7 @@ import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProvider
 import type { LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
+import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
 
 export interface FavoriteResolutionRuntimeDependencies {
   readonly collective?: FavoriteCollectiveLookupPort;
@@ -10,6 +11,7 @@ export interface FavoriteResolutionRuntimeDependencies {
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
   readonly hydration: FavoriteProviderHydrationPorts;
+  readonly identityRecovery?: ProviderIdentityRecoveryRuntime;
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;
@@ -64,7 +66,9 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
         }
         if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
+        if (dependencies.identityRecovery !== undefined && await dependencies.identityRecovery.prepare() !== 'READY') return;
         await runFavoriteResolutionSlice(dependencies);
+        await dependencies.identityRecovery?.publish();
     });
   return function reconcileFavorites(bookmarkMutation = false): Promise<void> {
     if (active !== undefined) {

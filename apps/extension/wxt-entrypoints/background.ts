@@ -11,8 +11,10 @@ import {
   WebExtensionNotificationAdapter,
   WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
+  WebExtensionProviderIdentitySyncAdapter,
+  WebExtensionProviderIdentitySyncStateAdapter,
 } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -24,7 +26,8 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
+import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -46,6 +49,16 @@ export default defineBackground({
     const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
+    const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
+    const identitySync = new WebExtensionProviderIdentitySyncAdapter(browser.storage.sync, identityAccessPolicy);
+    const identityRecovery = createProviderIdentityRecoveryRuntime({
+      checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
+      hydration: providerPorts,
+      now,
+      publisher: new ProviderIdentitySyncPublisher(identitySync, new WebExtensionProviderIdentitySyncStateAdapter(browser.storage.local, identityAccessPolicy), Date.now),
+      storage: privateStorage.storage,
+      sync: identitySync,
+    });
     const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
@@ -56,6 +69,7 @@ export default defineBackground({
       ensureReady: privateStorage.ensureReady,
       hydration: providerPorts,
       libraryId: primaryLibraryId,
+      identityRecovery,
       now,
       outbox: resolutionOutbox,
       sourceAdapters: favoriteSourceAdapters,
@@ -63,12 +77,17 @@ export default defineBackground({
       token,
     });
     browser.runtime.onInstalled.addListener(async () => {
+      await ensureReminderAlarm();
       await privateStorage.ensureReady();
       await reconcileFavorites();
-      await ensureReminderAlarm();
       await resumeNotifications();
     });
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
+    browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
+        void reconcileFavorites(true).catch(() => undefined);
+      }
+    });
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);

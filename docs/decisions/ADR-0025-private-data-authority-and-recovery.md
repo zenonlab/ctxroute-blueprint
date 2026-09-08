@@ -58,9 +58,22 @@ v10 ajoute deux index multi-entry privés aux fiches Work hydratées : aliases
 validés par type/saison et titres fournisseurs. L'export v4 conserve cette
 hydratation, son âge et ses aliases privés. Une lecture du cache ne repousse
 pas son expiration. Les lignes historiques et leurs liens Review sont conservés.
+IndexedDB v11 ajoute un singleton de scan/restauration des IDs. Ce checkpoint
+disparaît avec un reset explicite de la base, tandis que la publication sync
+en attente et sa cadence survivent dans local. Aucun favori ni élément de
+bibliothèque n'est inventé à partir des seules fiches restaurées.
 Les anciennes enveloppes sync ne sont plus produites; leur retrait n'est pas
 une suppression automatique. Les formats AES-GCM/PBKDF2 existants restent
 inchangés : déchiffrement et validation complète avant remplacement confirmé.
+
+Limite d'implémentation constatée le 2026-09-08 : Firefox ne fournit pas
+`StorageArea.setAccessLevel`. La poursuite autonome conserve sync sur Firefox
+avec une restriction applicative explicite : seul le background compose les
+adaptateurs, aucun message ni content script n'expose cette zone. Chromium
+requiert la restriction native; une erreur de cette API refuse l'accès, même
+sur Firefox si elle devient disponible. Cette limite ne vaut pas conformité
+au critère de restriction native sur Firefox.
+[Compatibilité MDN](https://github.com/mdn/browser-compat-data/blob/main/webextensions/api/storage.json).
 
 L'Agenda reste local, borné à 100 lignes par période demi-ouverte; une source
 résolue est retrouvée par son lien Work, sans exiger une Review artificielle.

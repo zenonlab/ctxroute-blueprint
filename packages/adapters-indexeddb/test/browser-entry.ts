@@ -12,13 +12,20 @@ import {
   reviewId,
   workId,
 } from '@tobirink/domain';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieStoragePort, verifyDatabaseIntegrity } from '../src';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderIdentityRecoveryStateAdapter, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
 
 const storage = new DexieStoragePort(`tobirink-contract-${Date.now()}`);
 const organizerSnapshots = new DexieOrganizerSnapshotStore(`tobirink-organizer-contract-${Date.now()}`);
 
 try {
   await verifyStoragePortContract(() => storage);
+  const recoveryState = { schemaVersion: 1 as const, restoration: { digest: 'a'.repeat(64), index: 2, complete: false, missingCount: 0 } };
+  await new DexieProviderIdentityRecoveryStateAdapter(storage.database).save(recoveryState);
+  storage.database.close();
+  const reopened = new TobirinkDatabase(storage.database.name);
+  if (JSON.stringify(await new DexieProviderIdentityRecoveryStateAdapter(reopened).read()) !== JSON.stringify(recoveryState)) throw new Error('Recovery checkpoint did not survive reopening IndexedDB.');
+  reopened.close();
+  await storage.database.open();
   const work = workId('work_browser');
   const workRecord = createWork({ externalReferences: [], id: work, mediaKind: 'manga', preferredTitle: 'Browser contract' });
   const review = createReview({ id: reviewId('review_browser'), sourceLabel: 'Fixture', status: 'pending', title: 'Browser contract' });

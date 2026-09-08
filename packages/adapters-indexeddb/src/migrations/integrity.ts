@@ -10,6 +10,7 @@ import {
 } from '@tobirink/domain';
 import { createFavoriteParseArtifactRecord, parseFavoriteResolutionTaskPayload, restoreDurableTask } from '@tobirink/application';
 import type { TobirinkDatabase } from '../database';
+import { providerIdentityRecoveryRecordSchema } from '../recovery/provider-identity-recovery-state-adapter';
 
 export interface IntegrityReport {
   checkedRecords: number;
@@ -53,7 +54,7 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
 
   if (favoriteInventoryCheckpoints.length > 1) throw new Error('Favorite inventory contains more than one checkpoint.');
   for (const checkpoint of favoriteProviderRateCheckpoints) {
-    if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangaupdates'].includes(checkpoint.provider) || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
+    if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangadex', 'mangaupdates'].includes(checkpoint.provider) || !Number.isSafeInteger(checkpoint.nextAllowedAt) || checkpoint.nextAllowedAt < 0) throw new Error('Favorite provider rate checkpoint is invalid.');
   }
 
   for (const library of validLibraries) {
@@ -88,8 +89,11 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     if (!reviewIds.has(set.reviewId) || set.candidates.length > 6 || !set.digest.trim()) throw new Error(`Favorite Review candidate set ${set.reviewId} is invalid.`);
   }
 
+  const recovery = await database.providerIdentityRecovery.limit(2).toArray();
+  if (recovery.length > 1) throw new Error('Provider identity recovery must have a single checkpoint.');
+  for (const record of recovery) providerIdentityRecoveryRecordSchema.parse(record);
   return {
-    checkedRecords: agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
+    checkedRecords: recovery.length + agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
     schemaVersion: database.verno,
   };
 }

@@ -96,9 +96,9 @@ async function seedVersion8(name: string, version = 8): Promise<void> {
     favoriteResolutionReceipts: '&id, &idempotencyKey, sourceId, completedAt',
     favoriteResolutionTasks: '&id, &idempotencyKey, kind, lane, state, availableAt, [kind+lane+state+availableAt], [state+claimedAt]',
     favoriteReviewCandidateSets: '&reviewId, recordedAt',
-    favoriteSources: version === 9 ? '&id, &bookmarkId, reviewId, matchedWorkId, importedAt' : '&id, &bookmarkId, reviewId, importedAt',
+    favoriteSources: version >= 9 ? '&id, &bookmarkId, reviewId, matchedWorkId, importedAt' : '&id, &bookmarkId, reviewId, importedAt',
     libraries: '&id', organizer: '&id', progress: '&id, workId, kind', reminders: '&id, agendaEntryId, channel',
-    reviews: '&id, status, matchedWorkId', works: '&id, mediaKind, preferredTitle',
+    reviews: '&id, status, matchedWorkId', works: version >= 10 ? '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys' : '&id, mediaKind, preferredTitle',
   });
   await database.table('works').bulkAdd(versionThree.works);
   await database.table('reviews').add(resolvedReview);
@@ -120,7 +120,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 10 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 11 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   database.close();
@@ -156,6 +156,7 @@ const versionFourName = `tobirink-migration-v4-${Date.now()}`;
 const versionFiveName = `tobirink-migration-v5-${Date.now()}`;
 const versionEightName = `tobirink-migration-v8-${Date.now()}`;
 const versionNineName = `tobirink-migration-v9-${Date.now()}`;
+const versionTenName = `tobirink-migration-v10-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
@@ -165,6 +166,7 @@ try {
   await verifySuccessfulMigration(versionFiveName, seedVersion5, 1);
   await verifySuccessfulMigration(versionEightName, seedVersion8, 1);
   await verifySuccessfulMigration(versionNineName, (name) => seedVersion8(name, 9), 1);
+  await verifySuccessfulMigration(versionTenName, (name) => seedVersion8(name, 10), 1);
   await verifyInterruptedMigration(interruptedName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
@@ -179,5 +181,6 @@ try {
   await deleteDatabase(versionFiveName);
   await deleteDatabase(versionEightName);
   await deleteDatabase(versionNineName);
+  await deleteDatabase(versionTenName);
   await deleteDatabase(interruptedName);
 }

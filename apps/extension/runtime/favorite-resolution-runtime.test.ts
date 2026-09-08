@@ -9,6 +9,23 @@ const unavailableCandidates = { anilist: unavailable, 'kitsu-anime': unavailable
 const emptyHydration = { anilist: noHydration, 'kitsu-anime': noHydration, 'kitsu-manga': noHydration, mangaupdates: noHydration } as const;
 
 describe('createFavoriteResolutionRuntime', () => {
+  it('waits for exact identity restoration before claiming resolution tasks and publishing new IDs', async () => {
+    const prepare = vi.fn(async (): Promise<'READY' | 'PENDING'> => 'READY').mockResolvedValueOnce('PENDING');
+    const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
+    const claimNext = vi.fn(async () => undefined);
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) }, candidates: unavailableCandidates,
+      ensureReady: async () => ({ schemaVersion: 11 }), hydration: emptyHydration, identityRecovery: { prepare, publish },
+      libraryId: libraryId('library_primary'), now: () => '2026-09-08T00:00:00.000Z', outbox: { block: vi.fn(), claimNext, retry: vi.fn() },
+      sourceAdapters: [], storage: new MemoryStoragePort(), token: () => 'recovery-token',
+    });
+    await reconcile();
+    expect(claimNext).not.toHaveBeenCalled(); expect(publish).not.toHaveBeenCalled();
+    await reconcile();
+    expect(claimNext).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledOnce();
+    expect(prepare.mock.invocationCallOrder[1]).toBeLessThan(claimNext.mock.invocationCallOrder[0] ?? 0);
+    expect(claimNext.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0] ?? 0);
+  });
   it('persists the latest bookmark mutation before requesting convergence', async () => {
     const storage = new MemoryStoragePort();
     const ensureReady = vi.fn(async () => ({ schemaVersion: 8 }));

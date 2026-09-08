@@ -3,6 +3,7 @@ import type { Table } from 'dexie';
 import type { AgendaEntry, FavoriteSource, Library, OrganizerConfiguration, Progress, Reminder, Review, Work } from '@tobirink/domain';
 import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet } from '@tobirink/application';
 import { migrateVersion1To2 } from './migrations/v2';
+import type { ProviderIdentityRecoveryRecord } from './recovery/provider-identity-recovery-state-adapter';
 
 export class TobirinkDatabase extends Dexie {
   readonly agenda!: Table<AgendaEntry, string>;
@@ -21,6 +22,7 @@ export class TobirinkDatabase extends Dexie {
   readonly reminders!: Table<Reminder, string>;
   readonly reviews!: Table<Review, string>;
   readonly works!: Table<Work, string>;
+  readonly providerIdentityRecovery!: Table<ProviderIdentityRecoveryRecord, string>;
 
   constructor(name: string) {
     super(name);
@@ -119,5 +121,6 @@ export class TobirinkDatabase extends Dexie {
     this.version(10).stores({
       works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys',
     });
+    this.version(11).stores({ providerIdentityRecovery: '&id' });
   }
 }

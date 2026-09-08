@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Inventaire borné. Fiches Work hydratées et index privés : aliases validés par type/saison, puis titres fournisseurs."
+        "note": "IndexedDB : fiches Work, index privés d'aliases/titres et checkpoint de reconstruction. Inventaire et scans bornés."
       },
       {
         "id": "recovery-collective",
@@ -56,7 +56,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "IDs seuls dans sync; port HTTP typé : clés SHA-256, lookup owner-scoped avant recherche. Site et WebBridge sans accès D1."
+        "note": "Sync : IDs fragmentés, digest puis manifeste; reprise locale de publication/hydratation. Lookup HTTP owner-scoped avant recherche."
       }
     ]
   },
