@@ -55,12 +55,14 @@
   },
   "directories": {
     "source": [
+      "pocs/macos-connector/",
       "pocs/macos-surface/",
       "pocs/macos-native-wallpaper/",
       "packages/",
       "scripts/"
     ],
     "tests": [
+      "pocs/macos-connector/Tests/",
       "pocs/macos-surface/Tests/",
       "tests/"
     ],

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "theme_id": "org.wallpaperthemes.poc2.orbit",
+  "display_name": "Orbite — PoC 2",
+  "panel_id": "theme.controls",
+  "background": "101B30",
+  "accent": "61DCC3",
+  "period_seconds": 24,
+  "objects": [
+    {"id": "orb.a", "color": "61DCC3", "phase": 0.0},
+    {"id": "orb.b", "color": "F6C667", "phase": 0.25},
+    {"id": "orb.c", "color": "B9A2FF", "phase": 0.5},
+    {"id": "orb.d", "color": "F5A9BA", "phase": 0.75}
+  ],
+  "system_controls": {
+    "placement": "top_left",
+    "items": ["motion", "audio", "interaction", "desktop", "settings"]
+  }
+}

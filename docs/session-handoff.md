@@ -5,10 +5,16 @@ deux représentations de panneau, deux fixtures et plusieurs chemins de diagnost
 ils restent utiles comme preuves mais ne forment pas l'application cible.
 
 La nouvelle référence est l'[architecture des connecteurs](architecture/platform-connectors.md).
-Le prochain travail est le [PoC macOS 2](pocs/macos-connector-poc2.md) : app connecteur
+Le travail actuel est le [PoC macOS 2](pocs/macos-connector-poc2.md) : app connecteur
 native, adaptateur wallpaper séparé, manifeste canonique et panneau logique unique.
 Ne pas poursuivre `pocs/macos-surface/` ou `pocs/macos-native-wallpaper/` pour y ajouter
-des fonctions produit. Aucun code PoC2 n'est encore créé.
+des fonctions produit. La première tranche est dans `pocs/macos-connector/` :
+Foundation, Core Animation, app AppKit et extension native. Quatre XCTest passent,
+build macOS 26 Swift 6 signé ad hoc ; App Group accessible depuis le binaire signé.
+Identité séparée `org.wallpaperthemes.connectorpoc2`. Le fond actif n'a pas été changé.
+L'entrée reste passive, audio absent, toggle Finder indisponible avec accès aux
+Réglages. Prochaine action : sélectionner la nouvelle extension et qualifier M2-03,
+M2-06 et M2-10 en session graphique. Ne pas confondre compilation et preuve d'ancrage.
 
 La personnalisation est cadrée séparément dans
 [l'architecture de thème](architecture/theme-customization.md) et

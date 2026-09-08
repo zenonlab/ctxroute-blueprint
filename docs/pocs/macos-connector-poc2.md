@@ -1,6 +1,8 @@
 # PoC macOS 2 — connecteur natif maintenable
 
-État au 8 septembre 2026 : **spécifié, non implémenté**.
+État au 8 septembre 2026 : **première tranche implémentée, qualification OS restante**.
+Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
+Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
 Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
 Ce PoC ne qualifie ni l'App Store, ni une API publique Apple de wallpaper dynamique.
 
@@ -39,7 +41,7 @@ l'import 3D ou le rig dans le connecteur.
 | Adaptateur wallpaper | Swift/Objective-C + Core Animation | chemin déjà observé dans WallpaperAgent | non, API privée à qualifier |
 | Modèle de thème | JSON Schema + types Swift purs | manifeste unique et tests sans surface | format à stabiliser |
 | Rendu de fixture | Core Animation | preuve minimale sans introduire un moteur général | non |
-| Communication | interface abstraite, transport comparé XPC/App Group + signal | éviter de figer Darwin notifications | non |
+| Communication | fichiers atomiques App Group + signal Darwin sans payload | transport expérimental borné avec quittances corrélées | non |
 | Tests | XCTest + scripts de package/runtime + gestes manuels | couvre logique, identité et comportement OS réel | oui comme stratégie locale |
 
 Le PoC2 n'introduit pas wgpu, Tauri, terminal natif ou FFI Rust. Ces choix seraient
@@ -81,6 +83,8 @@ messages ont une taille bornée, aucune URL de fichier libre et aucune commande 
 
 L'état durable minimal contient le thème choisi et des préférences non sensibles. Les
 permissions TCC ne sont ni copiées ni contournées. Les caches sont reconstructibles.
+Dans la première tranche, le thème est embarqué et l'état est uniquement en mémoire :
+la persistance des préférences ci-dessus reste à implémenter.
 
 ## Politique d'entrée
 
@@ -122,6 +126,27 @@ compté ensemble.
 | M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
 
 ## Conditions de sortie
+
+### Preuves de la première tranche — 8 septembre 2026
+
+| Critère | État réellement démontré |
+| --- | --- |
+| M2-01 | 4 objets/identités testés ; manifeste identique vérifié par `cmp` dans les bundles |
+| M2-02 | smoke : une fenêtre ; inspection macOS réelle : libellés lisibles et boutons indisponibles sans provider ; aucun panneau dans le renderer |
+| M2-03 | réacquisition et suspension implémentées ; Spaces/veille/Finder non qualifiés |
+| M2-04 | entrée refusée structurellement : aucun tap, aucune fenêtre de décor |
+| M2-05 | TCC non sollicité ; capacité interactive indisponible, cycle de permissions non testé |
+| M2-06 | XCTest : dédoublonnage, conflit d'ID, expiration, génération et instance ; échange avec WallpaperAgent restant |
+| M2-07 | aucune mesure énergétique ; pas de promesse de consommation |
+| M2-08 | compilation Swift 6 sans avertissement, signature stricte, plists et manifeste vérifiés ; installation documentée, non exécutée |
+| M2-09 | refus/timeout prévu dans l'app ; autonomie réelle du provider à observer après sélection |
+| M2-10 | capture du panneau et vignette séparées de la revue du vrai bureau, encore requise |
+| M2-11 | repli vers Réglages macOS ; toggle Finder indisponible, critère de lecture/confirmation non satisfait |
+
+Les quatre tests XCTest ne constituent pas onze critères validés. La tranche livrée
+permet de commencer la qualification, elle ne clôt pas M2. Le provider repose sur
+les interfaces privées Apple héritées d'une révision épinglée de Phosphene ; aucune
+garantie publique Apple n'est ajoutée par le découpage du code.
 
 Le PoC2 est réussi si M2-01 à M2-11 possèdent chacun une preuve datée et si les limites
 de l'API wallpaper sont explicitement publiées. Un test automatisé ne remplace pas les

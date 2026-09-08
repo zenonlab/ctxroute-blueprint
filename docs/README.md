@@ -4,7 +4,8 @@ Le dépôt est initialisé et le [PoC macOS 1](pocs/macos-surface.md) est désor
 gelé comme preuve expérimentale. Il a révélé une duplication de panneau et ne doit
 pas devenir le produit par accumulation de correctifs.
 La cible est maintenant un [cœur de thème unifié avec des connecteurs OS séparés](architecture/platform-connectors.md).
-Le [PoC macOS 2](pocs/macos-connector-poc2.md) est spécifié mais pas encore implémenté.
+Le [PoC macOS 2](pocs/macos-connector-poc2.md) dispose d'une première tranche isolée,
+compilée et testée ; sa qualification dans le vrai bureau macOS reste à conduire.
 Le terminal, le moteur de thèmes produit et l'ingestion restent à construire.
 Le [plan de démarrage des PoCs](05-poc-start-plan.md) fixe les outils et le
 périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.

@@ -173,8 +173,10 @@ chaque élément réutilisé devra avoir un propriétaire, une interface et un t
 
 ## Prochaine preuve
 
-Construire uniquement le [PoC macOS 2](../pocs/macos-connector-poc2.md) à partir
-d'un manifeste canonique et d'une seule surface de contrôle. Les connecteurs Windows
+Qualifier la première tranche du [PoC macOS 2](../pocs/macos-connector-poc2.md),
+implémentée dans `pocs/macos-connector/` avec un manifeste canonique et un panneau
+AppKit unique. [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md) borne
+son transport expérimental App Group et son provider privé macOS 26. Les connecteurs Windows
 et Linux ne commencent qu'après stabilisation du contrat commun, sans réutiliser les
 primitives macOS.
 
@@ -183,8 +185,9 @@ primitives macOS.
 Le diagramme Archify passe le profil `showcase` avec 9 contrôles sur 9, sans erreur
 ni avertissement. Le contrôle visuel automatisé passe à 1440×900, 1600×1000,
 1920×1080 et 2048×1320 en clair et sombre. La capture sombre 1440×900 a été inspectée
-manuellement : limites, libellés et relations sont lisibles, sans collision observée.
+manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et relations
+sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-SHA-256 de la source : `fa28dedc2f8fe1a0b2b9f049a5728d6a0d88c74ff4b5bdd16179214807d0b140`.
-SHA-256 de l'artefact : `d78eb744a60af77a4e231d80653c05c3e32501db56173a119844fe961415357b`.
+SHA-256 de la source : `8a459e7b395d9e47418e434306e7c3201e204296de95ebcdbd514f0814ee6f13`.
+SHA-256 de l'artefact : `5af1820f54d739bcc72bc6ad5501968e0dfcea86655a29729ca53b7a081bb4ca`.
