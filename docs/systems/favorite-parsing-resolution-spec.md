@@ -443,9 +443,10 @@ plusieurs et passe au niveau suivant seulement si aucun candidat ne correspond.
 5. même multiensemble de tokens significatifs, ordre libre ;
 6. distance d’édition bornée sur les clés compactes.
 
-Pour la distance, la borne est
-`min(2, floor(max(longueurGauche, longueurDroite) / 8))`. Une borne nulle
-interdit ce niveau. Une borne demandée négative ou non entière est invalide.
+Pour la distance, la borne est zéro si un titre compact a moins de cinq
+caractères; sinon `min(2, max(1, floor(max(longueurGauche, longueurDroite) / 8)))`.
+Une borne nulle interdit ce niveau. Les séquences numériques doivent être
+identiques : une petite faute de lettres ne peut changer un nombre intrinsèque.
 
 Le matcher est identique pour AniList et MangaUpdates. Il NE DOIT PAS utiliser
 l’ordre de réponse, la popularité, le rang, la note, la date, l’image, la

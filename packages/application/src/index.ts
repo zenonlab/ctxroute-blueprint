@@ -18,7 +18,8 @@ export type {
   TelemetryPort,
 } from './ports/capability-ports';
 export { createFavoriteParseArtifactRecord, privateStoreNames } from './ports/storage-port';
-export { agendaEntryListLimit, assertAgendaEntryListQuery, assertReviewMatchListQuery, reviewMatchListLimit } from './ports/storage-port';
+export { agendaEntryListLimit, assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery, reviewMatchListLimit } from './ports/storage-port';
+export type { WorkIdentityQuery } from './ports/storage-port';
 export type { AgendaEntryListQuery, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, FavoriteSourcePageQuery, PrivateStoreName, ReviewListQuery, ReviewMatchListQuery, StoragePort, StorageReadPort, StorageSession, StorageWritePort } from './ports/storage-port';
 export { defaultQuickPreferences, quickPreferencesSchema } from './ports/quick-preferences-port';
 export type { QuickPreferences, QuickPreferencesPort } from './ports/quick-preferences-port';

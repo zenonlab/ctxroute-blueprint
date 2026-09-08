@@ -53,8 +53,11 @@ résolution. Les IDs ne reconstruisent pas tout l'historique privé. Les exports
 versionnés et backups chiffrés restent distincts, compatibles et facultatifs.
 Le format d'export privé v4 conserve le lien Work direct, le résultat et ses
 versions, ainsi que le motif et l'origine d'une Review. Les formats v1, v2 et
-v3 restent importables. IndexedDB v9 ajoute uniquement l'index `matchedWorkId`
-des sources; les lignes historiques et leurs liens Review sont conservés.
+v3 restent importables. IndexedDB v9 ajoute l'index `matchedWorkId` des sources;
+v10 ajoute deux index multi-entry privés aux fiches Work hydratées : aliases
+validés par type/saison et titres fournisseurs. L'export v4 conserve cette
+hydratation, son âge et ses aliases privés. Une lecture du cache ne repousse
+pas son expiration. Les lignes historiques et leurs liens Review sont conservés.
 Les anciennes enveloppes sync ne sont plus produites; leur retrait n'est pas
 une suppression automatique. Les formats AES-GCM/PBKDF2 existants restent
 inchangés : déchiffrement et validation complète avant remplacement confirmé.

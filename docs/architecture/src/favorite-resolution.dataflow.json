@@ -20,7 +20,7 @@
           "parseArtifact",
           "titleMatcher"
         ],
-        "note": "Le brut reste intact; URL, titre, saison et progression deviennent des preuves séparées et auditables."
+        "note": "Règles versionnées : origine exacte et segments bornés, sans code distant. URL, titre, saison et progression restent séparés."
       },
       {
         "id": "durable-resolution",
@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "Chaque effet fournisseur reprend depuis IndexedDB et toute ambiguïté rejoint Review sans sélection implicite."
+        "note": "Anime et manga indépendants; Kitsu après NO_MATCH complet. Hydratation exacte et pagination reprenable dans IndexedDB."
       },
       {
         "id": "bounded-convergence",
@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Inventaire getChildren, outbox et lectures locales sont bornés et reprennent depuis leurs checkpoints IndexedDB."
+        "note": "Inventaire borné. Fiches Work hydratées et index privés : aliases validés par type/saison, puis titres fournisseurs."
       },
       {
         "id": "recovery-collective",
@@ -56,7 +56,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "IDs seuls dans sync; lookup owner-scoped via Worker avant recherche. Site et WebBridge ne touchent jamais D1."
+        "note": "IDs seuls dans sync; port HTTP typé : clés SHA-256, lookup owner-scoped avant recherche. Site et WebBridge sans accès D1."
       }
     ]
   },

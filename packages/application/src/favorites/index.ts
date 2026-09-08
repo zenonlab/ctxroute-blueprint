@@ -10,5 +10,6 @@ export * from './provider-ports';
 export * from './resolution-result-schema';
 export * from './season-extraction';
 export * from './source-evidence';
+export * from './site-rules';
 export * from './title-segmentation';
 export * from './title-normalization';

@@ -28,6 +28,7 @@ export default defineConfig({
     description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
     externally_connectable: { matches: externallyConnectableMatches },
     host_permissions: [
+      'https://api.mangadex.org/*',
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',

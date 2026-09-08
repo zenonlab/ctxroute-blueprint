@@ -1,4 +1,4 @@
-import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy } from '@tobirink/application';
+import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery } from '@tobirink/application';
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { ProviderCandidate } from '@tobirink/domain';
@@ -8,7 +8,7 @@ import type { FavoriteProviderFetch } from './provider-http';
 
 export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
 const mediaProjection = 'id type format siteUrl title { romaji english native } synonyms genres';
-const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!) { Page(page: 1, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
+const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!, $page: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
 const hydrateQuery = `query FavoriteById($id: Int!) { Media(id: $id) { ${mediaProjection} } }`;
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
@@ -53,15 +53,17 @@ export class AniListFavoriteProviderAdapter implements FavoriteProviderCandidate
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== 'anilist') throw new TypeError('AniList adapter requires provider anilist.');
+    const page = favoriteProviderPage(query.cursor);
     const response = await this.gate.run(favoriteProviderPolicy.anilist.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, anilistGraphqlEndpoint, {
-      body: JSON.stringify({ query: searchQuery, variables: { perPage: query.limit, search: query.titles[0] } }),
+      body: JSON.stringify({ query: searchQuery, variables: { page, perPage: query.limit, search: query.titles[0] } }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, anilistSearchSchema));
     const candidates = response.value.data.Page.media.map(candidate);
     if (candidates.length > query.limit) throw new RangeError('AniList result exceeds the requested limit.');
     const truncated = response.value.data.Page.pageInfo.hasNextPage;
-    return createProviderCandidateEnvelope({ candidates, complete: !truncated, digest: response.digest, provider: 'anilist', truncated });
+    const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'anilist' as const, truncated };
+    return createProviderCandidateEnvelope(truncated ? { ...envelope, nextCursor: String(page + 1) } : envelope);
   }
 
   async hydrate(reference: FavoriteProviderReference) {

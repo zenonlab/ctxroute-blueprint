@@ -72,4 +72,14 @@ describe('private recovery', () => {
     const legacy = { ...empty, exportedAt: '2026-09-04T10:00:00.000Z', format: 'tobirink-private-export', reviews: [review], version: 3 };
     expect(validatePrivateExport(JSON.stringify(legacy)).reviews).toEqual([review]);
   });
+
+  it('round-trips hydrated public metadata and private aliases without resetting cache age', async () => {
+    const work = createWork({
+      externalReferences: [{ externalId: '1', provider: 'anilist' }], id: workId('work_hydrated'), mediaKind: 'anime', preferredTitle: 'Synthetic title',
+      hydration: { candidate: { externalId: '1', provider: 'anilist', mediaKind: 'ANIME', preSerialization: false, titles: ['Synthetic title'] }, favoriteAliasKeys: ['["ANIME",null,"synthetic title"]'], hydratedAt: '2026-09-01T00:00:00.000Z', matcherVersion: 'favorite-matcher-v3', providerTitleKeys: ['synthetic title'] },
+    });
+    const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, works: [work] }), '2026-09-04T10:00:00.000Z');
+    expect(validatePrivateExport(JSON.stringify(value)).works).toEqual([work]);
+    expect(() => validatePrivateExport(JSON.stringify({ ...value, works: [{ ...work, hydration: { ...work.hydration, candidate: { ...work.hydration?.candidate, externalId: '2' } } }] }))).toThrow();
+  });
 });

@@ -7,6 +7,7 @@ import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite-source-presence';
 import { runFavoriteResolutionSlice } from './favorite-resolution-runner';
 import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
+import { FavoriteProviderRetryError } from './provider-ports';
 
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
@@ -47,6 +48,61 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('uses the owner-scoped lookup before title search and preserves its public references', async () => {
+    const { outbox, storage } = await fixture();
+    let searches = 0;
+    const references = [{ provider: 'kitsu-anime' as const, externalId: '46474' }, { provider: 'anilist' as const, externalId: candidate.externalId }];
+    await runFavoriteResolutionSlice({
+      collective: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, kind: 'FOUND', mediaKind: 'ANIME', references, scope: 'owner' })) },
+      candidates: candidatePorts({ search: async () => { searches += 1; throw new Error('unexpected search'); } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'owner-token',
+    });
+    expect(searches).toBe(0);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect(source?.matchedWorkId && await storage.getWork(source.matchedWorkId)).toMatchObject({ externalReferences: references });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+  it('schedules provider Retry-After without asking the fallback provider', async () => {
+    const { outbox, storage, task } = await fixture();
+    const retryAt = '2026-09-07T14:00:00.000Z';
+    await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => { throw new FavoriteProviderRetryError('429', new Date(retryAt).valueOf()); } }),
+      hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'rate-token',
+    });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ availableAt: retryAt, state: 'RETRY_AT' });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+  it.each([false, true])('reuses a hydrated identity and refreshes it only after expiry (%s)', async (expired) => {
+    const { outbox, storage } = await fixture();
+    let searches = 0;
+    let hydrations = 0;
+    let clock = now;
+    const dependencies = {
+      candidates: candidatePorts({ search: async () => {
+        searches += 1;
+        return createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'cached-search', provider: 'anilist', truncated: false });
+      } }),
+      hydration: hydrationPorts({ hydrate: async () => { hydrations += 1; return candidate; } }),
+      libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'cache-token',
+    };
+    await runFavoriteResolutionSlice(dependencies);
+    const [original] = await storage.listFavoriteSources({ limit: 1 });
+    clock = expired ? '2026-10-07T12:00:00.000Z' : '2026-09-07T12:01:00.000Z';
+    await importFavoriteSources([{ ...favorite, bookmarkId: 'cache-copy' }], storage, clock);
+    const copy = (await storage.listFavoriteSources({ limit: 100 })).find((source) => source.id !== original?.id);
+    const pending = copy === undefined ? undefined : await storage.getFavoriteResolutionTask(copy.id.replace(/^source_/u, 'favorite-resolution_'));
+    if (pending === undefined) throw new Error('Expected copied favorite task.');
+    const result = await runFavoriteResolutionSlice({ ...dependencies, outbox: new MemoryOutbox(storage, pending.id) });
+    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(searches).toBe(1);
+    expect(hydrations).toBe(expired ? 2 : 1);
+    const sources = await storage.listFavoriteSources({ limit: 100 });
+    expect(sources.every((source) => source.matchedWorkId === original?.matchedWorkId)).toBe(true);
+    expect(original?.matchedWorkId && await storage.getWork(original.matchedWorkId)).toMatchObject({ hydration: { hydratedAt: expired ? clock : now } });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+
   it('persists a hydrated Work and committed effect atomically without Review', async () => {
     const { outbox, storage, task } = await fixture();
     const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'search-1', provider: 'anilist', truncated: false });
@@ -87,13 +143,13 @@ describe('runFavoriteResolutionSlice', () => {
     await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
   });
 
-  it('uses one complete Kitsu fallback tier when AniList is unavailable', async () => {
+  it('uses one complete Kitsu fallback after a complete AniList NO_MATCH', async () => {
     const { outbox, storage, task } = await fixture();
     const kitsuCandidate = { ...candidate, externalId: '46474', provider: 'kitsu-anime' as const };
     const fallback = createProviderCandidateEnvelope({ candidates: [kitsuCandidate], complete: true, digest: 'kitsu-search', provider: 'kitsu-anime', truncated: false });
     const result = await runFavoriteResolutionSlice({
       candidates: {
-        anilist: { search: async () => { throw new Error('AniList unavailable'); } },
+        anilist: { search: async () => createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'empty-primary', provider: 'anilist', truncated: false }) },
         'kitsu-anime': { search: async () => fallback },
         'kitsu-manga': unusedSearch,
         mangaupdates: unusedSearch,
@@ -200,7 +256,7 @@ describe('runFavoriteResolutionSlice', () => {
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
-    expect(source && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: '154587' }, { externalId: '154588' }], digest: 'ambiguous' });
+    expect(source && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: '154587' }, { externalId: '154588' }], digest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
   });
 
   it('keeps a terminal NOT_FOUND actionable instead of making a no-match decision', async () => {
@@ -228,5 +284,51 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source && await storage.getFavoriteResolutionReceipt(`${source.id}:favorite-resolution`)).toBeUndefined();
     expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
     expect(await storage.getFavoriteResolutionTask(task.id)).toEqual(claimed);
+  });
+
+  it('leaves an expired request reclaimable instead of blocking a newer task', async () => {
+    const { outbox, storage, task } = await fixture();
+    let clock = now;
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => {
+        clock = '2026-09-07T12:01:01.000Z';
+        return createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'late', provider: 'anilist', truncated: false });
+      } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }),
+      libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'expired-request',
+    });
+    expect(result).toEqual({ blocked: 0, completed: 0, retried: 0 });
+    const current = await storage.getFavoriteResolutionTask(task.id);
+    expect(current?.state).toBe('CLAIMED');
+    expect(current && isTaskAvailable(current, clock)).toBe(true);
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+
+  it('resumes more than eight normal pages across rescans without exhausting the failure counter', async () => {
+    const { outbox, storage, task } = await fixture();
+    let clock = new Date(now).valueOf();
+    const requestedPages: string[] = [];
+    const dependencies = {
+      candidates: candidatePorts({ search: async (input: { cursor?: string }) => {
+        const page = Number(input.cursor ?? '1');
+        requestedPages.push(String(page));
+        const envelope = { candidates: [page === 10 ? candidate : { ...candidate, externalId: String(page), titles: [`Unrelated identity ${page}`] }], complete: page === 10, digest: `page-${page}`, provider: 'anilist' as const, truncated: page !== 10 };
+        return createProviderCandidateEnvelope(page === 10 ? envelope : { ...envelope, nextCursor: String(page + 1) });
+      } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'),
+      now: () => new Date(clock).toISOString(), outbox, storage, token: () => 'resume-token',
+    };
+    for (let page = 1; page <= 10; page += 1) {
+      await importFavoriteSources([favorite], storage, dependencies.now());
+      const result = await runFavoriteResolutionSlice(dependencies);
+      expect(result.blocked).toBe(0);
+      if (page < 10) {
+        expect(result.completed).toBe(0);
+        expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+      }
+      clock += 1_001;
+    }
+    expect(requestedPages).toEqual(Array.from({ length: 10 }, (_, index) => String(index + 1)));
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
   });
 });

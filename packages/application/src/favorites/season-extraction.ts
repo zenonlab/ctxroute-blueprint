@@ -11,7 +11,7 @@ interface MutableFavoriteSeasonAnalysis { bareTrailingNumber?: number; canonical
 
 const labelledSeason = /(?:\b(?:s|season|saison|temporada|stagione|staffel|seizoen|sesong|säsong|kausi|sezon|sezona|sezonas|сезон)[\s._-]*([1-9]\d?)\b)|(?:\b([1-9]\d?)(?:st|nd|rd|th|er|e|eme|ème)[\s._-]+season\b)/giu;
 
-function lastSeason(value: string): number | undefined {
+export function readLabelledFavoriteSeason(value: string): number | undefined {
   let found: number | undefined;
   for (const match of value.matchAll(labelledSeason)) {
     const raw = match[1] ?? match[2];
@@ -20,9 +20,17 @@ function lastSeason(value: string): number | undefined {
   return found;
 }
 
+export function stripFavoriteSeasonSuffix(value: string, season: number): string {
+  const trimmed = value.trim();
+  for (const match of trimmed.matchAll(labelledSeason)) {
+    if (Number(match[1] ?? match[2]) === season && match.index + match[0].length === trimmed.length) return trimmed.slice(0, match.index).trim();
+  }
+  return trimmed;
+}
+
 export function extractFavoriteSeason(title: string, evidence: SourceEvidence): FavoriteSeasonAnalysis {
-  const titleSeason = lastSeason(title);
-  const urlSeason = evidence.season ?? lastSeason([evidence.path, evidence.rawSlug, evidence.stableSlug].filter((value) => value !== undefined).join(' '));
+  const titleSeason = readLabelledFavoriteSeason(title);
+  const urlSeason = evidence.season ?? readLabelledFavoriteSeason([evidence.path, evidence.rawSlug, evidence.stableSlug].filter((value) => value !== undefined).join(' '));
   const conflict = titleSeason !== undefined && urlSeason !== undefined && titleSeason !== urlSeason;
   const canonicalSeason = conflict ? undefined : (titleSeason ?? urlSeason);
   const bare = title.match(/(?:^|\s)([1-9]\d?)\s*$/u)?.[1];

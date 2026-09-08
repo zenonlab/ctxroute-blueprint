@@ -116,5 +116,8 @@ export class TobirinkDatabase extends Dexie {
     this.version(9).stores({
       favoriteSources: '&id, &bookmarkId, reviewId, importedAt, matchedWorkId',
     });
+    this.version(10).stores({
+      works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys',
+    });
   }
 }

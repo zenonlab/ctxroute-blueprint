@@ -1,14 +1,17 @@
-import { favoriteProviderPolicy } from '@tobirink/application';
-import type { ResolutionProvider } from '@tobirink/application';
+import { favoriteProviderPolicy, FavoriteProviderRetryError } from '@tobirink/application';
+import type { FavoriteProvider } from '@tobirink/domain';
 import type { z } from 'zod';
 
 export const favoriteProviderResponseByteLimit = 64 * 1024;
 export type FavoriteProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export interface FavoriteProviderJson<TValue> { readonly digest: string; readonly value: TValue }
+export class FavoriteProviderHttpError extends Error {
+  constructor(readonly status: number) { super(`Favorite provider request failed with HTTP ${status}.`); }
+}
 export interface FavoriteProviderRateCheckpointPort {
-  read(provider: ResolutionProvider): Promise<number | undefined>;
-  write(provider: ResolutionProvider, nextAllowedAt: number): Promise<void>;
+  read(provider: FavoriteProvider): Promise<number | undefined>;
+  write(provider: FavoriteProvider, nextAllowedAt: number): Promise<void>;
 }
 
 export class FavoriteProviderRateGate {
@@ -16,7 +19,7 @@ export class FavoriteProviderRateGate {
   private nextAllowedAt = 0;
 
   constructor(
-    private readonly provider: ResolutionProvider,
+    private readonly provider: FavoriteProvider,
     private readonly checkpoints?: FavoriteProviderRateCheckpointPort,
     private readonly clock: () => number = Date.now,
     private readonly wait: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => { setTimeout(resolve, milliseconds); }),
@@ -27,12 +30,21 @@ export class FavoriteProviderRateGate {
     let release: () => void = () => {};
     this.active = new Promise<void>((resolve) => { release = resolve; });
     await previous;
-    const persisted = await this.checkpoints?.read(this.provider) ?? 0;
-    const waitMs = Math.max(0, Math.max(this.nextAllowedAt, persisted) - this.clock());
-    if (waitMs > 0) await this.wait(waitMs);
-    this.nextAllowedAt = this.clock() + minimumIntervalMs;
-    await this.checkpoints?.write(this.provider, this.nextAllowedAt);
-    try { return await operation(); } finally { release(); }
+    try {
+      const persisted = await this.checkpoints?.read(this.provider) ?? 0;
+      const waitMs = Math.max(0, Math.max(this.nextAllowedAt, persisted) - this.clock());
+      if (waitMs > favoriteProviderPolicy.requestTimeoutMs) throw new FavoriteProviderRetryError('Provider cadence requires a later wake.', this.clock() + waitMs);
+      if (waitMs > 0) await this.wait(waitMs);
+      this.nextAllowedAt = this.clock() + minimumIntervalMs;
+      await this.checkpoints?.write(this.provider, this.nextAllowedAt);
+      return await operation();
+    } catch (error) {
+      if (error instanceof FavoriteProviderRetryError) {
+        this.nextAllowedAt = Math.max(this.nextAllowedAt, error.retryAt);
+        await this.checkpoints?.write(this.provider, this.nextAllowedAt);
+      }
+      throw error;
+    } finally { release(); }
   }
 }
 
@@ -41,7 +53,13 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
   const timer = setTimeout(() => controller.abort(), favoriteProviderPolicy.requestTimeoutMs);
   try {
     const response = await fetcher(url, { cache: 'default', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', ...init, signal: controller.signal });
-    if (!response.ok) throw new Error(`Favorite provider request failed with HTTP ${response.status}.`);
+    if (response.status === 429) {
+      const header = response.headers.get('retry-after') ?? '';
+      const delay = /^\d+$/u.test(header) ? Number(header) * 1_000 : Date.parse(header) - Date.now();
+      const retryAt = Date.now() + (Number.isFinite(delay) && delay > 0 && delay < 8_000_000_000_000_000 ? delay : 60_000);
+      throw new FavoriteProviderRetryError('Favorite provider request failed with HTTP 429.', retryAt);
+    }
+    if (!response.ok) throw new FavoriteProviderHttpError(response.status);
     const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== undefined && contentType !== 'application/json' && !contentType.endsWith('+json')) throw new Error('Favorite provider response must be JSON.');
     const declaredLength = Number(response.headers.get('content-length'));
@@ -51,6 +69,15 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
     return Object.freeze({ digest: digestText(text), value: schema.parse(JSON.parse(text)) });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+export async function readFavoriteProviderIdentityJson<TValue>(fetcher: FavoriteProviderFetch, url: string, init: RequestInit, schema: z.ZodType<TValue>): Promise<FavoriteProviderJson<TValue> | undefined> {
+  try {
+    return await readFavoriteProviderJson(fetcher, url, init, schema);
+  } catch (error) {
+    if (error instanceof FavoriteProviderHttpError && error.status === 404) return undefined;
+    throw error;
   }
 }
 

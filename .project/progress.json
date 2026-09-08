@@ -5806,7 +5806,7 @@
         {
           "id": "step-3",
           "title": "Parsing, routage et fournisseurs déterministes",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Ordre ID, règle route, artefact/aliases, hydraté, D1 owner-scoped, recherche, Review terminale",
             "Kitsu après NO_MATCH complet seulement; aucune panne ni ambiguïté arbitrée par fallback; niveaux probants et lanes indépendantes",
@@ -5846,7 +5846,13 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'fix(parser): restore deterministic provider resolution'"
           ],
-          "evidence": []
+          "evidence": [
+            "Parser/matcher v3 : routes Anime-Sama, liens ordinaires exclus, ID exact MangaDex/AniList manga/MangaUpdates, fautes uniques, éditions ambiguës, saisons/nombres préservés.",
+            "Pagination et aliases reprenables, lanes indépendantes, fallback après NO_MATCH seulement, Retry-After persisté, claims expirés réenfilables; caches Work avec aliases corroborés et index IndexedDB v10.",
+            "Port collectif strict SHA-256 testé avant recherche; intégration HTTP authentifiée et règles distantes réservées à étape 5. Aucune écriture SQL ni production dans cette étape.",
+            "Application 233/233; domain 24/24; contracts 16/16; extension 97/97; adapters navigateur 42/42 puis HTTP 3/3; IndexedDB 2/2 et contrat Chromium; migrations v1/v2/v3/v4/v5/v8/v9 vers v10 et interruption Chromium passent.",
+            "Typecheck global, lint, anti-slop, parser-equivalence, docs, ADR, cohérence, Archify all showcase et diff check passent; snapshot synthétique U-04/S-04 expliqué, aucune prétention de parité privée."
+          ]
         },
         {
           "id": "step-4",

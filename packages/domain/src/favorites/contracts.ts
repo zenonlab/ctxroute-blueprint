@@ -152,7 +152,7 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
   return result;
 }
 
-function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
+export function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
   contract(input.provider === provider, 'candidate provider must match its envelope.');
   contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
   if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'candidate season must be a positive safe integer.');

@@ -12,7 +12,7 @@ describe('MangaUpdates exact-origin source adapter', () => {
   });
 
   it('canonicalizes the work URL without inventing a title', () => {
-    expect(evidence('https://www.mangaupdates.com/series/abc123')).toMatchObject({ canonicalUrl: 'https://www.mangaupdates.com/series/abc123', explicitProviderReference: { externalId: 'abc123' } });
+    expect(evidence('https://www.mangaupdates.com/series/abc123')).toMatchObject({ canonicalUrl: 'https://www.mangaupdates.com/series/abc123', explicitProviderReference: { externalId: '623698779' } });
     expect(evidence('https://www.mangaupdates.com/series/abc123').title).toBeUndefined();
   });
 

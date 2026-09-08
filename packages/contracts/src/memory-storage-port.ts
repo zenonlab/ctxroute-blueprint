@@ -1,4 +1,4 @@
-import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery } from '@tobirink/application';
 import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import { createOrganizerConfiguration } from '@tobirink/domain';
 import type {
@@ -131,6 +131,14 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
         .sort((left, right) => left.id.localeCompare(right.id))
         .slice(0, query.limit);
     },
+    listWorksByIdentityKey: async (query) => {
+      requireStore('works');
+      assertWorkIdentityQuery(query);
+      return [...state.works.values()].filter((work) => {
+        const keys = query.kind === 'favorite-alias' ? work.hydration?.favoriteAliasKeys : work.hydration?.providerTitleKeys;
+        return keys?.includes(query.key);
+      }).sort((left, right) => left.id.localeCompare(right.id)).slice(0, query.limit);
+    },
     listFavoriteSourcesByWorkId: async (query) => {
       requireStore('favoriteSources');
       assertReviewMatchListQuery(query);
@@ -188,6 +196,7 @@ export class MemoryStoragePort implements StoragePort {
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);

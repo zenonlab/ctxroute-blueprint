@@ -12,10 +12,12 @@ export const mangaUpdatesSourceAdapter: FavoriteSourceAdapter = Object.freeze({
   origins,
   analyze(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl) {
     const [route, id, slug] = url.decodedSegments;
-    if (route !== 'series' || id === undefined || url.decodedSegments.length > 3 || !/^[A-Za-z0-9]+$/u.test(id)) return undefined;
+    if (route !== 'series' || id === undefined || url.decodedSegments.length > 3 || !/^[A-Za-z0-9]{1,13}$/u.test(id)) return undefined;
+    const numericId = [...id.toLowerCase()].reduce((value, digit) => value * 36n + BigInt(parseInt(digit, 36)), 0n);
+    if (numericId === 0n || numericId > 9_223_372_036_854_775_807n) return undefined;
     const base = {
       aliases: [], canonicalUrl: `${url.origin}/series/${id}`, diagnostics: [],
-      explicitProviderReference: { externalId: id, provider: 'mangaupdates' as const },
+      explicitProviderReference: { externalId: numericId.toString(), provider: 'mangaupdates' as const },
       key: input.sourceKey, mediaKind: 'MANGA' as const, origin: url.origin, path: url.pathname,
       proofs: ['CATEGORY_PATH'] as const, sourceAdapter: 'mangaupdates-url', strategy: 'exact-origin' as const,
     };

@@ -1,9 +1,9 @@
-import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy } from '@tobirink/application';
+import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ResolutionProvider } from '@tobirink/application';
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from './provider-http';
 import type { FavoriteProviderFetch } from './provider-http';
 
 export const kitsuApiOrigin = 'https://kitsu.io/api/edge';
@@ -66,19 +66,23 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== this.provider) throw new TypeError(`Kitsu adapter requires provider ${this.provider}.`);
     const media = kind(this.provider);
+    const page = favoriteProviderPage(query.cursor);
     const url = new URL(endpoint(this.provider));
     url.searchParams.set('filter[text]', query.titles[0] ?? '');
     url.searchParams.set('page[limit]', String(query.limit));
+    url.searchParams.set('page[offset]', String((page - 1) * query.limit));
     url.searchParams.set(`fields[${media}]`, 'slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating');
     const response = await this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, url.href, { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, searchSchema));
     const candidates = response.value.data.map((resource) => candidate(resource, this.provider));
-    const truncated = response.value.links.next != null || response.value.meta.count > candidates.length;
-    return createProviderCandidateEnvelope({ candidates, complete: !truncated, digest: response.digest, provider: this.provider, truncated });
+    const truncated = response.value.links.next != null || response.value.meta.count > (page - 1) * query.limit + candidates.length;
+    const envelope = { candidates, complete: !truncated, digest: response.digest, provider: this.provider, truncated };
+    return createProviderCandidateEnvelope(truncated ? { ...envelope, nextCursor: String(page + 1) } : envelope);
   }
 
   async hydrate(reference: FavoriteProviderReference) {
     if (reference.provider !== this.provider || !/^\d+$/u.test(reference.externalId)) throw new TypeError(`Kitsu hydration requires a numeric ${this.provider} reference.`);
-    const response = await this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, endpoint(this.provider, reference.externalId), { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, hydrationSchema));
+    const response = await this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, () => readFavoriteProviderIdentityJson(this.fetcher, endpoint(this.provider, reference.externalId), { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, hydrationSchema));
+    if (response === undefined) return undefined;
     const hydrated = candidate(response.value.data, this.provider);
     if (hydrated.externalId !== reference.externalId) throw new Error('Kitsu hydration returned a different media identity.');
     return hydrated;

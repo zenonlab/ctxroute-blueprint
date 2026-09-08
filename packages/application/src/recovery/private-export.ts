@@ -17,6 +17,7 @@ import {
 import type { AgendaEntry, FavoriteSource, Library, OrganizerConfiguration, Progress, Reminder, Review, Work } from '@tobirink/domain';
 import { z } from 'zod';
 import { favoriteResolutionResultSchema, favoriteResolutionVersionsSchema } from '../favorites/resolution-result-schema';
+import { providerCandidateSchema } from '../favorites/provider-search-checkpoint';
 import { organizerConfigurationSchema, parseOrganizerConfiguration } from './organizer-export-schema';
 
 export interface PrivateSnapshot {
@@ -60,6 +61,7 @@ export interface RecoveryStorePort {
 }
 
 const workSchema = z.strictObject({
+  hydration: z.strictObject({ candidate: providerCandidateSchema, favoriteAliasKeys: z.array(z.string().min(1).max(2048)).max(64), hydratedAt: z.string(), matcherVersion: z.string().min(1).max(100), providerTitleKeys: z.array(z.string().min(1).max(2048)).max(16) }).optional(),
   externalReferences: z.array(z.strictObject({ externalId: z.string(), provider: z.string() })),
   id: z.string(), mediaKind: z.enum(['anime', 'manga']), preferredTitle: z.string(),
 });
@@ -125,7 +127,10 @@ function materializeSnapshot(input: z.infer<typeof snapshotSchema>): PrivateSnap
       if (item.decisionOrigin !== undefined) review.decisionOrigin = item.decisionOrigin;
       return createReview(review);
     }),
-    works: input.works.map((item) => createWork({ ...item, id: workId(item.id) })),
+    works: input.works.map(({ hydration, ...item }) => {
+      const base = { ...item, id: workId(item.id) };
+      return createWork(hydration === undefined ? base : { ...base, hydration });
+    }),
   };
   const organizer = input.organizer === undefined ? undefined : parseOrganizerConfiguration(input.organizer);
   const snapshot: PrivateSnapshot = organizer === undefined ? base : { ...base, organizer };

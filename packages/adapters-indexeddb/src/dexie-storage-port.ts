@@ -1,4 +1,4 @@
-import { assertAgendaEntryListQuery, assertReviewMatchListQuery } from '@tobirink/application';
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
@@ -99,6 +99,12 @@ export class DexieStoragePort implements StoragePort {
           .map(createReview)
           .sort((left, right) => left.id.localeCompare(right.id));
       },
+      listWorksByIdentityKey: async (query) => {
+        requireStore('works');
+        assertWorkIdentityQuery(query);
+        const index = query.kind === 'favorite-alias' ? 'hydration.favoriteAliasKeys' : 'hydration.providerTitleKeys';
+        return (await this.database.works.where(index).equals(query.key).limit(query.limit).toArray()).map(createWork);
+      },
       listFavoriteSourcesByWorkId: async (query) => {
         requireStore('favoriteSources');
         assertReviewMatchListQuery(query);
@@ -145,6 +151,7 @@ export class DexieStoragePort implements StoragePort {
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);
   listFavoriteSources: StoragePort['listFavoriteSources'] = (query) => this.session().listFavoriteSources(query);
   listReviews: StoragePort['listReviews'] = (query) => this.session().listReviews(query);

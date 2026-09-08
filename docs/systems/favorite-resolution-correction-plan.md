@@ -96,7 +96,10 @@ niveau suivant, une seule résout, plusieurs imposent Review. Les références
 de fournisseurs différents ne sont regroupées comme une même œuvre que par
 une association explicite validée, jamais par titre seul.
 
-Distance maximale : `min(2, floor(max(longueurA, longueurB) / 8))`.
+Distance maximale : zéro si un titre compact a moins de cinq caractères;
+sinon `min(2, max(1, floor(max(longueurA, longueurB) / 8)))`.
+Les séquences numériques doivent rester identiques. Ce plancher permet une
+faute unique comme `Frieran` → `Frieren`, sans rapprocher `20` de `21`.
 Les nombres intrinsèques et les saisons restent préservés; année, popularité,
 premier résultat, image, couverture de tokens et ordre API ne prouvent rien.
 
@@ -323,6 +326,13 @@ ne passe; une divergence finale non couverte par une décision approuvée exige
 l'accord utilisateur.
 
 ## Exécution, validation et publication
+
+Le snapshot synthétique du parser v3 change les versions et fingerprints.
+Deux corrections de fixtures sont explicites : U-04 injecte désormais une
+preuve d'ID AniList exact; S-04 conserve le titre précédant `season4`, plutôt
+que de prendre ce marqueur pour le titre. Les tests de routage et de reprise
+exécutent séparément l'import, les adaptateurs et les transactions. Ce snapshot
+ne prouve pas la parité avec la base privée, réservée à l'étape 7.
 
 Huit étapes dans Progress, chacune avec fichiers, commandes, critères et commit :
 documentation; contrats; parser/fournisseurs; sync; Worker SQL; migration/Review;

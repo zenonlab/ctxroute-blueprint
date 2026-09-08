@@ -23,12 +23,12 @@ const structuralSegments = new Set([
   'anime', 'chapter', 'chapitre', 'comic', 'episode', 'manga', 'manhua', 'manhwa',
   'read', 'saison', 'scan', 'season', 'series', 'title', 'volume', 'webtoon',
 ]);
-const releasePattern = /^(chapter|chapitre|episode|volume)[-_]?(\d+(?:[.,]\d+)?)$/iu;
-const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|episode|volume)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
 
 function releaseKind(value: string): 'chapter' | 'episode' | 'volume' {
-  if (value.toLowerCase() === 'episode') return 'episode';
-  if (value.toLowerCase() === 'volume') return 'volume';
+  if (['episode', 'ep'].includes(value.toLowerCase())) return 'episode';
+  if (['volume', 'vol'].includes(value.toLowerCase())) return 'volume';
   return 'chapter';
 }
 
@@ -50,12 +50,24 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   let identityIndex = decoded.length - 1;
   let release: SourceEvidence['release'];
   let releaseSuffix: string | undefined;
+  const labelledNumber = /^\d+(?:[.,]\d+)?$/u.test(decoded[identityIndex] ?? '')
+    && /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)$/iu.test(decoded[identityIndex - 1] ?? '');
+  if (labelledNumber) {
+    const label = decoded[identityIndex - 1] ?? '';
+    const rawNumber = decoded[identityIndex] ?? '';
+    releaseSuffix = `${label}/${rawNumber}`;
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    identityIndex -= 2;
+  }
   const separated = releasePattern.exec(decoded[identityIndex] ?? '');
   if (separated !== null) {
     identityIndex -= 1;
     releaseSuffix = separated[0];
     release = { kind: releaseKind(separated[1] ?? ''), provenance: 'URL_PATH', raw: separated[0], value: Number((separated[2] ?? '').replace(',', '.')) };
   }
+  const seasonTail = /^(?:season|saison|s)[-_]?([1-9]\d?)$/iu.exec(decoded[identityIndex] ?? '');
+  if (seasonTail !== null) identityIndex -= 1;
+  else if (/^[1-9]\d?$/u.test(decoded[identityIndex] ?? '') && /^(?:season|saison)$/iu.test(decoded[identityIndex - 1] ?? '')) identityIndex -= 2;
   const observedSlug = decoded[identityIndex];
   let stableSlug = observedSlug;
   const attached = attachedReleasePattern.exec(stableSlug ?? '');
@@ -70,6 +82,9 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
   }
   const category = decoded[identityIndex - 1]?.toLowerCase();
+  if ((category === undefined || !routeCategorySegments.has(category)) && release === undefined) {
+    return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
+  }
   const mediaKind = category === undefined ? 'UNKNOWN' : (categoryKinds[category] ?? 'UNKNOWN');
   const title = displayTitle(stableSlug);
   const proofs: SourceEvidence['proofs'] = [

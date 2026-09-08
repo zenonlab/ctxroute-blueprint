@@ -1,14 +1,15 @@
 import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import type { LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
 
 export interface FavoriteResolutionRuntimeDependencies {
+  readonly collective?: FavoriteCollectiveLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
-  readonly hydration: Readonly<Record<ResolutionProvider, FavoriteProviderHydrationPort>>;
+  readonly hydration: FavoriteProviderHydrationPorts;
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;

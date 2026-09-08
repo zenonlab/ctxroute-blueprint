@@ -2,6 +2,7 @@ import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, pa
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
+  mangaDexSourceAdapter,
   WebExtensionBookmarkEventAdapter,
   WebExtensionBookmarkImportAdapter,
   WebExtensionOrganizerAdapter,
@@ -23,6 +24,7 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from '@tobirink/application';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -44,7 +46,7 @@ export default defineBackground({
     const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
-    const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter] as const;
+    const favoriteSourceAdapters = [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)] as const;
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });

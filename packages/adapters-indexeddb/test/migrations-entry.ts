@@ -85,9 +85,9 @@ async function seedVersion5(name: string): Promise<void> {
   database.close();
 }
 
-async function seedVersion8(name: string): Promise<void> {
+async function seedVersion8(name: string, version = 8): Promise<void> {
   const database = new Dexie(name);
-  database.version(8).stores({
+  database.version(version).stores({
     agenda: '&id, workId, occursAt, availability',
     favoriteArtifacts: '&sourceId, reviewId, recordedAt, artifact.semanticFingerprint',
     favoriteBookmarkMutations: '&bookmarkId, sequence, kind',
@@ -96,7 +96,7 @@ async function seedVersion8(name: string): Promise<void> {
     favoriteResolutionReceipts: '&id, &idempotencyKey, sourceId, completedAt',
     favoriteResolutionTasks: '&id, &idempotencyKey, kind, lane, state, availableAt, [kind+lane+state+availableAt], [state+claimedAt]',
     favoriteReviewCandidateSets: '&reviewId, recordedAt',
-    favoriteSources: '&id, &bookmarkId, reviewId, importedAt',
+    favoriteSources: version === 9 ? '&id, &bookmarkId, reviewId, matchedWorkId, importedAt' : '&id, &bookmarkId, reviewId, importedAt',
     libraries: '&id', organizer: '&id', progress: '&id, workId, kind', reminders: '&id, agendaEntryId, channel',
     reviews: '&id, status, matchedWorkId', works: '&id, mediaKind, preferredTitle',
   });
@@ -120,8 +120,9 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 9 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 10 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
+  if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   database.close();
 }
 
@@ -154,6 +155,7 @@ const versionThreeName = `tobirink-migration-v3-${Date.now()}`;
 const versionFourName = `tobirink-migration-v4-${Date.now()}`;
 const versionFiveName = `tobirink-migration-v5-${Date.now()}`;
 const versionEightName = `tobirink-migration-v8-${Date.now()}`;
+const versionNineName = `tobirink-migration-v9-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
@@ -162,6 +164,7 @@ try {
   await verifySuccessfulMigration(versionFourName, seedVersion4, 1);
   await verifySuccessfulMigration(versionFiveName, seedVersion5, 1);
   await verifySuccessfulMigration(versionEightName, seedVersion8, 1);
+  await verifySuccessfulMigration(versionNineName, (name) => seedVersion8(name, 9), 1);
   await verifyInterruptedMigration(interruptedName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
@@ -175,5 +178,6 @@ try {
   await deleteDatabase(versionFourName);
   await deleteDatabase(versionFiveName);
   await deleteDatabase(versionEightName);
+  await deleteDatabase(versionNineName);
   await deleteDatabase(interruptedName);
 }

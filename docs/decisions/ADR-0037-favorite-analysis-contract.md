@@ -63,6 +63,18 @@ pertinent prouvé, pas sur la première page. Le curseur et jusqu'à trois alias
 sont persistés; budget atteint ou page manquante reste RETRYABLE. Une panne
 ne doit pas boucler sur une page déjà attestée ni devenir no-match humain.
 
+L'implémentation locale v3 utilise des checkpoints de pages par fournisseur
+dans l'artefact privé, liés au fingerprint et au claim courant. Elle retient
+au plus 20 identités au meilleur niveau de preuve, attend la fin des pages et
+aliases, puis décide. La pagination normale ne consomme pas les huit tentatives
+réservées aux erreurs. `Retry-After` est persisté et peut reporter le réveil.
+Les aliases mémorisés dans Work doivent eux-mêmes correspondre à la fiche
+hydratée; un libellé libre du favori ne devient pas un alias par simple voisinage.
+Le port collectif strict reçoit seulement une clé SHA-256 liée au titre
+normalisé/type/saison et les versions; ses références équivalentes sont
+hydratées suivant la priorité fournisseur. L'adaptateur HTTP authentifié et
+la distribution effective des règles sont raccordés à l'étape Worker/D1.
+
 Parser, matcher, progression, normalisation, règles, décisions et reçus sont
 versionnés. Brut et transformations restent locaux. Les règles distribuées
 par Worker sont des données JSON bornées origine/segments/type/progression;

@@ -1,6 +1,7 @@
 export { normalizeBookmarks } from './bookmarks/normalize-bookmarks';
 export { anilistSourceAdapter } from './favorites/anilist-source-adapter';
 export { mangaUpdatesSourceAdapter } from './favorites/mangaupdates-source-adapter';
+export { MangaDexFavoriteProviderAdapter, mangaDexSourceAdapter } from './favorites/mangadex-provider-adapter';
 export { AniListFavoriteProviderAdapter, anilistGraphqlEndpoint } from './favorites/anilist-provider-adapter';
 export { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './favorites/mangaupdates-provider-adapter';
 export { KitsuFavoriteProviderAdapter, kitsuApiOrigin } from './favorites/kitsu-provider-adapter';

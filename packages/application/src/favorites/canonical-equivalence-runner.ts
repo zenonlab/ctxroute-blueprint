@@ -1,4 +1,4 @@
-import { createFavoriteObservation, createProviderCandidateEnvelope } from '@tobirink/domain';
+import { createFavoriteObservation, createProviderCandidateEnvelope, createSourceEvidence } from '@tobirink/domain';
 import type { FavoriteParseArtifact, ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
 import { favoriteEquivalenceCorpus } from './equivalence-corpus';
@@ -41,6 +41,7 @@ function oracleDecision(value: FavoriteTitleMatchOutcome): FavoriteOracleDecisio
 }
 
 function candidates(caseId: string, title: string, mediaKind: 'ANIME' | 'MANGA'): readonly ProviderCandidate[] {
+  if (caseId === 'U-04') return Object.freeze([{ externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: [title] }]);
   if (caseId === 'P-05') return Object.freeze([
     { externalId: 'one', mediaKind, preSerialization: false, provider: 'anilist', titles: [title] },
     { externalId: 'two', mediaKind, preSerialization: false, provider: 'anilist', titles: [title] },
@@ -65,13 +66,17 @@ export function runCanonicalFavoritePipeline(): readonly Readonly<{ caseId: stri
     const titleSlug = title.trim().normalize('NFKD').replace(/[\u0300-\u036f]/gu, '').toLocaleLowerCase('fr').replace(/[^a-z0-9]+/gu, '-').replace(/^-|-$/gu, '');
     const url = urls[manifest.id] ?? `https://fixtures.tobirink.invalid/anime/${titleSlug}`;
     const observation = createFavoriteObservation({ bookmarkId: `oracle-${manifest.id}`, folderPath: ['Fixtures'], observationRevision: `oracle-${manifest.id}-v1`, observationSequence: index, observedAt: '2026-09-07T12:00:00.000Z', presence: 'observed', siblingOrder: index, title, url });
-    const evidence = extractFavoriteSourceEvidence({ sourceKey: observation.bookmarkId, title, url });
+    const evidence = manifest.id === 'U-04'
+      ? createSourceEvidence({ aliases: [], canonicalUrl: 'https://anilist.co/anime/154587', diagnostics: [], explicitProviderReference: { externalId: '154587', provider: 'anilist' }, key: observation.bookmarkId, mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'oracle-exact-id-fixture', strategy: 'exact-origin', title })
+      : extractFavoriteSourceEvidence({ sourceKey: observation.bookmarkId, title, url });
     const artifact = parseFavoriteObservation(observation, evidence);
     const sourceTitles = [artifact.displayTitle, ...(artifact.aliases ?? []).map((alias) => alias.value)].filter((value): value is string => value !== undefined);
     const safeTitles = sourceTitles.length > 0 ? sourceTitles : [title];
     const mediaKind = artifact.mediaKind === 'MANGA' ? 'MANGA' : 'ANIME';
     const envelope = createProviderCandidateEnvelope({ candidates: candidates(manifest.id, safeTitles[0] ?? title, mediaKind), complete: true, digest: `oracle-${manifest.id}`, provider: 'anilist', truncated: false });
-    const query: FavoriteTitleMatchQuery = manifest.id === 'F-01' ? { mediaKind, sourceFormat: 'OVA', sourceTitles: safeTitles } : { mediaKind, sourceTitles: safeTitles };
+    const query: FavoriteTitleMatchQuery = manifest.id === 'F-01' ? { mediaKind, sourceFormat: 'OVA', sourceTitles: safeTitles }
+      : evidence.explicitProviderReference !== undefined ? { explicitProviderReference: evidence.explicitProviderReference, mediaKind, sourceTitles: safeTitles }
+      : { mediaKind, sourceTitles: safeTitles };
     const decision = matchFavoriteTitles(query, [envelope]);
     const snapshot = Object.freeze({ artifact: oracleValue(artifact), decision: oracleDecision(decision), projection: oracleValue(projection(decision)) });
     return Object.freeze({ caseId: manifest.id, snapshot });

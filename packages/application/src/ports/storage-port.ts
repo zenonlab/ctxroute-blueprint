@@ -23,6 +23,8 @@ import type {
 } from '@tobirink/domain';
 import type { DurableTask } from '../tasks/task-state';
 import type { BookmarkInventoryCursor } from './capability-ports';
+import { favoriteSearchCheckpointSchema } from '../favorites/provider-search-checkpoint';
+import type { FavoriteSearchCheckpoint } from '../favorites/provider-search-checkpoint';
 
 export interface FavoriteInventoryCheckpoint {
   cursor?: BookmarkInventoryCursor;
@@ -30,6 +32,18 @@ export interface FavoriteInventoryCheckpoint {
   sessionId: string;
   startedAt: string;
   status: 'active' | 'complete';
+}
+
+export interface WorkIdentityQuery {
+  key: string;
+  kind: 'favorite-alias' | 'provider-title';
+  limit: number;
+}
+
+export function assertWorkIdentityQuery(query: WorkIdentityQuery): void {
+  if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 100) throw new RangeError('Work identity lookup limit must be between 1 and 100.');
+  if (query.key.trim().length === 0 || query.key.length > 2048) throw new RangeError('Work identity key must be non-empty and bounded.');
+  if (query.kind !== 'favorite-alias' && query.kind !== 'provider-title') throw new Error('Unsupported Work identity index.');
 }
 
 export interface FavoriteInventoryMark {
@@ -46,7 +60,7 @@ export interface FavoriteBookmarkMutation {
 
 export interface FavoriteProviderRateCheckpoint {
   nextAllowedAt: number;
-  provider: Extract<FavoriteProvider, 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangaupdates'>;
+  provider: FavoriteProvider;
 }
 
 export interface FavoriteResolutionReceipt {
@@ -70,12 +84,17 @@ export interface FavoriteParseArtifactRecord {
   recordedAt: string;
   reviewId?: ReviewId;
   sourceId: FavoriteSourceId;
+  searchCheckpoints?: readonly FavoriteSearchCheckpoint[];
 }
 
 export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRecord): FavoriteParseArtifactRecord {
   const recordedAt = new Date(input.recordedAt);
   if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
   const record = { ...input, artifact: createFavoriteParseArtifact(input.artifact), sourceId: favoriteSourceId(input.sourceId) };
+  if (input.searchCheckpoints !== undefined) {
+    if (input.searchCheckpoints.length > 4 || new Set(input.searchCheckpoints.map((item) => item.provider)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
+    record.searchCheckpoints = Object.freeze(input.searchCheckpoints.map((item) => favoriteSearchCheckpointSchema.parse(item)));
+  }
   return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });
 }
 
@@ -143,6 +162,7 @@ export interface StorageReadPort {
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
+  listWorksByIdentityKey(query: WorkIdentityQuery): Promise<readonly Work[]>;
   listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;
   listFavoriteSources(query: FavoriteSourcePageQuery): Promise<readonly FavoriteSource[]>;
   listReviews(query: ReviewListQuery): Promise<readonly Review[]>;

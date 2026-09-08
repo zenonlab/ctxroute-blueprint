@@ -76,7 +76,9 @@ export async function importFavoriteSources(
         const evidence = extractFavoriteSourceEvidence({ sourceKey: source.id, title: favorite.title, url: favorite.url }, sourceAdapters);
         const artifact = parseFavoriteObservation(observation, evidence);
         await session.putFavoriteSource(source);
-        await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord({ artifact, recordedAt: importedAt, sourceId: source.id }));
+        const sameArtifact = existingArtifact?.artifact.semanticFingerprint === artifact.semanticFingerprint;
+        const record = { artifact, recordedAt: importedAt, sourceId: source.id };
+        await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord(sameArtifact ? { ...existingArtifact, ...record } : record));
         if (existingArtifact?.artifact.semanticFingerprint !== artifact.semanticFingerprint) {
           await session.putFavoriteResolutionTask(createDurableTask({
             id: resolutionTaskIdentity(favorite.bookmarkId),
