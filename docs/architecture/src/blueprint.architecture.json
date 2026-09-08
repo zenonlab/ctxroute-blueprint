@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1280, 520],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns goals in a 512 KiB bounded record; Stop hands off; CTXRoute dispatches lifecycle." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "lifecycle", "ctxroute", "progressMcp", "progressDashboard", "dashboardState", "crg", "graph"], "note": "Progress owns at most 48 goals in a 512 KiB bounded record; Stop hands off; CTXRoute dispatches lifecycle." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
