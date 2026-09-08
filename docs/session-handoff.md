@@ -1,5 +1,32 @@
 # Reprise de session — Wallpaper
 
+## VaWZIK installé — 8 septembre 2026, 20:21
+
+L'utilisateur a sélectionné le fond Apple demandé. Le job exact de l'agent a été
+arrêté, puis l'ancien provider PID 26818 terminé. Préflight passé, VaWZIK installé
+sans reconstruction. Ancien g9pTbH conservé dans
+`dist/pocs/macos-connector/replaced.agV4zz/previous-app.disabled`.
+Signatures vérifiées et binaire installé identique au candidat.
+
+Agent enregistré : `agent.aWdeAz`, PID **3095**, lancement normal launchctl avec
+`--agent --diagnostics`. Journal 20:21:37 : **accessibility=false**. Un lancement
+direct temporaire depuis l'outil terminal avait affiché true (PID 78886) ; ce
+contexte ne prouve pas la permission du job macOS. Il a été terminé et ne doit pas
+servir de contournement. Premier démarrage sorti sans diagnostic ; lancement du
+job ensuite confirmé. Provider PID 5570 : configure appliqué, quittance reçue,
+mais **0 surface active** tant que le fond Noir reste sélectionné.
+
+Réglages relancés après installation : trois thèmes présents. Les clics automatisés
+sur Ambre ne changent pas SelectedDesktop (toujours Noir). Le menu de statut Orbite
+n'est pas exposé par l'outil de contrôle ; test réel du toggle non exécuté.
+Préférences finales inchangées : StandardHideDesktopIcons=0, CreateDesktop=1.
+
+Une question asynchrone demande l'accord pour renouveler uniquement l'entrée TCC
+Wallpaper Connector Agent ; aucune réponse encore reçue, aucun droit modifié.
+Prochaine étape : renouvellement autorisé + sélection Ambre, puis test masquer /
+réafficher et récupération menu. Garder VaWZIK gelé après permission. Aucun code,
+contrat ni diagramme changé dans cette installation ; seul le présent état évolue.
+
 ## Installation suspendue par l'interface macOS — 8 septembre 2026
 
 Après demande d'installation autonome, le candidat VaWZIK passe encore `--check`.
