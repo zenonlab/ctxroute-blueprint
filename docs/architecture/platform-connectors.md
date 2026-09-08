@@ -79,7 +79,8 @@ App Store ni une garantie sur une future version de macOS.
 
 Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
 signature et packaging. L'observation globale des clics est une capacité optionnelle.
-Le transport courant utilise un agent XPC nommé, enregistré pour la session utilisateur,
+Le transport courant utilise un agent XPC nommé, avec inscription persistante opt-in
+et reprise après échec selon [ADR-0055](../decisions/ADR-0055-macos-durable-agent.md),
 et un provider sandboxé avec exception de recherche Mach limitée à ce service.
 Les signatures sont épinglées mutuellement ; ni PID ni bundle ID seul ne constitue
 l'identité de confiance. [ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md) remplace

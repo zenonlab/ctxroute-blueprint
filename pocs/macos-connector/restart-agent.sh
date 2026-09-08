@@ -19,5 +19,9 @@ if connector_state="$(launchctl print "$connector_job" 2>/dev/null)"; then
   fi
   launchctl bootout "$connector_job"
 fi
-bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app"
+if [[ -f "$HOME/Library/LaunchAgents/org.wallpaperthemes.connectorpoc2.agent.plist" ]]; then
+  bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app" --persistent
+else
+  bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app"
+fi
 echo 'Connector restarted without diagnostics; native receipt still required. Provider is not restarted.'

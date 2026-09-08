@@ -1,5 +1,51 @@
 # Reprise de session — Wallpaper
 
+## Démarrage durable et signature locale — 8 septembre 2026
+
+Demande utilisateur : arrêter les régressions de clics à chaque relance/mise à jour.
+Accord reçu (« oui ») pour créer un certificat local dédié puis autoriser la nouvelle
+identité. `Wallpaper Local Development`, SHA1
+`8F422B938988AFF3A82FD871B42A66CAE13F865F`, importé dans le trousseau login et approuvé
+uniquement pour codeSign (pas TLS). Source OpenSSL publique versionnée ; sauvegarde
+locale de clé/certificat sous Application Support/org.wallpaperthemes.connectorpoc2/signing,
+hors dépôt, répertoire 0700 et clé 0600. Ne jamais journaliser ou committer cette clé.
+
+`--sign-local` exige l'identité valide sans repli ad hoc. Test réel : deux codes
+différents ont le même designated requirement et passent la vérification croisée.
+Le garde-fou d'installation rejette une migration sans `--allow-identity-change`.
+Cela ne prouve pas encore la persistance TCC entre deux mises à jour de l'app.
+
+Le script start est maintenant idempotent et accepte `--persistent`. Job actif :
+`~/Library/LaunchAgents/org.wallpaperthemes.connectorpoc2.agent.plist`, sans diagnostic,
+RunAtLoad=true, KeepAlive/SuccessfulExit=false, ThrottleInterval=10. Deux starts ont
+conservé PID 46850. Arrêt contrôlé SIGTERM de ce PID : reprise automatique PID 46948,
+runs=2. Ce test porte sur le job avec **l'ancien paquet VaWZIK encore installé**.
+Aucun logout/reboot testé. Quitter décharge le job ; le login suivant le recharge.
+
+Code candidat : le véritable agent est démarré par launchd, sans la course avec le
+lanceur LaunchServices transitoire. Un lancement direct est refusé (test exit 2).
+Le lanceur recharge le plist persistant vérifié après Quitter. 7 cas natifs de
+configuration passent, plus les 9 cas Finder et 9 cas Fichiers ; catalogue 3 thèmes.
+31 XCTest passent. Aucun changement au filtrage des icônes ni aux intentions du thème.
+
+Premier paquet signé **KJsOlG** construit et vérifié, mais installation refusée car
+Lagon était redevenu actif et macOS recréait son provider. Ancien agent redémarré
+sous le job persistant, aucune substitution forcée. Une question asynchrone demande
+de laisser Noir sélectionné pendant la migration.
+Dernier candidat **BdNKFb** inclut le rechargement après Quitter ; build en cours,
+session exec **6151**, bloqué sur codesign / SecurityAgent (demande d'accès à la clé).
+L'outil UI refuse SecurityAgent pour raisons de sécurité : validation utilisateur
+nécessaire, aucun contournement ni saisie de mot de passe. Ne pas installer ce
+paquet avant la fin du build et ne pas reconstruire après l'autorisation TCC finale.
+
+ADR-0055 + source Archify mis à jour : showcase 9/9, aucun avertissement ; source
+SHA256 `989ec71d0092ecbd8fa5f45f782e9b1978357a2daa6341708e491fc4974c2ca9`, HTML
+`7fda96271f8002791dac3e5e43eab79e7fa1bd629bc723a67948b0ad60159e24`.
+Containment 4 tailles clair/sombre ; captures sombres petite/grande inspectées.
+Viewer fixe anglais. AGENTS, CLAUDE, hooks inchangés ; aucune suppression.
+Audit : démarrage/script/signature et tests conformes ; boutons, TCC du nouveau
+paquet, login réel et mise à jour après autorisation restent à qualifier.
+
 ## VaWZIK installé — 8 septembre 2026, 20:21
 
 L'utilisateur a sélectionné le fond Apple demandé. Le job exact de l'agent a été

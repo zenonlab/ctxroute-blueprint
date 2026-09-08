@@ -59,24 +59,22 @@ import ApplicationServices
             return
         }
         if !CommandLine.arguments.contains("--agent") {
-            let launch = Process()
-            launch.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            launch.arguments = ["kickstart", "gui/\(getuid())/\(NativeWire.service)"]
-            try launch.run(); launch.waitUntilExit()
-            if launch.terminationStatus != 0 { print("Agent absent : exécuter start-agent.sh sur le paquet installé."); exit(2) }
+            guard try AgentLauncher.start(app: NativeWire.appBundle, service: NativeWire.service) else {
+                print("Agent absent ou configuration refusée : exécuter start-agent.sh sur le paquet installé.")
+                exit(2)
+            }
             return
         }
         guard Bundle.main.bundleIdentifier == "org.wallpaperthemes.connectorpoc2.agent" else {
             print("Utiliser l’agent embarqué enregistré, pas le lanceur en mode agent."); exit(2)
         }
         let app = NSApplication.shared
-        if let id = Bundle.main.bundleIdentifier,
-           let existing = NSRunningApplication.runningApplications(withBundleIdentifier: id)
-            .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
-            guard existing.bundleURL?.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL else {
-                print("Lancement refusé : une autre version du connecteur est déjà ouverte. Aucun processus arrêté."); exit(2)
-            }
-            existing.activate(options: []); return
+        // launchd serializes this job. A LaunchServices activation may briefly register
+        // the same bundle while kickstarting it; it is not another running agent.
+        guard ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"] == NativeWire.service ||
+                CommandLine.arguments.contains("--smoke") else {
+            print("Lancer le connecteur via start-agent.sh, pas directement depuis un terminal.")
+            exit(2)
         }
         let diagnostics = CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke")
         app.setActivationPolicy(diagnostics ? .regular : .accessory)

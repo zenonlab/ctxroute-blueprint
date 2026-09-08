@@ -140,17 +140,25 @@ commandes inchangés. Une connexion provider à la fois. Le refus d'un pair étr
 reste à tester. Après rupture, une reconnexion est tentée après 30 secondes : aucune
 promesse de zéro réveil lorsque l'agent est arrêté.
 
-Après installation, enregistrer explicitement l'agent pour **cette session utilisateur** :
+Après installation, démarrer l'agent de façon persistante (ADR-0055) :
 
 ```sh
-bash pocs/macos-connector/start-agent.sh '/Users/hazenawsky/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app'
+bash pocs/macos-connector/start-agent.sh '/Users/hazenawsky/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app' --persistent
 ```
 
-Adapter le chemin au compte local. Aucun plist installé dans `LaunchAgents`, aucun
-démarrage à la prochaine ouverture de session promis. L'agent reste sans fenêtre ;
+Adapter le chemin au compte local. Le mode `--persistent` installe le job dans
+`~/Library/LaunchAgents/` : demande au login, reprise après échec, starts idempotents.
+Sans ce flag, une première inscription reste limitée à la session. L'agent reste sans fenêtre ;
 diagnostic à la demande dans la barre des menus. Ajouter `--diagnostics` à la commande
 ci-dessus uniquement pour ouvrir ce panneau technique lors d'un test. Le lanceur
-extérieur sans argument demande seulement le démarrage du job déjà enregistré.
+extérieur sans argument démarre le job enregistré ou recharge son plist persistant
+validé après « Quitter » (bootout). Un chemin, service ou argument étranger est refusé.
+Pour désactiver le prochain login : décharger ce job puis déplacer son plist vers
+une sauvegarde hors LaunchAgents ; ne pas supprimer les thèmes ou le paquet.
+Une identité locale stable se sélectionne avec `build.sh --sign-local SHA1`.
+`test-signing.sh SHA1` vérifie deux codes distincts avec le même requirement, sans
+prouver TCC. `install.sh` refuse un changement d'identité sauf migration explicite
+`--allow-identity-change`, qui nécessite de requalifier Accessibilité.
 `--check` vérifie le manifeste, les trois signatures et l'épinglage de l'agent sans
 accéder à l'App Group. Il ne prouve jamais la présence du provider : son résultat
 reste `provider=unconfirmed`. Seul `--probe-mailbox` conserve la sonde historique.

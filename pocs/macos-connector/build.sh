@@ -4,10 +4,16 @@ connector_identity=-
 connector_team=""
 connector_development=false
 if [[ $# == 1 && "$1" == --help ]]; then
-  echo 'Usage: build.sh [--development | --sign CERTIFICATE_SHA1 TEAM_ID] (no installation)'
+  echo 'Usage: build.sh [--development | --sign-local CERTIFICATE_SHA1 | --sign CERTIFICATE_SHA1 TEAM_ID] (no installation)'
   exit 0
 elif [[ $# == 1 && "$1" == --development ]]; then
   connector_development=true
+elif [[ $# == 2 && "$1" == --sign-local && "$2" =~ ^[A-Fa-f0-9]{40}$ ]]; then
+  connector_identity="$(echo "$2" | tr '[:lower:]' '[:upper:]')"
+  if ! security find-identity -v -p codesigning | awk -v fingerprint="$connector_identity" '$2 == fingerprint { found=1 } END { exit !found }'; then
+    echo 'Local signing identity unavailable; no ad hoc fallback.' >&2
+    exit 2
+  fi
 elif [[ $# != 0 ]]; then
   if [[ $# != 3 || "$1" != --sign || ! "$2" =~ ^[A-Fa-f0-9]{40}$ || ! "$3" =~ ^[A-Z0-9]{10}$ ]]; then
     echo 'Expected --sign CERTIFICATE_SHA1 TEAM_ID; no build created.' >&2

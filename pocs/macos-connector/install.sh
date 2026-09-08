@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+if [[ $# != 1 && $# != 2 ]] || [[ $# == 2 && "$2" != --allow-identity-change ]]; then
+  echo 'Usage: install.sh <built.app> [--allow-identity-change]' >&2
+  exit 2
+fi
 connector_root="$(cd "$(dirname "$0")/../.." && pwd)"
 connector_source="${1:?Pass the exact built .app path}"
 connector_source="$(cd "$connector_source" && pwd -P)"
@@ -9,6 +13,19 @@ connector_register="/System/Library/Frameworks/CoreServices.framework/Frameworks
 connector_identity="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_source/Contents/Info.plist")"
 test "$connector_identity" = org.wallpaperthemes.connectorpoc2
 codesign --verify --deep --strict "$connector_source"
+if [[ -d "$connector_destination" ]]; then
+  connector_old_agent="$connector_destination/Contents/Library/LoginItems/Wallpaper Connector Agent.app"
+  connector_requirement="$(codesign -dr - "$connector_old_agent" 2>&1 | sed -n 's/^# designated => //p; s/^designated => //p')"
+  test -n "$connector_requirement"
+  if ! codesign --verify --strict --test-requirement "=$connector_requirement" \
+      "$connector_source/Contents/Library/LoginItems/Wallpaper Connector Agent.app" 2>/dev/null; then
+    if [[ "${2:-}" != --allow-identity-change ]]; then
+      echo 'Identity change refused: Accessibility may be lost. Use stable signing or explicitly plan reauthorization with --allow-identity-change.' >&2
+      exit 2
+    fi
+    echo 'Explicit identity migration: Accessibility must be requalified in the launchd agent.'
+  fi
+fi
 if launchctl print "gui/$(id -u)/org.wallpaperthemes.connectorpoc2.agent" >/dev/null 2>&1; then
   echo 'Agent registered: stop the exact connector job before replacing its package.' >&2
   exit 2

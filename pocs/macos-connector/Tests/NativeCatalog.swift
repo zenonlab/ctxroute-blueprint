@@ -7,6 +7,22 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         do { try run() } catch { extensionLog("native-catalog=FAIL \(error)"); exit(EXIT_FAILURE) }
     }
     static func run() throws {
+        let executable = "/expected/WallpaperConnector"
+        let service = "org.wallpaperthemes.connectorpoc2.agent"
+        let valid: [String: Any] = ["Label": service, "ProgramArguments": [executable, "--agent"],
+            "LimitLoadToSessionType": "Aqua", "MachServices": [service: true]]
+        guard AgentLauncher.matches(valid, executable: executable, service: service) else {
+            throw ModelError.invalid("valid launch configuration rejected")
+        }
+        for (key, value): (String, Any) in [("Label", "foreign"), ("Program", "/bin/sh"),
+            ("ProgramArguments", ["/foreign", "--agent"]), ("ProgramArguments", [executable, "--shell"]),
+            ("MachServices", ["foreign": true]), ("LimitLoadToSessionType", "System")] {
+            var invalid = valid; invalid[key] = value
+            guard !AgentLauncher.matches(invalid, executable: executable, service: service) else {
+                throw ModelError.invalid("foreign launch configuration accepted")
+            }
+        }
+        print("agent-launch-policy=PASS cases=7 (no job changed)")
         try testDesktopItems()
         let background = ["AXGroup", "AXScrollArea", "AXApplication"]
         guard FinderBackground.matches(bundle: "com.apple.finder", roles: background) else {
