@@ -1,5 +1,23 @@
 # Reprise de session — Wallpaper
 
+## Build corrigé autorisé — 8 septembre 2026, 19:59
+
+Après accord explicite et authentifications réalisées par l'utilisateur, seule
+l'entrée Accessibilité de Wallpaper Connector Agent a été renouvelée. Le sélecteur
+avait conservé un chemin de sauvegarde : navigation vers le parent Library puis
+LoginItems et relance complète des Réglages ont permis de sélectionner le chemin
+installé exact. Aucun autre droit changé, aucun fichier supprimé.
+Même build g9pTbH, sans reconstruction ; agent PID 27652, job `agent.1fu9Ns`.
+Journal à 19:59:34 : `accessibility=true`, puis **`tap-enabled`**.
+Cela prouve l'autorisation et la création du tap, pas le succès d'un geste.
+Le panneau diagnostic a été masqué sans arrêter l'agent ; les traces bornées restent
+actives. Les Réglages montrent encore le fond Apple Noir ; la sélection automatique
+de Lagon échoue malgré une vignette visible (`cannotClickOffscreenElement`, puis
+`noWindowsAvailable`). L'utilisateur est sollicité pour sélectionner Lagon et faire
+un clic droit sur personnage / clic sur son. Lire ensuite les codes catégorie input
+et les quittances XPC ; ne pas annoncer de clic réussi avant cette preuve.
+Aucun code, contrat ou diagramme changé dans cette étape.
+
 ## Correctif Finder candidat — 8 septembre 2026, 19:47
 
 Cause localisée : `FinderBackground` exigeait directement AXScrollArea alors que
