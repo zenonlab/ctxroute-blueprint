@@ -4,7 +4,8 @@
 Aucun moteur d'interactions, widget ou langage de thème implémenté.
 Voir [ADR-0039](../decisions/ADR-0039-programmable-theme-interactions.md),
 les [contrats C0–C6](module-contracts.md) et le
-[schéma runtime](src/runtime-infrastructure.architecture.json).
+[schéma runtime](src/runtime-infrastructure.architecture.json). L'apparence et les
+imports sont détaillés dans l'[architecture de personnalisation](theme-customization.md).
 
 ## Ce que le produit doit permettre
 
@@ -100,6 +101,11 @@ au premier plan. La capacité « afficher un panneau » et sa capacité « recev
 une saisie sûre » doivent être qualifiées séparément via C5.
 Une représentation non supportée donne un diagnostic ; un repli doit être déclaré,
 pas inventé en modifiant silencieusement l'expérience de l'auteur.
+
+La personnalisation visuelle peut remplacer formes, textures, polices, sons et motion,
+mais ne supprime pas la sémantique du contrôle. Une image de bouton importée ne devient
+pas à elle seule une zone cliquable : le composant déclare hit-box, action, focus,
+états et fallback accessible.
 
 ### Projection macOS à deux plans
 

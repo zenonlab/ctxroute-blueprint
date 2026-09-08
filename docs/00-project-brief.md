@@ -52,6 +52,12 @@ Wayland layer-shell, GNOME et X11 possèdent des connecteurs distincts qui annon
 leurs capacités réelles. Aucun type de fenêtre ou permission OS ne fuit dans le thème.
 Cette structure vise une expérience cohérente, pas une fausse parité universelle.
 
+La [personnalisation](architecture/theme-customization.md) est un domaine distinct :
+objets 2D/3D, rigs, animations, matériaux, sons et menus peuvent être importés et
+composés. L'app connecteur conserve une UI native de permission/diagnostic ; l'UI du
+thème est entièrement stylisable tout en gardant composants, focus et actions
+sémantiques. Les boutons provisoires du PoC macOS ne définissent pas le design final.
+
 Les [interactions programmables](architecture/theme-interactions.md) couvrent
 objets, géométrie, boutons et panneaux : un objet ouvre une UI, ses contrôles
 pilotent animations/effets et leurs résultats actualisent l'UI. Ces relations

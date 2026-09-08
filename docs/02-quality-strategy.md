@@ -17,6 +17,12 @@ les helpers. Elle rapporte le delta face au bureau natif, sur au moins cinq pass
 après préchauffage. La permission refusée et la cible d'entrée inconnue font partie
 du chemin nominal de test, pas uniquement des erreurs.
 
+Après M2-01, la preuve [D1](pocs/theme-design-poc.md) ajoute dix critères portant sur
+la fidélité du rig, le partage de ressources sans partage d'état, le menu stylé et
+accessible, la chaîne bouton-animation-UI, les fallbacks, l'export sans asset privé
+et l'invalidation énergétique. Le renderer n'est pas adopté avant cette scène
+représentative.
+
 Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
 reprise ; compilation native avec avertissements bloquants, puis smoke AppKit
 à durée finie. Les gestes Finder restent une preuve manuelle distincte.

@@ -59,6 +59,8 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 | Plateformes | connecteur distinct pour macOS, Windows, Wayland layer-shell, GNOME et X11 | versions minimales et capacités qualifiées |
 | macOS PoC2 | Swift 6, AppKit/Core Animation, app connecteur et adaptateur wallpaper séparés | transport XPC/App Group, API de distribution viable |
 | UI | un panneau logique ; une seule présentation active | scène interactive ou app selon preuve d'entrée |
+| Personnalisation | slots typés, styles sémantiques et assets privés résolus localement | formats pivots et outil de création final |
+| Rigs | squelette, bind pose et compatibilité conservés et qualifiés | bibliothèque/algorithme de retargeting |
 | Rendu partagé | interface d'hôte de scène sans type backend | wgpu, moteur existant ou assemblage spécialisé |
 | Terminal | processus et cycle de vie indépendants | stack native ou WebView après benchmark |
 | Entrée | passive par défaut, refus ouvert sur cible ambiguë | interaction directe par plateforme après test natif |
@@ -67,6 +69,10 @@ Le provider Apple utilisé par la preuve est privé et instable. Son fonctionnem
 local ne suffit pas pour choisir le canal de distribution. Le bouton Finder
 `CreateDesktop`, les notifications Darwin et les signatures ad hoc restent des
 instruments de PoC, pas des technologies du produit.
+
+Le choix du renderer sera évalué sur [D1](pocs/theme-design-poc.md), qui combine un
+objet riggé, deux animations, quatre instances et une UI stylée. Un test sur triangle
+ou les boutons AppKit du connecteur ne suffisent pas à sélectionner la stack graphique.
 
 ## Questions et preuves à obtenir
 

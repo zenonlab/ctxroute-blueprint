@@ -3,6 +3,22 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "theme-customization",
+      "kind": "dataflow-ir",
+      "audience": "product",
+      "format": "archify-json-ir",
+      "source": "docs/architecture/src/theme-customization.dataflow.json",
+      "narrative": "docs/architecture/theme-customization.md",
+      "validator": "npm run archify:validate -- all"
+    },
+    {
+      "id": "theme-design-poc",
+      "kind": "product-test-protocol",
+      "format": "markdown",
+      "source": "docs/pocs/theme-design-poc.md",
+      "requiredSections": ["Question", "Fixture", "Variantes comparées", "Critères", "Hors périmètre", "Sortie"]
+    },
+    {
       "id": "platform-connectors",
       "kind": "architecture-ir",
       "audience": "product",

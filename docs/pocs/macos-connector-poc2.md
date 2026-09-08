@@ -26,6 +26,11 @@ Le livrable contient :
 Il n'inclut ni terminal custom, ni ROM, ni IA, ni convertisseur, ni multi-OS, ni
 préférence Finder privée dans le parcours principal.
 
+Les contrôles visuels de ce PoC sont volontairement diagnostiques. Ils ne choisissent
+ni le design system, ni le renderer, ni l'apparence des thèmes. Le manifeste prépare
+des identités et slots compatibles avec [D1](theme-design-poc.md), sans implémenter
+l'import 3D ou le rig dans le connecteur.
+
 ## Stack expérimentale
 
 | Couche | Choix PoC2 | Motif | Décision de production ? |
@@ -134,6 +139,9 @@ l'interaction bascule vers l'app ou un mode modal.
 4. établir le transport corrélé et les reprises de cycle de vie ;
 5. ajouter l'entrée en refus par défaut puis conduire les gestes natifs ;
 6. mesurer l'énergie et produire le verdict avant toute intégration du terminal.
+
+Après l'étape 1, D1 peut utiliser le schéma et ses fixtures indépendamment de la
+surface macOS. Le raccord au wallpaper attend que les deux côtés passent leurs gates.
 
 La première implémentation s'arrête après M2-03 si une duplication visuelle réapparaît :
 elle corrige la frontière avant d'ajouter l'entrée.

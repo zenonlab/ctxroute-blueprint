@@ -13,11 +13,14 @@ périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 
 1. [Architecture des connecteurs](architecture/platform-connectors.md) : frontière cible commune/native.
 2. [PoC macOS 2](pocs/macos-connector-poc2.md) : prochaine preuve bornée.
-3. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
-4. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
-5. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
-6. [PoC macOS 1](pocs/macos-surface.md) : résultats et limites historiques.
-7. [Note de reprise](session-handoff.md) : état d'exécution local.
+3. [Personnalisation des thèmes](architecture/theme-customization.md) : imports 2D/3D,
+   rigs, UI stylée et séparation des assets privés.
+4. [Preuve de design D1](pocs/theme-design-poc.md) : tranche originale à réaliser après M2-01.
+5. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
+6. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
+7. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
+8. [PoC macOS 1](pocs/macos-surface.md) : résultats et limites historiques.
+9. [Note de reprise](session-handoff.md) : état d'exécution local.
 
 ## Séparer produit et outillage
 

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Personnalisation — des imports locaux au thème rendu",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 560]
+  },
+  "stages": [
+    { "label": "Sources" },
+    { "label": "Préparer" },
+    { "label": "Résoudre" },
+    { "label": "Composer" },
+    { "label": "Présenter" }
+  ],
+  "nodes": [
+    { "id": "creator", "type": "frontend", "label": "Création ouverte", "sublabel": "code · studio · modèles", "stage": 0, "row": 0, "width": 150 },
+    { "id": "game", "type": "external", "label": "Import local du jeu", "sublabel": "3D · rigs · UI · animations", "stage": 0, "row": 2, "width": 150 },
+    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "slots · styles · liaisons", "stage": 1, "row": 0, "width": 150 },
+    { "id": "importer", "type": "backend", "label": "Pipeline d'import", "sublabel": "valide · convertit · trace", "stage": 1, "row": 2, "width": 150 },
+    { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "capacités · licences · versions", "stage": 2, "row": 0, "width": 160 },
+    { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets et dépendances", "stage": 2, "row": 2, "width": 160 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "objets · rigs · états · menus", "stage": 3, "row": 1, "width": 170 },
+    { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "animation · matériaux · effets", "stage": 4, "row": 0, "width": 160 },
+    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "menus · boutons · panneaux", "stage": 4, "row": 1, "width": 160 },
+    { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
+  ],
+  "flows": [
+    { "from": "creator", "to": "recipe", "label": "design" },
+    { "from": "game", "to": "importer", "label": "assets locaux", "variant": "security", "labelAt": [208, 428] },
+    { "from": "recipe", "to": "resolver", "label": "slots et styles", "labelAt": [420, 200] },
+    { "from": "importer", "to": "library", "label": "assets validés", "variant": "security", "labelAt": [420, 428] },
+    { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
+    { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis" },
+    { "from": "runtime", "to": "renderer", "label": "objets et rigs", "variant": "emphasis" },
+    { "from": "runtime", "to": "ui", "label": "menus et états", "labelAt": [925, 220] },
+    { "from": "runtime", "to": "connector", "label": "intentions autorisées", "variant": "security" }
+  ]
+}

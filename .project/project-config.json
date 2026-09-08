@@ -8,7 +8,7 @@
   "decisions": {
     "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. Rust remains a candidate for the portable core and renderer; no production language is frozen. Node.js is governance tooling only.",
     "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
-    "frontend": "PoC2 uses one authoritative control surface at a time: native connector UI for settings and permissions, theme panel as one logical presentation. The two PoC1 decor/control panels are historical and must not be carried forward.",
+    "frontend": "PoC2 uses one authoritative control surface at a time. Native connector UI owns settings and permissions; the portable theme owns fully stylable semantic menus, buttons, panels and 2D/3D scene presentation. PoC2 diagnostics are not product design.",
     "backend": "PoC2 has no server, PTY, game reader or LLM runtime. App and wallpaper communicate through a bounded typed connector protocol; XPC versus App Group transport remains an experiment.",
     "storage": "PoC2 has one canonical JSON theme fixture, minimal connector preferences and reconstructible artifacts under ignored dist/. No ROM, terminal content or private filenames are stored.",
     "deployment": "PoC2: local stable bundle identities, explicit install/activation and documented rollback; no autostart or product installer yet. The private Apple wallpaper provider path remains experimental and is not an App Store claim.",
@@ -80,6 +80,7 @@
   ],
   "architecture": {
     "documents": [
+      "docs/architecture/src/theme-customization.dataflow.json",
       "docs/architecture/src/platform-connectors.architecture.json",
       "docs/architecture/src/macos-native-wallpaper.architecture.json",
       "docs/architecture/src/macos-surface-poc.architecture.json",

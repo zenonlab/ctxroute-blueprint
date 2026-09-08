@@ -10,6 +10,12 @@ native, adaptateur wallpaper séparé, manifeste canonique et panneau logique un
 Ne pas poursuivre `pocs/macos-surface/` ou `pocs/macos-native-wallpaper/` pour y ajouter
 des fonctions produit. Aucun code PoC2 n'est encore créé.
 
+La personnalisation est cadrée séparément dans
+[l'architecture de thème](architecture/theme-customization.md) et
+[ADR-0050](decisions/ADR-0050-theme-customization-and-local-assets.md). Les boutons
+AppKit observés restent diagnostiques. D1 éprouvera objets riggés, UI stylée et
+résolution d'assets privés après stabilisation du manifeste M2-01.
+
 Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolément.
 
 ## Reprise actuelle — qualification native
