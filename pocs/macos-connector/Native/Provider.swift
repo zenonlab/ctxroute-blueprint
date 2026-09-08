@@ -25,8 +25,9 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         var scene: Scene
         var themeID: String
         var suspended: Bool
+        var display: UInt32?
     }
-    let themes: [Theme]
+    var themes: [Theme]
     var sessions: [String: Session]
     var surfaces: [UUID: Surface] = [:]
     var transport: ProviderTransport?
@@ -60,25 +61,54 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         let states = themes.compactMap { theme -> ProviderStatus? in
             guard let session = sessions[theme.theme_id] else { return nil }
             return ProviderStatus(session: session,
-                surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count)
+                surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count, configuration: theme)
         }
-        return CatalogStatus(themes: states)
+        let layouts = surfaces.map { id, surface in
+            surface.scene.layout(id: id, display: surface.display, interactive: !sleeping && !surface.suspended)
+        }
+        return CatalogStatus(themes: states, layouts: layouts)
     }
     func publish() { transport?.publish(catalogStatus()) }
     func receive(_ command: Command) -> CatalogStatus? {
         guard var session = sessions[command.theme_id] else { return nil }
+        let previousGeneration = session.generation
         let receipt = session.apply(command)
+        // Preflight the complete reply before committing. A valid individual
+        // manifest must not make the bounded catalog impossible to transmit.
+        var projected = catalogStatus()
+        let configuration = receipt.status == .applied ? command.configuration : nil
+        let projectedThemes = projected.themes.map { state in
+            state.theme_id == command.theme_id
+                ? ProviderStatus(session: session, surfaces: state.surfaces, configuration: configuration ?? state.configuration)
+                : state
+        }
+        projected = CatalogStatus(themes: projectedThemes, layouts: projected.layouts ?? [])
+        guard (try? NativeWire.encode(projected)) != nil else { return nil }
         sessions[command.theme_id] = session
-        if receipt.status == .applied { apply() }
+        if receipt.status == .applied && session.generation != previousGeneration {
+            if let configuration = command.configuration, command.action == .configure,
+               let index = themes.firstIndex(where: { $0.theme_id == command.theme_id }) {
+                themes[index] = configuration
+                for id in Array(surfaces.keys) {
+                    guard var surface = surfaces[id], surface.themeID == command.theme_id else { continue }
+                    let size = surface.scene.root.bounds.size, scale = surface.scene.root.contentsScale
+                    let elapsed = surface.scene.layout(id: id, display: surface.display, interactive: false).elapsed
+                    surface.scene = Scene(theme: configuration); surface.scene.resize(size, scale: scale, initialElapsed: elapsed)
+                    surface.context.layer = surface.scene.root; surfaces[id] = surface
+                }
+            }
+            apply(publishStatus: false)
+        }
         extensionLog("XPC command=\(command.action.rawValue) result=\(receipt.status.rawValue) generation=\(session.generation)")
         return catalogStatus()
     }
-    func apply() {
+    func apply(publishStatus: Bool = true) {
         for surface in surfaces.values {
             guard let state = sessions[surface.themeID]?.state else { continue }
             surface.scene.apply(state, suspended: sleeping || surface.suspended)
         }
         CATransaction.flush()
+        if publishStatus { publish() }
     }
     func acquire(_ incoming: Incoming) -> AnyObject? {
         guard let configuration = named(incoming.request, "configuration") as? Data,
@@ -99,8 +129,10 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
                 existing.scene.resize(size, scale: scale)
                 existing.context.layer = existing.scene.root
             }
-            existing.suspended = false; surfaces[id] = existing
-            existing.scene.resize(size, scale: scale); apply(); publish()
+            existing.suspended = false
+            existing.display = named(incoming.request, "directDisplayID") as? UInt32
+            surfaces[id] = existing
+            existing.scene.resize(size, scale: scale); apply()
             extensionLog("Reused native surface")
             return createRemoteContextXPC(contextId: existing.context.contextId)
         }
@@ -111,7 +143,7 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
         let scene = Scene(theme: theme); scene.resize(size, scale: scale)
         scene.apply(session.state, suspended: sleeping)
         context.layer = scene.root
-        surfaces[id] = Surface(context: context, scene: scene, themeID: themeID, suspended: false)
+        surfaces[id] = Surface(context: context, scene: scene, themeID: themeID, suspended: false, display: display)
         CATransaction.flush(); publish()
         extensionLog("Created native surface count=\(surfaces.count)")
         return createRemoteContextXPC(contextId: context.contextId)

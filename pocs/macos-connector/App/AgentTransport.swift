@@ -56,7 +56,16 @@ private final class AgentPeer: NSObject, ConnectorAgentXPC, @unchecked Sendable 
         guard let result = try? NativeWire.decode(CatalogStatus.self, from: data),
               result.schema_version == 1, result.themes.count <= 8,
               Set(result.themes.map(\.theme_id)).count == result.themes.count,
-              result.themes.allSatisfy({ (0...16).contains($0.surfaces) && $0.generation >= 0 }) else { return }
+              result.themes.allSatisfy({ state in
+                  guard (0...16).contains(state.surfaces), state.generation >= 0,
+                        let configuration = state.configuration,
+                        configuration.theme_id == state.theme_id,
+                        let data = try? JSONEncoder().encode(configuration) else { return false }
+                  return (try? Theme.decode(data)) != nil
+              }),
+              (result.layouts?.count ?? 0) <= 16,
+              Set((result.layouts ?? []).map(\.id)).count == (result.layouts?.count ?? 0),
+              result.layouts?.allSatisfy(\.valid) != false else { return }
         status = result; onChange?()
     }
     func send(_ command: Command) throws {

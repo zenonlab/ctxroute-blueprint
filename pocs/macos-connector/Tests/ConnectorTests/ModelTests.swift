@@ -215,7 +215,7 @@ final class ModelTests: XCTestCase {
             let scene = Scene(theme: theme); scene.resize(CGSize(width: 800, height: 500))
             XCTAssertEqual(scene.objectIDs, theme.objects.map(\.id))
             if theme.motion_path == "still" {
-                XCTAssertTrue(scene.root.sublayers?.last?.sublayers?.allSatisfy { $0.animationKeys() == nil } == true)
+                XCTAssertFalse(scene.hasObjectAnimations)
             }
         }
     }

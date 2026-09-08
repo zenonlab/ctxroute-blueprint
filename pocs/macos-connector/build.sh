@@ -47,6 +47,8 @@ for connector_bundle in "$connector_app" "$connector_extension"; do
   cp "$connector_source/Native/Bridge/LICENSE" "$connector_bundle/Contents/Resources/Phosphene-LICENSE"
 done
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
+  "$connector_source/Sources/ThemeModel/ThemeLayout.swift"
+  "$connector_source/Sources/ThemeModel/ThemeStore.swift"
   "$connector_source/Sources/ThemeModel/GestureRouter.swift"
   "$connector_source/Sources/ThemeModel/LaunchPolicy.swift"
   "$connector_source/Sources/SceneRenderer/Scene.swift"

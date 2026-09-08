@@ -196,9 +196,11 @@ manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et rel
 sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-Le diagramme situe la reprise isolée de l'agent, relié au provider par XPC signé,
-dans le connecteur macOS. `restart-agent.sh` ne redémarre pas le provider ni Finder.
-Le lancement reste discret, le diagnostic à la demande ; les gestes restent non qualifiés.
+Le diagramme situe les gestes, la modale et le XPC signé dans le connecteur macOS.
+`restart-agent.sh` ne redémarre pas le provider ni Finder. Le lancement reste discret,
+le diagnostic à la demande ; les gestes sont implémentés mais restent non qualifiés.
+L'édition utilise la même frontière de commande, avec configuration validée et
+quittance avant sauvegarde locale, selon ADR-0054.
 
-SHA-256 de la source : `0fe1b695b9fa30d8daff38c1fd1d9a7024afe072a64fc12d4a6e1ed0147cf2ce`.
-SHA-256 de l'artefact : `a582e80256bba88c4c96d2cb21bc43c7eedce9be672be2ddf11ad3998a36ae23`.
+SHA-256 de la source : `9b240e790b292c17c2fe33bb997de5f649b98d740305b75bf820916513dcb408`.
+SHA-256 de l'artefact : `748a9952cc32b0fe63864659fedeb4b0e904c9adb6180664492afa518ef8acb0`.

@@ -1,6 +1,73 @@
 # Reprise de session — Wallpaper
 
-## État courant — redémarrage et diagnostic, 8 septembre 2026, 18:08
+## État courant — comparaison PoC1 et reprise des gestes, 8 septembre 2026
+
+Dernière demande : comparer le PoC1, corriger les boutons et continuer en autonomie.
+Constat réel dans Confidentialité et sécurité → Accessibilité, à 18:54 :
+`Wallpaper Desktop PoC` est **on**, `Wallpaper Connector Agent` est **off**.
+Une confirmation explicite pour activer ce dernier a été demandée ; ne pas
+interpréter l'autonomie générale comme un consentement à ce droit système.
+Aucun droit ni base TCC n'a été modifié. Le menu Activer appelle maintenant la
+demande Apple seulement après action utilisateur ; les Réglages ont été ouverts
+manuellement pour vérifier l'état, pas pour accorder le droit.
+
+Comparaison code : le PoC1 avait des fenêtres d'entrée transparentes
+`SplitDesktopControls` avec `acceptsFirstMouse`, mais déclarait la superposition
+Finder non supportée. Son autre chemin était déjà un `CGEventTap` soumis à TCC.
+Le PoC2 reprend ses notifications NSWorkspace pour retenter l'installation au
+retour des Réglages même si l'agent reste invisible. Il annule les gestes sur
+changement de Space/application, veille et session inactive. Pas de nouvel overlay.
+
+**Binaire à conserver pendant la qualification : `build.zCjZT3`**, installé à la
+destination habituelle. Agent 72704 (`agent.UtSysh`, mode diagnostic de test),
+provider 72851 ; deux surfaces acquises à 18:54:19. Précédent sauvegardé dans
+`replaced.30sUgD/previous-app.disabled`. Ne pas installer `build.GXHpaP` : variante
+de lien Réglages abandonnée ; le source est revenu à zCjZT3. Recompiler changerait
+l'identité ad hoc et pourrait invalider le prochain consentement.
+Le thème observé dans macOS lors de cette comparaison est Ambre statique ; ne pas
+le confondre avec une panne d'animation. La personnalisation Orbite reste locale.
+Prochaine action : après accord, activer le droit du bon paquet et vérifier le
+tap puis la vraie cible Finder avant toute déclaration de clic fonctionnel.
+
+## Modale et gestes implémentés — preuve précédente
+
+ADR-0054 : clic droit sur objet → modale centrée, jamais panneau latéral ; gauche
+→ application locale ; droit sur vide qualifié → ajout. Implémentation dans
+`CustomizationModal`, `DesktopInput`, `ThemeLayout`, `ThemeStore`. Pas de nouvel
+overlay, dépendance, shell ni modification des fixtures signées. Annuler garde le
+brouillon local ; Enregistrer valide, reçoit une quittance et persiste en Application
+Support. La progression de l'animation est conservée après édition/redimensionnement.
+
+Preuve native sur `build.lMgUtc` : modale inspectée visuellement et par AX ; le
+brouillon « À annuler » disparaît après Annuler/réouverture. Enregistrer la valeur
+Terminal sur le premier objet Orbite reçoit `configure/applied`, révision 2 à
+18:40:44, puis écrit un JSON local mode 0600. Les deux surfaces restent présentes.
+La modale a été ouverte par le menu de récupération (Cmd-E), **pas par le clic
+droit bureau** : l'agent indique encore `accessibility=false`.
+
+Cas réel détecté : deux surfaces actives 1512×982 sur display 1. `build.jbB7KU`
+ajoute le consensus des hit-tests : toutes les représentations candidates doivent
+viser le même thème et la même cible ; un désaccord reste natif. Ne jamais choisir
+arbitrairement une surface, ni promettre que TCC seul suffit à qualifier Finder.
+Ce build est installé à la destination habituelle. L'ancien paquet est conservé
+dans `dist/pocs/macos-connector/replaced.bxqJQP/previous-app.disabled`. Agent 53479,
+job `agent.Ut8S6M`, relancé sans diagnostic à 18:43:30. Aucune suppression, aucun
+arrêt de Finder/WallpaperAgent, aucun changement de préférence Finder ni de TCC.
+
+Qualification restante : autorisation TCC explicite demandée à l'utilisateur,
+classification du bureau Finder réel, icône superposée, gauche/droit/ajout,
+glisser, Spaces et énergie. `Fichiers…` ouvre les Réglages, pas un toggle ; les
+fixtures restent silencieuses et mute ne change pas le volume système.
+
+Vérification : 30 XCTest et build ad hoc strict/catalogue/signatures passent.
+Le gate `npm run verify` passe après le consensus puis après la reprise NSWorkspace
+(code 0 dans les deux cas). 30 XCTest et le build strict zCjZT3 passent.
+Archify showcase 9/9, zéro erreur/avertissement, quatre
+résolutions, captures sombres 1440×900 et 2048×1320 inspectées. L'UI fixe du viewer
+reste anglaise. Doctrine AGENTS/CLAUDE et hooks inchangés ; audit stack : manque
+la preuve du clic bureau, pas la modale ni la commande de configuration.
+
+## Historique — redémarrage et diagnostic, 8 septembre 2026, 18:08
 
 Build `build.LGtR5e` installé à la même destination ; précédent conservé dans
 `dist/pocs/macos-connector/replaced.VsCv0Q/previous-app.disabled`. Aucun fichier

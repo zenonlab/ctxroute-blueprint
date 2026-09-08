@@ -1,6 +1,11 @@
 # Architecture de personnalisation — scène, rigs et UI diégétique
 
-État au 8 septembre 2026 : **frontière produit acceptée, implémentation non commencée**.
+État au 8 septembre 2026 : **frontière produit acceptée ; première tranche PoC2
+implémentée, interactions natives encore à qualifier**.
+Le PoC2 fournit un brouillon d'objet (nom, couleur, taille, application), une modale
+sur clic droit, un ajout sur vide qualifié et une persistance locale après quittance.
+Il ne réalise pas encore les imports, rigs ni skins d'UI décrits dans cette cible.
+Voir [ADR-0054](../decisions/ADR-0054-macos-theme-interaction.md).
 Décision : [ADR-0050](../decisions/ADR-0050-theme-customization-and-local-assets.md).
 Les contrôles système intégrés au thème sont précisés par
 [ADR-0051](../decisions/ADR-0051-theme-system-control-shelf.md).

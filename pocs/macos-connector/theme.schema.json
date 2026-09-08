@@ -19,8 +19,14 @@
         "properties": {
           "id": {"$ref": "#/$defs/id"},
           "color": {"$ref": "#/$defs/color"},
-          "phase": {"type": "number", "minimum": 0, "exclusiveMaximum": 1}
-        }
+          "phase": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
+          "label": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]+$"},
+          "application_bundle_id": {"$ref": "#/$defs/id"},
+          "x": {"type": "number", "minimum": 0.05, "maximum": 0.95},
+          "y": {"type": "number", "minimum": 0.05, "maximum": 0.95},
+          "size": {"type": "number", "minimum": 24, "maximum": 96}
+        },
+        "dependentRequired": {"x": ["y"], "y": ["x"]}
       }
     },
     "system_controls": {

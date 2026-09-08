@@ -3,8 +3,18 @@ import Foundation
 public struct Theme: Codable, Equatable, Sendable {
     public struct Object: Codable, Equatable, Sendable {
         public let id: String
-        public let color: String
+        public var color: String
         public let phase: Double
+        public var label: String?
+        public var application_bundle_id: String?
+        public var x: Double?
+        public var y: Double?
+        public var size: Double?
+        public init(id: String, color: String, phase: Double, label: String? = nil,
+                    application: String? = nil, x: Double? = nil, y: Double? = nil, size: Double? = nil) {
+            self.id = id; self.color = color; self.phase = phase; self.label = label
+            application_bundle_id = application; self.x = x; self.y = y; self.size = size
+        }
     }
     public struct Controls: Codable, Equatable, Sendable {
         public let placement: String
@@ -18,7 +28,7 @@ public struct Theme: Codable, Equatable, Sendable {
     public let accent: String
     public let motion_path: String?
     public let period_seconds: Double
-    public let objects: [Object]
+    public var objects: [Object]
     public let system_controls: Controls
 
     public static func load(bundle: Bundle? = nil, resource: String = "theme") throws -> Theme {
@@ -61,7 +71,14 @@ public struct Theme: Codable, Equatable, Sendable {
               [nil, "orbit", "wave", "still"].contains(theme.motion_path),
               (1...8).contains(theme.objects.count),
               Set(theme.objects.map(\.id)).count == theme.objects.count,
-              theme.objects.allSatisfy({ validID($0.id) && validColor($0.color) && (0..<1).contains($0.phase) }),
+              theme.objects.allSatisfy({ object in
+                  validID(object.id) && validColor(object.color) && (0..<1).contains(object.phase)
+                  && (object.label.map { (1...40).contains($0.count) && !$0.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) } ?? true)
+                  && (object.application_bundle_id.map { validID($0) } ?? true)
+                  && ((object.x == nil && object.y == nil) ||
+                      (object.x.map { (0.05...0.95).contains($0) } == true && object.y.map { (0.05...0.95).contains($0) } == true))
+                  && (object.size.map { (24...96).contains($0) } ?? true)
+              }),
               theme.system_controls.placement == "top_left",
               (1...7).contains(theme.system_controls.items.count),
               Set(theme.system_controls.items).count == theme.system_controls.items.count,
@@ -83,11 +100,12 @@ public enum ModelError: Error { case invalid(String) }
 public struct ThemeState: Codable, Equatable, Sendable {
     public var paused = false
     public var highlighted = false
+    public var muted = true
     public init() {}
 }
 
 public enum ThemeAction: String, Codable, Sendable {
-    case pause, resume, highlight, unhighlight, inspect
+    case pause, resume, highlight, unhighlight, inspect, configure, mute, unmute
 }
 
 public struct Command: Codable, Equatable, Sendable {
@@ -98,11 +116,13 @@ public struct Command: Codable, Equatable, Sendable {
     public let generation: Int
     public let expires_at: Date
     public let action: ThemeAction
+    public let configuration: Theme?
     public init(theme: String, instance: UUID, generation: Int, action: ThemeAction,
-                id: UUID = UUID(), now: Date = Date()) {
+                id: UUID = UUID(), now: Date = Date(), configuration: Theme? = nil) {
         schema_version = 1; theme_id = theme; scene_instance_id = instance
         command_id = id; self.generation = generation; self.action = action
         expires_at = now.addingTimeInterval(5)
+        self.configuration = configuration
     }
 }
 
@@ -144,12 +164,20 @@ public struct Session: Sendable {
               command.scene_instance_id == instance, command.generation == generation,
               command.expires_at >= now, command.expires_at <= now.addingTimeInterval(6)
         else { return reject(command, "stale or invalid command") }
+        if command.action == .configure {
+            guard let configuration = command.configuration, configuration.theme_id == themeID,
+                  let data = try? JSONEncoder().encode(configuration), (try? Theme.decode(data)) != nil
+            else { return reject(command, "invalid configuration") }
+        } else if command.configuration != nil { return reject(command, "unexpected configuration") }
         switch command.action {
         case .pause: state.paused = true
         case .resume: state.paused = false
         case .highlight: state.highlighted = true
         case .unhighlight: state.highlighted = false
         case .inspect: break
+        case .configure: break
+        case .mute: state.muted = true
+        case .unmute: state.muted = false
         }
         generation += 1
         let receipt = Receipt(command: command, status: .applied, state: state, reason: nil)
@@ -169,16 +197,21 @@ public struct ProviderStatus: Codable, Sendable {
     public let state: ThemeState
     public let surfaces: Int
     public let receipt: Receipt?
-    public init(session: Session, surfaces: Int, receipt: Receipt? = nil, now: Date = Date()) {
+    public let configuration: Theme?
+    public init(session: Session, surfaces: Int, receipt: Receipt? = nil, now: Date = Date(), configuration: Theme? = nil) {
         theme_id = session.themeID; instance = session.instance; generation = session.generation
         state = session.state; self.surfaces = surfaces; self.receipt = receipt ?? session.receipt(now: now)
+        self.configuration = configuration
     }
 }
 
 public struct CatalogStatus: Codable, Sendable {
     public let schema_version: Int
     public let themes: [ProviderStatus]
-    public init(themes: [ProviderStatus]) { schema_version = 1; self.themes = themes }
+    public let layouts: [SurfaceLayout]?
+    public init(themes: [ProviderStatus], layouts: [SurfaceLayout] = []) {
+        schema_version = 1; self.themes = themes; self.layouts = layouts
+    }
     public func theme(_ id: String) -> ProviderStatus? {
         guard schema_version == 1, themes.count <= 8 else { return nil }
         return themes.first { $0.theme_id == id }

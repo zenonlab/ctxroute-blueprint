@@ -1,10 +1,64 @@
 # Connecteur macOS — PoC 2
 
 Une app AppKit de contrôle, une extension wallpaper native, un catalogue original.
-Pas de fenêtre de décor superposée, de terminal, de ROM, de WebView, de hook souris
-ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
+Pas de fenêtre de décor superposée, de terminal PTY, de ROM ou de WebView.
+Le PoC1 reste intact. Les gestes macOS sont soumis à Accessibilité et à une
+classification conservatrice du fond Finder ; aucun réglage Finder automatique.
 
-## Statut courant — XPC natif, 8 septembre 2026
+## Personnalisation locale — 8 septembre 2026
+
+Voir [ADR-0054](../../docs/decisions/ADR-0054-macos-theme-interaction.md).
+Le clic **droit** ouvre une fenêtre de personnalisation centrée, pas une barre à
+droite : nom, couleur, taille et application locale associée. Le clic gauche ouvre
+l'application (Terminal par défaut pour les fixtures). Le clic droit sur vide
+qualifié prépare un nouvel objet, limité à huit ; aucune suppression automatique.
+La commande d'édition est validée et corrélée. La sauvegarde privée dans
+`~/Library/Application Support/org.wallpaperthemes.connectorpoc2/themes/` suit la
+quittance ; Annuler avant envoi ne modifie rien. Les ressources signées restent intactes.
+
+Le provider peint les deux contrôles du manifeste dans ses calques natifs. `Son`
+modifie uniquement l'état muet du thème : les fixtures restent silencieuses et
+aucun volume système ne change. `Fichiers…` ouvre le réglage macOS, **pas un toggle
+qualifié**. Le menu de récupération du connecteur permet aussi l'édition d'un objet.
+Aucun panneau ne s'ouvre au lancement normal.
+
+`ThemeLayout` partage les 128 segments de trajectoire entre animation et hit-test.
+Chaque surface publie son écran, sa taille, son horloge et son état actif, sans
+polling par trame. Deux surfaces natives du même écran ne sont acceptées que si
+leurs hit-tests désignent le même objet/contrôle/vide dans le même thème ; sinon
+l'entrée reste native. Les écrans ou surfaces ambigus restent non interactifs. Les
+fenêtres, icônes et descendants Finder gardent la priorité ; les glissers sont
+annulés, les actions sont différées hors du callback souris. Cette politique
+nécessite encore la qualification native des superpositions et des Spaces.
+
+Preuves automatisées : 30 XCTest, Swift 6 strict, catalogue natif et signatures.
+L'autorisation TCC de l'agent installé était absente pendant la première inspection.
+Ne pas confondre ces preuves avec un test réussi de clic droit sur le bureau.
+Le reste de ce document conserve explicitement les états historiques antérieurs.
+
+### Comparaison ciblée avec le PoC1
+
+`pocs/macos-surface/Sources/SurfaceProbe/SplitDesktopControls.swift` utilisait des
+`NSPanel` transparents placés au-dessus des icônes, avec `acceptsFirstMouse=true`.
+Le décor était dans le provider ; ces petites fenêtres recevaient les clics. Leur
+qualification déclarait `icon-overlap-not-supported`. Les recopier rendrait certains
+clics possibles, mais réintroduirait la superposition et les conflits Finder.
+L'autre chemin, `ActiveClickTap`, utilisait déjà Accessibilité et un tap actif.
+
+Élément réutilisé : reprise événementielle depuis `NSWorkspace` (changement d'app,
+Space, veille et session), plutôt que depuis l'activation du seul agent invisible.
+Le PoC2 annule le geste lors de ces transitions et retente l'installation du tap
+au retour des Réglages, sans polling ni nouveau panneau. Le menu « Activer les
+interactions… » demande le consentement natif uniquement après action utilisateur.
+
+La signature locale ad hoc installée possède une exigence `cdhash` spécifique au
+binaire. Une autorisation d'un ancien build ne prouve pas celle du build courant,
+comme l'explique [Apple TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements/).
+Ne pas reconstruire après une autorisation puis attribuer l'échec aux calques.
+Aucune ancienne identité privilégiée, exception TCC ou signature affaiblie n'est
+réutilisée pour éviter le consentement.
+
+## Historique — XPC natif, 8 septembre 2026
 
 Le transport actif est désormais **XPC signé en mémoire**, selon
 [ADR-0053](../../docs/decisions/ADR-0053-macos-provider-xpc.md). Les passages App Group

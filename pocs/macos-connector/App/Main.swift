@@ -17,7 +17,7 @@ import ApplicationServices
             let pin = try String(contentsOf: provider.appendingPathComponent("Contents/Resources/agent-requirement.txt"),
                 encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
             guard pin == expected else { throw ModelError.invalid("Packaged agent signature pin mismatch") }
-            print("manifest=valid xpc-peers=valid provider=unconfirmed desktop-input=not-implemented")
+            print("manifest=valid xpc-peers=valid provider=unconfirmed desktop-input=requires-native-qualification")
             return
         }
         if CommandLine.arguments.contains("--probe-mailbox") {
@@ -102,6 +102,13 @@ import ApplicationServices
     var observed: ProviderStatus?
     var pending: Command?
     var timeout: Task<Void, Never>?
+    let editor = CustomizationModal()
+    let input = DesktopInput()
+    let store = ThemeStore(directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("org.wallpaperthemes.connectorpoc2/themes", isDirectory: true))
+    var restoredInstances: Set<UUID> = []
+    var confirmedInstances: Set<UUID> = []
+    var completion: ((Bool) -> Void)?
     let statusLabel = NSTextField(wrappingLabelWithString: "Le provider doit être sélectionné dans les réglages Fond d’écran.")
     var pauseButton: NSButton!
     var effectButton: NSButton!
@@ -112,7 +119,7 @@ import ApplicationServices
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
         Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
-            "Startup diagnostics=\(CommandLine.arguments.contains("--diagnostics")) accessibility=\(AXIsProcessTrusted()) desktop-input=not-implemented")
+            "Startup diagnostics=\(CommandLine.arguments.contains("--diagnostics")) accessibility=\(AXIsProcessTrusted()) desktop-input=capability-gated")
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 560),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Wallpaper Connector · PoC 2"
@@ -134,7 +141,7 @@ import ApplicationServices
         stack.addArrangedSubview(controls)
         statusLabel.font = .systemFont(ofSize: 13); stack.addArrangedSubview(statusLabel)
         let capabilities = NSTextField(wrappingLabelWithString:
-            "Audio : scène silencieuse\nEntrée bureau : passive, aucune interception\nFichiers du bureau : réglage macOS, automatisation non qualifiée")
+            "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : réglage macOS, toggle non qualifié.")
         capabilities.textColor = .secondaryLabelColor; stack.addArrangedSubview(capabilities)
         stack.addArrangedSubview(NSButton(title: "Choisir ce fond dans macOS…", target: self, action: #selector(wallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers dans Réglages…", target: self, action: #selector(desktopSettings)))
@@ -142,6 +149,10 @@ import ApplicationServices
         window.contentView = stack; window.center()
         let menu = NSMenu(); let appMenu = NSMenuItem(); menu.addItem(appMenu)
         let submenu = NSMenu(); submenu.addItem(withTitle: "Quitter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let customizeMenuItem = submenu.addItem(withTitle: "Personnaliser un objet…", action: #selector(editFirstObject), keyEquivalent: "e")
+        customizeMenuItem.target = self
+        let inputMenuItem = submenu.addItem(withTitle: "Activer les interactions…", action: #selector(interactionSettings), keyEquivalent: "i")
+        inputMenuItem.target = self
         appMenu.submenu = submenu; NSApp.mainMenu = menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.image = NSImage(systemSymbolName: "circle.hexagongrid", accessibilityDescription: "Orbite — connecteur")
@@ -149,12 +160,27 @@ import ApplicationServices
         let statusMenu = NSMenu()
         let diagnosticItem = statusMenu.addItem(withTitle: "Diagnostic du connecteur…", action: #selector(check), keyEquivalent: "")
         diagnosticItem.target = self
+        let interactionItem = statusMenu.addItem(withTitle: "Activer les interactions…", action: #selector(interactionSettings), keyEquivalent: "")
+        interactionItem.target = self
+        let editItem = statusMenu.addItem(withTitle: "Personnaliser un objet…", action: #selector(editFirstObject), keyEquivalent: "")
+        editItem.target = self
         statusMenu.addItem(.separator())
         statusMenu.addItem(withTitle: "Quitter le connecteur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         statusItem?.menu = statusMenu
         transport.onChange = { [weak self] in self?.receive() }
+        input.onIntent = { [weak self] intent, theme, layout in self?.interact(intent, theme: theme, layout: layout) }
+        editor.onSave = { [weak self] configuration in
+            guard let self else { return }
+            send(.configure, configuration: configuration, target: configuration.theme_id) { [weak self] applied in
+                guard let self else { return }
+                guard applied else { editor.failed("Le décor n’a pas confirmé. Vérifiez la connexion puis réessayez."); return }
+                do { try store.save(configuration); editor.confirmed() }
+                catch { editor.failed("Décor mis à jour, mais sauvegarde locale impossible. Réessayez.") }
+            }
+        }
+        input.install()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.refreshAndProbe() }
+            Task { @MainActor in self?.input.install(); self?.refreshAndProbe() }
         }
         refreshAndProbe()
         if CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke") {
@@ -180,6 +206,7 @@ import ApplicationServices
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        input.stop()
         // Stop the job as well, otherwise the provider would wake the agent again.
         let stop = Process()
         stop.executableURL = URL(fileURLWithPath: "/bin/launchctl")
@@ -189,6 +216,28 @@ import ApplicationServices
     }
     @objc func wallpaperSettings() { open("x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") }
     @objc func desktopSettings() { open("x-apple.systempreferences:com.apple.Desktop-Settings.extension") }
+    @objc func interactionSettings() {
+        input.requestPermission()
+    }
+    @objc func editFirstObject() {
+        guard let current = transport.status?.themes.first(where: { $0.surfaces > 0 })?.configuration,
+              let object = current.objects.first else { return }
+        editor.present(theme: current, objectID: object.id)
+    }
+    func interact(_ intent: InteractionIntent, theme: Theme, layout: SurfaceLayout) {
+        guard !editor.isVisible, transport.status?.theme(theme.theme_id)?.configuration == theme else { return }
+        switch intent {
+        case .customize(let id): editor.present(theme: theme, objectID: id)
+        case .add(let point): editor.present(theme: theme, objectID: nil, point: point, width: layout.width, height: layout.height)
+        case .activate(let id):
+            guard let object = theme.objects.first(where: { $0.id == id }),
+                  let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: object.application_bundle_id ?? "com.apple.Terminal") else { return }
+            NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        case .toggle(.audio):
+            send(transport.status?.theme(theme.theme_id)?.state.muted == false ? .mute : .unmute, target: theme.theme_id)
+        case .toggle(.desktopItems): desktopSettings()
+        }
+    }
     private func open(_ value: String) {
         if let url = URL(string: value), !NSWorkspace.shared.open(url) { statusLabel.stringValue = "Impossible d’ouvrir les Réglages macOS." }
     }
@@ -198,9 +247,14 @@ import ApplicationServices
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         refreshAndProbe()
+        for layout in transport.status?.layouts ?? [] {
+            Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+                "Layout display=\(layout.display_id ?? 0) size=\(layout.width)x\(layout.height) interactive=\(layout.interactive)")
+        }
     }
     @objc func changeControlTheme() {
-        pending = nil; timeout?.cancel(); observed = nil; refreshAndProbe()
+        guard pending == nil else { return }
+        observed = nil; refreshAndProbe()
     }
     func refreshAndProbe() {
         guard pending == nil else { return }
@@ -209,44 +263,68 @@ import ApplicationServices
         if observed?.theme_id == theme.theme_id { send(.inspect) }
         else { statusLabel.stringValue = "Provider XPC absent. Aucune commande confirmée." }
     }
-    func send(_ action: ThemeAction) {
-        guard pending == nil, let observed, observed.theme_id == theme.theme_id else { return }
-        let command = Command(theme: theme.theme_id, instance: observed.instance,
-            generation: observed.generation, action: action)
+    func send(_ action: ThemeAction, configuration: Theme? = nil, target: String? = nil, completion: ((Bool) -> Void)? = nil) {
+        let id = target ?? theme.theme_id
+        guard pending == nil, let observed = transport.status?.theme(id) else { completion?(false); return }
+        let command = Command(theme: id, instance: observed.instance,
+            generation: observed.generation, action: action, configuration: configuration)
+        self.completion = completion
         pending = command; setEnabled(false); statusLabel.stringValue = "En attente du provider…"
         do { try transport.send(command) }
-        catch { pending = nil; statusLabel.stringValue = "Échec du transport. Aucun succès confirmé."; return }
+        catch { finish(false); statusLabel.stringValue = "Échec du transport. Aucun succès confirmé."; return }
         timeout?.cancel()
         timeout = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: .seconds(6)) } catch { return }
             guard let self, self.pending?.command_id == command.command_id else { return }
             receive()
-            if pending != nil { pending = nil; setEnabled(false); statusLabel.stringValue = "Provider sans réponse. État inconnu — vérifier la connexion." }
+            if pending != nil { finish(false); setEnabled(false); statusLabel.stringValue = "Provider sans réponse. État inconnu — vérifier la connexion." }
         }
     }
     func receive() {
-        guard let result = transport.status?.theme(theme.theme_id) else {
-            observed = nil; pending = nil; timeout?.cancel(); setEnabled(false)
+        input.catalog = transport.status
+        guard let result = transport.status?.theme(pending?.theme_id ?? theme.theme_id) else {
+            observed = nil; finish(false); setEnabled(false)
             statusLabel.stringValue = "Provider XPC déconnecté. État inconnu."; return
         }
         observed = result
         guard let pending else {
-            // A status publication alone does not prove current liveness.
-            refreshAndProbe(); return
+            restoreNextTheme()
+            if self.pending == nil && !confirmedInstances.contains(result.instance) && result.surfaces > 0 { send(.inspect, target: result.theme_id) }
+            return
         }
         guard let receipt = result.receipt, receipt.command == pending else { return }
-        self.pending = nil; timeout?.cancel()
         guard receipt.status == .applied, result.instance == pending.scene_instance_id else {
+            finish(false)
             setEnabled(false); statusLabel.stringValue = "Requête refusée : vérifier la connexion."; return
         }
         pauseButton.title = result.state.paused ? "Reprendre" : "Suspendre"
         effectButton.title = result.state.highlighted ? "Atténuer" : "Accentuer"
         setEnabled(result.surfaces > 0)
+        if result.surfaces > 0 { confirmedInstances.insert(result.instance) }
+        finish(true)
         statusLabel.stringValue = "Confirmé par le provider · \(result.surfaces) surface(s) · révision \(result.generation)"
         Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
             "XPC receipt confirmed action=\(pending.action.rawValue, privacy: .public) surfaces=\(result.surfaces) generation=\(result.generation)")
+        restoreNextTheme()
+    }
+    func finish(_ applied: Bool) {
+        pending = nil; timeout?.cancel(); themePicker.isEnabled = true
+        let handler = completion; completion = nil; handler?(applied)
+    }
+    func restoreNextTheme() {
+        guard pending == nil, let catalog = transport.status else { return }
+        for state in catalog.themes where !restoredInstances.contains(state.instance) {
+            restoredInstances.insert(state.instance)
+            guard let base = themes.first(where: { $0.theme_id == state.theme_id }) else { continue }
+            do {
+                if let saved = try store.load(for: base), saved != state.configuration {
+                    send(.configure, configuration: saved, target: state.theme_id); return
+                }
+            } catch { statusLabel.stringValue = "Personnalisation locale illisible : original conservé, fichier intact." }
+        }
     }
     func setEnabled(_ enabled: Bool) {
+        themePicker.isEnabled = pending == nil
         pauseButton?.isEnabled = enabled && theme.motion_path != "still"
         effectButton?.isEnabled = enabled
     }

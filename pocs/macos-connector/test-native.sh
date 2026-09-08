@@ -7,6 +7,8 @@ mkdir -p "$connector_root/dist/pocs/macos-connector"
 connector_output="$connector_root/dist/pocs/macos-connector/native-catalog-test"
 env -u SDKROOT xcrun swiftc -swift-version 6 -warnings-as-errors -parse-as-library \
   "$connector_source/Sources/ThemeModel/Theme.swift" \
+  "$connector_source/Sources/ThemeModel/ThemeLayout.swift" \
+  "$connector_source/Sources/ThemeModel/GestureRouter.swift" \
   "$connector_source/Native/Bridge/CodableShims.swift" \
   "$connector_source/Native/Catalog.swift" "$connector_source/Tests/NativeCatalog.swift" \
   -o "$connector_output"

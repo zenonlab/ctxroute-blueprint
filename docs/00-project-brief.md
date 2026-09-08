@@ -182,6 +182,11 @@ Pour démarrer, [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) retient :
 Terminal/PTY, stockage durable, format public, packaging et isolation du code tiers
 restent hors du périmètre initial. Versions et commandes doivent être qualifiées
 lors de l'initialisation et de l'ajout du PoC concerné.
+La tranche ultérieure PoC2 ([ADR-0054](decisions/ADR-0054-macos-theme-interaction.md))
+ajoute une exception explicite : les personnalisations d'objets sont conservées
+dans Application Support de l'agent, après validation et quittance XPC. Ni ROM,
+ni contenu de terminal ; fixtures signées immuables. Une association locale ouvre
+une application installée, sans shell. Les permissions et gestes restent à qualifier.
 L1 est désormais cadré par [ADR-0043](decisions/ADR-0043-isolated-macos-surface-poc.md) :
 Swift 6.3.2, SDK macOS 26.5, package SwiftPM autonome sans dépendance, XCTest,
 avertissements de compilation bloquants et durée finie (60 secondes par défaut,
