@@ -1,5 +1,21 @@
 # Reprise de session — Wallpaper
 
+## Installation suspendue par l'interface macOS — 8 septembre 2026
+
+Après demande d'installation autonome, le candidat VaWZIK passe encore `--check`.
+Le thème réellement sélectionné est **Ambre statique**, et non Lagon. L'automatisation
+voit les vignettes et capture les Réglages, mais refuse Noir et Sequoia avec
+`cannotClickOffscreenElement` ; clic par coordonnées : `noWindowsAvailable`.
+Relance complète des Réglages par leur menu, défilement, navigation clavier,
+Raise et « Tout ramener au premier plan » ne résolvent pas le problème. Une capture
+a aussi échoué avec SCStreamErrorDomain -3811. Aucun changement de fond confirmé.
+
+Le provider PID 26818 et l'agent autorisé PID 27652 restent actifs au chemin installé.
+Aucun arrêt, remplacement, changement TCC ou nouveau build. Ne pas affaiblir le
+préflight : une sélection manuelle temporaire d'un fond Apple est nécessaire avant
+de poursuivre l'installation de VaWZIK. Remettre ensuite Ambre statique et qualifier
+les deux sens du contrôle Fichiers. Aucun contrat ni diagramme ne change ici.
+
 ## Fichiers du bureau — correctif candidat, 8 septembre 2026
 
 **Retour utilisateur : les interactions fonctionnent sur g9pTbH**, sauf le bouton
