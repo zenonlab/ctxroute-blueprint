@@ -153,6 +153,15 @@ qualification déclarait `icon-overlap-not-supported`. Les recopier rendrait cer
 clics possibles, mais réintroduirait la superposition et les conflits Finder.
 L'autre chemin, `ActiveClickTap`, utilisait déjà Accessibilité et un tap actif.
 
+Le PoC2 reprend désormais ce principe uniquement pour les deux contrôles système
+fixes : deux micro-fenêtres transparentes de 40×40 points, sans pixel ni panneau
+visible, suivent exactement les hit-boxes rendues par le provider. Elles restent
+sous les applications normales et isolent le clic du geste macOS « afficher le
+bureau ». Le tap global exclut leurs rectangles et reste seul responsable des
+objets mobiles et du clic droit sur le vide. Une icône Finder superposée à l'une de
+ces deux zones réservées n'est pas supportée dans ce PoC ; aucune priorité universelle
+n'est revendiquée.
+
 Élément réutilisé : reprise événementielle depuis `NSWorkspace` (changement d'app,
 Space, veille et session), plutôt que depuis l'activation du seul agent invisible.
 Le PoC2 annule le geste lors de ces transitions et retente l'installation du tap

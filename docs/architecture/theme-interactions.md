@@ -166,8 +166,11 @@ des labels 3D, ni exposer le flux PTY à tous les scripts de thème.
 
 ## Entrées, focus et accessibilité
 
-La priorité native demeure : une icône Explorer/Finder ou une application située
-devant l'ancre doit conserver son geste. À l'intérieur d'une surface qui reçoit
+La priorité native demeure pour les ancres de scène : une icône Explorer/Finder ou
+une application située devant l'ancre doit conserver son geste. Sur macOS, les petites
+zones AppKit réservées aux contrôles système fixes constituent une capacité distincte :
+elles isolent le bouton du geste de fond, mais une icône Finder placée exactement dans
+la même zone n'est pas actionnable dans ce PoC. À l'intérieur d'une surface qui reçoit
 légitimement l'entrée, une seule cible gagne le hit-test selon l'ordre UI/scène
 annoncé. Un bouton au-dessus d'un objet ne déclenche pas simultanément les deux.
 La propagation à d'autres cibles n'existe que si une règle la demande explicitement.

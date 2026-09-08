@@ -48,6 +48,7 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         }
         print("agent-launch-policy=PASS cases=7 (no job changed)")
         try testDesktopItems()
+        try testControlInputPlaneProjection()
         let backgrounds = [
             ["AXGroup", "AXScrollArea", "AXApplication"],
             ["AXGroup", "AXGroup", "AXScrollArea", "AXGroup", "AXApplication"],

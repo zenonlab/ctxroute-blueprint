@@ -14,7 +14,14 @@ import os
     private var sessionActive = true
     private var lifecycleObservers: [NSObjectProtocol] = []
     private var traceBudget = CommandLine.arguments.contains("--diagnostics") ? 32 : 0
-    var catalog: CatalogStatus?
+    private lazy var controls: ControlInputPlane = {
+        let plane = ControlInputPlane()
+        plane.onControl = { [weak self] control, theme, layout in
+            self?.onIntent?(.toggle(control), theme, layout)
+        }
+        return plane
+    }()
+    var catalog: CatalogStatus? { didSet { controls.update(catalog) } }
     var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)?
     var installed: Bool { port.map { CGEvent.tapIsEnabled(tap: $0) } ?? false }
 
@@ -46,7 +53,7 @@ import os
     /// Only called from an explicit user menu action, never at startup.
     func requestPermission() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        if AXIsProcessTrustedWithOptions([key: true] as CFDictionary) { stop(); install() }
+        if AXIsProcessTrustedWithOptions([key: true] as CFDictionary) { detachTap(); install() }
     }
 
     func install() {
@@ -61,7 +68,7 @@ import os
                 if !wasEnabled { trace(restored ? "tap-reenabled" : "tap-reenable-failed") }
                 return
             }
-            stop()
+            detachTap()
         }
         let events: [CGEventType] = [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
                                      .leftMouseDragged, .rightMouseDragged]
@@ -81,6 +88,10 @@ import os
         trace(installed ? "tap-enabled" : "tap-disabled")
     }
     func stop() {
+        detachTap()
+        controls.hide()
+    }
+    private func detachTap() {
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         if let port { CFMachPortInvalidate(port) }
         port = nil; source = nil; captured = false; router.detach()
@@ -109,6 +120,9 @@ import os
             if captured { router.cancel() }
             return captured
         }
+        // Fixed controls are real, tiny AppKit input regions. The native window owns
+        // the complete gesture; the global tap must neither consume nor reinterpret it.
+        if controls.contains(event.location) { return false }
         let down = type == .leftMouseDown || type == .rightMouseDown
         let button: PointerButton = type == .leftMouseDown || type == .leftMouseUp ? .left : .right
         guard screensAwake, sessionActive, AXIsProcessTrusted(), let (theme, layout, point) = target(at: event.location) else {

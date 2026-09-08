@@ -26,6 +26,12 @@ ouvre une modale de personnalisation, jamais un panneau placé à droite de l'é
 Le provider conserve le rendu natif et peint les deux contrôles dans son arbre de
 calques. Il publie la géométrie et l'horloge de chaque surface pour un hit-test CPU
 partageant exactement la construction des trajectoires. Aucun polling de rendu.
+Les contrôles système fixes sont toutefois possédés en entrée par de petites fenêtres
+AppKit transparentes de la taille exacte de leur hit-box. Elles ne dessinent aucun
+pixel, ne couvrent jamais l'écran entier, restent sous les applications normales et
+appellent directement l'intention du contrôle. Le tap global exclut ces rectangles :
+un même geste ne peut donc atteindre à la fois le contrôle et le fond Finder.
+Cette exception ne s'étend pas aux objets mobiles, qui restent calculés par le tap.
 Dans ce PoC, les objets simples conservent le proxy invisible éprouvé par le PoC1
 (minimum 112×70 points) et la cible la plus proche gagne en cas de recouvrement.
 Le proxy n'est pas un `CALayer` interactif ni une fenêtre superposée. Le contrat de
@@ -39,6 +45,9 @@ ou une zone de défilement Finder, atteindre l'application Finder, contenir une 
 de défilement et ne traverser aucune fenêtre. Les rôles natifs d'icône, libellé et
 bouton sont refusés dès le premier élément. Cette politique reste fermée en cas
 d'erreur ou de chaîne inconnue et évite un coût variable avec le nombre d'icônes.
+Une icône Finder placée dans la hit-box d'un contrôle fixe n'est pas qualifiée dans
+ce PoC : la zone du contrôle est réservée par le thème. Le connecteur doit annoncer
+cette restriction au lieu de revendiquer une priorité Finder universelle.
 
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
