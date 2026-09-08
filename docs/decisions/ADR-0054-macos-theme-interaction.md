@@ -48,8 +48,9 @@ puis conserve la configuration locale. Aucun shell ni commande arbitraire.
 Les personnalisations sont dans Application Support, séparées des fixtures signées.
 Les associations d'applications sont locales et proviennent d'un choix utilisateur.
 Le mute porte uniquement sur l'audio du thème, jamais le volume système. Le contrôle
-Finder reste conditionné par une capacité OS observée ; un réglage de préférence
-non confirmé visuellement n'est pas présenté comme une preuve de fichiers masqués.
+Finder reste conditionné par une capacité OS observée. Son icône ne présente que
+l'état relu par l'agent : écran si inconnu, œil si visible, œil barré si masqué.
+Cet état de préférence ne prouve pas à lui seul le résultat visuel du compositeur.
 Un chemin de récupération natif reste disponible hors de la scène.
 
 ## Consequences
@@ -70,9 +71,11 @@ requis, en particulier avec une icône exactement superposée à une ancre. Une 
 sans écran associé ou ambiguë échoue ouverte vers macOS.
 Les fixtures n'ont pas de piste audio ; mute est un état du thème. Le contrôle
 Fichiers appelle désormais un contrôleur local de `StandardHideDesktopIcons`
-(WindowManager), sans redémarrer Finder ni modifier `CreateDesktop`. Aucun ajout
-au contrat XPC : c'est une action de l'agent. La préférence est relue à chaque
-action ; un échec d'écriture ou de confirmation est signalé. Le menu natif conserve
+(WindowManager), sans redémarrer Finder ni modifier `CreateDesktop`. L'action OS
+reste la propriété exclusive de l'agent. Trois actions XPC bornées projettent ensuite
+visible, masqué ou inconnu dans l'état visuel du provider ; elles ne modifient aucun
+réglage. La préférence est relue à chaque action ; un échec d'écriture ou de
+confirmation est signalé. Le menu natif conserve
 un réaffichage explicite indépendant de la capture des clics. Stage Manager actif
 ou bureau Finder désactivé par un autre outil : refus, avec accès aux Réglages.
 La case native a suivi l'écriture sur MAC-01, mais le cycle visuel complet depuis

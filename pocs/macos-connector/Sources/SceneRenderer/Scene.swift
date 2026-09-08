@@ -6,6 +6,7 @@ import ThemeModel
 
 /// One persistent tree per WallpaperID. No NSWindow and no frame timer.
 @MainActor public final class Scene {
+    private enum ControlIcon { case volumeMuted, volume, desktopUnknown, desktopVisible, desktopHidden }
     public let root = CALayer()
     private let theme: Theme
     private let background = CAGradientLayer()
@@ -41,8 +42,8 @@ import ThemeModel
             let control = CALayer(); control.name = "control.\(item)"
             control.backgroundColor = Self.color("18283F").copy(alpha: 0.92); control.cornerRadius = 6
             control.borderWidth = 1; control.borderColor = Self.color("FFFFFF").copy(alpha: 0.16)
-            let icon = CAShapeLayer(); icon.name = item == "audio" ? "lucide.volume-x" : "lucide.files"
-            icon.path = Self.controlIcon(audio: item == "audio", muted: true)
+            let icon = CAShapeLayer(); icon.name = item == "audio" ? "lucide.volume-x" : "lucide.monitor"
+            icon.path = Self.controlIcon(item == "audio" ? .volumeMuted : .desktopUnknown)
             icon.fillColor = nil; icon.strokeColor = Self.color("FFFFFF")
             icon.lineWidth = 2; icon.lineCap = .round; icon.lineJoin = .round
             icon.frame = CGRect(x: 8, y: 8, width: 24, height: 24)
@@ -105,7 +106,22 @@ import ThemeModel
         for control in controls where control.name == "control.audio" {
             if let icon = control.sublayers?.first as? CAShapeLayer {
                 icon.name = state.muted ? "lucide.volume-x" : "lucide.volume-2"
-                icon.path = Self.controlIcon(audio: true, muted: state.muted)
+                icon.path = Self.controlIcon(state.muted ? .volumeMuted : .volume)
+            }
+        }
+        for control in controls where control.name == "control.desktop" {
+            if let icon = control.sublayers?.first as? CAShapeLayer {
+                switch state.desktopItemsVisible {
+                case true:
+                    icon.name = "lucide.eye"
+                    icon.path = Self.controlIcon(.desktopVisible)
+                case false:
+                    icon.name = "lucide.eye-off"
+                    icon.path = Self.controlIcon(.desktopHidden)
+                case nil:
+                    icon.name = "lucide.monitor"
+                    icon.path = Self.controlIcon(.desktopUnknown)
+                }
             }
         }
         CATransaction.commit(); updates += 1
@@ -120,11 +136,12 @@ import ThemeModel
     public var isPaused: Bool { motion.speed == 0 }
     public var objectIDs: [String] { dots.compactMap(\.name) }
     public var hasObjectAnimations: Bool { dots.contains { !($0.animationKeys() ?? []).isEmpty } }
-    /// Native path adaptation of Lucide 0.468.0 volume-x, volume-2 and files.
+    /// Native path adaptation of Lucide 0.468.0 volume-x, volume-2, eye,
+    /// eye-off and monitor.
     /// See Packaging/Lucide-LICENSE. No browser, font icon or per-frame image decode.
-    private static func controlIcon(audio: Bool, muted: Bool) -> CGPath {
+    private static func controlIcon(_ kind: ControlIcon) -> CGPath {
         let path = CGMutablePath()
-        if audio {
+        if kind == .volumeMuted || kind == .volume {
             path.move(to: CGPoint(x: 11, y: 4.702))
             path.addQuadCurve(to: CGPoint(x: 9.797, y: 4.204), control: CGPoint(x: 11, y: 3.706))
             path.addLine(to: CGPoint(x: 6.413, y: 7.587))
@@ -138,7 +155,7 @@ import ThemeModel
             path.addLine(to: CGPoint(x: 9.797, y: 19.797))
             path.addQuadCurve(to: CGPoint(x: 11, y: 19.298), control: CGPoint(x: 11, y: 20.295))
             path.closeSubpath()
-            if muted {
+            if kind == .volumeMuted {
                 path.move(to: CGPoint(x: 22, y: 9)); path.addLine(to: CGPoint(x: 16, y: 15))
                 path.move(to: CGPoint(x: 16, y: 9)); path.addLine(to: CGPoint(x: 22, y: 15))
             } else {
@@ -150,20 +167,21 @@ import ThemeModel
                 path.addArc(center: CGPoint(x: 13, y: 12), radius: 9,
                     startAngle: .pi / 4, endAngle: -.pi / 4, clockwise: true)
             }
+        } else if kind == .desktopUnknown {
+            path.addRoundedRect(in: CGRect(x: 2, y: 3, width: 20, height: 14), cornerWidth: 2, cornerHeight: 2)
+            path.move(to: CGPoint(x: 12, y: 17)); path.addLine(to: CGPoint(x: 12, y: 21))
+            path.move(to: CGPoint(x: 8, y: 21)); path.addLine(to: CGPoint(x: 16, y: 21))
         } else {
-            path.move(to: CGPoint(x: 20, y: 7)); path.addLine(to: CGPoint(x: 17, y: 7))
-            path.addQuadCurve(to: CGPoint(x: 15, y: 5), control: CGPoint(x: 15, y: 7))
-            path.addLine(to: CGPoint(x: 15, y: 2))
-            path.move(to: CGPoint(x: 9, y: 18))
-            path.addQuadCurve(to: CGPoint(x: 7, y: 16), control: CGPoint(x: 7, y: 18))
-            path.addLine(to: CGPoint(x: 7, y: 4))
-            path.addQuadCurve(to: CGPoint(x: 9, y: 2), control: CGPoint(x: 7, y: 2))
-            path.addLine(to: CGPoint(x: 16, y: 2)); path.addLine(to: CGPoint(x: 20, y: 6))
-            path.addLine(to: CGPoint(x: 20, y: 16))
-            path.addQuadCurve(to: CGPoint(x: 18, y: 18), control: CGPoint(x: 20, y: 18)); path.closeSubpath()
-            path.move(to: CGPoint(x: 3, y: 7.6)); path.addLine(to: CGPoint(x: 3, y: 20.4))
-            path.addQuadCurve(to: CGPoint(x: 4.6, y: 22), control: CGPoint(x: 3, y: 22))
-            path.addLine(to: CGPoint(x: 14.4, y: 22))
+            path.move(to: CGPoint(x: 2, y: 12))
+            path.addCurve(to: CGPoint(x: 12, y: 5), control1: CGPoint(x: 4.5, y: 7), control2: CGPoint(x: 7.8, y: 5))
+            path.addCurve(to: CGPoint(x: 22, y: 12), control1: CGPoint(x: 16.2, y: 5), control2: CGPoint(x: 19.5, y: 7))
+            path.addCurve(to: CGPoint(x: 12, y: 19), control1: CGPoint(x: 19.5, y: 17), control2: CGPoint(x: 16.2, y: 19))
+            path.addCurve(to: CGPoint(x: 2, y: 12), control1: CGPoint(x: 7.8, y: 19), control2: CGPoint(x: 4.5, y: 17))
+            path.closeSubpath()
+            path.addEllipse(in: CGRect(x: 9, y: 9, width: 6, height: 6))
+            if kind == .desktopHidden {
+                path.move(to: CGPoint(x: 3, y: 3)); path.addLine(to: CGPoint(x: 21, y: 21))
+            }
         }
         var flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 24)
         return path.copy(using: &flip) ?? path

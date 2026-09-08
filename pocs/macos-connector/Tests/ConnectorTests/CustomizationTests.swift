@@ -105,7 +105,18 @@ final class CustomizationTests: XCTestCase {
         XCTAssertEqual(controls[0].sublayers?.first?.name, "lucide.volume-2")
         state.muted = true; scene.apply(state)
         XCTAssertEqual(controls[0].sublayers?.first?.name, "lucide.volume-x")
-        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.files")
+        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.monitor")
+        state.desktopItemsVisible = true; scene.apply(state)
+        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.eye")
+        let visiblePath = try XCTUnwrap((controls[1].sublayers?.first as? CAShapeLayer)?.path)
+        state.desktopItemsVisible = false; scene.apply(state)
+        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.eye-off")
+        let hiddenPath = try XCTUnwrap((controls[1].sublayers?.first as? CAShapeLayer)?.path)
+        XCTAssertEqual(visiblePath.boundingBox, CGRect(x: 2, y: 5, width: 20, height: 14))
+        XCTAssertEqual(hiddenPath.boundingBox, CGRect(x: 2, y: 3, width: 20, height: 18))
+        XCTAssertNotEqual(visiblePath, hiddenPath)
+        state.desktopItemsVisible = nil; scene.apply(state)
+        XCTAssertEqual(controls[1].sublayers?.first?.name, "lucide.monitor")
     }
     func testLocalStoreDoesNotModifyOriginalAndRejectsInvalidFile() throws {
         // Deliberately retain bounded fixtures; repository policy forbids automatic deletion.

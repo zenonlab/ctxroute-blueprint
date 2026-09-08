@@ -6,6 +6,7 @@ scope:
   - docs/session-handoff.md
   - .project/project-config.json
 review: on-change
+revised: true
 ---
 # ADR-0053 — Canal XPC nommé du provider au connecteur
 
@@ -52,6 +53,9 @@ génération du modèle restent inchangés. La perte du lien invalide l'état af
 Le canal n'autorise que les actions du modèle ; aucune commande shell, chemin de
 fichier du bureau ou donnée terminal n'y transite. Les vieux fichiers App Group
 ne servent jamais de repli automatique ; les sondes historiques restent explicites.
+Un état OS déjà relu et confirmé par l'agent peut être projeté par une action
+sémantique bornée (`visible`, `hidden`, `unknown`). Le provider n'obtient ainsi ni
+clé de préférence, ni primitive Finder, ni autorité pour modifier le système.
 
 ## Consequences et validation
 

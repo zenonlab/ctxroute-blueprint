@@ -61,6 +61,11 @@ seulement après une action utilisateur, relit l'état lorsque possible et renvo
 quittance corrélée. Le contrôle est désactivé avec une explication si la plateforme
 ne possède pas de chemin qualifié.
 
+Un état OS confirmé peut être projeté dans une scène par une action sémantique
+bornée. Cette projection ne donne aucune autorité OS au provider : sur macOS,
+l'agent relit `desktop.items.visible`, puis transmet seulement visible, masqué ou
+inconnu. Le même mécanisme réconcilie les scènes après reconnexion, sans polling.
+
 Le format de ce contrat doit rester indépendant du langage et versionné par schéma.
 Le PoC2 peut utiliser des types Swift générés ou écrits localement sans décider que
 le cœur portable de production sera en Swift. Rust reste candidat pour le cœur et le

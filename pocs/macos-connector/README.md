@@ -9,7 +9,8 @@ classification conservatrice du fond Finder ; aucun réglage modifié au lanceme
 
 L'utilisateur confirme les interactions du build installé `g9pTbH`, sauf le bouton
 Fichiers : celui-ci ouvrait seulement les Réglages. Le correctif raccorde cette
-intention à `App/DesktopItems.swift`, dans l'agent, sans nouveau message XPC.
+intention à `App/DesktopItems.swift`, dans l'agent. Le provider ne modifie jamais la
+préférence : trois actions XPC bornées lui projettent seulement l'état confirmé.
 Il modifie `com.apple.WindowManager/StandardHideDesktopIcons` via CFPreferences,
 uniquement après clic. L'état est relu avant chaque bascule et après synchronisation.
 Le menu Orbite dispose d'un toggle et d'une commande **Réafficher les fichiers du
@@ -30,8 +31,10 @@ Si Stage Manager est actif ou si un autre outil a déjà mis `CreateDesktop=fals
 l'action échoue explicitement et le diagnostic propose les Réglages : elle ne
 change pas ces politiques à l'insu de l'utilisateur. Les neuf cas injectés de
 `test-native.sh` couvrent bascules, restauration, changement externe, refus de
-synchronisation, absence de quittance et ces deux restrictions. L'icône reste
-neutre : le réglage observé n'est pas une preuve d'état visuel du compositeur.
+synchronisation, absence de quittance et ces deux restrictions. Le bouton montre
+`monitor` si l'état est inconnu, `eye` si les éléments sont visibles et `eye-off`
+s'ils sont masqués. Il ne change qu'après relecture de la préférence par l'agent ;
+une reconnexion resynchronise progressivement toutes les scènes du catalogue.
 
 ## Personnalisation locale — 8 septembre 2026
 
@@ -79,8 +82,9 @@ Aucun panneau ne s'ouvre au lancement normal.
 
 Présentation corrigée : deux boutons carrés 40×40, espace 8 points, icônes seules
 24×24 adaptées de [Lucide 0.468.0](https://github.com/lucide-icons/lucide/tree/0.468.0/icons).
-`volume-x`/`volume-2` suivent l'état muet du thème ; `files` reste neutre tant que
-l'état Finder n'est pas observé. Tracés CAShapeLayer, pas de WebView, police d'icônes
+`volume-x`/`volume-2` suivent l'état muet du thème ; `monitor`/`eye`/`eye-off`
+représentent l'état inconnu/visible/masqué des éléments du bureau. Tracés
+CAShapeLayer, pas de WebView, police d'icônes
 ou chargement réseau. Licence dans chaque paquet signé. La zone de clic provient
 du même `ThemeLayout.control` que le dessin. Le test vérifie les dimensions, l'écart,
 l'absence de texte, l'échelle Retina et les deux états audio.
@@ -413,7 +417,8 @@ Le retrait de l'app et du groupe partagé reste une suppression manuelle à conf
 
 Animation et accent visuel sont les seules actions de thème. Audio : absent, donc
 pas de fausse commande muet. Interaction bureau : désactivée, sans permission TCC
-demandée. Fichiers Finder : lien vers le réglage natif, **pas de toggle automatique**.
+demandée. Fichiers Finder : toggle local explicite et réversible, jamais exécuté
+au lancement.
 Les actions système universelles, UI stylée, import 3D et rig restent dans D1.
 
 Le canal App Group contient seulement `command.json` et `status.json` (16 KiB max),

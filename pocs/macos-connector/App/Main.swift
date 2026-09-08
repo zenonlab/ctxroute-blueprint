@@ -228,12 +228,13 @@ import ApplicationServices
         }
         desktopItemsMenuItem?.title = visible ? "Masquer les fichiers du bureau" : "Afficher les fichiers du bureau"
     }
-    @objc func toggleDesktopItems() { changeDesktopItems(restore: false) }
-    @objc func showDesktopItems() { changeDesktopItems(restore: true) }
-    private func changeDesktopItems(restore: Bool) {
+    @objc func toggleDesktopItems() { changeDesktopItems(restore: false, target: nil) }
+    @objc func showDesktopItems() { changeDesktopItems(restore: true, target: nil) }
+    private func changeDesktopItems(restore: Bool, target: String?) {
         do {
             let visible = try restore ? desktopItems.setVisible(true) : desktopItems.toggle()
             statusLabel.stringValue = visible ? "Réglage enregistré : fichiers affichés." : "Réglage enregistré : fichiers masqués. Réaffichage disponible dans le menu Orbite."
+            synchronizeDesktopItems(visible: visible, target: target ?? theme.theme_id)
         } catch {
             // Recovery is accessible without a wallpaper hit-test or a permission prompt.
             window.makeKeyAndOrderFront(nil)
@@ -261,7 +262,7 @@ import ApplicationServices
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         case .toggle(.audio):
             send(transport.status?.theme(theme.theme_id)?.state.muted == false ? .mute : .unmute, target: theme.theme_id)
-        case .toggle(.desktopItems): toggleDesktopItems()
+        case .toggle(.desktopItems): changeDesktopItems(restore: false, target: theme.theme_id)
         }
     }
     private func open(_ value: String) {
@@ -315,6 +316,7 @@ import ApplicationServices
         observed = result
         guard let pending else {
             restoreNextTheme()
+            if self.pending == nil { synchronizeNextDesktopItems() }
             if self.pending == nil && !confirmedInstances.contains(result.instance) && result.surfaces > 0 { send(.inspect, target: result.theme_id) }
             return
         }
@@ -332,6 +334,7 @@ import ApplicationServices
         Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
             "XPC receipt confirmed action=\(pending.action.rawValue, privacy: .public) surfaces=\(result.surfaces) generation=\(result.generation)")
         restoreNextTheme()
+        if self.pending == nil { synchronizeNextDesktopItems() }
     }
     func finish(_ applied: Bool) {
         pending = nil; timeout?.cancel(); themePicker.isEnabled = true
@@ -348,6 +351,18 @@ import ApplicationServices
                 }
             } catch { statusLabel.stringValue = "Personnalisation locale illisible : original conservé, fichier intact." }
         }
+    }
+    private func synchronizeDesktopItems(visible: Bool?, target: String) {
+        guard pending == nil, let state = transport.status?.theme(target)?.state,
+              state.desktopItemsVisible != visible else { return }
+        let action: ThemeAction = visible.map { $0 ? .desktopItemsVisible : .desktopItemsHidden }
+            ?? .desktopItemsUnknown
+        send(action, target: target)
+    }
+    private func synchronizeNextDesktopItems() {
+        let visible = try? desktopItems.isVisible()
+        guard let target = transport.status?.themes.first(where: { $0.state.desktopItemsVisible != visible })?.theme_id else { return }
+        synchronizeDesktopItems(visible: visible, target: target)
     }
     func setEnabled(_ enabled: Bool) {
         themePicker.isEnabled = pending == nil

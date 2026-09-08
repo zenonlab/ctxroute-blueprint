@@ -101,11 +101,13 @@ public struct ThemeState: Codable, Equatable, Sendable {
     public var paused = false
     public var highlighted = false
     public var muted = true
+    public var desktopItemsVisible: Bool?
     public init() {}
 }
 
 public enum ThemeAction: String, Codable, Sendable {
     case pause, resume, highlight, unhighlight, inspect, configure, mute, unmute
+    case desktopItemsVisible, desktopItemsHidden, desktopItemsUnknown
 }
 
 public struct Command: Codable, Equatable, Sendable {
@@ -178,6 +180,9 @@ public struct Session: Sendable {
         case .configure: break
         case .mute: state.muted = true
         case .unmute: state.muted = false
+        case .desktopItemsVisible: state.desktopItemsVisible = true
+        case .desktopItemsHidden: state.desktopItemsVisible = false
+        case .desktopItemsUnknown: state.desktopItemsVisible = nil
         }
         generation += 1
         let receipt = Receipt(command: command, status: .applied, state: state, reason: nil)

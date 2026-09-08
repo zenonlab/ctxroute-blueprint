@@ -28,6 +28,12 @@ final class ModelTests: XCTestCase {
         XCTAssertThrowsError(try NativeWire.encode(String(repeating: "x", count: 16_384)))
         XCTAssertThrowsError(try NativeWire.requirement(for: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
     }
+    func testThemeStateDecodesStatusFromOlderProvider() throws {
+        let legacy = Data(#"{"paused":false,"highlighted":false,"muted":true}"#.utf8)
+        let state = try NativeWire.decode(ThemeState.self, from: legacy)
+        XCTAssertTrue(state.muted)
+        XCTAssertNil(state.desktopItemsVisible)
+    }
     func testProviderMachExceptionIsExactAndSandboxRemains() throws {
         let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Packaging/Extension.entitlements")
@@ -165,6 +171,18 @@ final class ModelTests: XCTestCase {
         let resume = Command(theme: "test", instance: session.instance, generation: 1, action: .resume, now: now)
         XCTAssertEqual(session.apply(resume, now: now).status, .applied)
         XCTAssertFalse(session.state.paused)
+        let hidden = Command(theme: "test", instance: session.instance, generation: 2,
+            action: .desktopItemsHidden, now: now)
+        XCTAssertEqual(session.apply(hidden, now: now).status, .applied)
+        XCTAssertEqual(session.state.desktopItemsVisible, false)
+        let visible = Command(theme: "test", instance: session.instance, generation: 3,
+            action: .desktopItemsVisible, now: now)
+        XCTAssertEqual(session.apply(visible, now: now).status, .applied)
+        XCTAssertEqual(session.state.desktopItemsVisible, true)
+        let unknown = Command(theme: "test", instance: session.instance, generation: 4,
+            action: .desktopItemsUnknown, now: now)
+        XCTAssertEqual(session.apply(unknown, now: now).status, .applied)
+        XCTAssertNil(session.state.desktopItemsVisible)
     }
     func testMailboxRoundTripAndOversize() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

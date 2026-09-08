@@ -7,10 +7,11 @@ sur clic droit, un ajout sur vide qualifié et une persistance locale après qui
 Il ne réalise pas encore les imports, rigs ni skins d'UI décrits dans cette cible.
 Le starter PoC2 remplace les libellés des contrôles par deux carrés 40×40,
 espacés de 8 points, avec tracés natifs adaptés de Lucide 0.468.0 (`volume-x`,
-`volume-2`, `files`), icônes 24×24 et licence embarquée. Le renderer et le hit-test
+`volume-2`, `monitor`, `eye`, `eye-off`), icônes 24×24 et licence embarquée. Le renderer et le hit-test
 partagent la même géométrie ; ce changement visuel ne qualifie pas l'entrée macOS.
-Le contrôle fichiers n'est toujours pas un toggle natif confirmé : ne pas peindre
-un état masqué/visible inventé. L'ouverture des Réglages n'est pas l'objectif final.
+Le contrôle fichiers projette uniquement l'état relu par le connecteur : écran si
+inconnu, œil si visible, œil barré si masqué. Le provider ne lit ni ne modifie les
+préférences macOS. L'ouverture des Réglages demeure le fallback d'erreur.
 Voir [ADR-0054](../decisions/ADR-0054-macos-theme-interaction.md).
 Décision : [ADR-0050](../decisions/ADR-0050-theme-customization-and-local-assets.md).
 Les contrôles système intégrés au thème sont précisés par
