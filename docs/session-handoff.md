@@ -1,6 +1,40 @@
 # Reprise de session — Wallpaper
 
-## État courant — redémarrage propre, 8 septembre 2026
+## État courant — retrait du panneau automatique, 8 septembre 2026
+
+Retour utilisateur : le panneau technique ne remplace ni les deux contrôles en haut
+à gauche, ni le clic gauche d'action, ni le clic droit de personnalisation/ajout.
+Ces interactions restent absentes du bureau réel. Ne pas présenter le PoC2 comme
+une interface produit fonctionnelle.
+
+Correctif `App/Main.swift` : lancement normal en mode accessoire, sans fenêtre ni
+activation forcée ; diagnostic accessible à la demande dans la barre des menus.
+Fermer le diagnostic laisse le connecteur actif. `--diagnostics` et `--smoke`
+ouvrent explicitement la fenêtre. Pas de nouveau service de démarrage automatique,
+ni de modification du transport, des permissions ou du contrat d'interaction.
+
+Build vérifié mais NON INSTALLÉ :
+`dist/pocs/macos-connector/build.vwLogo/Wallpaper Connector PoC 2.app`.
+Compilation Swift stricte, signature/plists et catalogue Apple trois thèmes PASS ;
+21 XCTest réussis. Les tests de modèle ne prouvent pas le comportement UI AppKit.
+La tentative d'installation a été refusée par le préflight : le provider installé
+a redémarré après SIGTERM (88715 observé). Aucun remplacement n'a eu lieu.
+L'ancien compagnon a été arrêté ; ne pas le relancer, il ouvre encore son panneau.
+La vérification UI du nouveau lancement reste à faire après installation sûre.
+Le contrôle graphique a aussi rencontré une erreur ScreenCaptureKit -3811.
+
+Prochaine étape : débloquer la publication native documentée ci-dessous, puis
+raccorder effectivement l'étagère et les gestes. Cacher le diagnostic seul n'est
+pas l'achèvement de la demande. Le gate exige une preuve de placement pour ce
+changement : le schéma connecteurs précise « Diagnostic à la demande », sans
+nouvelle frontière ni dépendance. Archify showcase 9/9, zéro erreur/avertissement,
+containment quatre résolutions et captures sombres 1440×900/2048×1320 inspectées.
+Audit : CONFORME pour compilation, 21 XCTest, `npm run verify` (code 0), revue du
+diff et conservation des fichiers/réglages. MANQUE : installation et preuve UI du
+démarrage discret, transport natif et interactions bureau. N/A : modification de
+doctrine/hooks, nouvelle dépendance ou migration architecturale.
+
+## Historique — redémarrage propre, 8 septembre 2026
 
 À la demande « clean tout redémarre aux propres », contrôle préalable des Réglages :
 `webzenon.background` sélectionné, et non plus Ambre. Les anciens providers

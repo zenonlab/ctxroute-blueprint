@@ -51,9 +51,11 @@ import UniformTypeIdentifiers
             }
             existing.activate(options: []); return
         }
-        app.setActivationPolicy(.regular)
+        let diagnostics = CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke")
+        app.setActivationPolicy(diagnostics ? .regular : .accessory)
         do { try Preflight.check(installing: false) }
         catch {
+            guard diagnostics else { print("Lancement refusé : \(error.localizedDescription)"); return }
             let alert = NSAlert(); alert.messageText = "Lancement refusé"
             alert.informativeText = error.localizedDescription
             alert.runModal(); return
@@ -70,6 +72,7 @@ import UniformTypeIdentifiers
     let mailbox: Mailbox?
     let transportFailure: String?
     var window: NSWindow!
+    var statusItem: NSStatusItem?
     var signal: WakeSignal?
     var observed: ProviderStatus?
     var pending: Command?
@@ -91,7 +94,7 @@ import UniformTypeIdentifiers
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.edgeInsets = NSEdgeInsets(top: 28, left: 28, bottom: 28, right: 28)
         let title = NSTextField(labelWithString: "Wallpaper Connector"); title.font = .systemFont(ofSize: 26, weight: .semibold)
-        let subtitle = NSTextField(wrappingLabelWithString: "Une scène native. Un seul panneau de contrôle.")
+        let subtitle = NSTextField(wrappingLabelWithString: "Diagnostic du provider — ce panneau n’est pas l’interface du thème.")
         subtitle.textColor = .secondaryLabelColor
         stack.addArrangedSubview(title); stack.addArrangedSubview(subtitle)
         themePicker.addItems(withTitles: themes.map(\.display_name))
@@ -110,16 +113,27 @@ import UniformTypeIdentifiers
         stack.addArrangedSubview(NSButton(title: "Choisir ce fond dans macOS…", target: self, action: #selector(wallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers dans Réglages…", target: self, action: #selector(desktopSettings)))
         stack.addArrangedSubview(NSButton(title: "Vérifier la connexion", target: self, action: #selector(check)))
-        window.contentView = stack; window.center(); window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window.contentView = stack; window.center()
         let menu = NSMenu(); let appMenu = NSMenuItem(); menu.addItem(appMenu)
         let submenu = NSMenu(); submenu.addItem(withTitle: "Quitter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenu.submenu = submenu; NSApp.mainMenu = menu
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem?.button?.image = NSImage(systemSymbolName: "circle.hexagongrid", accessibilityDescription: "Orbite — connecteur")
+        statusItem?.button?.toolTip = "Orbite — diagnostic du connecteur"
+        let statusMenu = NSMenu()
+        let diagnosticItem = statusMenu.addItem(withTitle: "Diagnostic du connecteur…", action: #selector(check), keyEquivalent: "")
+        diagnosticItem.target = self
+        statusMenu.addItem(.separator())
+        statusMenu.addItem(withTitle: "Quitter le connecteur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        statusItem?.menu = statusMenu
         if mailbox != nil { signal = WakeSignal(Mailbox.statusSignal) { [weak self] in self?.receive() } }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.refreshAndProbe() }
         }
         refreshAndProbe()
+        if CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke") {
+            check()
+        }
         // Finite UI smoke: captures this app's content only, never the desktop.
         if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--smoke" {
             Task { @MainActor in
@@ -138,7 +152,7 @@ import UniformTypeIdentifiers
             }
         }
     }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     @objc func wallpaperSettings() { open("x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") }
     @objc func desktopSettings() { open("x-apple.systempreferences:com.apple.Desktop-Settings.extension") }
     private func open(_ value: String) {
@@ -146,7 +160,11 @@ import UniformTypeIdentifiers
     }
     @objc func pause() { send(observed?.state.paused == true ? .resume : .pause) }
     @objc func effect() { send(observed?.state.highlighted == true ? .unhighlight : .highlight) }
-    @objc func check() { refreshAndProbe() }
+    @objc func check() {
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        refreshAndProbe()
+    }
     @objc func changeControlTheme() {
         pending = nil; timeout?.cancel(); observed = nil; refreshAndProbe()
     }

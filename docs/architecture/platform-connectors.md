@@ -194,5 +194,8 @@ manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et rel
 sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-SHA-256 de la source : `b4201bd268d7e77d2b17c3cf3bda58eb3b18fc9861bd62a8956a9fa22df85394`.
-SHA-256 de l'artefact : `c60694710e0ce4fd3ad2c3f465a1d0ab9f2d9aea0480124a83d14d787e8e8672`.
+Le connecteur macOS distingue désormais le lancement discret du diagnostic ouvert
+à la demande. Ce correctif ne qualifie ni les commandes natives ni les gestes.
+
+SHA-256 de la source : `103683ec28ead919a3c36bb66e7a0aee013fbb8d797331989561da46bce9e6aa`.
+SHA-256 de l'artefact : `c959e87994257a4152e707b47bd4f471035d1628c7f92c5f63e74a486291cc17`.

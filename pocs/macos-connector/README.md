@@ -6,6 +6,14 @@ ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
 
 ## Statut et limites
 
+Le lancement normal ne montre plus de fenêtre et ne vole pas le focus : le
+connecteur réside dans la barre des menus. « Diagnostic du connecteur… » ouvre
+le panneau technique à la demande ; le fermer ne quitte pas le connecteur.
+`--diagnostics` et `--smoke` ouvrent explicitement cette fenêtre.
+Ce démarrage discret n'installe pas de service de connexion automatique et ne
+sélectionne pas un wallpaper à la place de l'utilisateur. L'étagère de deux
+boutons et les clics du bureau restent non raccordés, pas implicitement livrés.
+
 Correctifs de revue : commandes et quittances testées, dernière quittance conservée
 30 secondes par thème même lors d'une publication de surface. Les mailboxes de tests
 n'émettent plus de notifications système ; seul `shared()` les active.
@@ -121,7 +129,8 @@ L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 - `--thumbnail <chemin.png>` : exporte la fixture, sans animer ni ouvrir une fenêtre ;
 - `--thumbnails <répertoire>` : exporte une vignette par thème du catalogue ;
 - `--smoke <chemin.png>` : ouvre le seul panneau, capture son contenu et quitte ;
-- sans argument : ouvre le connecteur.
+- `--diagnostics` : ouvre explicitement le panneau technique ;
+- sans argument : démarre le connecteur sans fenêtre, accessible dans la barre des menus.
 
 Le schéma `theme.schema.json` décrit la fixture. `Theme.decode` contrôle aussi les
 identités uniques et la taille maximale de 32 KiB. Les propriétés inconnues sont
