@@ -71,11 +71,15 @@ requis, en particulier avec une icône exactement superposée à une ancre. Une 
 sans écran associé ou ambiguë échoue ouverte vers macOS.
 Les fixtures n'ont pas de piste audio ; mute est un état du thème. Le contrôle
 Fichiers appelle désormais un contrôleur local de `StandardHideDesktopIcons`
-(WindowManager), sans redémarrer Finder ni modifier `CreateDesktop`. L'action OS
+(WindowManager), sans modifier `CreateDesktop`. Après confirmation de l'écriture,
+l'agent redémarre le seul service Finder de la session pour appliquer la présentation,
+comme le PoC1, sans redémarrer Dock ni toucher aux fichiers. L'action OS
 reste la propriété exclusive de l'agent. Trois actions XPC bornées projettent ensuite
 visible, masqué ou inconnu dans l'état visuel du provider ; elles ne modifient aucun
-réglage. La préférence est relue à chaque action ; un échec d'écriture ou de
-confirmation est signalé. Le menu natif conserve
+réglage. La préférence est relue à chaque action ; un échec d'écriture, de
+confirmation ou de rafraîchissement est signalé. Après échec du rafraîchissement,
+l'agent tente un rollback confirmé ; son échec est distinct et n'est jamais acquitté.
+Le menu natif conserve
 un réaffichage explicite indépendant de la capture des clics. Stage Manager actif
 ou bureau Finder désactivé par un autre outil : refus, avec accès aux Réglages.
 La case native a suivi l'écriture sur MAC-01, mais le cycle visuel complet depuis

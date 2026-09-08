@@ -15,23 +15,27 @@ Il modifie `com.apple.WindowManager/StandardHideDesktopIcons` via CFPreferences,
 uniquement après clic. L'état est relu avant chaque bascule et après synchronisation.
 Le menu Orbite dispose d'un toggle et d'une commande **Réafficher les fichiers du
 bureau**, indépendants du hit-test du wallpaper. Aucun fichier n'est lu, déplacé,
-supprimé ni modifié. Aucun redémarrage Finder/Dock ni polling n'est ajouté.
+supprimé ni modifié. Après confirmation de la préférence, l'agent redémarre seulement
+le service Finder de la session afin qu'il recharge sa présentation ; jamais Dock.
 
 Le PoC1 utilisait `CreateDesktop` puis redémarrait Finder, comme le fait
 [OnlySwitch](https://github.com/jacklandrin/OnlySwitch/blob/main/Modules/Sources/Switches/ShellCommandDefine.swift).
-Ce chemin n'est pas repris : retirer le bureau Finder peut retirer la cible AX
-positive nécessaire aux clics du PoC2. Le nouveau réglage reste une préférence
+PoC2 reprend uniquement le rafraîchissement Finder : il ne change pas `CreateDesktop`,
+car retirer le bureau Finder peut retirer la cible AX positive nécessaire aux clics.
+Le nouveau réglage reste une préférence
 macOS non contractuelle, qualifiée seulement sur MAC-01 : la case native « Sur le
 bureau » est passée de 1 à 0 puis 1 lors de l'essai ; une écriture directe a aussi
-mis cette case à 0. `CreateDesktop` est resté à 1 ; Finder n'a pas été redémarré.
+mis cette case à 0. Lors de cet essai initial, `CreateDesktop` est resté à 1 et Finder
+n'avait pas été redémarré ; la comparaison avec PoC1 a isolé ce rafraîchissement manquant.
 Affichage initial rétabli. Cela confirme le réglage, **pas encore le cycle visuel
 masquer/réafficher par le bouton du nouveau paquet** ni la conservation du hit-test.
 
 Si Stage Manager est actif ou si un autre outil a déjà mis `CreateDesktop=false`,
 l'action échoue explicitement et le diagnostic propose les Réglages : elle ne
-change pas ces politiques à l'insu de l'utilisateur. Les neuf cas injectés de
+change pas ces politiques à l'insu de l'utilisateur. Les onze cas injectés de
 `test-native.sh` couvrent bascules, restauration, changement externe, refus de
-synchronisation, absence de quittance et ces deux restrictions. Le bouton montre
+synchronisation, absence de quittance, échec de rafraîchissement/rollback et ces
+deux restrictions. Le bouton montre
 `monitor` si l'état est inconnu, `eye` si les éléments sont visibles et `eye-off`
 s'ils sont masqués. Il ne change qu'après relecture de la préférence par l'agent ;
 une reconnexion resynchronise progressivement toutes les scènes du catalogue.

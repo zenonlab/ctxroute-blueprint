@@ -141,7 +141,7 @@ import ApplicationServices
         stack.addArrangedSubview(controls)
         statusLabel.font = .systemFont(ofSize: 13); stack.addArrangedSubview(statusLabel)
         let capabilities = NSTextField(wrappingLabelWithString:
-            "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : bureau standard, sans redémarrage Finder.")
+            "Clic gauche : ouvrir l’application. Clic droit : personnaliser.\nEntrée : nécessite Accessibilité et un fond Finder reconnu.\nAudio : fixtures silencieuses. Fichiers : bureau standard, avec rechargement ciblé de Finder.")
         capabilities.textColor = .secondaryLabelColor; stack.addArrangedSubview(capabilities)
         stack.addArrangedSubview(NSButton(title: "Choisir ce fond dans macOS…", target: self, action: #selector(wallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers dans Réglages…", target: self, action: #selector(desktopSettings)))

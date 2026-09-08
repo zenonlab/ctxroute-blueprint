@@ -143,6 +143,12 @@ requête et la valeur relue. Une modification externe invalide l'affichage puis 
 le nouvel état lorsque le connecteur sait l'observer. Timeout, redémarrage de Finder
 ou d'Explorer et changement de session ne valent jamais succès.
 
+Sur macOS qualifié, `StandardHideDesktopIcons` nécessite un rafraîchissement du
+service Finder pour devenir visible. Le connecteur effectue ce rafraîchissement après
+l'écriture confirmée et tente de restaurer la préférence précédente si le service ne
+repart pas ; l'échec du rollback reste une erreur explicite, jamais un succès.
+`CreateDesktop` reste inchangé afin de conserver le bureau et sa priorité d'entrée.
+
 `desktop.items.visible` ne s'exécute ni à l'installation, ni au chargement du thème,
 ni parce qu'une IA l'a placé dans une recette. Seule une action utilisateur confirmée
 peut le modifier. La préférence appartient à l'utilisateur et non au thème ; changer

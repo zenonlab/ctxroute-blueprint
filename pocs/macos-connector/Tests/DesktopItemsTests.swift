@@ -5,11 +5,16 @@ import Foundation
     var writes = 0
     var synchronize = true
     var acceptWrite = true
+    var refreshes = 0
+    var refreshResults: [Bool] = []
     let controller = DesktopItems(read: { domain, key in preferences[domain + "/" + key] }, write: { domain, key, value in
         precondition(domain == DesktopItems.domain && key == DesktopItems.key)
         writes += 1
         if acceptWrite { preferences[domain + "/" + key] = value }
         return synchronize
+    }, refresh: {
+        refreshes += 1
+        return refreshResults.isEmpty ? true : refreshResults.removeFirst()
     })
     func require(_ result: Bool) throws {
         if !result { throw ModelError.invalid("desktop items regression") }
@@ -28,6 +33,19 @@ import Foundation
     try expect(.writeFailed) { _ = try controller.setVisible(true) }
     synchronize = true; acceptWrite = false
     try expect(.unconfirmed) { _ = try controller.setVisible(false) }
+    acceptWrite = true; refreshResults = [false, true]
+    try expect(.refreshFailed) { _ = try controller.setVisible(false) }
+    try require(controller.isVisible()) // failed refresh rolls the preference back
+    try require(refreshes == 6)
+    var rollbackPreferences = [DesktopItems.domain + "/" + DesktopItems.key: false]
+    var rollbackWrites = 0
+    let rollbackFailure = DesktopItems(read: { domain, key in rollbackPreferences[domain + "/" + key] },
+        write: { domain, key, value in
+            rollbackWrites += 1
+            if rollbackWrites == 1 { rollbackPreferences[domain + "/" + key] = value; return true }
+            return false
+        }, refresh: { false })
+    try expect(.rollbackFailed) { _ = try rollbackFailure.setVisible(false) }
     let previousWrites = writes
     preferences["com.apple.finder/CreateDesktop"] = false
     try expect(.unavailable) { _ = try controller.toggle() }
@@ -35,5 +53,5 @@ import Foundation
     preferences[DesktopItems.domain + "/GloballyEnabled"] = true
     try expect(.unavailable) { _ = try controller.setVisible(true) }
     try require(writes == previousWrites)
-    print("desktop-items=PASS cases=9 (injected preferences; no Finder or user data mutation)")
+    print("desktop-items=PASS cases=11 (injected preferences and refresh; no Finder or user data mutation)")
 }
