@@ -12,6 +12,25 @@ enum DiagnosticCommand: String, CaseIterable, Sendable {
     }
 }
 
+// A receipt confirms only that the extension applied the named visual command.
+// It carries no user data and is intentionally separate from the request name.
+struct DiagnosticReceipt: Equatable, Sendable {
+    static let prefix = "org.wallpaperthemes.nativeprobe.controls.receipt."
+    let command: DiagnosticCommand
+
+    init(_ command: DiagnosticCommand) { self.command = command }
+
+    var notification: String { Self.prefix + command.rawValue }
+
+    init?(notification: String) {
+        guard notification.hasPrefix(Self.prefix),
+              let command = DiagnosticCommand(rawValue: String(notification.dropFirst(Self.prefix.count))) else {
+            return nil
+        }
+        self.command = command
+    }
+}
+
 struct DiagnosticState: Equatable, Sendable {
     var panelOpen = false
     var paused = false

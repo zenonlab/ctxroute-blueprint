@@ -44,8 +44,8 @@ require_equal "$(plutil -extract CFBundleIdentifier raw "$host_plist")" \
   org.wallpaperthemes.nativeprobe.controls 'unexpected host bundle identity'
 require_equal "$(plutil -extract CFBundleIdentifier raw "$extension_plist")" \
   org.wallpaperthemes.nativeprobe.controls.extension 'unexpected extension bundle identity'
-require_equal "$(plutil -extract CFBundleVersion raw "$host_plist")" 9 'unexpected host catalog version'
-require_equal "$(plutil -extract CFBundleVersion raw "$extension_plist")" 9 'unexpected extension catalog version'
+require_equal "$(plutil -extract CFBundleVersion raw "$host_plist")" 10 'unexpected host catalog version'
+require_equal "$(plutil -extract CFBundleVersion raw "$extension_plist")" 10 'unexpected extension catalog version'
 require_equal "$(plutil -extract EXAppExtensionAttributes.EXExtensionPointIdentifier raw "$extension_plist")" \
   com.apple.wallpaper 'unexpected extension point'
 [[ -f "$theme_asset" && -f "$schema_asset" && -f "$host_theme_asset" && -f "$host_schema_asset" ]] || \
@@ -62,6 +62,8 @@ snapshot_height="$(sips -g pixelHeight "$snapshot_asset" | awk '/pixelHeight/ { 
 require_equal "${snapshot_width}x${snapshot_height}" 480x270 'unexpected diagnostic snapshot dimensions'
 extension_strings="$(strings "$extension_binary")"
 grep -Fxq 'native-wallpaper-controls' <<<"$extension_strings" || fail 'compiled settings group is missing'
+grep -Fxq 'org.wallpaperthemes.nativeprobe.controls.receipt.' <<<"$extension_strings" || \
+  fail 'compiled receipt channel is missing'
 codesign --verify --strict "$probe_extension" || fail 'extension signature is invalid'
 codesign --verify --deep --strict "$probe_app" || fail 'application signature is invalid'
 
@@ -70,4 +72,4 @@ grep -Fq '[Key] com.apple.security.app-sandbox' <<<"$entitlements" || fail 'sand
 entitlement_count="$(grep -c '^[[:space:]]*\[Key\]' <<<"$entitlements" || true)"
 require_equal "$entitlement_count" 1 'extension has an unexpected entitlement'
 
-echo 'PASS: 18 package checks; identities, synchronized assets, signatures and sandbox verified'
+echo 'PASS: 19 package checks; identities, receipt channel, synchronized assets, signatures and sandbox verified'

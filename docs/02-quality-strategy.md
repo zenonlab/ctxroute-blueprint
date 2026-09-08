@@ -58,6 +58,17 @@ dans `Index.plist` après sélection, puis création/rendu de la surface. Sur ma
 26.2, ne pas automatiser la sélection par `accessibilityPerformPress` : le panneau
 Apple plante avant l'appel au renderer. Une sélection physique et la lecture
 postérieure de `Index.plist` sont requises.
+Le transport des commandes dispose d'une cinquième preuve distincte : le
+compagnon n'affiche « appliqué par le wallpaper » qu'après réception d'une
+quittance Darwin émise par l'extension ayant au moins une surface active. Ce
+signal ne prouve ni une livraison garantie, ni un clic direct dans le décor,
+mais interdit de confondre l'envoi avec une mutation rendue.
+Le gate rejouable
+`bash pocs/macos-native-wallpaper/verify-runtime.sh <paquet.app>` reste en
+lecture seule et exige le chemin isolé exact, le provider enregistré, un seul
+hôte et une seule extension provenant de ce paquet, la sélection persistante de
+la scène, deux contextes du PID courant et cinq transitions appliquées. Les
+codes 64/65 distinguent un appel invalide d'un chemin hors périmètre.
 Les résultats réellement obtenus sont consignés dans la
 [note de reprise](session-handoff.md).
 

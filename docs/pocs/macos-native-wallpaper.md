@@ -5,12 +5,14 @@
 L'utilisateur confirme l'animation du build 3. Son ancien processus d'extension
 a été arrêté le 8 septembre pour isoler le test suivant, sans supprimer son
 paquet. Le dernier paquet préparé est
-`dist/pocs/macos-native-wallpaper/compile.PKkhnQ/Native Wallpaper Probe.app`.
+`dist/pocs/macos-native-wallpaper/compile.9n1Dga/Native Wallpaper Probe.app`.
 Identités indépendantes `org.wallpaperthemes.nativeprobe.controls` et
-`org.wallpaperthemes.nativeprobe.controls.extension`, version 9. Signature et
+`org.wallpaperthemes.nativeprobe.controls.extension`, version 10. Signature et
 plist validées. Hôte enregistré par `lsregister -f`, extension par `pluginkit -a`.
-Le compagnon et l'extension ont été lancés ; le fond actif reste toutefois le
-choix build 3 dans `Index.plist`, car l'activation v9 n'a pas encore réussi.
+Le compagnon PID 64966 et l'extension PID 64974 sont lancés. `Index.plist`
+référence le provider `controls`, la scène 2222… et la sélection
+`Balayage interactif`. Son chemin de miniature demeure celui du paquet v9
+PKkhnQ choisi à 07:45:33 ; le provider v10 enregistré dessert ensuite ce choix.
 Les anciens compagnons `compile.g74ecK` (PID 43344) et `compile.Bbw4WZ`
 (PID 72671) restent les processus hôtes interactifs observés au moment de cette
 mise à jour ; ils ne lisent pas le dernier manifeste. Aucun ancien fichier n'a
@@ -18,7 +20,7 @@ mise à jour ; ils ne lisent pas le dernier manifeste. Aucun ancien fichier n'a
 Le premier assemblage HJrJSV, antérieur à la mise à jour de l'identité hôte,
 n'a pas été enregistré et ne doit pas être utilisé.
 
-Pour tester le nouveau paquet : ouvrir **ce chemin PKkhnQ** dans Finder ; le
+Pour tester le nouveau paquet : ouvrir **ce chemin 9n1Dga** dans Finder ; le
 compagnon présente ses commandes et un bouton vers les Réglages. Choisir
 **Native Wallpaper Interactive → Balayage interactif** uniquement pour ce test.
 Conserver **Native Wallpaper Probe** comme retour au build 3 déjà observé.
@@ -53,8 +55,8 @@ Dans le contexte de développement déjà autorisé, une sonde ponctuelle sans n
 de fichiers observe le fond Finder comme
 `AXGroup → AXScrollArea → AXApplication` et les icônes comme
 `AXImage → AXGroup → AXScrollArea → AXApplication`. Cette mesure prouve que les
-deux cibles sont distinguables sur cette session macOS 26.2. PKkhnQ est
-désormais lancé, mais la pression AX de sa tuile fait planter le panneau Apple
+deux cibles sont distinguables sur cette session macOS 26.2. La pression AX de
+la tuile v9 fait planter le panneau Apple
 avant l'acquisition d'une surface ; aucune signature n'est donc promue en
 production.
 
@@ -67,30 +69,51 @@ cadres entièrement contenus et non superposés, références d'actions valides,
 sept commandes exactes et unicité des identifiants.
 Un asset invalide n'est ni rendu ni présenté comme choix utilisable.
 
-La transmission utilise sept notifications Darwin nommées sans payload,
-idempotentes mais non authentifiées et sans garantie de livraison. Aucun shell,
+La transmission utilise sept requêtes Darwin et sept quittances nommées sans
+payload, idempotentes mais non authentifiées et sans garantie de livraison. Aucun shell,
 fichier utilisateur, réseau ou terminal réel n'est piloté. L'UI annonce
-« demande envoyée », pas « appliquée ». L'extension écrit `[Interaction] applied`
-dans son conteneur propre à réception ; aucune boucle de polling supplémentaire.
+« en attente », puis « appliqué par le wallpaper » seulement après quittance.
+L'extension écrit `[Interaction] applied` dans son conteneur propre avant la
+quittance ; aucune boucle de polling supplémentaire.
 L'absence de récepteur doit laisser le compagnon utilisable sans attendre.
 
-Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 22
-assertions commandes/états, 14 assertions d'asset, 6 assertions de hit-testing,
+Validation native : `bash pocs/macos-native-wallpaper/test.sh` réussit, 34
+assertions commandes/quittances/états, 14 assertions d'asset, 6 assertions de hit-testing,
 8 assertions de priorité macOS et 17 assertions sur les calques (pause
 idempotente, reprise, effet, reset, panneau unique, contrôles et ancres bornés,
-ancres toujours visibles, sélection soulignée et taille réduite), soit 67 contrôles.
+ancres toujours visibles, sélection soulignée et taille réduite), soit 79 contrôles.
 Le manifeste passe aussi son JSON Schema Draft 2020-12. Dispatch direct de test,
 pas de message envoyé au wallpaper actif et pas de fenêtre de test visible.
 Ces tests ne prouvent pas le transport Darwin à travers la sandbox, le rendu
-du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.PKkhnQ`
+du panneau par WallpaperAgent ni un clic réel. Le build complet `compile.9n1Dga`
 réussit avec deux avertissements amont déjà présents ; aucune notarisation revendiquée.
 Son hôte porte le SHA-256
-`399391e7ccc8fd5238d4c7e0433df5e4bf192b2446a2da4ee47cb1c413326e2c` et son
-extension `12ff651d1f9fe560bb159111d77c3da1409e2a40ad55bce112d7377d9e71c72a`.
+`5b54283e08cb6e82844c881318a921b4a053e2cfd243fab8e12fba85fc12ae64` et son
+extension `fca18f511ef32a59559badc20f6f8cf802d895ce02a5045e98bc395fd86235ac`.
 LaunchServices et pluginkit référencent ce chemin unique pour l'identité
 `controls` ; les anciens enregistrements interactifs ont été retirés sans
-supprimer leurs paquets. Le compagnon PID 77803 et l'extension PID 77832 ont été
-observés depuis PKkhnQ après interrogation du catalogue par macOS.
+supprimer leurs paquets. Le compagnon PID 64966 et l'extension PID 64974 ont été
+observés depuis 9n1Dga après interrogation du catalogue par macOS.
+
+Le journal v10 prouve deux contextes actifs pour l'écran 1, chacun en 1512×982,
+avec installation de `colorDiag` et mises à jour `default`/`idle`. Un clic réel
+sur le bouton compagnon « Ouvrir » a produit `[Interaction] applied showPanel
+roots=2`, puis l'UI a affiché « Appliqué par le wallpaper : Ouvrir. ». Les
+transitions pause, effet actif, reprise et reset ont ensuite toutes été
+appliquées à deux racines et la dernière quittance affichée. Cela qualifie le
+transport bidirectionnel et la mutation des calques du renderer actif ; cela ne
+qualifie toujours pas les clics directement dans le décor.
+Cette preuve est rejouable sans mutation avec :
+
+```sh
+bash pocs/macos-native-wallpaper/verify-runtime.sh \
+  'dist/pocs/macos-native-wallpaper/compile.9n1Dga/Native Wallpaper Probe.app'
+```
+
+Le gate passe 8 contrôles sur le PID 64974 : chemin isolé, enregistrement du
+provider, processus issus du paquet, sélection provider/scène, initialisation du
+PID, deux surfaces et cinq commandes appliquées. Il refuse les arguments absents
+avec le code 64 et les chemins externes avec le code 65.
 
 Le candidat g74ecK a été lancé et sa fenêtre AppKit, ses sept boutons ainsi que
 l'état « demande envoyée » ont été observés. Les Réglages ont affiché le groupe
@@ -112,10 +135,10 @@ emploie donc une nouvelle identité provider/groupe et la version 9 pour isoler
 le cache sans supprimer le choix historique.
 
 `verify-package.sh` permet de rejouer la qualification statique sur un paquet
-déjà construit sans l'exécuter. PKkhnQ passe ses 18 contrôles : emplacement isolé,
+déjà construit sans l'exécuter. 9n1Dga passe ses 19 contrôles : emplacement isolé,
 binaires présents, plist, identités, versions, extension point, manifeste et
 schéma identiques entre l'hôte et l'extension, miniature 480×270, nom/UUID de
-scène, identifiant de groupe compilé, signatures et sandbox.
+scène, identifiant de groupe et canal de quittance compilés, signatures et sandbox.
 Le vérificateur refuse un chemin extérieur au répertoire de builds du PoC et
 exige que la sandbox soit l'unique entitlement de l'extension.
 Le gate emploie des refus explicites, car Bash 3.2 ne propage pas `errexit` pour
@@ -125,19 +148,21 @@ Après enregistrement puis lancement de sZMB0b, Réglages Système affichait enc
 `Native Wallpaper Interactive → Balayage diagnostic` et `Index.plist` pointait
 vers nXn2Mw. Le nouvel identifiant v9 a forcé une seconde interrogation :
 Réglages affiche alors une entrée indépendante `Balayage interactif` et lance
-l'extension PKkhnQ. Cela qualifie la découverte du provider, pas son activation.
-Un `sky.click` par index Accessibilité sur la nouvelle tuile fait planter
+l'extension PKkhnQ. Lors du premier essai automatisé, cela qualifiait la
+découverte du provider, pas encore son activation. Un `sky.click` par index
+Accessibilité sur la nouvelle tuile a fait planter
 `com.apple.Wallpaper-Settings.extension` PID 77876 dans
 `AccessibilityButtonModifier` / `accessibilityPerformPress`, rapport
 `Wallpaper-2026-09-08-015333.ips`. Aucune trame `ACQUIRE` du renderer n'est
-observée et `Index.plist` reste inchangé : ce crash appartient au chemin de
+observée et `Index.plist` restait inchangé : ce crash appartient au chemin de
 pression AX du panneau Apple, avant la création de surface. Les clics coordonnés
-de l'automatisation n'ont pas activé la tuile. La sélection manuelle v9 reste la
-preuve suivante ; ne pas confondre ce défaut d'automatisation avec un échec du
-renderer.
+de l'automatisation n'ont pas activé la tuile. Une sélection ultérieure à
+07:45:33 a inscrit le provider `controls` et le chemin PKkhnQ dans `Index.plist`,
+puis créé deux surfaces. Le défaut AX est donc distinct du renderer, maintenant
+qualifié par l'activation v9 puis par l'exécution v10.
 La miniature du catalogue reste une image de diagnostic fixe et ne prouve pas
-les nouveaux états interactifs : transport, mise en veille et énergie restent
-à qualifier. Le test hors écran produit trois captures PNG 1200×780 : repos, panneau
+les nouveaux états interactifs : clics dans le décor, mise en veille et énergie
+restent à qualifier. Le test hors écran produit trois captures PNG 1200×780 : repos, panneau
 actif, puis panneau avec animation en pause et effet actif. Le test exige trois
 fichiers valides et byte-à-byte distincts ; leur revue visuelle confirme les
 transitions, les sept contrôles et les trois ancres sans troncature. Les ancres
@@ -147,12 +172,12 @@ sans faire disparaître les autres objets du décor.
 AGENTS.md, CLAUDE.md, hooks et clone amont inchangés ; aucun fichier supprimé.
 
 Archify architecture : 9/9 showcase, zéro erreur/avertissement. Source SHA-256
-`feb63eced5f18ba139fcbb86833c166d8f4f1a1ffff58b14c2647d5505da4776` ; HTML
-`d6419d66cb2ec653bfba4184ceba33ee368ea7294b00a2969657f9a0511c414c`.
+`466b11eee9aada76b7138f096428b85bacbe293b58407381c10d8afa516abf1c` ; HTML
+`e944a4906406cd677f210bcf1b440f8ba1925faf2297100c6724a8257cab7cb1`.
 Artefact `dist/architecture/macos-native-wallpaper.architecture.html` ; quatre
 tailles sans débordement, capture sombre 2048×1320 inspectée : hiérarchie,
-relations, gate statique, cache de catalogue et libellés lisibles, sans collision
-visible. Libellés français, interface fixe du visualiseur en anglais.
+relations, gate statique, cache de catalogue, requêtes et quittance lisibles,
+sans collision visible. Libellés français, interface fixe du visualiseur en anglais.
 
 ## Paquet animé précédent conservé
 

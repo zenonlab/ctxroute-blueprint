@@ -2,10 +2,13 @@ import AppKit
 
 @MainActor
 final class HostControls: NSObject, NSApplicationDelegate {
+    nonisolated(unsafe) private static weak var active: HostControls?
     private var window: NSWindow?
     private let status = NSTextField(wrappingLabelWithString: "Aucune commande envoyée. Le fond interactif doit être sélectionné séparément.")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.active = self
+        observeReceipts()
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 490, height: 420),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Commandes du wallpaper · essai"
@@ -44,7 +47,25 @@ final class HostControls: NSObject, NSApplicationDelegate {
         guard let id = sender.identifier?.rawValue, let command = DiagnosticCommand(rawValue: id) else { return }
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
             CFNotificationName(command.notification as CFString), nil, nil, true)
-        status.stringValue = "Demande envoyée : \(sender.title). Réception non confirmée ; vérifier le décor."
+        status.stringValue = "Demande envoyée : \(sender.title). En attente de l’extension…"
+    }
+
+    private func observeReceipts() {
+        for command in DiagnosticCommand.allCases {
+            let receipt = DiagnosticReceipt(command)
+            CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), nil,
+                { _, _, name, _, _ in
+                    guard let name, let receipt = DiagnosticReceipt(notification: name.rawValue as String) else { return }
+                    DispatchQueue.main.async {
+                        HostControls.active?.confirm(receipt.command)
+                    }
+                }, receipt.notification as CFString, nil, .coalesce)
+        }
+    }
+
+    private func confirm(_ command: DiagnosticCommand) {
+        let label = (try? DiagnosticTheme.load().actions.first { $0.command == command }?.label) ?? command.rawValue
+        status.stringValue = "Appliqué par le wallpaper : \(label)."
     }
 
     @objc private func openSettings() {

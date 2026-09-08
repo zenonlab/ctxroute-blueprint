@@ -39,6 +39,10 @@ enum InteractiveDiagnostic {
         roots.removeAll { $0.layer == nil }
         for root in roots { if let layer = root.layer { render(layer) } }
         extensionLog("[Interaction] applied \(command.rawValue) roots=\(roots.count)")
+        guard !roots.isEmpty else { return }
+        let receipt = DiagnosticReceipt(command)
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(receipt.notification as CFString), nil, nil, true)
     }
 
     private static func render(_ root: CALayer) {

@@ -81,7 +81,7 @@ ne remplace ni l'enregistrement ni le processus déjà qualifié.
 Sa scène emploie aussi un UUID distinct du diagnostic animé précédent : les
 descripteurs de choix de WallpaperAgent ne doivent jamais partager l'identité
 de contenu entre deux fournisseurs.
-Le groupe de Réglages porte également un identifiant propre
+Le premier groupe isolé de Réglages portait l'identifiant propre
 `native-wallpaper-interactive`. Réutiliser l'identifiant amont
 `video-wallpapers` provoque une fusion entre fournisseurs dans WallpaperAgent,
 associe la mauvaise tuile au nouveau groupe et empêche de qualifier le lancement.
@@ -103,6 +103,20 @@ le panneau Apple dans `AccessibilityButtonModifier` avant tout `ACQUIRE` de notr
 extension. La qualification doit employer un clic utilisateur physique et
 contrôler ensuite le provider inscrit dans `Index.plist`; un test AX ne peut pas
 être présenté comme équivalent sur cette version du système.
+
+La version 10 conserve l'identité `controls` et ajoute le canal de quittance
+`org.wallpaperthemes.nativeprobe.controls.receipt.*`. L'extension n'émet une
+quittance qu'après application de la commande à au moins une racine de rendu
+vivante. Le compagnon affiche « en attente » après l'envoi, puis « appliqué par
+le wallpaper » à réception. Cette notification sans payload n'est ni
+authentifiée ni persistante : elle sert de preuve diagnostique de bout en bout,
+jamais d'autorisation de sécurité.
+La sélection ultérieure a inscrit le provider `controls` dans `Index.plist`.
+Après remplacement enregistré par v10, WallpaperAgent a créé deux contextes
+1512×982 et le renderer y a installé ses calques. Les commandes `showPanel`,
+`pause`, `effectOn`, `resume` et `reset` ont été appliquées à deux racines ; le
+compagnon a reçu leurs quittances. L'activation et le transport bidirectionnel
+sont donc qualifiés, contrairement au clic direct dans le décor.
 
 Un compagnon AppKit expose sept commandes explicites : ouvrir/fermer un panneau
 dans les calques du fond, pause/reprise, effet activé/désactivé et réinitialisation.
