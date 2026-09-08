@@ -9,6 +9,10 @@ connector_register="/System/Library/Frameworks/CoreServices.framework/Frameworks
 connector_identity="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_source/Contents/Info.plist")"
 test "$connector_identity" = org.wallpaperthemes.connectorpoc2
 codesign --verify --deep --strict "$connector_source"
+if launchctl print "gui/$(id -u)/org.wallpaperthemes.connectorpoc2.agent" >/dev/null 2>&1; then
+  echo 'Agent registered: stop the exact connector job before replacing its package.' >&2
+  exit 2
+fi
 bash "$connector_root/pocs/macos-connector/test-native.sh" "$connector_source"
 "$connector_source/Contents/MacOS/WallpaperConnector" --preflight-install
 mkdir -p "$HOME/Applications/Wallpaper Themes" "$connector_root/dist/pocs/macos-connector"

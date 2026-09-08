@@ -102,6 +102,15 @@ codes 64/65 distinguent un appel invalide d'un chemin hors périmètre.
 Les résultats réellement obtenus sont consignés dans la
 [note de reprise](session-handoff.md).
 
+Pour le PoC2, ADR-0053 remplace le transport fichiers/Darwin par XPC nommé : le
+critère reste la quittance corrélée du provider courant, pas l'envoi d'un message.
+`swift test --package-path pocs/macos-connector --scratch-path dist/pocs/macos-connector/swift-build`
+couvre modèle, gestes purs et limites d'enveloppe. `build.sh` vérifie catalogue
+Apple, signatures et manifestes des trois bundles. La preuve native doit ajouter
+pause/reprise, perte/reconnexion du lien et refus d'un pair de signature étrangère.
+Ces essais restent distincts de la visibilité réelle, de la priorité Finder et
+des mesures énergétiques ; les scripts du PoC1 ci-dessus ne qualifient pas le PoC2.
+
 ## Scénarios d'acceptation produit
 
 Les [épreuves I01–I10](architecture/theme-interactions.md#tranche-de-validation-et-limites)

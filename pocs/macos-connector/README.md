@@ -4,7 +4,53 @@ Une app AppKit de contrôle, une extension wallpaper native, un catalogue origin
 Pas de fenêtre de décor superposée, de terminal, de ROM, de WebView, de hook souris
 ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
 
-## Statut et limites
+## Statut courant — XPC natif, 8 septembre 2026
+
+Le transport actif est désormais **XPC signé en mémoire**, selon
+[ADR-0053](../../docs/decisions/ADR-0053-macos-provider-xpc.md). Les passages App Group
+ci-dessous décrivent les sondes historiques ; le runtime ne lit plus leurs fichiers.
+Le build ad hoc `build.ov2G03` est installé : inspection, pause, reprise, accentuation
+et atténuation ont reçu des quittances du vrai provider macOS (deux surfaces,
+révisions 1 à 6). Aucun certificat développeur utilisé. Cela ne prouve pas encore
+l'effet visuel, les clics, Spaces ou la consommation. Les deux contrôles du thème
+et les gestes gauche/droite restent non raccordés au bureau.
+
+Le paquet contient trois bundles signés dans l'ordre agent → provider → lanceur.
+L'agent est le connecteur, pas un démon supplémentaire. Le provider garde sa sandbox
+avec une seule exception Mach lookup pour `org.wallpaperthemes.connectorpoc2.agent`.
+L'agent contrôle l'UID et impose la signature du provider embarqué ; le provider impose
+celle de l'agent épinglée dans ses ressources. JSON limité à 16 KiB, invariants de
+commandes inchangés. Une connexion provider à la fois. Le refus d'un pair étranger
+reste à tester. Après rupture, une reconnexion est tentée après 30 secondes : aucune
+promesse de zéro réveil lorsque l'agent est arrêté.
+
+Après installation, enregistrer explicitement l'agent pour **cette session utilisateur** :
+
+```sh
+bash pocs/macos-connector/start-agent.sh '/Users/hazenawsky/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app'
+```
+
+Adapter le chemin au compte local. Aucun plist installé dans `LaunchAgents`, aucun
+démarrage à la prochaine ouverture de session promis. L'agent reste sans fenêtre ;
+diagnostic à la demande dans la barre des menus. Ajouter `--diagnostics` à la commande
+ci-dessus uniquement pour ouvrir ce panneau technique lors d'un test. Le lanceur
+extérieur sans argument demande seulement le démarrage du job déjà enregistré.
+Ses anciens `--check` et `--probe-mailbox` sont des sondes App Group, **pas un état XPC**.
+Les anciens `--diagnostics`/`--smoke` s'appliquent au binaire agent avec `--agent`,
+pas au lanceur extérieur. Le build normal suffit pour XPC ad hoc ; `--development`
+ne sert plus qu'à autoriser les sondes historiques de groupe local.
+
+Arrêt avant remplacement :
+
+```sh
+launchctl bootout gui/$(id -u)/org.wallpaperthemes.connectorpoc2.agent
+```
+
+L'installation refuse un job encore enregistré et conserve l'ancien paquet.
+Fermer le diagnostic ne quitte pas l'agent. Le provider reste indépendant.
+Swift 6 strict, signature et catalogue natif passent ; le total est de 23 XCTest.
+
+## Historique du transport App Group et limites de la première tranche
 
 Le lancement normal ne montre plus de fenêtre et ne vole pas le focus : le
 connecteur réside dans la barre des menus. « Diagnostic du connecteur… » ouvre
@@ -58,11 +104,11 @@ des interfaces privées : ni stabilité Apple ni distribution App Store garantie
 | --- | --- |
 | `Sources/ThemeModel` | manifeste canonique, validation, actions, état, quittances |
 | `Sources/SceneRenderer` | arbre Core Animation par surface ; aucune NSWindow |
-| `Sources/ConnectorTransport` | fichiers JSON atomiques bornés et notifications de réveil |
-| `App` | une fenêtre de contrôle et états indisponible/en attente/confirmé |
+| `Sources/ConnectorTransport` | XPC borné, signatures ; sondes fichiers historiques |
+| `App` | agent XPC, diagnostic à la demande et états indisponible/en attente/confirmé |
 | `Native` | catalogue Apple, surfaces, cycle de vie, validation du client XPC |
 | `Native/Bridge` | déclarations et shims Phosphene, licence MIT conservée |
-| `Packaging` | identités et droits des deux bundles |
+| `Packaging` | identités et droits du lanceur, de l'agent et du provider |
 | `Tests` | modèle, idempotence, transport fichiers et arbre de calques |
 
 Le provider possède une session d'état par `theme_id`, partagée seulement entre les

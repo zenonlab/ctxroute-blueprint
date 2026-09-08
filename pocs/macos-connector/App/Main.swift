@@ -1,6 +1,7 @@
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
+import os
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
@@ -42,6 +43,17 @@ import UniformTypeIdentifiers
             catch { print(error.localizedDescription); exit(2) }
             return
         }
+        if !CommandLine.arguments.contains("--agent") {
+            let launch = Process()
+            launch.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            launch.arguments = ["kickstart", "gui/\(getuid())/\(NativeWire.service)"]
+            try launch.run(); launch.waitUntilExit()
+            if launch.terminationStatus != 0 { print("Agent absent : exécuter start-agent.sh sur le paquet installé."); exit(2) }
+            return
+        }
+        guard Bundle.main.bundleIdentifier == "org.wallpaperthemes.connectorpoc2.agent" else {
+            print("Utiliser l’agent embarqué enregistré, pas le lanceur en mode agent."); exit(2)
+        }
         let app = NSApplication.shared
         if let id = Bundle.main.bundleIdentifier,
            let existing = NSRunningApplication.runningApplications(withBundleIdentifier: id)
@@ -69,11 +81,9 @@ import UniformTypeIdentifiers
     let themes: [Theme]
     var theme: Theme { themes[themePicker.indexOfSelectedItem >= 0 ? themePicker.indexOfSelectedItem : 0] }
     let themePicker = NSPopUpButton()
-    let mailbox: Mailbox?
-    let transportFailure: String?
+    let transport: AgentTransport
     var window: NSWindow!
     var statusItem: NSStatusItem?
-    var signal: WakeSignal?
     var observed: ProviderStatus?
     var pending: Command?
     var timeout: Task<Void, Never>?
@@ -82,8 +92,7 @@ import UniformTypeIdentifiers
     var effectButton: NSButton!
     init(themes: [Theme]) {
         self.themes = themes
-        do { mailbox = try Mailbox.shared(); transportFailure = nil }
-        catch { mailbox = nil; transportFailure = error.localizedDescription }
+        transport = AgentTransport()
         super.init()
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -126,7 +135,7 @@ import UniformTypeIdentifiers
         statusMenu.addItem(.separator())
         statusMenu.addItem(withTitle: "Quitter le connecteur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         statusItem?.menu = statusMenu
-        if mailbox != nil { signal = WakeSignal(Mailbox.statusSignal) { [weak self] in self?.receive() } }
+        transport.onChange = { [weak self] in self?.receive() }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.refreshAndProbe() }
         }
@@ -153,6 +162,14 @@ import UniformTypeIdentifiers
         }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Stop the job as well, otherwise the provider would wake the agent again.
+        let stop = Process()
+        stop.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        stop.arguments = ["bootout", "gui/\(getuid())/\(NativeWire.service)"]
+        try? stop.run()
+        return .terminateNow
+    }
     @objc func wallpaperSettings() { open("x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") }
     @objc func desktopSettings() { open("x-apple.systempreferences:com.apple.Desktop-Settings.extension") }
     private func open(_ value: String) {
@@ -170,17 +187,17 @@ import UniformTypeIdentifiers
     }
     func refreshAndProbe() {
         guard pending == nil else { return }
-        do { observed = try mailbox?.status()?.theme(theme.theme_id) } catch { observed = nil }
+        observed = transport.status?.theme(theme.theme_id)
         setEnabled(false)
         if observed?.theme_id == theme.theme_id { send(.inspect) }
-        else { statusLabel.stringValue = transportFailure ?? "Aucun état reçu. Provider absent ou publication inaccessible : vérifier le diagnostic avant de changer le fond." }
+        else { statusLabel.stringValue = "Provider XPC absent. Aucune commande confirmée." }
     }
     func send(_ action: ThemeAction) {
-        guard pending == nil, let mailbox, let observed, observed.theme_id == theme.theme_id else { return }
+        guard pending == nil, let observed, observed.theme_id == theme.theme_id else { return }
         let command = Command(theme: theme.theme_id, instance: observed.instance,
             generation: observed.generation, action: action)
         pending = command; setEnabled(false); statusLabel.stringValue = "En attente du provider…"
-        do { try mailbox.write(command) }
+        do { try transport.send(command) }
         catch { pending = nil; statusLabel.stringValue = "Échec du transport. Aucun succès confirmé."; return }
         timeout?.cancel()
         timeout = Task { @MainActor [weak self] in
@@ -191,7 +208,10 @@ import UniformTypeIdentifiers
         }
     }
     func receive() {
-        guard let result = try? mailbox?.status()?.theme(theme.theme_id) else { return }
+        guard let result = transport.status?.theme(theme.theme_id) else {
+            observed = nil; pending = nil; timeout?.cancel(); setEnabled(false)
+            statusLabel.stringValue = "Provider XPC déconnecté. État inconnu."; return
+        }
         observed = result
         guard let pending else {
             // A status publication alone does not prove current liveness.
@@ -206,6 +226,8 @@ import UniformTypeIdentifiers
         effectButton.title = result.state.highlighted ? "Atténuer" : "Accentuer"
         setEnabled(result.surfaces > 0)
         statusLabel.stringValue = "Confirmé par le provider · \(result.surfaces) surface(s) · révision \(result.generation)"
+        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+            "XPC receipt confirmed action=\(pending.action.rawValue, privacy: .public) surfaces=\(result.surfaces) generation=\(result.generation)")
     }
     func setEnabled(_ enabled: Bool) {
         pauseButton?.isEnabled = enabled && theme.motion_path != "still"

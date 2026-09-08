@@ -29,8 +29,7 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     let themes: [Theme]
     var sessions: [String: Session]
     var surfaces: [UUID: Surface] = [:]
-    let mailbox: Mailbox?
-    var signal: WakeSignal?
+    var transport: ProviderTransport?
     var screenSleeping = false
     var sessionInactive = false
     var sleeping: Bool { screenSleeping || sessionInactive }
@@ -38,9 +37,6 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     init() {
         themes = (try? Theme.catalog()) ?? []
         sessions = Dictionary(uniqueKeysWithValues: themes.map { ($0.theme_id, Session(themeID: $0.theme_id)) })
-        do { mailbox = try Mailbox.shared() }
-        catch { mailbox = nil; extensionLog("App Group unavailable: \(error.localizedDescription)") }
-        if mailbox != nil { signal = WakeSignal(Mailbox.commandSignal) { [weak self] in self?.receive() } }
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
                      NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
@@ -56,29 +52,26 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
                 }
             }
         }
+        transport = ProviderTransport(execute: { [weak self] command in self?.receive(command) },
+            snapshot: { [weak self] in self?.catalogStatus() })
         publish()
     }
-    func publish(_ receipt: Receipt? = nil) {
-        do {
-            let states = themes.compactMap { theme -> ProviderStatus? in
-                guard let session = sessions[theme.theme_id] else { return nil }
-                return ProviderStatus(session: session,
-                    surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count,
-                    receipt: receipt?.command.theme_id == theme.theme_id ? receipt : nil)
-            }
-            try mailbox?.write(CatalogStatus(themes: states))
+    func catalogStatus() -> CatalogStatus {
+        let states = themes.compactMap { theme -> ProviderStatus? in
+            guard let session = sessions[theme.theme_id] else { return nil }
+            return ProviderStatus(session: session,
+                surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count)
         }
-        catch { extensionLog("Cannot publish provider status") }
+        return CatalogStatus(themes: states)
     }
-    func receive() {
-        do {
-            guard let command = try mailbox?.command() else { publish(); return }
-            guard var session = sessions[command.theme_id] else { return }
-            let receipt = session.apply(command)
-            sessions[command.theme_id] = session
-            if receipt.status == .applied { apply() }
-            publish(receipt)
-        } catch { extensionLog("Invalid command rejected") }
+    func publish() { transport?.publish(catalogStatus()) }
+    func receive(_ command: Command) -> CatalogStatus? {
+        guard var session = sessions[command.theme_id] else { return nil }
+        let receipt = session.apply(command)
+        sessions[command.theme_id] = session
+        if receipt.status == .applied { apply() }
+        extensionLog("XPC command=\(command.action.rawValue) result=\(receipt.status.rawValue) generation=\(session.generation)")
+        return catalogStatus()
     }
     func apply() {
         for surface in surfaces.values {

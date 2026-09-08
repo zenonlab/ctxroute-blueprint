@@ -15,7 +15,7 @@ import AppKit
             guard pair.count == 2, let pid = Int32(pair[0]), pid != ProcessInfo.processInfo.processIdentifier else { return nil }
             return pair[1].trimmingCharacters(in: .whitespaces)
         }
-        let conflicts = LaunchPolicy.conflicts(paths: paths, installing: installing, appPath: Bundle.main.bundlePath)
+        let conflicts = LaunchPolicy.conflicts(paths: paths, installing: installing, appPath: NativeWire.appBundle.path)
         guard conflicts.isEmpty else {
             throw NSError(domain: "ConnectorPreflight", code: 1, userInfo: [NSLocalizedDescriptionKey:
                 "Prototype concurrent : \(Set(conflicts.map { URL(fileURLWithPath: $0).lastPathComponent }).sorted().joined(separator: ", ")). Quitter les compagnons et choisir un fond macOS avant de retirer les anciens providers. Aucun processus arrêté."])

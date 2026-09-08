@@ -35,6 +35,7 @@ for connector_role in App Extension; do
 done
 connector_app="$connector_stage/Wallpaper Connector PoC 2.app"
 connector_extension="$connector_app/Contents/Extensions/WallpaperProvider.appex"
+connector_agent="$connector_app/Contents/Library/LoginItems/Wallpaper Connector Agent.app"
 connector_sdk="$(env -u SDKROOT xcrun --sdk macosx --show-sdk-path)"
 connector_arch="$(uname -m)"
 mkdir -p "$connector_app/Contents/MacOS" "$connector_app/Contents/Resources" \
@@ -50,6 +51,7 @@ connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
   "$connector_source/Sources/ThemeModel/LaunchPolicy.swift"
   "$connector_source/Sources/SceneRenderer/Scene.swift"
   "$connector_source/Sources/ConnectorTransport/Mailbox.swift")
+connector_shared+=("$connector_source/Sources/ConnectorTransport/NativeXPC.swift")
 connector_flags=(-sdk "$connector_sdk" -target "$connector_arch-apple-macos26.0"
   -swift-version 6 -warnings-as-errors -parse-as-library -O
   -module-cache-path "$connector_base/module-cache")
@@ -58,6 +60,17 @@ if [[ "$connector_development" == true ]]; then
 fi
 env -u SDKROOT xcrun swiftc "${connector_flags[@]}" "${connector_shared[@]}" \
   "$connector_source"/App/*.swift -o "$connector_app/Contents/MacOS/WallpaperConnector"
+mkdir -p "$connector_agent/Contents/MacOS" "$connector_agent/Contents/Resources"
+cp "$connector_app/Contents/MacOS/WallpaperConnector" "$connector_agent/Contents/MacOS/WallpaperConnector"
+cp "$connector_app/Contents/Info.plist" "$connector_agent/Contents/Info.plist"
+cp "$connector_app/Contents/Resources/"*.json "$connector_agent/Contents/Resources/"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier org.wallpaperthemes.connectorpoc2.agent' "$connector_agent/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleName Wallpaper Connector Agent' "$connector_agent/Contents/Info.plist"
+codesign --sign "$connector_identity" --entitlements "$connector_stage/App.entitlements" "$connector_agent"
+codesign -dr - "$connector_agent" 2>&1 | sed -n 's/^# designated => //p; s/^designated => //p' > "$connector_extension/Contents/Resources/agent-requirement.txt"
+test -s "$connector_extension/Contents/Resources/agent-requirement.txt"
+connector_agent_requirement="$(< "$connector_extension/Contents/Resources/agent-requirement.txt")"
+codesign --verify --strict --test-requirement "=$connector_agent_requirement" "$connector_agent"
 "$connector_app/Contents/MacOS/WallpaperConnector" --thumbnails "$connector_extension/Contents/Resources"
 env -u SDKROOT xcrun swiftc "${connector_flags[@]}" -module-name WallpaperProvider \
   -import-objc-header "$connector_source/Native/Bridge/WallpaperExtension-Bridging-Header.h" \
@@ -68,7 +81,7 @@ codesign --sign "$connector_identity" --entitlements "$connector_stage/Extension
 codesign --sign "$connector_identity" --entitlements "$connector_stage/App.entitlements" "$connector_app"
 codesign --verify --deep --strict "$connector_app"
 if [[ -n "$connector_team" ]]; then
-  for connector_bundle in "$connector_app" "$connector_extension"; do
+  for connector_bundle in "$connector_app" "$connector_agent" "$connector_extension"; do
     connector_actual_team="$(codesign -dv "$connector_bundle" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
     if [[ "$connector_actual_team" != "$connector_team" ]]; then
       echo 'Signed Team ID differs from requested team; do not install this build.' >&2
@@ -86,5 +99,6 @@ plutil -lint "$connector_app/Contents/Info.plist" "$connector_extension/Contents
 for connector_manifest in "$connector_source"/Sources/ThemeModel/Resources/*.json; do
   connector_name="$(basename "$connector_manifest")"
   cmp "$connector_app/Contents/Resources/$connector_name" "$connector_extension/Contents/Resources/$connector_name"
+  cmp "$connector_app/Contents/Resources/$connector_name" "$connector_agent/Contents/Resources/$connector_name"
 done
 echo "$connector_app"

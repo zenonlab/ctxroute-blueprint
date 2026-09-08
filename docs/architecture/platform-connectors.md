@@ -79,11 +79,13 @@ App Store ni une garantie sur une future version de macOS.
 
 Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
 signature et packaging. L'observation globale des clics est une capacité optionnelle.
-Le transport App Group du PoC2 distingue le mode strict, avec identité explicite et
-groupe préfixé par son Team ID, du mode de développement ad hoc compilé explicitement.
-Ce dernier utilise un groupe local isolé, conserve la sandbox et laisse macOS décider
-de l'accès. Les deux modes vérifient leurs droits ; l'accès du provider et sa quittance
-restent à éprouver séparément de la sonde CLI sandboxée.
+Le transport courant utilise un agent XPC nommé, enregistré pour la session utilisateur,
+et un provider sandboxé avec exception de recherche Mach limitée à ce service.
+Les signatures sont épinglées mutuellement ; ni PID ni bundle ID seul ne constitue
+l'identité de confiance. [ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md) remplace
+l'essai App Group, dont la sonde CLI réussissait mais le provider hébergé échouait.
+Les premières quittances natives ad hoc sont observées ; aucun succès de gestes,
+de cycle Spaces ou de distribution signée n'est déduit de ce transport.
 Sans classification certaine de la cible Finder, il ne consomme aucun clic.
 La visibilité des éléments du bureau est proposée dans les réglages macOS récents,
 mais aucun réglage interne tel que `CreateDesktop` n'est promu en API produit avant
@@ -181,7 +183,7 @@ chaque élément réutilisé devra avoir un propriétaire, une interface et un t
 Qualifier la première tranche du [PoC macOS 2](../pocs/macos-connector-poc2.md),
 implémentée dans `pocs/macos-connector/` avec un manifeste canonique et un panneau
 AppKit unique. [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md) borne
-son transport expérimental App Group et son provider privé macOS 26. Les connecteurs Windows
+son provider privé macOS 26 ; ADR-0053 décrit le transport XPC actuel. Les connecteurs Windows
 et Linux ne commencent qu'après stabilisation du contrat commun, sans réutiliser les
 primitives macOS.
 
@@ -194,8 +196,8 @@ manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et rel
 sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-Le connecteur macOS distingue désormais le lancement discret du diagnostic ouvert
-à la demande. Ce correctif ne qualifie ni les commandes natives ni les gestes.
+Le diagramme situe le lien agent ↔ provider XPC signé dans le connecteur macOS.
+Le lancement reste discret, le diagnostic à la demande ; les gestes restent non qualifiés.
 
-SHA-256 de la source : `103683ec28ead919a3c36bb66e7a0aee013fbb8d797331989561da46bce9e6aa`.
-SHA-256 de l'artefact : `c959e87994257a4152e707b47bd4f471035d1628c7f92c5f63e74a486291cc17`.
+SHA-256 de la source : `2711f19dc38f42737f45fb7388cd0e0cc5dc71d466a1b4dd4836c47e826c019b`.
+SHA-256 de l'artefact : `67f597dc5527f7285d7e4cec7a298658c32481479346ff18dabe4a6ae46ceb0d`.

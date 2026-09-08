@@ -1,6 +1,53 @@
 # Reprise de session — Wallpaper
 
-## État courant — retrait du panneau automatique, 8 septembre 2026
+## État courant — transport natif débloqué, 8 septembre 2026
+
+Demande produit inchangée : aucune modal de connecteur au lancement ; deux contrôles
+en haut à gauche ; gauche = ouvrir/lancer ; droite = personnaliser, ou ajouter sur
+vide confirmé. **Ces contrôles et gestes du bureau ne sont pas encore raccordés.**
+
+Le refus System Policy App Group du provider est contourné architecturalement par
+un canal XPC nommé, sans retirer la sandbox et sans demander de certificat développeur.
+Voir ADR-0053. Agent signé avant provider, exigence de signature embarquée, lanceur
+signé en dernier. JSON borné en mémoire, pas de fichiers runtime ni signaux Darwin.
+Exception Mach lookup limitée à `org.wallpaperthemes.connectorpoc2.agent`.
+
+Build installé : `dist/pocs/macos-connector/build.ov2G03/Wallpaper Connector PoC 2.app`.
+Destination : `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
+L'agent est dans `Contents/Library/LoginItems/Wallpaper Connector Agent.app`.
+Anciennes apps conservées dans `replaced.FhW9oW` et `replaced.pPrTxV`, sous `dist/pocs/macos-connector`.
+Aucun fichier supprimé, aucun réglage Finder modifié, aucun service Apple arrêté.
+
+Preuve native : Orbite sélectionné, provider 49895, deux surfaces. Le diagnostic
+explicite de l'agent 49867 a reçu inspection, pause, reprise, accentuation et atténuation
+(révisions 1 à 6). Les changements de libellés et les quittances sont observés dans
+l'arbre AX ; les journaux natifs confirment les commandes. Cela ne prouve pas l'effet
+visible sur le bureau : la capture Finder a échoué `cgWindowNotFound`.
+
+Job relancé sans diagnostic : agent 50546, provider 49895 inchangé.
+Plist éphémère : `dist/pocs/macos-connector/agent.YtVFl4/agent.plist`.
+Arrêt exact : `launchctl bootout gui/501/org.wallpaperthemes.connectorpoc2.agent`.
+Relance : `bash pocs/macos-connector/start-agent.sh` suivi du chemin installé.
+Pas de plist dans LaunchAgents ni démarrage automatique à la prochaine session.
+Le lanceur extérieur sans argument démarre le job déjà enregistré ; les sondes
+`--check`/`--probe-mailbox` concernent l'ancien App Group, pas la disponibilité XPC.
+
+23 XCTest passent (Swift 6), catalogue Apple trois thèmes et signatures vérifiés.
+Reconnexion confirmée à 17:53:58 : même provider, nouvel agent, inspection révision 7
+et quittance corrélée dans les deux journaux. L'inspection AX de l'agent sans fenêtre
+expire (`timeoutReached`) ; ne pas en déduire un crash ni une preuve visuelle.
+À poursuivre : pair étranger refusé, contrôle visuel natif,
+puis étagère et gestes avec priorité Finder. Aucun succès complet du PoC2 annoncé.
+
+Audit de cette étape : CONFORME — 23 XCTest, build strict et catalogue natif,
+`npm run verify` code 0, diff vérifié, aucune suppression, doctrine/hooks inchangés.
+Archify connecteurs : showcase 9/9, zéro erreur/avertissement, containment quatre
+résolutions ; captures sombres 1440×900 et 2048×1320 inspectées, reçus dans
+`architecture/platform-connectors.md`. MANQUE — test négatif de signature,
+preuve visuelle du lancement discret, gestes/contrôles Finder et énergie.
+N/A — nouvelle bibliothèque externe, persistance ROM/terminal ou changement PoC1.
+
+## Historique — retrait du panneau automatique, 8 septembre 2026
 
 Retour utilisateur : le panneau technique ne remplace ni les deux contrôles en haut
 à gauche, ni le clic gauche d'action, ni le clic droit de personnalisation/ajout.

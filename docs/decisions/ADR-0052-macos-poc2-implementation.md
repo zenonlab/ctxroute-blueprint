@@ -15,6 +15,11 @@ revised: true
 - Status: accepted
 - Date: 2026-09-08
 
+Le transport App Group décrit ici est historique depuis
+[ADR-0053](ADR-0053-macos-provider-xpc.md) : le runtime utilise désormais XPC nommé.
+Les sondes App Group restent explicites, sans repli runtime vers leurs fichiers.
+Les autres décisions de cette fiche sont conservées.
+
 ## Context
 
 Le deuxième PoC doit rendre les frontières ADR-0049 à ADR-0051 exécutables sans

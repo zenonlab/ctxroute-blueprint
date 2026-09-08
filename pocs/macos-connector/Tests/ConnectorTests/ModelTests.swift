@@ -4,6 +4,24 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testNativeWireRoundTripAndBounds() throws {
+        let command = Command(theme: "test", instance: UUID(), generation: 3, action: .pause)
+        XCTAssertEqual(try NativeWire.decode(Command.self, from: NativeWire.encode(command)), command)
+        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data()))
+        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data("{}".utf8)))
+        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data(repeating: 32, count: 16_385)))
+        XCTAssertThrowsError(try NativeWire.encode(String(repeating: "x", count: 16_384)))
+        XCTAssertThrowsError(try NativeWire.requirement(for: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+    }
+    func testProviderMachExceptionIsExactAndSandboxRemains() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Packaging/Extension.entitlements")
+        let plist = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: file), format: nil) as? [String: Any])
+        XCTAssertEqual(plist["com.apple.security.app-sandbox"] as? Bool, true)
+        XCTAssertEqual(plist["com.apple.security.temporary-exception.mach-lookup.global-name"] as? [String], [NativeWire.service])
+        XCTAssertNil(plist["com.apple.security.network.client"])
+        XCTAssertNil(plist["com.apple.security.network.server"])
+    }
     func testDevelopmentGroupRequiresExplicitModeAndAdHocSignature() throws {
         let groups = [Mailbox.localGroup]
         XCTAssertEqual(try Mailbox.sharedGroup(team: "", entitlements: groups,

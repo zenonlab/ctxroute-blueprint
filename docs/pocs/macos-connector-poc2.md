@@ -41,7 +41,7 @@ l'import 3D ou le rig dans le connecteur.
 | Adaptateur wallpaper | Swift/Objective-C + Core Animation | chemin déjà observé dans WallpaperAgent | non, API privée à qualifier |
 | Modèle de thème | JSON Schema + types Swift purs | manifeste unique et tests sans surface | format à stabiliser |
 | Rendu de fixture | Core Animation | preuve minimale sans introduire un moteur général | non |
-| Communication | fichiers atomiques App Group + signal Darwin sans payload | transport expérimental borné avec quittances corrélées | non |
+| Communication | XPC nommé agent utilisateur ↔ provider sandboxé, signatures épinglées | transport borné avec quittances corrélées ; ADR-0053 | non |
 | Tests | XCTest + scripts de package/runtime + gestes manuels | couvre logique, identité et comportement OS réel | oui comme stratégie locale |
 
 Le PoC2 n'introduit pas wgpu, Tauri, terminal natif ou FFI Rust. Ces choix seraient
@@ -127,7 +127,29 @@ compté ensemble.
 
 ## Conditions de sortie
 
-### Correctifs de revue — état courant
+### État courant — XPC natif, 8 septembre 2026, 17:49–17:53
+
+[ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md) remplace les fichiers App Group
+par un canal XPC nommé. Build `build.ov2G03` installé et signé ad hoc, sans certificat
+développeur. Sandbox conservée, exception Mach limitée au nom exact de l'agent.
+Agent 49867 et provider 49895 : inspection, pause, reprise, accentuation et atténuation
+ont produit des quittances corrélées pour deux surfaces, révisions 1 à 6. L'interface
+diagnostic est passée de Suspendre à Reprendre puis inversement, et d'Accentuer à
+Atténuer puis inversement. Ce n'est pas une preuve visuelle de l'animation du bureau.
+
+23 XCTest passent ; compilation Swift 6 stricte, catalogue Apple trois thèmes,
+signatures des trois bundles et manifeste identique vérifiés. Le diagnostic a été
+fermé puis le job relancé sans `--diagnostics` ; le provider 49895 est resté actif.
+L'arrêt/reprise du connecteur ne nécessite ni arrêt de Finder ni de WallpaperAgent.
+Job de développement limité à la session : aucun démarrage à la connexion suivante.
+
+M2-06 possède maintenant une preuve native de quittances, pas seulement des fichiers
+de tests. M2-04/05/07/10/11 restent non qualifiés : clics gauche/droite, deux contrôles
+du thème, Finder, effet visible, Spaces et énergie ne sont pas livrés par ce transport.
+La reconnexion à 17:53:58 est confirmée par inspection/quittance révision 7, même
+provider et nouvel agent 50546. Le refus d'un pair étranger reste à éprouver.
+
+### Historique — correctifs du transport App Group
 
 Le modèle conserve la dernière quittance 30 secondes ; les publications sans action
 ne l'effacent plus. Les mailboxes de test ont des notifications inactives par défaut.
