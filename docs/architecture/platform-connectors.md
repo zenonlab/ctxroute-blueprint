@@ -46,12 +46,20 @@ Le contrat conceptuel minimal comporte cinq groupes de capacités :
 - `Visibility`: annoncer visible, masqué, verrouillé, endormi ou inconnu ;
 - `Input`: passif, survol, région interactive ou interaction modale ;
 - `SystemAction`: présenter un panneau, focaliser une session ou demander une action
-  explicitement autorisée ;
+  explicitement autorisée, dont la visibilité des éléments du bureau lorsqu'elle est
+  qualifiée ;
 - `Lifecycle`: installation, activation, reprise, mise à jour et diagnostic.
 
 Chaque capacité est négociée à l'activation du thème. Une capacité absente ne doit
 jamais être simulée silencieusement. Le thème choisit un fallback déclaré, ou le
 connecteur refuse uniquement la fonction concernée.
+
+Les contrôles ont des noms portables, pas des implémentations portables. Par exemple,
+`desktop.items.visible` décrit l'intention commune de masquer ou montrer les éléments
+du bureau. Chaque connecteur publie `supported`, `unsupported` ou `unknown`, applique
+seulement après une action utilisateur, relit l'état lorsque possible et renvoie une
+quittance corrélée. Le contrôle est désactivé avec une explication si la plateforme
+ne possède pas de chemin qualifié.
 
 Le format de ce contrat doit rester indépendant du langage et versionné par schéma.
 Le PoC2 peut utiliser des types Swift générés ou écrits localement sans décider que
@@ -72,6 +80,9 @@ App Store ni une garantie sur une future version de macOS.
 Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
 signature et packaging. L'observation globale des clics est une capacité optionnelle.
 Sans classification certaine de la cible Finder, il ne consomme aucun clic.
+La visibilité des éléments du bureau est proposée dans les réglages macOS récents,
+mais aucun réglage interne tel que `CreateDesktop` n'est promu en API produit avant
+preuve d'observation, de restauration et de compatibilité sur la version qualifiée.
 
 ### Windows
 
@@ -79,6 +90,9 @@ Connecteur Win32 dédié. Il doit qualifier WorkerW/Explorer sur les versions ci
 sans considérer `WS_EX_TRANSPARENT` ou `HTTRANSPARENT` comme une garantie générale
 de traversée interprocessus. L'interactivité directe reste conditionnée par une preuve
 de priorité des icônes et du bureau natif.
+Windows expose le geste utilisateur « Afficher les éléments du Bureau », mais le
+connecteur doit encore qualifier un mécanisme programmatique supportable ; il ne doit
+pas simuler ce menu contextuel ni écrire une valeur interne sans test de restauration.
 
 ### Linux Wayland layer-shell
 

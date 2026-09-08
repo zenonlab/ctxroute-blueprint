@@ -119,10 +119,11 @@ compté ensemble.
 | M2-08 | Packaging | identités stables, signature reproductible, installation et désinstallation documentées sans suppression automatique |
 | M2-09 | Défaillance | app absente : wallpaper reste sûr ; extension absente : app explique la capacité manquante |
 | M2-10 | Revue visuelle | aucun plan visible devant Finder, aucune duplication de panneau, aucune disparition non expliquée |
+| M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
 
 ## Conditions de sortie
 
-Le PoC2 est réussi si M2-01 à M2-10 possèdent chacun une preuve datée et si les limites
+Le PoC2 est réussi si M2-01 à M2-11 possèdent chacun une preuve datée et si les limites
 de l'API wallpaper sont explicitement publiées. Un test automatisé ne remplace pas les
 gestes Finder, Spaces et Mission Control.
 

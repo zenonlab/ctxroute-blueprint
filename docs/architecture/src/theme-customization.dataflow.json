@@ -20,9 +20,10 @@
     { "id": "importer", "type": "backend", "label": "Pipeline d'import", "sublabel": "valide · convertit · trace", "stage": 1, "row": 2, "width": 150 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "capacités · licences · versions", "stage": 2, "row": 0, "width": 160 },
     { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets et dépendances", "stage": 2, "row": 2, "width": 160 },
-    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "objets · rigs · états · menus", "stage": 3, "row": 1, "width": 170 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "objets · rigs · états · menus", "stage": 3, "row": 0, "width": 170 },
+    { "id": "capabilities", "type": "security", "label": "Courtier de capacités", "sublabel": "support · consentement · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "animation · matériaux · effets", "stage": 4, "row": 0, "width": 160 },
-    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "menus · boutons · panneaux", "stage": 4, "row": 1, "width": 160 },
+    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "menus · contrôles système", "stage": 4, "row": 1, "width": 160 },
     { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
   ],
   "flows": [
@@ -31,9 +32,11 @@
     { "from": "recipe", "to": "resolver", "label": "slots et styles", "labelAt": [420, 200] },
     { "from": "importer", "to": "library", "label": "assets validés", "variant": "security", "labelAt": [420, 428] },
     { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
-    { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis" },
-    { "from": "runtime", "to": "renderer", "label": "objets et rigs", "variant": "emphasis" },
+    { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },
+    { "from": "runtime", "to": "renderer", "label": "objets et rigs", "variant": "emphasis", "labelAt": [855, 108] },
     { "from": "runtime", "to": "ui", "label": "menus et états", "labelAt": [925, 220] },
-    { "from": "runtime", "to": "connector", "label": "intentions autorisées", "variant": "security" }
+    { "from": "runtime", "to": "capabilities", "label": "intentions typées", "variant": "security", "labelAt": [745, 200] },
+    { "from": "capabilities", "to": "connector", "label": "actions autorisées", "variant": "security", "route": "straight", "labelAt": [855, 428] },
+    { "from": "capabilities", "to": "ui", "label": "état confirmé", "variant": "dashed" }
   ]
 }

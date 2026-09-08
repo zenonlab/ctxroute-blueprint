@@ -125,6 +125,13 @@ thème. L'implémentation actuelle utilise la préférence non documentée `Crea
 elle ne doit jamais être déclenchée au chargement ou par un test automatisé, et sa
 défaillance ne doit pas toucher aux fichiers.
 
+Dans le contrat cible, le thème appelle l'intention portable
+`SetDesktopItemsVisibility(bool)` depuis son étagère `system_controls`. Le courtier
+renvoie la capacité et l'état confirmés ; le connecteur macOS peut l'implémenter,
+la refuser ou l'annoncer indisponible. Le thème ne connaît jamais `CreateDesktop`,
+ne lance pas `defaults` et ne redémarre pas Finder lui-même. La même règle vaut pour
+Explorer, GNOME, KDE et tout autre shell.
+
 Le tap est suspendu avec la session ou les écrans sans faire disparaître ni
 recharger les objets du wallpaper. Un kart, personnage, bouton 2D ou projection
 d'un sous-maillage 3D utilise la même identité stable. La nature du renderer ne

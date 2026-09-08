@@ -261,6 +261,25 @@ surface transparente ne devient pas automatiquement traversable, et une surface
 traversable ne reçoit pas automatiquement les mouvements du pointeur.
 [Protocole wl_surface](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface-request-set_input_region).
 
+### Réglages exposés par l'étagère système
+
+Le contrat portable ne garantit pas une API OS commune. Il distingue les contrôles
+possédés par notre runtime et les demandes adressées au shell du bureau.
+
+| Intention | macOS | Windows | Wayland/X11 | Position produit |
+| --- | --- | --- | --- | --- |
+| Audio du thème | possédé par notre moteur audio | identique | identique | portable et garanti |
+| Mouvement, interactions, overlay, profil | possédés par le runtime | identique | identique | portables selon capacités du thème |
+| Éléments du bureau | réglage utilisateur documenté dans Desktop & Dock ; API programmable publique non sélectionnée | geste utilisateur documenté dans Affichage du bureau ; API programmable supportable non sélectionnée | dépend du shell/compositeur et de son gestionnaire d'icônes | capacité optionnelle par connecteur |
+| Volume maître | ne pas confondre avec l'audio du thème | EndpointVolume existe mais Microsoft réserve normalement le contrôle maître à l'utilisateur | dépend des serveurs audio et de la session | hors socle initial |
+
+Sources officielles consultées le 8 septembre 2026 :
+[réglages Bureau et Dock de macOS](https://support.apple.com/guide/mac-help/change-desktop-dock-settings-mchlp1119/26/mac/26),
+[afficher ou masquer les icônes Windows](https://support.microsoft.com/en-US/Windows/Experience/personalization/customize-the-desktop-icons-in-windows) et
+[contrôle de volume Windows](https://learn.microsoft.com/en-us/windows/win32/api/endpointvolume/nn-endpointvolume-iaudioendpointvolume).
+Ces pages prouvent l'existence de réglages utilisateur ou d'une API audio Windows ;
+elles ne prouvent pas un mécanisme programmatique portable pour les éléments du bureau.
+
 ### Bilan utilisable pour démarrer
 
 Les mécanismes candidats existent, mais aucune configuration n'a réussi B-O.

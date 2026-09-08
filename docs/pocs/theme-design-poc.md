@@ -18,6 +18,8 @@ La fixture est entièrement originale et contient :
 - un matériau, une texture, une icône et une police de test redistribuables ;
 - une piste ou scène simple avec quatre slots d'instances ;
 - un panneau de sessions avec bouton, liste, focus clavier et états d'activité ;
+- une étagère `system_controls` en haut à gauche par défaut, repliable et restylée
+  dans le langage visuel de la fixture ;
 - une animation déclenchée par le panneau et un événement de fin renvoyé à l'UI ;
 - un fallback 2D pour la ressource 3D absente.
 
@@ -44,6 +46,9 @@ Aucun asset commercial n'est nécessaire pour réussir D1.
 | D1-08 | scène statique sans timer ; systèmes invisibles suspendus |
 | D1-09 | décompte mémoire, frames et énergie incrémentale documenté |
 | D1-10 | rendu et menu forment une composition unique, sans panneau diagnostic du connecteur |
+| D1-11 | audio, motion, interactions et profil énergétique agissent dans le runtime sans commande OS brute |
+| D1-12 | contrôle desktop simulé suit pending/quittance/refus et ne ment jamais sur son état |
+| D1-13 | étagère déplacée/restylée reste dans la safe area et accessible ; retrait exige une déclaration explicite |
 
 ## Hors périmètre
 

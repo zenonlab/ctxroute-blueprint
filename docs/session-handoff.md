@@ -16,6 +16,11 @@ La personnalisation est cadrée séparément dans
 AppKit observés restent diagnostiques. D1 éprouvera objets riggés, UI stylée et
 résolution d'assets privés après stabilisation du manifeste M2-01.
 
+[ADR-0051](decisions/ADR-0051-theme-system-control-shelf.md) ajoute l'étagère de
+contrôles intégrée au thème : coin supérieur gauche par défaut, apparence libre,
+actions runtime portables et `desktop.items.visible` négocié avec état confirmé.
+Le toggle Finder historique ne doit pas être repris sans preuve de récupération.
+
 Mise à jour : 7 septembre 2026. Dépôt initialisé ; L1 implémenté isolément.
 
 ## Reprise actuelle — qualification native

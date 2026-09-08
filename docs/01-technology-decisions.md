@@ -60,6 +60,7 @@ Une recommandation doit être reliée à un parcours utilisateur et à une preuv
 | macOS PoC2 | Swift 6, AppKit/Core Animation, app connecteur et adaptateur wallpaper séparés | transport XPC/App Group, API de distribution viable |
 | UI | un panneau logique ; une seule présentation active | scène interactive ou app selon preuve d'entrée |
 | Personnalisation | slots typés, styles sémantiques et assets privés résolus localement | formats pivots et outil de création final |
+| Contrôles système | étagère sémantique stylable ; actions runtime portables et capacités OS négociées | mécanismes qualifiés de visibilité desktop par connecteur |
 | Rigs | squelette, bind pose et compatibilité conservés et qualifiés | bibliothèque/algorithme de retargeting |
 | Rendu partagé | interface d'hôte de scène sans type backend | wgpu, moteur existant ou assemblage spécialisé |
 | Terminal | processus et cycle de vie indépendants | stack native ou WebView après benchmark |

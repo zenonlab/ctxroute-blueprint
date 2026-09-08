@@ -2,6 +2,8 @@
 
 État au 8 septembre 2026 : **frontière produit acceptée, implémentation non commencée**.
 Décision : [ADR-0050](../decisions/ADR-0050-theme-customization-and-local-assets.md).
+Les contrôles système intégrés au thème sont précisés par
+[ADR-0051](../decisions/ADR-0051-theme-system-control-shelf.md).
 Le [flux Archify](src/theme-customization.dataflow.json) montre comment une création
 partageable se combine à des ressources privées importées localement.
 
@@ -92,6 +94,59 @@ Les valeurs peuvent être fournies par code ou par un futur studio. Le format ne
 pas de l'outil d'édition. Le contrat UI générique du blueprint n'est pas le thème du
 produit ; il sert seulement de garde initial pour l'interface de développement.
 
+## Étagère de contrôles système
+
+Chaque thème dispose d'une région sémantique `system_controls`. Sa position par défaut
+est le coin supérieur gauche dans une safe area tenant compte de l'écran, de l'échelle
+et des éléments système. Le thème peut changer son apparence, sa disposition, son
+animation, son état replié et même sa position. Il ne recode pas le comportement des
+capacités standard.
+
+Le socle initial expose :
+
+| Contrôle | Portée | Garantie |
+| --- | --- | --- |
+| `theme.audio.muted` | sons et musique du thème | portable, sans modifier le volume des autres apps |
+| `theme.motion.paused` | animations et simulations du thème | portable ; l'UI reste réveillable |
+| `theme.interaction.locked` | ancres et actions diégétiques | portable ; la récupération native reste accessible |
+| `theme.performance.profile` | économie, équilibré ou qualité | portable selon les profils réellement fournis |
+| `theme.overlay.visible` | panneaux et informations du thème | portable si un overlay est déclaré |
+| `desktop.items.visible` | fichiers/icônes gérés par le shell du bureau | capacité OS optionnelle et réversible |
+| `theme.settings.open` | panneau de réglages du thème | portable ; présentation adaptée au connecteur |
+
+Le mute standard concerne uniquement l'audio produit par le thème. Le volume maître
+du système est une action différente, intrusive pour les autres applications, et
+n'entre pas dans ce socle. Elle ne pourra être ajoutée que comme capacité explicite
+avec consentement et retour d'état propres à chaque OS.
+
+### État confirmé, jamais optimiste
+
+Une action suit `requested → pending → applied | rejected | unsupported | unknown`.
+Le bouton ne change son état final qu'après une quittance portant l'identifiant de la
+requête et la valeur relue. Une modification externe invalide l'affichage puis publie
+le nouvel état lorsque le connecteur sait l'observer. Timeout, redémarrage de Finder
+ou d'Explorer et changement de session ne valent jamais succès.
+
+`desktop.items.visible` ne s'exécute ni à l'installation, ni au chargement du thème,
+ni parce qu'une IA l'a placé dans une recette. Seule une action utilisateur confirmée
+peut le modifier. La préférence appartient à l'utilisateur et non au thème ; changer
+de thème ne la réinitialise pas. L'app connecteur conserve un contrôle natif de
+récupération indépendant du rendu pour rendre les éléments visibles si le thème ou
+son entrée échoue.
+
+### Contrat pour les auteurs et l'IA
+
+Le starter de thème instancie `system_controls` dès la création, au lieu de greffer
+des boutons après le design. Le générateur reçoit le catalogue de capacités, leurs
+états, leurs fallbacks et les composants sémantiques obligatoires avant d'écrire la
+scène. Le validateur signale une étagère hors écran, illisible, masquée sans autre
+chemin ou liée à une commande native brute.
+
+L'auteur garde le dernier mot : il peut réorganiser, remplacer la représentation ou
+déclarer un retrait explicite. Ce retrait est visible dans le manifeste et dans la
+review ; il ne peut pas être produit silencieusement par omission. Les thèmes officiels
+conservent au minimum audio, mouvement, verrouillage, profil énergétique et réglages.
+
 ## Symbiose avec un jeu sans fusion des contenus
 
 Un package partageable contient notre logique et des slots, par exemple :
@@ -123,6 +178,7 @@ Le manifeste canonique est organisé par domaines stables :
 | `scene` | instances, hiérarchie, caméra, éclairage et couches |
 | `ui` | tokens, composants, panneaux, navigation et accessibilité |
 | `bindings` | événements, conditions, actions, cibles et résultats |
+| `system_controls` | placement, style, ordre et présentation des capacités standard |
 | `capabilities` | fonctions requises, optionnelles et fallbacks |
 | `profiles` | budgets de rendu, animation, audio et qualité |
 | `provenance` | auteur, licences, versions, outils et contenu exportable |
@@ -173,7 +229,7 @@ ni avertissement. Le contrôle visuel passe à 1440×900, 1600×1000, 1920×1080
 2048×1320 en clair et sombre. La capture sombre 1440×900 a été inspectée : étapes,
 branches publique/privée et sorties de présentation sont lisibles sans collision.
 Source SHA-256 :
-`39241e96386dc174012cedad6bbad03c64ea2d18f76097009ab8da444f13cc24`.
+`bb74f68927eb3a44d9f64a47d760738e32c506598cef3f7666f5e249fc7901f0`.
 Artefact SHA-256 :
-`bdc9c2d2eeae9610f70df443336bd56e7edd9bcd12a621064554d10081ac4eaa`.
+`dc98a7cffd7ee389ccd0fc2c719527bdf42f4c53ad73096a82433b63fc03add6`.
 Les libellés sont en français ; l'interface fixe du viewer reste en anglais.

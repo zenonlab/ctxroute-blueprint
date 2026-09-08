@@ -79,6 +79,25 @@ adaptée, estimée ou indisponible, avec distinction entre preuve documentaire e
 preuve exécutée. Ces mots expriment la sémantique ; le schéma exécutable reste E3.
 Les sorties de l'IA sont non fiables tant qu'elles ne sont pas validées.
 
+### Contexte obligatoire avant génération d'un thème
+
+Le générateur reçoit avant toute écriture le starter canonique, le catalogue de
+capacités, les composants sémantiques, les safe areas et les politiques de repli.
+Il instancie l'étagère `system_controls` dans la composition initiale : ce n'est pas
+une surcouche ajoutée après que le thème a été dessiné.
+
+Le contrôle standard couvre le mute de l'audio du thème, la pause du mouvement, le
+verrouillage des interactions, le profil énergétique et l'accès aux réglages. La
+visibilité des éléments du bureau est une intention conditionnelle ; l'IA ne génère
+ni `defaults`, ni écriture de registre, ni commande de shell pour l'implémenter. Elle
+se lie uniquement à la capacité `desktop.items.visible` et prévoit les états pending,
+refusé, inconnu et non supporté.
+
+L'IA peut proposer une autre position, transformer les boutons en objets diégétiques
+ou demander leur retrait. Le validateur exige alors un chemin accessible équivalent
+ou une dérogation explicite. La liberté créative ne permet pas de cacher silencieusement
+la récupération, de simuler un succès ou de modifier un réglage OS au chargement.
+
 ## Petit socle extensible, représentations distinctes
 
 Commencer par les opérations utiles aux parcours : identité/état, événement,

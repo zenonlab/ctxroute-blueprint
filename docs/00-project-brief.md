@@ -58,6 +58,13 @@ composés. L'app connecteur conserve une UI native de permission/diagnostic ; l'
 thème est entièrement stylisable tout en gardant composants, focus et actions
 sémantiques. Les boutons provisoires du PoC macOS ne définissent pas le design final.
 
+Une étagère de contrôles fait partie du thème dès sa création, en haut à gauche par
+défaut et entièrement stylisable : mute du thème, pause des animations, verrouillage
+des interactions, profil énergétique, panneaux et réglages. La visibilité des fichiers
+du bureau utilise la même intention dans tous les thèmes, mais reste une capacité du
+connecteur OS avec état confirmé et récupération native. Elle n'est jamais appliquée
+automatiquement au chargement.
+
 Les [interactions programmables](architecture/theme-interactions.md) couvrent
 objets, géométrie, boutons et panneaux : un objet ouvre une UI, ses contrôles
 pilotent animations/effets et leurs résultats actualisent l'UI. Ces relations

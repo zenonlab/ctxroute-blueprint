@@ -41,12 +41,12 @@ vérifient cette autonomie et les limites de protection contre les pannes.
 
 | Contrat | Producteur → consommateur ; propriétaire | Contenu minimal | Erreurs et limites |
 | --- | --- | --- | --- |
-| C0 — Recette | Auteur → préparateur ; thème | Identité/version de thème, références logiques, paramètres, ancres, comportements et capacités requises/optionnelles | Une recette ne donne ni chemin privé libre, ni handle moteur/PTY, ni permission d'exécuter une commande. Import non fiable, taille et profondeur bornées. |
+| C0 — Recette | Auteur → préparateur ; thème | Identité/version de thème, références logiques, paramètres, ancres, comportements, étagère de contrôles et capacités requises/optionnelles | Une recette ne donne ni chemin privé libre, ni handle moteur/PTY, ni permission d'exécuter une commande. Import non fiable, taille et profondeur bornées. |
 | C1 — Sélection résolue | Préparateur → contrôle ; préparateur | Révision de composition, ressources sélectionnées et versions, liens entre objets, capacités et diagnostics ; accès local limité aux ressources résolues | Référence ambiguë/manquante ou capacité requise absente : échec explicite. Ne pas deviner un autre asset ; ne pas charger le jeu entier. |
 | C2 — Scène et intentions | Contrôle ↔ hôte ; contrôle pour activation, hôte pour état visuel | Préparer/activer/libérer une composition, mises à jour ciblées, profil énergétique ; retour prêt/échec et intention d'ancre avec révision de scène | Événement d'ancienne scène refusé. Pas d'accès direct aux commandes OS depuis l'hôte. Aucune scène complète sérialisée à chaque frame. |
 | C3 — Actions et états de session | Contrôle ↔ sessions ; gestionnaire de sessions | ID de session opaque stable, actions autorisées de création/fermeture/resize selon le parcours, état et résultat corrélé | Apparence ≠ identité. Action absente ou non autorisée refusée ; fermeture du décor ne ferme pas le shell. Les IDs ne sont pas des preuves d'autorisation. |
 | C4 — Terminal | Sessions ↔ interface terminal ; sessions pour transport, interface pour interprétation/affichage | Flux d'octets ordonné, saisie du terminal focalisé, dimensions, état du processus et contrôle de débit | Backpressure bornée sans perte silencieuse de texte. Le thème reçoit seulement les états autorisés, jamais le flux terminal. La reprise du texte exige une politique de tampon/rejeu distincte. |
-| C5 — Présentation native | Hôte ↔ adaptateur desktop ; adaptateur pour cycle de surface, hôte pour GPU | Créer/attacher, configurer, invalider, détacher ; coordonnées et échelle, génération de surface, capacités input/visibilité et motif | Les handles natifs restent dans cette intégration privée. Rendu et surface peuvent devoir être remplacés ensemble. Une capacité inconnue n'est pas disponible. |
+| C5 — Présentation native | Hôte/contrôle ↔ adaptateur desktop ; adaptateur pour cycle de surface et état OS, hôte pour GPU | Créer/attacher, configurer, invalider, détacher ; coordonnées et échelle, génération de surface, capacités input/visibilité ; requêtes corrélées et états confirmés des réglages desktop | Les handles natifs restent dans cette intégration privée. Rendu et surface peuvent devoir être remplacés ensemble. Une capacité inconnue n'est pas disponible ; une requête envoyée n'est pas un succès. |
 | C6 — Résultats d'ingestion | Lecteur → bibliothèque/préparateur ; bibliothèque pour identités durables | Provenance et version d'entrée, identités sources, ressources et relations comprises, couverture et diagnostics privés | Conserver l'information comprise et qualifier l'inconnue. La sortie native d'un outil n'est pas automatiquement le contrat canonique. Aucun envoi privé vers une IA distante. |
 
 C0 et C6 appartiennent à la préparation détaillée dans
@@ -62,6 +62,12 @@ et l'état visuel local, sans échange par frame. C5 qualifie chaque présentati
 (dans la scène, overlay ou fenêtre distincte), sa visibilité et son focus.
 Ce sont les mêmes contrats, pas un nouveau bus. Les règles de propagation,
 d'annulation et de quotas figurent dans [theme-interactions.md](theme-interactions.md).
+
+L'étagère `system_controls` utilise C0 pour sa composition, C2 pour les intentions
+locales du thème et C5 pour les capacités OS. Les contrôles portables d'audio, motion,
+interaction, overlay et profil énergétique restent dans le runtime. L'intention
+`SetDesktopItemsVisibility` traverse C5 ; son état final vient exclusivement du
+connecteur. Aucun toggle ne déduit le nouvel état en inversant une valeur locale.
 
 ## Identités, versions et migration
 
