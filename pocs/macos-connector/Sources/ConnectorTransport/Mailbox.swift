@@ -9,25 +9,38 @@ public enum TransportError: Error, LocalizedError {
     case signingRequired, groupMismatch, groupUnavailable
     public var errorDescription: String? {
         switch self {
-        case .signingRequired: "Contrôle indisponible : signature Apple avec Team ID requise pour éprouver l’App Group. Changer le fond ne corrige pas cette erreur."
+        case .signingRequired: "Mode strict : signature avec Team ID requise. Pour un essai local sans certificat, reconstruire explicitement avec --development."
         case .groupMismatch: "Signature et App Group incohérents. Reconstruire les deux bundles avec la même identité et le même Team ID."
-        case .groupUnavailable: "Transport App Group inaccessible. Vérifier la signature et les droits des deux bundles."
+        case .groupUnavailable: "Accès App Group non accordé par macOS. Une signature ou un mode développement ne garantit pas cet accès."
         }
     }
 }
 
 public struct Mailbox: Sendable {
-    /// This macOS-only naming convention does not require a group provisioning profile.
+    public static let localGroup = "group.org.wallpaperthemes.connectorpoc2.local"
+    #if CONNECTOR_LOCAL_DEVELOPMENT
+    public static let developmentEnabled = true
+    public static let signalPrefix = "org.wallpaperthemes.connectorpoc2.local"
+    #else
+    public static let developmentEnabled = false
+    public static let signalPrefix = "org.wallpaperthemes.connectorpoc2"
+    #endif
+    /// Strict mode uses the macOS Team ID convention; local mode requests OS-managed access.
     /// Entitlement consistency is a prerequisite, never proof of sandbox access.
-    public static func sharedGroup(team: String, entitlements: [String]) throws -> String {
+    public static func sharedGroup(team: String, entitlements: [String],
+                                   development: Bool = false, adHoc: Bool = false) throws -> String {
+        if development {
+            guard adHoc, team.isEmpty, entitlements == [localGroup] else { throw TransportError.groupMismatch }
+            return localGroup
+        }
         guard team.range(of: "^[A-Z0-9]{10}$", options: .regularExpression) != nil
         else { throw TransportError.signingRequired }
         let group = "\(team).org.wallpaperthemes.connectorpoc2"
         guard entitlements == [group] else { throw TransportError.groupMismatch }
         return group
     }
-    public static let commandSignal = "org.wallpaperthemes.connectorpoc2.command"
-    public static let statusSignal = "org.wallpaperthemes.connectorpoc2.status"
+    public static let commandSignal = signalPrefix + ".command"
+    public static let statusSignal = signalPrefix + ".status"
     public let directory: URL
     private let onSignal: @Sendable (String) -> Void
     /// Standalone/test mailboxes have no system-wide side effects.
@@ -44,18 +57,28 @@ public struct Mailbox: Sendable {
         guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
               SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
               SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
-              let values = information as? [String: Any],
-              let team = values[kSecCodeInfoTeamIdentifier as String] as? String, !team.isEmpty
+              let values = information as? [String: Any]
         else { throw TransportError.signingRequired }
+        let team = values[kSecCodeInfoTeamIdentifier as String] as? String ?? ""
+        let flags = (values[kSecCodeInfoFlags as String] as? NSNumber)?.uint32Value ?? 0
         let entitlements = values[kSecCodeInfoEntitlementsDict as String] as? [String: Any]
         let group = try sharedGroup(team: team,
-            entitlements: entitlements?["com.apple.security.application-groups"] as? [String] ?? [])
+            entitlements: entitlements?["com.apple.security.application-groups"] as? [String] ?? [],
+            development: developmentEnabled, adHoc: SecCodeSignatureFlags(rawValue: flags).contains(.adhoc))
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
         else { throw TransportError.groupUnavailable }
         return try Mailbox(directory: container.appendingPathComponent("Connector-v1", isDirectory: true), onSignal: Self.signal)
     }
     public func command() throws -> Command? { try read("command.json") }
     public func status() throws -> CatalogStatus? { try read("status.json") }
+    /// Explicit diagnostic only. Never touches a command/status or emits a wakeup.
+    /// This proves this process's access, not the provider's access or liveness.
+    public func verifyAccess() throws {
+        let nonce = UUID().uuidString
+        try write(nonce, name: "access-probe.json")
+        let observed: String? = try read("access-probe.json")
+        guard observed == nonce else { throw ModelError.invalid("mailbox access probe mismatch") }
+    }
     public func write(_ command: Command) throws {
         try write(command, name: "command.json"); onSignal(Self.commandSignal)
     }

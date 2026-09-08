@@ -4,9 +4,17 @@ import UniformTypeIdentifiers
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
-        if CommandLine.arguments.contains("--check") {
+        if CommandLine.arguments.contains("--check") || CommandLine.arguments.contains("--probe-mailbox") {
             _ = try Theme.catalog()
-            do { _ = try Mailbox.shared(); print("manifest=valid transport=unconfirmed (provider receipt required)") }
+            print("transport-mode=\(Mailbox.developmentEnabled ? "local-ad-hoc" : "strict")")
+            do {
+                let mailbox = try Mailbox.shared()
+                if CommandLine.arguments.contains("--probe-mailbox") {
+                    try mailbox.verifyAccess()
+                    print("local-process-access=read-write provider=unconfirmed")
+                }
+                print("manifest=valid transport=unconfirmed (provider receipt required)")
+            }
             catch { print("manifest=valid transport=unavailable: \(error.localizedDescription)"); exit(2) }
             return
         }

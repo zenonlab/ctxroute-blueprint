@@ -9,9 +9,11 @@ ou de manipulation automatique des réglages Finder. Le PoC1 reste intact.
 Correctifs de revue : commandes et quittances testées, dernière quittance conservée
 30 secondes par thème même lors d'une publication de surface. Les mailboxes de tests
 n'émettent plus de notifications système ; seul `shared()` les active.
-Sans Team ID, `--check` retourne le code 2 avec un diagnostic de signature, sans
-accéder au groupe. Une signature avec Team ID reste à qualifier dans les deux
-processus : elle ne garantit pas à elle seule des droits App Group fonctionnels.
+En mode strict sans Team ID, `--check` retourne 2 avant accès au groupe.
+Le build explicite `--development` autorise l'essai ad hoc d'un groupe local séparé,
+sans retirer la sandbox. Sur MAC-01, lecture/écriture passent dans le connecteur
+et dans la sonde CLI sandboxée ; l'extension hébergée par WallpaperAgent reste
+à qualifier. Ni le mode local ni la signature ne garantissent une quittance native.
 Le nouveau build n'est pas installé automatiquement ; les apps historiques doivent
 rester arrêtées. Aucune interface interactive, audio ou toggle Finder n'est livrée
 par ce correctif. Les deux contrôles du manifeste restent des déclarations pour D1.
@@ -23,7 +25,7 @@ natives ou inconnues ne sont jamais capturées au début d'un geste. Le raccord
 aux événements macOS et l'exécution autorisée des intentions restent absents.
 Les tests synthétiques ne prouvent donc pas la priorité Finder sur le vrai bureau.
 
-Le code compile avec Swift 6 strict ; les 19 tests XCTest passent. Les deux
+Le code compile avec Swift 6 strict ; les 21 tests XCTest passent. Les deux
 bundles sont signés ad hoc et leur manifeste embarqué est identique. Ce résultat
 n'est **pas** une qualification du wallpaper dans WallpaperAgent : activation,
 Spaces, animation visible, commandes interprocessus et énergie restent à vérifier
@@ -74,7 +76,22 @@ swift test --package-path pocs/macos-connector --scratch-path dist/pocs/macos-co
 bash pocs/macos-connector/build.sh
 ```
 
-Le mode ci-dessus reste ad hoc et sans transport partagé. Pour préparer une preuve
+Le mode ci-dessus reste strict, ad hoc et sans transport partagé. Pour développer
+sans certificat : `bash pocs/macos-connector/build.sh --development`.
+Ce choix est compilé dans les deux exécutables, pas activable par une variable
+d'environnement ou un argument au lancement. Le groupe de test est
+`group.org.wallpaperthemes.connectorpoc2.local`, avec des signaux Darwin distincts.
+Le runtime exige une vraie signature ad hoc et exactement ce groupe dans ses droits.
+macOS reste seul décisionnaire de l'accès ; aucun droit supplémentaire n'est ajouté.
+
+La sonde `--probe-mailbox` vérifie lecture/écriture dans le processus appelant sans
+envoyer de commande. `bash pocs/macos-connector/test-sandbox-access.sh <build.app>`
+copie le CLI dans un paquet de diagnostic sous `dist/`, signé ad hoc avec les droits
+sandbox du provider et le groupe local. Ce n'est ni une installation ni un hébergement
+par WallpaperAgent. `access-probe.json` ne contient qu'un UUID et reste dans le groupe
+de test ; aucune donnée du bureau n'est lue. Les paquets de diagnostic sont conservés.
+
+Pour préparer une preuve
 signée, choisir une identité existante avec `security find-identity -v -p codesigning`,
 puis passer son empreinte SHA-1 (40 caractères hexadécimaux) et son Team ID :
 `bash pocs/macos-connector/build.sh --sign <empreinte> <TEAMID>`.
@@ -99,6 +116,7 @@ des shims seuls n'aurait pas détecté ce problème.
 L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 
 - `--check` : valide le manifeste et le prérequis de signature du transport ; ne prouve jamais une quittance du provider ;
+- `--probe-mailbox` : teste lecture/écriture locale, sans toucher à `command.json`/`status.json` ni notifier le provider ;
 - `--preflight-install` : refuse compagnons et providers concurrents sans les arrêter ;
 - `--thumbnail <chemin.png>` : exporte la fixture, sans animer ni ouvrir une fenêtre ;
 - `--thumbnails <répertoire>` : exporte une vignette par thème du catalogue ;

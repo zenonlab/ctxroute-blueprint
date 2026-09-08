@@ -4,10 +4,31 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testDevelopmentGroupRequiresExplicitModeAndAdHocSignature() throws {
+        let groups = [Mailbox.localGroup]
+        XCTAssertEqual(try Mailbox.sharedGroup(team: "", entitlements: groups,
+            development: true, adHoc: true), Mailbox.localGroup)
+        XCTAssertThrowsError(try Mailbox.sharedGroup(team: "", entitlements: groups, adHoc: true))
+        XCTAssertThrowsError(try Mailbox.sharedGroup(team: "", entitlements: groups, development: true))
+        XCTAssertThrowsError(try Mailbox.sharedGroup(team: "AB123CD456", entitlements: groups,
+            development: true, adHoc: true))
+        for invalid in [[], groups + groups, ["group.org.wallpaperthemes.connectorpoc2"]] {
+            XCTAssertThrowsError(try Mailbox.sharedGroup(team: "", entitlements: invalid,
+                development: true, adHoc: true))
+        }
+    }
+    func testAccessProbeDoesNotSendCommandsOrNotifyProviders() throws {
+        let recorder = SignalRecorder()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let box = try Mailbox(directory: root, onSignal: { recorder.append($0) })
+        try box.verifyAccess()
+        XCTAssertTrue(recorder.values.isEmpty)
+        XCTAssertNil(try box.command()); XCTAssertNil(try box.status())
+    }
     func testBuildRejectsIncompleteOrMalformedSigningArguments() throws {
         let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("build.sh")
-        for args in [["--sign"], ["--unknown"], ["--sign", "not-a-fingerprint", "AB123CD456"],
+        for args in [["--sign"], ["--unknown"], ["--development", "--sign"], ["--sign", "not-a-fingerprint", "AB123CD456"],
                      ["--sign", String(repeating: "0", count: 40), "../other"]] {
             let process = Process(); let output = Pipe()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")

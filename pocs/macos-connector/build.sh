@@ -2,9 +2,12 @@
 set -euo pipefail
 connector_identity=-
 connector_team=""
+connector_development=false
 if [[ $# == 1 && "$1" == --help ]]; then
-  echo 'Usage: build.sh [--sign CERTIFICATE_SHA1 TEAM_ID] (no installation)'
+  echo 'Usage: build.sh [--development | --sign CERTIFICATE_SHA1 TEAM_ID] (no installation)'
   exit 0
+elif [[ $# == 1 && "$1" == --development ]]; then
+  connector_development=true
 elif [[ $# != 0 ]]; then
   if [[ $# != 3 || "$1" != --sign || ! "$2" =~ ^[A-Fa-f0-9]{40}$ || ! "$3" =~ ^[A-Z0-9]{10}$ ]]; then
     echo 'Expected --sign CERTIFICATE_SHA1 TEAM_ID; no build created.' >&2
@@ -26,6 +29,8 @@ for connector_role in App Extension; do
   cp "$connector_source/Packaging/$connector_role.entitlements" "$connector_stage/$connector_role.entitlements"
   if [[ -n "$connector_team" ]]; then
     /usr/libexec/PlistBuddy -c "Set :com.apple.security.application-groups:0 $connector_team.org.wallpaperthemes.connectorpoc2" "$connector_stage/$connector_role.entitlements"
+  elif [[ "$connector_development" == true ]]; then
+    /usr/libexec/PlistBuddy -c 'Set :com.apple.security.application-groups:0 group.org.wallpaperthemes.connectorpoc2.local' "$connector_stage/$connector_role.entitlements"
   fi
 done
 connector_app="$connector_stage/Wallpaper Connector PoC 2.app"
@@ -48,6 +53,9 @@ connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
 connector_flags=(-sdk "$connector_sdk" -target "$connector_arch-apple-macos26.0"
   -swift-version 6 -warnings-as-errors -parse-as-library -O
   -module-cache-path "$connector_base/module-cache")
+if [[ "$connector_development" == true ]]; then
+  connector_flags+=(-D CONNECTOR_LOCAL_DEVELOPMENT)
+fi
 env -u SDKROOT xcrun swiftc "${connector_flags[@]}" "${connector_shared[@]}" \
   "$connector_source"/App/*.swift -o "$connector_app/Contents/MacOS/WallpaperConnector"
 "$connector_app/Contents/MacOS/WallpaperConnector" --thumbnails "$connector_extension/Contents/Resources"

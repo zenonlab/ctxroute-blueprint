@@ -38,16 +38,25 @@ expire et une seule est en vol. Sans accès au groupe partagé, annoncer indispo
 Ce transport local expérimental n'est pas une adoption de production.
 
 Correctif de revue : la construction ad hoc ne qualifie pas l'accès App Group.
-Sans Team ID, le transport partagé est explicitement indisponible, sans tentative
-de contournement. Une identité présente ne vaut pas preuve d'accès du provider.
+Le mode strict refuse le transport sans Team ID. Ce refus applicatif n'est pas une
+interdiction générale de développement macOS. Le mode `--development`, choisi à la
+compilation, autorise uniquement une signature ad hoc avec les droits exacts du groupe
+de test `group.org.wallpaperthemes.connectorpoc2.local`. Il conserve la sandbox,
+laisse macOS autoriser ou refuser l'accès et ne s'active jamais en repli automatique.
+Ce groupe distinct ne migre ni ne modifie les anciens échanges. Une identité présente
+ou un `containerURL` obtenu ne vaut pas preuve d'accès du provider.
 Le build accepte une identité explicitement choisie (empreinte SHA-1) et son Team ID,
 vérifie sa présence avant compilation et contrôle la signature obtenue dans chaque
 bundle. Le groupe macOS est alors `<TEAMID>.org.wallpaperthemes.connectorpoc2` ;
 le runtime vérifie ce même groupe dans ses droits signés avant accès. Le mode ad hoc
-reste destiné aux tests sans transport ; aucun repli ad hoc après échec de signature.
+par défaut reste destiné aux tests sans transport ; aucun repli ad hoc après échec de signature.
 Cette convention macOS sans profil de groupe est documentée par
 [Apple](https://developer.apple.com/documentation/xcode/accessing-app-group-containers).
 Elle ne garantit ni l'acquisition du provider privé ni l'accès partagé à l'exécution.
+Apple décrit également un consentement d'accès au conteneur limité à l'instance
+quand les conditions d'accès automatique ne sont pas réunies ; sa disponibilité
+pour ce provider hébergé par WallpaperAgent reste à éprouver, pas à supposer :
+[App Group Container Protection](https://developer.apple.com/forums/thread/721701).
 Les mailboxes de tests n'émettent aucune notification Darwin par défaut ; seul
 `shared()` active les signaux système. Chaque session conserve sa dernière quittance
 30 secondes afin qu'une publication de cycle de surface ne l'efface pas.

@@ -133,9 +133,10 @@ Le modèle conserve la dernière quittance 30 secondes ; les publications sans a
 ne l'effacent plus. Les mailboxes de test ont des notifications inactives par défaut.
 Le préflight refuse les compagnons historiques, les providers historiques et les
 providers PoC2 d'un autre paquet ; l'installation refuse aussi un provider PoC2 actif.
-Aucun processus n'est arrêté implicitement. Les builds ad hoc annoncent explicitement
-le transport indisponible avant accès au groupe ; ils ne demandent pas de changer de
-fond pour résoudre une erreur de signature. Le contrôle natif M2-06 reste à qualifier.
+Aucun processus n'est arrêté implicitement. Le mode strict ad hoc refuse le transport.
+Le build explicite `--development` permet désormais de tester un groupe local distinct
+sans Team ID, avec la sandbox et les contrôles macOS conservés. Le contrôle natif M2-06
+reste à qualifier ; changer le fond n'est jamais présenté comme un correctif de signature.
 Le manifeste accepte un sous-ensemble ordonné de contrôles, sans accorder leurs
 capacités. Les fixtures préparent seulement audio et fichiers en haut à gauche.
 La politique pure des gestes D1-14–16 est implémentée dans `GestureRouter` :
@@ -148,12 +149,18 @@ pour éviter de transmettre un événement orphelin. Le connecteur doit requalif
 la cible et l'autorisation aux deux extrémités ; `unknown` ne vaut jamais `empty`.
 Le routage n'est pas branché au provider : aucun tap, lancement d'app, éditeur,
 audio ou réglage Finder n'est activé par ces tests. M2-04/05 et D1 natif restent
-non qualifiés. Le total courant est 19 XCTest, sans notifications système de test.
+non qualifiés. Le total courant est 21 XCTest, sans notifications système de test.
 Le build accepte désormais `--sign <empreinte SHA-1> <TEAMID>` ; arguments incomplets,
 identité absente ou signature incohérente sont des erreurs, sans repli ad hoc.
 Le groupe macOS préfixé par le Team ID est généré dans les droits des deux bundles
 et vérifié dans les droits signés par le runtime. Le succès de ce chemin signé reste
 non testé faute d'identité disponible ; il ne lève pas encore le blocage M2-06.
+Preuve locale ad hoc du 8 septembre : build `build.By7pIs`, `--probe-mailbox` retourne
+0 et `local-process-access=read-write provider=unconfirmed`. Même résultat pour
+`test-sandbox-access.sh`, paquet `access.ZKSvLx/Transport Access Probe.app`.
+La sonde sandboxée est un CLI lancé depuis l'environnement de développement, pas
+le provider hébergé par WallpaperAgent. Aucun succès M2-06, geste natif ou consentement
+permanent n'est déduit de ces deux accès. Aucun prompt n'a été accepté automatiquement.
 Cette implémentation reste dans le modèle existant : aucun contrat de transport,
 dépendance ou frontière ne change. Le dataflow de personnalisation précise seulement
 que la composition du thème possède aussi la politique de gestes.

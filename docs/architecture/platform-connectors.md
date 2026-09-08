@@ -79,9 +79,11 @@ App Store ni une garantie sur une future version de macOS.
 
 Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
 signature et packaging. L'observation globale des clics est une capacité optionnelle.
-Le transport App Group du PoC2 exige une identité sélectionnée explicitement et un
-groupe préfixé par son Team ID, identique dans les deux bundles. Le build et le
-runtime contrôlent cette cohérence ; l'accès du provider reste à éprouver séparément.
+Le transport App Group du PoC2 distingue le mode strict, avec identité explicite et
+groupe préfixé par son Team ID, du mode de développement ad hoc compilé explicitement.
+Ce dernier utilise un groupe local isolé, conserve la sandbox et laisse macOS décider
+de l'accès. Les deux modes vérifient leurs droits ; l'accès du provider et sa quittance
+restent à éprouver séparément de la sonde CLI sandboxée.
 Sans classification certaine de la cible Finder, il ne consomme aucun clic.
 La visibilité des éléments du bureau est proposée dans les réglages macOS récents,
 mais aucun réglage interne tel que `CreateDesktop` n'est promu en API produit avant
@@ -192,5 +194,5 @@ manuellement, ainsi que la capture sombre 2048×1320 : limites, libellés et rel
 sont lisibles, sans collision observée.
 L'interface fixe du viewer reste en anglais ; les libellés produit sont en français.
 
-SHA-256 de la source : `238a4ea761eafd137f581e23851c4a90f068abd25541fa81b7009ee0d80d8711`.
-SHA-256 de l'artefact : `dc6b798c714269c9d950277fa2c35722389c6154dfab691d111e1d16bd5e14b7`.
+SHA-256 de la source : `b4201bd268d7e77d2b17c3cf3bda58eb3b18fc9861bd62a8956a9fa22df85394`.
+SHA-256 de l'artefact : `c60694710e0ce4fd3ad2c3f465a1d0ab9f2d9aea0480124a83d14d787e8e8672`.

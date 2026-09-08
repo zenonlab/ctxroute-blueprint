@@ -1,6 +1,35 @@
 # Reprise de session — Wallpaper
 
-## État courant — préparation de signature, 8 septembre 2026
+## État courant — mode local sans certificat, 8 septembre 2026
+
+L'utilisateur n'a pas de certificat Apple et a demandé le mode de développement.
+`bash pocs/macos-connector/build.sh --development` compile un mode ad hoc explicite
+avec groupe et notifications `.local` distincts. Mode strict et contrôle Team ID
+préservés, pas de repli implicite, pas de sandbox retirée.
+
+Build local : `dist/pocs/macos-connector/build.By7pIs/Wallpaper Connector PoC 2.app`.
+21 XCTest passent. Catalogue Apple trois thèmes, signature ad hoc et plists passent.
+Lancement CLI `--probe-mailbox` : code 0, lecture/écriture réelle dans le connecteur.
+`test-sandbox-access.sh` : même résultat sous sandbox, paquet temporaire conservé
+`dist/pocs/macos-connector/access.ZKSvLx/Transport Access Probe.app`.
+Ces sondes n'envoient aucune commande ni signal Darwin. Elles écrivent seulement
+un UUID dans `access-probe.json`, sans accéder aux données Finder.
+Le provider réel reste NON QUALIFIÉ : les sondes CLI ne tournent pas dans WallpaperAgent.
+
+Inspection des Réglages : « Ambre statique — PoC 2 » sélectionné, tous espaces activé.
+Aucun changement appliqué. Accord demandé pour passer temporairement sur un fond
+macOS standard, installer ce build local puis sélectionner Orbite ; réponse attendue.
+Ne pas réinstaller par-dessus les deux anciens providers encore chargés et ne pas
+arrêter WallpaperAgent/Finder. Ne pas réclamer un certificat pour ce mode local.
+Audit final : CONFORME — 21 XCTest, builds local et strict, `npm run verify` à 0,
+diff contrôlé, doctrine/hooks inchangés et aucune suppression. Le build strict
+`build.jujiZ3` retourne bien 2 à `--probe-mailbox`, sans activer le mode local.
+Archify connecteurs : showcase 9/9, zéro erreur/avertissement, containment quatre
+résolutions ; captures sombres 1440×900 et 2048×1320 inspectées. Reçus dans
+`architecture/platform-connectors.md`. MANQUE — échange avec le provider natif
+et action visible, après accord de remplacement. N/A — nouvelle dépendance/service.
+
+## Historique — préparation de signature, 8 septembre 2026
 
 Défaut corrigé : `build.sh` imposait l'ad hoc et le groupe était figé. Le mode
 `--sign <empreinte SHA-1> <TEAMID>` sélectionne explicitement une identité existante,
