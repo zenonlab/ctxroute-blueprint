@@ -17,6 +17,17 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     headless: true,
   });
   try {
+    await context.route('https://graphql.anilist.co/**', async (route) => {
+      await route.fulfill({
+        body: JSON.stringify({ data: { Media: {
+          format: 'TV', genres: ['Adventure'], id: 154587,
+          siteUrl: 'https://anilist.co/anime/154587/frieren-beyond-journeys-end',
+          synonyms: [], title: { english: "Frieren: Beyond Journey's End", native: '葬送のフリーレン', romaji: 'Sousou no Frieren' }, type: 'ANIME',
+        } } }),
+        contentType: 'application/json',
+        status: 200,
+      });
+    });
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     await worker.evaluate(async () => {
@@ -40,7 +51,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
         };
         request.onerror = () => reject(request.error);
       });
-    }), { timeout: 30_000 }).toBe('COMMITTED:resolved:kitsu-anime:46474:frieren beyond journeys end');
+    }), { timeout: 30_000 }).toBe('COMMITTED:resolved:anilist:154587:frieren beyond journeys end');
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible({ timeout: 30_000 });
 

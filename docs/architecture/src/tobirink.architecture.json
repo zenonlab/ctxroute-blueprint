@@ -19,7 +19,7 @@
           "indexedDb",
           "sync"
         ],
-        "note": "Favoris : présence et progression observée. IndexedDB : transactions privées. Sync : IDs publics seulement."
+        "note": "Extension MV3 Chrome/Firefox. Favoris : présence et progression observée. IndexedDB : transactions privées. Sync : IDs publics seulement."
       },
       {
         "id": "collective",

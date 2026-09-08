@@ -11,7 +11,7 @@ let browser;
 try {
   browser = await firefox.launch({ headless: true, executablePath });
   process.stdout.write(`Firefox ${browser.version()}\n`);
-  for (const path of ['test/index.html', 'test/migrations.html']) {
+  for (const path of ['test/index.html', 'test/migrations.html', 'test/tasks.html']) {
     const page = await browser.newPage();
     await page.goto(endpoint + path);
     await page.waitForFunction(() => ['passed', 'failed'].includes(globalThis.document.body.dataset.status), { timeout: 30000 });

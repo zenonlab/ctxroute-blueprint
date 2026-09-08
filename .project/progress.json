@@ -5707,7 +5707,7 @@
       "schemaVersion": 1,
       "id": "goal-tobirink-favlib-complete-correction",
       "title": "Corriger intégralement FavLib → TobiRink selon la doctrine 3267de2",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6014,7 +6014,7 @@
         {
           "id": "step-7",
           "title": "Oracle FavLib réel en lecture seule",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Base FavLib lue seule hors dépôt; fixtures uniquement synthétiques/anonymisées; aucune donnée privée dans Git/logs/artefacts partagés",
             "Corpus complet comparé sur artefact type progression identité décision raison; environ 40/4 reste hypothèse avant mesure; aucune différence inexpliquée"
@@ -6050,12 +6050,15 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'test(favorites): validate against readonly favlib oracle'"
           ],
-          "evidence": []
+          "evidence": [
+            "external: Aucun corpus FavLib complet lisible actuellement: service historique 5433 inaccessible, Docker arrêté, dump non chiffré vide et sauvegardes complètes chiffrées. Chemin local ou service accessible demandé; aucun secret lu ni déchiffrement lancé.",
+            "Les fixtures et snapshots synthétiques existants ne prouvent pas la parité avec la base réelle. Aucun comptage 40/4 mesuré ni différence historique déclarée conforme."
+          ]
         },
         {
           "id": "step-8",
           "title": "Validation complète et préparation locale de publication",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Tests domaines contrats adapters extension Worker D1 local, migrations Chromium/Firefox, MV3 checkpoints, Review/WebBridge, quotas sécurité budgets et oracle passent",
             "npm run verify, Archify showcase, CRG, audit dépendances et diff passent; ZIP 1.0.0 reproductibles préparés hors chemins publiés, tests réellement installés verts",
@@ -6105,7 +6108,16 @@
             "git add -- <fichiers vérifiés de cette étape>",
             "git commit -m 'test(favorites): verify complete favlib parity'"
           ],
-          "evidence": []
+          "evidence": [
+            "external: Validation complète dépendante du corpus FavLib réel indisponible à l’étape 7; aucune parité, distribution de latence sur ce corpus ou différence 40/4 déclarée conforme.",
+            "665 tests des workspaces et typecheck passent; sécurité extension 8 et Worker 13, Worker complet 32, performance 4 et packaging 2 passent. Audit npm: zéro vulnérabilité.",
+            "IndexedDB: contrats, migrations additives/rollback et tâches durables passent dans Chromium et Firefox 151. Review/WebBridge: report distinct du no-match et motifs transmis, tests Workbench 12 et web 9.",
+            "Deux builds par cible sont byte-identiques: Chrome 273208 octets SHA-256 092f7c3e7cf17ebfb8e309ec56523631e766d2641d474e4d0c72a35bb321fd58; Firefox 273254 octets SHA-256 b2ed10d07fa702bac05ec520874a60cbec84c417963bf837dc016f9c1ad15b0c.",
+            "ZIP réellement chargés dans Chromium 153 et Firefox 151: démarrage, favori ordinaire exclu, cloche vide et zéro Review importée passent; panne fournisseur conservée RETRYABLE.",
+            "Plan Cloudflare 22f8d180… appliqué: D1 0004 sans migration restante, deux objets R2 relus et hashés, Worker 5739481c-21a2-4763-9cc3-67b40aa61b3e actif à 100%; production Playwright 7/7.",
+            "npm run verify et npm run integration restent en échec sur la déclaration MCP Codex préexistante: Codex must declare exactly ctxroute-progress and code-review-graph. Configuration utilisateur conservée, aucune règle contournée.",
+            "Archify showcase et dataflow favorite-resolution passent 9/9; lint, anti-slop, docs, ADR, diff et audit passent. Le probe AniList du poste de validation reçoit HTTP 403; le produit garde un retry sans faux no-match ni Review."
+          ]
         }
       ]
     }

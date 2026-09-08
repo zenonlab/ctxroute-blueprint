@@ -32,6 +32,46 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### FavLib correction deployment — 2026-09-08
+
+The approved Cloudflare plan applied additive D1 migration
+`0004_favorite_owner_resolution.sql`, published both 1.0.0 browser archives,
+and deployed Worker version `5739481c-21a2-4763-9cc3-67b40aa61b3e` at 100%.
+Remote D1 inspection reports no pending migration and a bounded read confirms
+the owner-scoped tables, covering indexes and triggers without writing data.
+
+The R2 objects and the public downloads are byte-identical to the packaged
+candidates: Chrome is 273,208 bytes with SHA-256
+`092f7c3e7cf17ebfb8e309ec56523631e766d2641d474e4d0c72a35bb321fd58`;
+Firefox is 273,254 bytes with SHA-256
+`b2ed10d07fa702bac05ec520874a60cbec84c417963bf837dc016f9c1ad15b0c`.
+Both public responses use `application/zip`, an attachment disposition and the
+immutable one-year cache policy. The production Playwright suite passes 7/7,
+including the packaged Chrome extension, WebBridge, offline recovery, Library,
+Review and Agenda. Provider matching in this release test uses a deterministic
+AniList response; a separate live probe returned HTTP 403 from the validation
+host, and the extension correctly retained a retryable state without producing
+a no-match or Review.
+
+For the FavLib correction, run
+`node scripts/release/package-extension.mjs --verify-isolated`.
+It builds each browser target twice in separate fresh directories under
+`build/.output/`, compares the complete archive bytes across builds, and retains both
+archives and their hashes. Existing package and download paths are untouched.
+This proves reproducibility only; installed-browser checks and the real FavLib
+oracle remain separate acceptance requirements.
+The Chromium Review journey can load an archive produced by that command with
+`node apps/extension/scripts/installed-review.mjs <local-chrome-zip>`.
+It extracts the trusted local candidate into a fresh temporary directory,
+records the archive SHA-256, and installs that content in an isolated profile.
+For Firefox, set `FIREFOX_BIN` to an already installed test executable and run
+`node apps/extension/scripts/installed-firefox.mjs <local-firefox-zip>`.
+The script uses Firefox's native Marionette `Addon:Install` with `temporary`
+enabled in a fresh profile, then checks health, exclusion of an ordinary
+bookmark, an empty Review queue and zero Review records. It does not change
+signature preferences or the user's browser profile. The transport follows
+Mozilla's [Marionette documentation](https://firefox-source-docs.mozilla.org/python/marionette_driver.html).
+
 1. Run `npm run package:extension`.
 2. Run `npm run verify` and retain its output with the release candidate.
 3. Compare each ZIP SHA-256 with `release-manifest.json` before transfer.

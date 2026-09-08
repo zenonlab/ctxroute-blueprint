@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,7 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(new URL('../../web/package.json', import.meta.url));
 const { chromium } = require('@playwright/test');
-const extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url));
+let extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url));
+const archive = process.argv[2];
+if (archive !== undefined) {
+  const bytes = await readFile(archive);
+  extensionPath = await mkdtemp(join(tmpdir(), 'tobirink-installed-archive-'));
+  const extraction = spawnSync('unzip', ['-q', archive, '-d', extensionPath], { encoding: 'utf8' });
+  if (extraction.status !== 0) throw new Error('Test archive extraction failed.');
+  process.stdout.write(`Installed archive SHA-256: ${createHash('sha256').update(bytes).digest('hex')}\n`);
+}
 const profile = await mkdtemp(join(tmpdir(), 'tobirink-installed-review-'));
 const context = await chromium.launchPersistentContext(profile, {
   args: ['--enable-unsafe-extension-debugging'],
