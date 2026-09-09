@@ -5,37 +5,30 @@ Pas de fenêtre de décor superposée, de terminal PTY, de ROM ou de WebView.
 Le PoC1 reste intact. Les gestes macOS sont soumis à Accessibilité et à une
 classification conservatrice du fond Finder ; aucun réglage modifié au lancement.
 
-## Fichiers du bureau — correctif du 8 septembre 2026
+## Fichiers du bureau — correctif du 9 septembre 2026
 
-L'utilisateur confirme les interactions du build installé `g9pTbH`, sauf le bouton
-Fichiers : celui-ci ouvrait seulement les Réglages. Le correctif raccorde cette
-intention à `App/DesktopItems.swift`, dans l'agent. Le provider ne modifie jamais la
-préférence : trois actions XPC bornées lui projettent seulement l'état confirmé.
-Il modifie `com.apple.WindowManager/StandardHideDesktopIcons` via CFPreferences,
-uniquement après clic. L'état est relu avant chaque bascule et après synchronisation.
+L'utilisateur confirme que les intentions du build signé atteignent l'agent, mais
+`StandardHideDesktopIcons` ne masque pas les éléments sur MAC-01 : Finder se recharge
+seulement. Le correctif remplace cette préférence par `com.apple.finder/CreateDesktop`,
+le mécanisme déjà efficace dans le PoC1. Le provider ne modifie jamais la préférence :
+trois actions XPC bornées lui projettent seulement l'état confirmé.
 Le menu Orbite dispose d'un toggle et d'une commande **Réafficher les fichiers du
 bureau**, indépendants du hit-test du wallpaper. Aucun fichier n'est lu, déplacé,
 supprimé ni modifié. Après confirmation de la préférence, l'agent redémarre seulement
 le service Finder de la session afin qu'il recharge sa présentation ; jamais Dock.
 
-Le PoC1 utilisait `CreateDesktop` puis redémarrait Finder, comme le fait
+L'adaptateur utilise `CreateDesktop` puis redémarre Finder, comme le fait
 [OnlySwitch](https://github.com/jacklandrin/OnlySwitch/blob/main/Modules/Sources/Switches/ShellCommandDefine.swift).
-PoC2 reprend uniquement le rafraîchissement Finder : il ne change pas `CreateDesktop`,
-car retirer le bureau Finder peut retirer la cible AX positive nécessaire aux clics.
-Le nouveau réglage reste une préférence
-macOS non contractuelle, qualifiée seulement sur MAC-01 : la case native « Sur le
-bureau » est passée de 1 à 0 puis 1 lors de l'essai ; une écriture directe a aussi
-mis cette case à 0. Lors de cet essai initial, `CreateDesktop` est resté à 1 et Finder
-n'avait pas été redémarré ; la comparaison avec PoC1 a isolé ce rafraîchissement manquant.
-Affichage initial rétabli. Cela confirme le réglage, **pas encore le cycle visuel
-masquer/réafficher par le bouton du nouveau paquet** ni la conservation du hit-test.
-
-Si Stage Manager est actif ou si un autre outil a déjà mis `CreateDesktop=false`,
-l'action échoue explicitement et le diagnostic propose les Réglages : elle ne
-change pas ces politiques à l'insu de l'utilisateur. Les onze cas injectés de
-`test-native.sh` couvrent bascules, restauration, changement externe, refus de
-synchronisation, absence de quittance, échec de rafraîchissement/rollback et ces
-deux restrictions. Le bouton montre
+Quand les fichiers sont visibles, le classificateur AX laisse toute icône Finder
+prioritaire. Quand ils sont masqués et que ce plan AX n'existe plus, le tap global
+refuse les gestes. Des micro-fenêtres transparentes au niveau `normal - 1`, sans
+pixels, couvrent seulement les boutons et objets du thème : une application normale
+reste au-dessus et macOS arbitre réellement l'exposition. Elles suivent les objets
+animés à 30 Hz seulement dans ce mode, puis sont détruites au réaffichage. Aucun plan
+d'entrée plein écran n'est créé ; le clic droit du vide reste donc natif quand Finder
+est masqué. Les tests injectés couvrent bascules, non-opération idempotente, changement
+externe, refus de synchronisation, absence de quittance, échec de rafraîchissement,
+rollback et projection des proxys. Le bouton montre
 `monitor` si l'état est inconnu, `eye` si les éléments sont visibles et `eye-off`
 s'ils sont masqués. Il ne change qu'après relecture de la préférence par l'agent ;
 une reconnexion resynchronise progressivement toutes les scènes du catalogue.
@@ -94,9 +87,10 @@ du même `ThemeLayout.control` que le dessin. Le test vérifie les dimensions, l
 l'absence de texte, l'échelle Retina et les deux états audio.
 
 `ThemeLayout` partage les 128 segments de trajectoire entre animation et hit-test.
-Les objets conservent aussi le proxy de clic invisible du PoC1, au minimum 112×70
+Les objets conservent aussi la zone de clic invisible du PoC1, au minimum 112×70
 points autour du centre ; le plus proche gagne si ces zones se chevauchent. Le clic
-reste capturé par le tap global, pas par un calque ou une fenêtre devant Finder.
+reste capturé par le tap global devant Finder. Les fenêtres de hit-test ne sont
+activées que lorsque `CreateDesktop=false`, où Finder n'expose plus de plan AX.
 Un objet capturé au bouton enfoncé reste la cible si sa propre animation le fait
 sortir de la zone avant le relâchement, mais une icône/fenêtre native apparue entre
 les deux annule toujours l'action. Le mouvement physique du pointeur annule aussi.

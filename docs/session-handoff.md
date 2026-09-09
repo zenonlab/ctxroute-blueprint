@@ -1,5 +1,29 @@
 # Reprise de session — Wallpaper
 
+## État courant — correctif Fichiers et entrée sans Finder, 9 septembre 2026
+
+Le paquet signé installé recevait bien les intentions `desktopItemsVisible` et
+`desktopItemsHidden`, mais `StandardHideDesktopIcons` ne changeait pas le rendu du
+bureau sur MAC-01 : seul Finder se rechargeait. Le correctif revient à
+`com.apple.finder/CreateDesktop`, déjà efficace dans le PoC1, sans reprendre ses
+fenêtres superposées. Écriture et relecture sont confirmées, une cible déjà atteinte
+ne redémarre pas Finder, et un échec de rafraîchissement tente un rollback.
+
+Le premier fallback masqué par `CGWindowList` est invalidé : après Afficher le bureau,
+Chrome reste déclaré aux anciennes coordonnées et tous les clics sont rejetés. Le
+routage candidat est désormais bifurqué. Avec les éléments visibles, la chaîne AX
+Finder protège icônes, libellés et fenêtres. Avec les éléments masqués, le tap refuse
+tout geste et seules de petites `NSPanel` transparentes au niveau `normal - 1`
+matérialisent les boutons et objets. Elles ne dessinent rien, restent derrière les
+applications et suivent `ThemeLayout` à 30 Hz uniquement si des objets bougent.
+Un remplacement d'instantané annule toute capture et recrée ou détruit ces régions.
+
+Preuves locales du candidat : diagramme macOS showcase 9/9 sans erreur ni
+avertissement ; 35 XCTest ; politique Finder et projection des proxys passantes.
+La construction signée reste à terminer puis installer : `codesign` a attendu le
+trousseau après compilation. Le cycle visuel masquer/réafficher et les clics des deux
+états doivent être qualifiés sur ce paquet exact avant validation finale.
+
 ## État courant — tap unifié sans fenêtre d'entrée, 9 septembre 2026
 
 Les micro-fenêtres AppKit ont été retirées : elles étaient de vraies fenêtres de

@@ -12,6 +12,7 @@ env -u SDKROOT xcrun swiftc -swift-version 6 -warnings-as-errors -parse-as-libra
   "$connector_source/App/DesktopEventTap.swift" \
   "$connector_source/App/DesktopInput.swift" \
   "$connector_source/App/ControlInputPlane.swift" \
+  "$connector_source/App/HiddenDesktopInputPlane.swift" \
   "$connector_source/App/DesktopItems.swift" \
   "$connector_source/App/AgentLauncher.swift" \
   "$connector_source/Tests/DesktopItemsTests.swift" \

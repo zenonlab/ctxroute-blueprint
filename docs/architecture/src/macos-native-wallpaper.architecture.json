@@ -8,13 +8,13 @@
     { "id": "package-gate", "type": "security", "label": "Gate paquet", "sublabel": "19 contrôles · sans lancement", "pos": [750, 20], "size": [190, 70] },
     { "id": "extension", "type": "backend", "label": "Extension diagnostic", "sublabel": "Provider controls · XPC privé", "pos": [1010, 110], "size": [230, 80] },
     { "id": "animation", "type": "backend", "label": "Scène native épurée", "sublabel": "Piste · véhicules · effets", "pos": [1010, 530], "size": [230, 80] },
-    { "id": "controls", "type": "frontend", "label": "Adaptateur d’entrée", "sublabel": "Tap HID/session · watchdog", "pos": [40, 320], "size": [230, 80] },
-    { "id": "priority", "type": "security", "label": "Priorité macOS", "sublabel": "Cible Finder qualifiée · fail-open", "pos": [40, 430], "size": [190, 70] },
-    { "id": "commands", "type": "messagebus", "label": "Commandes bornées", "sublabel": "Requêtes + quittances Darwin", "pos": [520, 320], "size": [240, 80] },
+    { "id": "controls", "type": "frontend", "label": "Adaptateur d’entrée", "sublabel": "Tap · proxys invisibles conditionnels", "pos": [40, 320], "size": [230, 80] },
+    { "id": "priority", "type": "security", "label": "Priorité macOS", "sublabel": "Finder ou fenêtres natives", "pos": [40, 430], "size": [190, 70] },
+    { "id": "commands", "type": "messagebus", "label": "Commandes bornées", "sublabel": "Requêtes + quittances XPC", "pos": [520, 320], "size": [240, 80] },
     { "id": "theme", "type": "database", "label": "Asset de thème", "sublabel": "JSON · formation · actions", "pos": [800, 320], "size": [190, 80] },
     { "id": "hit-testing", "type": "backend", "label": "Routeur de gestes", "sublabel": "Carte immuable · callback borné", "pos": [310, 440], "size": [190, 70] },
     { "id": "context", "type": "frontend", "label": "Surfaces système", "sublabel": "CAContext · IOSurface", "pos": [520, 530], "size": [240, 80] },
-    { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "Bureau et transitions", "pos": [40, 530], "size": [230, 80] }
+    { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "CreateDesktop · mode d’entrée adapté", "pos": [40, 530], "size": [230, 80] }
   ],
   "boundaries": [{ "kind": "region", "label": "Paquet .app / .appex", "wraps": ["extension"], "pad": 20 }],
   "connections": [

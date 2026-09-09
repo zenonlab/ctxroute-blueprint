@@ -143,11 +143,16 @@ requête et la valeur relue. Une modification externe invalide l'affichage puis 
 le nouvel état lorsque le connecteur sait l'observer. Timeout, redémarrage de Finder
 ou d'Explorer et changement de session ne valent jamais succès.
 
-Sur macOS qualifié, `StandardHideDesktopIcons` nécessite un rafraîchissement du
-service Finder pour devenir visible. Le connecteur effectue ce rafraîchissement après
-l'écriture confirmée et tente de restaurer la préférence précédente si le service ne
-repart pas ; l'échec du rollback reste une erreur explicite, jamais un succès.
-`CreateDesktop` reste inchangé afin de conserver le bureau et sa priorité d'entrée.
+Sur le PoC macOS qualifié, l'essai réel a invalidé `StandardHideDesktopIcons` : la
+préférence changeait et Finder se rechargeait, mais les éléments restaient affichés.
+Le connecteur utilise donc `com.apple.finder/CreateDesktop`, confirme l'écriture,
+rafraîchit Finder et restaure la valeur précédente si ce rafraîchissement échoue.
+Il évite tout redémarrage lorsque l'état demandé est déjà présent. Quand le bureau
+Finder est visible, son arbre AX protège icônes et contrôles natifs. Quand il est
+masqué, le tap global reste passif : de petites fenêtres transparentes, sans pixels
+et limitées aux contrôles/objets, sont placées derrière les applications ordinaires.
+Elles suivent la même horloge `ThemeLayout` que le rendu et disparaissent avec cet
+état. Il n'existe aucune fenêtre d'entrée plein écran en mode masqué.
 
 `desktop.items.visible` ne s'exécute ni à l'installation, ni au chargement du thème,
 ni parce qu'une IA l'a placé dans une recette. Seule une action utilisateur confirmée

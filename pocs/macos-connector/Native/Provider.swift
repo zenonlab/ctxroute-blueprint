@@ -159,16 +159,19 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
             surface.suspended = true
         }
         surfaces[id] = surface; apply()
+        extensionLog("Updated native surface suspended=\(surface.suspended)")
     }
     func invalidate(_ incoming: Incoming) {
         guard let id = field(incoming.id, type: UUID.self), var surface = surfaces[id] else { return }
         surface.suspended = true; surfaces[id] = surface; apply()
+        extensionLog("Invalidated native surface; retaining scene for grace period")
         teardown[id]?.cancel()
         teardown[id] = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: .seconds(15)) } catch { return }
             guard let self else { return }
             surfaces[id]?.context.layer = nil
             surfaces[id] = nil; teardown[id] = nil; publish()
+            extensionLog("Released invalidated native surface count=\(surfaces.count)")
         }
     }
     func snapshot(_ incoming: Incoming) -> AnyObject? {

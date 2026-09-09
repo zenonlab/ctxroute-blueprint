@@ -33,25 +33,30 @@ point de session officiellement disponible si macOS refuse HID au processus non-
 Le point réellement acquis est publié dans le diagnostic. Le tap annoté plus tardif
 n'isole pas suffisamment le contrôle du geste système. Un watchdog vérifie l'état réel du port et le réarme si
 macOS le désactive silencieusement. L'agent ne crée aucune
-fenêtre AppKit proxy. Le tap supprime uniquement l'appui, le drag éventuel et le
+fenêtre AppKit proxy tant que Finder expose son plan de bureau. Le tap supprime uniquement l'appui, le drag éventuel et le
 relâchement d'un geste dont la surface, la cible et le fond Finder sont qualifiés.
 Une erreur, une ambiguïté ou une cible native laisse l'événement original à macOS.
-Dans ce PoC, les objets simples conservent le proxy invisible éprouvé par le PoC1
+Dans ce PoC, les objets simples conservent la zone invisible éprouvée par le PoC1
 (minimum 112×70 points) et la cible la plus proche gagne en cas de recouvrement.
-Le proxy n'est pas un `CALayer` interactif ni une fenêtre superposée. Le contrat de
+Cette zone n'est pas un `CALayer` interactif. Le contrat de
 scène de production devra fournir des formes d'interaction explicites adaptées aux
 sprites, maillages 3D, boutons et collisions importés.
 L'agent reçoit seulement les gestes autorisés : une icône, une fenêtre ou une cible
 AX inconnue garde la priorité. Un glisser n'est jamais converti en clic.
-Le fond Finder est qualifié par l'élément AX directement pointé et son ascendance,
-pas par une énumération de tous les enfants du bureau. La cible doit être un groupe
-ou une zone de défilement Finder, atteindre l'application Finder, contenir une zone
-de défilement et ne traverser aucune fenêtre. Les rôles natifs d'icône, libellé et
-bouton sont refusés dès le premier élément. Cette politique reste fermée en cas
-d'erreur ou de chaîne inconnue et évite un coût variable avec le nombre d'icônes.
-Une icône Finder placée dans la hit-box d'un contrôle garde donc la priorité. Cette
-propriété doit encore être éprouvée manuellement sur le paquet signé exact ; elle
-n'est jamais déduite des seuls tests de géométrie.
+Quand les éléments du bureau sont visibles, le fond Finder est qualifié par l'élément
+AX directement pointé et son ascendance, pas par une énumération de tous les enfants
+du bureau. La cible doit être un groupe ou une zone de défilement Finder, atteindre
+l'application Finder, contenir une zone de défilement et ne traverser aucune fenêtre.
+Les rôles natifs d'icône, libellé et bouton sont refusés dès le premier élément.
+Quand `CreateDesktop=false` retire ce plan AX, ni AX ni `CGWindowList` ne décrivent
+fidèlement l'exposition visuelle produite par Afficher le bureau : les fenêtres
+d'applications restent déclarées aux anciennes coordonnées. Le tap global refuse donc
+tous les gestes dans cet état. Le connecteur matérialise uniquement les cibles du
+thème par de petites `NSPanel` transparentes au niveau `normal - 1`, derrière les
+applications ordinaires, sans aucun pixel. Elles sont détruites dès le retour de
+Finder. Une icône Finder garde ainsi la priorité lorsqu'elle existe et une application
+non déplacée reste au-dessus. Le clic droit du vide n'est pas offert dans ce mode :
+une fenêtre plein écran transparente compromettrait les interactions natives.
 
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
@@ -88,18 +93,17 @@ le code ou déduit de la signature ad hoc. Le classifier Finder est un candidat
 structurel conservateur, pas une garantie publique Apple ; les tests réels restent
 requis, en particulier avec une icône exactement superposée à une ancre. Une surface
 sans écran associé ou ambiguë échoue ouverte vers macOS.
-Les fixtures n'ont pas de piste audio ; mute est un état du thème. Le contrôle
-Fichiers appelle désormais un contrôleur local de `StandardHideDesktopIcons`
-(WindowManager), sans modifier `CreateDesktop`. Après confirmation de l'écriture,
-l'agent redémarre le seul service Finder de la session pour appliquer la présentation,
-comme le PoC1, sans redémarrer Dock ni toucher aux fichiers. L'action OS
-reste la propriété exclusive de l'agent. Trois actions XPC bornées projettent ensuite
-visible, masqué ou inconnu dans l'état visuel du provider ; elles ne modifient aucun
-réglage. La préférence est relue à chaque action ; un échec d'écriture, de
-confirmation ou de rafraîchissement est signalé. Après échec du rafraîchissement,
-l'agent tente un rollback confirmé ; son échec est distinct et n'est jamais acquitté.
-Le menu natif conserve
-un réaffichage explicite indépendant de la capture des clics. Stage Manager actif
-ou bureau Finder désactivé par un autre outil : refus, avec accès aux Réglages.
-La case native a suivi l'écriture sur MAC-01, mais le cycle visuel complet depuis
-le bouton du nouveau paquet et les clics après masquage restent à qualifier.
+Les fixtures n'ont pas de piste audio ; mute est un état du thème. L'essai installé
+sur MAC-01 a prouvé que `StandardHideDesktopIcons` pouvait être relu et provoquer un
+rechargement de Finder sans masquer les éléments. Ce signal est donc abandonné.
+Le contrôle Fichiers utilise l'adaptateur réversible `com.apple.finder/CreateDesktop`
+déjà observé dans le PoC1. Il n'écrit qu'après un geste utilisateur, confirme la
+valeur, puis redémarre le seul service Finder de la session ; il ne touche ni à Dock
+ni aux fichiers. Une cible déjà dans l'état demandé n'entraîne aucun redémarrage.
+Après échec du rafraîchissement, l'agent tente un rollback confirmé ; son échec est
+distinct et n'est jamais acquitté. Trois actions XPC bornées projettent visible,
+masqué ou inconnu dans le provider. Le menu natif conserve un réaffichage explicite
+indépendant du wallpaper. Cette préférence reste privée et qualifiée par version :
+le cycle visuel complet et les clics après masquage doivent être éprouvés sur le
+paquet signé exact. Le premier essai `CGWindowList` est invalidé sur MAC-01 : Chrome
+restait retourné au point après Afficher le bureau et bloquait toute interaction.

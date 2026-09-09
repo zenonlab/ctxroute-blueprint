@@ -6,6 +6,14 @@ struct DesktopInputSurface: Sendable {
     let theme: Theme
     let layout: SurfaceLayout
     let quartzBounds: CGRect
+    let desktopItemsVisible: Bool?
+}
+
+struct DesktopInputTarget: Sendable {
+    let theme: Theme
+    let layout: SurfaceLayout
+    let point: ScenePoint
+    let desktopItemsVisible: Bool?
 }
 
 struct DesktopInputSnapshot: Sendable {
@@ -29,22 +37,25 @@ struct DesktopInputSnapshot: Sendable {
                   abs(screen.frame.width - layout.width) < 1, abs(screen.frame.height - layout.height) < 1 else {
                 return nil
             }
-            return DesktopInputSurface(theme: theme, layout: layout, quartzBounds: bounds)
+            return DesktopInputSurface(theme: theme, layout: layout, quartzBounds: bounds,
+                desktopItemsVisible: catalog.theme(layout.theme_id)?.state.desktopItemsVisible)
         }
         return DesktopInputSnapshot(surfaces: surfaces, finderPID: finderPID)
     }
 
-    func target(at point: CGPoint, now: Double) -> (Theme, SurfaceLayout, ScenePoint)? {
-        let matches = surfaces.compactMap { surface -> (Theme, SurfaceLayout, ScenePoint)? in
+    func target(at point: CGPoint, now: Double) -> DesktopInputTarget? {
+        let matches = surfaces.compactMap { surface -> (Theme, SurfaceLayout, ScenePoint, Bool?)? in
             guard surface.quartzBounds.contains(point) else { return nil }
             return (surface.theme, surface.layout,
-                ScenePoint(x: point.x - surface.quartzBounds.minX, y: point.y - surface.quartzBounds.minY))
+                ScenePoint(x: point.x - surface.quartzBounds.minX, y: point.y - surface.quartzBounds.minY),
+                surface.desktopItemsVisible)
         }
         guard let first = matches.first,
-              matches.allSatisfy({ $0.0 == first.0 && $0.2 == first.2 }),
+              matches.allSatisfy({ $0.0 == first.0 && $0.2 == first.2 && $0.3 == first.3 }),
               let layout = SurfaceLayout.consensus(matches.map(\.1), theme: first.0, point: first.2, now: now) else {
             return nil
         }
-        return (first.0, layout, first.2)
+        return DesktopInputTarget(theme: first.0, layout: layout, point: first.2,
+            desktopItemsVisible: first.3)
     }
 }

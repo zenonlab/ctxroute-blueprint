@@ -95,10 +95,15 @@ l'identité de confiance. [ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md
 l'essai App Group, dont la sonde CLI réussissait mais le provider hébergé échouait.
 Les premières quittances natives ad hoc sont observées ; aucun succès de gestes,
 de cycle Spaces ou de distribution signée n'est déduit de ce transport.
-Sans classification certaine de la cible Finder, il ne consomme aucun clic.
-La visibilité des éléments du bureau est proposée dans les réglages macOS récents,
-mais aucun réglage interne tel que `CreateDesktop` n'est promu en API produit avant
-preuve d'observation, de restauration et de compatibilité sur la version qualifiée.
+Sans classification certaine de la cible Finder, il ne consomme
+aucun clic. Le PoC emploie `CreateDesktop` derrière la capacité portable
+`desktop.items.visible`, car `StandardHideDesktopIcons` s'est montré sans effet
+visuel sur MAC-01 malgré une écriture et un rechargement confirmés. Cette préférence
+reste une implémentation privée du connecteur, jamais une API de thème ni une garantie
+multi-version. Visible, Finder est qualifié par AX. Masqué, le tap refuse les gestes
+et des micro-fenêtres d'entrée transparentes matérialisent seulement les cibles du
+thème au niveau `normal - 1`. Le WindowServer, et non une heuristique d'occlusion,
+décide alors si une application ordinaire les couvre.
 
 ### Windows
 
