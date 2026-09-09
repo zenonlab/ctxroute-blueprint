@@ -1,16 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
-import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createReview, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
+import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createWork, favoriteSourceId, libraryId, progressId, workId } from '@tobirink/domain';
 import { createWebBridgeRequestHandler } from './web-bridge-adapter';
 
 const primaryLibraryId = libraryId('library_primary');
 
 async function addResolvedWork(storage: MemoryStoragePort, input: { id: string; kind: 'anime' | 'manga'; title: string }) {
   const id = workId(input.id);
-  const review = createReview({ id: reviewId(`review_${input.id.slice(5)}`), matchedWorkId: id, sourceLabel: input.title, status: 'resolved', title: input.title });
   await storage.putWork(createWork({ externalReferences: [], id, mediaKind: input.kind, preferredTitle: input.title }));
-  await storage.putReview(review);
-  await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: `bookmark-${input.id}`, folderPath: ['Bibliothèque'], id: favoriteSourceId(`source_${input.id.slice(5)}`), importedAt: '2026-09-06T00:00:00.000Z', order: 0, reviewId: review.id, title: input.title, url: `https://reader.example/${input.id}` }));
+  await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: `bookmark-${input.id}`, folderPath: ['Bibliothèque'], id: favoriteSourceId(`source_${input.id.slice(5)}`), importedAt: '2026-09-06T00:00:00.000Z', matchedWorkId: id, order: 0, resolution: { kind: 'RESOLVED' }, title: input.title, url: `https://reader.example/${input.id}` }));
   return id;
 }
 
@@ -62,10 +60,8 @@ describe('WebBridge private projections', () => {
   it('truncates a large Agenda projection below the transport ceiling', async () => {
     const storage = new MemoryStoragePort();
     const id = workId('work_largeagenda');
-    const review = createReview({ id: reviewId('review_largeagenda'), matchedWorkId: id, sourceLabel: 'Agenda', status: 'resolved', title: 'Agenda' });
     await storage.putWork(createWork({ externalReferences: [], id, mediaKind: 'anime', preferredTitle: 'Agenda volumineux' }));
-    await storage.putReview(review);
-    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'bookmark-large-agenda', folderPath: [], id: favoriteSourceId('source_largeagenda'), importedAt: '2026-09-06T00:00:00.000Z', order: 0, reviewId: review.id, title: 'Source locale', url: `https://reader.example/${'a'.repeat(1_700)}` }));
+    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'bookmark-large-agenda', folderPath: [], id: favoriteSourceId('source_largeagenda'), importedAt: '2026-09-06T00:00:00.000Z', matchedWorkId: id, order: 0, resolution: { kind: 'RESOLVED' }, title: 'Source locale', url: `https://reader.example/${'a'.repeat(1_700)}` }));
     for (let index = 0; index < 100; index += 1) {
       await storage.putAgendaEntry(createAgendaEntry({ availability: 'estimated', id: agendaEntryId(`agenda_large${String(index).padStart(3, '0')}`), occursAt: `2026-09-${String(7 + (index % 7)).padStart(2, '0')}T${String(index % 24).padStart(2, '0')}:00:00.000Z`, releaseLabel: `Sortie ${index}`, workId: id }));
     }

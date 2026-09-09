@@ -1,7 +1,7 @@
 import type { ProgressId, WorkId } from './identity';
 import { invariant, nonNegativeNumber } from './invariant';
 
-export type ProgressKind = 'chapter' | 'episode';
+export type ProgressKind = 'chapter' | 'episode' | 'volume';
 
 export interface Progress {
   id: ProgressId;

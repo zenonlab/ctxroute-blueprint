@@ -326,6 +326,12 @@ Les cas d’usage locaux construisent ensuite :
 Une `Work` absente produit un état partiel. Une lecture UI ne déclenche aucun
 réseau et ne remplace aucune donnée manquante par une fixture.
 
+Le commit `RESOLVED` écrit atomiquement la `Work`, son association à la
+`FavoriteSource` et la progression chapitre, épisode ou volume extraite du
+favori. Une observation plus basse ne remplace jamais une progression locale
+plus avancée. WebBridge retrouve la source directement par `matchedWorkId`;
+une Review résolue n'est pas requise pour ouvrir le favori d'origine.
+
 ### 11. Réconcilier et reprendre
 
 Au démarrage et sur alarme, le runner libère les claims expirés, exécute les

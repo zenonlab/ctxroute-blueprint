@@ -24,20 +24,23 @@ function projectionFits(serialized: string): boolean {
 }
 
 async function preferredSource(storage: StoragePort, id: WorkId): Promise<FavoriteSource | undefined> {
-  const reviews = await storage.listReviewsByWorkId({ limit: 100, workId: id });
-  const sources = await Promise.all(reviews.map((review) => storage.findFavoriteSourceByReviewId(review.id)));
-  return sources.filter((source): source is FavoriteSource => source !== undefined)
+  const sources = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: id });
+  return sources.filter((source) => source.presence === 'observed')
     .sort((left, right) => left.folderPath.join('\u0000').localeCompare(right.folderPath.join('\u0000')) || left.order - right.order || left.id.localeCompare(right.id))[0];
+}
+
+function progressLabel(progress: Awaited<ReturnType<StoragePort['findProgressByWorkId']>>): string | undefined {
+  if (progress === undefined) return undefined;
+  const label = progress.kind === 'episode' ? 'Épisode' : progress.kind === 'volume' ? 'Volume' : 'Chapitre';
+  return `${label} ${progress.value}${progress.maximum === undefined ? '' : `/${progress.maximum}`}`;
 }
 
 async function mapLibraryItem(storage: StoragePort, work: Work) {
   const [progress, source] = await Promise.all([storage.findProgressByWorkId(work.id), preferredSource(storage, work.id)]);
   const base = { mediaKind: work.mediaKind, title: work.preferredTitle, workId: work.id };
-  const progressLabel = progress
-    ? `${progress.kind === 'episode' ? 'Épisode' : 'Chapitre'} ${progress.value}${progress.maximum === undefined ? '' : `/${progress.maximum}`}`
-    : undefined;
-  if (progressLabel && source) return { ...base, progressLabel, sourceUrl: source.url };
-  if (progressLabel) return { ...base, progressLabel };
+  const label = progressLabel(progress);
+  if (label && source) return { ...base, progressLabel: label, sourceUrl: source.url };
+  if (label) return { ...base, progressLabel: label };
   if (source) return { ...base, sourceUrl: source.url };
   return base;
 }

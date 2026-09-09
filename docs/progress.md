@@ -318,3 +318,11 @@
 
 - [x] **Add a bounded release snapshot publication gate** — DONE _(evidence: 19 infrastructure tests pass with fail-closed release publication coverage, npm run verify passes including repeated Chromium IndexedDB contract, production-publication Archify showcase passes 9 of 9 with zero warnings)_
 - [x] **Publish and verify the empty public snapshot** — DONE _(evidence: Cloudflare plan 45d51fc1 changed only the snapshot and current pointer keys, GET v1 releases returns HTTP 200 revision empty-2026-09-09 and conditional HTTP 304, D1 has no pending migration and both public ZIP hashes remain exact)_
+
+## Restore the complete local favorite-to-library pipeline — ACTIVE
+
+- [x] **Persist complete resolved favorite state** — DONE _(evidence: Vitest targeted resolution WebBridge collective and domain suite: 36 passed, All 9 workspace typechecks passed, ESLint and complete documentation validation passed)_
+- [ ] **Preserve provider display metadata and covers** — PENDING
+- [ ] **Project the complete local catalogue to the website** — PENDING
+- [ ] **Restore rights-aware cover delivery** — PENDING
+- [ ] **Certify the installed multi-provider pipeline** — PENDING

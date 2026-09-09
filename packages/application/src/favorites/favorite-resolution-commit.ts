@@ -1,5 +1,5 @@
-import { addWork, createFavoriteSource, createLibrary, createReview, createWork, reviewId, workId } from '@tobirink/domain';
-import type { ExternalReference, FavoriteResolutionResult, LibraryId, ProviderCandidate, WorkId } from '@tobirink/domain';
+import { addWork, createFavoriteSource, createLibrary, createProgress, createReview, createWork, progressId, reviewId, workId } from '@tobirink/domain';
+import type { ExternalReference, FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, Progress, ProviderCandidate, WorkId } from '@tobirink/domain';
 import type { FavoriteReviewCandidateSet, StoragePort } from '../ports/storage-port';
 import { commitTask, parseFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
 import type { DurableTask } from '../tasks';
@@ -25,6 +25,16 @@ export function favoriteCandidateWorkId(candidate: Pick<ProviderCandidate, 'prov
   return workId(`work_${encoded}`);
 }
 
+function resolvedProgress(artifact: FavoriteParseArtifact, candidate: ProviderCandidate, id: WorkId, previous?: Progress): Progress | undefined {
+  const observed = artifact.progress;
+  if (observed === undefined || previous !== undefined && previous.kind !== observed.kind) return previous;
+  const maximum = observed.kind === 'episode' ? candidate.episodeCount : observed.kind === 'chapter' ? candidate.chapterCount : candidate.volumeCount;
+  const value = Math.max(previous?.value ?? 0, observed.value);
+  const boundedMaximum = maximum !== undefined && maximum >= value ? maximum : previous?.maximum !== undefined && previous.maximum >= value ? previous.maximum : undefined;
+  const base = { id: previous?.id ?? progressId(`progress_favorite_${id.slice('work_'.length)}`), kind: observed.kind, value, workId: id };
+  return createProgress(boundedMaximum === undefined ? base : { ...base, maximum: boundedMaximum });
+}
+
 export async function persistFavoriteResolutionCompletion(
   dependencies: FavoriteResolutionCommitDependencies,
   task: DurableTask,
@@ -38,7 +48,7 @@ export async function persistFavoriteResolutionCompletion(
   const resolution = favoriteResolutionResultSchema.parse(result);
   await dependencies.storage.transaction([
     'favoriteArtifacts', 'favoriteSources', 'favoriteResolutionReceipts',
-    'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'libraries', 'reviews', 'works',
+    'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'libraries', 'progress', 'reviews', 'works',
   ], async (session) => {
     const payload = parseFavoriteResolutionTaskPayload(task.payload);
     const source = await session.getFavoriteSource(payload.sourceId);
@@ -67,12 +77,15 @@ export async function persistFavoriteResolutionCompletion(
           preferredTitle: candidate.titles.find((title) => title.trim().length > 0) ?? source.title,
         });
         await session.putWork(work);
+        const progress = resolvedProgress(record.artifact, candidate, work.id, await session.findProgressByWorkId(work.id));
+        if (progress !== undefined) await session.putProgress(progress);
         const library = await session.getLibrary(dependencies.libraryId) ?? createLibrary(dependencies.libraryId);
         if (!library.workIds.includes(work.id)) await session.putLibrary(addWork(library, work.id));
         updated = createFavoriteSource({ ...updated, matchedWorkId: work.id });
         if (existingReview) await session.putReview(createReview({ ...existingReview, decisionOrigin: 'automatic', matchedWorkId: work.id, status: 'resolved' }));
       } else if (resolution.kind === 'REVIEW_REQUIRED') {
         if (source.presence !== 'observed') throw new Error('STALE_PRIVATE_REFERENCE');
+        if (resolution.reason === 'AMBIGUOUS' && (candidateSet === undefined || (candidateSet.totalCandidates ?? candidateSet.candidates.length) < 2 || candidateSet.candidates.length < 2)) throw new Error('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
         const id = source.reviewId ?? reviewId(`review_${source.id.slice('source_'.length)}`);
         await session.putReview(createReview({ id, reason: resolution.reason, sourceLabel: source.url, status: 'pending', title: source.title }));
         const compared = candidateSet ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };

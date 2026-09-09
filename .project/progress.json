@@ -6567,6 +6567,167 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-end-to-end-remediation",
+      "title": "Restore the complete local favorite-to-library pipeline",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Persist complete resolved favorite state",
+          "status": "DONE",
+          "acceptance": [
+            "A direct resolution links its observed FavoriteSource to the Work and WebBridge retrieves that source without a Review",
+            "Parsed bookmark progression is persisted transactionally and does not regress existing progress automatically",
+            "AMBIGUOUS Reviews contain at least two comparable identities while NOT_FOUND remains separately actionable"
+          ],
+          "files": [
+            "packages/domain/src/progress.ts",
+            "packages/application/src/favorites/favorite-resolution-commit.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/collective-index/favorite-collective-lookup.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run packages/application/src/favorites/favorite-resolution-runner.test.ts apps/extension/runtime/web-bridge-adapter.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m fix(favorites): persist complete resolved favorite state"
+          ],
+          "evidence": [
+            "Vitest targeted resolution WebBridge collective and domain suite: 36 passed",
+            "All 9 workspace typechecks passed",
+            "ESLint and complete documentation validation passed",
+            "favorite-resolution.dataflow showcase: 9 of 9 checks passed",
+            "git diff --check passed"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Preserve provider display metadata and covers",
+          "status": "TODO",
+          "acceptance": [
+            "AniList MangaUpdates MangaDex and Kitsu hydration preserve a bounded HTTPS cover descriptor and title-language evidence",
+            "Provider metadata remains local and strict contracts reject untrusted image origins or oversized values",
+            "Existing Work records migrate additively without data deletion"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/work.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.test.ts"
+          ],
+          "commands": [
+            "npm test -- --run packages/adapters-browser/src/favorites",
+            "npm run typecheck",
+            "git diff --check",
+            "git commit -m feat(metadata): preserve provider display metadata"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Project the complete local catalogue to the website",
+          "status": "TODO",
+          "acceptance": [
+            "The website receives the same local facets sorting statistics metadata cover progression and source as the extension catalogue",
+            "Facet controls remain visible and support multiple include or exclude selections",
+            "Every card opens a real favorite source or a functional local work detail route; no inert work fragment remains"
+          ],
+          "files": [
+            "packages/contracts/src/web-bridge.ts",
+            "packages/application/src/ports/web-bridge-port.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/library/[workId]/page.tsx",
+            "packages/ui/src/features/library/library-surface/Library.tsx",
+            "packages/ui/src/features/library/library-surface/Library.test.tsx"
+          ],
+          "commands": [
+            "npm test -- --run apps/extension/runtime/web-bridge-adapter.test.ts packages/ui/src/features/library/library-surface/Library.test.tsx",
+            "npm run typecheck",
+            "npm run test:web",
+            "git diff --check",
+            "git commit -m fix(library): project the complete local catalogue"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Restore rights-aware cover delivery",
+          "status": "TODO",
+          "acceptance": [
+            "Provider covers render through fixed allowlisted URLs with attribution and bounded fallback behavior",
+            "R2 ingestion remains unavailable unless an explicit provider rights policy permits it and is callable only through the operational gate",
+            "No raw favorite URL title folder or progression is written to Cloudflare"
+          ],
+          "files": [
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-cloudflare/src/media/cover-master-adapter.ts",
+            "apps/worker/src/composition.ts",
+            "apps/worker/src/media/cover-routes.ts",
+            "apps/worker/src/media/cover-routes.test.ts",
+            "docs/decisions/ADR-0026-catalogue-and-media-pipeline.md",
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm test -- --run apps/worker/src/media/cover-routes.test.ts packages/adapters-cloudflare/src/media",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m feat(media): restore provider cover delivery"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Certify the installed multi-provider pipeline",
+          "status": "TODO",
+          "acceptance": [
+            "Synthetic FavLib-shaped fixtures cover AniList MangaUpdates MangaDex Kitsu slug resolution progression source metadata and covers without reading a FavLib database",
+            "Chrome and Firefox packaged builds pass import to rendered library tests with zero ordinary links in Review",
+            "The full verification suite and Archify showcase pass and reproducible ZIP hashes are recorded locally"
+          ],
+          "files": [
+            "packages/application/src/favorites/equivalence-corpus.ts",
+            "packages/application/src/favorites/equivalence-oracle.test.ts",
+            "apps/extension/e2e/favorite-library.spec.ts",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:workspaces",
+            "npm run test:indexeddb:chromium",
+            "npm run build:extension:chrome",
+            "npm run build:extension:firefox",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m test(favorites): certify complete local library flow"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
