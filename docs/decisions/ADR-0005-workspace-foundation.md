@@ -29,7 +29,9 @@ An exact transitive security pin may be corrected by a version-bound,
 reviewable `patch-package` diff when the upstream package has not published the
 patch. Its lockfile edge records the same reviewed replacement. The
 clean-install gate must apply it without fuzz, produce a valid
-`npm ls` tree and pass every affected runtime test.
+`npm ls` tree and pass every affected runtime test. Darwin native bindings must
+not carry Linux-only `libc` selectors in the lockfile because npm otherwise
+omits the matching macOS optional package.
 
 ## Alternatives
 
