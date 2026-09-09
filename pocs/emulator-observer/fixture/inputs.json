@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "events": [
+    { "frame": 2, "port": 0, "device": 1, "index": 0, "id": 8, "value": 1 },
+    { "frame": 3, "port": 0, "device": 1, "index": 0, "id": 8, "value": 1 },
+    { "frame": 7, "port": 0, "device": 1, "index": 0, "id": 8, "value": 1 }
+  ]
+}

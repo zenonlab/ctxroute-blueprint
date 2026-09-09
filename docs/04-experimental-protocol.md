@@ -1,6 +1,7 @@
 # Protocole expérimental produit
 
-État : protocole préparé le 7 septembre 2026 ; aucun essai produit exécuté.
+État : protocole préparé le 7 septembre 2026. Les essais produit E1–E6 restent
+ouverts ; seul le harnais préparatoire E6-A1 sur fixture originale a été exécuté.
 Le [plan de démarrage L1–L3](05-poc-start-plan.md) fixe maintenant la stack
 expérimentale, les fixtures bornées, les états simulés et les premiers livrables.
 Complète la [stratégie qualité](02-quality-strategy.md), les tests P01–P28 et

@@ -111,6 +111,13 @@ pause/reprise, perte/reconnexion du lien et refus d'un pair de signature étrang
 Ces essais restent distincts de la visibilité réelle, de la priorité Finder et
 des mesures énergétiques ; les scripts du PoC1 ci-dessus ne qualifient pas le PoC2.
 
+Le harnais préparatoire E6-A1 s'exécute avec
+`bash pocs/emulator-observer/test.sh`. Il compile uniquement le core-fixture C
+original, lance cinq observations identiques, compare les artefacts et refuse les
+entrées symboliques, les nombres de frames hors quota et une sortie non vide. Ce
+gate valide l'ABI du frontend et sa répétabilité ; il ne valide ni la sandbox d'un
+core natif tiers, ni une console, ni la transformation d'un jeu.
+
 ## Scénarios d'acceptation produit
 
 Les [épreuves I01–I10](architecture/theme-interactions.md#tranche-de-validation-et-limites)

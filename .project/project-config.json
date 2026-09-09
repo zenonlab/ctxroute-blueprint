@@ -9,11 +9,11 @@
     "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. Rust remains a candidate for the portable core and renderer; no production language is frozen. Node.js is governance tooling only.",
     "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
     "frontend": "PoC2 uses one authoritative control surface at a time. Native connector UI owns permissions and recovery; the portable theme owns fully stylable semantic menus, buttons, panels, system_controls and 2D/3D scene presentation. PoC2 diagnostics are not product design.",
-    "backend": "PoC2 has no server, PTY, game reader or LLM runtime. A per-login user agent and the sandboxed wallpaper provider exchange bounded typed XPC messages with mutually pinned code signatures. App Group probes are historical only; ADR-0053.",
+    "backend": "The wallpaper/terminal runtimes contain no game reader or LLM runtime. PoC2 uses a per-login user agent and a sandboxed wallpaper provider with bounded typed XPC and pinned signatures. The isolated E6-A1 offline observer is a Python ctypes frontend plus original C Libretro fixture; it is never loaded by the wallpaper runtime.",
     "storage": "PoC2 has three canonical JSON fixtures in an immutable embedded catalog, in-memory provider state and private local customization JSON in the agent's Application Support directory after a correlated receipt. Artifacts stay under ignored dist/. No ROM or terminal content is stored; ADR-0054.",
     "deployment": "PoC2: opt-in persistent user LaunchAgent, idempotent start, crash recovery and an installation gate on signing identity changes. Local certificate signing is explicit; TCC and login behavior require native qualification. Private Apple wallpaper provider remains experimental, not an App Store claim; ADR-0055.",
     "observability": "PoC2: bounded capability, lifecycle, command/receipt and render counters without terminal content, filenames or desktop capture; every proof is dated and tied to MAC-01.",
-    "security": "PoC2 defaults to passive input. Global click handling is enabled only with TCC permission and positive Finder-background classification; unknown targets fail open to macOS. No shell, network, ROM, IA or converter is in scope.",
+    "security": "PoC2 defaults to passive input. Global click handling requires TCC and positive Finder-background classification; unknown targets fail open to macOS. The optional offline observer accepts only local bounded regular files; E6-A1 loads native fixture code in-process and therefore does not claim third-party-core isolation.",
     "performance": "PoC2 uses event invalidation, no timer for static scenes, and measured incremental energy against the native desktop across all related processes; no numerical budget is claimed before the benchmark."
   },
   "commands": {
@@ -58,6 +58,7 @@
       "pocs/macos-connector/",
       "pocs/macos-surface/",
       "pocs/macos-native-wallpaper/",
+      "pocs/emulator-observer/",
       "packages/",
       "scripts/"
     ],

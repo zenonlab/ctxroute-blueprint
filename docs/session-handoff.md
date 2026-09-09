@@ -14,6 +14,11 @@ La frontière émulateur est actée par ADR-0056 : observation locale optionnell
 hors ligne, jamais runtime. Le rapport sourcé et les essais E6-A à E6-C sont dans
 `docs/research/macos-interaction-and-emulator-boundary.md`.
 
+E6-A1 est maintenant exécutable sous `pocs/emulator-observer/` : un frontend Python
+charge un core-fixture C original, capture cinq artefacts et produit un manifeste
+de capacités. Cinq runs de douze frames sont identiques ; trois refus de sûreté sont
+testés. La sandbox d'un core tiers reste explicitement E6-A2.
+
 ## Qualification du filtre Finder — 8 septembre 2026, 22:35
 
 Les clics réels à 22:29 atteignaient le tap mais produisaient `finder-rejected`

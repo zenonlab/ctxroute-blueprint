@@ -71,12 +71,18 @@ utilise en outre une constante de niveau Finder mesurée et interroge la liste d
 fenêtres dans le callback. Il constitue une preuve de faisabilité pour le survol
 et la duplication d’entrée, pas pour l’exclusivité exigée ici.
 
-Halo illustre le second modèle. Son tap `.defaultTap` fonctionne sur un thread
-dédié, retourne `nil` lorsque le raccourci doit être avalé et réarme le port si le
-système le désactive.^7 Son domaine fonctionnel est différent — clavier et overlay
+Halo illustre le second modèle. Son tap HID `.defaultTap` fonctionne sur un thread
+dédié, retourne `nil` lorsque le raccourci doit être avalé, garde son callback court
+et vérifie périodiquement si le système a désactivé le port.^7 Son domaine fonctionnel est différent — clavier et overlay
 temporaire — mais son cycle de vie est la bonne référence pour une interception
 exclusive. Halo souligne aussi qu’une identité de signature stable est nécessaire
 pour conserver l’autorisation Accessibility entre deux builds.^7
+
+La documentation Core Graphics publiée par Apple réserve toutefois le point HID
+aux processus root.^5 Ce contrat public prime sur le seul exemple Halo : le PoC
+tente HID sur les versions où le système l'autorise, puis utilise le point de
+session si la création retourne `NULL`. Il ne retombe jamais silencieusement sur
+le point annoté qui avait laissé le geste WindowServer se produire en parallèle.
 
 La méthode retenue combine ces enseignements sans importer leur UI :
 
@@ -87,7 +93,7 @@ La méthode retenue combine ces enseignements sans importer leur UI :
 | Géométrie | Instantané immuable des surfaces et thèmes | Ambiguïté entre deux représentations : refus |
 | Priorité Finder | Hit-test AX du point et chaîne de rôles bornée | Icône, texte, bouton, fenêtre ou erreur : macOS garde le clic |
 | Geste | Routeur appui/drag/relâchement | Un drag ne devient jamais un clic ; le relâchement capturé reste équilibré |
-| Interception | `CGEventTap` actif annoté, CFRunLoop dédié | `nil` uniquement pour un geste positivement capturé |
+| Interception | `CGEventTap` actif HID puis repli session, CFRunLoop dédié, watchdog | `nil` uniquement pour un geste positivement capturé |
 | Action | Dispatch asynchrone vers l’acteur principal | Aucun XPC, ouverture d’app ou modale dans le callback |
 | Reprise | Réarmement sur notifications de désactivation | État publié dans le diagnostic ; aucun succès silencieux |
 
@@ -97,6 +103,14 @@ de coût de production. L’étape suivante doit comparer ce chemin à un cache 
 qualification maintenu hors callback. Un cache ne peut être adopté que s’il garde
 la priorité d’une icône déplacée juste avant le clic et échoue ouvert lorsque son
 âge ou sa provenance ne sont plus valides.
+
+Apple précise que `AXUIElementCopyElementAtPosition` utilise le Z-order réel et
+des coordonnées écran relatives au coin supérieur gauche.^13 Le point reçu par
+Core Graphics peut donc être réutilisé sans conversion AppKit ; la qualification
+doit toutefois accepter `kAXErrorCannotComplete` comme un refus ponctuel, pas comme
+la preuve que la zone appartient au wallpaper. Le timeout de 3 ms du premier essai
+pouvait produire des refus sous charge : il est remplacé par 12 ms par appel et un
+plafond total de 80 ms, toujours en mode fail-open vers macOS.
 
 ## État observé du PoC corrigé
 
@@ -247,6 +261,11 @@ maximum. Il ne commence pas par une matrice de toutes les consoles.
 - hashes des frames, de l’audio et des traces comparés sur cinq exécutions ;
 - réseau interdit, entrée en lecture seule, sortie dédiée et quotas appliqués.
 
+La tranche E6-A1 du dépôt valide l'ABI, les callbacks et la répétabilité avec un
+core-fixture original. Elle charge encore la bibliothèque native dans son propre
+processus : le confinement réseau et système d'un core tiers reste E6-A2 et ne doit
+pas être annoncé comme acquis.
+
 ### E6-B — Observation spécialisée
 
 - une scène GameCube/Wii via FIFO Dolphin, ou un système MAME via Lua ;
@@ -282,3 +301,4 @@ l’adoption de ce chemin.
 10. MAME, « [Lua Scripting Interface](https://docs.mamedev.org/luascript/index.html) » et « [Lua Device Classes](https://docs.mamedev.org/luascript/ref-devices.html) », version 0.289, consultés le 9 septembre 2026.
 11. DuckStation, « [Texture Replacement](https://github.com/stenzek/duckstation/wiki/Texture-Replacement) », limites et formats de dump, consulté le 9 septembre 2026.
 12. Ghidra, « [AnalyzeHeadless](https://ghidra.re/ghidra_docs/api/ghidra/app/util/headless/AnalyzeHeadless.html) » et « [HeadlessOptions](https://ghidra.re/ghidra_docs/api/ghidra/app/util/headless/HeadlessOptions.html) », consultés le 9 septembre 2026.
+13. Apple, « [AXUIElementCopyElementAtPosition](https://developer.apple.com/documentation/applicationservices/1462077-axuielementcopyelementatposition) », coordonnées et hit-test suivant le Z-order, consulté le 9 septembre 2026.

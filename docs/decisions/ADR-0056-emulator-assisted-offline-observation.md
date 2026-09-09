@@ -5,6 +5,7 @@ scope:
   - docs/04-experimental-protocol.md
   - docs/research/macos-interaction-and-emulator-boundary.md
 review: on-change
+revised: true
 ---
 # ADR-0056 — Observation émulée locale et hors ligne
 
@@ -45,4 +46,5 @@ les capacités du jeu concerné sans fragiliser le cœur produit. Les thèmes of
 ne redistribuent aucune donnée commerciale extraite.
 
 L'adoption effective d'un outil attend les preuves E6-A à E6-C : répétabilité du
-runner, corrélation spécialisée et exécution autonome du résultat.
+runner, confinement du core tiers, corrélation spécialisée et exécution autonome
+du résultat. Le PoC E6-A1 ne vaut pas preuve de sandbox à lui seul.
