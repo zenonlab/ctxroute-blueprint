@@ -26,6 +26,8 @@ describe('FacetSelect', () => {
     expect(component).toMatch(/current === 'include'/);
     expect(component).toMatch(/delete next\[optionValue\]/);
     expect(component).toMatch(/'check'.*'x'.*'circle'/s);
+    expect(component).toMatch(/onClick=\{\(\) => toggleOption\(option\.value\)\}/);
+    expect(component).not.toMatch(/onClick=\{\(\) => \{\s*toggleOption\(option\.value\);\s*closeMenu/u);
   });
 
   it('supports arrows, Escape and focus restoration', () => {
@@ -49,6 +51,8 @@ describe('FacetSelect', () => {
     expect(css).toMatch(/backdrop-filter: blur\(var\(--space-3\)\)/);
     expect(css).toMatch(/var\(--color-primary-soft\)/);
     expect(css).toMatch(/var\(--color-danger-soft\)/);
+    expect(css).toMatch(/max-height: calc\(100vh - var\(--space-8\)\)/);
+    expect(css).toMatch(/overflow-y: auto/);
     expect(css).toMatch(/prefers-reduced-motion: reduce/);
     expect(css).not.toMatch(/linear-gradient/);
   });

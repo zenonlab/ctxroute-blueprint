@@ -22,15 +22,18 @@ describe('offline library and automatic progress', () => {
     expect(await storage.getWork(id)).toEqual(work);
   });
 
-  it('routes bounded Library pages through the background instead of React storage access', () => {
+  it('routes the bounded full-library catalogue through the background instead of React storage access', () => {
     const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
 
-    expect(background).toMatch(/readLibraryPage\(privateStorage\.storage, input\)/);
+    expect(background).toMatch(/readLocalLibraryCatalogueSnapshot\(privateStorage\.storage, primaryLibraryId, parsed\.data\)/);
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).not.toMatch(/library\.page\.read[\s\S]{0,900}fetch\(/);
     expect(background).not.toMatch(/defineContentScript|browser\.scripting/);
-    expect(surface).toMatch(/readLibraryPageMessage\(model\.nextCursor\)/);
+    expect(surface).toMatch(/readCatalogue\(\{ \.\.\.catalogueInput, offset: model\.nextOffset \}\)/);
+    expect(surface).toMatch(/requestGeneration\.current !== generation/);
+    expect(surface).toMatch(/facets: \{ format: filters\.format, genre: filters\.genre/);
+    expect(surface).toMatch(/current\.statistics === undefined[\s\S]*state: 'loading'[\s\S]*: current/);
     expect(surface).not.toMatch(/items=\{\[\]\}/);
     expect(surface).not.toMatch(/indexedDB|Dexie/);
   });

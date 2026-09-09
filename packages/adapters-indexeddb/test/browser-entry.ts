@@ -1,13 +1,15 @@
 import { verifyStoragePortContract } from '@tobirink/contracts';
-import { commitTask, importFavoriteSources, recordTaskEffect } from '@tobirink/application';
+import { commitTask, importFavoriteSources, readLibraryCatalogue, recordTaskEffect } from '@tobirink/application';
 import {
   agendaEntryId,
   createAgendaEntry,
   createFavoriteSource,
+  createLibrary,
   createReminder,
   createReview,
   createWork,
   favoriteSourceId,
+  libraryId,
   reminderId,
   reviewId,
   workId,
@@ -40,6 +42,27 @@ try {
   if (!(await storage.getReview(review.id)) || !(await storage.getAgendaEntry(agenda.id)) || !(await storage.getReminder(reminder.id))) {
     throw new Error('Review, agenda or reminder did not round-trip through IndexedDB.');
   }
+  const catalogueWorks = Array.from({ length: 500 }, (_, index) => createWork({
+    externalReferences: [{ externalId: String(index + 1), provider: 'anilist' }],
+    hydration: {
+      candidate: { externalId: String(index + 1), genres: [index % 2 === 0 ? 'Fantasy' : 'Adventure'], mediaKind: 'ANIME', metadataVersion: 1, preSerialization: false, provider: 'anilist', startYear: 2000 + (index % 25), titles: [`Catalogue ${index}`] },
+      favoriteAliasKeys: [], hydratedAt: '2026-09-09T00:00:00.000Z', matcherVersion: 'matcher-v3', providerTitleKeys: [],
+    },
+    id: workId(`work_catalogue-${String(index).padStart(3, '0')}`),
+    mediaKind: 'anime',
+    preferredTitle: `Catalogue ${String(index).padStart(3, '0')}`,
+  }));
+  await storage.database.works.bulkPut(catalogueWorks);
+  const catalogueLibrary = createLibrary(libraryId('library_catalogue'), catalogueWorks.map(({ id }) => id));
+  await storage.database.libraries.put(catalogueLibrary);
+  const catalogueStartedAt = performance.now();
+  const catalogue = await readLibraryCatalogue(storage, { facets: { genre: { fantasy: 'include' } }, libraryId: catalogueLibrary.id, limit: 24, sort: 'YEAR_DESC' });
+  const catalogueElapsedMs = performance.now() - catalogueStartedAt;
+  if (catalogue.items.length !== 24 || catalogue.total !== 250 || catalogue.nextOffset !== 24) throw new Error('IndexedDB catalogue did not filter before stable pagination.');
+  if (catalogue.facets.genre.length !== 2 || catalogue.facets.genre.some(({ count }) => count !== 250)) throw new Error('IndexedDB catalogue facets did not describe the complete bounded corpus.');
+  if (JSON.stringify(catalogue).length >= 64 * 1024) throw new Error('IndexedDB catalogue page exceeded the MV3 response budget.');
+  if (catalogueElapsedMs >= 200) throw new Error(`IndexedDB catalogue exceeded 200 ms: ${catalogueElapsedMs.toFixed(2)} ms.`);
+  document.body.dataset.catalogueMs = catalogueElapsedMs.toFixed(2);
   await importFavoriteSources([{ bookmarkId: 'browser-atomic', folderPath: ['Mangas'], order: 0, state: 'eligible', title: 'Atomic fixture', url: 'https://reader.example/manga/atomic-fixture' }], storage, '2026-09-07T12:00:00.000Z');
   const imported = (await storage.listFavoriteSources({ limit: 10 })).find((source) => source.bookmarkId === 'browser-atomic');
   if (imported === undefined || await storage.getFavoriteParseArtifact(imported.id) === undefined) throw new Error('Favorite artifact did not share the import transaction.');
@@ -90,7 +113,7 @@ try {
   await organizerSnapshots.save(organizerSnapshot);
   if (JSON.stringify(await organizerSnapshots.load()) !== JSON.stringify(organizerSnapshot)) throw new Error('Organizer snapshot did not round-trip through IndexedDB.');
   document.body.dataset.status = 'passed';
-  document.body.textContent = 'IndexedDB StoragePort contract passed';
+  document.body.textContent = `IndexedDB StoragePort contract passed; 500-work catalogue ${document.body.dataset.catalogueMs} ms`;
 } catch (error) {
   document.body.dataset.status = 'failed';
   document.body.textContent = error instanceof Error ? error.message : String(error);

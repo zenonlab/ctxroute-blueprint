@@ -16,6 +16,9 @@ const attributesSchema = z.object({
   nsfw: z.boolean(),
   slug: nonEmptyString,
   subtype: nonEmptyString.nullable(),
+  status: nonEmptyString.optional(), startDate: nonEmptyString.nullable().optional(), endDate: nonEmptyString.nullable().optional(),
+  episodeCount: z.number().int().nonnegative().nullable().optional(), chapterCount: z.number().int().nonnegative().nullable().optional(), volumeCount: z.number().int().nonnegative().nullable().optional(),
+  userCount: z.number().int().nonnegative().nullable().optional(),
   titles: z.record(z.string(), nonEmptyString).refine((value) => Object.keys(value).length <= 16),
 }).strict();
 const resourceSchema = z.object({ attributes: attributesSchema, id: nonEmptyString, type: z.enum(['anime', 'manga']) }).passthrough();
@@ -43,15 +46,25 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCa
     preSerialization: expectedType === 'manga' && /novel/iu.test(resource.attributes.subtype ?? ''),
     provider,
     titles,
+    metadataVersion: 1,
   };
   if (resource.attributes.subtype !== null) result.format = resource.attributes.subtype;
   if (resource.attributes.nsfw || resource.attributes.ageRating === 'R18') result.categories = ['Adult'];
+  const status = resource.attributes.status?.toLocaleLowerCase();
+  if (status !== undefined) result.editorialStatus = status === 'current' ? 'ONGOING' : status === 'finished' ? 'COMPLETED' : status === 'unreleased' || status === 'upcoming' ? 'UPCOMING' : 'UNKNOWN';
+  const startYear = Number(resource.attributes.startDate?.slice(0, 4)); const endYear = Number(resource.attributes.endDate?.slice(0, 4));
+  if (Number.isSafeInteger(startYear) && startYear >= 1800 && startYear <= 3000) result.startYear = startYear;
+  if (Number.isSafeInteger(endYear) && endYear >= 1800 && endYear <= 3000) result.endYear = endYear;
+  if (resource.attributes.episodeCount != null) result.episodeCount = resource.attributes.episodeCount;
+  if (resource.attributes.chapterCount != null) result.chapterCount = resource.attributes.chapterCount;
+  if (resource.attributes.volumeCount != null) result.volumeCount = resource.attributes.volumeCount;
+  if (resource.attributes.userCount != null) result.popularity = { kind: 'MEMBERS', value: resource.attributes.userCount };
   return result;
 }
 
 function endpoint(provider: KitsuProvider, id?: string): string {
   const media = kind(provider);
-  if (id !== undefined) return `${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}?fields[${media}]=slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating`;
+  if (id !== undefined) return `${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}?fields[${media}]=slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating,status,startDate,endDate,episodeCount,chapterCount,volumeCount,userCount`;
   return `${kitsuApiOrigin}/${media}`;
 }
 
@@ -71,7 +84,7 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
     url.searchParams.set('filter[text]', query.titles[0] ?? '');
     url.searchParams.set('page[limit]', String(query.limit));
     url.searchParams.set('page[offset]', String((page - 1) * query.limit));
-    url.searchParams.set(`fields[${media}]`, 'slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating');
+    url.searchParams.set(`fields[${media}]`, 'slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating,status,startDate,endDate,episodeCount,chapterCount,volumeCount,userCount');
     const response = await this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, url.href, { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, searchSchema));
     const candidates = response.value.data.map((resource) => candidate(resource, this.provider));
     const truncated = response.value.links.next != null || response.value.meta.count > (page - 1) * query.limit + candidates.length;

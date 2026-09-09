@@ -6202,6 +6202,309 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-structured-metadata",
+      "title": "Add local library metadata facets sorting and statistics",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Add canonical provider metadata and additive local persistence",
+          "status": "DONE",
+          "acceptance": [
+            "Genres, editorial status, format, years, unit totals and popularity use strict optional canonical fields with provider provenance",
+            "AniList, MangaUpdates, MangaDex and Kitsu map available fields without affecting identity matching",
+            "IndexedDB migration and private export compatibility are additive, resumable and preserve all existing data"
+          ],
+          "files": [
+            "packages/domain/src/**",
+            "packages/application/src/favorites/**",
+            "packages/application/src/recovery/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-indexeddb/src/**",
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "git diff --check",
+            "git commit message feat(metadata): persist sortable provider facts"
+          ],
+          "evidence": [
+            "Provider contract and four adapters map strict optional status, year, totals, genres and comparable popularity without changing matcher rules",
+            "IndexedDB v13 adds metadata indexes; migrations, storage, recovery and all workspace typechecks pass",
+            "Domain 24, application 259, contracts 16 and provider adapter 35 tests pass; Archify showcase 9 of 9 and ADR validation pass"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Implement full-library facets sorting statistics and organizer statuses",
+          "status": "DONE",
+          "acceptance": [
+            "Filtering and sorting happen before pagination over the complete bounded local library query",
+            "Genre, status, type, format, year, progress, source and popularity filters and sorts are deterministic; missing values stay visible and sort last",
+            "Facet menus stay open after a click, preserve selected options and allow multiple simultaneous include or exclude selections",
+            "Organizer Ongoing, Completed, Hiatus and Cancelled rules receive real canonical metadata; local statistics never leave the extension"
+          ],
+          "files": [
+            "packages/application/src/library/**",
+            "packages/application/src/organizer/**",
+            "packages/ui/src/components/facet-select/**",
+            "packages/ui/src/features/library/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/library/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:e2e",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "git diff --check",
+            "git commit message feat(library): add stable metadata facets and sorting"
+          ],
+          "evidence": [
+            "Application 262, UI 127 and extension 114 tests pass; strict catalogue message supports stable seven-facet multi-selection before pagination",
+            "Organizer preview now uses hydrated editorial status, detailed media type and personal progress; targeted organizer and catalogue tests pass",
+            "Chrome and Firefox MV3 builds, all workspace typechecks, accessibility 8, security 21, Sensor SAFE and Archify showcase 9/9 pass"
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Document and verify the local metadata boundary",
+          "status": "DONE",
+          "acceptance": [
+            "ADR and Archify document provider provenance, local-only statistics, bounded queries and stable facet behavior",
+            "No description, synopsis, popularity or library metadata is written to D1 or storage.sync",
+            "Full repository verification passes and the final diff contains no unrelated user configuration"
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/**",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "package.json",
+            "package-lock.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --ignore-scripts",
+            "npm ls sharp",
+            "npm audit --audit-level=high",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- all",
+            "npm run verify",
+            "git diff --check",
+            "git commit message docs(library): define local metadata analytics boundary"
+          ],
+          "evidence": [
+            "Metadata facets statistics and provider popularity remain local to IndexedDB; storage.sync IDs and D1 payloads are unchanged",
+            "favorite-resolution dataflow and all product Archify sources pass showcase 9/9 with zero errors and warnings; docs and ADR validation pass",
+            "npm run verify passes end to end: 273 governance tests plus 1 skip, 665 workspace tests, Chromium IndexedDB, Chrome/Firefox builds, performance, integration and audit 0"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-audit-remediation",
+      "title": "Remediate the library metadata and facet audit",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Stabilize facet interactions and pagination",
+          "status": "DONE",
+          "acceptance": [
+            "Reject stale pagination after catalogue input changes",
+            "Keep multi-select facets open accessible and scrollable",
+            "Pass real UI and asynchronous interaction tests"
+          ],
+          "files": [
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/runtime/ExtensionSurface.test.tsx",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "packages/ui/src/components/facet-select/FacetSelect.tsx",
+            "packages/ui/src/components/facet-select/FacetSelect.module.css",
+            "packages/ui/src/components/facet-select/FacetSelect.test.tsx",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.test.tsx",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test:accessibility",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "git diff --check",
+            "git commit -m fix(library): stabilize facets and pagination"
+          ],
+          "evidence": [
+            "UI 127 and extension 117 tests pass including real facet and stale-page interactions",
+            "All workspace typechecks and accessibility 8 of 8 pass",
+            "Chrome and Firefox MV3 builds pass; favorite-resolution Archify showcase 9 of 9"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Preserve provider metadata semantics and message bounds",
+          "status": "DONE",
+          "acceptance": [
+            "Map only MangaDex genre tags as genres",
+            "Do not represent latest units as editorial totals",
+            "Bound domain values and MV3 projections without deleting stored data"
+          ],
+          "files": [
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/work.ts",
+            "packages/domain/src/work.test.ts",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/library-catalogue-messages.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "git diff --check",
+            "git commit -m fix(metadata): preserve provider fact semantics"
+          ],
+          "evidence": [
+            "MangaDex maps only genre-group tags; MangaDex and MangaUpdates no longer expose latest units as totals",
+            "Domain 24, application 262, browser adapters 53 and extension 118 tests pass",
+            "All workspace typechecks and favorite-resolution Archify showcase 9 of 9 pass"
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Verify bounded IndexedDB catalogue behavior",
+          "status": "DONE",
+          "acceptance": [
+            "Test 500 real IndexedDB works and stable pages of 24",
+            "Measure actual catalogue path and MV3 response size",
+            "Keep Chromium validation repeatable and evidence current"
+          ],
+          "files": [
+            "scripts/performance/extension-performance.test.tsx",
+            "packages/adapters-indexeddb/test/library-catalogue.test.ts",
+            "packages/application/src/library/read-library-catalogue.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:performance",
+            "npm run test:indexeddb",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "git diff --check",
+            "git commit -m test(library): verify bounded indexeddb catalogue"
+          ],
+          "evidence": [
+            "Chromium real IndexedDB catalogue reads 500 works filters to 250 and paginates 24 in 34.70 to 37.70 ms across three runs",
+            "The real catalogue snapshot remains below 64 KiB and complete-corpus facet counts are 250 each",
+            "Performance 4 of 4 and Chrome Firefox MV3 builds pass"
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Restore reproducible sharp dependency resolution",
+          "status": "DONE",
+          "acceptance": [
+            "Clean install and npm ls agree on sharp without invalid packages",
+            "Worker and browser builds pass from the clean tree",
+            "Audit has no high vulnerability and no node_modules patch is committed"
+          ],
+          "files": [
+            "package.json",
+            "package-lock.json",
+            "docs/01-technology-decisions.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --package-lock-only",
+            "npm ci",
+            "npm ls sharp --all",
+            "npm test --workspace @tobirink/worker",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "npm audit --audit-level=high",
+            "git diff --check",
+            "git commit -m chore(deps): restore reproducible sharp resolution"
+          ],
+          "evidence": [
+            "Clean npm ci payload plus postinstall applies the version-bound Miniflare patch and npm ls sharp all is valid at sharp 0.35.4",
+            "npm audit reports zero vulnerabilities; no opaque node_modules artifact is tracked",
+            "Worker 32 of 32 and Chrome Firefox MV3 builds pass from the clean dependency tree"
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Certify the corrected local library boundary",
+          "status": "DONE",
+          "acceptance": [
+            "Align ADR quality strategy and product diagrams",
+            "Pass favorite-resolution and all Archify showcase checks",
+            "Pass full verify and audit with no D1 sync production secret or user-config change"
+          ],
+          "files": [
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:architecture",
+            "npm run validate:docs -- --all",
+            "npm run check:coherence",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run verify",
+            "npm audit --audit-level=high",
+            "git diff --check",
+            "git commit -m docs(library): certify metadata facet boundaries"
+          ],
+          "evidence": [
+            "npm run verify passes: 675 workspace tests plus governance coverage, parser equivalence, performance, CRG and integration",
+            "Security 21 tests and recovery 30 tests pass; Chrome and Firefox MV3 builds pass",
+            "All Archify product views pass showcase 9 of 9; audit reports zero vulnerabilities and boundary diff shows no D1 sync recovery or hook change"
+          ]
+        }
+      ]
     }
   ]
 }

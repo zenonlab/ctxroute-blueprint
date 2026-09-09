@@ -130,5 +130,8 @@ export class TobirinkDatabase extends Dexie {
         if (review.reason !== undefined && review.status === 'pending' && review.availableAt === undefined) review.availableAt = '1970-01-01T00:00:00.000Z';
       });
     });
+    this.version(13).stores({
+      works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys, *hydration.candidate.genres, hydration.candidate.editorialStatus, hydration.candidate.format, hydration.candidate.startYear, hydration.candidate.popularity.value',
+    });
   }
 }

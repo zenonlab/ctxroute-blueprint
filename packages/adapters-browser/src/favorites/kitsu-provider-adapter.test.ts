@@ -4,7 +4,7 @@ import { KitsuFavoriteProviderAdapter } from './kitsu-provider-adapter';
 const anime = {
   attributes: {
     abbreviatedTitles: ['Frieren'], ageRating: 'PG', canonicalTitle: 'Sousou no Frieren', nsfw: false,
-    slug: 'sousou-no-frieren', subtype: 'TV', titles: { en: 'Frieren: Beyond Journey’s End', ja_jp: '葬送のフリーレン' },
+    endDate: '2024-03-22', episodeCount: 28, slug: 'sousou-no-frieren', startDate: '2023-09-29', status: 'finished', subtype: 'TV', titles: { en: 'Frieren: Beyond Journey’s End', ja_jp: '葬送のフリーレン' }, userCount: 180000,
   },
   id: '46474',
   type: 'anime',
@@ -20,7 +20,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
     const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
     expect(requested).toContain('filter%5Btext%5D=Frieren');
     expect(envelope).toMatchObject({ complete: true, provider: 'kitsu-anime', truncated: false });
-    expect(envelope.candidates[0]).toMatchObject({ externalId: '46474', mediaKind: 'ANIME', provider: 'kitsu-anime' });
+    expect(envelope.candidates[0]).toMatchObject({ editorialStatus: 'COMPLETED', endYear: 2024, episodeCount: 28, externalId: '46474', mediaKind: 'ANIME', popularity: { kind: 'MEMBERS', value: 180000 }, provider: 'kitsu-anime', startYear: 2023 });
   });
 
   it('marks paginated responses incomplete and rejects cross-lane media', async () => {

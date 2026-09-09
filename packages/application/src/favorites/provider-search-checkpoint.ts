@@ -11,19 +11,32 @@ import type { FavoriteProviderCandidatePort, ResolutionProvider } from './provid
 
 const levels = ['source-id', 'source-url', 'ordered-exact', 'explicit-season', 'reordered-significant-words', 'bounded-edit-distance'] as const;
 const text = z.string().min(1).max(1024);
+const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 export const providerCandidateSchema = z.strictObject({
   canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(16).optional(), externalId: text,
   format: text.optional(), genres: z.array(text).max(16).optional(), mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
+  editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
+  startYear: z.number().int().min(1800).max(3000).optional(), endYear: z.number().int().min(1800).max(3000).optional(),
+  episodeCount: count.optional(), chapterCount: count.optional(), volumeCount: count.optional(),
+  popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: count }).optional(), metadataVersion: z.literal(1).optional(),
   preSerialization: z.boolean(), provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']),
   season: z.number().int().positive().optional(), titles: z.array(text).min(1).max(16),
-}).transform(({ canonicalUrl, categories, format, genres, season, ...candidate }) => {
+}).transform(({ canonicalUrl, categories, format, genres, season, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
   const value: MutableProviderCandidate = candidate;
   if (canonicalUrl !== undefined) value.canonicalUrl = canonicalUrl;
   if (categories !== undefined) value.categories = categories;
   if (format !== undefined) value.format = format;
   if (genres !== undefined) value.genres = genres;
   if (season !== undefined) value.season = season;
+  if (editorialStatus !== undefined) value.editorialStatus = editorialStatus;
+  if (startYear !== undefined) value.startYear = startYear;
+  if (endYear !== undefined) value.endYear = endYear;
+  if (episodeCount !== undefined) value.episodeCount = episodeCount;
+  if (chapterCount !== undefined) value.chapterCount = chapterCount;
+  if (volumeCount !== undefined) value.volumeCount = volumeCount;
+  if (popularity !== undefined) value.popularity = popularity;
+  if (metadataVersion !== undefined) value.metadataVersion = metadataVersion;
   return createProviderCandidate(value, value.provider);
 });
 export const favoriteSearchCheckpointSchema = z.strictObject({

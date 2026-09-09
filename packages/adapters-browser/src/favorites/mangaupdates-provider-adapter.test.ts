@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './mangaupdates-provider-adapter';
 
-const series = { associated: [{ title: 'Synthetic Alias' }], categories: [{ category: 'Fantasy' }], genres: [{ genre: 'Adventure' }], series_id: 12345, title: 'Synthetic Series', type: 'Manhwa', url: 'https://www.mangaupdates.com/series/abc123/synthetic-series' };
+const series = { associated: [{ title: 'Synthetic Alias' }], categories: [{ category: 'Fantasy' }], genres: [{ genre: 'Adventure' }], latest_chapter: 84, series_id: 12345, status: 'Complete', title: 'Synthetic Series', type: 'Manhwa', url: 'https://www.mangaupdates.com/series/abc123/synthetic-series', year: 2020 };
 
 describe('MangaUpdatesFavoriteProviderAdapter', () => {
   it('maps search results and exposes truncation', async () => {
@@ -10,7 +10,8 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     const result = await adapter.search({ limit: 1, provider: 'mangaupdates', titles: ['Synthetic Series'] });
     expect(fetcher).toHaveBeenCalledWith(`${mangaUpdatesApiOrigin}/v1/series/search`, expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }));
     expect(result).toMatchObject({ complete: false, provider: 'mangaupdates', truncated: true });
-    expect(result.candidates[0]).toMatchObject({ externalId: '12345', mediaKind: 'MANHWA', titles: ['Synthetic Series', 'Synthetic Alias'] });
+    expect(result.candidates[0]).toMatchObject({ editorialStatus: 'COMPLETED', externalId: '12345', mediaKind: 'MANHWA', metadataVersion: 1, startYear: 2020, titles: ['Synthetic Series', 'Synthetic Alias'] });
+    expect(result.candidates[0]).not.toHaveProperty('chapterCount');
   });
 
   it('hydrates the exact series route and rejects a foreign reference', async () => {

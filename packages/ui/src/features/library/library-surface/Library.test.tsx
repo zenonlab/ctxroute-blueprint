@@ -20,6 +20,13 @@ describe('shared Library surface', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
   });
 
+  it('shows local statistics and structured card details', () => {
+    expect(component).toContain('Statistiques de la bibliothèque');
+    expect(component).toContain('statistics.inProgress');
+    expect(component).toContain('statistics.completed');
+    expect(component).toContain('item.detail ?? item.source');
+  });
+
   it('accepts a real stored source without changing the Extension fallback', () => {
     expect(component).toContain('item.href ?? `#work-${item.id}`');
   });

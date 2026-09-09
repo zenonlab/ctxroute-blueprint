@@ -9,7 +9,7 @@ import { BridgeState, WebMemberShell, useWebMemberNavigation } from '../componen
 import { WebBridgeProvider, useWebBridge } from '../components/WebBridgeProvider';
 
 const typeOptions = [{ label: 'Anime', value: 'anime' }, { label: 'Manga', value: 'manga' }] as const;
-const filterOptions = { progress: [], status: [], type: typeOptions } as const;
+const filterOptions = { format: [], genre: [], progress: [], source: [], status: [], type: typeOptions, year: [] } as const;
 
 function LibrarySurface() {
   const router = useRouter();
@@ -30,7 +30,7 @@ function LibrarySurface() {
     if (search) nextQuery.search = search;
     return nextQuery;
   }, [cursor, facet, search]);
-  const filters: LibraryFiltersValue = { progress: {}, query: search, status: {}, type: facet === 'all' ? {} : { [facet]: 'include' } };
+  const filters: LibraryFiltersValue = { format: {}, genre: {}, progress: {}, query: search, sort: 'ADDED_DESC', source: {}, status: {}, type: facet === 'all' ? {} : { [facet]: 'include' }, year: {} };
 
   const setQuery = (value: LibraryFiltersValue) => {
     const params = new URLSearchParams();

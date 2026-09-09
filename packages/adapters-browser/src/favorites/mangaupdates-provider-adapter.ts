@@ -14,6 +14,7 @@ const mangaUpdatesSeriesSchema = z.object({
   associated: z.array(z.object({ title: nonEmptyString }).strict()).max(16).optional().default([]),
   categories: z.array(z.object({ category: nonEmptyString }).strict()).max(16).optional().default([]),
   genres: z.array(z.object({ genre: nonEmptyString }).strict()).max(16).optional().default([]),
+  year: z.union([z.number().int(), z.string()]).optional(), status: nonEmptyString.optional(),
   series_id: identifierSchema,
   title: nonEmptyString,
   type: nonEmptyString,
@@ -39,10 +40,17 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
     preSerialization: /novel/iu.test(series.type),
     provider: 'mangaupdates',
     titles: [...new Set([series.title, ...series.associated.map((item) => item.title)])],
+    metadataVersion: 1,
   };
   if (series.url !== undefined) result.canonicalUrl = series.url;
   if (series.genres.length > 0) result.genres = series.genres.map((item) => item.genre);
   if (series.categories.length > 0) result.categories = series.categories.map((item) => item.category);
+  const year = Number(series.year);
+  if (Number.isSafeInteger(year) && year >= 1800 && year <= 3000) result.startYear = year;
+  if (series.status !== undefined) {
+    const value = series.status.toLocaleLowerCase();
+    result.editorialStatus = /cancel|discontinu/iu.test(value) ? 'CANCELLED' : /hiatus|pause/iu.test(value) ? 'HIATUS' : /complete|finish/iu.test(value) ? 'COMPLETED' : /ongoing|active|publish/iu.test(value) ? 'ONGOING' : 'UNKNOWN';
+  }
   return result;
 }
 

@@ -87,7 +87,10 @@
   gap: var(--space-1);
   left: 0;
   margin-top: var(--space-2);
+  max-height: calc(100vh - var(--space-8));
   min-width: calc(var(--size-column-min) + var(--space-8));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-2);
   position: absolute;
   top: 100%;

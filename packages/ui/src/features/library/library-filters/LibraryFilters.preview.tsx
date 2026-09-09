@@ -13,6 +13,8 @@ import type { LibraryFilterOptions, LibraryFiltersState, LibraryFiltersValue } f
 import styles from './LibraryFilters.module.css';
 
 const options: LibraryFilterOptions = {
+  format: [{ count: 31, label: 'TV', value: 'tv' }],
+  genre: [{ count: 24, label: 'Fantasy', value: 'fantasy' }],
   type: [
     { count: 48, label: 'Manga', value: 'manga' },
     { count: 17, label: 'Anime', value: 'anime' },
@@ -28,13 +30,20 @@ const options: LibraryFilterOptions = {
     { count: 39, label: 'En cours', value: 'ongoing' },
     { count: 28, label: 'Terminé', value: 'finished' },
   ],
+  source: [{ count: 48, label: 'AniList', value: 'anilist' }],
+  year: [{ count: 8, label: '2024', value: '2024' }],
 };
 
 const filteredValue: LibraryFiltersValue = {
+  format: {},
+  genre: { fantasy: 'include' },
   progress: { ongoing: 'include' },
   query: 'frieren',
+  sort: 'POPULARITY_DESC',
+  source: {},
   status: {},
   type: { manga: 'include' },
+  year: {},
 };
 
 function isState(value: string): value is LibraryFiltersState {
@@ -62,7 +71,7 @@ const libraryFiltersPreview = definePreview({
   purpose: 'Rechercher et combiner des facettes sérialisables dans la bibliothèque.',
   variants: [...libraryFiltersVariants],
   states: [...libraryFiltersStates],
-  fixtures: ['74 œuvres · type, statut et progression'],
+  fixtures: ['74 œuvres · tri et sept facettes persistantes'],
   sources: [
     { label: 'API publique', path: 'features/library/library-filters/index.ts' },
     { label: 'Contrat', path: 'features/library/library-filters/library-filters.contract.ts' },
@@ -74,7 +83,7 @@ const libraryFiltersPreview = definePreview({
   dependencies: ['SearchField', 'FacetSelect', 'design tokens'],
   accessibility: [
     'La recherche native possède un nom explicite',
-    'Les trois facettes conservent clavier, Escape et recherche interne',
+    'Les sept facettes conservent clavier, Escape, recherche interne et sélection multiple',
     'Chaque sélection incluse ou exclue reste annoncée par son nom accessible',
   ],
   usage: `import { LibraryFilters } from '@tobirink/ui/features/library/library-filters';`,

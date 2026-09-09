@@ -6,13 +6,19 @@ import { z } from 'zod';
 import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson } from './provider-http';
 import type { FavoriteProviderFetch } from './provider-http';
 
+type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
+
 const uuid = z.uuid();
 const titleMap = z.record(z.string().max(16), z.string().min(1).max(1024)).refine((value) => Object.keys(value).length <= 64);
 const hydrationSchema = z.object({
   result: z.literal('ok'),
   data: z.object({
     id: uuid, type: z.literal('manga'),
-    attributes: z.object({ title: titleMap, altTitles: z.array(titleMap).max(128), contentRating: z.enum(['safe', 'suggestive', 'erotica', 'pornographic']), originalLanguage: z.string().min(2).max(16) }),
+    attributes: z.object({
+      title: titleMap, altTitles: z.array(titleMap).max(128), contentRating: z.enum(['safe', 'suggestive', 'erotica', 'pornographic']), originalLanguage: z.string().min(2).max(16),
+      status: z.enum(['ongoing', 'completed', 'hiatus', 'cancelled']).optional(), year: z.number().int().min(1800).max(3000).nullable().optional(),
+      tags: z.array(z.object({ attributes: z.object({ group: z.enum(['content', 'format', 'genre', 'theme']), name: titleMap }).passthrough() }).passthrough()).max(32).optional().default([]),
+    }).passthrough(),
   }),
 });
 
@@ -45,10 +51,15 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderHydratio
     const titles = [...new Set([...Object.values(attributes.title), ...attributes.altTitles.flatMap((value) => Object.values(value))])];
     if (titles.length === 0) throw new Error('MangaDex identity requires a title.');
     const blocked = attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic';
-    return {
+    const result: MutableCandidate = {
       canonicalUrl: `https://mangadex.org/title/${id}`, categories: blocked ? ['Adult'] : [],
       externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA',
-      preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16),
+      preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 1,
     };
+    const genres = [...new Set(attributes.tags.filter((tag) => tag.attributes.group === 'genre').flatMap((tag) => Object.values(tag.attributes.name)))].slice(0, 16);
+    if (genres.length > 0) result.genres = genres;
+    if (attributes.status !== undefined) result.editorialStatus = ({ ongoing: 'ONGOING', completed: 'COMPLETED', hiatus: 'HIATUS', cancelled: 'CANCELLED' } as const)[attributes.status];
+    if (attributes.year != null) result.startYear = attributes.year;
+    return result;
   }
 }

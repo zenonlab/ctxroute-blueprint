@@ -19,9 +19,13 @@ const works: readonly LibraryWork[] = [
 ];
 
 const options = {
+  format: [{ label: 'TV', value: 'tv' }],
+  genre: [{ label: 'Fantasy', value: 'fantasy' }],
   progress: [{ label: 'À commencer', value: 'new' }, { label: 'En cours', value: 'current' }, { label: 'Terminé', value: 'done' }],
+  source: [{ label: 'AniList', value: 'anilist' }, { label: 'MangaUpdates', value: 'mangaupdates' }],
   status: [{ label: 'Actif', value: 'active' }, { label: 'En pause', value: 'paused' }],
   type: [{ count: 4, label: 'Manga', value: 'manga' }, { count: 2, label: 'Anime', value: 'anime' }],
+  year: [{ label: '2024', value: '2024' }],
 } as const;
 
 function isState(value: string): value is LibraryState {

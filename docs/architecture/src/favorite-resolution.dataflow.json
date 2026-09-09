@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB : fiches Work, index privés d'aliases/titres et checkpoint de reconstruction. Inventaire et scans bornés."
+        "note": "IndexedDB : fiches, faits structurés, facettes et statistiques privés. Lecture transactionnelle bornée à 500 œuvres avant pagination."
       },
       {
         "id": "recovery-collective",
@@ -157,7 +157,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "preuves · reçus · autorité"
+      "tag": "preuves · fiches · facettes"
     },
     {
       "id": "syncedIds",
@@ -352,6 +352,17 @@
         "Curseurs, reçus et cadences survivent à MV3",
         "Panne ou réponse incomplète reste RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Bibliothèque locale",
+      "items": [
+        "Sept facettes stables, menus persistants et sélection multiple avant pagination",
+        "Réponses paginées obsolètes ignorées après tout changement de requête",
+        "Tri par titre, ajout, année, progression ou popularité comparable",
+        "Genres typés et totaux éditoriaux explicites uniquement",
+        "Aucune métadonnée de bibliothèque dans sync ou D1"
       ]
     }
   ]

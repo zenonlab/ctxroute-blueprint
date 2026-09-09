@@ -12,6 +12,7 @@ import {
   favoriteTransformationLimit,
   favoriteUrlByteLimit,
   providerCandidateLimit,
+  providerFacetValueByteLimit,
   utf8ByteLength,
 } from './limits';
 import type {
@@ -27,6 +28,15 @@ export type { SourceEvidence } from './source-evidence-contract';
 export type { FavoriteParseArtifact } from './parse-artifact-contract';
 
 export const favoriteContractVersion = 2 as const;
+export const providerMetadataVersion = 1 as const;
+
+export const providerEditorialStatuses = ['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN'] as const;
+export type ProviderEditorialStatus = (typeof providerEditorialStatuses)[number];
+
+export interface ProviderPopularity {
+  readonly kind: 'MEMBERS' | 'RANK';
+  readonly value: number;
+}
 
 export interface FavoriteObservation {
   readonly bookmarkId: string;
@@ -46,6 +56,14 @@ export interface ProviderCandidate {
   readonly externalId: string;
   readonly format?: string;
   readonly genres?: readonly string[];
+  readonly editorialStatus?: ProviderEditorialStatus;
+  readonly startYear?: number;
+  readonly endYear?: number;
+  readonly episodeCount?: number;
+  readonly chapterCount?: number;
+  readonly volumeCount?: number;
+  readonly popularity?: ProviderPopularity;
+  readonly metadataVersion?: typeof providerMetadataVersion;
   readonly mediaKind: Exclude<FavoriteMediaKind, 'UNKNOWN'>;
   readonly preSerialization: boolean;
   readonly provider: FavoriteProvider;
@@ -87,9 +105,9 @@ function boundedText(value: string, field: string, limit: number): string {
   return value;
 }
 
-function boundedTexts(values: readonly string[], field: string, limit: number): readonly string[] {
+function boundedTexts(values: readonly string[], field: string, limit: number, byteLimit = favoriteTitleByteLimit): readonly string[] {
   contract(Array.isArray(values) && values.length <= limit, `${field} exceeds ${limit} entries.`);
-  return Object.freeze(values.map((value, index) => nonEmpty(value, `${field}[${index}]`)));
+  return Object.freeze(values.map((value, index) => boundedText(value, `${field}[${index}]`, byteLimit)));
 }
 
 export function createFavoriteObservation(input: FavoriteObservation): FavoriteObservation {
@@ -156,6 +174,19 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
   contract(input.provider === provider, 'candidate provider must match its envelope.');
   contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
   if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'candidate season must be a positive safe integer.');
+  for (const [field, value] of Object.entries({ startYear: input.startYear, endYear: input.endYear })) {
+    if (value !== undefined) contract(Number.isSafeInteger(value) && value >= 1800 && value <= 3000, `${field} must be a plausible year.`);
+  }
+  if (input.startYear !== undefined && input.endYear !== undefined) contract(input.endYear >= input.startYear, 'endYear cannot precede startYear.');
+  for (const [field, value] of Object.entries({ episodeCount: input.episodeCount, chapterCount: input.chapterCount, volumeCount: input.volumeCount })) {
+    if (value !== undefined) contract(Number.isSafeInteger(value) && value >= 0, `${field} must be a non-negative safe integer.`);
+  }
+  if (input.editorialStatus !== undefined) contract(providerEditorialStatuses.includes(input.editorialStatus), 'editorialStatus is invalid.');
+  if (input.metadataVersion !== undefined) contract(input.metadataVersion === providerMetadataVersion, `metadataVersion must be ${providerMetadataVersion}.`);
+  if (input.popularity !== undefined) {
+    contract(input.popularity.kind === 'MEMBERS' || input.popularity.kind === 'RANK', 'popularity.kind is invalid.');
+    contract(Number.isSafeInteger(input.popularity.value) && input.popularity.value >= 0, 'popularity.value must be a non-negative safe integer.');
+  }
   let canonicalUrl: string | undefined;
   if (input.canonicalUrl !== undefined) {
     const parsed = new URL(boundedText(input.canonicalUrl, 'canonicalUrl', favoriteUrlByteLimit));
@@ -163,16 +194,24 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
     canonicalUrl = parsed.href;
   }
   const candidate = {
-    externalId: nonEmpty(input.externalId, 'externalId'),
+    externalId: boundedText(input.externalId, 'externalId', favoriteTitleByteLimit),
     mediaKind: input.mediaKind,
     preSerialization: input.preSerialization,
     provider: input.provider,
     titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
   };
-  if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', favoriteTitleByteLimit) });
+  if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', providerFacetValueByteLimit) });
   if (input.season !== undefined) Object.assign(candidate, { season: input.season });
-  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit) });
-  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit) });
+  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit, providerFacetValueByteLimit) });
+  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit, providerFacetValueByteLimit) });
+  if (input.editorialStatus !== undefined) Object.assign(candidate, { editorialStatus: input.editorialStatus });
+  if (input.startYear !== undefined) Object.assign(candidate, { startYear: input.startYear });
+  if (input.endYear !== undefined) Object.assign(candidate, { endYear: input.endYear });
+  if (input.episodeCount !== undefined) Object.assign(candidate, { episodeCount: input.episodeCount });
+  if (input.chapterCount !== undefined) Object.assign(candidate, { chapterCount: input.chapterCount });
+  if (input.volumeCount !== undefined) Object.assign(candidate, { volumeCount: input.volumeCount });
+  if (input.popularity !== undefined) Object.assign(candidate, { popularity: Object.freeze({ ...input.popularity }) });
+  if (input.metadataVersion !== undefined) Object.assign(candidate, { metadataVersion: input.metadataVersion });
   if (canonicalUrl !== undefined) Object.assign(candidate, { canonicalUrl });
   return Object.freeze(candidate);
 }
