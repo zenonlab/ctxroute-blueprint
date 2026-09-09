@@ -1,7 +1,7 @@
 # G1/D1 — jeu complet indexé et premier thème soigné
 
-État au 9 septembre 2026 : **indexeur G1 et visualiseur de pack implémentés ;
-relations sémantiques, pack privé complet et raccord wallpaper D1 non terminés**.
+État au 9 septembre 2026 : **indexeur G1 et harnais de chargement implémentés ;
+export visuel privé rejeté, relations sémantiques et raccord 3D wallpaper non terminés**.
 Cette preuve commence sur le contrat stabilisé du
 [PoC connecteur macOS](macos-connector-poc2.md). Elle suit
 [ADR-0058](../decisions/ADR-0058-complete-game-poc.md) et la
@@ -54,10 +54,12 @@ qu'après exécution sur le pack privé puis raccord du même pack à la vraie
 `CAMetalLayer` du provider macOS.
 
 Exécution observée sur MAC-01 : backend Metal sélectionné sur Apple M1 Pro, pack
-chargé sans avertissement d'attribut après réduction à `COLOR_0`, textures visibles
-et caméra orbitale opérationnelle. Le binaire debug mesure 134 MiB avec symboles et
+chargé sans avertissement d'attribut après réduction à `COLOR_0` et caméra orbitale
+opérationnelle. La revue humaine rejette cependant le résultat : les textures sont
+mal associées et la fenêtre n'est pas le runtime wallpaper. Le binaire debug mesure
+134 MiB avec symboles et
 le graphe de dépendances reste important ; aucune conclusion de taille ou d'énergie
-production n'en est tirée avant build release et protocole répété.
+production n'en est tirée avant build release et protocole répété. Voir ADR-0061.
 
 ## Variantes comparées
 

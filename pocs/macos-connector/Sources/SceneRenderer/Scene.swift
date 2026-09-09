@@ -10,6 +10,7 @@ import ThemeModel
     public let root = CALayer()
     private let theme: Theme
     private let background = CAGradientLayer()
+    private let backgroundImage = CALayer()
     private let ring = CAShapeLayer()
     private let motion = CALayer()
     private var dots: [CALayer] = []
@@ -20,7 +21,17 @@ import ThemeModel
     public private(set) var updates = 0
     public init(theme: Theme) {
         self.theme = theme
-        root.addSublayer(background); root.addSublayer(ring); root.addSublayer(motion)
+        root.addSublayer(background)
+        if let asset = theme.background_asset,
+           let url = Bundle.main.url(forResource: asset, withExtension: nil),
+           let image = NSImage(contentsOf: url),
+           let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            backgroundImage.contents = cgImage
+            backgroundImage.contentsGravity = .resizeAspectFill
+            backgroundImage.masksToBounds = true
+            root.addSublayer(backgroundImage)
+        }
+        root.addSublayer(ring); root.addSublayer(motion)
         background.colors = [Self.color(theme.background), Self.color(theme.accent).copy(alpha: 0.22) ?? Self.color(theme.accent)]
         root.backgroundColor = Self.color(theme.background)
         background.startPoint = CGPoint(x: 0, y: 0); background.endPoint = CGPoint(x: 1, y: 1)
@@ -57,7 +68,8 @@ import ThemeModel
         previousSize = size; previousScale = scale; updates += 1
         CATransaction.begin(); CATransaction.setDisableActions(true)
         root.frame = CGRect(origin: .zero, size: size); root.contentsScale = scale
-        background.frame = root.bounds; motion.frame = root.bounds; ring.frame = root.bounds
+        background.frame = root.bounds; backgroundImage.frame = root.bounds
+        motion.frame = root.bounds; ring.frame = root.bounds
         for (index, control) in controls.enumerated() {
             let rect = ThemeLayout.control(index)
             control.frame = CGRect(x: rect.x, y: size.height - rect.y - rect.height, width: rect.width, height: rect.height)

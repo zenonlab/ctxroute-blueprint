@@ -25,6 +25,7 @@ public struct Theme: Codable, Equatable, Sendable {
     public let display_name: String
     public let panel_id: String
     public let background: String
+    public let background_asset: String?
     public let accent: String
     public let motion_path: String?
     public let period_seconds: Double
@@ -68,6 +69,7 @@ public struct Theme: Codable, Equatable, Sendable {
               (1...80).contains(theme.display_name.count),
               (4...120).contains(theme.period_seconds),
               validColor(theme.background), validColor(theme.accent),
+              (theme.background_asset.map { validAssetName($0) } ?? true),
               [nil, "orbit", "wave", "still"].contains(theme.motion_path),
               (1...8).contains(theme.objects.count),
               Set(theme.objects.map(\.id)).count == theme.objects.count,
@@ -92,6 +94,9 @@ public struct Theme: Codable, Equatable, Sendable {
     }
     private static func validColor(_ value: String) -> Bool {
         value.range(of: "^[0-9A-F]{6}$", options: .regularExpression) != nil
+    }
+    private static func validAssetName(_ value: String) -> Bool {
+        value.range(of: "^[a-z][a-z0-9-]{0,63}\\.png$", options: .regularExpression) != nil
     }
 }
 

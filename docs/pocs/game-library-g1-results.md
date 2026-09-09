@@ -105,8 +105,9 @@ répertoire privé ignoré `game/` et ne constituent pas un adaptateur redistrib
 | attributs de couleur réimportés | 1 (`COLOR_0`) |
 | SHA-256 du GLB | `d9b8fb6834e69eba1f3521330434b575f56accca40e8b9d2a078c37a4abf3c53` |
 
-Cette preuve valide un **pont géométrie + texture dégradé**, pas un thème. Les
-combineurs N64 sont remplacés par un matériau Principled à texture unique ; acteurs,
+Cette preuve valide seulement un **pont géométrique**. Le pont texture est rejeté :
+une texture `Tex0_*` choisie sans interpréter les commandes de matériau produit un
+rendu visiblement faux. Les combineurs N64 ne sont pas préservés ; acteurs,
 collisions, chemins et matériaux animés sont absents. Les groupes d'affichage
 importés restent fragmentés selon leurs volumes de culling. Fast64/Blender est donc
 un outil optionnel d'inspection et de dérivation visuelle derrière le contrat

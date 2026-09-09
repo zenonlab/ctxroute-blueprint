@@ -31,6 +31,10 @@ Le contrat du visualiseur se vérifie séparément avec
 `cargo test --manifest-path pocs/game-theme-viewer/Cargo.toml`. Un lancement sur le
 pack privé valide le chargement glTF en fenêtre et les interactions de caméra ; il
 ne qualifie ni la surface wallpaper, ni le picking, ni la consommation.
+Il ne qualifie pas non plus la fidélité visuelle : l'export Majora's Mask du
+9 septembre est rejeté parce que ses matériaux ont été réduits à une texture
+choisie arbitrairement. Le gate suivant compare le rendu à un oracle F3DEX2 avant
+de raccorder le même asset à la surface native.
 
 La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
 Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,

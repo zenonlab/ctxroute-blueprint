@@ -86,7 +86,7 @@ adopter prématurément une dépendance.
 | Bibliothèque locale | SQLite pour index/relations + blobs adressés par contenu | Adopté conceptuellement pour le PoC ; les gros contenus ne résident pas dans SQLite et le runtime ne lit pas une base mutable. |
 | Pack de rendu | GLB/glTF pour la livraison géométrique ; KTX2 comme cache dérivé candidat | glTF n'est ni la base canonique, ni le langage de comportement, ni la provenance. |
 | Comportement | Graphe déclaratif typé et contrôleur de formation déterministe | Adopté pour D1 ; Wasm reste différé tant qu'un cas réel ne l'exige pas. |
-| Surface et rendu | Bevy 0.19.1 derrière `RenderHost`, raccordé à la vraie `CAMetalLayer` | Fenêtre de référence validée sur Metal avec un pack privé ; adopté pour le PoC, pas encore pour la production. |
+| Surface et rendu | Bevy 0.19.1 reste un candidat derrière `RenderHost` ; macOS exige une preuve sur la vraie `CAMetalLayer` | La fenêtre de référence charge le pack mais ne qualifie ni les matériaux ni le wallpaper ; ADR-0061. |
 | Terminal | États de sessions synthétiques uniquement | Le moteur de terminal réel reste en E4 et ne bloque pas G1/D1. |
 
 Godot sait importer glTF et travailler headless, mais son intégration documentée

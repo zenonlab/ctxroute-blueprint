@@ -81,6 +81,22 @@ final class ModelTests: XCTestCase {
             XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("no build created"))
         }
     }
+    func testBuildRejectsUnsafeLocalBackgroundBeforeCompilation() throws {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("build.sh")
+        let process = Process(); let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [script.path, "--development"]
+        process.environment = ProcessInfo.processInfo.environment.merging([
+            "CONNECTOR_LOCAL_BACKGROUND_PATH": "../private.png"
+        ]) { _, new in new }
+        process.standardOutput = output; process.standardError = output
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 2)
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("absolute regular PNG"))
+    }
     func testSharedGroupMustMatchSignedTeamExactly() throws {
         let group = "AB123CD456.org.wallpaperthemes.connectorpoc2"
         XCTAssertEqual(try Mailbox.sharedGroup(team: "AB123CD456", entitlements: [group]), group)
@@ -143,11 +159,14 @@ final class ModelTests: XCTestCase {
     func testManifestAndInvalidInputs() throws {
         let theme = try Theme.load()
         XCTAssertEqual(theme.objects.count, 4)
+        XCTAssertEqual(theme.background_asset, "theme-background.png")
         let data = try JSONEncoder().encode(theme)
         XCTAssertEqual(try Theme.decode(data), theme)
         let string = String(decoding: data, as: UTF8.self)
         XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "orb.b", with: "orb.a").utf8)))
         XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "101B30", with: "red").utf8)))
+        XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "theme-background.png", with: "../private.png").utf8)))
+        XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "theme-background.png", with: "theme-background.jpg").utf8)))
         XCTAssertThrowsError(try Theme.decode(Data(repeating: 32, count: 32_769)))
     }
     func testCommandsAreCorrelatedIdempotentAndBounded() {

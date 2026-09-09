@@ -15,7 +15,7 @@
     { "id": "coverage", "type": "security", "label": "Rapport de couverture", "sublabel": "Complet · partiel · inconnu", "pos": [660, 270], "size": [260, 80] },
     { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Notre logique et nos créations", "pos": [40, 280], "size": [250, 80] },
     { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Sélection et dérivés minimaux", "pos": [970, 460], "size": [260, 80] },
-    { "id": "runtime", "type": "frontend", "label": "Hôte de thème", "sublabel": "Bevy PoC · backend remplaçable", "pos": [500, 460], "size": [240, 80] }
+    { "id": "runtime", "type": "frontend", "label": "Hôte de thème", "sublabel": "CAContext témoin · Metal 3D à prouver", "pos": [500, 460], "size": [240, 80] }
   ],
   "connections": [
     { "id": "read", "from": "game", "to": "readers", "label": "inventorier sans exécuter", "labelAt": [305, 184] },

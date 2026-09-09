@@ -3,6 +3,7 @@ set -euo pipefail
 connector_identity=-
 connector_team=""
 connector_development=false
+connector_local_background="${CONNECTOR_LOCAL_BACKGROUND_PATH:-}"
 if [[ $# == 1 && "$1" == --help ]]; then
   echo 'Usage: build.sh [--development | --sign-local CERTIFICATE_SHA1 | --sign CERTIFICATE_SHA1 TEAM_ID] (no installation)'
   exit 0
@@ -53,6 +54,18 @@ for connector_bundle in "$connector_app" "$connector_extension"; do
   cp "$connector_source/Native/Bridge/LICENSE" "$connector_bundle/Contents/Resources/Phosphene-LICENSE"
   cp "$connector_source/Packaging/Lucide-LICENSE" "$connector_bundle/Contents/Resources/Lucide-LICENSE"
 done
+if [[ -n "$connector_local_background" ]]; then
+  if [[ "$connector_local_background" != /* || ! -f "$connector_local_background" || -L "$connector_local_background" ]]; then
+    echo 'CONNECTOR_LOCAL_BACKGROUND_PATH must name an absolute regular PNG file.' >&2
+    exit 2
+  fi
+  if ! sips -g format "$connector_local_background" 2>/dev/null | grep -q 'format: png'; then
+    echo 'CONNECTOR_LOCAL_BACKGROUND_PATH is not a readable PNG.' >&2
+    exit 2
+  fi
+  cp "$connector_local_background" "$connector_app/Contents/Resources/theme-background.png"
+  cp "$connector_local_background" "$connector_extension/Contents/Resources/theme-background.png"
+fi
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift"
   "$connector_source/Sources/ThemeModel/ThemeStore.swift"

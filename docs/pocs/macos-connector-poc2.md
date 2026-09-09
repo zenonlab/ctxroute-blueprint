@@ -47,6 +47,12 @@ l'import 3D ou le rig dans le connecteur.
 Le PoC2 n'introduit pas wgpu, Tauri, terminal natif ou FFI Rust. Ces choix seraient
 sans rapport avec la question testée et rendraient le résultat illisible.
 
+Le build accepte désormais un témoin visuel privé via la variable explicite
+`CONNECTOR_LOCAL_BACKGROUND_PATH`, qui doit désigner un PNG absolu, régulier et non
+symbolique. Le fichier est copié uniquement dans le candidat local signé et composé
+par le provider dans son `CAContext`. Son absence conserve le dégradé original. Ce
+chemin prouve le raccord d'un asset au wallpaper ; il ne prouve aucune 3D temps réel.
+
 ## Flux attendu
 
 1. L'application charge et valide le manifeste canonique.
