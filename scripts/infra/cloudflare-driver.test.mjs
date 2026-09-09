@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCloudflareDriver, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
 
@@ -95,14 +96,15 @@ async function test_release_publish_is_hashed_and_translated() {
 async function test_release_snapshot_publication_is_validated_and_ordered() {
   const calls = [];
   const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
+  const releaseDirectory = resolve('/releases');
   const files = new Map([
-    ['/releases/empty-2026-09-09.json', Buffer.from('{"entries":[],"generatedAt":"2026-09-09T12:00:00.000Z","revision":"empty-2026-09-09"}\n')],
-    ['/releases/current-empty-2026-09-09.json', Buffer.from('{"revision":"empty-2026-09-09"}\n')],
+    [resolve(releaseDirectory, 'empty-2026-09-09.json'), Buffer.from('{"entries":[],"generatedAt":"2026-09-09T12:00:00.000Z","revision":"empty-2026-09-09"}\n')],
+    [resolve(releaseDirectory, 'current-empty-2026-09-09.json'), Buffer.from('{"revision":"empty-2026-09-09"}\n')],
   ]);
   const driver = createCloudflareDriver({
     config: releaseConfig,
     workerDirectory: '/worker',
-    releaseDirectory: '/releases',
+    releaseDirectory,
     read: async path => files.get(path),
     run: async args => { calls.push(args); return 'uploaded'; },
   });
