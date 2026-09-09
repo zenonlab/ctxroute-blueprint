@@ -1,9 +1,12 @@
-import { createFavoriteObservation, createProviderCandidateEnvelope } from '@tobirink/domain';
+import { createFavoriteObservation, createProviderCandidate, createProviderCandidateEnvelope } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
-import { auditFavoriteEquivalenceCorpus, favoriteEquivalenceCorpus } from './equivalence-corpus';
+import { auditFavoriteEquivalenceCorpus, favoriteEquivalenceCorpus, favoriteProviderEquivalenceFixtures } from './equivalence-corpus';
 import { assertFavoriteOracleCoverage, runFavoriteEquivalenceOracle } from './equivalence-oracle';
 import type { FavoriteEquivalenceFixture, FavoriteOracleSnapshot } from './equivalence-oracle';
 import { runCanonicalFavoritePipeline } from './canonical-equivalence-runner';
+import { extractFavoriteSourceEvidence } from './source-evidence';
+import { parseFavoriteObservation } from './favorite-parser';
+import { matchFavoriteTitles } from './provider-matcher';
 
 const observation = createFavoriteObservation({
   bookmarkId: 'bookmark-oracle',
@@ -83,5 +86,19 @@ describe('favorite equivalence oracle', () => {
     expect(results).toHaveLength(82);
     expect(results.map(({ caseId }) => caseId)).toEqual(favoriteEquivalenceCorpus.map(({ id }) => id));
     expect(results).toMatchSnapshot();
+  });
+
+  it.each(favoriteProviderEquivalenceFixtures)('preserves parser progress and provider display metadata for $provider', (providerFixture) => {
+    const observed = createFavoriteObservation({ bookmarkId: providerFixture.id, folderPath: ['Fixtures'], observationRevision: `${providerFixture.id}-v1`, observationSequence: 1, observedAt: '2026-09-09T12:00:00.000Z', presence: 'observed', siblingOrder: 0, title: providerFixture.title, url: providerFixture.url });
+    const evidence = extractFavoriteSourceEvidence({ sourceKey: providerFixture.id, title: providerFixture.title, url: providerFixture.url });
+    const artifact = parseFavoriteObservation(observed, evidence);
+    const displayTitle = providerFixture.title.replace(/\s+(?:Chapter|Episode)\s+\d+$/u, '');
+    const candidate = createProviderCandidate({ cover: { attribution: providerFixture.coverAttribution, url: providerFixture.coverUrl }, displayTitle, externalId: providerFixture.externalId, mediaKind: providerFixture.mediaKind, metadataVersion: 2, preSerialization: false, provider: providerFixture.provider, titleVariants: [{ title: displayTitle }], titles: [displayTitle] }, providerFixture.provider);
+    const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: providerFixture.id, provider: providerFixture.provider, truncated: false });
+    const decision = matchFavoriteTitles({ mediaKind: artifact.mediaKind, sourceTitles: [artifact.displayTitle ?? displayTitle] }, [envelope]);
+
+    expect(artifact.progress).toMatchObject(providerFixture.progress);
+    expect(decision).toMatchObject({ kind: 'MATCH', matchedReference: { externalId: providerFixture.externalId, provider: providerFixture.provider } });
+    expect(candidate).toMatchObject({ cover: { attribution: providerFixture.coverAttribution, url: providerFixture.coverUrl }, displayTitle, metadataVersion: 2 });
   });
 });

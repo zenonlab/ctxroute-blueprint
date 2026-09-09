@@ -60,6 +60,9 @@ describe('favorite pipeline contracts', () => {
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, genres: ['a'.repeat(121)] }], complete: true, digest: 'digest-genre', provider: 'anilist', truncated: false })).toThrow(/genres\[0\] exceeds/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, format: 'a'.repeat(121) }], complete: true, digest: 'digest-format', provider: 'anilist', truncated: false })).toThrow(/format exceeds/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, canonicalUrl: 'ftp://example.invalid/work' }], complete: true, digest: 'digest-url', provider: 'anilist', truncated: false })).toThrow(/HTTP\(S\)/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, cover: { attribution: 'AniList', url: 'http://s4.anilist.co/file.jpg' } }], complete: true, digest: 'digest-cover-http', provider: 'anilist', truncated: false })).toThrow(/HTTPS/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, cover: { attribution: 'AniList', url: 'https://images.invalid/file.jpg' } }], complete: true, digest: 'digest-cover-origin', provider: 'anilist', truncated: false })).toThrow(/not allowed/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, titleVariants: Array.from({ length: 17 }, () => ({ title: 'Alias' })) }], complete: true, digest: 'digest-title-variants', provider: 'anilist', truncated: false })).toThrow(/16 entries/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, season: 0 }], complete: true, digest: 'digest-season', provider: 'anilist', truncated: false })).toThrow(/positive safe integer/u);
   });
 

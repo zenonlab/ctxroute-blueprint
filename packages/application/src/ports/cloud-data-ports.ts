@@ -30,6 +30,37 @@ export interface CoverMasterReadPort {
 
 export type CoverOutputFormat = 'image/avif' | 'image/jpeg' | 'image/png' | 'image/webp';
 
+export type CoverRightsBasis = 'licensed' | 'public-domain';
+
+export interface NormalizedCoverMaster {
+  attribution?: string;
+  bytes: Uint8Array;
+  colorSpace: 'srgb';
+  contentType: CoverOutputFormat;
+  height: number;
+  metadataStripped: true;
+  orientationNormalized: true;
+  rights: {
+    basis: CoverRightsBasis;
+    policyId: string;
+  };
+  sourceUrl: string;
+  width: number;
+}
+
+export interface StoredCoverMaster {
+  contentType: CoverOutputFormat;
+  created: boolean;
+  digest: string;
+  height: number;
+  key: string;
+  width: number;
+}
+
+export interface CoverMasterIngestionPort {
+  ingest(master: NormalizedCoverMaster): Promise<StoredCoverMaster>;
+}
+
 export interface CoverImageRenderPort {
   render(input: {
     body: ReadableStream<Uint8Array>;

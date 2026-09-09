@@ -130,7 +130,7 @@ async function readCatalogueSnapshot(storage: StorageReadPort, input: LibraryCat
     statistics: Object.freeze({
       completed: corpus.filter((item) => progressState(item.progress) === 'COMPLETED').length,
       inProgress: corpus.filter((item) => progressState(item.progress) === 'IN_PROGRESS').length,
-      knownMetadata: corpus.filter((item) => item.work.hydration?.candidate.metadataVersion === 1).length,
+      knownMetadata: corpus.filter((item) => item.work.hydration?.candidate.metadataVersion !== undefined).length,
       notStarted: corpus.filter((item) => progressState(item.progress) === 'NOT_STARTED').length,
       total: corpus.length,
     }),

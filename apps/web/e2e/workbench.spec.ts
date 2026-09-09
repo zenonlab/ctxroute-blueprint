@@ -30,18 +30,31 @@ async function installBridge(page: Page, selectedFixture: BridgeFixture = fixtur
     window.addEventListener('message', (event) => {
       const message = event.data;
       if (message?.type === 'webbridge.handshake') {
-        const response = { expiresAt: Date.now() + 60_000, nonce: 'test_session_nonce', ok: true, protocolVersion: 2, requestId: message.requestId, type: 'tobirink.webbridge.response' };
+        const response = { expiresAt: Date.now() + 60_000, nonce: 'test_session_nonce', ok: true, protocolVersion: 3, requestId: message.requestId, type: 'tobirink.webbridge.response' };
         window.postMessage({ requestId: message.requestId, response, type: 'tobirink.webbridge.response' }, window.location.origin);
         return;
       }
       const request = message?.request;
       if (!request?.requestId) return;
       let value;
-      if (request.type === 'bootstrap.read') value = { availability: 'connected', generation: 1, libraryCount: bridgeFixture.library.length, pendingReviewCount: 0, protocolVersion: 2 };
+      if (request.type === 'bootstrap.read') value = { availability: 'connected', generation: 1, libraryCount: bridgeFixture.library.length, pendingReviewCount: 0, protocolVersion: 3 };
       if (request.type === 'review.read') value = { candidates: [], context: 'local' };
       if (request.type === 'library.read') {
         window.__libraryReads = (window.__libraryReads ?? 0) + 1;
-        value = { hasMore: false, items: bridgeFixture.library.filter((item) => request.query.facet === 'all' || item.mediaKind === request.query.facet).slice(0, request.query.limit), query: request.query };
+        const typeSelection = request.query.facets?.type ?? {};
+        const includedTypes = Object.entries(typeSelection).filter(([, state]) => state === 'include').map(([value]) => value);
+        const excludedTypes = Object.entries(typeSelection).filter(([, state]) => state === 'exclude').map(([value]) => value);
+        const items = bridgeFixture.library.filter((item) => {
+          const type = item.mediaKind.toUpperCase();
+          return (request.query.facet === 'all' || item.mediaKind === request.query.facet)
+            && !excludedTypes.includes(type) && (includedTypes.length === 0 || includedTypes.includes(type));
+        }).slice(0, request.query.limit);
+        value = {
+          facets: { format: [], genre: [], progress: [], source: [], status: [], type: [{ count: 2, label: 'Anime', value: 'ANIME' }, { count: 2, label: 'Manga', value: 'MANGA' }], year: [] },
+          hasMore: false, items, query: request.query,
+          statistics: { completed: 0, inProgress: 2, knownMetadata: 0, notStarted: 2, total: bridgeFixture.library.length },
+          total: items.length, truncated: false,
+        };
       }
       if (request.type === 'agenda.read') {
         window.__agendaReads = (window.__agendaReads ?? 0) + 1;
@@ -65,6 +78,9 @@ test('desktop Workbench renders real bridge projections and navigation', async (
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(9, 9, 11)');
   expect(await page.locator('header img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('a[data-variant="library"]').first().click();
+  await expect(page).toHaveURL(/\/library\/_\?work=work_alpha$/u);
+  await expect(page.getByRole('main', { name: 'Fiche de Œuvre Alpha' })).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
 
@@ -77,6 +93,10 @@ test('Library keeps filters, reflow, focus and accessibility media modes on mobi
   await expect.poll(() => page.evaluate(() => window.__libraryReads)).toBe(1);
   await expect(page.getByLabel('Rechercher dans la bibliothèque')).toHaveValue('œuvre');
   await expect(page.locator('a[data-variant="library"]')).toHaveCount(2);
+  await page.getByRole('button', { name: /^Type/u }).click();
+  await page.getByRole('button', { name: 'Manga : neutre' }).click();
+  await expect(page.getByRole('group', { name: 'Type — filtres' })).toBeVisible();
+  await expect(page.locator('a[data-variant="library"]')).toHaveCount(4);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus-visible')).toHaveCount(1);

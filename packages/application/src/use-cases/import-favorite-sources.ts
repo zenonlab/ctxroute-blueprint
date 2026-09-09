@@ -4,7 +4,7 @@ import {
   favoriteSourceId,
 } from '@tobirink/domain';
 import type { FavoriteSourceId } from '@tobirink/domain';
-import { createDurableTask, encodeFavoriteResolutionTaskPayload } from '../tasks';
+import { claimTask, commitTask, createDurableTask, encodeFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
 import { createFavoriteParseArtifactRecord } from '../ports/storage-port';
 import { parseFavoriteObservation } from '../favorites/favorite-parser';
 import { extractFavoriteSourceEvidence } from '../favorites/source-evidence';
@@ -12,6 +12,7 @@ import type { FavoriteSourceAdapter } from '../favorites/source-evidence';
 import type { ImportableFavorite } from '../resolution';
 import type { StoragePort } from '../ports/storage-port';
 import { correctImportedReview } from '../favorites/correct-imported-review';
+import { favoriteResolutionVersions } from '../favorites/resolution-result-schema';
 
 export const favoriteImportBatchSize = 100;
 
@@ -55,6 +56,7 @@ export async function importFavoriteSources(
           : await correctImportedReview(session, previousSource, resolutionTaskIdentity(favorite.bookmarkId), importedAt);
         const corrected = existingSource !== previousSource;
         const existingArtifact = existingSource === undefined ? undefined : await session.getFavoriteParseArtifact(id);
+        const existingTask = await session.getFavoriteResolutionTask(resolutionTaskIdentity(favorite.bookmarkId));
         let source = createFavoriteSource({
           ...existingSource,
           bookmarkId: favorite.bookmarkId,
@@ -87,17 +89,45 @@ export async function importFavoriteSources(
             source = createFavoriteSource(processing);
           }
         }
+        const task = createDurableTask({
+          id: resolutionTaskIdentity(favorite.bookmarkId),
+          idempotencyKey: `favorite-resolution:${source.id}:${artifact.semanticFingerprint}`,
+          kind: 'favorite-resolution',
+          lane: 'routing',
+          payload: encodeFavoriteResolutionTaskPayload({ semanticFingerprint: artifact.semanticFingerprint, sourceId: source.id }),
+        });
+        const identityMissing = artifact.status === 'identity-missing'
+          && artifact.sourceEvidence.explicitProviderReference === undefined
+          && source.reviewId === undefined;
+        if (identityMissing) {
+          source = createFavoriteSource({
+            ...source,
+            resolution: { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' },
+            resolutionVersions: favoriteResolutionVersions(artifact),
+          });
+        }
         await session.putFavoriteSource(source);
         const record = { artifact, recordedAt: importedAt, sourceId: source.id };
         await session.putFavoriteParseArtifact(createFavoriteParseArtifactRecord(sameArtifact ? { ...existingArtifact, ...record } : record));
-        if (corrected || !sameArtifact) {
-          await session.putFavoriteResolutionTask(createDurableTask({
-            id: resolutionTaskIdentity(favorite.bookmarkId),
-            idempotencyKey: `favorite-resolution:${source.id}:${artifact.semanticFingerprint}`,
-            kind: 'favorite-resolution',
-            lane: 'routing',
-            payload: encodeFavoriteResolutionTaskPayload({ semanticFingerprint: artifact.semanticFingerprint, sourceId: source.id }),
-          }));
+        if (identityMissing && (corrected || !sameArtifact || existingTask?.state !== 'COMMITTED' || existingTask.idempotencyKey !== task.idempotencyKey)) {
+          const claimToken = `import:${artifact.semanticFingerprint}`;
+          const expiresAt = new Date(new Date(importedAt).getTime() + 60_000).toISOString();
+          const committed = commitTask(recordTaskEffect(claimTask(task, claimToken, importedAt, expiresAt), claimToken, 'unsupported:identity-missing'), claimToken);
+          await session.putFavoriteResolutionTask(committed);
+          const receiptId = `${source.id}:favorite-resolution`;
+          const previousReceipt = await session.getFavoriteResolutionReceipt(receiptId);
+          if (previousReceipt?.idempotencyKey !== task.idempotencyKey) {
+            await session.putFavoriteResolutionReceipt({
+              completedAt: importedAt,
+              effectDigest: 'unsupported:identity-missing',
+              id: receiptId,
+              idempotencyKey: task.idempotencyKey,
+              sourceId: source.id,
+              versions: favoriteResolutionVersions(artifact),
+            });
+          }
+        } else if (!identityMissing && (corrected || !sameArtifact)) {
+          await session.putFavoriteResolutionTask(task);
         }
       }
     });

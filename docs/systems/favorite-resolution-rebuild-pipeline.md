@@ -20,6 +20,11 @@ possède D1, pour lookup owner-scoped puis confirmations distinctes. La pipeline
 et ses budgets suivent le plan v3; la section suivante décrit l'ancien runtime,
 qui ne constitue pas le résultat cible.
 
+Les permissions du paquet MV3 sont limitées aux cinq origines HTTPS nécessaires
+à l'exécution : AniList, MangaUpdates, MangaDex, Kitsu et `tobirink.com` pour
+WebBridge. Les anciennes preuves Progress qui indiquent `host_permissions vide`
+sont historiques et ne décrivent plus le manifest installé.
+
 ## État implémenté vérifié
 
 Le runtime actuel possède déjà des fondations réutilisables :
@@ -27,21 +32,22 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - `WebExtensionBookmarkImportAdapter` parcourt l’arbre avec
   `bookmarks.getChildren`, par tranches de 100 feuilles et curseur DFS;
 - `normalizeBookmarks` qualifie uniquement les URL HTTP(S);
-- `importFavoriteSources` écrit `FavoriteSource` et `Review` par transactions
-  de 100 entrées et conserve `importedAt` lors d’un nouvel import;
+- `importFavoriteSources` écrit `FavoriteSource`, artefact et tâche par
+  transactions de 100 entrées et conserve `importedAt` lors d’un nouvel import;
 - Dexie v8 stocke les données privées dans `tobirink-private`;
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
-- le WebBridge limite les parcours Bibliothèque à 500 œuvres, les pages à 24,
-  Agenda à 100 entrées et ses enveloppes à 64 Kio;
+- le WebBridge v3 limite les parcours Bibliothèque à 500 œuvres, les pages à
+  24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
 - le background compose les ports locaux, les adaptateurs AniList et
   MangaUpdates, puis lance la convergence à l’installation, au démarrage, sur
   alarme et sur les quatre mutations de favoris;
-- l’import persiste atomiquement `FavoriteSource`, `Review`, artefact et tâche;
+- l’import persiste atomiquement `FavoriteSource`, artefact et tâche, sans
+  créer de Review;
 - l’outbox IndexedDB v8 réclame les tâches dues par index composé sans
   `toArray()` global, huit au plus par tranche;
 - le runner recherche, décide, hydrate par ID exact, puis écrit `Work`,
@@ -58,6 +64,11 @@ Le runtime actuel possède déjà des fondations réutilisables :
   et `hreflang` faible sans introduire de réseau ni de décision implicite;
 - une source absente est marquée `detached`; elle reste sauvegardable mais ne
   fournit plus de lien à Review, Agenda, Organisateur ou popup.
+- une route HTTP sans identité média probante est conservée comme source et
+  artefact `UNSUPPORTED/IDENTITY_MISSING`, avec tâche et reçu déjà terminaux;
+  elle n'occupe jamais les huit créneaux fournisseur d'un réveil MV3;
+- une route imbriquée de type `anime/{identité}/{sortie}-02-vostfr` conserve le
+  segment d'identité précédent et sépare la progression de la clé recherchée.
 
 L’inventaire ne matérialise jamais l’arbre complet : le runtime reprend le
 curseur durable, traite au plus huit tranches de 100 par réveil puis programme
@@ -92,6 +103,23 @@ Chaque résultat porte versions, source, révision, provenance et reçu.
     entrées-sorties.
 
 ## Flux de bout en bout
+
+Le popup ne fabrique jamais une œuvre depuis le seul titre de l'onglet actif.
+Il affiche et mémorise une reprise uniquement lorsque la page correspond à une
+unique `FavoriteSource` observée déjà liée à un `Work` local. Les anciennes
+reprises génériques sans identifiant `Work` sont ignorées lors de la lecture du
+cache; aucune ligne IndexedDB n'est supprimée.
+
+Le WebBridge renouvelle sa session courte après chaque expiration tant que le
+handshake et les projections initiales sont valides. Chaque renouvellement
+réussi réarme le suivant; un renouvellement défaillant s'arrête après cet essai
+et expose l'état récupérable sans boucle de requêtes.
+
+Le message interne `library.page.read` est conservé pour compatibilité avec les
+anciens écrans extension. Il n'est plus consommé par les surfaces actuelles :
+la bibliothèque extension utilise `library.catalogue.read` et le site utilise
+`library.read` via WebBridge. Sa suppression éventuelle fera l'objet d'une
+étape destructive séparée.
 
 ### 1. Capturer le déclencheur
 
@@ -199,8 +227,11 @@ persistance et des entrées-sorties.
 ### 5. Importer atomiquement
 
 Une transaction dans `tobirink-private` écrit ou met à jour `FavoriteSource`,
-ne crée aucune `Review` et enregistre l’artefact ainsi que la première entrée de
-l’outbox `ResolutionTask`. Aucun appel réseau n’a lieu avant le commit.
+ne crée aucune `Review` et enregistre l’artefact. Avec une identité média ou un
+ID fournisseur explicite, elle ajoute une entrée `READY` dans l’outbox
+`ResolutionTask`. Sans identité, elle écrit le résultat
+`UNSUPPORTED/IDENTITY_MISSING`, la tâche `COMMITTED` et son reçu dans la même
+transaction. Aucun appel réseau n’a lieu avant le commit.
 L’identité locale reste dérivée de l’identifiant du favori selon le contrat
 actuel; `importedAt` et une décision Review existante sont préservés.
 
@@ -299,13 +330,23 @@ change ni l’identité ni la progression calculées par le parser favori.
 
 Les cas d’usage locaux construisent ensuite :
 
-- Bibliothèque à partir de la bibliothèque, des `Work` et progressions locales;
+- Bibliothèque à partir de la bibliothèque, des `Work`, de leurs métadonnées
+  d'affichage et progressions locales;
 - Review à partir des seules pending AMBIGUOUS/NOT_FOUND et de leurs preuves;
 - Agenda à partir des entrées locales dans la semaine demandée;
-- WebBridge à partir de ces projections sérialisées et validées.
+- WebBridge v3 à partir de ces projections sérialisées et validées. Sa page
+  Bibliothèque transporte les facettes, tris, statistiques, jaquettes
+  attribuées, progression structurée et source nécessaires à l'affichage.
+  Elle ne transporte ni dossier de favoris, ni décision, ni secret.
 
 Une `Work` absente produit un état partiel. Une lecture UI ne déclenche aucun
 réseau et ne remplace aucune donnée manquante par une fixture.
+
+Le commit `RESOLVED` écrit atomiquement la `Work`, son association à la
+`FavoriteSource` et la progression chapitre, épisode ou volume extraite du
+favori. Une observation plus basse ne remplace jamais une progression locale
+plus avancée. WebBridge retrouve la source directement par `matchedWorkId`;
+une Review résolue n'est pas requise pour ouvrir le favori d'origine.
 
 ### 11. Réconcilier et reprendre
 
@@ -331,7 +372,7 @@ requête composée reste indexable sans branche de scan.
 | `FavoriteParseArtifact` | brut, transformations, identité, saison, progression, versions, empreinte | parser pur | import et resolver |
 | `ResolutionTask` | ID, artefact, état, tentative, échéance, claim, clé idempotente | import/réconciliation | runner |
 | `ResolutionDecision` | `CERTAIN`, `AMBIGUOUS` ou `NO_MATCH`, niveau, références, motifs | matcher pur | persistance/Review |
-| `ProviderCandidateEnvelope` | candidats normalisés, fournisseur, curseur, `complete`, `truncated`, digest | adaptateur fournisseur | matcher pur |
+| `ProviderCandidateEnvelope` | identité, titres localisés, jaquette attribuée, faits normalisés, curseur, `complete`, `truncated`, digest | adaptateur fournisseur | matcher pur et projection locale |
 | `ProviderRateCheckpoint` | fournisseur et `nextAllowedAt` | rate gate | lane fournisseur |
 | Étape d’hydratation | fournisseur et ID exact issus de la décision | runner réclamé | adaptateur fournisseur |
 | `LocalLanguageEvidence` | déclarations bornées, statistique, conflits et provenance | analyseur local facultatif | enrichissement local |
@@ -680,6 +721,20 @@ domaine/application/adaptateurs, le parser et le matcher sans I/O, l’outbox v8
 atomique et indexée, les limites réseau et locales, et l’absence de cascade à la
 suppression d’un favori. Chromium valide les migrations et le contrat réel
 IndexedDB.
+
+La certification finale couvre aussi le paquet Chrome réellement chargé avec
+cinq résolutions synthétiques : AniList et MangaDex par référence exacte,
+MangaUpdates comme source manga principale, puis Kitsu Anime et Kitsu Manga
+après `NO_MATCH` complet de la source principale. Les cinq fiches atteignent la
+bibliothèque locale avec leur progression et leur jaquette attribuée; le
+rechargement hors ligne conserve le résultat et la table Review reste vide.
+
+MangaUpdates impose une page minimale de 25 éléments. Cette page est inspectée
+entièrement avant réduction au contrat de 20 candidats comparables. Une page
+sans candidat comparable peut avancer vers son curseur suivant; une réponse
+incomplète ne devient jamais `NO_MATCH`. Le checkpoint sérialise les
+métadonnées v1 et v2 afin qu'une suspension MV3 ne perde ni la couverture, ni
+les variantes de titre, ni les facettes déjà hydratées.
 
 Les trois écarts précédemment critiques sont fermés : inventaire
 `getChildren()` reprenable et journalisé; assertions sémantiques exécutées pour

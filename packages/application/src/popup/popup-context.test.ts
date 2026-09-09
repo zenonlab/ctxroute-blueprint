@@ -24,7 +24,7 @@ describe('readPopupContext', () => {
     expect(parsePageProgress({ title: 'Frieren', url: 'https://example.test/chapter-100001' })).toBeUndefined();
   });
 
-  it('extracts the work and preserves its latest useful page', async () => {
+  it('rejects an ordinary YouTube page and removes legacy generic continuations', async () => {
     const writes: PopupContinuationRecord[][] = [];
     const cache = {
       read: async () => [record('frieren', '2026-09-03T10:00:00.000Z', { url: 'https://other.test/frieren-1' })],
@@ -33,18 +33,18 @@ describe('readPopupContext', () => {
     const result = await readPopupContext({
       cache,
       now: () => '2026-09-04T10:00:00.000Z',
-      pageContext: { readActivePage: async () => ({ title: 'Frieren — Chapitre 141 — Example', url: 'https://example.test/frieren/141' }) },
+      pageContext: { readActivePage: async () => ({ title: '(3) CES STREAMERS QUI GHOSTENT M. LE MAIRE', url: 'https://www.youtube.com/watch?v=synthetic' }) },
       storage: new MemoryStoragePort(),
     });
 
-    expect(result.active).toMatchObject({ id: 'frieren', source: 'example.test', title: 'Frieren', url: 'https://example.test/frieren/141' });
+    expect(result.active).toBeUndefined();
     expect(result.continuations).toEqual([]);
-    expect(writes.at(-1)?.[0]?.url).toBe('https://example.test/frieren/141');
+    expect(writes.at(-1)).toEqual([]);
   });
 
   it('expires old and completed entries and keeps the cache bounded', async () => {
     let written: readonly PopupContinuationRecord[] = [];
-    const recent = Array.from({ length: 7 }, (_, index) => record(`work-${index}`, `2026-09-0${index + 1}T10:00:00.000Z`));
+    const recent = Array.from({ length: 7 }, (_, index) => record(`work_fixture_${index}`, `2026-09-0${index + 1}T10:00:00.000Z`));
     const result = await readPopupContext({
       cache: {
         read: async () => [
@@ -66,7 +66,7 @@ describe('readPopupContext', () => {
   });
 
   it('ignores browser-internal pages while preserving cached continuations', async () => {
-    const cached = [record('dandadan', '2026-09-04T09:00:00.000Z')];
+    const cached = [record('work_dandadan', '2026-09-04T09:00:00.000Z')];
     const result = await readPopupContext({
       cache: { read: async () => cached, write: async () => undefined },
       now: () => '2026-09-04T10:00:00.000Z',
@@ -137,7 +137,7 @@ describe('readPopupContext', () => {
       await session.putFavoriteSource(createFavoriteSource({ bookmarkId: 'bookmark-b', folderPath: [], id: favoriteSourceId('source_frieren-other'), importedAt: '2026-09-01T10:00:00.000Z', order: 1, reviewId: secondReview.id, title: 'Frieren', url: 'https://b.test/frieren' }));
     });
     const ambiguous = await readPopupContext({ ...dependencies, pageContext: { readActivePage: async () => ({ title: 'Frieren — Chapitre 2', url: 'https://b.test/frieren/chapter-2' }) } });
-    expect(ambiguous.active).toMatchObject({ id: 'frieren', indicator: '- / -', mediaType: 'Œuvre' });
+    expect(ambiguous.active).toBeUndefined();
     expect(await storage.findProgressByWorkId(otherId)).toBeUndefined();
   });
 });

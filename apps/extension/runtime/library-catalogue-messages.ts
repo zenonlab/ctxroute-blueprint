@@ -44,7 +44,10 @@ export const libraryCatalogueResponseSchema = z.discriminatedUnion('ok', [
         year: z.array(facetOptionSchema).max(64),
       }),
       items: z.array(z.strictObject({
+        coverAlt: z.string().min(1).max(500).optional(),
+        coverSrc: z.url().max(4096).optional(),
         detail: z.string().min(1).max(300).optional(),
+        href: z.url().max(8192).optional(),
         id: z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u),
         mediaType: z.enum(['anime', 'manga']),
         progress: z.string().min(1).max(60).optional(),

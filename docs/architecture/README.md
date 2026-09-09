@@ -63,8 +63,10 @@ only the four explicitly declared HTTP(S), bare and `www` origins.
 
 [`src/favorite-source-boundaries.architecture.json`](src/favorite-source-boundaries.architecture.json)
 shows the package boundary behind that behavior: Application owns qualification,
-registry selection and the generic fallback; Browser Adapters owns exact AniList
-URL knowledge; Domain validates the immutable `SourceEvidence` result.
+registry selection and the generic fallback; Browser Adapters owns the exact
+AniList, MangaDex, MangaUpdates and Kitsu lanes; Domain validates the immutable
+`SourceEvidence` result. MangaDex handles exact public references, while Kitsu
+is a controlled anime/manga fallback and never an ambiguity arbiter.
 
 [`src/extension-delivery-validation.dataflow.json`](src/extension-delivery-validation.dataflow.json)
 maps the delivery evidence from the shared extension sources through automated
@@ -87,6 +89,12 @@ Manifest V3 shell remains separate from reusable React surfaces and previews.
 The generated manifest carries only documented browser permissions, local-only
 script policy, and a background router that validates every message before
 dispatch.
+
+The active library path is `library.catalogue.read` in the extension and
+`library.read` through WebBridge. The older `library.page.read` message remains
+an explicitly documented compatibility contract and has no active surface
+consumer. Historical Progress entries that mention an empty `host_permissions`
+array are superseded by the current manifest's five exact HTTPS origins.
 
 The blueprint control-plane sources are declared in
 `architecture.internalDocuments`. They are maintainer-only validation inputs:

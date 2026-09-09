@@ -24,6 +24,12 @@
         "label": "Chemin MangaUpdates",
         "focus": ["favoriteObservation", "eligibility", "sourceRegistry", "mangaUpdatesAdapter", "sourceContract"],
         "note": "Seule une route /series/{id} sur une origine exacte peut produire un identifiant MangaUpdates."
+      },
+      {
+        "id": "mangadex-kitsu-paths",
+        "label": "Chemins MangaDex et Kitsu",
+        "focus": ["favoriteObservation", "eligibility", "sourceRegistry", "mangadexAdapter", "kitsuAdapter", "sourceContract"],
+        "note": "MangaDex hydrate une référence exacte; Kitsu reste le repli contrôlé après un NO_MATCH complet."
       }
     ]
   },
@@ -32,23 +38,29 @@
     { "id": "eligibility", "type": "security", "label": "Qualification URL", "sublabel": "packages/application", "pos": [250, 270], "size": [160, 68], "tag": "HTTP(S) borné" },
     { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "règles JSON versionnées" },
     { "id": "genericEvidence", "type": "backend", "label": "Preuve générique", "sublabel": "structure de route", "pos": [710, 120], "size": [160, 68], "tag": "type UNKNOWN permis" },
+    { "id": "mangadexAdapter", "type": "backend", "label": "Adaptateur MangaDex", "sublabel": "packages/adapters-browser", "pos": [710, 220], "size": [160, 68], "tag": "UUID exact" },
+    { "id": "kitsuAdapter", "type": "backend", "label": "Adaptateurs Kitsu", "sublabel": "anime + manga · fallback", "pos": [710, 320], "size": [160, 68], "tag": "repli contrôlé" },
     { "id": "anilistAdapter", "type": "backend", "label": "Adaptateur AniList", "sublabel": "packages/adapters-browser", "pos": [710, 420], "size": [160, 68], "tag": "origine exacte" },
     { "id": "mangaUpdatesAdapter", "type": "backend", "label": "Adaptateur MangaUpdates", "sublabel": "packages/adapters-browser", "pos": [710, 520], "size": [160, 68], "tag": "/series/{id}" },
     { "id": "sourceContract", "type": "security", "label": "SourceEvidence", "sublabel": "packages/domain", "pos": [930, 270], "size": [140, 68], "tag": "immuable" }
   ],
   "boundaries": [
     { "kind": "region", "label": "Cœur pur", "wraps": ["eligibility", "sourceRegistry", "genericEvidence", "sourceContract"], "pad": 22 },
-    { "kind": "region", "label": "Adaptateurs navigateur", "wraps": ["anilistAdapter", "mangaUpdatesAdapter"], "pad": 18 }
+    { "kind": "region", "label": "Adaptateurs navigateur", "wraps": ["anilistAdapter", "mangaUpdatesAdapter", "mangadexAdapter", "kitsuAdapter"], "pad": 18 }
   ],
   "connections": [
     { "id": "observationQualification", "from": "favoriteObservation", "to": "eligibility", "label": "qualifie sans réécrire", "variant": "security", "labelAt": [220, 352] },
     { "id": "qualificationRegistry", "from": "eligibility", "to": "sourceRegistry", "label": "URL admissible", "variant": "emphasis", "labelAt": [445, 352] },
-    { "id": "registryGeneric", "from": "sourceRegistry", "to": "genericEvidence", "label": "aucune origine exacte", "variant": "dashed" },
-    { "id": "registryAniList", "from": "sourceRegistry", "to": "anilistAdapter", "label": "route AniList", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[650, 304], [650, 454]], "labelAt": [610, 380] },
-    { "id": "registryMangaUpdates", "from": "sourceRegistry", "to": "mangaUpdatesAdapter", "label": "route MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[680, 304], [680, 554]], "labelAt": [645, 520] },
-    { "id": "genericContract", "from": "genericEvidence", "to": "sourceContract", "label": "preuves de route" },
-    { "id": "anilistContract", "from": "anilistAdapter", "to": "sourceContract", "label": "ID AniList", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[880, 454], [880, 304]], "labelAt": [870, 380] },
-    { "id": "mangaUpdatesContract", "from": "mangaUpdatesAdapter", "to": "sourceContract", "label": "ID MU", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[920, 554], [920, 304]], "labelAt": [955, 520] }
+    { "id": "registryGeneric", "from": "sourceRegistry", "to": "genericEvidence", "variant": "dashed" },
+    { "id": "registryMangaDex", "from": "sourceRegistry", "to": "mangadexAdapter", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[650, 304], [650, 254]] },
+    { "id": "registryKitsu", "from": "sourceRegistry", "to": "kitsuAdapter", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[660, 304], [660, 354]] },
+    { "id": "registryAniList", "from": "sourceRegistry", "to": "anilistAdapter", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[650, 304], [650, 454]] },
+    { "id": "registryMangaUpdates", "from": "sourceRegistry", "to": "mangaUpdatesAdapter", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[680, 304], [680, 554]] },
+    { "id": "genericContract", "from": "genericEvidence", "to": "sourceContract" },
+    { "id": "mangaDexContract", "from": "mangadexAdapter", "to": "sourceContract", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[880, 254], [880, 304]] },
+    { "id": "kitsuContract", "from": "kitsuAdapter", "to": "sourceContract", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[900, 354], [900, 304]] },
+    { "id": "anilistContract", "from": "anilistAdapter", "to": "sourceContract", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[880, 454], [880, 304]] },
+    { "id": "mangaUpdatesContract", "from": "mangaUpdatesAdapter", "to": "sourceContract", "variant": "security", "fromSide": "right", "toSide": "left", "via": [[920, 554], [920, 304]] }
   ],
   "cards": [
     { "dot": "emerald", "title": "Autorité", "items": ["Favoris : présence et progression observée", "FavoriteSource : Work direct, Review optionnelle, résultat versionné"] },

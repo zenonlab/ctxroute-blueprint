@@ -18,7 +18,7 @@ describe('WebBridgePort transport contract', () => {
   });
 
   it('requires the exact origin and an unexpired nonce envelope', () => {
-    const envelope = { expiresAt: 2_000, nonce: 'nonce_1', origin: 'https://tobirink.example', protocolVersion: 2 as const, request: { type: 'bootstrap.read' as const, requestId: 'req_4' } };
+    const envelope = { expiresAt: 2_000, nonce: 'nonce_1', origin: 'https://tobirink.example', protocolVersion: 3 as const, request: { type: 'bootstrap.read' as const, requestId: 'req_4' } };
     expect(parseWebRequestEnvelope(envelope, 'https://tobirink.example', 1_000).request.type).toBe('bootstrap.read');
     expect(() => parseWebRequestEnvelope(envelope, 'https://evil.example', 1_000)).toThrow('webbridge-origin-mismatch');
     expect(() => parseWebRequestEnvelope(envelope, 'https://tobirink.example', 2_000)).toThrow('webbridge-nonce-expired');
@@ -39,7 +39,7 @@ describe('WebBridgePort transport contract', () => {
   it('validates correlated page responses while preserving version mismatch detection', () => {
     const handshake = {
       requestId: 'req_10',
-      response: { expiresAt: 60_000, nonce: 'nonce_10', ok: true, protocolVersion: 2, requestId: 'req_10', type: 'tobirink.webbridge.response' },
+      response: { expiresAt: 60_000, nonce: 'nonce_10', ok: true, protocolVersion: 3, requestId: 'req_10', type: 'tobirink.webbridge.response' },
       type: 'tobirink.webbridge.response',
     };
     expect(webPageBridgeInboundSchema.parse(handshake)).toEqual(handshake);

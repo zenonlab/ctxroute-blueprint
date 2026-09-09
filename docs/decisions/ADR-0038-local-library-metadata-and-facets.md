@@ -30,6 +30,16 @@ la bibliothèque : genres, format, statut éditorial canonique, années, totaux
 d'épisodes/chapitres/volumes et popularité accompagnée de sa nature. Le
 fournisseur de la fiche constitue la provenance. Une valeur absente reste
 inconnue; aucune donnée ne doit être inventée ou utilisée pour le matching.
+La même fiche peut conserver un titre d'affichage, au plus seize variantes de
+titre avec leur langue lorsqu'elle est fournie, et une jaquette HTTPS attribuée.
+L'origine de la jaquette est fixée par fournisseur dans le contrat de domaine;
+une origine différente ou une valeur hors limite invalide la réponse complète.
+Cette référence HTTPS attribuée reste locale et est affichée directement. Elle
+ne vaut pas licence de copie : aucun téléchargement, proxy Worker ou stockage
+R2 n'est déclenché par l'hydratation d'un favori. Seul le gate opérationnel
+défini par ADR-0026 peut ingérer un master assorti d'une politique de droits.
+La version 2 des métadonnées ajoute ces champs. La version 1 reste lisible afin
+que les fiches existantes migrent par réhydratation, sans suppression.
 Les totaux représentent uniquement un total éditorial explicite : le dernier
 chapitre ou volume observé ne devient jamais un total. Les tags MangaDex du
 groupe `genre` alimentent seuls la facette Genre; thèmes et formats restent
@@ -60,8 +70,9 @@ plusieurs inclusions ou exclusions successives.
 Ces faits, les filtres et les statistiques restent dans IndexedDB. D1 et
 `storage.sync` ne reçoivent aucun champ supplémentaire. Les descriptions,
 synopsis, personnes, critiques et textes éditoriaux ne sont pas collectés. Les
-messages MV3 stricts exposent uniquement la projection nécessaire aux cartes,
-facettes et compteurs.
+titres localisés et la référence de jaquette restent dans IndexedDB et ne sont
+transmis au site que par le WebBridge local. Les messages MV3 stricts exposent
+uniquement la projection nécessaire aux cartes, facettes et compteurs.
 
 ## Conséquences
 

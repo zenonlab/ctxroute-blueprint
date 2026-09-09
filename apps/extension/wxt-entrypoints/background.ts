@@ -24,7 +24,7 @@ import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-cata
 import { drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
-const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
+const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';

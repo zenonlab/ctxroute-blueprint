@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AniListFavoriteProviderAdapter, anilistGraphqlEndpoint } from './anilist-provider-adapter';
 
-const media = { chapters: null, endDate: { year: null }, episodes: 28, format: 'TV', genres: ['Adventure'], id: 154587, popularity: 250000, siteUrl: 'https://anilist.co/anime/154587', startDate: { year: 2023 }, status: 'FINISHED', synonyms: ['Sousou no Frieren'], title: { english: 'Frieren', native: '葬送のフリーレン', romaji: 'Sousou no Frieren' }, type: 'ANIME', volumes: null };
+const media = { chapters: null, coverImage: { extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/example.jpg', large: null, medium: null }, endDate: { year: null }, episodes: 28, format: 'TV', genres: ['Adventure'], id: 154587, popularity: 250000, siteUrl: 'https://anilist.co/anime/154587', startDate: { year: 2023 }, status: 'FINISHED', synonyms: ['Sousou no Frieren'], title: { english: 'Frieren', native: '葬送のフリーレン', romaji: 'Sousou no Frieren' }, type: 'ANIME', volumes: null };
 
 describe('AniListFavoriteProviderAdapter', () => {
   it('maps a complete bounded search response', async () => {
@@ -10,7 +10,7 @@ describe('AniListFavoriteProviderAdapter', () => {
     const result = await adapter.search({ limit: 10, provider: 'anilist', titles: ['Frieren'] });
     expect(fetcher).toHaveBeenCalledWith(anilistGraphqlEndpoint, expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }));
     expect(result).toMatchObject({ complete: true, provider: 'anilist', truncated: false });
-    expect(result.candidates[0]).toMatchObject({ editorialStatus: 'COMPLETED', episodeCount: 28, externalId: '154587', mediaKind: 'ANIME', metadataVersion: 1, popularity: { kind: 'MEMBERS', value: 250000 }, startYear: 2023, titles: ['Sousou no Frieren', 'Frieren', '葬送のフリーレン'] });
+    expect(result.candidates[0]).toMatchObject({ cover: { attribution: 'AniList', url: media.coverImage.extraLarge }, displayTitle: 'Frieren', editorialStatus: 'COMPLETED', episodeCount: 28, externalId: '154587', mediaKind: 'ANIME', metadataVersion: 2, popularity: { kind: 'MEMBERS', value: 250000 }, startYear: 2023, titleVariants: expect.arrayContaining([{ language: 'en', title: 'Frieren' }]), titles: ['Sousou no Frieren', 'Frieren', '葬送のフリーレン'] });
   });
 
   it('fails closed on a malformed or oversized response', async () => {
@@ -31,5 +31,10 @@ describe('AniListFavoriteProviderAdapter', () => {
     const adapter = new AniListFavoriteProviderAdapter(async () => new Response(JSON.stringify({ data: { Media: manga } }), { headers: { 'content-type': 'application/json' } }));
 
     await expect(adapter.hydrate({ externalId: '30013', provider: 'anilist' })).resolves.toMatchObject({ externalId: '30013', mediaKind: 'MANGA' });
+  });
+
+  it('rejects a cover outside the AniList image origin', async () => {
+    const adapter = new AniListFavoriteProviderAdapter(async () => Response.json({ data: { Media: { ...media, coverImage: { extraLarge: 'https://images.invalid/cover.jpg', large: null, medium: null } } } }));
+    await expect(adapter.hydrate({ externalId: '154587', provider: 'anilist' })).rejects.toThrow(/not allowed/u);
   });
 });

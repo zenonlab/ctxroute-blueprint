@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
-import { claimTask, commitTask, recordTaskEffect } from '../tasks';
+import { claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
@@ -12,7 +12,7 @@ const favorite: ImportableFavorite = {
   order: 3,
   state: 'eligible',
   title: 'Frieren chapitre 140',
-  url: 'https://reader.example/frieren/140',
+  url: 'https://reader.example/manga/frieren/chapter-140',
 };
 
 describe('importFavoriteSources', () => {
@@ -68,6 +68,41 @@ describe('importFavoriteSources', () => {
     const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
     expect(task).toMatchObject({ availableAt: '1970-01-01T00:00:00.000Z', kind: 'favorite-resolution', state: 'READY' });
     expect(task?.payload).toContain(source?.id);
+  });
+
+  it('closes an ordinary web link locally without consuming a provider task or creating Review', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ ...favorite, bookmarkId: 'youtube', title: '(3) CES STREAMERS QUI GHOSTENT M. LE MAIRE ft. Dach', url: 'https://www.youtube.com/watch?v=fixture' }], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 10 });
+    expect(source).toMatchObject({ resolution: { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' } });
+    expect(await storage.getFavoriteResolutionTask('favorite-resolution_e_796f7574756265')).toMatchObject({
+      effectRecord: 'unsupported:identity-missing',
+      state: 'COMMITTED',
+    });
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
+  });
+
+  it('closes a stale READY task for an unchanged identity-missing artifact on rescan', async () => {
+    const storage = new MemoryStoragePort();
+    const ordinary = { ...favorite, bookmarkId: 'youtube', title: 'Ordinary video', url: 'https://www.youtube.com/watch?v=fixture' };
+    await importFavoriteSources([ordinary], storage, importedAt);
+    const taskId = 'favorite-resolution_e_796f7574756265';
+    const committed = await storage.getFavoriteResolutionTask(taskId);
+    if (committed === undefined) throw new Error('Expected terminal task.');
+    await storage.putFavoriteResolutionTask(createDurableTask({
+      id: committed.id,
+      idempotencyKey: committed.idempotencyKey,
+      kind: committed.kind,
+      lane: committed.lane,
+      payload: committed.payload,
+    }));
+
+    await importFavoriteSources([ordinary], storage, '2026-09-06T01:00:00.000Z');
+
+    await expect(storage.getFavoriteResolutionTask(taskId)).resolves.toMatchObject({
+      effectRecord: 'unsupported:identity-missing',
+      state: 'COMMITTED',
+    });
   });
 
   it.each([

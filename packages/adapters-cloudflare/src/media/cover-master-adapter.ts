@@ -1,20 +1,14 @@
-export const COVER_CONTENT_TYPES = ['image/avif', 'image/jpeg', 'image/png', 'image/webp'] as const;
+import type {
+  CoverMasterIngestionPort,
+  CoverOutputFormat,
+  NormalizedCoverMaster,
+  StoredCoverMaster,
+} from '@tobirink/application';
+
+export const COVER_CONTENT_TYPES = ['image/avif', 'image/jpeg', 'image/png', 'image/webp'] as const satisfies readonly CoverOutputFormat[];
 
 export type CoverContentType = (typeof COVER_CONTENT_TYPES)[number];
-export type CoverRightsStatus = 'licensed' | 'public-domain';
-
-export interface NormalizedCoverMaster {
-  attribution?: string;
-  bytes: Uint8Array;
-  colorSpace: 'srgb';
-  contentType: CoverContentType;
-  height: number;
-  metadataStripped: true;
-  orientationNormalized: true;
-  rightsStatus: CoverRightsStatus;
-  sourceUrl: string;
-  width: number;
-}
+export type { NormalizedCoverMaster, StoredCoverMaster } from '@tobirink/application';
 
 interface StoredCoverObject {
   etag: string;
@@ -35,17 +29,9 @@ export interface CoverObjectStore {
   ): Promise<StoredCoverObject | null>;
 }
 
-export interface StoredCoverMaster {
-  contentType: CoverContentType;
-  created: boolean;
-  digest: string;
-  height: number;
-  key: string;
-  width: number;
-}
-
 const MAX_COVER_BYTES = 10 * 1024 * 1024;
 const MAX_COVER_DIMENSION = 8192;
+const POLICY_ID_PATTERN = /^[a-z0-9](?:[a-z0-9._:-]{0,126}[a-z0-9])?$/u;
 const EXTENSIONS: Record<CoverContentType, string> = {
   'image/avif': 'avif',
   'image/jpeg': 'jpg',
@@ -54,7 +40,8 @@ const EXTENSIONS: Record<CoverContentType, string> = {
 };
 
 function assertNormalizedMaster(master: NormalizedCoverMaster): void {
-  if (!['licensed', 'public-domain'].includes(master.rightsStatus)) {
+  if (!['licensed', 'public-domain'].includes(master.rights?.basis)
+    || !POLICY_ID_PATTERN.test(master.rights?.policyId ?? '')) {
     throw new TypeError('Cover copying is not permitted');
   }
   if (!COVER_CONTENT_TYPES.includes(master.contentType)) {
@@ -79,7 +66,7 @@ function hex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export class R2CoverMasterAdapter {
+export class R2CoverMasterAdapter implements CoverMasterIngestionPort {
   constructor(private readonly bucket: CoverObjectStore) {}
 
   async ingest(master: NormalizedCoverMaster): Promise<StoredCoverMaster> {
@@ -96,7 +83,8 @@ export class R2CoverMasterAdapter {
       height: String(master.height),
       metadataStripped: 'true',
       orientationNormalized: 'true',
-      rightsStatus: master.rightsStatus,
+      rightsBasis: master.rights.basis,
+      rightsPolicyId: master.rights.policyId,
       sourceUrl: master.sourceUrl,
       width: String(master.width),
     } satisfies Record<string, string>;

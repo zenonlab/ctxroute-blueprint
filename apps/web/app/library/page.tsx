@@ -8,8 +8,23 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { BridgeState, WebMemberShell, useWebMemberNavigation } from '../components/SiteShell';
 import { WebBridgeProvider, useWebBridge } from '../components/WebBridgeProvider';
 
-const typeOptions = [{ label: 'Anime', value: 'anime' }, { label: 'Manga', value: 'manga' }] as const;
-const filterOptions = { format: [], genre: [], progress: [], source: [], status: [], type: typeOptions, year: [] } as const;
+const facetNames = ['format', 'genre', 'progress', 'source', 'status', 'type', 'year'] as const;
+const emptyFilterOptions = { format: [], genre: [], progress: [], source: [], status: [], type: [], year: [] } as const;
+
+function filtersFrom(searchParams: ReturnType<typeof useSearchParams>): LibraryFiltersValue {
+  const selections: Record<(typeof facetNames)[number], Record<string, 'include' | 'exclude'>> = { format: {}, genre: {}, progress: {}, source: {}, status: {}, type: {}, year: {} };
+  const sort = searchParams.get('sort');
+  const selectedSort = sort === 'PROGRESS_DESC' || sort === 'POPULARITY_DESC' || sort === 'TITLE_ASC' || sort === 'TITLE_DESC' || sort === 'YEAR_DESC' ? sort : 'ADDED_DESC';
+  for (const facet of facetNames) for (const encoded of searchParams.getAll(`f.${facet}`).slice(0, 64)) {
+    const separator = encoded.indexOf(':');
+    const state = encoded.slice(0, separator);
+    const option = separator === -1 ? '' : encoded.slice(separator + 1).slice(0, 120);
+    if (option && (state === 'include' || state === 'exclude')) selections[facet][option] = state;
+  }
+  const legacyFacet = searchParams.get('facet');
+  if (Object.keys(selections.type).length === 0 && (legacyFacet === 'anime' || legacyFacet === 'manga')) selections.type[legacyFacet.toUpperCase()] = 'include';
+  return { ...selections, query: searchParams.get('search')?.slice(0, 120) ?? '', sort: selectedSort };
+}
 
 function LibrarySurface() {
   const router = useRouter();
@@ -20,25 +35,23 @@ function LibrarySurface() {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const search = searchParams.get('search')?.slice(0, 120) ?? '';
-  const facetValue = searchParams.get('facet');
-  const facet: WebLibraryQuery['facet'] = facetValue === 'anime' || facetValue === 'manga' ? facetValue : 'all';
   const cursor = searchParams.get('cursor')?.slice(0, 128) || undefined;
+  const [filters, setFilters] = useState<LibraryFiltersValue>(() => filtersFrom(searchParams));
   const query = useMemo<WebLibraryQuery>(() => {
-    const nextQuery: WebLibraryQuery = { facet, limit: 24 };
+    const nextQuery: WebLibraryQuery = { facet: 'all', facets: { format: filters.format, genre: filters.genre, progress: filters.progress, source: filters.source, status: filters.status, type: filters.type, year: filters.year }, limit: 24, sort: filters.sort };
     if (cursor) nextQuery.cursor = cursor;
-    if (search) nextQuery.search = search;
+    if (filters.query) nextQuery.search = filters.query;
     return nextQuery;
-  }, [cursor, facet, search]);
-  const filters: LibraryFiltersValue = { format: {}, genre: {}, progress: {}, query: search, sort: 'ADDED_DESC', source: {}, status: {}, type: facet === 'all' ? {} : { [facet]: 'include' }, year: {} };
+  }, [cursor, filters]);
 
   const setQuery = (value: LibraryFiltersValue) => {
     const params = new URLSearchParams();
     const nextSearch = value.query.trim();
-    const nextFacet = Object.entries(value.type).find(([, selection]) => selection === 'include')?.[0];
     if (nextSearch) params.set('search', nextSearch);
-    if (nextFacet === 'anime' || nextFacet === 'manga') params.set('facet', nextFacet);
-    router.replace(params.size > 0 ? `/library?${params.toString()}` : '/library');
+    if (value.sort !== 'ADDED_DESC') params.set('sort', value.sort);
+    for (const facet of facetNames) for (const [option, selection] of Object.entries(value[facet])) params.append(`f.${facet}`, `${selection}:${option}`);
+    setFilters(value);
+    window.history.replaceState(null, '', params.size > 0 ? `/library?${params.toString()}` : '/library');
   };
 
   useEffect(() => {
@@ -49,23 +62,25 @@ function LibrarySurface() {
   }, [query, readLibrary, retryCount, status]);
   const nextCursor = page?.cursor;
   const items: readonly LibraryWork[] = page?.items.map((item) => ({
+    coverAlt: item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined,
     coverSrc: item.coverUrl,
-    href: item.sourceUrl,
+    detail: [item.format, item.startYear, item.provider].filter(Boolean).join(' · ') || undefined,
+    href: item.sourceUrl ?? item.canonicalUrl ?? `/library/_?work=${encodeURIComponent(item.workId)}`,
     id: item.workId,
     mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga',
     progress: item.progressLabel,
-    source: item.sourceUrl ? new URL(item.sourceUrl).hostname : 'Source enregistrée',
+    source: (item.sourceUrl ? new URL(item.sourceUrl).hostname : undefined) ?? item.provider ?? 'Fiche locale',
     title: item.title,
   })) ?? [];
 
   if (status === 'loading' || status === 'reconnecting') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
-  if (status === 'extension-missing') return <Library extensionRequired filterOptions={filterOptions} filters={filters} items={[]} navigation={navigation} onChangeFilters={setQuery} onDownloadExtension={() => router.push('/download')} onLoadMore={() => undefined} onOpenRecovery={() => setRetryCount((count) => count + 1)} onRetry={() => setRetryCount((count) => count + 1)} state="empty" />;
+  if (status === 'extension-missing') return <Library extensionRequired filterOptions={emptyFilterOptions} filters={filters} items={[]} navigation={navigation} onChangeFilters={setQuery} onDownloadExtension={() => router.push('/download')} onLoadMore={() => undefined} onOpenRecovery={() => setRetryCount((count) => count + 1)} onRetry={() => setRetryCount((count) => count + 1)} state="empty" />;
   if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
-  const filtered = search.length > 0 || facet !== 'all';
-  const state: LibraryState = failed ? 'error' : loading ? 'loading' : page && items.length === 0 && !filtered ? 'empty' : 'ready';
+  const filtered = filters.query.length > 0 || facetNames.some((facet) => Object.keys(filters[facet]).length > 0);
+  const state: LibraryState = failed ? 'error' : loading && !page ? 'loading' : page && items.length === 0 && !filtered ? 'empty' : 'ready';
 
   return <Library
-    filterOptions={filterOptions}
+    filterOptions={page?.facets ?? emptyFilterOptions}
     filters={filters}
     hasMore={Boolean(page?.hasMore && nextCursor)}
     items={items}
@@ -76,6 +91,7 @@ function LibrarySurface() {
     onOpenRecovery={() => setRetryCount((count) => count + 1)}
     onRetry={() => setRetryCount((count) => count + 1)}
     state={state}
+    statistics={page?.statistics}
   />;
 }
 

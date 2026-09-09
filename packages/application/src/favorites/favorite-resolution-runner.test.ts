@@ -125,6 +125,31 @@ describe('runFavoriteResolutionSlice', () => {
     await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [source?.matchedWorkId] });
   });
 
+  it('persists bookmark progression with the hydrated provider maximum', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ ...favorite, title: 'Frieren épisode 7' }], storage, now);
+    const task = await storage.getFavoriteResolutionTask('favorite-resolution_c_72756e6e6572');
+    if (task === undefined) throw new Error('Expected progression task.');
+    const hydrated = { ...candidate, episodeCount: 28 };
+    await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => createProviderCandidateEnvelope({ candidates: [hydrated], complete: true, digest: 'progress-search', provider: 'anilist', truncated: false }) }),
+      hydration: hydrationPorts({ hydrate: async () => hydrated }), libraryId: libraryId('library_primary'), now: () => now,
+      outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'progress-token',
+    });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.matchedWorkId && await storage.findProgressByWorkId(source.matchedWorkId)).toMatchObject({ kind: 'episode', maximum: 28, value: 7 });
+
+    await importFavoriteSources([{ ...favorite, title: 'Frieren épisode 3' }], storage, '2026-09-07T12:01:00.000Z');
+    const revisedTask = await storage.getFavoriteResolutionTask('favorite-resolution_c_72756e6e6572');
+    if (revisedTask === undefined) throw new Error('Expected revised progression task.');
+    await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => createProviderCandidateEnvelope({ candidates: [hydrated], complete: true, digest: 'lower-progress-search', provider: 'anilist', truncated: false }) }),
+      hydration: hydrationPorts({ hydrate: async () => hydrated }), libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:01:00.000Z',
+      outbox: new MemoryOutbox(storage, revisedTask.id), storage, token: () => 'lower-progress-token',
+    });
+    expect(source?.matchedWorkId && await storage.findProgressByWorkId(source.matchedWorkId)).toMatchObject({ kind: 'episode', maximum: 28, value: 7 });
+  });
+
   it('persists a retry after a recoverable provider failure', async () => {
     const { outbox, storage, task } = await fixture();
     const result = await runFavoriteResolutionSlice({
@@ -187,7 +212,7 @@ describe('runFavoriteResolutionSlice', () => {
 
   it('Q-07 hydrates an explicit provider reference without title rematching', async () => {
     const storage = new MemoryStoragePort();
-    const explicitFavorite = { ...favorite, bookmarkId: 'explicit', url: 'https://anilist.co/anime/154587/frieren' };
+    const explicitFavorite = { ...favorite, bookmarkId: 'explicit', title: 'Titre local volontairement différent', url: 'https://anilist.co/anime/154587/frieren' };
     await importFavoriteSources([explicitFavorite], storage, now, [{
       analyze: (input, url) => createSourceEvidence({ aliases: [], diagnostics: [], explicitProviderReference: { externalId: '154587', provider: 'anilist' }, key: input.sourceKey, mediaKind: 'ANIME', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH'], sourceAdapter: 'test-anilist', strategy: 'exact-origin', title: input.title }),
       id: 'test-anilist',
@@ -209,6 +234,9 @@ describe('runFavoriteResolutionSlice', () => {
 
     expect(searches).toBe(0);
     expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect(source?.reviewId).toBeUndefined();
   });
 
   it('applies blocked taxonomy after exact hydration without creating a Work', async () => {
@@ -257,6 +285,17 @@ describe('runFavoriteResolutionSlice', () => {
     });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: '154587' }, { externalId: '154588' }], digest: expect.stringMatching(/^[a-f0-9]{64}$/u) });
+  });
+
+  it('refuses to publish an ambiguous Review without comparable candidates', async () => {
+    const { storage, task } = await fixture();
+    const claimed = claimTask(task, 'ambiguous-token', now, '2026-09-07T12:01:00.000Z');
+    await storage.putFavoriteResolutionTask(claimed);
+    await expect(persistFavoriteResolutionCompletion(
+      { libraryId: libraryId('library_primary'), now: () => now, storage }, claimed, 'ambiguous-token',
+      { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:invalid-empty',
+    )).rejects.toThrow('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
   });
 
   it('keeps a terminal NOT_FOUND actionable instead of making a no-match decision', async () => {

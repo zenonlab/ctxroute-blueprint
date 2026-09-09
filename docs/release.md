@@ -19,6 +19,10 @@ difference. The manifest records target, version, file count, byte size and
 SHA-256.
 The release packager also injects and verifies the exact non-secret bridge
 origin `https://tobirink.com/*` in both generated manifests.
+Standard WXT builds use that production origin by default, so the unpacked
+Chrome directory remains compatible with WebBridge after `npm run verify`.
+Development against another exact HTTPS origin requires an explicit
+`WXT_PUBLIC_SITE_ORIGIN` override.
 
 Packaging is local only. It never signs, uploads, publishes, deploys, edits a
 store listing or handles store credentials. Submission remains a separate

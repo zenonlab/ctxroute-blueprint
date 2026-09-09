@@ -869,7 +869,7 @@
           "evidence": [
             "Application 23/23, contrats 9/9 et IndexedDB 2/2 plus contrat Chromium passent; lookup reviewId borne et doublons refuses.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor SAFE passent; candidats limites a 6, requete exclusive reference ou titre, revision deterministe testee.",
-            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent avec host_permissions vide; docs, ADR et Archify Tobirink 9/9 passent."
+            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent; les manifests declarent uniquement les origines HTTPS necessaires (AniList, MangaUpdates, MangaDex, Kitsu et tobirink.com); docs, ADR et Archify Tobirink 9/9 passent."
           ]
         },
         {
@@ -956,7 +956,7 @@
           "evidence": [
             "Application 23/23 et adaptateur navigateur 5/5 passent; reponses JSON strictes, erreurs normalisees, limites et chemins possedes testes.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor cible SAFE passent; securite extension/Worker 12/12 et builds Chrome/Firefox ~590 kB passent.",
-            "Manifestes Chrome/Firefox gardent host_permissions vide; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
+            "Manifestes Chrome/Firefox declarent uniquement les origines HTTPS necessaires; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
           ]
         },
         {
@@ -1013,7 +1013,7 @@
           "evidence": [
             "Application 25/25, UI 117/117, extension 67/67, Workbench 9/9, accessibilite 7/7 et IndexedDB Chromium passent; pagination stable de 24 et references manquantes testees.",
             "Recherche et filtre Type utilisent les donnees locales; facettes sans options et CTA telechargement sans callback ne sont pas rendus; Chrome headless charge #library a 390 px sans overlay.",
-            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; host_permissions reste vide."
+            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; les permissions d’hote restent limitees aux origines HTTPS necessaires."
           ]
         },
         {
@@ -1120,7 +1120,7 @@
           "evidence": [
             "Popup runtime reuses useLocalAgenda; local releases map to WorkCard and open the full Agenda through a host callback; empty periods render no placeholder copy.",
             "Extension 71/71, UI 117/117, Workbench 9/9 and accessibility 7/7 pass; typecheck passes all 8 workspaces.",
-            "Chrome and Firefox builds remain about 597 kB; extension security 8/8 and both manifests retain empty host_permissions.",
+            "Chrome and Firefox builds remain about 597 kB; extension security 8/8 and both manifests retain only the required HTTPS origins.",
             "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, docs and UI contract validations pass.",
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings.",
             "external: no in-app browser instance was available for an additional manual screenshot; automated Workbench and accessibility checks passed."
@@ -1191,7 +1191,7 @@
             "Application 28/28 and contracts 9/9 pass; multiple resolved favorites are preserved, ordered by folder path, bookmark order and stable ID, with source reads coalesced per Work.",
             "Dexie v4 indexes matchedWorkId; adapter 2/2, Chromium StoragePort contract and v1/v2/v3-to-v4 migration checks pass.",
             "Extension 72/72, UI 118/118, Workbench 9/9 and accessibility 7/7 pass; sourceUrl accepts only HTTP(S) and source-less WorkCard has no href.",
-            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with empty host_permissions.",
+            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with only the required HTTPS origins.",
             "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, UI/docs/34 ADR validations and git diff check pass.",
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings."
           ]
@@ -6564,6 +6564,196 @@
             "Cloudflare plan 45d51fc1 changed only the snapshot and current pointer keys",
             "GET v1 releases returns HTTP 200 revision empty-2026-09-09 and conditional HTTP 304",
             "D1 has no pending migration and both public ZIP hashes remain exact"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-end-to-end-remediation",
+      "title": "Restore the complete local favorite-to-library pipeline",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Persist complete resolved favorite state",
+          "status": "DONE",
+          "acceptance": [
+            "A direct resolution links its observed FavoriteSource to the Work and WebBridge retrieves that source without a Review",
+            "Parsed bookmark progression is persisted transactionally and does not regress existing progress automatically",
+            "AMBIGUOUS Reviews contain at least two comparable identities while NOT_FOUND remains separately actionable"
+          ],
+          "files": [
+            "packages/domain/src/progress.ts",
+            "packages/application/src/favorites/favorite-resolution-commit.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/collective-index/favorite-collective-lookup.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run packages/application/src/favorites/favorite-resolution-runner.test.ts apps/extension/runtime/web-bridge-adapter.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m fix(favorites): persist complete resolved favorite state"
+          ],
+          "evidence": [
+            "Vitest targeted resolution WebBridge collective and domain suite: 36 passed",
+            "All 9 workspace typechecks passed",
+            "ESLint and complete documentation validation passed",
+            "favorite-resolution.dataflow showcase: 9 of 9 checks passed",
+            "git diff --check passed"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Preserve provider display metadata and covers",
+          "status": "DONE",
+          "acceptance": [
+            "AniList MangaUpdates MangaDex and Kitsu hydration preserve a bounded HTTPS cover descriptor and title-language evidence",
+            "Provider metadata remains local and strict contracts reject untrusted image origins or oversized values",
+            "Existing Work records migrate additively without data deletion"
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/work.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.test.ts"
+          ],
+          "commands": [
+            "npm test -- --run packages/adapters-browser/src/favorites",
+            "npm run typecheck",
+            "git diff --check",
+            "git commit -m feat(metadata): preserve provider display metadata"
+          ],
+          "evidence": [
+            "Provider domain Work library and resolution Vitest suites: 50 passed across 7 files",
+            "All 9 workspace typechecks and ESLint passed",
+            "Complete docs validation and favorite-resolution Archify showcase 9/9 passed",
+            "Live Kitsu and MangaUpdates payload shapes confirmed bounded cover origins",
+            "git diff --check passed"
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Project the complete local catalogue to the website",
+          "status": "DONE",
+          "acceptance": [
+            "The website receives the same local facets sorting statistics metadata cover progression and source as the extension catalogue",
+            "Facet controls remain visible and support multiple include or exclude selections",
+            "Every card opens a real favorite source or a functional local work detail route; no inert work fragment remains"
+          ],
+          "files": [
+            "packages/contracts/src/web-bridge.ts",
+            "packages/application/src/ports/web-bridge-port.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/library/[workId]/page.tsx",
+            "packages/ui/src/features/library/library-surface/Library.tsx",
+            "packages/ui/src/features/library/library-surface/Library.test.tsx"
+          ],
+          "commands": [
+            "npm test -- --run apps/extension/runtime/web-bridge-adapter.test.ts packages/ui/src/features/library/library-surface/Library.test.tsx",
+            "npm run typecheck",
+            "npm run test:web",
+            "git diff --check",
+            "git commit -m fix(library): project the complete local catalogue"
+          ],
+          "evidence": [
+            "WebBridge catalogue and contract suites: 32 tests passed across 7 files",
+            "Web workspace: 10 tests passed; shared UI: 127 tests passed",
+            "Next static production build passed with the local work detail route",
+            "Playwright: 7 of 7 web and packaged-extension journeys passed, including persistent multi-select facets and detail navigation",
+            "All 9 workspace typechecks, ESLint, docs validation, Archify 9/9 and git diff check passed"
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Restore rights-aware cover delivery",
+          "status": "DONE",
+          "acceptance": [
+            "Provider covers render through fixed allowlisted URLs with attribution and bounded fallback behavior",
+            "R2 ingestion remains unavailable unless an explicit provider rights policy permits it and is callable only through the operational gate",
+            "No raw favorite URL title folder or progression is written to Cloudflare"
+          ],
+          "files": [
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-cloudflare/src/media/cover-master-adapter.ts",
+            "apps/worker/src/composition.ts",
+            "apps/worker/src/media/cover-routes.ts",
+            "apps/worker/src/media/cover-routes.test.ts",
+            "docs/decisions/ADR-0026-catalogue-and-media-pipeline.md",
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm test -- --run apps/worker/src/media/cover-routes.test.ts packages/adapters-cloudflare/src/media",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m feat(media): restore provider cover delivery"
+          ],
+          "evidence": [
+            "R2 and Worker media suites: 17 tests passed including no POST PUT DELETE ingestion route",
+            "Application Cloudflare adapter and Worker typechecks plus ESLint and Oxlint passed",
+            "Rights-aware dataflow passes Archify showcase 9/9; docs decisions and git diff validation passed"
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Certify the installed multi-provider pipeline",
+          "status": "DONE",
+          "acceptance": [
+            "Synthetic FavLib-shaped fixtures cover AniList MangaUpdates MangaDex Kitsu slug resolution progression source metadata and covers without reading a FavLib database",
+            "Chrome and Firefox packaged builds pass import to rendered library tests with zero ordinary links in Review",
+            "The full verification suite and Archify showcase pass and reproducible ZIP hashes are recorded locally"
+          ],
+          "files": [
+            "packages/application/src/favorites/equivalence-corpus.ts",
+            "packages/application/src/favorites/equivalence-oracle.test.ts",
+            "packages/application/src/favorites/provider-matcher.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "docs/systems/favorite-resolution-correction-plan.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run apps/extension/runtime/local-library-catalogue-runtime.test.ts packages/application/src/favorites/provider-search-checkpoint.test.ts packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts packages/application/src/favorites/equivalence-oracle.test.ts",
+            "npm run test:e2e --workspace @tobirink/web -- packaged-extension.spec.ts",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "git diff --check",
+            "git commit -m test(favorites): certify complete local library flow"
+          ],
+          "evidence": [
+            "npm run verify passes: 697 workspace tests plus 273 governance tests and 1 intentional skip, Chromium IndexedDB, performance, CRG, integration, audit 0 and docs",
+            "Packaged Chrome MV3 E2E passes with AniList MangaUpdates MangaDex Kitsu Anime and Kitsu Manga, four cover origins, zero Review, an excluded YouTube link and offline reload",
+            "Chrome and Firefox 1.0.0 ZIPs are independently reproducible: SHA-256 16aa888d74ddae5d385af73ea100eaccbcef42edb15e64920616b3963cf95ec6 and 89b2be2fc60c88245bbea6197cbe229f116e97309e43d4128f87fccf1d5fb3db; native Firefox was unavailable",
+            "MangaUpdates 25-result minimum page and metadata-v2 MV3 checkpoints are regression tested; focused suite passes 27 tests",
+            "favorite-resolution dataflow passes Archify showcase 9/9 with zero errors or warnings; git diff --check passes"
           ]
         }
       ]

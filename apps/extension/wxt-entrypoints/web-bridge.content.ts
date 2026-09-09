@@ -2,7 +2,7 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { z } from 'zod';
 import { assertWebBridgeMessageSize, webHandshakeSchema, webRequestEnvelopeSchema } from '@tobirink/contracts/web-bridge';
 
-const siteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() ?? '';
+const siteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
 const pageBridgeMessageSchema = z.union([webHandshakeSchema, webRequestEnvelopeSchema]);
 
 export default defineContentScript({

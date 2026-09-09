@@ -27,8 +27,9 @@ describe('shared Library surface', () => {
     expect(component).toContain('item.detail ?? item.source');
   });
 
-  it('accepts a real stored source without changing the Extension fallback', () => {
-    expect(component).toContain('item.href ?? `#work-${item.id}`');
+  it('never manufactures an inert work fragment', () => {
+    expect(component).toContain('href={item.href}');
+    expect(component).not.toContain('#work-');
   });
 
   it('distinguishes an absent extension from an installed empty library', () => {

@@ -62,7 +62,7 @@ export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollective
     if (candidate === undefined) return { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' };
     if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('Collective hydration identity mismatch.');
     if (!isProviderCandidateCompatible({ mediaKind: result.mediaKind, sourceTitles: candidate.titles }, candidate)
-      || (artifact.mediaKind !== 'UNKNOWN' && !isProviderCandidateCompatible({ mediaKind: artifact.mediaKind, sourceTitles: candidate.titles }, candidate))) return { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' };
+      || (artifact.mediaKind !== 'UNKNOWN' && !isProviderCandidateCompatible({ mediaKind: artifact.mediaKind, sourceTitles: candidate.titles }, candidate))) return { kind: 'MISS' };
     return { kind: 'RESOLVED', candidate, references: result.references, scope: result.scope };
   } catch (error) {
     return error instanceof FavoriteProviderRetryError ? { kind: 'RETRYABLE', retryAt: error.retryAt } : { kind: 'RETRYABLE' };

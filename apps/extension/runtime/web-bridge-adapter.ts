@@ -1,18 +1,14 @@
-import { readAgendaPeriod, readReviewQueue } from '@tobirink/application';
+import { readAgendaPeriod, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
 import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, Work, WorkId } from '@tobirink/domain';
-import type { WebAgendaPeriod, WebBootstrapSnapshot, WebLibraryPage, WebRequest, WebReviewSnapshot } from '@tobirink/contracts/web-bridge';
+import type { WebAgendaPeriod, WebBootstrapSnapshot, WebLibraryItem, WebLibraryPage, WebRequest, WebReviewSnapshot } from '@tobirink/contracts/web-bridge';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from './local-review-runtime';
 import type { WebBridgeRequestHandler, WebBridgeValue } from './web-bridge-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 const libraryScanLimit = 500;
 const projectionByteLimit = 60 * 1024;
-
-function normalizeSearch(value: string): string {
-  return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase().trim();
-}
 
 function localMidnight(dateOnly: string): string {
   const [year, month, day] = dateOnly.split('-').map(Number);
@@ -24,22 +20,67 @@ function projectionFits(serialized: string): boolean {
 }
 
 async function preferredSource(storage: StoragePort, id: WorkId): Promise<FavoriteSource | undefined> {
-  const reviews = await storage.listReviewsByWorkId({ limit: 100, workId: id });
-  const sources = await Promise.all(reviews.map((review) => storage.findFavoriteSourceByReviewId(review.id)));
-  return sources.filter((source): source is FavoriteSource => source !== undefined)
+  const sources = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: id });
+  return sources.filter((source) => source.presence === 'observed')
     .sort((left, right) => left.folderPath.join('\u0000').localeCompare(right.folderPath.join('\u0000')) || left.order - right.order || left.id.localeCompare(right.id))[0];
 }
 
-async function mapLibraryItem(storage: StoragePort, work: Work) {
-  const [progress, source] = await Promise.all([storage.findProgressByWorkId(work.id), preferredSource(storage, work.id)]);
-  const base = { mediaKind: work.mediaKind, title: work.preferredTitle, workId: work.id };
-  const progressLabel = progress
-    ? `${progress.kind === 'episode' ? 'Épisode' : 'Chapitre'} ${progress.value}${progress.maximum === undefined ? '' : `/${progress.maximum}`}`
-    : undefined;
-  if (progressLabel && source) return { ...base, progressLabel, sourceUrl: source.url };
-  if (progressLabel) return { ...base, progressLabel };
-  if (source) return { ...base, sourceUrl: source.url };
+function progressLabel(progress: Awaited<ReturnType<StoragePort['findProgressByWorkId']>>): string | undefined {
+  if (progress === undefined) return undefined;
+  const label = progress.kind === 'episode' ? 'Épisode' : progress.kind === 'volume' ? 'Volume' : 'Chapitre';
+  return `${label} ${progress.value}${progress.maximum === undefined ? '' : `/${progress.maximum}`}`;
+}
+
+function projectedUrl(value: string | undefined, limit: number): string | undefined {
+  return value !== undefined && value.length <= limit ? value : undefined;
+}
+
+function projectedText(value: string, limit: number): string {
+  return value.slice(0, limit);
+}
+
+async function mapLibraryItem(storage: StoragePort, item: { readonly progress?: Awaited<ReturnType<StoragePort['findProgressByWorkId']>>; readonly work: Work }): Promise<WebLibraryItem> {
+  const { progress, work } = item;
+  const source = await preferredSource(storage, work.id);
+  const candidate = work.hydration?.candidate;
+  const base: WebLibraryItem = { mediaKind: work.mediaKind, title: projectedText(work.preferredTitle, 240), workId: work.id };
+  const label = progressLabel(progress);
+  if (label !== undefined) base.progressLabel = label;
+  if (progress !== undefined) base.progress = progress.maximum === undefined
+    ? { kind: progress.kind, value: progress.value }
+    : { kind: progress.kind, maximum: progress.maximum, value: progress.value };
+  if (source !== undefined) {
+    const sourceUrl = projectedUrl(source.url, 2048);
+    if (sourceUrl !== undefined) base.sourceUrl = sourceUrl;
+  }
+  if (candidate === undefined) return base;
+  const canonicalUrl = projectedUrl(candidate.canonicalUrl, 2048);
+  const coverUrl = projectedUrl(candidate.cover?.url, 4096);
+  if (canonicalUrl !== undefined) base.canonicalUrl = canonicalUrl;
+  if (coverUrl !== undefined) base.coverUrl = coverUrl;
+  if (candidate.cover !== undefined) base.coverAttribution = projectedText(candidate.cover.attribution, 120);
+  if (candidate.format !== undefined) base.format = projectedText(candidate.format, 120);
+  if (candidate.genres !== undefined) base.genres = candidate.genres.map((genre) => projectedText(genre, 120));
+  if (candidate.editorialStatus !== undefined) base.editorialStatus = candidate.editorialStatus;
+  if (candidate.startYear !== undefined) base.startYear = candidate.startYear;
+  if (candidate.endYear !== undefined) base.endYear = candidate.endYear;
+  if (candidate.episodeCount !== undefined) base.episodeCount = candidate.episodeCount;
+  if (candidate.chapterCount !== undefined) base.chapterCount = candidate.chapterCount;
+  if (candidate.volumeCount !== undefined) base.volumeCount = candidate.volumeCount;
+  if (candidate.popularity !== undefined) base.popularity = candidate.popularity;
+  base.provider = projectedText(candidate.provider, 120);
+  if (candidate.titleVariants !== undefined) base.titleVariants = candidate.titleVariants.map((variant) => variant.language === undefined
+    ? { title: projectedText(variant.title, 240) }
+    : { language: projectedText(variant.language, 120), title: projectedText(variant.title, 240) });
   return base;
+}
+
+function libraryOffset(cursor: string | undefined): number {
+  if (cursor === undefined) return 0;
+  const match = /^offset:(\d{1,6})$/u.exec(cursor);
+  const offset = Number(match?.[1]);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > libraryScanLimit) throw new Error('invalid-library-cursor');
+  return offset;
 }
 
 function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCandidateSnapshot>>): WebReviewSnapshot {
@@ -61,30 +102,40 @@ export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: 
     if (request.type === 'bootstrap.read') {
       const library = await storage.getLibrary(primaryLibraryId);
       const review = await readReviewQueue(storage);
-      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: library?.workIds.length ?? 0, pendingReviewCount: review.items.length, protocolVersion: 2 };
+      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: library?.workIds.length ?? 0, pendingReviewCount: review.items.length, protocolVersion: 3 };
       return snapshot;
     }
     if (request.type === 'library.read') {
-      const library = await storage.getLibrary(primaryLibraryId);
-      const scannedIds = library?.workIds.slice(0, libraryScanLimit) ?? [];
-      const works = (await Promise.all(scannedIds.map((id) => storage.getWork(id)))).filter((work): work is Work => work !== undefined);
-      const search = normalizeSearch(request.query.search ?? '');
-      const filtered = works.filter((work) => (request.query.facet === 'all' || work.mediaKind === request.query.facet)
-        && (search.length === 0 || normalizeSearch(work.preferredTitle).includes(search)));
-      const start = request.query.cursor === undefined ? 0 : filtered.findIndex((work) => work.id === request.query.cursor) + 1;
-      if (request.query.cursor !== undefined && start === 0) throw new Error('invalid-library-cursor');
-      const selected = filtered.slice(start, start + request.query.limit);
-      const mapped = await Promise.all(selected.map((work) => mapLibraryItem(storage, work)));
+      const start = libraryOffset(request.query.cursor);
+      const legacyType = request.query.facet === 'all' ? undefined : { [request.query.facet.toUpperCase()]: 'include' as const };
+      const facets = legacyType === undefined ? request.query.facets : { ...request.query.facets, type: request.query.facets?.type ?? legacyType };
+      const catalogue = await readLibraryCatalogue(storage, {
+        facets, libraryId: primaryLibraryId, limit: request.query.limit, offset: start,
+        query: request.query.search, sort: request.query.sort,
+      });
+      let selected = catalogue.items;
+      if (request.query.workId !== undefined) {
+        const requestedWork = await storage.getWork(workId(request.query.workId));
+        if (requestedWork === undefined) selected = [];
+        else {
+          const progress = await storage.findProgressByWorkId(requestedWork.id);
+          selected = progress === undefined ? [{ addedOrder: 0, work: requestedWork }] : [{ addedOrder: 0, progress, work: requestedWork }];
+        }
+      }
+      const mapped = await Promise.all(selected.map((item) => mapLibraryItem(storage, item)));
       const items = [...mapped];
-      let hasMore = start + selected.length < filtered.length;
-      let snapshot: WebLibraryPage = { hasMore, items, query: request.query };
+      let hasMore = catalogue.nextOffset !== undefined;
+      const projectedFacets = {
+        format: [...catalogue.facets.format], genre: [...catalogue.facets.genre], progress: [...catalogue.facets.progress],
+        source: [...catalogue.facets.source], status: [...catalogue.facets.status], type: [...catalogue.facets.type], year: [...catalogue.facets.year],
+      };
+      let snapshot: WebLibraryPage = { facets: projectedFacets, hasMore, items, query: request.query, statistics: catalogue.statistics, total: request.query.workId === undefined ? catalogue.total : items.length, truncated: catalogue.truncated };
       while (!projectionFits(JSON.stringify(snapshot)) && items.length > 0) {
         items.pop();
         hasMore = true;
-        snapshot = { hasMore, items, query: request.query };
+        snapshot = { ...snapshot, hasMore, items };
       }
-      const cursor = items.at(-1)?.workId;
-      if (hasMore && cursor) snapshot = { ...snapshot, cursor };
+      if (hasMore && items.length > 0) snapshot = { ...snapshot, cursor: `offset:${start + items.length}` };
       return snapshot;
     }
     if (request.type === 'agenda.read') {

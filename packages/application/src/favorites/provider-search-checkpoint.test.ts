@@ -37,6 +37,24 @@ describe('durable relevant candidate pagination', () => {
     expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [{ externalId: 'exact' }] } });
   });
 
+  it('persists version 2 display metadata and advances across an empty evidence page', async () => {
+    const checkpoint = checkpointPort();
+    const first = createProviderCandidateEnvelope({ candidates: [], complete: false, digest: 'empty', nextCursor: '2', provider: 'anilist', truncated: true });
+    const richCandidate: ProviderCandidate = {
+      ...candidate('rich'),
+      cover: { attribution: 'AniList', url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/example.jpg' },
+      displayTitle: 'Synthetic Journey',
+      metadataVersion: 2,
+      titleVariants: [{ language: 'en', title: 'Synthetic Journey' }],
+    };
+    const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => input.cursor === undefined
+      ? first
+      : createProviderCandidateEnvelope({ candidates: [richCandidate], complete: true, digest: 'rich', provider: 'anilist', truncated: false })) };
+
+    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toEqual({ kind: 'PAGE_PENDING' });
+    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [richCandidate], complete: true } });
+  });
+
   it('searches all local aliases before declaring a provider NO_MATCH', async () => {
     const checkpoint = checkpointPort();
     const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => createProviderCandidateEnvelope({ candidates: input.titles[0] === 'Other Alias' ? [candidate('alias', 'Other Alias')] : [], complete: true, digest: 'alias-search', provider: 'anilist', truncated: false })) };

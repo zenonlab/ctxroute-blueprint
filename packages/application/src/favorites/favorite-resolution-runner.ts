@@ -8,7 +8,7 @@ import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
-import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
@@ -119,11 +119,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     if (candidate !== undefined) {
       if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-      const compatibility = artifact.mediaKind === 'UNKNOWN' ? {} : { mediaKind: artifact.mediaKind };
-      if (!isProviderCandidateCompatible({ ...compatibility, sourceTitles: providerTitles(artifact) }, candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:explicit-reference-incompatible');
-        return 'completed';
-      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
@@ -141,13 +136,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   const matchQuery: MutableFavoriteTitleMatchQuery = { sourceTitles: titles };
   if (artifact.sourceEvidence.explicitProviderReference !== undefined) matchQuery.explicitProviderReference = artifact.sourceEvidence.explicitProviderReference;
-  if (artifact.season !== undefined) matchQuery.explicitSeason = artifact.season;
+  if (artifact.season !== undefined && artifact.seasonEvidence?.conflict !== true) matchQuery.explicitSeason = artifact.season;
   if (artifact.mediaKind !== 'UNKNOWN') matchQuery.mediaKind = artifact.mediaKind;
   if (artifact.sourceEvidence.canonicalUrl !== undefined) matchQuery.sourceCanonicalUrl = artifact.sourceEvidence.canonicalUrl;
-  if (artifact.seasonEvidence?.conflict) {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:conflicting-season-evidence');
-    return 'completed';
-  }
   const local = await readLocalFavoriteIdentity(dependencies.storage, artifact, matchQuery);
   if (local.kind === 'MATCH') {
     const cachedAt = local.work.hydration?.hydratedAt;
@@ -165,10 +156,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:cached-id-not-found');
     } else {
       if (candidate.provider !== local.candidate.provider || candidate.externalId !== local.candidate.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-      if (!isProviderCandidateCompatible(matchQuery, candidate)) {
-        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:cached-reference-incompatible');
-        return 'completed';
-      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
       } else {

@@ -11,7 +11,7 @@ describe('local library catalogue projection', () => {
     const work = createWork({
       externalReferences: [{ externalId: '42', provider: 'anilist' }],
       hydration: {
-        candidate: { externalId: '42', format: 'TV', mediaKind: 'ANIME', metadataVersion: 1, preSerialization: false, provider: 'anilist', titles: [title] },
+        candidate: { canonicalUrl: 'https://anilist.co/anime/42', cover: { attribution: 'AniList', url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/fixture.jpg' }, externalId: '42', format: 'TV', mediaKind: 'ANIME', metadataVersion: 2, preSerialization: false, provider: 'anilist', titles: [title] },
         favoriteAliasKeys: [],
         hydratedAt: '2026-09-09T00:00:00.000Z',
         matcherVersion: 'matcher-v3',
@@ -28,6 +28,7 @@ describe('local library catalogue projection', () => {
 
     expect(snapshot.items[0]?.title.length).toBe(300);
     expect(snapshot.items[0]?.detail).toBe('TV');
+    expect(snapshot.items[0]).toMatchObject({ coverAlt: expect.stringContaining('AniList'), coverSrc: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/fixture.jpg', href: 'https://anilist.co/anime/42' });
     expect((await storage.getWork(work.id))?.preferredTitle).toBe(title);
     expect(libraryCatalogueResponseSchema.safeParse({ ok: true, snapshot }).success).toBe(true);
   });

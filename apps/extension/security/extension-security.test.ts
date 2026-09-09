@@ -16,8 +16,8 @@ const generatedManifestSchema = z.object({
   }).optional(),
   content_security_policy: z.object({ extension_pages: z.string() }),
   host_permissions: z.array(z.string()).optional(),
-  externally_connectable: z.object({ matches: z.array(z.string()).min(1) }).optional(),
-  content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })).optional(),
+  externally_connectable: z.object({ matches: z.array(z.string()).min(1) }),
+  content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })),
   minimum_chrome_version: z.string().optional(),
   icons: z.record(z.string(), z.string()),
   manifest_version: z.number(),
@@ -46,7 +46,11 @@ describe('extension security boundary', () => {
       'https://api.mangaupdates.com/*',
       'https://graphql.anilist.co/*',
       'https://kitsu.io/*',
-      ...(value.externally_connectable?.matches ?? []),
+      'https://tobirink.com/*',
+    ]);
+    expect(value.externally_connectable.matches).toEqual(['https://tobirink.com/*']);
+    expect(value.content_scripts).toEqual([
+      expect.objectContaining({ matches: ['https://tobirink.com/*'] }),
     ]);
     expect(value.permissions?.every((permission) => allowed.has(permission))).toBe(true);
     expect(value.permissions).toEqual(expect.arrayContaining(['activeTab', 'alarms', 'bookmarks', 'notifications', 'storage']));
@@ -118,5 +122,14 @@ describe('extension security boundary', () => {
     expect(favoriteResolution).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
+  });
+
+  it('keeps the background WebBridge origin aligned with the production manifest fallback', async () => {
+    const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
+
+    expect(background).toMatch(
+      /WXT_PUBLIC_SITE_ORIGIN\?\.trim\(\) \|\| 'https:\/\/tobirink\.com'/,
+    );
+    expect(background).not.toMatch(/WXT_PUBLIC_SITE_ORIGIN\?\.trim\(\) \?\? ''/);
   });
 });
