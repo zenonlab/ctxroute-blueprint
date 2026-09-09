@@ -110,6 +110,11 @@ function isFresh(record: PopupContinuationRecord, nowMs: number): boolean {
     && isHttpPage(record.url);
 }
 
+function isResolvedWorkRecord(record: PopupContinuationRecord): boolean {
+  return /^work_[a-z0-9][a-z0-9_-]{5,}$/u.test(record.id)
+    && (record.mediaType === 'Anime' || record.mediaType === 'Manga');
+}
+
 function recordFromPage(page: { title: string; url: string }, visitedAt: string): PopupContinuationRecord | undefined {
   if (!isHttpPage(page.url) || !page.title.trim()) return undefined;
   const parsed = new URL(page.url);
@@ -205,13 +210,13 @@ export async function readPopupContext({ cache, now, pageContext, storage }: Rea
   const currentTime = now();
   const nowMs = Date.parse(currentTime);
   const cached = (await cache.read())
-    .filter((record) => Number.isFinite(nowMs) && isFresh(record, nowMs))
+    .filter((record) => Number.isFinite(nowMs) && isFresh(record, nowMs) && isResolvedWorkRecord(record))
     .sort((left, right) => Date.parse(right.visitedAt) - Date.parse(left.visitedAt));
   const page = await pageContext.readActivePage();
   let active = page ? recordFromPage(page, currentTime) : undefined;
   if (active && page) {
     const enriched = await enrichActiveRecord(storage, page, active).catch(() => undefined);
-    if (enriched) active = enriched;
+    active = enriched;
   }
 
   if (!active) {

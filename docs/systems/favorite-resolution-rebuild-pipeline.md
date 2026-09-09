@@ -93,6 +93,12 @@ Chaque résultat porte versions, source, révision, provenance et reçu.
 
 ## Flux de bout en bout
 
+Le popup ne fabrique jamais une œuvre depuis le seul titre de l'onglet actif.
+Il affiche et mémorise une reprise uniquement lorsque la page correspond à une
+unique `FavoriteSource` observée déjà liée à un `Work` local. Les anciennes
+reprises génériques sans identifiant `Work` sont ignorées lors de la lecture du
+cache; aucune ligne IndexedDB n'est supprimée.
+
 ### 1. Capturer le déclencheur
 
 Le `BookmarkEventAdapter` transforme les événements navigateur en commandes
