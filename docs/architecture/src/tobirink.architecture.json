@@ -161,7 +161,7 @@
       "id": "bridge",
       "type": "security",
       "label": "WebBridge typé",
-      "sublabel": "Origine / session / anti-rejeu",
+      "sublabel": "Prod par défaut / session",
       "pos": [
         840,
         640
