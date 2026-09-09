@@ -57,10 +57,16 @@ browser or `workerd` test when platform behavior is the risk.
   per facet. Catalogue tests prove OR semantics inside one facet, AND semantics
   between facets, exclusion priority, filtering before pagination and options
   computed from the unchanged bounded corpus.
+- DOM interaction tests cycle include, exclude and neutral facet states without
+  closing the menu, restore focus on Escape and reject a delayed pagination
+  response after the query changes.
 - Provider provenance, format, genres, status, years, totals, typed popularity,
   filters and derived statistics stay in IndexedDB and extension messages.
   Sync and collective payload fixtures reject these fields; no synopsis,
   description or other editorial prose is collected.
+- MangaDex tests admit only tags whose declared group is `genre` into the genre
+  facet. MangaDex last chapter/volume and MangaUpdates latest chapter remain
+  observations and never become editorial totals.
 - An encrypted backup rejects tampering and a wrong passphrase without exposing
   plaintext or partially replacing local state.
 - `npm run test:recovery` performs real WebCrypto AES-GCM/PBKDF2 round trips,
@@ -98,6 +104,10 @@ browser or `workerd` test when platform behavior is the risk.
   expose at most 64 values per facet and return at most 24 cards. Missing and
   cross-provider popularity values sort after the selected comparable provider
   cohort with a stable title/ID tie-breaker.
+- The Chromium storage contract materializes 500 real Dexie works, filters the
+  complete corpus before a 24-card page, checks the 64 KiB response ceiling and
+  enforces the 200 ms local-read budget. Three validation runs on the reference
+  profile measured 34.70–37.70 ms.
 - Background startup: no unbounded scan and no network dependency.
 - Parser favori local : p95 inférieur à 10 ms pour une entrée typique et à
   50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.
@@ -110,6 +120,14 @@ browser or `workerd` test when platform behavior is the risk.
   Le plan v3 active X-01 MangaDex. Le corpus clean-room couvre explicitement
   identité, type, progression, décision et raison sans connexion, export ou
   donnée FavLib.
+
+## Dependency integrity
+
+- A clean npm installation applies the version-bound Miniflare patch before
+  validation. `npm ls sharp --all` must resolve 0.35.4 without invalid edges.
+- `npm audit --audit-level=high`, Worker tests, Oxlint and both browser builds
+  run from that clean tree. Darwin native entries must not carry Linux `libc`
+  selectors in the lockfile.
 - Extension package: target below 1.5 MB compressed, with approved exceptions.
 - Public API: p95 below 300 ms excluding third-party latency, with a bounded
   timeout and explicit unavailable result.

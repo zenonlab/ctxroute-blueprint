@@ -6326,7 +6326,7 @@
       "schemaVersion": 1,
       "id": "goal-library-audit-remediation",
       "title": "Remediate the library metadata and facet audit",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6472,7 +6472,7 @@
         {
           "id": "step-5",
           "title": "Certify the corrected local library boundary",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Align ADR quality strategy and product diagrams",
             "Pass favorite-resolution and all Archify showcase checks",
@@ -6498,7 +6498,11 @@
             "git diff --check",
             "git commit -m docs(library): certify metadata facet boundaries"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passes: 675 workspace tests plus governance coverage, parser equivalence, performance, CRG and integration",
+            "Security 21 tests and recovery 30 tests pass; Chrome and Firefox MV3 builds pass",
+            "All Archify product views pass showcase 9 of 9; audit reports zero vulnerabilities and boundary diff shows no D1 sync recovery or hook change"
+          ]
         }
       ]
     }
