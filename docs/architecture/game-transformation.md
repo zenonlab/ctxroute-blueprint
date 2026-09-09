@@ -37,6 +37,21 @@ La première passe reproductible est documentée dans les
 uniques et 36 625 relations de contenance/référence, avec 1 575 entrées encore
 inconnues et des limites audio explicites.
 
+Le contrat de preuve Bevy est désormais multi-instance : le pack déclare les assets,
+les identités du décor, des personnages et objets, leurs transformations, leurs clips
+optionnels et la caméra. Cette extension ne déplace aucune connaissance du jeu dans
+le renderer. Les relations scène → acteur → modèle → animation restent résolues par
+le compilateur local et chaque dérivé conserve sa qualification. Voir
+[ADR-0062](../decisions/ADR-0062-data-driven-bevy-scene-pack.md).
+
+Le format de scène n'efface pas le pipeline graphique d'origine. Chaque asset porte
+un `semantic_profile`, un `render_profile` et une `visual_qualification`. Bevy garde
+l'orchestration universelle, tandis qu'un adaptateur de rendu isolé implémente les
+sémantiques propres à la source et se compare à un oracle hors ligne. Pour la N64,
+un matériau glTF standard n'est qu'un diagnostic ; le gate exige Fast3D/RDP ou une
+traduction WGSL qualifiée. Voir
+[ADR-0063](../decisions/ADR-0063-source-render-profiles-and-oracles.md).
+
 ## Intention confirmée
 
 L'infrastructure doit permettre de programmer des expériences à partir de jeux

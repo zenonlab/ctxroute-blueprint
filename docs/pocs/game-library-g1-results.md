@@ -1,7 +1,7 @@
 # Résultats G1 — bibliothèque locale Majora's Mask
 
-État au 9 septembre 2026 : **première indexation complète réussie et premier pont
-visuel qualifié ; G1 partiel**. Les critères G1-01, G1-02, G1-03 et la répétabilité
+État au 9 septembre 2026 : **première indexation complète réussie et pont
+géométrique diagnostique ; G1 partiel**. Les critères G1-01, G1-02, G1-03 et la répétabilité
 de G1-06 sont prouvés sur la machine MAC-01. Le pont visuel décrit ci-dessous ne
 ferme ni les relations sémantiques profondes, ni le compilateur D1, ni G1-04 à G1-10.
 
@@ -112,6 +112,33 @@ collisions, chemins et matériaux animés sont absents. Les groupes d'affichage
 importés restent fragmentés selon leurs volumes de culling. Fast64/Blender est donc
 un outil optionnel d'inspection et de dérivation visuelle derrière le contrat
 d'adaptateur, pas la fondation universelle du produit.
+
+La tentative suivante d'afficher ce fallback dans Bevy a confirmé l'échec attendu :
+groupes de culling fragmentés, matériaux incomplets et acteur non qualifiable. Elle
+est classée `semantic_profile: n64.f3dex2`, `render_profile: gltf.standard` et
+`visual_qualification: diagnostic`. Elle ne constitue ni une régression du moteur
+commun, ni une preuve N64. [ADR-0063](../decisions/ADR-0063-source-render-profiles-and-oracles.md)
+impose désormais l'oracle Fast3D/RDP avant tout nouveau rendu qualifié.
+
+## Reçu de l'oracle Fast3D
+
+L'oracle local repose sur le dépôt officiel `2ship2harkinian` à la révision
+`2e211bf0ae85c108b949fc6f58ffc76a37003ad3` (version 5.0.1), avec ses sous-modules
+épinglés. Le binaire macOS `2s2h-macos` et ZAPD ont été compilés depuis ces sources.
+L'extracteur officiel a ensuite généré, dans `game/oracle/2ship-v5/`, deux archives
+privées portant toutes deux un `portVersion` 5.0.1 :
+
+| Archive locale | SHA-256 | Contenu vérifié |
+| --- | --- | --- |
+| `2ship.o2r` | `a1a2e3c625719d773838c4a6bb385437bdc70460577ccf0e98888dba538ac821` | ressources propres au port |
+| `mm.o2r` | `e21f4c78dda2a482231f802128bb4fa7958a65f8aead824378381fb18c0a2dee` | 50 496 entrées issues de la ROM |
+
+`mm.o2r` contient 579 entrées sous `Z2_CLOCKTOWER` et 83 sous `object_mm`.
+Le démarrage a chargé les deux archives et annoncé
+`Starting 2 Ship 2 Harkinian version Battler Bravo (5.0.1)` : la chaîne exacte est
+donc exécutable sur l'hôte. Cette preuve qualifie l'**oracle**, pas encore notre
+adaptateur Bevy. Une capture déterministe de la même caméra dans Bourg-Clocher reste
+requise avant toute comparaison de pixels ou fermeture du gate visuel.
 
 La prochaine fermeture utile est structurelle : relier les déclarations de scène
 issues de `zeldaret/mm` aux rooms, acteurs, objets, collisions et display lists,

@@ -102,6 +102,16 @@ dans une fenêtre ordinaire. wgpu sait cibler directement une `CAMetalLayer`, ce
 fournit le chemin technique sous-jacent :
 [`SurfaceTargetUnsafe::CoreAnimationLayer`](https://docs.rs/wgpu/latest/x86_64-apple-darwin/wgpu/enum.SurfaceTargetUnsafe.html).
 
+Bevy 0.19 expose aussi `GltfExtensionHandlers`, ce qui autorise un plugin de matériau
+source sans contaminer l'ECS commun. Cette primitive ne traduit rien automatiquement :
+les extensions Fast64 N64 sont encore marquées Draft et sans implémentation connue.
+Pour Majora's Mask, Torch/libultraship ou RT64 sert donc d'oracle hors ligne ; un
+handler Bevy/WGSL ou un backend Fast3D isolé ne devient qualifié qu'après comparaison.
+La première chaîne oracle retenue est désormais le port officiel
+[2Ship2Harkinian](https://github.com/HarbourMasters/2ship2harkinian) : sa révision
+épinglée 5.0.1 a été compilée localement et accepte les archives privées produites
+par son propre extracteur. Elle ne sera jamais embarquée dans le runtime wallpaper.
+
 ## Formats de travail
 
 - glTF/GLB reste le format de livraison géométrique, pas la base canonique ni un
@@ -132,9 +142,10 @@ ouvert :
 4. compiler un premier thème privé avec `Z2_CLOCKTOWER` (sud de Bourg-Clocher),
    puis les autres zones extérieures et leurs dépendances transitives ;
 5. exécuter le cycle temporel adapté et les interactions sans terminal ;
-6. rendre le pack avec Bevy dans une fenêtre de référence puis sur `CAMetalLayer` ;
-7. intégrer Bevy au connecteur macOS sans déplacer la logique du thème ;
-8. mesurer énergie incrémentale, mémoire, temps de chargement, frames et qualité.
+6. produire les vues oracle Fast3D/RDP et qualifier un profil `n64.f3dex2` ;
+7. rendre le pack avec Bevy dans une fenêtre de référence puis sur `CAMetalLayer` ;
+8. intégrer Bevy au connecteur macOS sans déplacer la logique du thème ;
+9. mesurer énergie incrémentale, mémoire, temps de chargement, frames et qualité.
 
 Le changement de zone ou d'acteur doit réutiliser l'index existant sans rescanner le
 jeu. La suppression d'un asset local doit devenir une dépendance manquante explicite,

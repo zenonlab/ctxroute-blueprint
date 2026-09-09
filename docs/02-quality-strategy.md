@@ -35,6 +35,17 @@ Il ne qualifie pas non plus la fidélité visuelle : l'export Majora's Mask du
 9 septembre est rejeté parce que ses matériaux ont été réduits à une texture
 choisie arbitrairement. Le gate suivant compare le rendu à un oracle F3DEX2 avant
 de raccorder le même asset à la surface native.
+Le contrat multi-instance vérifie en plus les références asset, les identités uniques,
+les transformations finies, les échelles positives, la caméra non dégénérée et les
+paramètres de clips. Un clip absent ou une référence inconnue est une erreur de pack.
+Il refuse aussi toute qualification visuelle lorsque `semantic_profile` et
+`render_profile` diffèrent. Un profil non implémenté échoue avant l'initialisation
+graphique ; un fallback déclaré reste visible uniquement sous le statut `diagnostic`.
+
+Le gate N64 prend des captures déterministes de l'oracle Fast3D/RDP et de l'adaptateur
+sur les mêmes caméra, frame d'animation et paramètres de matériau. Il conserve les
+images, la différence perceptuelle, les modes rencontrés et les exceptions. Une
+seule capture reconnaissable, un import Blender ou un GLB chargé ne qualifie rien.
 
 La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
 Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,

@@ -44,10 +44,17 @@ ne pas rendre le checkout tiers obligatoire en CI.
 ## Visualiseur de pack de référence
 
 `pocs/game-theme-viewer` fige une frontière exécutable minimale : Bevy 0.19.1 reçoit
-un répertoire contenant `theme.json` et un GLB, valide la version et les chemins,
-puis charge la scène. Le code ne contient aucun identifiant Zelda64 et ne connaît
-pas Blender ou Fast64. L'orbite, le zoom et le reset de caméra sont événementiels ;
-aucune rotation automatique ne force une boucle continue.
+un répertoire contenant `theme.json` et des GLB, valide la version, les références et
+les chemins, puis instancie décor, personnages et objets avec leurs transformations
+et clips déclarés. Le code ne contient aucun identifiant Zelda64 et ne connaît pas
+Blender ou Fast64. La caméra vient du pack ; orbite, zoom et reset sont événementiels.
+Voir [ADR-0062](../decisions/ADR-0062-data-driven-bevy-scene-pack.md).
+
+Ce visualiseur ne prend actuellement en charge que le profil `gltf.standard`. Les
+assets N64 convertis vers ce profil doivent être marqués `diagnostic` et la fenêtre
+l'affiche explicitement. La prochaine preuve ajoute un profil source qualifié par un
+oracle Fast3D/RDP, conformément à
+[ADR-0063](../decisions/ADR-0063-source-render-profiles-and-oracles.md).
 
 Cette preuve est volontairement une fenêtre de référence. Elle ne ferme D1-19
 qu'après exécution sur le pack privé puis raccord du même pack à la vraie

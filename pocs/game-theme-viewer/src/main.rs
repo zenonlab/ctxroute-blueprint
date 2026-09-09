@@ -9,20 +9,30 @@ use bevy::{
     prelude::*,
     window::WindowPlugin,
     winit::WinitSettings,
+    world_serialization::WorldInstanceReady,
 };
-use manifest::ValidatedPack;
+use manifest::{AnimationDescriptor, TransformDescriptor, ValidatedPack};
+
+#[derive(Clone)]
+struct RenderableInstance {
+    id: String,
+    asset: String,
+    scene_index: usize,
+    transform: TransformDescriptor,
+    animation: Option<AnimationDescriptor>,
+}
 
 #[derive(Resource)]
 struct ViewerConfig {
-    asset: String,
-    scene_index: usize,
-    scale: f32,
+    instances: Vec<RenderableInstance>,
     camera_position: Vec3,
     camera_target: Vec3,
+    camera_fov_y_degrees: f32,
 }
 
 #[derive(Resource)]
 struct OrbitCamera {
+    enabled: bool,
     target: Vec3,
     yaw: f32,
     pitch: f32,
@@ -32,10 +42,23 @@ struct OrbitCamera {
 #[derive(Component)]
 struct ViewerCamera;
 
+#[derive(Component, Clone)]
+struct InstanceAnimation {
+    graph: Handle<AnimationGraph>,
+    node: AnimationNodeIndex,
+    repeat: bool,
+    speed: f32,
+}
+
 fn main() -> Result<()> {
     let pack_path = pack_path_from_args()?;
     let pack = ValidatedPack::load(&pack_path)?;
-    let title = format!("Theme Preview — {}", pack.manifest.display_name);
+    let diagnostic = pack.is_visual_diagnostic();
+    let title = if diagnostic {
+        format!("DIAGNOSTIC ONLY — {}", pack.manifest.display_name)
+    } else {
+        format!("Theme Preview — {}", pack.manifest.display_name)
+    };
     let initial_position = Vec3::from_array(pack.manifest.camera.position);
     let target = Vec3::from_array(pack.manifest.camera.target);
     let offset = initial_position - target;
@@ -47,6 +70,21 @@ fn main() -> Result<()> {
         .to_str()
         .context("pack path is not valid UTF-8")?
         .to_owned();
+    let instances = pack
+        .manifest
+        .instances
+        .iter()
+        .map(|instance| {
+            let asset = &pack.manifest.assets[&instance.asset];
+            RenderableInstance {
+                id: instance.id.clone(),
+                asset: asset.path.clone(),
+                scene_index: asset.scene_index,
+                transform: instance.transform.clone(),
+                animation: instance.animation.clone(),
+            }
+        })
+        .collect();
 
     eprintln!(
         "loading theme {} from {} with {} declared capabilities",
@@ -54,18 +92,23 @@ fn main() -> Result<()> {
         pack.root.display(),
         pack.manifest.capabilities.len()
     );
+    if diagnostic {
+        eprintln!(
+            "warning: this pack contains a semantic-to-render profile conversion and is not a visual-fidelity proof"
+        );
+    }
 
     App::new()
         .insert_resource(WinitSettings::desktop_app())
         .insert_resource(ClearColor(Color::srgb(0.018, 0.026, 0.042)))
         .insert_resource(ViewerConfig {
-            asset: pack.manifest.scene.asset,
-            scene_index: pack.manifest.scene.scene_index,
-            scale: pack.manifest.scene.scale,
+            instances,
             camera_position: initial_position,
             camera_target: target,
+            camera_fov_y_degrees: pack.manifest.camera.fov_y_degrees,
         })
         .insert_resource(OrbitCamera {
+            enabled: pack.manifest.camera.orbit_enabled,
             target,
             yaw,
             pitch,
@@ -102,14 +145,37 @@ fn pack_path_from_args() -> Result<PathBuf> {
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>, config: Res<ViewerConfig>) {
-    commands.spawn((
-        WorldAssetRoot(
-            asset_server
-                .load(GltfAssetLabel::Scene(config.scene_index).from_asset(config.asset.clone())),
-        ),
-        Transform::from_scale(Vec3::splat(config.scale)),
-    ));
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut animation_graphs: ResMut<Assets<AnimationGraph>>,
+    config: Res<ViewerConfig>,
+) {
+    for instance in &config.instances {
+        let mut entity = commands.spawn((
+            Name::new(instance.id.clone()),
+            WorldAssetRoot(asset_server.load(
+                GltfAssetLabel::Scene(instance.scene_index).from_asset(instance.asset.clone()),
+            )),
+            descriptor_transform(&instance.transform),
+        ));
+        if let Some(animation) = &instance.animation
+            && animation.autoplay
+        {
+            let clip = asset_server.load(
+                GltfAssetLabel::Animation(animation.clip_index).from_asset(instance.asset.clone()),
+            );
+            let (graph, node) = AnimationGraph::from_clip(clip);
+            entity
+                .insert(InstanceAnimation {
+                    graph: animation_graphs.add(graph),
+                    node,
+                    repeat: animation.repeat,
+                    speed: animation.speed,
+                })
+                .observe(play_instance_animation);
+        }
+    }
     commands.spawn((
         DirectionalLight {
             illuminance: 8_000.0,
@@ -120,10 +186,47 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, config: Res<Vie
     ));
     commands.spawn((
         Camera3d::default(),
+        Projection::Perspective(PerspectiveProjection {
+            fov: config.camera_fov_y_degrees.to_radians(),
+            ..default()
+        }),
         Transform::from_translation(config.camera_position)
             .looking_at(config.camera_target, Vec3::Y),
         ViewerCamera,
     ));
+}
+
+fn descriptor_transform(descriptor: &TransformDescriptor) -> Transform {
+    let [x, y, z] = descriptor.rotation_degrees.map(f32::to_radians);
+    Transform {
+        translation: Vec3::from_array(descriptor.translation),
+        rotation: Quat::from_euler(EulerRot::XYZ, x, y, z),
+        scale: Vec3::from_array(descriptor.scale),
+    }
+}
+
+fn play_instance_animation(
+    ready: On<WorldInstanceReady>,
+    mut commands: Commands,
+    children: Query<&Children>,
+    requests: Query<&InstanceAnimation>,
+    mut players: Query<&mut AnimationPlayer>,
+) {
+    let Ok(request) = requests.get(ready.entity) else {
+        return;
+    };
+    for child in children.iter_descendants(ready.entity) {
+        let Ok(mut player) = players.get_mut(child) else {
+            continue;
+        };
+        commands
+            .entity(child)
+            .insert(AnimationGraphHandle(request.graph.clone()));
+        let active = player.play(request.node).set_speed(request.speed);
+        if request.repeat {
+            active.repeat();
+        }
+    }
 }
 
 fn orbit_camera(
@@ -135,6 +238,11 @@ fn orbit_camera(
     mut orbit: ResMut<OrbitCamera>,
     mut cameras: Query<&mut Transform, With<ViewerCamera>>,
 ) {
+    if !orbit.enabled {
+        motion.clear();
+        wheel.clear();
+        return;
+    }
     let mut changed = false;
     if buttons.pressed(MouseButton::Left) {
         for event in motion.read() {

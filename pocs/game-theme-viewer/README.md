@@ -1,8 +1,16 @@
 # Game theme reference viewer
 
-Ce PoC charge un pack local générique composé de `theme.json` et d'une scène
-`glTF/GLB`. Il ne lit ni ROM, ni fichiers Fast64/Blender, ni identifiants propres à
-un jeu. Bevy reste derrière cette frontière et n'est pas le format du produit.
+Ce PoC charge un pack local générique composé de `theme.json` et de scènes
+`glTF/GLB`. Le manifeste v2 décrit un catalogue d'assets, leurs instances, leurs
+transformations, leurs clips optionnels et la caméra. Il ne lit ni ROM, ni fichiers
+Fast64/Blender, ni identifiants propres à un jeu. Bevy reste derrière cette frontière
+et n'est pas le format du produit.
+
+Chaque asset déclare ses profils sémantique et de rendu. Ce binaire n'implémente que
+`gltf.standard`. Une conversion depuis `n64.f3dex2` peut être ouverte comme
+`diagnostic`, avec un avertissement et un titre non ambigu ; elle ne constitue pas
+une preuve de fidélité. Un profil source qualifié doit être fourni par un adaptateur
+et comparé à un oracle Fast3D/RDP.
 
 ```bash
 cargo run --release --manifest-path pocs/game-theme-viewer/Cargo.toml -- \

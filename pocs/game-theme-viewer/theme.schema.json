@@ -1,22 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wallpaper.local/schemas/theme-pack-v1.json",
+  "$id": "https://wallpaper.local/schemas/theme-pack-v2.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "id", "display_name", "scene", "camera"],
+  "required": ["schema_version", "id", "display_name", "assets", "instances", "camera"],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "id": { "type": "string", "minLength": 1 },
     "display_name": { "type": "string", "minLength": 1 },
-    "scene": {
+    "assets": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["asset"],
-      "properties": {
-        "asset": { "type": "string", "pattern": "^[^/\\\\](?!.*\\.\\.)[^\\\\]*\\.(glb|gltf)$" },
-        "scene_index": { "type": "integer", "minimum": 0, "default": 0 },
-        "scale": { "type": "number", "exclusiveMinimum": 0, "default": 1 }
-      }
+      "minProperties": 1,
+      "maxProperties": 256,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/asset" }
+    },
+    "instances": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/instance" }
     },
     "camera": {
       "type": "object",
@@ -24,7 +27,9 @@
       "required": ["position", "target"],
       "properties": {
         "position": { "$ref": "#/$defs/vec3" },
-        "target": { "$ref": "#/$defs/vec3" }
+        "target": { "$ref": "#/$defs/vec3" },
+        "fov_y_degrees": { "type": "number", "minimum": 10, "maximum": 120, "default": 45 },
+        "orbit_enabled": { "type": "boolean", "default": true }
       }
     },
     "capabilities": {
@@ -36,6 +41,55 @@
     }
   },
   "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,96}$" },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "semantic_profile",
+        "render_profile",
+        "visual_qualification"
+      ],
+      "properties": {
+        "path": { "type": "string", "pattern": "^[^/\\\\](?!.*\\.\\.)[^\\\\]*\\.(glb|gltf)$" },
+        "scene_index": { "type": "integer", "minimum": 0, "default": 0 },
+        "semantic_profile": { "$ref": "#/$defs/id" },
+        "render_profile": { "$ref": "#/$defs/id" },
+        "visual_qualification": { "enum": ["diagnostic", "qualified"] }
+      }
+    },
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "asset"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "asset": { "$ref": "#/$defs/id" },
+        "transform": { "$ref": "#/$defs/transform" },
+        "animation": { "$ref": "#/$defs/animation" }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "translation": { "$ref": "#/$defs/vec3" },
+        "rotation_degrees": { "$ref": "#/$defs/vec3" },
+        "scale": { "$ref": "#/$defs/positive_vec3" }
+      }
+    },
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clip_index"],
+      "properties": {
+        "clip_index": { "type": "integer", "minimum": 0 },
+        "autoplay": { "type": "boolean", "default": true },
+        "repeat": { "type": "boolean", "default": true },
+        "speed": { "type": "number", "minimum": 0.05, "maximum": 4, "default": 1 }
+      }
+    },
     "vec3": {
       "type": "array",
       "minItems": 3,
@@ -44,6 +98,17 @@
         { "type": "number" },
         { "type": "number" },
         { "type": "number" }
+      ],
+      "items": false
+    },
+    "positive_vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        { "type": "number", "exclusiveMinimum": 0 },
+        { "type": "number", "exclusiveMinimum": 0 },
+        { "type": "number", "exclusiveMinimum": 0 }
       ],
       "items": false
     }

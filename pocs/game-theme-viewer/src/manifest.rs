@@ -13,7 +13,8 @@ pub struct ThemeManifest {
     pub schema_version: u32,
     pub id: String,
     pub display_name: String,
-    pub scene: SceneDescriptor,
+    pub assets: BTreeMap<String, AssetDescriptor>,
+    pub instances: Vec<InstanceDescriptor>,
     pub camera: CameraDescriptor,
     #[serde(default)]
     pub capabilities: BTreeMap<String, CapabilityStatus>,
@@ -21,12 +22,56 @@ pub struct ThemeManifest {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SceneDescriptor {
-    pub asset: String,
+pub struct AssetDescriptor {
+    pub path: String,
     #[serde(default)]
     pub scene_index: usize,
+    pub semantic_profile: String,
+    pub render_profile: String,
+    pub visual_qualification: VisualQualification,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InstanceDescriptor {
+    pub id: String,
+    pub asset: String,
+    #[serde(default)]
+    pub transform: TransformDescriptor,
+    pub animation: Option<AnimationDescriptor>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransformDescriptor {
+    #[serde(default)]
+    pub translation: [f32; 3],
+    #[serde(default)]
+    pub rotation_degrees: [f32; 3],
     #[serde(default = "default_scale")]
-    pub scale: f32,
+    pub scale: [f32; 3],
+}
+
+impl Default for TransformDescriptor {
+    fn default() -> Self {
+        Self {
+            translation: [0.0; 3],
+            rotation_degrees: [0.0; 3],
+            scale: default_scale(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnimationDescriptor {
+    pub clip_index: usize,
+    #[serde(default = "default_true")]
+    pub autoplay: bool,
+    #[serde(default = "default_true")]
+    pub repeat: bool,
+    #[serde(default = "default_speed")]
+    pub speed: f32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -34,6 +79,10 @@ pub struct SceneDescriptor {
 pub struct CameraDescriptor {
     pub position: [f32; 3],
     pub target: [f32; 3],
+    #[serde(default = "default_fov")]
+    pub fov_y_degrees: f32,
+    #[serde(default = "default_true")]
+    pub orbit_enabled: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -43,6 +92,13 @@ pub enum CapabilityStatus {
     Approximated,
     Missing,
     Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum VisualQualification {
+    Diagnostic,
+    Qualified,
 }
 
 #[derive(Clone, Debug)]
@@ -66,7 +122,7 @@ impl ValidatedPack {
         let manifest: ThemeManifest = serde_json::from_slice(&bytes)
             .with_context(|| format!("invalid {}", manifest_path.display()))?;
 
-        if manifest.schema_version != 1 {
+        if manifest.schema_version != 2 {
             bail!(
                 "unsupported theme schema version {}",
                 manifest.schema_version
@@ -75,44 +131,144 @@ impl ValidatedPack {
         if manifest.id.trim().is_empty() || manifest.display_name.trim().is_empty() {
             bail!("theme id and display_name must not be empty");
         }
-        if !manifest.scene.scale.is_finite() || manifest.scene.scale <= 0.0 {
-            bail!("scene scale must be finite and greater than zero");
+        if manifest.assets.is_empty() || manifest.instances.is_empty() {
+            bail!("theme assets and instances must not be empty");
+        }
+        if manifest.assets.len() > 256 || manifest.instances.len() > 1024 {
+            bail!("theme assets or instances exceed the PoC limits");
         }
         if manifest
             .camera
             .position
             .into_iter()
             .chain(manifest.camera.target)
+            .chain([manifest.camera.fov_y_degrees])
             .any(|value| !value.is_finite())
         {
             bail!("camera coordinates must be finite");
         }
-
-        let asset = Path::new(&manifest.scene.asset);
-        if asset.as_os_str().is_empty()
-            || asset
-                .components()
-                .any(|part| !matches!(part, Component::Normal(_)))
+        if manifest.camera.position == manifest.camera.target
+            || !(10.0..=120.0).contains(&manifest.camera.fov_y_degrees)
         {
-            bail!("scene asset must be a non-empty relative path without traversal");
+            bail!("camera must have a distinct target and a valid vertical field of view");
         }
-        if !matches!(
-            asset.extension().and_then(|value| value.to_str()),
-            Some("glb" | "gltf")
-        ) {
-            bail!("scene asset must use .glb or .gltf");
+
+        for (id, descriptor) in &manifest.assets {
+            validate_id("asset", id)?;
+            validate_asset_path(&root, &descriptor.path)?;
+            validate_id("semantic profile", &descriptor.semantic_profile)?;
+            validate_id("render profile", &descriptor.render_profile)?;
+            if descriptor.visual_qualification == VisualQualification::Qualified
+                && descriptor.semantic_profile != descriptor.render_profile
+            {
+                bail!(
+                    "asset {id} cannot be visually qualified: semantic profile {} is rendered as {}",
+                    descriptor.semantic_profile,
+                    descriptor.render_profile
+                );
+            }
+            if descriptor.render_profile != "gltf.standard" {
+                bail!(
+                    "asset {id} requires unsupported render profile {}; this viewer currently implements only gltf.standard",
+                    descriptor.render_profile
+                );
+            }
         }
-        let resolved_asset = root.join(asset);
-        if !resolved_asset.is_file() {
-            bail!("scene asset is missing: {}", resolved_asset.display());
+
+        let mut instance_ids = std::collections::BTreeSet::new();
+        for instance in &manifest.instances {
+            validate_id("instance", &instance.id)?;
+            if !instance_ids.insert(&instance.id) {
+                bail!("duplicate instance id {}", instance.id);
+            }
+            if !manifest.assets.contains_key(&instance.asset) {
+                bail!(
+                    "instance {} references unknown asset {}",
+                    instance.id,
+                    instance.asset
+                );
+            }
+            if instance
+                .transform
+                .translation
+                .into_iter()
+                .chain(instance.transform.rotation_degrees)
+                .chain(instance.transform.scale)
+                .any(|value| !value.is_finite())
+                || instance
+                    .transform
+                    .scale
+                    .into_iter()
+                    .any(|value| value <= 0.0)
+            {
+                bail!("instance {} has an invalid transform", instance.id);
+            }
+            if let Some(animation) = &instance.animation
+                && (!animation.speed.is_finite() || !(0.05..=4.0).contains(&animation.speed))
+            {
+                bail!("instance {} has an invalid animation speed", instance.id);
+            }
         }
 
         Ok(Self { root, manifest })
     }
+
+    pub fn is_visual_diagnostic(&self) -> bool {
+        self.manifest.assets.values().any(|asset| {
+            asset.visual_qualification == VisualQualification::Diagnostic
+                || asset.semantic_profile != asset.render_profile
+        })
+    }
 }
 
-const fn default_scale() -> f32 {
+fn validate_id(kind: &str, id: &str) -> Result<()> {
+    if id.is_empty()
+        || id.len() > 96
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+    {
+        bail!("{kind} id is invalid: {id}");
+    }
+    Ok(())
+}
+
+fn validate_asset_path(root: &Path, value: &str) -> Result<()> {
+    let asset = Path::new(value);
+    if asset.as_os_str().is_empty()
+        || asset
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        bail!("scene asset must be a non-empty relative path without traversal");
+    }
+    if !matches!(
+        asset.extension().and_then(|value| value.to_str()),
+        Some("glb" | "gltf")
+    ) {
+        bail!("scene asset must use .glb or .gltf");
+    }
+    let resolved_asset = root.join(asset);
+    if !resolved_asset.is_file() {
+        bail!("scene asset is missing: {}", resolved_asset.display());
+    }
+    Ok(())
+}
+
+const fn default_scale() -> [f32; 3] {
+    [1.0; 3]
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+const fn default_speed() -> f32 {
     1.0
+}
+
+const fn default_fov() -> f32 {
+    45.0
 }
 
 #[cfg(test)]
@@ -127,11 +283,20 @@ mod tests {
             root.join("theme.json"),
             format!(
                 r#"{{
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "fixture.theme",
   "display_name": "Fixture",
-  "scene": {{ "asset": {asset:?}, "scene_index": 0, "scale": 1.0 }},
-  "camera": {{ "position": [0.0, 2.0, 5.0], "target": [0.0, 0.0, 0.0] }},
+  "assets": {{
+    "world": {{
+      "path": {asset:?},
+      "scene_index": 0,
+      "semantic_profile": "gltf.standard",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "qualified"
+    }}
+  }},
+  "instances": [{{ "id": "world.main", "asset": "world" }}],
+  "camera": {{ "position": [0.0, 2.0, 5.0], "target": [0.0, 0.0, 0.0], "fov_y_degrees": 50.0 }},
   "capabilities": {{ "visual": "exact" }}
 }}"#
             ),
@@ -146,7 +311,8 @@ mod tests {
 
         let pack = ValidatedPack::load(directory.path()).unwrap();
 
-        assert_eq!(pack.manifest.schema_version, 1);
+        assert_eq!(pack.manifest.schema_version, 2);
+        assert_eq!(pack.manifest.instances[0].id, "world.main");
         assert_eq!(
             pack.manifest.capabilities["visual"],
             CapabilityStatus::Exact
@@ -170,10 +336,11 @@ mod tests {
         fs::write(
             directory.path().join("theme.json"),
             r#"{
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "fixture.theme",
   "display_name": "Fixture",
-  "scene": { "asset": "scene.glb" },
+  "assets": { "world": { "path": "scene.glb" } },
+  "instances": [{ "id": "world.main", "asset": "world" }],
   "camera": { "position": [0, 2, 5], "target": [0, 0, 0] },
   "surprise": true
 }"#,
@@ -181,5 +348,185 @@ mod tests {
         .unwrap();
 
         assert!(ValidatedPack::load(directory.path()).is_err());
+    }
+
+    #[test]
+    fn accepts_multiple_instances_and_animation_contracts() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("world.glb"), b"fixture").unwrap();
+        fs::write(directory.path().join("actor.glb"), b"fixture").unwrap();
+        fs::write(
+            directory.path().join("theme.json"),
+            r#"{
+  "schema_version": 2,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": {
+    "world": {
+      "path": "world.glb",
+      "semantic_profile": "gltf.standard",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "qualified"
+    },
+    "actor": {
+      "path": "actor.glb",
+      "scene_index": 1,
+      "semantic_profile": "gltf.standard",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "qualified"
+    }
+  },
+  "instances": [
+    { "id": "world.main", "asset": "world" },
+    {
+      "id": "actor.one",
+      "asset": "actor",
+      "transform": {
+        "translation": [1, 2, 3],
+        "rotation_degrees": [0, 90, 0],
+        "scale": [0.5, 0.5, 0.5]
+      },
+      "animation": { "clip_index": 2, "autoplay": true, "repeat": true, "speed": 0.75 }
+    }
+  ],
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0], "orbit_enabled": false }
+}"#,
+        )
+        .unwrap();
+
+        let pack = ValidatedPack::load(directory.path()).unwrap();
+
+        assert_eq!(pack.manifest.assets.len(), 2);
+        assert_eq!(pack.manifest.instances.len(), 2);
+        assert_eq!(
+            pack.manifest.instances[1]
+                .animation
+                .as_ref()
+                .unwrap()
+                .clip_index,
+            2
+        );
+        assert!(!pack.manifest.camera.orbit_enabled);
+    }
+
+    #[test]
+    fn rejects_unknown_assets_duplicate_instances_and_invalid_transforms() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("scene.glb"), b"fixture").unwrap();
+        let base = r#"{
+  "schema_version": 2,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": {
+    "world": {
+      "path": "scene.glb",
+      "semantic_profile": "gltf.standard",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "qualified"
+    }
+  },
+  "instances": INSTANCES,
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0] }
+}"#;
+        for instances in [
+            r#"[{ "id": "actor.one", "asset": "missing" }]"#,
+            r#"[{ "id": "same", "asset": "world" }, { "id": "same", "asset": "world" }]"#,
+            r#"[{ "id": "actor.one", "asset": "world", "transform": { "scale": [1, 0, 1] } }]"#,
+            r#"[{ "id": "actor.one", "asset": "world", "animation": { "clip_index": 0, "speed": 0 } }]"#,
+        ] {
+            fs::write(
+                directory.path().join("theme.json"),
+                base.replace("INSTANCES", instances),
+            )
+            .unwrap();
+            assert!(ValidatedPack::load(directory.path()).is_err());
+        }
+    }
+
+    #[test]
+    fn accepts_a_declared_diagnostic_conversion() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("scene.glb"), b"fixture").unwrap();
+        fs::write(
+            directory.path().join("theme.json"),
+            r#"{
+  "schema_version": 2,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": {
+    "world": {
+      "path": "scene.glb",
+      "semantic_profile": "n64.f3dex2",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "diagnostic"
+    }
+  },
+  "instances": [{ "id": "world.main", "asset": "world" }],
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0] }
+}"#,
+        )
+        .unwrap();
+
+        let pack = ValidatedPack::load(directory.path()).unwrap();
+
+        assert!(pack.is_visual_diagnostic());
+    }
+
+    #[test]
+    fn rejects_a_false_visual_qualification() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("scene.glb"), b"fixture").unwrap();
+        fs::write(
+            directory.path().join("theme.json"),
+            r#"{
+  "schema_version": 2,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": {
+    "world": {
+      "path": "scene.glb",
+      "semantic_profile": "n64.f3dex2",
+      "render_profile": "gltf.standard",
+      "visual_qualification": "qualified"
+    }
+  },
+  "instances": [{ "id": "world.main", "asset": "world" }],
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0] }
+}"#,
+        )
+        .unwrap();
+
+        let error = ValidatedPack::load(directory.path()).unwrap_err();
+
+        assert!(error.to_string().contains("cannot be visually qualified"));
+    }
+
+    #[test]
+    fn rejects_an_unimplemented_render_profile() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("scene.glb"), b"fixture").unwrap();
+        fs::write(
+            directory.path().join("theme.json"),
+            r#"{
+  "schema_version": 2,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": {
+    "world": {
+      "path": "scene.glb",
+      "semantic_profile": "n64.f3dex2",
+      "render_profile": "n64.f3dex2",
+      "visual_qualification": "qualified"
+    }
+  },
+  "instances": [{ "id": "world.main", "asset": "world" }],
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0] }
+}"#,
+        )
+        .unwrap();
+
+        let error = ValidatedPack::load(directory.path()).unwrap_err();
+
+        assert!(error.to_string().contains("unsupported render profile"));
     }
 }
