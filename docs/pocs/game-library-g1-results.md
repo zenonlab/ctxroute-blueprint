@@ -136,9 +136,13 @@ privées portant toutes deux un `portVersion` 5.0.1 :
 `mm.o2r` contient 579 entrées sous `Z2_CLOCKTOWER` et 83 sous `object_mm`.
 Le démarrage a chargé les deux archives et annoncé
 `Starting 2 Ship 2 Harkinian version Battler Bravo (5.0.1)` : la chaîne exacte est
-donc exécutable sur l'hôte. Cette preuve qualifie l'**oracle**, pas encore notre
-adaptateur Bevy. Une capture déterministe de la même caméra dans Bourg-Clocher reste
-requise avant toute comparaison de pixels ou fermeture du gate visuel.
+donc exécutable sur l'hôte. Une frame Metal 3000 × 1160 de la séquence en jeu, avec
+décor, acteurs et matériaux Fast3D, est conservée localement sous
+`game/oracle/2ship-v5/reference-startup.png` (SHA-256
+`b47290e76214f5336e67990421e20cd9f0b3dcd6abac0a62a7fce0c0fb7847b3`). Cette
+preuve qualifie l'**oracle**, pas encore notre adaptateur Bevy. Une capture
+déterministe de la même caméra dans South Clock Town reste requise avant toute
+comparaison de pixels ou fermeture du gate visuel.
 
 La prochaine fermeture utile est structurelle : relier les déclarations de scène
 issues de `zeldaret/mm` aux rooms, acteurs, objets, collisions et display lists,
