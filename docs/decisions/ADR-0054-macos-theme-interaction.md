@@ -27,7 +27,12 @@ Le provider conserve le rendu natif et peint les deux contrôles dans son arbre 
 calques. Il publie la géométrie et l'horloge de chaque surface pour un hit-test CPU
 partageant exactement la construction des trajectoires. Aucun polling de rendu.
 Une seule voie d'entrée traite contrôles fixes, objets mobiles et clic droit vide :
-un `CGEventTap` actif sur un thread et une CFRunLoop dédiés. L'agent ne crée aucune
+un `CGEventTap` actif sur un thread et une CFRunLoop dédiés. L'agent demande d'abord
+le point HID utilisé par les implémentations Tahoe observées, puis se replie sur le
+point de session officiellement disponible si macOS refuse HID au processus non-root.
+Le point réellement acquis est publié dans le diagnostic. Le tap annoté plus tardif
+n'isole pas suffisamment le contrôle du geste système. Un watchdog vérifie l'état réel du port et le réarme si
+macOS le désactive silencieusement. L'agent ne crée aucune
 fenêtre AppKit proxy. Le tap supprime uniquement l'appui, le drag éventuel et le
 relâchement d'un geste dont la surface, la cible et le fond Finder sont qualifiés.
 Une erreur, une ambiguïté ou une cible native laisse l'événement original à macOS.
@@ -71,7 +76,9 @@ Cette tranche n'est pas un importeur 3D/ROM ni un terminal PTY complet. Le tap s
 réarme après désactivation système, reconstruit son instantané lors des changements
 d'applications, d'écrans, de Space et de session, et publie son état dans le
 diagnostic. Le hit-test AX synchrone est borné mais demeure une limite du PoC à
-mesurer avant production.
+mesurer avant production. Le callback ne réalise aucune commande XPC, ouverture
+d'application ou mutation AppKit ; ces effets sont déportés sur le `MainActor`
+après le relâchement.
 
 ## Limites de la preuve
 

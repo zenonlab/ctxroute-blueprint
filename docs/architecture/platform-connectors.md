@@ -84,6 +84,9 @@ App Store ni une garantie sur une future version de macOS.
 
 Le connecteur macOS possède TCC, les écrans, Spaces, veille, sélection du provider,
 signature et packaging. L'observation globale des clics est une capacité optionnelle.
+Le PoC tente le point HID, se replie sur le point de session si macOS refuse HID au
+processus non-root, et maintient un watchdog. Un tap annoté plus tardif peut laisser
+WindowServer engager son propre geste de révélation du bureau avant le filtrage.
 Le transport courant utilise un agent XPC nommé, avec inscription persistante opt-in
 et reprise après échec selon [ADR-0055](../decisions/ADR-0055-macos-durable-agent.md),
 et un provider sandboxé avec exception de recherche Mach limitée à ce service.

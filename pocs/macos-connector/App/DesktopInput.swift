@@ -108,6 +108,7 @@ private final class DesktopGestureEngine: @unchecked Sendable {
     var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)?
     var onStatus: ((DesktopTapState, Bool) -> Void)?
     var installed: Bool { tap.isActive }
+    var tapLocation: String? { tap.locationName }
 
     init() {
         // The accessory agent need not become active when the user returns from
@@ -163,7 +164,7 @@ private final class DesktopGestureEngine: @unchecked Sendable {
     }
     private func record(_ state: DesktopTapState) {
         tapState = state
-        trace("tap-\(state.rawValue)")
+        trace("tap-\(state.rawValue)-\(tap.locationName ?? "none")")
         onStatus?(state, AXIsProcessTrusted())
     }
     private func trace(_ decision: String) {
@@ -192,17 +193,20 @@ enum FinderBackground {
     static func contains(_ point: CGPoint, finderPID: pid_t) -> Bool {
         let started = CACurrentMediaTime()
         let system = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(system, 0.003)
+        // Three milliseconds proved too aggressive on a busy Finder and made
+        // otherwise valid targets intermittently fail closed. Keep a strict
+        // total budget while allowing individual public AX calls to complete.
+        AXUIElementSetMessagingTimeout(system, 0.012)
         var target: AXUIElement?
         guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &target) == .success,
               let target else { return false }
-        AXUIElementSetMessagingTimeout(target, 0.003)
+        AXUIElementSetMessagingTimeout(target, 0.012)
         var pid: pid_t = 0
         guard AXUIElementGetPid(target, &pid) == .success else { return false }
         guard pid == finderPID else { return false }
         var roles: [String] = [], current = target
         for _ in 0..<8 {
-            guard CACurrentMediaTime() - started < 0.018,
+            guard CACurrentMediaTime() - started < 0.075,
                   let role = attribute(current, kAXRoleAttribute) as? String else { return false }
             roles.append(role)
             if role == kAXApplicationRole { break }
@@ -210,10 +214,10 @@ enum FinderBackground {
                   CFGetTypeID(parent) == AXUIElementGetTypeID() else { return false }
             current = unsafeDowncast(parent, to: AXUIElement.self)
         }
-        return matches(bundle: "com.apple.finder", roles: roles) && CACurrentMediaTime() - started < 0.020
+        return matches(bundle: "com.apple.finder", roles: roles) && CACurrentMediaTime() - started < 0.080
     }
     private static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
-        AXUIElementSetMessagingTimeout(element, 0.003)
+        AXUIElementSetMessagingTimeout(element, 0.012)
         var value: CFTypeRef?
         return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil
     }

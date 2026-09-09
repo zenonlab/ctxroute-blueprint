@@ -136,8 +136,10 @@ sépare le wallpaper natif complet et le calcul de hit-test. L'extension possèd
 les pixels du décor et des objets ainsi que leurs animations. Lors d'un clic global,
 le compagnon évalue la même fonction de transformation au temps monotone courant puis
 teste les coordonnées, sans posséder de second état de course. Son `CGEventTap` actif
+utilise le premier point autorisé entre HID et session, jamais le point annoté tardif, et
 supprime l'appui et le relâchement d'un clic confirmé sur un objet ; les autres événements
-sont inchangés. Aucune fenêtre ne suit les objets et une grande surcouche plein écran
+restent inchangés. Un watchdog réarme le port lorsque macOS le désactive ; l'état du
+port, et non sa seule existence, détermine la capacité. Aucune fenêtre ne suit les objets et une grande surcouche plein écran
 est interdite. Le panneau natif de la sonde est un HUD fixe ; sa région possède la
 priorité sur les objets mobiles du thème.
 

@@ -254,8 +254,8 @@ import ApplicationServices
         let permission = trusted ? "Accessibilité accordée" : "Accessibilité refusée"
         let runtime: String
         switch state {
-        case .active: runtime = "tap actif"
-        case .rearmed: runtime = "tap réarmé après interruption"
+        case .active: runtime = "tap \(input.tapLocation ?? "inconnu") actif"
+        case .rearmed: runtime = "tap \(input.tapLocation ?? "inconnu") réarmé après interruption"
         case .permissionMissing: runtime = "tap non créé"
         case .creationFailed: runtime = "création du tap refusée"
         case .disabled: runtime = "tap désactivé par macOS"
