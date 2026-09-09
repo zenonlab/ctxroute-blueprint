@@ -6,6 +6,7 @@ scope:
   - docs/architecture/src/game-transformation.architecture.json
   - docs/architecture/src/product-roadmap.workflow.json
 review: on-change
+revised: true
 ---
 # ADR-0058 — Jeu complet indexé avant composition sélective
 
@@ -41,8 +42,11 @@ La bibliothèque utilise conceptuellement un index SQLite et un stockage de blob
 adressés par contenu. Le pack compilé emploie des formats ouverts et des identifiants
 stables ; glTF ne porte ni le gameplay ni la provenance à lui seul.
 
-Le premier comportement adapté est le cycle vivant de Bourg-Clocher : horloge
-contrôlée, états temporels, trajectoires planifiées de PNJ et transitions réversibles.
+Le premier comportement adapté est le cycle vivant du sud de Bourg-Clocher
+(`Z2_CLOCKTOWER`) : horloge contrôlée, états temporels, trajectoires planifiées
+de PNJ et transitions réversibles. Les zones Est (`Z2_TOWN`), Ouest (`Z2_ICHIBA`),
+Nord (`Z2_BACKTOWN`) et Lavoir (`Z2_ALLEY`) éprouvent ensuite la sélection sans
+réingestion. `Z2_00KEIKOKU` reste correctement identifié comme Plaine de Termina.
 Toute dépendance à la logique originale est citée ; le résultat n'est pas étiqueté
 comme simulation originale complète.
 

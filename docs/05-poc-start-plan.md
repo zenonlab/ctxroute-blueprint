@@ -170,6 +170,7 @@ Majora's Mask NTSC-U 1.0 locale est vérifiée et ignorée par Git.
 
 Réaliser maintenant G1 avant le rendu : épingler les outils Zelda64, extraire dans
 un espace privé, produire l'index et le rapport de couverture, puis compiler la
-fermeture de Bourg-Clocher. L3 raccorde ensuite ce pack à Bevy en fenêtre de
+fermeture de `Z2_CLOCKTOWER` et sélectionner les autres zones de Bourg-Clocher.
+L3 raccorde ensuite ce pack à Bevy en fenêtre de
 référence puis à la vraie `CAMetalLayer`. Aucun succès en fenêtre ne vaut validation
 du wallpaper.

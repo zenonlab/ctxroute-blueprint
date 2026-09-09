@@ -18,8 +18,9 @@ complet ; E6 reste réservé aux nouveaux adaptateurs et à l'assistance IA.
 
 - **G1** comptabilise chaque fichier et ressource de Majora's Mask NTSC-U 1.0,
   conserve hashes, provenance, licences et relations, et qualifie les inconnues ;
-- **D1** résout Bourg-Clocher, ses acteurs et ses états temporels depuis cette
-  bibliothèque, puis ne charge que leurs dépendances dans le wallpaper.
+- **D1** résout d'abord le sud de Bourg-Clocher (`Z2_CLOCKTOWER`), ses acteurs et
+  ses états temporels, puis sélectionne Est/Ouest/Nord/Lavoir depuis la même
+  bibliothèque sans réingestion.
 
 Cette preuve ne lance pas le jeu et ne transforme pas Zelda64 en runtime. Le
 contrôleur du thème adapte le cycle de trois jours et les trajectoires planifiées
@@ -361,7 +362,9 @@ prioritaires ; les références matérielles précises restent à sélectionner.
 
 ## Matrice de validation du corpus pilote
 
-Majora's Mask NTSC-U 1.0 est le corpus pilote et Bourg-Clocher la première zone.
+Majora's Mask NTSC-U 1.0 est le corpus pilote et le sud de Bourg-Clocher
+(`Z2_CLOCKTOWER`) la première zone. Bourg-Clocher est un ensemble de cinq scènes
+extérieures dans les données ; `Z2_00KEIKOKU` est la Plaine de Termina.
 La [première passe G1](../pocs/game-library-g1-results.md) prouve l'inventaire
 reproductible, pas encore toutes les capacités du tableau ci-dessous. L'étude
 [OoT → environnement interactif](../research/oot-environment-pilot.md) reste une

@@ -129,7 +129,8 @@ ouvert :
 1. épingler les révisions `zeldaret/mm`, ZAPD et outils, puis vérifier la ROM ;
 2. extraire et indexer la totalité du corpus dans SQLite + CAS avec hashes et relations ;
 3. produire un rapport par catégorie : découvert, interprété, lié, inconnu, erreur ;
-4. compiler un premier thème privé avec Bourg-Clocher et ses dépendances transitives ;
+4. compiler un premier thème privé avec `Z2_CLOCKTOWER` (sud de Bourg-Clocher),
+   puis les autres zones extérieures et leurs dépendances transitives ;
 5. exécuter le cycle temporel adapté et les interactions sans terminal ;
 6. rendre le pack avec Bevy dans une fenêtre de référence puis sur `CAMetalLayer` ;
 7. intégrer Bevy au connecteur macOS sans déplacer la logique du thème ;
@@ -148,7 +149,7 @@ relations sémantiques profondes, l'export de recette ni le second adaptateur.
 | Gate | Preuve exigée |
 | --- | --- |
 | G1-A | 100 % des chemins du corpus épinglé comptabilisés ; aucune catégorie ignorée silencieusement |
-| G1-B | toutes les références de Bourg-Clocher résolues ou qualifiées ; sortie déterministe sur deux passes |
+| G1-B | toutes les références de `Z2_CLOCKTOWER` résolues ou qualifiées, puis sélection Est/Ouest/Nord/Lavoir sans réingestion ; sortie déterministe sur deux passes |
 | G1-C | package partageable inspecté : aucun asset, chemin absolu ou contenu privé |
 | D1-A | horloge, états et trajectoires d'acteurs restent déterministes pendant pause, reprise et changement de phase |
 | D1-B | clic gauche, clic droit, menu, Son/Fichiers et animation utilisent les mêmes identités sémantiques |

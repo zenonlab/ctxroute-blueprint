@@ -58,10 +58,13 @@ et des `coverage.json` identiques, SHA-256
 `e0c8a9ea162704594d3b37855ffcfccc1786164de6e7c8dc4dbfe93c856c0a06`.
 La commande `verify` confirme 25 272 lignes et zéro blob manquant.
 
-Bourg-Clocher (`Z2_00KEIKOKU`) est sélectionnable dans l'index : 208 fragments de
-géométrie, 92 textures, deux définitions de room, deux définitions de scène et
-522 relations touchent ce sous-arbre. Cela
-prouve la requête locale ; pas encore la fermeture transitive des dépendances D1.
+Une vérification sémantique de la table source a corrigé une hypothèse initiale :
+`Z2_00KEIKOKU` désigne **la Plaine de Termina**, pas Bourg-Clocher. L'index contient
+les cinq scènes extérieures de Bourg-Clocher : `Z2_TOWN` (Est, 254 fichiers),
+`Z2_ICHIBA` (Ouest, 143), `Z2_BACKTOWN` (Nord, 99), `Z2_CLOCKTOWER` (Sud, 242) et
+`Z2_ALLEY` (Lavoir, 68). D1 commence par `Z2_CLOCKTOWER`, puis vérifie la sélection
+des quatre autres sans réingestion. Cette liste prouve la requête locale ; pas
+encore la fermeture transitive des dépendances D1.
 
 ## Limites visibles
 

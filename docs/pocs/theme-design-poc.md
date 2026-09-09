@@ -26,7 +26,8 @@ comptée même si son format reste inconnu.
 
 La composition D1 contient :
 
-- Bourg-Clocher résolu depuis la bibliothèque locale avec plusieurs acteurs riggés ;
+- le sud de Bourg-Clocher (`Z2_CLOCKTOWER`) résolu depuis la bibliothèque locale
+  avec plusieurs acteurs riggés, puis sélection des quatre autres zones extérieures ;
 - un sélecteur capable de choisir une autre zone/variation sans réingestion ;
 - un cycle temporel déterministe et des trajectoires de PNJ adaptées ;
 - un panneau de sessions alimenté par des états synthétiques, avec bouton, liste,
