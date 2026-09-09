@@ -12,11 +12,18 @@ const statusLabels: Readonly<Record<ProviderEditorialStatus, string>> = Object.f
   UPCOMING: 'À venir',
 });
 
+function displayText(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  const truncated = value.slice(0, limit);
+  const finalCodeUnit = truncated.charCodeAt(truncated.length - 1);
+  return finalCodeUnit >= 0xD800 && finalCodeUnit <= 0xDBFF ? truncated.slice(0, -1) : truncated;
+}
+
 function itemDetail(work: Awaited<ReturnType<StoragePort['getWork']>>): string | undefined {
   const candidate = work?.hydration?.candidate;
   if (candidate === undefined) return undefined;
   const facts = [candidate.format, candidate.startYear?.toString(), candidate.editorialStatus ? statusLabels[candidate.editorialStatus] : undefined].filter((value): value is string => value !== undefined);
-  return facts.length > 0 ? facts.join(' · ') : undefined;
+  return facts.length > 0 ? displayText(facts.join(' · '), 300) : undefined;
 }
 
 export async function readLocalLibraryCatalogueSnapshot(
@@ -33,8 +40,8 @@ export async function readLocalLibraryCatalogueSnapshot(
     const base = {
       id: work.id,
       mediaType: work.mediaKind,
-      source: work.hydration?.candidate.provider ?? work.externalReferences[0]?.provider ?? work.mediaKind,
-      title: work.preferredTitle,
+      source: displayText(work.hydration?.candidate.provider ?? work.externalReferences[0]?.provider ?? work.mediaKind, 64),
+      title: displayText(work.preferredTitle, 300),
     };
     const detail = itemDetail(work);
     const progressLabel = progress === undefined ? undefined : `${progress.value} / ${progress.maximum ?? '?'}`;

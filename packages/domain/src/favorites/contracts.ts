@@ -12,6 +12,7 @@ import {
   favoriteTransformationLimit,
   favoriteUrlByteLimit,
   providerCandidateLimit,
+  providerFacetValueByteLimit,
   utf8ByteLength,
 } from './limits';
 import type {
@@ -104,9 +105,9 @@ function boundedText(value: string, field: string, limit: number): string {
   return value;
 }
 
-function boundedTexts(values: readonly string[], field: string, limit: number): readonly string[] {
+function boundedTexts(values: readonly string[], field: string, limit: number, byteLimit = favoriteTitleByteLimit): readonly string[] {
   contract(Array.isArray(values) && values.length <= limit, `${field} exceeds ${limit} entries.`);
-  return Object.freeze(values.map((value, index) => nonEmpty(value, `${field}[${index}]`)));
+  return Object.freeze(values.map((value, index) => boundedText(value, `${field}[${index}]`, byteLimit)));
 }
 
 export function createFavoriteObservation(input: FavoriteObservation): FavoriteObservation {
@@ -193,16 +194,16 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
     canonicalUrl = parsed.href;
   }
   const candidate = {
-    externalId: nonEmpty(input.externalId, 'externalId'),
+    externalId: boundedText(input.externalId, 'externalId', favoriteTitleByteLimit),
     mediaKind: input.mediaKind,
     preSerialization: input.preSerialization,
     provider: input.provider,
     titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
   };
-  if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', favoriteTitleByteLimit) });
+  if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', providerFacetValueByteLimit) });
   if (input.season !== undefined) Object.assign(candidate, { season: input.season });
-  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit) });
-  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit) });
+  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit, providerFacetValueByteLimit) });
+  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit, providerFacetValueByteLimit) });
   if (input.editorialStatus !== undefined) Object.assign(candidate, { editorialStatus: input.editorialStatus });
   if (input.startYear !== undefined) Object.assign(candidate, { startYear: input.startYear });
   if (input.endYear !== undefined) Object.assign(candidate, { endYear: input.endYear });

@@ -1,6 +1,6 @@
 import type { WorkId } from './identity';
 import { canonicalDateTime, invariant, requiredText } from './invariant';
-import { createProviderCandidate } from './favorites/contracts';
+import { createProviderCandidate, favoriteTitleByteLimit, utf8ByteLength } from './favorites/contracts';
 import type { ProviderCandidate } from './favorites/contracts';
 
 export type MediaKind = 'anime' | 'manga';
@@ -26,10 +26,16 @@ export interface WorkHydration {
   providerTitleKeys: readonly string[];
 }
 
+function boundedWorkText(value: string, field: string): string {
+  const text = requiredText(value, field);
+  invariant(utf8ByteLength(text) <= favoriteTitleByteLimit, 'invalid-text', `${field} exceeds ${favoriteTitleByteLimit} UTF-8 bytes.`);
+  return text;
+}
+
 export function createWork(input: Work): Work {
   const references = input.externalReferences.map((reference) => ({
-    externalId: requiredText(reference.externalId, 'externalId'),
-    provider: requiredText(reference.provider, 'provider'),
+    externalId: boundedWorkText(reference.externalId, 'externalId'),
+    provider: boundedWorkText(reference.provider, 'provider'),
   }));
   const keys = references.map(({ externalId, provider }) => `${provider}\u0000${externalId}`);
   invariant(new Set(keys).size === keys.length, 'duplicate-reference', 'A provider reference may appear only once per work.');
@@ -37,7 +43,7 @@ export function createWork(input: Work): Work {
   const work: Work = {
     ...input,
     externalReferences: Object.freeze(references),
-    preferredTitle: requiredText(input.preferredTitle, 'preferredTitle'),
+    preferredTitle: boundedWorkText(input.preferredTitle, 'preferredTitle'),
   };
   if (input.hydration !== undefined) {
     const hydration = input.hydration;
@@ -45,9 +51,9 @@ export function createWork(input: Work): Work {
     invariant(references.some((reference) => reference.provider === hydration.candidate.provider && reference.externalId === hydration.candidate.externalId), 'invalid-favorite-resolution', 'Hydrated identity must belong to the work.');
     work.hydration = Object.freeze({
       candidate: createProviderCandidate(hydration.candidate, hydration.candidate.provider),
-      favoriteAliasKeys: Object.freeze(hydration.favoriteAliasKeys.map((key) => requiredText(key, 'favoriteAliasKey'))),
-      hydratedAt: canonicalDateTime(hydration.hydratedAt, 'hydratedAt'), matcherVersion: requiredText(hydration.matcherVersion, 'matcherVersion'),
-      providerTitleKeys: Object.freeze(hydration.providerTitleKeys.map((key) => requiredText(key, 'providerTitleKey'))),
+      favoriteAliasKeys: Object.freeze(hydration.favoriteAliasKeys.map((key) => boundedWorkText(key, 'favoriteAliasKey'))),
+      hydratedAt: canonicalDateTime(hydration.hydratedAt, 'hydratedAt'), matcherVersion: boundedWorkText(hydration.matcherVersion, 'matcherVersion'),
+      providerTitleKeys: Object.freeze(hydration.providerTitleKeys.map((key) => boundedWorkText(key, 'providerTitleKey'))),
     });
   }
   return Object.freeze(work);

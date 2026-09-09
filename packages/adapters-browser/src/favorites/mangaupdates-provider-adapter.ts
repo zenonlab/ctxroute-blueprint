@@ -15,7 +15,6 @@ const mangaUpdatesSeriesSchema = z.object({
   categories: z.array(z.object({ category: nonEmptyString }).strict()).max(16).optional().default([]),
   genres: z.array(z.object({ genre: nonEmptyString }).strict()).max(16).optional().default([]),
   year: z.union([z.number().int(), z.string()]).optional(), status: nonEmptyString.optional(),
-  latest_chapter: z.union([z.number(), z.string()]).optional(),
   series_id: identifierSchema,
   title: nonEmptyString,
   type: nonEmptyString,
@@ -48,8 +47,6 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
   if (series.categories.length > 0) result.categories = series.categories.map((item) => item.category);
   const year = Number(series.year);
   if (Number.isSafeInteger(year) && year >= 1800 && year <= 3000) result.startYear = year;
-  const chapterCount = Number(series.latest_chapter);
-  if (Number.isSafeInteger(chapterCount) && chapterCount >= 0) result.chapterCount = chapterCount;
   if (series.status !== undefined) {
     const value = series.status.toLocaleLowerCase();
     result.editorialStatus = /cancel|discontinu/iu.test(value) ? 'CANCELLED' : /hiatus|pause/iu.test(value) ? 'HIATUS' : /complete|finish/iu.test(value) ? 'COMPLETED' : /ongoing|active|publish/iu.test(value) ? 'ONGOING' : 'UNKNOWN';

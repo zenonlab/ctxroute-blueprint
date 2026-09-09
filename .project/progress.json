@@ -6370,7 +6370,7 @@
         {
           "id": "step-2",
           "title": "Preserve provider metadata semantics and message bounds",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Map only MangaDex genre tags as genres",
             "Do not represent latest units as editorial totals",
@@ -6399,7 +6399,11 @@
             "git diff --check",
             "git commit -m fix(metadata): preserve provider fact semantics"
           ],
-          "evidence": []
+          "evidence": [
+            "MangaDex maps only genre-group tags; MangaDex and MangaUpdates no longer expose latest units as totals",
+            "Domain 24, application 262, browser adapters 53 and extension 118 tests pass",
+            "All workspace typechecks and favorite-resolution Archify showcase 9 of 9 pass"
+          ]
         },
         {
           "id": "step-3",

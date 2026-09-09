@@ -361,6 +361,7 @@
         "Sept facettes stables, menus persistants et sélection multiple avant pagination",
         "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
+        "Genres typés et totaux éditoriaux explicites uniquement",
         "Aucune métadonnée de bibliothèque dans sync ou D1"
       ]
     }

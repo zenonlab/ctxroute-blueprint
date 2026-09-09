@@ -309,7 +309,7 @@
 ## Remediate the library metadata and facet audit — ACTIVE
 
 - [x] **Stabilize facet interactions and pagination** — DONE _(evidence: UI 127 and extension 117 tests pass including real facet and stale-page interactions, All workspace typechecks and accessibility 8 of 8 pass, Chrome and Firefox MV3 builds pass; favorite-resolution Archify showcase 9 of 9)_
-- [ ] **Preserve provider metadata semantics and message bounds** — PENDING
+- [x] **Preserve provider metadata semantics and message bounds** — DONE _(evidence: MangaDex maps only genre-group tags; MangaDex and MangaUpdates no longer expose latest units as totals, Domain 24, application 262, browser adapters 53 and extension 118 tests pass, All workspace typechecks and favorite-resolution Archify showcase 9 of 9 pass)_
 - [ ] **Verify bounded IndexedDB catalogue behavior** — PENDING
 - [ ] **Restore reproducible sharp dependency resolution** — PENDING
 - [ ] **Certify the corrected local library boundary** — PENDING

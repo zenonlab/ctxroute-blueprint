@@ -48,6 +48,7 @@ describe('Work and Library invariants', () => {
         { externalId: '52991', provider: 'MAL' },
       ],
     })).toThrowError(/only once/);
+    expect(() => createWork({ ...work, preferredTitle: 'a'.repeat(8 * 1024 + 1) })).toThrowError(/preferredTitle exceeds/u);
   });
 
   it('keeps library identity stable and membership unique', () => {

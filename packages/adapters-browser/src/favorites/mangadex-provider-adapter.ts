@@ -17,8 +17,7 @@ const hydrationSchema = z.object({
     attributes: z.object({
       title: titleMap, altTitles: z.array(titleMap).max(128), contentRating: z.enum(['safe', 'suggestive', 'erotica', 'pornographic']), originalLanguage: z.string().min(2).max(16),
       status: z.enum(['ongoing', 'completed', 'hiatus', 'cancelled']).optional(), year: z.number().int().min(1800).max(3000).nullable().optional(),
-      lastChapter: z.string().nullable().optional(), lastVolume: z.string().nullable().optional(),
-      tags: z.array(z.object({ attributes: z.object({ name: titleMap }).passthrough() }).passthrough()).max(32).optional().default([]),
+      tags: z.array(z.object({ attributes: z.object({ group: z.enum(['content', 'format', 'genre', 'theme']), name: titleMap }).passthrough() }).passthrough()).max(32).optional().default([]),
     }).passthrough(),
   }),
 });
@@ -57,13 +56,10 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderHydratio
       externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA',
       preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 1,
     };
-    const genres = [...new Set(attributes.tags.flatMap((tag) => Object.values(tag.attributes.name)))].slice(0, 16);
+    const genres = [...new Set(attributes.tags.filter((tag) => tag.attributes.group === 'genre').flatMap((tag) => Object.values(tag.attributes.name)))].slice(0, 16);
     if (genres.length > 0) result.genres = genres;
     if (attributes.status !== undefined) result.editorialStatus = ({ ongoing: 'ONGOING', completed: 'COMPLETED', hiatus: 'HIATUS', cancelled: 'CANCELLED' } as const)[attributes.status];
     if (attributes.year != null) result.startYear = attributes.year;
-    const chapters = Number(attributes.lastChapter); const volumes = Number(attributes.lastVolume);
-    if (Number.isSafeInteger(chapters) && chapters >= 0) result.chapterCount = chapters;
-    if (Number.isSafeInteger(volumes) && volumes >= 0) result.volumeCount = volumes;
     return result;
   }
 }

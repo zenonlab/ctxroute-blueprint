@@ -30,6 +30,13 @@ la bibliothèque : genres, format, statut éditorial canonique, années, totaux
 d'épisodes/chapitres/volumes et popularité accompagnée de sa nature. Le
 fournisseur de la fiche constitue la provenance. Une valeur absente reste
 inconnue; aucune donnée ne doit être inventée ou utilisée pour le matching.
+Les totaux représentent uniquement un total éditorial explicite : le dernier
+chapitre ou volume observé ne devient jamais un total. Les tags MangaDex du
+groupe `genre` alimentent seuls la facette Genre; thèmes et formats restent
+distincts et ne polluent pas cette taxonomie.
+Chaque valeur structurée de facette est limitée à 120 octets UTF-8. Les titres
+privés conservent leur borne historique et leur projection MV3 est réduite à
+300 caractères sans modifier la fiche IndexedDB.
 
 Effectuer recherche, filtrage, tri, facettes et statistiques dans
 l'application avant pagination. Les options de facettes proviennent du corpus

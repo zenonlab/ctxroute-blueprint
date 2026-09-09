@@ -10,7 +10,8 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     const result = await adapter.search({ limit: 1, provider: 'mangaupdates', titles: ['Synthetic Series'] });
     expect(fetcher).toHaveBeenCalledWith(`${mangaUpdatesApiOrigin}/v1/series/search`, expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }));
     expect(result).toMatchObject({ complete: false, provider: 'mangaupdates', truncated: true });
-    expect(result.candidates[0]).toMatchObject({ chapterCount: 84, editorialStatus: 'COMPLETED', externalId: '12345', mediaKind: 'MANHWA', metadataVersion: 1, startYear: 2020, titles: ['Synthetic Series', 'Synthetic Alias'] });
+    expect(result.candidates[0]).toMatchObject({ editorialStatus: 'COMPLETED', externalId: '12345', mediaKind: 'MANHWA', metadataVersion: 1, startYear: 2020, titles: ['Synthetic Series', 'Synthetic Alias'] });
+    expect(result.candidates[0]).not.toHaveProperty('chapterCount');
   });
 
   it('hydrates the exact series route and rejects a foreign reference', async () => {
