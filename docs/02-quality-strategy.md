@@ -17,12 +17,16 @@ les helpers. Elle rapporte le delta face au bureau natif, sur au moins cinq pass
 après préchauffage. La permission refusée et la cible d'entrée inconnue font partie
 du chemin nominal de test, pas uniquement des erreurs.
 
-Après M2-01, la preuve [D1](pocs/theme-design-poc.md) ajoute seize critères portant sur
+Après M2-01, la preuve [G1/D1](pocs/theme-design-poc.md) ajoute dix critères de
+couverture du jeu et vingt critères portant sur
 la fidélité du rig, le partage de ressources sans partage d'état, le menu stylé et
 accessible, la chaîne bouton-animation-UI, les fallbacks, l'export sans asset privé
 et l'invalidation énergétique. Elle vérifie aussi l'étagère système personnalisable,
 les actions locales portables et l'état confirmé d'une capacité desktop simulée. Le
 renderer n'est pas adopté avant cette scène représentative.
+La [première passe G1](pocs/game-library-g1-results.md) a comptabilisé 25 272
+fichiers et produit deux SQLite identiques. Ce reçu valide le déterminisme de
+l'indexeur, pas encore la fermeture sémantique des dépendances ni le rendu D1.
 
 La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
 Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,
@@ -192,9 +196,9 @@ la simulation attendue. Pour chaque comportement, annoncer s'il est récupéré,
 adapté, réimplémenté, précalculé ou non supporté. Le mode ambiant peut simplifier
 les comportements sans modifier les données canoniques conservées.
 
-La matrice détaillée du [PoC OoT](architecture/game-transformation.md) fait foi :
-pièce et matériaux, acteur animé, collision séparée, audio référencé et placements
-traçables. Ajouter les essais négatifs : collision absente → pas de patrouille,
+La matrice détaillée de la [preuve Majora's Mask](architecture/game-transformation.md)
+fait foi : zone et matériaux, acteur animé, collision séparée, audio référencé et
+placements traçables. Ajouter les essais négatifs : collision absente → pas de patrouille,
 AABB de clic → aucune navigation implicite, matériau dégradé → fidélité signalée,
 boucle non validée → lecture unique ou crossfade annoncé. Vérifier la conservation
 des sources après simplification et la résolution des ressources partagées.

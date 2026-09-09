@@ -1,14 +1,40 @@
 # Transformation du jeu et exécution sélective
 
-État : bibliothèque canonique et diorama ambiant confirmés le 7 septembre 2026 ;
-technologies et formats encore ouverts. Aucun extracteur n'est implémenté.
+État au 9 septembre 2026 : bibliothèque canonique et diorama ambiant confirmés ;
+indexeur G1 implémenté et première passe Majora's Mask réussie ; relations
+sémantiques profondes, compilateur D1 et qualification Bevy encore ouverts.
 Voir le [schéma conceptuel](src/game-transformation.architecture.json).
 
 La [consolidation des audits](../research/architecture-audit-synthesis.md) conserve
 cette frontière : découverte et conversion locales optionnelles hors affichage,
 pas de décompilation universelle garantie ni de fusion dans le thème partageable.
-Le [protocole](../04-experimental-protocol.md) teste d'abord le runtime avec des
-ressources originales synthétiques ; les preuves d'extraction restent en E6.
+Le [protocole](../04-experimental-protocol.md) conserve des fixtures originales
+pour les tests automatisés. G1 ajoute en E3 une preuve locale sur un jeu public
+complet ; E6 reste réservé aux nouveaux adaptateurs et à l'assistance IA.
+
+## Prochaine preuve : jeu complet indexé, thème sélectif
+
+[ADR-0058](../decisions/ADR-0058-complete-game-poc.md) sépare deux résultats :
+
+- **G1** comptabilise chaque fichier et ressource de Majora's Mask NTSC-U 1.0,
+  conserve hashes, provenance, licences et relations, et qualifie les inconnues ;
+- **D1** résout Bourg-Clocher, ses acteurs et ses états temporels depuis cette
+  bibliothèque, puis ne charge que leurs dépendances dans le wallpaper.
+
+Cette preuve ne lance pas le jeu et ne transforme pas Zelda64 en runtime. Le
+contrôleur du thème adapte le cycle de trois jours et les trajectoires planifiées
+en états ambiants déterministes. Il ne sera pas présenté comme la simulation
+originale complète.
+
+L'index de travail est un SQLite local associé à un stockage de blobs adressés par
+contenu. Le pack de rendu est un dérivé reconstructible et indépendant du backend ;
+la recette partageable ne contient aucun asset, chemin privé ou contenu de session.
+Bevy est le renderer du PoC, à raccorder à la vraie `CAMetalLayer` avant toute
+qualification. Voir la [recherche primaire et les gates](../research/complete-game-theme-poc.md).
+La première passe reproductible est documentée dans les
+[résultats G1](../pocs/game-library-g1-results.md) : 25 272 chemins, 22 377 blobs
+uniques et 36 625 relations de contenance/référence, avec 1 575 entrées encore
+inconnues et des limites audio explicites.
 
 ## Intention confirmée
 
@@ -333,19 +359,14 @@ alimentation, durée et méthode de calcul avant d'en faire un critère bloquant
 Comparer aussi mémoire, énergie et réactivité. Les iGPU et Apple Silicon sont
 prioritaires ; les références matérielles précises restent à sélectionner.
 
-## PoC préalable à la sélection définitive du jeu pilote
+## Matrice de validation du corpus pilote
 
-Étude publique désormais disponible : [OoT → environnement interactif](../research/oot-environment-pilot.md).
-Temple du Temps est le cas provisoire ; révisions, voies Python/Torch, limites
-Fast64 et raccordements V1–V6 y sont précisés. Aucun extracteur exécuté.
-La petite tranche objet/panneau n'exige pas toutes les capacités du tableau
-ci-dessous ; celui-ci reste le contrôle plus complet d'une chaîne d'ingestion.
-
-Ocarina of Time est le candidat prioritaire. Tester une scène unique, Temple du
-Temps ou Maison de Link, après identification d'une version exacte du jeu et
-de ce que les outils savent réellement extraire. SM64 et Sunshine sont des
-alternatives à évaluer si des relations critiques manquent ou si l'intégration
-spécifique devient excessive ; aucune bascule automatique n'est définie.
+Majora's Mask NTSC-U 1.0 est le corpus pilote et Bourg-Clocher la première zone.
+La [première passe G1](../pocs/game-library-g1-results.md) prouve l'inventaire
+reproductible, pas encore toutes les capacités du tableau ci-dessous. L'étude
+[OoT → environnement interactif](../research/oot-environment-pilot.md) reste une
+future preuve de réutilisation du même adaptateur Zelda64. SM64 et Sunshine sont
+des adaptations distinctes à étudier seulement lorsqu'un thème le demande.
 
 | Preuve | Critère de réussite |
 | --- | --- |

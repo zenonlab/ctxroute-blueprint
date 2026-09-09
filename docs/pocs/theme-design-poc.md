@@ -1,36 +1,69 @@
-# D1 — preuve de personnalisation et d'import
+# G1/D1 — jeu complet indexé et premier thème soigné
 
-État au 8 septembre 2026 : **spécifiée, non implémentée**.
-Cette preuve commence après la stabilisation de M2-01 du
-[PoC connecteur macOS](macos-connector-poc2.md). Elle évalue le thème, pas l'ancrage OS.
+État au 9 septembre 2026 : **indexeur G1 implémenté et première passe réelle
+réussie ; relations sémantiques et D1 non implémentés**.
+Cette preuve commence sur le contrat stabilisé du
+[PoC connecteur macOS](macos-connector-poc2.md). Elle suit
+[ADR-0058](../decisions/ADR-0058-complete-game-poc.md) et la
+[recherche de stack](../research/complete-game-theme-poc.md).
+Les mesures et limites observées sont consignées dans les
+[résultats G1](game-library-g1-results.md).
 
 ## Question
 
-Peut-on produire une composition cohérente mêlant objet 3D riggé, animation, menu
-stylisé et interactions, tout en conservant une recette partageable séparée des assets
-privés et un runtime économe ?
+Peut-on inventorier un vrai jeu complet, compiler plusieurs compositions depuis la
+même bibliothèque, puis livrer un thème cohérent mêlant ville, acteurs riggés,
+animations, menu stylisé et interactions, sans exécuter le jeu ni redistribuer ses
+assets et avec un runtime mesurable ?
 
-## Fixture
+## Corpus et composition
 
-La fixture est entièrement originale et contient :
+Le corpus G1 est **Majora's Mask N64 NTSC-U 1.0**, SHA-1
+`d6133ace5afaa0882cf214cf88daba39e266c078`. L'index couvre la ROM, les fichiers
+extraits, scènes, rooms, acteurs, objets, textures, matériaux, rigs, animations,
+audio, collisions, overlays, messages, horaires et relations. Chaque entrée est
+comptée même si son format reste inconnu.
 
-- un véhicule ou personnage low-poly avec squelette et deux clips ;
-- un matériau, une texture, une icône et une police de test redistribuables ;
-- une piste ou scène simple avec quatre slots d'instances ;
-- un panneau de sessions avec bouton, liste, focus clavier et états d'activité ;
+La composition D1 contient :
+
+- Bourg-Clocher résolu depuis la bibliothèque locale avec plusieurs acteurs riggés ;
+- un sélecteur capable de choisir une autre zone/variation sans réingestion ;
+- un cycle temporel déterministe et des trajectoires de PNJ adaptées ;
+- un panneau de sessions alimenté par des états synthétiques, avec bouton, liste,
+  focus clavier et états d'activité ;
 - une étagère `system_controls` en haut à gauche par défaut, repliable et restylée
-  dans le langage visuel de la fixture ;
+  dans le langage visuel du thème ;
 - une animation déclenchée par le panneau et un événement de fin renvoyé à l'UI ;
 - un fallback 2D pour la ressource 3D absente.
 
-Aucun asset commercial n'est nécessaire pour réussir D1.
+Aucun asset du jeu n'est commité avec le produit ou inclus dans la recette partageable.
+Des fixtures originales minimales restent utilisées dans les tests automatisés pour
+ne pas rendre le checkout tiers obligatoire en CI.
 
 ## Variantes comparées
 
-1. chargement de la fixture originale depuis le package partageable ;
-2. résolution des mêmes slots vers une bibliothèque privée factice ;
-3. ressource ou rig incompatible avec diagnostic et fallback ;
-4. thème statique, animation active et panneau fermé pour mesurer l'invalidation.
+1. indexation complète du corpus épinglé puis seconde passe sans changement ;
+2. compilation d'une piste avec fermeture transitive de ses dépendances ;
+3. sélection d'une autre zone et d'acteurs sans rescanner le corpus ;
+4. ressource, référence ou rig incompatible avec diagnostic et fallback ;
+5. rendu Bevy du pack dans une fenêtre de référence puis sur la vraie `CAMetalLayer` ;
+6. thème statique, animation active, occlusion et panneau fermé pour mesurer
+   l'invalidation et le coût incrémental.
+
+## Critères G1 — jeu complet
+
+| ID | Résultat requis |
+| --- | --- |
+| G1-01 | révisions du code, des données et des outils, hashes et inventaire de licences enregistrés |
+| G1-02 | 100 % des chemins du corpus comptabilisés comme compris, partiels, inconnus ou exclus avec motif |
+| G1-03 | index SQLite reproductible et blobs dédupliqués par contenu ; aucun gros asset stocké dans la base |
+| G1-04 | relations scène → rooms → acteurs → objets → matériaux → textures → audio inspectables dans les deux sens |
+| G1-05 | rigs, animations, collisions, graphes et logique sont des catégories distinctes ; aucune capacité inférée du seul mesh |
+| G1-06 | deux indexations identiques produisent le même manifeste logique et aucun accès réseau pendant la lecture privée |
+| G1-07 | compilation d'une piste résout toutes ses dépendances ou échoue avec la liste exacte des références manquantes |
+| G1-08 | changer de zone/acteur réutilise la bibliothèque sans réingestion globale |
+| G1-09 | recette partageable contrôlée : aucun asset tiers, blob privé, chemin absolu ou contenu de session |
+| G1-10 | un second adaptateur fixture prouve que le schéma commun ne contient aucun identifiant Zelda64 |
 
 ## Critères
 
@@ -52,14 +85,21 @@ Aucun asset commercial n'est nécessaire pour réussir D1.
 | D1-14 | clic gauche lance uniquement l'association approuvée ; clic droit personnalise sans lancement |
 | D1-15 | clic droit dans le vide ajoute ; annulation sans mutation ; cible native/inconnue jamais interceptée |
 | D1-16 | seulement mute et fichiers visibles par défaut ; options avancées accessibles par personnalisation |
+| D1-17 | le cycle temporel et les trajectoires d'acteurs sont déterministes, suspendables et réversibles |
+| D1-18 | changement de zone/acteur ne modifie ni les identités de sessions ni les associations approuvées |
+| D1-19 | Bevy rend le même pack et reçoit les mêmes événements en fenêtre puis sur `CAMetalLayer` |
+| D1-20 | la qualification Bevy est motivée par mesures répétées, couverture visuelle et code restant, pas par préférence |
 
 ## Hors périmètre
 
 Pas d'éditeur grand public complet, marketplace, génération IA en runtime, conversion
-de ROM réelle, terminal PTY, physique de jeu complète ou certification multi-OS.
+de ROM autre que l'entrée locale autorisée, terminal PTY, port bit-à-bit de toute la simulation Zelda64 ou
+certification multi-OS. Le corpus complet est indexé ; seule la composition utile est
+matérialisée et exécutée.
 
 ## Sortie
 
-D1 choisit le contrat minimal de thème et fournit une scène représentative pour
-comparer les backends de rendu. Il ne choisit pas à lui seul la stack du terminal ou
-le mécanisme wallpaper de chaque OS.
+G1 livre une bibliothèque de jeu inspectable et réutilisable. D1 livre un thème
+visuellement présentable, un pack compilé indépendant du backend et un verdict de
+renderer sur macOS. Il ne choisit pas la stack du terminal ni le mécanisme wallpaper
+des autres OS.

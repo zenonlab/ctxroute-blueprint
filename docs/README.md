@@ -16,7 +16,7 @@ périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 2. [PoC macOS 2](pocs/macos-connector-poc2.md) : prochaine preuve bornée.
 3. [Personnalisation des thèmes](architecture/theme-customization.md) : imports 2D/3D,
    rigs, UI stylée et séparation des assets privés.
-4. [Preuve de design D1](pocs/theme-design-poc.md) : tranche originale à réaliser après M2-01.
+4. [Preuve G1/D1](pocs/theme-design-poc.md) : jeu complet indexé, puis thème sélectif ; la [première passe G1](pocs/game-library-g1-results.md) est reproductible.
 5. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
 6. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
 7. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.

@@ -16,7 +16,7 @@
       "kind": "product-test-protocol",
       "format": "markdown",
       "source": "docs/pocs/theme-design-poc.md",
-      "requiredSections": ["Question", "Fixture", "Variantes comparées", "Critères", "Hors périmètre", "Sortie"]
+      "requiredSections": ["Question", "Corpus et composition", "Variantes comparées", "Critères", "Hors périmètre", "Sortie"]
     },
     {
       "id": "platform-connectors",

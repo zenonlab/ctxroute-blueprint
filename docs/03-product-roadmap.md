@@ -1,7 +1,8 @@
 # Feuille de route produit — progression par preuves
 
-État au 8 septembre 2026 : **dépôt initialisé, PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté, non qualifié**.
-E2 n'est pas validée ; L2/L3 et E3–E6 restent non démarrées.
+État au 9 septembre 2026 : **dépôt initialisé, PoC macOS 1 gelé, connecteur macOS
+fonctionnellement éprouvé, qualification énergétique E2 encore ouverte**.
+Le prochain incrément est G1/D1 ; E3–E6 ne sont pas validées.
 Le [plan L1–L3](05-poc-start-plan.md) et
 [ADR-0042](decisions/ADR-0042-bounded-poc-start.md) fixent le premier périmètre.
 Le [PoC L1](pocs/macos-surface.md) ne certifie aucun support OS ni benchmark. Ce document est la
@@ -17,16 +18,18 @@ et tester le remplacement des modules, sans promettre une migration gratuite.
 de correction à E2 : reconstruire un connecteur macOS borné depuis un manifeste
 canonique et une seule surface de contrôle. Les PoCs Windows/Linux suivront comme
 connecteurs indépendants derrière le même contrat, pas comme branches du code AppKit.
-[ADR-0050](decisions/ADR-0050-theme-customization-and-local-assets.md) prépare ensuite
-D1 : objet original riggé, imports privés factices et menu diégétique stylé. D1 peut
-commencer après le manifeste M2-01, mais ne remplace pas les gestes natifs du connecteur.
+[ADR-0050](decisions/ADR-0050-theme-customization-and-local-assets.md) prépare D1.
+[ADR-0058](decisions/ADR-0058-complete-game-poc.md) l'étend avec G1 : indexer un
+corpus local complet avant de compiler un thème sélectif et soigné. D1 peut commencer
+après le manifeste M2-01, sans remplacer la qualification native du connecteur.
 
 ## Règles de progression
 
 Précision [ADR-0041](decisions/ADR-0041-ai-prepared-selective-behaviors.md) :
 les [contrôleurs sélectifs](architecture/ai-prepared-behaviors.md) sont éprouvés
 sur fixtures originales 2D/3D/custom, avec états de sessions synthétiques en E2.
-OoT n'est pas une dépendance obligatoire. L'IA prépare les liens en E6 ; elle
+OoT n'est pas une dépendance obligatoire. G1 utilise Majora's Mask NTSC-U 1.0 sans IA pour
+prouver l'indexation complète. L'IA prépare de nouveaux liens/adaptateurs en E6 ; elle
 n'entre pas dans la boucle de rendu. Le cas course impose de vrais virages et
 une formation, pas un remplacement implicite par des portraits fixes.
 
@@ -41,10 +44,11 @@ puis au plus deux finalistes par question ; pas de construction simultanée de
 plusieurs moteurs complets. B-O/B-R commencent en E2, B-T complet en E4,
 qualification élargie en E5 et extraction optionnelle en E6.
 
-Énergie du wallpaper d'abord, personnalisation ensuite. Réutiliser l'existant,
-mesurer avant de généraliser, ne jamais rendre IA ou conversion obligatoires
-pour utiliser un thème préparé. Le premier thème est original et synthétique,
-sans ROM ni contenu tiers privé. Les trois modes restent la cible du produit.
+Énergie et comportement natif restent mesurés en parallèle du prochain incrément.
+Réutiliser l'existant, mesurer avant de généraliser, ne jamais rendre IA ou
+conversion obligatoires pour utiliser un thème préparé. Le thème D1 utilise une
+bibliothèque privée ; les tests automatisés emploient uniquement des fixtures
+originales. Les trois modes restent la cible du produit.
 
 Chaque étape requiert un livrable, des tests et un verdict daté : réussi, à
 reprendre ou non exécuté. Un échec entraîne une correction/recomparaison au même
@@ -58,12 +62,12 @@ Les vérifications ordinaires ne créent pas de pauses conversationnelles.
 | --- | --- | --- | --- |
 | E1 — Banc et décisions initiales | Cadrage et matrice OS existants | Identifier premier OS/build, CPU/GPU/pilote, écran, accès aux autres machines ; thème synthétique statique et animé ; protocole, budgets et candidats versionnés. Renseigner les décisions initiales obligatoires du brief. | Fiche de banc reproductible, seuils et conditions de mesure fixés avant comparaison, licences examinées, stack expérimentale et limites de sécurité documentées. Aucun code produit avant la clôture des prérequis d'initialisation. |
 | E2 — Wallpaper natif et énergie | E1 et initialisation vérifiée | Petite scène originale avec image 2D, objet 3D animé, transparence, clic et variante visuelle ; surface en fenêtre puis sous le bureau, pause/reprise et recréation. Aucun terminal custom, ROM, IA, physique ou audio nécessaire. | Ancrage, focus/icônes et états statique/animé/masqué testés ; budget tenu ; R01–R04 réussis, capacités absentes signalées. Preuve native minimale sur les environnements de la première livraison avant adoption durable du moteur ; pas d'adoption sur un triangle seul. |
-| E3 — Package de thème et sécurité | Manifeste M2-01 stable ; qualification native E2 poursuivie | D1 : contrat versionné, création par code, objet riggé, UI stylée et étagère système, installation/activation, références et cache séparés ; actions typées et permissions. Deux thèmes originaux distincts, dont un 2D, sans exceptions par jeu dans le cœur. | Rig, menu et contrôles système représentatifs validés ; changement de thème, référence manquante et import malveillant testés ; aucune commande implicite, aucun parcours hors périmètre ; export sans données privées ; budget E2 recontrôlé. |
+| E3 — Jeu indexé, package et sécurité | Manifeste M2-01 stable ; qualification native E2 poursuivie | G1 indexe Majora's Mask NTSC-U 1.0 dans une bibliothèque locale ; D1 compile Bourg-Clocher, ses acteurs et son cycle temporel avec UI stylée et actions typées. Des fixtures originales restent en CI et prouvent l'absence d'exception Zelda dans le cœur. | Tout fichier et ressource est compté ou qualifié ; dépendances de la scène fermées ; changement de zone sans réingestion ; rigs, interactions et export sans données privées validés ; budget E2 recontrôlé. |
 | E4 — Terminal et sessions | E3 réussi | Réutiliser terminal/PTY, ajouter portraits et associations ; définir fermeture, reprise et paramètres sauvegardés. Vérifier terminal seul, wallpaper seul et ensemble. | Deux sessions stables lors d'un changement/arrêt du décor ; TUI, Unicode/IME, resize et backpressure corrects ; actions explicitement autorisées ; surcoût terminal et IPC mesuré séparément. |
 | E5 — Qualification et distribution | E4 réussi | Installation, désinstallation, versions/migrations, politique de mise à jour et reprise après échec ; licences et diagnostics locaux. Rejouer le banc complet par configuration OS annoncée. | Parcours d'installation et trois modes réussis, limites publiées, régressions énergie/sécurité absentes sur le périmètre retenu. Une plateforme non testée reste non testée. Premier thème original livrable sans convertisseur. |
-| E6 — Ingestion assistée optionnelle | E5 réussi et demande de thème dépendant d'un jeu | Réutiliser un lecteur public identifié, extraction locale séparée et adaptateur reproductible ; prouver d'abord une chaîne déterministe, puis ajouter la découverte IA bornée. | Pour une entrée/version précise : ressources et relations nécessaires vérifiées, capacités qualifiées, isolation testée, aucun transfert privé ; réactivation sans IA ni émulateur ; partage du thème sans contenu extrait. |
+| E6 — Nouveaux adaptateurs optionnels | E5 réussi et demande d'un autre jeu/moteur | Réutiliser un lecteur public identifié, conversion locale séparée et adaptateur reproductible ; ajouter ensuite la découverte IA bornée. | Pour une entrée/version précise : ressources et relations vérifiées, capacités qualifiées, isolation testée, aucun transfert privé ; réactivation sans IA ni émulateur ; partage du thème sans contenu extrait. |
 
-E5 termine le premier parcours de livraison wallpaper + terminal ; E6 est une
+E5 termine le premier parcours de livraison wallpaper + terminal ; E6 étend
 extension indépendante de l'affichage, pas une condition pour publier des thèmes
 originaux. Une preuve isolée réussie à E2 n'est pas encore ce produit complet.
 L'étude documentaire d'un lecteur reste possible en amont ; son implémentation
@@ -138,11 +142,10 @@ prouvent des invariants locaux, pas les gestes natifs ni la consommation du prod
 
 ## Prochaine action
 
-Qualifier le transport et le lancement exclusif du PoC2 sur MAC-01, puis ses gestes
-natifs et son énergie. Le contrôle App Group reste bloqué avec la signature ad hoc.
-D1 prépare séparément deux boutons principaux et les gestes de personnalisation ;
-il ne remplace pas la qualification native. Ni nouveau PoC, ni changement de moteur,
-ni terminal ou ROM ne sont requis pour corriger ces frontières.
+Implémenter d'abord G1 sans renderer : manifeste de corpus épinglé, indexeur SQLite,
+CAS local, couverture typée et compilation déterministe des dépendances d'une piste.
+Ensuite seulement, raccorder D1/Bevy à la vraie surface macOS et mesurer ce raccord.
+La qualification énergétique E2 continue sur le même banc ; le terminal réel attend E4.
 
 Schéma workflow en français ; interface fixe du visualiseur en anglais (repli
 Archify). HTML généré : `dist/architecture/product-roadmap.workflow.html`.

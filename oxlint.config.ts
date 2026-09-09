@@ -22,7 +22,7 @@ if (effectEnabled) {
 }
 
 export default defineConfig({
-  ignorePatterns: ['tools/oxlint/anti-slop/**'],
+  ignorePatterns: ['game/**', 'tools/**/target/**', 'tools/oxlint/anti-slop/**'],
   jsPlugins,
   rules,
 });

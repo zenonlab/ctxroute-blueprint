@@ -44,3 +44,16 @@ Source: https://github.com/tirth8205/code-review-graph
 `ignore` 7.0.8 is distributed under the MIT License.
 
 Source: https://github.com/kaelzhang/node-ignore
+
+## Indexeur de bibliothèque de jeu
+
+`tools/game-library/Cargo.lock` épingle les dépendances Rust de l'indexeur. Les
+dépendances directes (`anyhow`, `clap`, `hex`, `regex`, `rusqlite`, `serde`,
+`serde_json`, `sha2`, `walkdir`) sont distribuées sous MIT, Apache-2.0 ou une
+combinaison permissive équivalente déclarée dans leurs packages. SQLite est lié
+via `libsqlite3-sys` sous licence MIT pour la liaison ; SQLite lui-même est dans
+le domaine public.
+
+La chaîne locale Majora's Mask n'est pas redistribuée par ce dépôt. ZAPD déclare
+une licence MIT dans son checkout épinglé ; le dépôt de décompilation et les
+assets extraits ne sont pas supposés couverts par une licence permissive globale.

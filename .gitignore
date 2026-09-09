@@ -22,6 +22,8 @@ ci-summary.md
 coverage/
 dist/
 build/
+game/
+tools/**/target/
 pocs/macos-connector/.build/
 .env
 .env.*

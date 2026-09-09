@@ -71,9 +71,30 @@ local ne suffit pas pour choisir le canal de distribution. Le bouton Finder
 `CreateDesktop`, les notifications Darwin et les signatures ad hoc restent des
 instruments de PoC, pas des technologies du produit.
 
-Le choix du renderer sera évalué sur [D1](pocs/theme-design-poc.md), qui combine un
-objet riggé, deux animations, quatre instances et une UI stylée. Un test sur triangle
-ou les boutons AppKit du connecteur ne suffisent pas à sélectionner la stack graphique.
+Le choix du renderer sera évalué sur [G1/D1](pocs/theme-design-poc.md), qui combine
+un corpus local entièrement indexé, une piste, quatre objets riggés, animations et UI
+stylée. Un test sur triangle ou les boutons AppKit du connecteur ne suffisent pas à
+sélectionner la stack graphique. La [recherche dédiée](research/complete-game-theme-poc.md)
+et [ADR-0058](decisions/ADR-0058-complete-game-poc.md) fixent le comparatif sans
+adopter prématurément une dépendance.
+
+## Stack du prochain PoC G1/D1
+
+| Frontière | Choix de preuve | Statut et motif |
+| --- | --- | --- |
+| Corpus complet | Majora's Mask NTSC-U 1.0, ROM personnelle et outils épinglés localement | Adopté pour G1 seulement : scènes, acteurs, rigs, collisions, temps et comportements documentés ; aucun asset n'entre dans le dépôt ou la recette. |
+| Bibliothèque locale | SQLite pour index/relations + blobs adressés par contenu | Adopté conceptuellement pour le PoC ; les gros contenus ne résident pas dans SQLite et le runtime ne lit pas une base mutable. |
+| Pack de rendu | GLB/glTF pour la livraison géométrique ; KTX2 comme cache dérivé candidat | glTF n'est ni la base canonique, ni le langage de comportement, ni la provenance. |
+| Comportement | Graphe déclaratif typé et contrôleur de formation déterministe | Adopté pour D1 ; Wasm reste différé tant qu'un cas réel ne l'exige pas. |
+| Surface et rendu | Bevy derrière `RenderHost`, raccordé à la vraie `CAMetalLayer` | Adopté pour le PoC, pas encore pour la production ; fenêtre Bevy ordinaire insuffisante. |
+| Terminal | États de sessions synthétiques uniquement | Le moteur de terminal réel reste en E4 et ne bloque pas G1/D1. |
+
+Godot sait importer glTF et travailler headless, mais son intégration documentée
+conserve le jeu dans un processus distinct ; elle ne prouve pas le rendu dans la
+surface possédée par notre provider. Bevy résout davantage de scène et d'animation,
+mais son intégration standard avec winit doit elle aussi être démontrée sur cette
+surface. Bevy apporte le graphe de scène, l'animation, l'ECS et le rendu wgpu ; le
+PoC doit adapter son hôte de fenêtre sans contaminer le contrat de thème.
 
 ## Questions et preuves à obtenir
 
@@ -103,15 +124,13 @@ La séparation locale est acquise dans
 
 La [transformation du jeu](architecture/game-transformation.md) retient désormais
 la bibliothèque canonique, la conversion par scène et le diorama ambiant adapté.
-Une preuve d'ingestion possible reste le PoC OoT précédemment proposé : pièce,
-acteur animé, collision, musique et placements avec références conservées.
-Comparer les outils sur cette chaîne avant de choisir les formats d'ingestion.
-Ce PoC n'est pas une condition pour commencer un thème original ni pour comparer
-les technologies du terminal et du wallpaper.
-La récupération par décompilation/recompilation reste une piste à évaluer.
+OoT reste une étude utile du même moteur. La prochaine preuve utilise Majora's Mask
+NTSC-U 1.0 afin de valider le couple « index complet / exécution sélective » sur
+une ROM locale vérifiée. Elle ne prétend pas généraliser cette couverture aux ROMs
+inconnues. OoT devra ensuite éprouver la réutilisation de l'adaptateur Zelda64.
 
-Suivre E1–E6 : banc et décisions initiales, ancrage/énergie sans ROM, contrat de
-thème, terminal, qualification/distribution, puis ingestion assistée optionnelle.
+Suivre E1–E6 : banc et décisions initiales, ancrage/énergie, G1/D1 et contrat de
+thème, terminal, qualification/distribution, puis nouveaux adaptateurs assistés.
 Le détail et les critères de sortie vivent uniquement dans la feuille de route.
 
 Rust/wgpu et winit sont retenus pour le candidat expérimental, pas pour la

@@ -23,7 +23,7 @@ Ordre d'exécution : [feuille de route E1–E6](../03-product-roadmap.md) et
 6. [Protocole expérimental](../04-experimental-protocol.md) : banc E1, mesures et preuves avant adoption.
 7. [Faisabilité OS](../research/os-feasibility.md) puis [préflight de stack](../research/stack-preflight.md) : MAC-01 observé, contraintes natives et composants à éprouver.
 8. [PoC macOS 2](../pocs/macos-connector-poc2.md) : reconstruction bornée du connecteur après gel du PoC1.
-9. [Preuve D1](../pocs/theme-design-poc.md) : composition originale représentative avant choix du renderer.
+9. [Preuve G1/D1](../pocs/theme-design-poc.md) : corpus local complet indexé, composition sélective et comparaison des renderers.
 
 Les schémas produit sont complémentaires ; l'infrastructure contient une proposition
 de banc d'essai, pas une stack déjà installée. Les ADR portent les décisions,

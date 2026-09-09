@@ -1,7 +1,8 @@
 # Vision produit — bureau et terminal ludiques
 
 État : PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté et non qualifié, 8 septembre 2026. Nom de travail : Wallpaper.
-Aucun moteur, terminal ou extracteur produit n'est encore implémenté.
+Le terminal et le renderer produit ne sont pas encore implémentés. L'indexeur
+hors ligne G1 est disponible et sa première passe Majora's Mask est reproductible.
 Le dépôt est initialisé ; une [sonde native isolée](pocs/macos-surface.md) est implémentée.
 Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
 Il ne constitue pas une adoption de production. Le PoC1 a fourni des preuves utiles
@@ -121,9 +122,10 @@ récupérées ; le mode nominal diorama peut adapter les comportements. La fidé
 sensorielle recherchée et chaque approximation doivent être vérifiées et signalées.
 
 La décision antérieure sur l'ingestion retient l'indexation globale, les exports progressifs par
-scène, les capacités explicites et les profils énergétiques mesurables.
-OoT est candidat prioritaire pour une preuve d'extraction, pas encore un jeu
-pilote validé. Voir [ADR-0031](decisions/ADR-0031-canonical-library-and-capabilities.md).
+scène, les capacités explicites et les profils énergétiques mesurables. Majora's
+Mask NTSC-U 1.0 est désormais le corpus G1 ; OoT reste une épreuve secondaire de
+réutilisation de l'adaptateur Zelda64. Voir
+[ADR-0058](decisions/ADR-0058-complete-game-poc.md).
 
 L'ambition exprimée est de disposer des données du jeu et d'en isoler les éléments
 pour les réutiliser : environnements, personnages, objets, textures, squelettes,
@@ -218,6 +220,10 @@ Pour cette étape : un socle CTXRoute installé, une documentation cohérente,
 un schéma conceptuel validé et une note permettant de reprendre sans relire
 la conversation. Une sonde expérimentale est disponible, sans stack de production
 sélectionnée ni qualification complète du bureau.
+
+La phase suivante a commencé : voir les
+[résultats G1](pocs/game-library-g1-results.md). Ils prouvent un inventaire local
+déterministe, sans encore prouver le compilateur de thème ni le renderer Bevy.
 
 Pour le futur produit : les trois modes sont utilisables, chaque joueur ouvre
 la bonne session, changer d'apparence conserve le travail, les assets disponibles

@@ -1,8 +1,8 @@
 # Démarrage des PoCs — décisions expérimentales
 
-État au 7 septembre 2026 : L1 implémenté et partiellement éprouvé ; L2/L3 non commencés.
-Les [résultats L1](pocs/macos-surface.md) distinguent tests réussis et smoke graphique
-non validé lorsque AppKit signale la fenêtre invisible.
+État au 9 septembre 2026 : dépôt initialisé, connecteur macOS fonctionnellement
+éprouvé, qualification énergétique ouverte ; G1/D1 est le prochain incrément.
+Les [résultats macOS](pocs/macos-connector-poc2.md) restent séparés de la preuve Bevy.
 Ce document ferme le périmètre de départ, pas le choix de production.
 Il complète [E1–E6](03-product-roadmap.md) et le
 [protocole de mesure](04-experimental-protocol.md), sans les remplacer.
@@ -31,7 +31,7 @@ assertions contradictoires de la conversation ne deviennent pas des exigences.
 | Partie | Choix pour les essais | Limite de cette décision |
 | --- | --- | --- |
 | Sonde OS initiale | Swift + AppKit sur MAC-01, SDK local ; contrôles natifs | Programme de diagnostic jetable, pas adoption de Swift pour le produit portable |
-| Contrôleur et rendu candidat | Rust, Cargo, wgpu/WGSL, winit ; dépendances ajoutées au moment du PoC concerné | Pas de moteur 3D généraliste à construire ; aucune version distante adoptée par défaut |
+| Contrôleur et rendu candidat | Rust, Cargo et Bevy réduit aux modules nécessaires | Bevy est adopté pour G1/D1 seulement ; son raccord à la surface wallpaper et son coût restent à qualifier |
 | État et fixtures | Structures typées et JSON versionné de test ; géométrie originale | Format interne expérimental, pas package public `.scene` figé |
 | Tests | Tests unitaires Rust pour contrôleurs ; sonde native et gestes OS consignés ; banc B-R pour rendu | Tests blueprint conservés mais comptés séparément |
 | Backend et transport | Aucun service distant ; sessions simulées en mémoire | IPC et PTY réels attendent E4 ; pas un démon par contrat |
@@ -97,7 +97,7 @@ Ni sprite original, ni Lakitu extrait : indicateur de récupération original.
 
 ### L3 — Rendu et interaction représentatifs
 
-Brancher L2 à un petit hôte Rust/wgpu en fenêtre : image 2D, géométrie 3D originale,
+Brancher L2 à un hôte Bevy en fenêtre : image 2D, géométrie 3D originale,
 transparence, picking et panneau/bouton pilotant animation/effet puis retour d'état.
 Changer caméra et disposition, pas seulement lire une vidéo figée. Réutiliser
 une brique UI après inspection de son exemple ; ne pas écrire un toolkit complet.
@@ -165,14 +165,11 @@ concerné avant d'étendre sa portée. Aucun résultat factice dans un dossier d
 
 ## Passage à l'implémentation
 
-Le dépôt est encore `template` : avant le premier code produit, terminer la lecture
-des documents starter, reporter ces décisions expérimentales dans la configuration,
-qualifier les commandes de build/test et lancer `npm run initialize` conformément
-à ADR-0001. Ne pas modifier son statut manuellement ni annoncer cette étape faite.
-Cette préparation administrative ne nécessite pas une nouvelle sélection de stack
-de production ni une nouvelle approbation de principe.
+Le dépôt est `initialized` et le connecteur macOS fournit la base native. La ROM
+Majora's Mask NTSC-U 1.0 locale est vérifiée et ignorée par Git.
 
-Puis réaliser L1, L2, L3 dans cet ordre, avec un compte rendu par résultat cohérent.
-La session suivante doit commencer par cette initialisation et L1, pas par une
-nouvelle recherche générale de moteurs. Aucun PoC, benchmark ou support OS n'est
-livré par la présente correction documentaire.
+Réaliser maintenant G1 avant le rendu : épingler les outils Zelda64, extraire dans
+un espace privé, produire l'index et le rapport de couverture, puis compiler la
+fermeture de Bourg-Clocher. L3 raccorde ensuite ce pack à Bevy en fenêtre de
+référence puis à la vraie `CAMetalLayer`. Aucun succès en fenêtre ne vaut validation
+du wallpaper.
