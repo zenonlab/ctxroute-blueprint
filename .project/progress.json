@@ -6616,7 +6616,7 @@
         {
           "id": "step-2",
           "title": "Preserve provider display metadata and covers",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "AniList MangaUpdates MangaDex and Kitsu hydration preserve a bounded HTTPS cover descriptor and title-language evidence",
             "Provider metadata remains local and strict contracts reject untrusted image origins or oversized values",
@@ -6640,7 +6640,13 @@
             "git diff --check",
             "git commit -m feat(metadata): preserve provider display metadata"
           ],
-          "evidence": []
+          "evidence": [
+            "Provider domain Work library and resolution Vitest suites: 50 passed across 7 files",
+            "All 9 workspace typechecks and ESLint passed",
+            "Complete docs validation and favorite-resolution Archify showcase 9/9 passed",
+            "Live Kitsu and MangaUpdates payload shapes confirmed bounded cover origins",
+            "git diff --check passed"
+          ]
         },
         {
           "id": "step-3",

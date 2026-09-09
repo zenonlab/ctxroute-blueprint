@@ -74,7 +74,7 @@ export async function persistFavoriteResolutionCompletion(
           hydration: { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))] },
           id,
           mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
-          preferredTitle: candidate.titles.find((title) => title.trim().length > 0) ?? source.title,
+          preferredTitle: candidate.displayTitle ?? candidate.titles.find((title) => title.trim().length > 0) ?? source.title,
         });
         await session.putWork(work);
         const progress = resolvedProgress(record.artifact, candidate, work.id, await session.findProgressByWorkId(work.id));

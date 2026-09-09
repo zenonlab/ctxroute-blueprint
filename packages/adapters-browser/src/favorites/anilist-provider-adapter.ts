@@ -1,18 +1,19 @@
 import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery } from '@tobirink/application';
-import { createProviderCandidateEnvelope } from '@tobirink/domain';
+import { createProviderCandidate, createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
 import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
 import type { FavoriteProviderFetch } from './provider-http';
 
 export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
-const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres startDate { year } endDate { year } episodes chapters volumes popularity';
+const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres coverImage { extraLarge large medium } startDate { year } endDate { year } episodes chapters volumes popularity';
 const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!, $page: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
 const hydrateQuery = `query FavoriteById($id: Int!) { Media(id: $id) { ${mediaProjection} } }`;
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
 const anilistMediaSchema = z.object({
+  coverImage: z.object({ extraLarge: z.url().nullable(), large: z.url().nullable(), medium: z.url().nullable() }).strict(),
   format: nonEmptyString.nullable(),
   genres: z.array(nonEmptyString).max(16),
   status: z.enum(['FINISHED', 'RELEASING', 'NOT_YET_RELEASED', 'CANCELLED', 'HIATUS']).optional(),
@@ -35,7 +36,7 @@ function titles(media: AniListMedia): readonly string[] {
   const values = [media.title.romaji, media.title.english, media.title.native, ...media.synonyms]
     .filter((value): value is string => value !== null);
   if (values.length === 0) throw new TypeError('AniList media requires a title.');
-  return [...new Set(values)];
+  return [...new Set(values)].slice(0, 16);
 }
 
 function candidate(media: AniListMedia): ProviderCandidate {
@@ -45,8 +46,18 @@ function candidate(media: AniListMedia): ProviderCandidate {
     preSerialization: media.type === 'MANGA' && /novel/iu.test(media.format ?? ''),
     provider: 'anilist',
     titles: titles(media),
-    metadataVersion: 1,
+    metadataVersion: 2,
+    titleVariants: [
+      ...(media.title.english === null ? [] : [{ language: 'en', title: media.title.english }]),
+      ...(media.title.romaji === null ? [] : [{ language: 'ja-Latn', title: media.title.romaji }]),
+      ...(media.title.native === null ? [] : [{ language: 'und', title: media.title.native }]),
+      ...media.synonyms.map((title) => ({ title })),
+    ].slice(0, 16),
   };
+  const displayTitle = media.title.english ?? media.title.romaji ?? media.title.native;
+  if (displayTitle !== null) result.displayTitle = displayTitle;
+  const coverUrl = media.coverImage.extraLarge ?? media.coverImage.large ?? media.coverImage.medium;
+  if (coverUrl !== null) result.cover = { attribution: 'AniList', url: coverUrl };
   if (media.siteUrl !== null) result.canonicalUrl = media.siteUrl;
   if (media.format !== null) result.format = media.format;
   if (media.genres.length > 0) result.genres = media.genres;
@@ -57,7 +68,7 @@ function candidate(media: AniListMedia): ProviderCandidate {
   if (media.chapters != null) result.chapterCount = media.chapters;
   if (media.volumes != null) result.volumeCount = media.volumes;
   if (media.popularity != null) result.popularity = { kind: 'MEMBERS', value: media.popularity };
-  return result;
+  return createProviderCandidate(result, 'anilist');
 }
 
 export class AniListFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {

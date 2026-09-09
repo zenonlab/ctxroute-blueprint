@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB : fiches, faits structurés, facettes et statistiques privés. Lecture transactionnelle bornée à 500 œuvres avant pagination."
+        "note": "IndexedDB privé : titres localisés, jaquettes HTTPS attribuées et facettes. Lecture bornée à 500 œuvres avant pagination."
       },
       {
         "id": "recovery-collective",
@@ -130,7 +130,7 @@
       "stage": 3,
       "row": 4,
       "width": 150,
-      "tag": "primaire puis repli contrôlé"
+      "tag": "identité + affichage borné"
     },
     {
       "id": "titleMatcher",
@@ -247,7 +247,7 @@
     {
       "from": "providerAdapters",
       "to": "titleMatcher",
-      "label": "candidats typés",
+      "label": "candidats + affichage",
       "classification": "réponse bornée",
       "variant": "default",
       "labelAt": [

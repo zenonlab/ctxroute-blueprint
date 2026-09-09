@@ -28,7 +28,8 @@ export type { SourceEvidence } from './source-evidence-contract';
 export type { FavoriteParseArtifact } from './parse-artifact-contract';
 
 export const favoriteContractVersion = 2 as const;
-export const providerMetadataVersion = 1 as const;
+export const providerMetadataVersion = 2 as const;
+export const supportedProviderMetadataVersions = [1, providerMetadataVersion] as const;
 
 export const providerEditorialStatuses = ['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN'] as const;
 export type ProviderEditorialStatus = (typeof providerEditorialStatuses)[number];
@@ -36,6 +37,16 @@ export type ProviderEditorialStatus = (typeof providerEditorialStatuses)[number]
 export interface ProviderPopularity {
   readonly kind: 'MEMBERS' | 'RANK';
   readonly value: number;
+}
+
+export interface ProviderCover {
+  readonly attribution: string;
+  readonly url: string;
+}
+
+export interface ProviderTitleVariant {
+  readonly language?: string;
+  readonly title: string;
 }
 
 export interface FavoriteObservation {
@@ -63,7 +74,10 @@ export interface ProviderCandidate {
   readonly chapterCount?: number;
   readonly volumeCount?: number;
   readonly popularity?: ProviderPopularity;
-  readonly metadataVersion?: typeof providerMetadataVersion;
+  readonly cover?: ProviderCover;
+  readonly displayTitle?: string;
+  readonly titleVariants?: readonly ProviderTitleVariant[];
+  readonly metadataVersion?: (typeof supportedProviderMetadataVersions)[number];
   readonly mediaKind: Exclude<FavoriteMediaKind, 'UNKNOWN'>;
   readonly preSerialization: boolean;
   readonly provider: FavoriteProvider;
@@ -182,7 +196,7 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
     if (value !== undefined) contract(Number.isSafeInteger(value) && value >= 0, `${field} must be a non-negative safe integer.`);
   }
   if (input.editorialStatus !== undefined) contract(providerEditorialStatuses.includes(input.editorialStatus), 'editorialStatus is invalid.');
-  if (input.metadataVersion !== undefined) contract(input.metadataVersion === providerMetadataVersion, `metadataVersion must be ${providerMetadataVersion}.`);
+  if (input.metadataVersion !== undefined) contract(supportedProviderMetadataVersions.includes(input.metadataVersion), `metadataVersion must be one of ${supportedProviderMetadataVersions.join(', ')}.`);
   if (input.popularity !== undefined) {
     contract(input.popularity.kind === 'MEMBERS' || input.popularity.kind === 'RANK', 'popularity.kind is invalid.');
     contract(Number.isSafeInteger(input.popularity.value) && input.popularity.value >= 0, 'popularity.value must be a non-negative safe integer.');
@@ -193,6 +207,27 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
     contract(parsed.protocol === 'http:' || parsed.protocol === 'https:', 'canonicalUrl must use HTTP(S).');
     canonicalUrl = parsed.href;
   }
+  let cover: ProviderCover | undefined;
+  if (input.cover !== undefined) {
+    const parsed = new URL(boundedText(input.cover.url, 'cover.url', favoriteUrlByteLimit));
+    contract(parsed.protocol === 'https:', 'cover.url must use HTTPS.');
+    const allowedHosts: Readonly<Record<FavoriteProvider, readonly string[]>> = {
+      anilist: ['s4.anilist.co'],
+      mangaupdates: ['cdn.mangaupdates.com'],
+      mangadex: ['uploads.mangadex.org'],
+      'kitsu-anime': ['media.kitsu.app'],
+      'kitsu-manga': ['media.kitsu.app'],
+    };
+    contract(allowedHosts[provider].includes(parsed.hostname), `cover.url origin is not allowed for ${provider}.`);
+    cover = Object.freeze({ attribution: boundedText(input.cover.attribution, 'cover.attribution', providerFacetValueByteLimit), url: parsed.href });
+  }
+  const titleVariants = input.titleVariants === undefined ? undefined : Object.freeze(input.titleVariants.map((variant, index) => {
+    const title = boundedText(variant.title, `titleVariants[${index}].title`, favoriteTitleByteLimit);
+    return Object.freeze(variant.language === undefined
+      ? { title }
+      : { language: boundedText(variant.language, `titleVariants[${index}].language`, providerFacetValueByteLimit), title });
+  }));
+  contract((titleVariants?.length ?? 0) <= favoriteAliasLimit, `titleVariants exceeds ${favoriteAliasLimit} entries.`);
   const candidate = {
     externalId: boundedText(input.externalId, 'externalId', favoriteTitleByteLimit),
     mediaKind: input.mediaKind,
@@ -211,6 +246,9 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
   if (input.chapterCount !== undefined) Object.assign(candidate, { chapterCount: input.chapterCount });
   if (input.volumeCount !== undefined) Object.assign(candidate, { volumeCount: input.volumeCount });
   if (input.popularity !== undefined) Object.assign(candidate, { popularity: Object.freeze({ ...input.popularity }) });
+  if (cover !== undefined) Object.assign(candidate, { cover });
+  if (input.displayTitle !== undefined) Object.assign(candidate, { displayTitle: boundedText(input.displayTitle, 'displayTitle', favoriteTitleByteLimit) });
+  if (titleVariants !== undefined) Object.assign(candidate, { titleVariants });
   if (input.metadataVersion !== undefined) Object.assign(candidate, { metadataVersion: input.metadataVersion });
   if (canonicalUrl !== undefined) Object.assign(candidate, { canonicalUrl });
   return Object.freeze(candidate);

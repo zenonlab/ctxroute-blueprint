@@ -1,6 +1,6 @@
 import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery } from '@tobirink/application';
-import { createProviderCandidateEnvelope } from '@tobirink/domain';
+import { createProviderCandidate, createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteMediaKind, ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
 import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from './provider-http';
@@ -10,10 +10,14 @@ export const mangaUpdatesApiOrigin = 'https://api.mangaupdates.com';
 const seriesEndpoint = `${mangaUpdatesApiOrigin}/v1/series`;
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
+const mangaUpdatesImageSchema = z.object({
+  url: z.object({ original: z.url().optional(), thumb: z.url().optional() }).passthrough(),
+}).passthrough();
 const mangaUpdatesSeriesSchema = z.object({
   associated: z.array(z.object({ title: nonEmptyString }).strict()).max(16).optional().default([]),
   categories: z.array(z.object({ category: nonEmptyString }).strict()).max(16).optional().default([]),
   genres: z.array(z.object({ genre: nonEmptyString }).strict()).max(16).optional().default([]),
+  image: mangaUpdatesImageSchema.optional(),
   year: z.union([z.number().int(), z.string()]).optional(), status: nonEmptyString.optional(),
   series_id: identifierSchema,
   title: nonEmptyString,
@@ -40,8 +44,12 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
     preSerialization: /novel/iu.test(series.type),
     provider: 'mangaupdates',
     titles: [...new Set([series.title, ...series.associated.map((item) => item.title)])],
-    metadataVersion: 1,
+    metadataVersion: 2,
+    displayTitle: series.title,
+    titleVariants: [{ title: series.title }, ...series.associated.map((item) => ({ title: item.title }))].slice(0, 16),
   };
+  const coverUrl = series.image?.url.original ?? series.image?.url.thumb;
+  if (coverUrl !== undefined) result.cover = { attribution: 'MangaUpdates', url: coverUrl };
   if (series.url !== undefined) result.canonicalUrl = series.url;
   if (series.genres.length > 0) result.genres = series.genres.map((item) => item.genre);
   if (series.categories.length > 0) result.categories = series.categories.map((item) => item.category);
@@ -51,7 +59,7 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
     const value = series.status.toLocaleLowerCase();
     result.editorialStatus = /cancel|discontinu/iu.test(value) ? 'CANCELLED' : /hiatus|pause/iu.test(value) ? 'HIATUS' : /complete|finish/iu.test(value) ? 'COMPLETED' : /ongoing|active|publish/iu.test(value) ? 'ONGOING' : 'UNKNOWN';
   }
-  return result;
+  return createProviderCandidate(result, 'mangaupdates');
 }
 
 export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
