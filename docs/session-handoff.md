@@ -5,8 +5,9 @@
 Le paquet signé installé recevait bien les intentions `desktopItemsVisible` et
 `desktopItemsHidden`, mais `StandardHideDesktopIcons` ne changeait pas le rendu du
 bureau sur MAC-01 : seul Finder se rechargeait. Le correctif revient à
-`com.apple.finder/CreateDesktop`, déjà efficace dans le PoC1, sans reprendre ses
-fenêtres superposées. Écriture et relecture sont confirmées, une cible déjà atteinte
+`com.apple.finder/CreateDesktop`, déjà efficace dans le PoC1. Seules ses petites
+fenêtres d'entrée transparentes sont reprises dans l'état masqué ; jamais son décor
+visible ni une fenêtre plein écran. Écriture et relecture sont confirmées, une cible déjà atteinte
 ne redémarre pas Finder, et un échec de rafraîchissement tente un rollback.
 
 Le premier fallback masqué par `CGWindowList` est invalidé : après Afficher le bureau,
@@ -19,10 +20,13 @@ applications et suivent `ThemeLayout` à 30 Hz uniquement si des objets bougent.
 Un remplacement d'instantané annule toute capture et recrée ou détruit ces régions.
 
 Preuves locales du candidat : diagramme macOS showcase 9/9 sans erreur ni
-avertissement ; 35 XCTest ; politique Finder et projection des proxys passantes.
-La construction signée reste à terminer puis installer : `codesign` a attendu le
-trousseau après compilation. Le cycle visuel masquer/réafficher et les clics des deux
-états doivent être qualifiés sur ce paquet exact avant validation finale.
+avertissement ; 35 XCTest ; politique Finder et projection des proxys passantes ;
+263 tests dépôt passants, aucun échec. Le build signé `build.okvqzD` est installé et
+son prédécesseur conservé dans `replaced.PSV4hG/previous-app.disabled`. L'agent
+persistant PID 32314 exécute le binaire installé. Le réglage expérimental
+`StandardHideDesktopIcons` est restauré à `false` et `CreateDesktop` à `true`.
+Un fond Apple temporaire (`Mac bleu`) est actif : sélectionner Orbite puis qualifier
+le cycle masquer/réafficher et les clics des deux états avant validation finale.
 
 ## État courant — tap unifié sans fenêtre d'entrée, 9 septembre 2026
 
