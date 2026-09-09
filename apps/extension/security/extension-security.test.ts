@@ -123,4 +123,13 @@ describe('extension security boundary', () => {
     expect(localStorage).toMatch(/new DexieStoragePort\(extensionDatabaseName\)/);
     expect(localStorage).not.toMatch(/browser\.|chrome\.|fetch\s*\(/);
   });
+
+  it('keeps the background WebBridge origin aligned with the production manifest fallback', async () => {
+    const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
+
+    expect(background).toMatch(
+      /WXT_PUBLIC_SITE_ORIGIN\?\.trim\(\) \|\| 'https:\/\/tobirink\.com'/,
+    );
+    expect(background).not.toMatch(/WXT_PUBLIC_SITE_ORIGIN\?\.trim\(\) \?\? ''/);
+  });
 });
