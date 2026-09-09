@@ -20,6 +20,11 @@ possède D1, pour lookup owner-scoped puis confirmations distinctes. La pipeline
 et ses budgets suivent le plan v3; la section suivante décrit l'ancien runtime,
 qui ne constitue pas le résultat cible.
 
+Les permissions du paquet MV3 sont limitées aux cinq origines HTTPS nécessaires
+à l'exécution : AniList, MangaUpdates, MangaDex, Kitsu et `tobirink.com` pour
+WebBridge. Les anciennes preuves Progress qui indiquent `host_permissions vide`
+sont historiques et ne décrivent plus le manifest installé.
+
 ## État implémenté vérifié
 
 Le runtime actuel possède déjà des fondations réutilisables :
@@ -109,6 +114,12 @@ Le WebBridge renouvelle sa session courte après chaque expiration tant que le
 handshake et les projections initiales sont valides. Chaque renouvellement
 réussi réarme le suivant; un renouvellement défaillant s'arrête après cet essai
 et expose l'état récupérable sans boucle de requêtes.
+
+Le message interne `library.page.read` est conservé pour compatibilité avec les
+anciens écrans extension. Il n'est plus consommé par les surfaces actuelles :
+la bibliothèque extension utilise `library.catalogue.read` et le site utilise
+`library.read` via WebBridge. Sa suppression éventuelle fera l'objet d'une
+étape destructive séparée.
 
 ### 1. Capturer le déclencheur
 
