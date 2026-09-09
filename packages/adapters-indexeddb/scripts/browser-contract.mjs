@@ -142,6 +142,10 @@ try {
       expression: 'JSON.stringify({ status: document.body.dataset.status, detail: document.body.textContent, catalogueMs: document.body.dataset.catalogueMs })',
       returnByValue: true,
     });
+    if (evaluation.result.type !== 'string') {
+      await delay(50);
+      continue;
+    }
     const result = JSON.parse(evaluation.result.value);
     status = result.status ?? 'pending';
     detail = result.detail ?? '';

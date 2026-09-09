@@ -104,6 +104,12 @@ These commands are documentation, not authorization.
 The plan preview binds the two ZIP byte hashes and the Worker dry-run output to
 its digest; the apply gate repeats both checks immediately before mutation.
 
+An agenda snapshot is published independently with matching
+`r2-release-snapshot:<revision>` and `r2-release-pointer:<revision>` operations.
+The repository gate reads only the canonical files under `build/releases/`,
+validates the strict public schema, hashes both inputs, and writes the immutable
+snapshot before changing `releases/current.json`. D1 is not involved.
+
 ## Rollback
 
 Rollback never mutates local user data and is never automatic.

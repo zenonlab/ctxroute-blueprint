@@ -92,6 +92,50 @@ async function test_release_publish_is_hashed_and_translated() {
   ]]);
 }
 
+async function test_release_snapshot_publication_is_validated_and_ordered() {
+  const calls = [];
+  const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
+  const files = new Map([
+    ['/releases/empty-2026-09-09.json', Buffer.from('{"entries":[],"generatedAt":"2026-09-09T12:00:00.000Z","revision":"empty-2026-09-09"}\n')],
+    ['/releases/current-empty-2026-09-09.json', Buffer.from('{"revision":"empty-2026-09-09"}\n')],
+  ]);
+  const driver = createCloudflareDriver({
+    config: releaseConfig,
+    workerDirectory: '/worker',
+    releaseDirectory: '/releases',
+    read: async path => files.get(path),
+    run: async args => { calls.push(args); return 'uploaded'; },
+  });
+  const actions = driver.resolveOperations([
+    'r2-release-pointer:empty-2026-09-09',
+    'r2-release-snapshot:empty-2026-09-09',
+  ]);
+  assert.deepEqual(actions, [
+    { kind: 'r2-release-pointer', target: 'r2:public-releases/releases/current.json' },
+    { kind: 'r2-release-snapshot', target: 'r2:public-releases/releases/snapshots/empty-2026-09-09.json' },
+  ]);
+  const preview = await driver.preview(actions);
+  assert.deepEqual(preview.actions, actions);
+  assert.equal(preview.artifacts.length, 2);
+  await driver.apply(actions);
+  assert.deepEqual(calls.map(args => args.slice(0, 4)), [
+    ['r2', 'object', 'put', 'public-releases/releases/snapshots/empty-2026-09-09.json'],
+    ['r2', 'object', 'put', 'public-releases/releases/current.json'],
+  ]);
+  assert.ok(calls[0].includes('public, max-age=31536000, immutable'));
+  assert.ok(calls[1].includes('no-cache'));
+}
+
+async function test_release_snapshot_publication_fails_closed() {
+  const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
+  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', releaseDirectory: '/releases', read: async () => Buffer.from('{}'), run: async () => '' });
+  assert.throws(() => driver.resolveOperations(['r2-release-snapshot:bad/revision', 'r2-release-pointer:bad/revision']), /Invalid string/u);
+  assert.throws(() => driver.resolveOperations(['r2-release-snapshot:one', 'r2-release-pointer:two']), /revision-mismatch/u);
+  assert.throws(() => driver.resolveOperations(['r2-release-snapshot:one']), /requires-snapshot-and-pointer/u);
+  const actions = driver.resolveOperations(['r2-release-snapshot:one', 'r2-release-pointer:one']);
+  await assert.rejects(() => driver.preview(actions), /Invalid input/u);
+}
+
 async function test_reject_unknown_operations() {
   const calls = [];
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async args => { calls.push(args); return ''; } });
@@ -134,6 +178,8 @@ test('the driver derives operation targets from configuration', test_derive_oper
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
 test('release publication hashes bytes before translating the bounded R2 upload', test_release_publish_is_hashed_and_translated);
+test('release snapshots are schema-validated and uploaded before their pointer', test_release_snapshot_publication_is_validated_and_ordered);
+test('release snapshot publication rejects unsafe revisions, mismatches, incomplete pairs and invalid JSON', test_release_snapshot_publication_fails_closed);
 test('unknown operations and actions fail before invoking Wrangler', test_reject_unknown_operations);
 test('the checked-in Wrangler config is the single resource source', test_load_checked_in_config);
 test('the driver accepts a complete provider configuration', test_accept_valid_config);

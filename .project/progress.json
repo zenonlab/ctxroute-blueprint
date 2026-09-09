@@ -6505,6 +6505,64 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-release-snapshot",
+      "title": "Restore the public release snapshot endpoint",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Add a bounded release snapshot publication gate",
+          "status": "DONE",
+          "acceptance": [
+            "The project gate validates and uploads one immutable snapshot before its current pointer",
+            "Tests reject malformed paths and content"
+          ],
+          "files": [
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/release-snapshot-operation.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "packages/adapters-indexeddb/scripts/browser-contract.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/release.md",
+            "docs/architecture/src/production-publication.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:infra",
+            "npm run validate:docs -- --all"
+          ],
+          "evidence": [
+            "19 infrastructure tests pass with fail-closed release publication coverage",
+            "npm run verify passes including repeated Chromium IndexedDB contract",
+            "production-publication Archify showcase passes 9 of 9 with zero warnings"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Publish and verify the empty public snapshot",
+          "status": "TODO",
+          "acceptance": [
+            "The bounded Cloudflare plan changes only the immutable snapshot and current pointer",
+            "GET /v1/releases returns a valid empty snapshot with HTTP 200",
+            "D1 remains unchanged and public downloads stay healthy"
+          ],
+          "files": [
+            "build/release-snapshot-empty.json",
+            "build/release-snapshot-current.json",
+            "build/release-snapshot-cloudflare-plan.json"
+          ],
+          "commands": [
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "curl https://tobirink.com/v1/releases"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

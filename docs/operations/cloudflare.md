@@ -40,6 +40,22 @@ The preview hashes the exact local bytes of both ZIPs and includes those hashes
 in the plan digest. The driver cannot accept another bucket, object key, local
 file, or version through command-line input.
 
+Public agenda snapshots use the same bounded path. Place the strict snapshot at
+`build/releases/<revision>.json` and its strict pointer at
+`build/releases/current-<revision>.json`, then plan both matching operations:
+
+```sh
+npm run infra:plan -- \
+  --account <cloudflare-account-id> \
+  --operation r2-release-snapshot:<revision> \
+  --operation r2-release-pointer:<revision>
+```
+
+The revision accepts only 1–64 ASCII letters, digits, dots, underscores, or
+hyphens. The gate validates both JSON schemas, binds both hashes to the plan,
+requires a matching pair, and always uploads the immutable snapshot before the
+mutable `releases/current.json` pointer.
+
 `plan` repeats inspection and runs `wrangler deploy --dry-run` when deployment
 is selected. It prints a strict JSON plan to stdout; it does not write a plan
 file or mutate Cloudflare. The plan contains only hashes of inspection and
@@ -66,6 +82,13 @@ For the `1.0.0` publication plan, replace the D1 allowlist with exactly:
 r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip
 r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip
 worker:tobirink-public-api
+```
+
+For an agenda revision, allow exactly its two materialized R2 keys:
+
+```text
+r2:tobirink-public-releases/releases/snapshots/<revision>.json
+r2:tobirink-public-releases/releases/current.json
 ```
 
 Before the first mutation, the gate verifies the plan schema and digest,

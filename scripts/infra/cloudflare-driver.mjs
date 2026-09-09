@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { isReleaseArtifactAction, releaseMutationArguments, releaseRevisionFromActions, resolveReleaseAction, validateReleaseJson, validateReleasePair } from './release-snapshot-operation.mjs';
 
 const execFileAsync = promisify(execFile);
 const DRIVER_ID = 'cloudflare-wrangler';
@@ -41,7 +42,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2 };
 }
 
-export function createCloudflareDriver({ config, workerDirectory, run = runWrangler, read = readFile }) {
+export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile }) {
   validateCloudflareConfig(config);
   const operations = new Map([
     ...releasePublishOperations(config),
@@ -55,7 +56,7 @@ export function createCloudflareDriver({ config, workerDirectory, run = runWrang
       return [...operations.entries()].map(([name, action]) => ({ name, kind: action.kind, target: action.target }));
     },
     resolveOperations(operationNames) {
-      return selectOperations(operations, operationNames).map(({ kind, target }) => ({ kind, target }));
+      return resolveOperations(operations, operationNames, config, releaseDirectory).map(({ kind, target }) => ({ kind, target }));
     },
     async inspect(accountId) {
       requiredString(accountId, 'account-id');
@@ -75,13 +76,14 @@ export function createCloudflareDriver({ config, workerDirectory, run = runWrang
       };
     },
     async preview(requestedActions) {
-      const actions = requestedActions.map(action => findAction(operations, action));
+      const actions = materializeActions(operations, requestedActions, config, releaseDirectory);
       const output = {};
       if (actions.some(action => action.kind === 'worker-deploy')) {
         output.worker = (await run(['deploy', '--dry-run'], { cwd: workerDirectory })).trim();
       }
-      const artifacts = await Promise.all(actions.filter(action => action.kind === 'r2-publish').map(async action => {
+      const artifacts = await Promise.all(actions.filter(isReleaseArtifactAction).map(async action => {
         const content = await read(action.source);
+        validateReleaseJson(action, content);
         return { target: action.target, sha256: createHash('sha256').update(content).digest('hex'), size: content.length };
       }));
       if (artifacts.length > 0) output.artifacts = artifacts;
@@ -89,8 +91,7 @@ export function createCloudflareDriver({ config, workerDirectory, run = runWrang
       return output;
     },
     async apply(actions) {
-      const selected = actions
-        .map(action => findAction(operations, action))
+      const selected = materializeActions(operations, actions, config, releaseDirectory)
         .sort((left, right) => operationPriority(left) - operationPriority(right));
       const results = [];
       for (const action of selected) {
@@ -108,6 +109,8 @@ function mutationArguments(action) {
   if (action.kind === 'r2-publish') {
     return ['r2', 'object', 'put', `${action.bucket}/downloads/${action.artifact}`, '--file', action.source, '--content-type', 'application/zip', '--content-disposition', `attachment; filename="${action.artifact}"`, '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force'];
   }
+  const releaseArguments = releaseMutationArguments(action);
+  if (releaseArguments) return releaseArguments;
   throw new Error(`unsupported-action-kind:${action.kind}`);
 }
 
@@ -122,14 +125,26 @@ async function runWrangler(args, { cwd }) {
   return stdout;
 }
 
-function selectOperations(operations, names) {
+function resolveOperations(operations, names, config, releaseDirectory) {
   if (!Array.isArray(names) || names.length === 0) throw new Error('missing-operation');
   if (new Set(names).size !== names.length) throw new Error('duplicate-operation');
-  return names.map(name => {
-    const action = operations.get(name);
-    if (!action) throw new Error(`unsupported-operation:${name}`);
-    return action;
+  const releaseBucket = config.r2.find(resource => resource.binding === 'RELEASE_SNAPSHOTS');
+  const selected = names.map(name => operations.get(name) ?? resolveReleaseAction(name, releaseBucket, releaseDirectory));
+  validateReleasePair(selected);
+  return selected;
+}
+
+function materializeActions(operations, expectedActions, config, releaseDirectory) {
+  const revision = releaseRevisionFromActions(expectedActions);
+  const releaseBucket = config.r2.find(resource => resource.binding === 'RELEASE_SNAPSHOTS');
+  const actions = expectedActions.map(expected => {
+    if (expected.kind === 'r2-release-snapshot' && revision) return resolveReleaseAction(`r2-release-snapshot:${revision}`, releaseBucket, releaseDirectory);
+    if (expected.kind === 'r2-release-pointer' && revision) return resolveReleaseAction(`r2-release-pointer:${revision}`, releaseBucket, releaseDirectory);
+    return findAction(operations, expected);
   });
+  if (actions.some((action, index) => action.kind !== expectedActions[index].kind || action.target !== expectedActions[index].target)) throw new Error('unsupported-release-action');
+  validateReleasePair(actions);
+  return actions;
 }
 
 function findAction(operations, expected) {
@@ -140,8 +155,9 @@ function findAction(operations, expected) {
 
 function operationPriority(action) {
   if (action.kind === 'd1-migrate') return 0;
-  if (action.kind === 'r2-publish') return 1;
-  return 2;
+  if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 1;
+  if (action.kind === 'r2-release-pointer') return 2;
+  return 3;
 }
 
 export function validateCloudflareConfig(config) {
