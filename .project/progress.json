@@ -6207,7 +6207,7 @@
       "schemaVersion": 1,
       "id": "goal-library-structured-metadata",
       "title": "Add local library metadata facets sorting and statistics",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6286,7 +6286,7 @@
         {
           "id": "step-3",
           "title": "Document and verify the local metadata boundary",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "ADR and Archify document provider provenance, local-only statistics, bounded queries and stable facet behavior",
             "No description, synopsis, popularity or library metadata is written to D1 or storage.sync",
@@ -6298,10 +6298,15 @@
             "docs/decisions/**",
             "docs/architecture/src/tobirink.architecture.json",
             "docs/architecture/src/favorite-resolution.dataflow.json",
+            "package.json",
+            "package-lock.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
           "commands": [
+            "npm install --ignore-scripts",
+            "npm ls sharp",
+            "npm audit --audit-level=high",
             "npm run validate:decisions",
             "npm run validate:docs -- --all",
             "npm run archify:validate -- all",
@@ -6309,7 +6314,11 @@
             "git diff --check",
             "git commit message docs(library): define local metadata analytics boundary"
           ],
-          "evidence": []
+          "evidence": [
+            "Metadata facets statistics and provider popularity remain local to IndexedDB; storage.sync IDs and D1 payloads are unchanged",
+            "favorite-resolution dataflow and all product Archify sources pass showcase 9/9 with zero errors and warnings; docs and ADR validation pass",
+            "npm run verify passes end to end: 273 governance tests plus 1 skip, 665 workspace tests, Chromium IndexedDB, Chrome/Firefox builds, performance, integration and audit 0"
+          ]
         }
       ]
     }

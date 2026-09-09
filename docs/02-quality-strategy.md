@@ -53,6 +53,14 @@ browser or `workerd` test when platform behavior is the risk.
 - `storage.sync` contains only provider IDs and manifests; quotas include old
   generations, keys and metadata. Corruption/interruption retains the last
   validated snapshot. Chrome and Firefox reset journeys must pass.
+- Library message tests reject unbounded offsets and more than 64 selections
+  per facet. Catalogue tests prove OR semantics inside one facet, AND semantics
+  between facets, exclusion priority, filtering before pagination and options
+  computed from the unchanged bounded corpus.
+- Provider provenance, format, genres, status, years, totals, typed popularity,
+  filters and derived statistics stay in IndexedDB and extension messages.
+  Sync and collective payload fixtures reject these fields; no synopsis,
+  description or other editorial prose is collected.
 - An encrypted backup rejects tampering and a wrong passphrase without exposing
   plaintext or partially replacing local state.
 - `npm run test:recovery` performs real WebCrypto AES-GCM/PBKDF2 round trips,
@@ -86,6 +94,10 @@ browser or `workerd` test when platform behavior is the risk.
 ## Performance budgets
 
 - Local UI operations: visible response within 200 ms on the reference profile.
+- Library reads use one IndexedDB transaction, inspect at most 500 work IDs,
+  expose at most 64 values per facet and return at most 24 cards. Missing and
+  cross-provider popularity values sort after the selected comparable provider
+  cohort with a stable title/ID tie-breaker.
 - Background startup: no unbounded scan and no network dependency.
 - Parser favori local : p95 inférieur à 10 ms pour une entrée typique et à
   50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.

@@ -8,6 +8,7 @@ scope:
   - packages/ui/**
   - apps/extension/**
 review: on-change
+revised: true
 ---
 
 # ADR-0038 — Métadonnées locales, facettes et statistiques de bibliothèque
@@ -37,12 +38,23 @@ le statut éditorial (`UPCOMING`, `ONGOING`, `HIATUS`, `COMPLETED`,
 `CANCELLED`, `UNKNOWN`) de la progression personnelle.
 
 Comparer la popularité uniquement à nature identique (`MEMBERS` ou `RANK`) et
-à fournisseur identique. Les valeurs manquantes ou incomparables passent après
+à fournisseur identique. Le tri choisit la cohorte comparable la plus
+représentée dans le résultat filtré, avec la clé fournisseur/nature comme
+départage déterministe. Les valeurs manquantes ou hors cohorte passent après
 les valeurs comparables avec un départage stable par titre puis ID.
+
+La requête lit au plus 500 identifiants dans une transaction IndexedDB, applique
+les inclusions multiples par union au sein d'une facette, les facettes entre
+elles par intersection, puis pagine par 24. Les sept listes d'options sont
+calculées sur le corpus borné avant filtrage et limitées à 64 valeurs. Un clic
+ne démonte pas la barre de filtres : le menu reste ouvert pour permettre
+plusieurs inclusions ou exclusions successives.
 
 Ces faits, les filtres et les statistiques restent dans IndexedDB. D1 et
 `storage.sync` ne reçoivent aucun champ supplémentaire. Les descriptions,
-synopsis, personnes, critiques et textes éditoriaux ne sont pas collectés.
+synopsis, personnes, critiques et textes éditoriaux ne sont pas collectés. Les
+messages MV3 stricts exposent uniquement la projection nécessaire aux cartes,
+facettes et compteurs.
 
 ## Conséquences
 

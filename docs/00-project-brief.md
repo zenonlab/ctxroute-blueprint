@@ -27,7 +27,10 @@
   API must scale horizontally but remains optional and non-blocking.
 - Data and lifecycle: browser bookmarks own presence and observed progress;
   IndexedDB owns private transactional artifacts, works, decisions, agenda and
-  tasks. D1 adds a minimal owner-scoped key/public-ID index through the Worker
+  tasks. Hydrated works may retain only structured catalogue facts needed for
+  local library filters, sorting and statistics: provider provenance, media
+  type, format, genres, editorial status, years, unit totals and typed
+  popularity. D1 adds a minimal owner-scoped key/public-ID index through the Worker
   alongside the existing separate public catalogue. R2 stores rights-approved cover masters. Export/import is
   always available; encrypted cloud recovery is opt-in.
 - Integrations: WebExtension active-tab context, bookmarks, alarms,
@@ -46,7 +49,8 @@
 ## Constraints
 
 - Performance: extension UI interactive within 200 ms for local operations;
-  background startup performs no unbounded scan; normal extension bundle target
+  the library filters and sorts a transactional snapshot of at most 500 works
+  before paginating 24 visible results; background startup performs no unbounded scan; normal extension bundle target
   is below 1.5 MB compressed; public API p95 target is below 300 ms excluding
   third-party calls.
 - Security: least-privilege manifest permissions, strict CSP, no remotely hosted
@@ -91,6 +95,11 @@ not become runtime dependencies of Tobirink.
   provider-ID snapshot; D1 for separate catalogue rows and consented
   normalized-key/owner/public-ID associations; R2 for image objects and encrypted backup blobs.
   Domain code cannot import any provider.
+- Library analytics: seven stable multi-select facets (genre, editorial status,
+  detailed type, format, year, personal progress and provider) and six sorts
+  run in the extension. Facet options come from the complete bounded local
+  corpus, remain mounted while a selection changes and never become collective
+  data.
 - Tests: Vitest for domain and contracts, Vitest Browser Mode for UI, Playwright
   for Chromium extension journeys, Firefox packaging smoke with `web-ext`, and
   Workers integration tests in `workerd`.
