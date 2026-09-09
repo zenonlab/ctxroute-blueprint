@@ -299,3 +299,9 @@
 ## Finaliser FavLib → TobiRink sans dépendance à FavLib — DONE
 
 - [x] **Corriger la frontière clean-room et auditer la livraison** — DONE _(evidence: Doctrine corrigée: aucune base, donnée, export, secret, code ou runtime FavLib requis; sept sources canoniques alignées., Audit: zéro Review à l'import, sync limitée aux IDs, Worker seul devant D1, payload collectif strict et SQL borné confirmés par le code et les tests., Corpus clean-room, Worker, sécurité, recovery et verify complet passent; Archify favorite-resolution et all passent showcase 9/9.)_
+
+## Add local library metadata facets sorting and statistics — ACTIVE
+
+- [x] **Add canonical provider metadata and additive local persistence** — DONE _(evidence: Provider contract and four adapters map strict optional status, year, totals, genres and comparable popularity without changing matcher rules, IndexedDB v13 adds metadata indexes; migrations, storage, recovery and all workspace typechecks pass, Domain 24, application 259, contracts 16 and provider adapter 35 tests pass; Archify showcase 9 of 9 and ADR validation pass)_
+- [ ] **Implement full-library facets sorting statistics and organizer statuses** — PENDING
+- [ ] **Document and verify the local metadata boundary** — PENDING

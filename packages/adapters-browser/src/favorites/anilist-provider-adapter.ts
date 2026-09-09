@@ -7,7 +7,7 @@ import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-h
 import type { FavoriteProviderFetch } from './provider-http';
 
 export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
-const mediaProjection = 'id type format siteUrl title { romaji english native } synonyms genres';
+const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres startDate { year } endDate { year } episodes chapters volumes popularity';
 const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!, $page: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
 const hydrateQuery = `query FavoriteById($id: Int!) { Media(id: $id) { ${mediaProjection} } }`;
 const nonEmptyString = z.string().trim().min(1);
@@ -15,6 +15,11 @@ const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).
 const anilistMediaSchema = z.object({
   format: nonEmptyString.nullable(),
   genres: z.array(nonEmptyString).max(16),
+  status: z.enum(['FINISHED', 'RELEASING', 'NOT_YET_RELEASED', 'CANCELLED', 'HIATUS']).optional(),
+  startDate: z.object({ year: z.number().int().min(1800).max(3000).nullable() }).strict().optional(),
+  endDate: z.object({ year: z.number().int().min(1800).max(3000).nullable() }).strict().optional(),
+  episodes: z.number().int().nonnegative().nullable().optional(), chapters: z.number().int().nonnegative().nullable().optional(), volumes: z.number().int().nonnegative().nullable().optional(),
+  popularity: z.number().int().nonnegative().nullable().optional(),
   id: identifierSchema,
   siteUrl: z.url().nullable(),
   synonyms: z.array(nonEmptyString).max(16),
@@ -40,10 +45,18 @@ function candidate(media: AniListMedia): ProviderCandidate {
     preSerialization: media.type === 'MANGA' && /novel/iu.test(media.format ?? ''),
     provider: 'anilist',
     titles: titles(media),
+    metadataVersion: 1,
   };
   if (media.siteUrl !== null) result.canonicalUrl = media.siteUrl;
   if (media.format !== null) result.format = media.format;
   if (media.genres.length > 0) result.genres = media.genres;
+  if (media.status !== undefined) result.editorialStatus = ({ FINISHED: 'COMPLETED', RELEASING: 'ONGOING', NOT_YET_RELEASED: 'UPCOMING', CANCELLED: 'CANCELLED', HIATUS: 'HIATUS' } as const)[media.status];
+  if (media.startDate?.year != null) result.startYear = media.startDate.year;
+  if (media.endDate?.year != null) result.endYear = media.endDate.year;
+  if (media.episodes != null) result.episodeCount = media.episodes;
+  if (media.chapters != null) result.chapterCount = media.chapters;
+  if (media.volumes != null) result.volumeCount = media.volumes;
+  if (media.popularity != null) result.popularity = { kind: 'MEMBERS', value: media.popularity };
   return result;
 }
 

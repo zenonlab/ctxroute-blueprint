@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { MangaDexFavoriteProviderAdapter } from './mangadex-provider-adapter';
 
 const id = '12345678-1234-4234-8234-123456789abc';
-const payload = { result: 'ok', data: { id, type: 'manga', attributes: { title: { en: 'Synthetic Series' }, altTitles: [{ ja: 'Synthetic Alias' }], contentRating: 'safe', originalLanguage: 'ko' } } };
+const payload = { result: 'ok', data: { id, type: 'manga', attributes: { title: { en: 'Synthetic Series' }, altTitles: [{ ja: 'Synthetic Alias' }], contentRating: 'safe', lastChapter: '42', lastVolume: '6', originalLanguage: 'ko', status: 'ongoing', tags: [{ attributes: { name: { en: 'Adventure' } } }], year: 2021 } } };
 
 describe('MangaDex exact hydration', () => {
   it('hydrates only the requested public identity and retains aliases', async () => {
     const fetcher = vi.fn(async () => Response.json(payload));
     const adapter = new MangaDexFavoriteProviderAdapter(fetcher);
-    await expect(adapter.hydrate({ provider: 'mangadex', externalId: id })).resolves.toMatchObject({ provider: 'mangadex', externalId: id, mediaKind: 'MANHWA', titles: ['Synthetic Series', 'Synthetic Alias'] });
+    await expect(adapter.hydrate({ provider: 'mangadex', externalId: id })).resolves.toMatchObject({ provider: 'mangadex', externalId: id, mediaKind: 'MANHWA', editorialStatus: 'ONGOING', genres: ['Adventure'], startYear: 2021, chapterCount: 42, volumeCount: 6, titles: ['Synthetic Series', 'Synthetic Alias'] });
     expect(fetcher).toHaveBeenCalledWith(`https://api.mangadex.org/manga/${id}`, expect.objectContaining({ method: 'GET' }));
   });
 

@@ -6202,6 +6202,112 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-structured-metadata",
+      "title": "Add local library metadata facets sorting and statistics",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Add canonical provider metadata and additive local persistence",
+          "status": "DONE",
+          "acceptance": [
+            "Genres, editorial status, format, years, unit totals and popularity use strict optional canonical fields with provider provenance",
+            "AniList, MangaUpdates, MangaDex and Kitsu map available fields without affecting identity matching",
+            "IndexedDB migration and private export compatibility are additive, resumable and preserve all existing data"
+          ],
+          "files": [
+            "packages/domain/src/**",
+            "packages/application/src/favorites/**",
+            "packages/application/src/recovery/**",
+            "packages/adapters-browser/src/favorites/**",
+            "packages/adapters-indexeddb/src/**",
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:domain",
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:recovery",
+            "git diff --check",
+            "git commit message feat(metadata): persist sortable provider facts"
+          ],
+          "evidence": [
+            "Provider contract and four adapters map strict optional status, year, totals, genres and comparable popularity without changing matcher rules",
+            "IndexedDB v13 adds metadata indexes; migrations, storage, recovery and all workspace typechecks pass",
+            "Domain 24, application 259, contracts 16 and provider adapter 35 tests pass; Archify showcase 9 of 9 and ADR validation pass"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Implement full-library facets sorting statistics and organizer statuses",
+          "status": "TODO",
+          "acceptance": [
+            "Filtering and sorting happen before pagination over the complete bounded local library query",
+            "Genre, status, type, format, year, progress, source and popularity filters and sorts are deterministic; missing values stay visible and sort last",
+            "Facet menus stay open after a click, preserve selected options and allow multiple simultaneous include or exclude selections",
+            "Organizer Ongoing, Completed, Hiatus and Cancelled rules receive real canonical metadata; local statistics never leave the extension"
+          ],
+          "files": [
+            "packages/application/src/library/**",
+            "packages/application/src/organizer/**",
+            "packages/ui/src/components/facet-select/**",
+            "packages/ui/src/features/library/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/library/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test:ui",
+            "npm run test:ui-workbench",
+            "npm run test:e2e",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "git diff --check",
+            "git commit message feat(library): add stable metadata facets and sorting"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Document and verify the local metadata boundary",
+          "status": "TODO",
+          "acceptance": [
+            "ADR and Archify document provider provenance, local-only statistics, bounded queries and stable facet behavior",
+            "No description, synopsis, popularity or library metadata is written to D1 or storage.sync",
+            "Full repository verification passes and the final diff contains no unrelated user configuration"
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/**",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- all",
+            "npm run verify",
+            "git diff --check",
+            "git commit message docs(library): define local metadata analytics boundary"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
