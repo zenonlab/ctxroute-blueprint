@@ -1,8 +1,10 @@
 # Vision produit — bureau et terminal ludiques
 
 État : PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté et non qualifié, 8 septembre 2026. Nom de travail : Wallpaper.
-Le terminal et le renderer produit ne sont pas encore implémentés. L'indexeur
-hors ligne G1 est disponible et sa première passe Majora's Mask est reproductible.
+Le terminal et le renderer wallpaper produit ne sont pas encore implémentés.
+L'indexeur hors ligne G1 est disponible, sa première passe Majora's Mask est
+reproductible et un visualiseur Bevy générique charge le premier pack GLB privé
+dans une fenêtre de référence. Cette preuve ne vaut pas raccord wallpaper.
 Le dépôt est initialisé ; une [sonde native isolée](pocs/macos-surface.md) est implémentée.
 Le [plan L1–L3](05-poc-start-plan.md) fixe le périmètre expérimental ;
 Il ne constitue pas une adoption de production. Le PoC1 a fourni des preuves utiles

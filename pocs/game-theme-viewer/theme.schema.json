@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wallpaper.local/schemas/theme-pack-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "display_name", "scene", "camera"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "display_name": { "type": "string", "minLength": 1 },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset"],
+      "properties": {
+        "asset": { "type": "string", "pattern": "^[^/\\\\](?!.*\\.\\.)[^\\\\]*\\.(glb|gltf)$" },
+        "scene_index": { "type": "integer", "minimum": 0, "default": 0 },
+        "scale": { "type": "number", "exclusiveMinimum": 0, "default": 1 }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["position", "target"],
+      "properties": {
+        "position": { "$ref": "#/$defs/vec3" },
+        "target": { "$ref": "#/$defs/vec3" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": ["exact", "approximated", "missing", "unsupported"]
+      },
+      "default": {}
+    }
+  },
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false
+    }
+  }
+}

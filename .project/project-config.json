@@ -6,9 +6,9 @@
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. Rust remains a candidate for the portable core and renderer; no production language is frozen. Node.js is governance tooling only.",
-    "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
-    "frontend": "PoC2 uses one authoritative control surface at a time. Native connector UI owns permissions and recovery; the portable theme owns fully stylable semantic menus, buttons, panels, system_controls and 2D/3D scene presentation. PoC2 diagnostics are not product design.",
+    "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. The isolated game-theme viewer uses Rust edition 2024 and Bevy 0.19.1; no production language is frozen. Node.js is governance tooling only.",
+    "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. The Bevy viewer is a normal-window pack proof, not a wallpaper connector. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
+    "frontend": "PoC2 uses one authoritative control surface at a time. Native connector UI owns permissions and recovery; the portable theme owns fully stylable semantic menus, buttons, panels, system_controls and 2D/3D scene presentation. The Bevy reference viewer currently exposes only event-driven orbit, zoom and camera reset. PoC diagnostics are not product design.",
     "backend": "The wallpaper/terminal runtimes contain no game reader or LLM runtime. PoC2 uses a per-login user agent and a sandboxed wallpaper provider with bounded typed XPC and pinned signatures. The isolated E6-A1 offline observer is a Python ctypes frontend plus original C Libretro fixture; it is never loaded by the wallpaper runtime.",
     "storage": "PoC2 has three canonical JSON fixtures in an immutable embedded catalog, in-memory provider state and private local customization JSON in the agent's Application Support directory after a correlated receipt. Artifacts stay under ignored dist/. No ROM or terminal content is stored; ADR-0054.",
     "deployment": "PoC2: opt-in persistent user LaunchAgent, idempotent start, crash recovery and an installation gate on signing identity changes. Local certificate signing is explicit; TCC and login behavior require native qualification. Private Apple wallpaper provider remains experimental, not an App Store claim; ADR-0055.",
@@ -59,6 +59,7 @@
       "pocs/macos-surface/",
       "pocs/macos-native-wallpaper/",
       "pocs/emulator-observer/",
+      "pocs/game-theme-viewer/",
       "packages/",
       "scripts/"
     ],

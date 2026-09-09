@@ -27,6 +27,10 @@ renderer n'est pas adopté avant cette scène représentative.
 La [première passe G1](pocs/game-library-g1-results.md) a comptabilisé 25 272
 fichiers et produit deux SQLite identiques. Ce reçu valide le déterminisme de
 l'indexeur, pas encore la fermeture sémantique des dépendances ni le rendu D1.
+Le contrat du visualiseur se vérifie séparément avec
+`cargo test --manifest-path pocs/game-theme-viewer/Cargo.toml`. Un lancement sur le
+pack privé valide le chargement glTF en fenêtre et les interactions de caméra ; il
+ne qualifie ni la surface wallpaper, ni le picking, ni la consommation.
 
 La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
 Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,

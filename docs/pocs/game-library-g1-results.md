@@ -96,14 +96,14 @@ répertoire privé ignoré `game/` et ne constituent pas un adaptateur redistrib
 
 | Observation sur le GLB réimporté dans Blender vierge | Valeur |
 | --- | ---: |
-| taille du GLB autonome | 337 KiB |
+| taille du GLB autonome | 278 KiB |
 | maillages | 10 |
 | sommets après triangulation/dédoublonnage glTF | 2 070 |
 | polygones | 969 |
 | matériaux | 112 |
 | images embarquées | 58 |
-| attributs de couleur réimportés | 3 |
-| SHA-256 du GLB | `634e65b54b51832ffc82a0ca12aa44babc012ed46425cc0bacccc87aeee6c145` |
+| attributs de couleur réimportés | 1 (`COLOR_0`) |
+| SHA-256 du GLB | `d9b8fb6834e69eba1f3521330434b575f56accca40e8b9d2a078c37a4abf3c53` |
 
 Cette preuve valide un **pont géométrie + texture dégradé**, pas un thème. Les
 combineurs N64 sont remplacés par un matériau Principled à texture unique ; acteurs,

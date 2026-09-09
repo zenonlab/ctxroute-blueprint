@@ -1,7 +1,7 @@
 # G1/D1 — jeu complet indexé et premier thème soigné
 
-État au 9 septembre 2026 : **indexeur G1 implémenté et première passe réelle
-réussie ; relations sémantiques et D1 non implémentés**.
+État au 9 septembre 2026 : **indexeur G1 et visualiseur de pack implémentés ;
+relations sémantiques, pack privé complet et raccord wallpaper D1 non terminés**.
 Cette preuve commence sur le contrat stabilisé du
 [PoC connecteur macOS](macos-connector-poc2.md). Elle suit
 [ADR-0058](../decisions/ADR-0058-complete-game-poc.md) et la
@@ -40,6 +40,24 @@ La composition D1 contient :
 Aucun asset du jeu n'est commité avec le produit ou inclus dans la recette partageable.
 Des fixtures originales minimales restent utilisées dans les tests automatisés pour
 ne pas rendre le checkout tiers obligatoire en CI.
+
+## Visualiseur de pack de référence
+
+`pocs/game-theme-viewer` fige une frontière exécutable minimale : Bevy 0.19.1 reçoit
+un répertoire contenant `theme.json` et un GLB, valide la version et les chemins,
+puis charge la scène. Le code ne contient aucun identifiant Zelda64 et ne connaît
+pas Blender ou Fast64. L'orbite, le zoom et le reset de caméra sont événementiels ;
+aucune rotation automatique ne force une boucle continue.
+
+Cette preuve est volontairement une fenêtre de référence. Elle ne ferme D1-19
+qu'après exécution sur le pack privé puis raccord du même pack à la vraie
+`CAMetalLayer` du provider macOS.
+
+Exécution observée sur MAC-01 : backend Metal sélectionné sur Apple M1 Pro, pack
+chargé sans avertissement d'attribut après réduction à `COLOR_0`, textures visibles
+et caméra orbitale opérationnelle. Le binaire debug mesure 134 MiB avec symboles et
+le graphe de dépendances reste important ; aucune conclusion de taille ou d'énergie
+production n'en est tirée avant build release et protocole répété.
 
 ## Variantes comparées
 
