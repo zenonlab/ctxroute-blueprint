@@ -58,6 +58,11 @@ Le runtime actuel possède déjà des fondations réutilisables :
   et `hreflang` faible sans introduire de réseau ni de décision implicite;
 - une source absente est marquée `detached`; elle reste sauvegardable mais ne
   fournit plus de lien à Review, Agenda, Organisateur ou popup.
+- une route HTTP sans identité média probante est conservée comme source et
+  artefact `UNSUPPORTED/IDENTITY_MISSING`, avec tâche et reçu déjà terminaux;
+  elle n'occupe jamais les huit créneaux fournisseur d'un réveil MV3;
+- une route imbriquée de type `anime/{identité}/{sortie}-02-vostfr` conserve le
+  segment d'identité précédent et sépare la progression de la clé recherchée.
 
 L’inventaire ne matérialise jamais l’arbre complet : le runtime reprend le
 curseur durable, traite au plus huit tranches de 100 par réveil puis programme
@@ -205,8 +210,11 @@ persistance et des entrées-sorties.
 ### 5. Importer atomiquement
 
 Une transaction dans `tobirink-private` écrit ou met à jour `FavoriteSource`,
-ne crée aucune `Review` et enregistre l’artefact ainsi que la première entrée de
-l’outbox `ResolutionTask`. Aucun appel réseau n’a lieu avant le commit.
+ne crée aucune `Review` et enregistre l’artefact. Avec une identité média ou un
+ID fournisseur explicite, elle ajoute une entrée `READY` dans l’outbox
+`ResolutionTask`. Sans identité, elle écrit le résultat
+`UNSUPPORTED/IDENTITY_MISSING`, la tâche `COMMITTED` et son reçu dans la même
+transaction. Aucun appel réseau n’a lieu avant le commit.
 L’identité locale reste dérivée de l’identifiant du favori selon le contrat
 actuel; `importedAt` et une décision Review existante sont préservés.
 

@@ -21,10 +21,11 @@ const categoryKinds: Readonly<Record<string, FavoriteMediaKind>> = Object.freeze
 const routeCategorySegments = new Set([...Object.keys(categoryKinds), 'read', 'series', 'title']);
 const structuralSegments = new Set([
   'anime', 'chapter', 'chapitre', 'comic', 'episode', 'manga', 'manhua', 'manhwa',
-  'read', 'saison', 'scan', 'season', 'series', 'title', 'volume', 'webtoon',
+  'read', 'saison', 'scan', 'season', 'series', 'title', 'volume', 'watch', 'webtoon',
 ]);
 const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
 const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
 
 function releaseKind(value: string): 'chapter' | 'episode' | 'volume' {
   if (['episode', 'ep'].includes(value.toLowerCase())) return 'episode';
@@ -68,6 +69,19 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   const seasonTail = /^(?:season|saison|s)[-_]?([1-9]\d?)$/iu.exec(decoded[identityIndex] ?? '');
   if (seasonTail !== null) identityIndex -= 1;
   else if (/^[1-9]\d?$/u.test(decoded[identityIndex] ?? '') && /^(?:season|saison)$/iu.test(decoded[identityIndex - 1] ?? '')) identityIndex -= 2;
+  const localizedRelease = localizedReleaseSuffixPattern.exec(decoded[identityIndex] ?? '');
+  const precedingCategory = decoded[identityIndex - 2]?.toLowerCase();
+  if (localizedRelease !== null && precedingCategory !== undefined && categoryKinds[precedingCategory] !== undefined) {
+    const value = localizedRelease[1] ?? '';
+    releaseSuffix = localizedRelease[0].replace(/^[-_.]/u, '');
+    release = {
+      kind: categoryKinds[precedingCategory] === 'ANIME' ? 'episode' : 'chapter',
+      provenance: 'URL_SLUG_SUFFIX',
+      raw: releaseSuffix,
+      value: Number(value.replace(',', '.')),
+    };
+    identityIndex -= 1;
+  }
   const observedSlug = decoded[identityIndex];
   let stableSlug = observedSlug;
   const attached = attachedReleasePattern.exec(stableSlug ?? '');

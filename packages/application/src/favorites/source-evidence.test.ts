@@ -57,6 +57,22 @@ describe('favorite source evidence U-01…U-10', () => {
     expect(extractFavoriteSourceEvidence(input('U-06', 'https://fixtures.tobirink.invalid/manga/frieren-chapter-12'))).toMatchObject({ canonicalUrl: 'https://fixtures.tobirink.invalid/manga/frieren', proofs: ['CATEGORY_PATH', 'TITLE_SLUG', 'RELEASE_SUFFIX'], releaseSuffix: 'chapter-12', stableSlug: 'frieren' });
   });
 
+  it('keeps the identity route before a localized release slug', () => {
+    expect(extractFavoriteSourceEvidence(input('nested-release', 'https://anime-sama.example/anime/remonster/re-monster-02-vostfr'))).toMatchObject({
+      canonicalUrl: 'https://anime-sama.example/anime/remonster',
+      mediaKind: 'ANIME',
+      release: { kind: 'episode', provenance: 'URL_SLUG_SUFFIX', value: 2 },
+      stableSlug: 'remonster',
+    });
+  });
+
+  it('does not treat a YouTube watch route as a media identity', () => {
+    expect(extractFavoriteSourceEvidence(input('youtube', 'https://www.youtube.com/watch?v=fixture'))).toMatchObject({
+      disposition: 'URL_IDENTITY_UNRESOLVED',
+      proofs: [],
+    });
+  });
+
   it('U-07 lets a scan path override an anime-looking hostname', () => {
     expect(extractFavoriteSourceEvidence(input('U-07', 'https://anime-fixtures.tobirink.invalid/scan/frieren'))).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'frieren' });
   });

@@ -121,7 +121,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "8 tâches · compaction 30 j"
+      "tag": "identités prouvées · 8 tâches"
     },
     {
       "id": "providerAdapters",
@@ -224,8 +224,8 @@
     {
       "from": "parseArtifact",
       "to": "durableQueue",
-      "label": "source + artefact + tâche",
-      "classification": "transaction atomique",
+      "label": "tâche si identité prouvée",
+      "classification": "sinon terminal local",
       "variant": "security",
       "labelAt": [
         575,
@@ -348,7 +348,7 @@
       "dot": "cyan",
       "title": "Convergence MV3 bornée",
       "items": [
-        "Source, artefact et tâche atomiques sans Review à import",
+        "Source et artefact atomiques; lien ordinaire terminal sans réseau",
         "Curseurs, reçus et cadences survivent à MV3",
         "Panne ou réponse incomplète reste RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"

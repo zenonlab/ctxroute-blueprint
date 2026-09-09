@@ -8,6 +8,12 @@ const noHydration = { hydrate: async () => undefined };
 const unavailableCandidates = { anilist: unavailable, 'kitsu-anime': unavailable, 'kitsu-manga': unavailable, mangaupdates: unavailable } as const;
 const emptyHydration = { anilist: noHydration, 'kitsu-anime': noHydration, 'kitsu-manga': noHydration, mangaupdates: noHydration } as const;
 
+function resolutionTaskId(bookmarkId: string): string {
+  const hexadecimal = [...new TextEncoder().encode(bookmarkId)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  const encoded = `${hexadecimal.length.toString(36)}_${hexadecimal}`.padEnd(6, '0');
+  return `favorite-resolution_${encoded}`;
+}
+
 describe('createFavoriteResolutionRuntime', () => {
   it('waits for exact identity restoration before claiming resolution tasks and publishing new IDs', async () => {
     const prepare = vi.fn(async (): Promise<'READY' | 'PENDING'> => 'READY').mockResolvedValueOnce('PENDING');
@@ -123,5 +129,34 @@ describe('createFavoriteResolutionRuntime', () => {
     await expect(reconcile()).resolves.toBeUndefined();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ sessionId: 'empty-session', status: 'complete' });
     await expect(storage.listFavoriteSources({ limit: 1 })).resolves.toEqual([]);
+  });
+
+  it('closes ordinary links during import so a later media slug remains ready in a noisy inventory', async () => {
+    const storage = new MemoryStoragePort();
+    const ordinary = Array.from({ length: 100 }, (_, index) => ({
+      bookmarkId: `ordinary-${index}`,
+      folderPath: [],
+      order: index,
+      title: `Ordinary video ${index}`,
+      url: `https://www.youtube.com/watch?v=fixture-${index}`,
+    }));
+    const media = { bookmarkId: 'media-frieren', folderPath: ['Anime'], order: 100, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
+    const readBookmarkBatch = vi.fn()
+      .mockResolvedValueOnce({ complete: false, cursor: { frames: [{ folderId: '0', folderPath: [], nextChildIndex: 100 }], rootId: '0' }, records: ordinary })
+      .mockResolvedValueOnce({ complete: true, records: [media] });
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
+      ensureReady: async () => ({ schemaVersion: 8 }), hydration: emptyHydration,
+      libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'noisy-session',
+    });
+
+    await reconcile();
+
+    for (const favorite of ordinary) {
+      await expect(storage.getFavoriteResolutionTask(resolutionTaskId(favorite.bookmarkId))).resolves.toMatchObject({ state: 'COMMITTED' });
+    }
+    await expect(storage.getFavoriteResolutionTask(resolutionTaskId(media.bookmarkId))).resolves.toMatchObject({ state: 'READY' });
+    await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
   });
 });

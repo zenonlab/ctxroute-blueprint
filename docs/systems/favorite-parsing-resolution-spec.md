@@ -75,7 +75,10 @@ Le flux cible est le suivant :
 2. qualifier l’URL et sa disposition sans modifier les valeurs brutes ;
 3. extraire une preuve de source versionnée ;
 4. produire un artefact de parsing versionné et une empreinte de fraîcheur ;
-5. persister l’entrée et la tâche avant toute requête fournisseur ;
+5. persister l’entrée et l’artefact puis, seulement avec une identité ou un ID
+   fournisseur explicite, une tâche avant toute requête fournisseur ; une route
+   sans identité devient immédiatement `UNSUPPORTED/IDENTITY_MISSING` avec reçu
+   terminal et ne consomme aucun créneau réseau ;
 6. essayer ID/route exacte, artefact/aliases, fiches locales, D1 owner-scoped
    via Worker puis recherche fournisseur locale selon le plan v3 ;
 7. comparer les candidats avec une politique symétrique et déterministe ;

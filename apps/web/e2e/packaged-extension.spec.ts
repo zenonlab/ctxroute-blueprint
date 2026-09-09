@@ -31,6 +31,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     await worker.evaluate(async () => {
+      await chrome.bookmarks.create({ title: '(3) CES STREAMERS QUI GHOSTENT M. LE MAIRE ft. Dach', url: 'https://www.youtube.com/watch?v=fixture' });
       await chrome.bookmarks.create({ title: 'Frieren: Beyond Journey’s End', url: 'https://anilist.co/anime/154587/frieren-beyond-journeys-end' });
     });
 
@@ -45,19 +46,25 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
       const transaction = database.transaction(['favoriteArtifacts', 'favoriteResolutionTasks'], 'readonly');
       const request = transaction.objectStore('favoriteResolutionTasks').getAll();
       const artifacts = transaction.objectStore('favoriteArtifacts').getAll();
-      return new Promise<string>((resolveState, reject) => {
+      return new Promise<boolean>((resolveState, reject) => {
         request.onsuccess = () => {
-          artifacts.onsuccess = () => resolveState(`${String(request.result[0]?.state ?? 'missing')}:${String(request.result[0]?.effectRecord ?? 'none')}:${String(artifacts.result[0]?.artifact?.displayTitle ?? 'no-title')}`);
+          artifacts.onsuccess = () => resolveState(
+            request.result.some((task) => task.state === 'COMMITTED' && task.effectRecord === 'resolved:anilist:154587')
+            && request.result.some((task) => task.state === 'COMMITTED' && task.effectRecord === 'unsupported:identity-missing')
+            && artifacts.result.some((artifact) => artifact.artifact?.displayTitle === 'frieren beyond journeys end'),
+          );
         };
         request.onerror = () => reject(request.error);
       });
-    }), { timeout: 30_000 }).toBe('COMMITTED:resolved:anilist:154587:frieren beyond journeys end');
+    }), { timeout: 30_000 }).toBe(true);
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible({ timeout: 30_000 });
+    await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
 
     const site = await context.newPage();
     await site.goto('https://tobirink.com/library');
     await expect(site.getByText('Frieren').first()).toBeVisible({ timeout: 10_000 });
+    await expect(site.getByText('CES STREAMERS')).toHaveCount(0);
 
     await context.setOffline(true);
     await privateLibrary.reload();
