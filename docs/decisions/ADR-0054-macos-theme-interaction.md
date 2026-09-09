@@ -48,18 +48,14 @@ AX directement pointé et son ascendance, pas par une énumération de tous les 
 du bureau. La cible doit être un groupe ou une zone de défilement Finder, atteindre
 l'application Finder, contenir une zone de défilement et ne traverser aucune fenêtre.
 Les rôles natifs d'icône, libellé et bouton sont refusés dès le premier élément.
-Quand `CreateDesktop=false` retire ce plan AX, ni AX ni `CGWindowList` ne décrivent
-fidèlement l'exposition visuelle produite par Afficher le bureau : les fenêtres
-d'applications restent déclarées aux anciennes coordonnées. Le tap global refuse donc
-tous les gestes dans cet état. Le connecteur matérialise uniquement les cibles du
-thème par de petites `NSPanel` transparentes au niveau `normal - 1`, derrière les
-applications ordinaires, sans aucun pixel. Leur comportement de collection doit
-inclure `fullScreenAuxiliary` : avec `fullScreenNone`, AppKit les déclarait visibles
-mais WindowServer les excluait de `optionOnScreenOnly`, supprimant toute interaction.
-Elles sont détruites dès le retour de
-Finder. Une icône Finder garde ainsi la priorité lorsqu'elle existe et une application
-non déplacée reste au-dessus. Le clic droit du vide n'est pas offert dans ce mode :
-une fenêtre plein écran transparente compromettrait les interactions natives.
+Quand `CreateDesktop=false` retire ce plan AX, une énumération globale
+`CGWindowList` ne décrit pas fidèlement l'exposition produite par Afficher le bureau :
+des fenêtres d'applications peuvent rester déclarées à leurs anciennes coordonnées.
+Le tap exploite donc les champs `mouseEventWindowUnderMousePointer` portés par
+l'événement exact. Une fenêtre de niveau normal ou supérieur refuse le geste ; seuls
+l'absence de fenêtre attachée et un niveau desktop négatif autorisent le hit-test.
+Le connecteur ne crée aucune `NSPanel`, fenêtre transparente ou autre couche d'entrée.
+Cette règle vaut pour contrôles, objets et clic droit vide.
 
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
@@ -107,6 +103,7 @@ Après échec du rafraîchissement, l'agent tente un rollback confirmé ; son é
 distinct et n'est jamais acquitté. Trois actions XPC bornées projettent visible,
 masqué ou inconnu dans le provider. Le menu natif conserve un réaffichage explicite
 indépendant du wallpaper. Cette préférence reste privée et qualifiée par version :
-le cycle visuel complet et les clics après masquage doivent être éprouvés sur le
-paquet signé exact. Le premier essai `CGWindowList` est invalidé sur MAC-01 : Chrome
-restait retourné au point après Afficher le bureau et bloquait toute interaction.
+le cycle visuel complet et les champs de fenêtre portés par les événements après
+masquage doivent être éprouvés sur le paquet signé exact. Le premier essai
+d'énumération `CGWindowList` est invalidé sur MAC-01 : Chrome restait retourné au
+point après Afficher le bureau.

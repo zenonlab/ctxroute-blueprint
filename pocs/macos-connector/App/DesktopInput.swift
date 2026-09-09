@@ -61,9 +61,9 @@ private final class DesktopGestureEngine: @unchecked Sendable {
                 FinderBackground.contains(event.location, finderPID: $0)
             } ?? false
         case false:
-            // Finder's desktop AX plane no longer exists. Native proxy regions,
-            // placed below normal apps, own this mode without guessing occlusion.
-            authorized = false
+            // CreateDesktop removes Finder's useful AX plane. Use the window that
+            // WindowServer attached to this exact event; never create an overlay.
+            authorized = DesktopEventTarget.isDesktop(event)
         case nil:
             authorized = false
         }
@@ -99,11 +99,9 @@ private final class DesktopGestureEngine: @unchecked Sendable {
     }
 }
 
-/// The global path owns no overlay window or frame polling. A separate native
-/// hit-region plane is activated only when Finder's desktop plane is disabled.
+/// The global path owns no overlay window or frame polling in either Finder mode.
 @MainActor final class DesktopInput {
     private let engine = DesktopGestureEngine()
-    private let hiddenPlane = HiddenDesktopInputPlane()
     private var screensAwake = true
     private var sessionActive = true
     private var lifecycleObservers: [NSObjectProtocol] = []
@@ -126,12 +124,9 @@ private final class DesktopGestureEngine: @unchecked Sendable {
         didSet {
             let snapshot = DesktopInputSnapshot.make(catalog)
             engine.replace(snapshot)
-            hiddenPlane.replace(snapshot)
         }
     }
-    var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)? {
-        didSet { hiddenPlane.onIntent = onIntent }
-    }
+    var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)?
     var onStatus: ((DesktopTapState, Bool) -> Void)?
     var installed: Bool { tap.isActive }
     var tapLocation: String? { tap.locationName }
@@ -151,17 +146,16 @@ private final class DesktopGestureEngine: @unchecked Sendable {
                     self.engine.reset()
                     switch name {
                     case NSWorkspace.screensDidSleepNotification:
-                        self.screensAwake = false; self.tap.stop(); self.hiddenPlane.stop()
+                        self.screensAwake = false; self.tap.stop()
                     case NSWorkspace.screensDidWakeNotification: self.screensAwake = true
                     case NSWorkspace.sessionDidResignActiveNotification:
-                        self.sessionActive = false; self.tap.stop(); self.hiddenPlane.stop()
+                        self.sessionActive = false; self.tap.stop()
                     case NSWorkspace.sessionDidBecomeActiveNotification: self.sessionActive = true
                     default: break
                     }
                     let snapshot = DesktopInputSnapshot.make(self.catalog)
                     self.engine.replace(snapshot)
                     if self.screensAwake && self.sessionActive {
-                        self.hiddenPlane.replace(snapshot)
                         self.install()
                     }
                 }
@@ -182,7 +176,7 @@ private final class DesktopGestureEngine: @unchecked Sendable {
         guard screensAwake, sessionActive else { record(.stopped); return }
         if !tap.start() { record(.creationFailed) }
     }
-    func stop() { engine.reset(); hiddenPlane.stop(); tap.stop() }
+    func stop() { engine.reset(); tap.stop() }
 
     /// Shared recovery path; injected operations let tests verify retry and refusal
     /// without creating an event tap or changing the user's permissions.

@@ -20,19 +20,14 @@ le service Finder de la session afin qu'il recharge sa présentation ; jamais Do
 L'adaptateur utilise `CreateDesktop` puis redémarre Finder, comme le fait
 [OnlySwitch](https://github.com/jacklandrin/OnlySwitch/blob/main/Modules/Sources/Switches/ShellCommandDefine.swift).
 Quand les fichiers sont visibles, le classificateur AX laisse toute icône Finder
-prioritaire. Quand ils sont masqués et que ce plan AX n'existe plus, le tap global
-refuse les gestes. Des micro-fenêtres transparentes au niveau `normal - 1`, sans
-pixels, couvrent seulement les boutons et objets du thème : une application normale
-reste au-dessus et macOS arbitre réellement l'exposition. Elles suivent les objets
-animés à 30 Hz seulement dans ce mode, puis sont détruites au réaffichage. Aucun plan
-d'entrée plein écran n'est créé. Elles utilisent `fullScreenAuxiliary` : l'ancien
-`fullScreenNone` produisait des fenêtres `isVisible` mais absentes de la liste
-WindowServer à l'écran, cause exacte des boutons inertes après masquage. Le test natif
-crée désormais brièvement ces surfaces transparentes et exige leur présence dans
-`CGWindowList(optionOnScreenOnly)`. Le clic droit du vide reste donc natif quand Finder
-est masqué. Les tests injectés couvrent bascules, non-opération idempotente, changement
+prioritaire. Quand ils sont masqués et que ce plan AX n'existe plus, le même tap global
+lit l'identifiant de fenêtre attaché par WindowServer à l'événement exact. Une fenêtre
+de niveau normal ou supérieur conserve le clic ; seuls l'absence de fenêtre et un
+élément de niveau desktop autorisent le hit-test du thème. Aucune `NSPanel`, fenêtre
+transparente, couche d'entrée ou minuterie de suivi n'est créée. Les tests injectés
+couvrent bascules, non-opération idempotente, changement
 externe, refus de synchronisation, absence de quittance, échec de rafraîchissement,
-rollback et projection des proxys. Le bouton montre
+rollback et qualification de la fenêtre d'événement. Le bouton montre
 `monitor` si l'état est inconnu, `eye` si les éléments sont visibles et `eye-off`
 s'ils sont masqués. Il ne change qu'après relecture de la préférence par l'agent ;
 une reconnexion resynchronise progressivement toutes les scènes du catalogue.

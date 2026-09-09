@@ -13,36 +13,11 @@ import AppKit
           snapshot.target(at: CGPoint(x: 1513, y: 76), now: 12) == nil else {
         throw ModelError.invalid("desktop input snapshot projection")
     }
-    guard let screen = NSScreen.screens.first,
-          let display = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else {
-        throw ModelError.invalid("native screen unavailable")
+    guard DesktopEventTarget.isDesktop(nil),
+          DesktopEventTarget.isDesktop(.init(id: 7, layer: -1)),
+          !DesktopEventTarget.isDesktop(.init(id: 8, layer: 0)),
+          !DesktopEventTarget.isDesktop(.init(id: 9, layer: 24)) else {
+        throw ModelError.invalid("event target authority")
     }
-    let hiddenLayout = SurfaceLayout(id: UUID(), theme: theme.theme_id, display: display,
-        width: screen.frame.width, height: screen.frame.height, capturedAt: 10, elapsed: 2,
-        running: false, interactive: true)
-    let hidden = DesktopInputSnapshot(surfaces: [DesktopInputSurface(theme: theme, layout: hiddenLayout,
-        quartzBounds: screen.frame, desktopItemsVisible: false)], finderPID: nil)
-    let targets = HiddenDesktopInputPlane.targets(snapshot: hidden, now: 12)
-    guard targets.count == theme.system_controls.items.count + theme.objects.count,
-          targets.contains(where: { $0.intent == .toggle(.audio) }),
-          targets.contains(where: { $0.intent == .toggle(.desktopItems) }),
-          targets.contains(where: {
-              if case .activate = $0.intent { return true }
-              return false
-          }) else { throw ModelError.invalid("hidden input proxy plan") }
-    NSApplication.shared.setActivationPolicy(.accessory)
-    NSApplication.shared.finishLaunching()
-    let plane = HiddenDesktopInputPlane()
-    plane.replace(hidden)
-    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
-    let onScreen = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
-        as? [[String: Any]])?.filter {
-            ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == getpid()
-                && (($0[kCGWindowName as String] as? String) ?? "").isEmpty
-        } ?? []
-    plane.stop()
-    guard onScreen.count >= targets.count else {
-        throw ModelError.invalid("hidden input proxies not composed by WindowServer")
-    }
-    print("desktop-input-snapshot=PASS cases=6 (projection and transparent proxy composition)")
+    print("desktop-input-snapshot=PASS cases=6 (projection and event-window authority)")
 }

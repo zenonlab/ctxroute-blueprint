@@ -1,6 +1,22 @@
 # Reprise de session — Wallpaper
 
-## État courant — correctif Fichiers et entrée sans Finder, 9 septembre 2026
+## État courant — suppression de la couche d'entrée masquée, 9 septembre 2026
+
+Le défaut utilisateur est requalifié : `CreateDesktop=false` fonctionnait, mais il
+déclenchait aussi la création de micro-`NSPanel`. Ces fenêtres Core Graphics de niveau
+0 pouvaient se placer devant une application et constituaient précisément la couche
+supplémentaire interdite. Elles sont intégralement retirées du runtime.
+
+Le connecteur conserve maintenant le même `CGEventTap`, le même instantané géométrique
+et le même routeur avant et après la bascule Finder. Quand Finder n'expose plus son
+plan AX, l'autorité vient de l'identifiant de fenêtre attaché à l'événement par
+WindowServer : zéro ou niveau desktop autorise le thème ; niveau normal ou supérieur
+laisse le clic natif. Aucun objet AppKit, timer de suivi ou pixel n'est ajouté.
+
+Les sections historiques ci-dessous décrivent les candidats rejetés et ne sont plus
+l'état courant.
+
+## Candidat rejeté — proxys d'entrée sans Finder, 9 septembre 2026
 
 Le paquet signé installé recevait bien les intentions `desktopItemsVisible` et
 `desktopItemsHidden`, mais `StandardHideDesktopIcons` ne changeait pas le rendu du
