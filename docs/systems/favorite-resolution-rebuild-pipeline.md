@@ -27,21 +27,22 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - `WebExtensionBookmarkImportAdapter` parcourt l’arbre avec
   `bookmarks.getChildren`, par tranches de 100 feuilles et curseur DFS;
 - `normalizeBookmarks` qualifie uniquement les URL HTTP(S);
-- `importFavoriteSources` écrit `FavoriteSource` et `Review` par transactions
-  de 100 entrées et conserve `importedAt` lors d’un nouvel import;
+- `importFavoriteSources` écrit `FavoriteSource`, artefact et tâche par
+  transactions de 100 entrées et conserve `importedAt` lors d’un nouvel import;
 - Dexie v8 stocke les données privées dans `tobirink-private`;
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
-- le WebBridge limite les parcours Bibliothèque à 500 œuvres, les pages à 24,
-  Agenda à 100 entrées et ses enveloppes à 64 Kio;
+- le WebBridge v3 limite les parcours Bibliothèque à 500 œuvres, les pages à
+  24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
 - le background compose les ports locaux, les adaptateurs AniList et
   MangaUpdates, puis lance la convergence à l’installation, au démarrage, sur
   alarme et sur les quatre mutations de favoris;
-- l’import persiste atomiquement `FavoriteSource`, `Review`, artefact et tâche;
+- l’import persiste atomiquement `FavoriteSource`, artefact et tâche, sans
+  créer de Review;
 - l’outbox IndexedDB v8 réclame les tâches dues par index composé sans
   `toArray()` global, huit au plus par tranche;
 - le runner recherche, décide, hydrate par ID exact, puis écrit `Work`,
@@ -318,10 +319,14 @@ change ni l’identité ni la progression calculées par le parser favori.
 
 Les cas d’usage locaux construisent ensuite :
 
-- Bibliothèque à partir de la bibliothèque, des `Work` et progressions locales;
+- Bibliothèque à partir de la bibliothèque, des `Work`, de leurs métadonnées
+  d'affichage et progressions locales;
 - Review à partir des seules pending AMBIGUOUS/NOT_FOUND et de leurs preuves;
 - Agenda à partir des entrées locales dans la semaine demandée;
-- WebBridge à partir de ces projections sérialisées et validées.
+- WebBridge v3 à partir de ces projections sérialisées et validées. Sa page
+  Bibliothèque transporte les facettes, tris, statistiques, jaquettes
+  attribuées, progression structurée et source nécessaires à l'affichage.
+  Elle ne transporte ni dossier de favoris, ni décision, ni secret.
 
 Une `Work` absente produit un état partiel. Une lecture UI ne déclenche aucun
 réseau et ne remplace aucune donnée manquante par une fixture.
@@ -356,7 +361,7 @@ requête composée reste indexable sans branche de scan.
 | `FavoriteParseArtifact` | brut, transformations, identité, saison, progression, versions, empreinte | parser pur | import et resolver |
 | `ResolutionTask` | ID, artefact, état, tentative, échéance, claim, clé idempotente | import/réconciliation | runner |
 | `ResolutionDecision` | `CERTAIN`, `AMBIGUOUS` ou `NO_MATCH`, niveau, références, motifs | matcher pur | persistance/Review |
-| `ProviderCandidateEnvelope` | candidats normalisés, fournisseur, curseur, `complete`, `truncated`, digest | adaptateur fournisseur | matcher pur |
+| `ProviderCandidateEnvelope` | identité, titres localisés, jaquette attribuée, faits normalisés, curseur, `complete`, `truncated`, digest | adaptateur fournisseur | matcher pur et projection locale |
 | `ProviderRateCheckpoint` | fournisseur et `nextAllowedAt` | rate gate | lane fournisseur |
 | Étape d’hydratation | fournisseur et ID exact issus de la décision | runner réclamé | adaptateur fournisseur |
 | `LocalLanguageEvidence` | déclarations bornées, statistique, conflits et provenance | analyseur local facultatif | enrichissement local |

@@ -323,6 +323,6 @@
 
 - [x] **Persist complete resolved favorite state** — DONE _(evidence: Vitest targeted resolution WebBridge collective and domain suite: 36 passed, All 9 workspace typechecks passed, ESLint and complete documentation validation passed)_
 - [x] **Preserve provider display metadata and covers** — DONE _(evidence: Provider domain Work library and resolution Vitest suites: 50 passed across 7 files, All 9 workspace typechecks and ESLint passed, Complete docs validation and favorite-resolution Archify showcase 9/9 passed)_
-- [ ] **Project the complete local catalogue to the website** — PENDING
+- [x] **Project the complete local catalogue to the website** — DONE _(evidence: WebBridge catalogue and contract suites: 32 tests passed across 7 files, Web workspace: 10 tests passed; shared UI: 127 tests passed, Next static production build passed with the local work detail route)_
 - [ ] **Restore rights-aware cover delivery** — PENDING
 - [ ] **Certify the installed multi-provider pipeline** — PENDING

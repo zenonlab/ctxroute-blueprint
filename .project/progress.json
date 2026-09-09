@@ -6651,7 +6651,7 @@
         {
           "id": "step-3",
           "title": "Project the complete local catalogue to the website",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "The website receives the same local facets sorting statistics metadata cover progression and source as the extension catalogue",
             "Facet controls remain visible and support multiple include or exclude selections",
@@ -6674,7 +6674,13 @@
             "git diff --check",
             "git commit -m fix(library): project the complete local catalogue"
           ],
-          "evidence": []
+          "evidence": [
+            "WebBridge catalogue and contract suites: 32 tests passed across 7 files",
+            "Web workspace: 10 tests passed; shared UI: 127 tests passed",
+            "Next static production build passed with the local work detail route",
+            "Playwright: 7 of 7 web and packaged-extension journeys passed, including persistent multi-select facets and detail navigation",
+            "All 9 workspace typechecks, ESLint, docs validation, Archify 9/9 and git diff check passed"
+          ]
         },
         {
           "id": "step-4",

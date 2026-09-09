@@ -9,6 +9,7 @@ const routes = new Map([
   ['/agenda', 'agenda.html'],
   ['/download', 'download.html'],
   ['/library', 'library.html'],
+  ['/library/_', 'library/_.html'],
   ['/privacy', 'privacy.html'],
 ]);
 const mimeTypes = new Map([

@@ -5,7 +5,7 @@ import { publicDownloads } from '../app/download/page';
 
 describe('Workbench web routes', () => {
   it('bounds the home preview to four local works', () => {
-    expect(webLibraryQuerySchema.parse({ facet: 'all', limit: 4 })).toEqual({ facet: 'all', limit: 4 });
+    expect(webLibraryQuerySchema.parse({ facet: 'all', limit: 4 })).toEqual({ facet: 'all', limit: 4, sort: 'ADDED_DESC' });
   });
 
   it('accepts the URL-addressable Library projection bound', () => {

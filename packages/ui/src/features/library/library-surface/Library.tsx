@@ -94,7 +94,7 @@ export function Library({
                     coverSrc={item.coverSrc}
                     context={item.mediaType}
                     detail={item.detail ?? item.source}
-                    href={item.href ?? `#work-${item.id}`}
+                    href={item.href}
                     indicator={item.progress}
                     key={item.id}
                     title={item.title}

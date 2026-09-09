@@ -3,7 +3,7 @@ import { z } from 'zod';
 const workIdSchema = z.string().regex(/^work_[a-z0-9_]+$/u);
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
 
-export const webProtocolVersion = 2 as const;
+export const webProtocolVersion = 3 as const;
 export const webBridgeMessageLimit = 64 * 1024;
 export const webBridgeSessionDurationMs = 60_000;
 
@@ -15,27 +15,61 @@ export const webBootstrapSnapshotSchema = z.object({
   protocolVersion: z.literal(webProtocolVersion),
 }).strict();
 
+const webFacetStateSchema = z.enum(['include', 'exclude']);
+const webFacetSelectionSchema = z.record(boundedText(120), webFacetStateSchema)
+  .refine((value) => Object.keys(value).length <= 64, 'A facet selection accepts at most 64 values.');
+const webFacetNameSchema = z.enum(['format', 'genre', 'progress', 'source', 'status', 'type', 'year']);
+const webLibraryFacetsSchema = z.object({
+  format: webFacetSelectionSchema.optional(), genre: webFacetSelectionSchema.optional(), progress: webFacetSelectionSchema.optional(),
+  source: webFacetSelectionSchema.optional(), status: webFacetSelectionSchema.optional(), type: webFacetSelectionSchema.optional(), year: webFacetSelectionSchema.optional(),
+}).strict();
+const webLibrarySortSchema = z.enum(['ADDED_DESC', 'PROGRESS_DESC', 'POPULARITY_DESC', 'TITLE_ASC', 'TITLE_DESC', 'YEAR_DESC']);
+
 export const webLibraryQuerySchema = z.object({
   cursor: boundedText(128).optional(),
   facet: z.enum(['all', 'anime', 'manga']).default('all'),
+  facets: webLibraryFacetsSchema.optional(),
   limit: z.number().int().min(1).max(24),
   search: z.string().trim().max(120).optional(),
+  sort: webLibrarySortSchema.default('ADDED_DESC'),
+  workId: workIdSchema.optional(),
 }).strict();
 
 export const webLibraryItemSchema = z.object({
-  coverUrl: z.string().url().max(2048).optional(),
+  canonicalUrl: z.string().url().max(2048).optional(),
+  chapterCount: z.number().int().nonnegative().optional(),
+  coverAttribution: boundedText(120).optional(),
+  coverUrl: z.string().url().max(4096).optional(),
+  editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
+  endYear: z.number().int().min(1800).max(3000).optional(),
+  episodeCount: z.number().int().nonnegative().optional(),
+  format: boundedText(120).optional(),
+  genres: z.array(boundedText(120)).max(16).optional(),
   mediaKind: z.enum(['anime', 'manga']),
+  popularity: z.object({ kind: z.enum(['MEMBERS', 'RANK']), value: z.number().int().nonnegative() }).strict().optional(),
+  progress: z.object({ kind: z.enum(['episode', 'chapter', 'volume']), maximum: z.number().nonnegative().optional(), value: z.number().nonnegative() }).strict().optional(),
   progressLabel: boundedText(80).optional(),
+  provider: boundedText(120).optional(),
   sourceUrl: z.string().url().max(2048).optional(),
+  startYear: z.number().int().min(1800).max(3000).optional(),
   title: boundedText(240),
+  titleVariants: z.array(z.object({ language: boundedText(120).optional(), title: boundedText(240) }).strict()).max(16).optional(),
+  volumeCount: z.number().int().nonnegative().optional(),
   workId: workIdSchema,
 }).strict();
 
+const webFacetOptionsSchema = z.record(webFacetNameSchema, z.array(z.object({ count: z.number().int().nonnegative(), label: boundedText(120), value: boundedText(120) }).strict()).max(64));
+const webLibraryStatisticsSchema = z.object({ completed: z.number().int().nonnegative(), inProgress: z.number().int().nonnegative(), knownMetadata: z.number().int().nonnegative(), notStarted: z.number().int().nonnegative(), total: z.number().int().nonnegative() }).strict();
+
 export const webLibraryPageSchema = z.object({
   cursor: boundedText(128).optional(),
+  facets: webFacetOptionsSchema,
   hasMore: z.boolean(),
   items: z.array(webLibraryItemSchema).max(24),
   query: webLibraryQuerySchema,
+  statistics: webLibraryStatisticsSchema,
+  total: z.number().int().nonnegative(),
+  truncated: z.boolean(),
 }).strict();
 
 export const webAgendaPeriodSchema = z.object({
@@ -173,6 +207,7 @@ export const webPageBridgeInboundSchema = z.union([
 
 export type WebBootstrapSnapshot = z.infer<typeof webBootstrapSnapshotSchema>;
 export type WebLibraryQuery = z.infer<typeof webLibraryQuerySchema>;
+export type WebLibraryItem = z.infer<typeof webLibraryItemSchema>;
 export type WebLibraryPage = z.infer<typeof webLibraryPageSchema>;
 export type WebAgendaPeriod = z.infer<typeof webAgendaPeriodSchema>;
 export type WebReviewSnapshot = z.infer<typeof webReviewSnapshotSchema>;
