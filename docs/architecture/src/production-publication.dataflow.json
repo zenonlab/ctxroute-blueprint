@@ -9,8 +9,8 @@
       {
         "id": "publication",
         "label": "Publication bornée",
-        "focus": ["releasePackages", "approvalGate", "releaseBucket", "publicWorker"],
-        "note": "Le digest approuvé autorise uniquement deux archives 1.0.0 et le Worker public."
+        "focus": ["releasePackages", "releaseSchedule", "approvalGate", "releaseBucket", "publicWorker"],
+        "note": "Le digest approuvé lie les archives, le snapshot immuable, son pointeur et le Worker public."
       },
       {
         "id": "verification",
@@ -30,8 +30,9 @@
   "nodes": [
     { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "5 routes publiques", "stage": 0, "row": 0, "tag": "Next statique" },
     { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.0", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
+    { "id": "releaseSchedule", "type": "backend", "label": "Agenda public", "sublabel": "snapshot + pointeur", "stage": 0, "row": 4, "tag": "schéma strict" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + 3 cibles", "stage": 1, "row": 2, "tag": "approuvée" },
-    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "2 objets versionnés", "stage": 2, "row": 3, "tag": "R2" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP + agenda révisionné", "stage": 2, "row": 3, "tag": "R2" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "production" },
     { "id": "memberPages", "type": "frontend", "label": "Pages Workbench", "sublabel": "accueil / biblio / agenda", "stage": 3, "row": 0, "tag": "HTTP 200" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
@@ -39,9 +40,10 @@
   ],
   "flows": [
     { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "66 assets", "classification": "prévisualisé", "variant": "default" },
-    { "id": "packagesToGate", "from": "releasePackages", "to": "approvalGate", "label": "tailles + SHA-256", "classification": "lié au digest", "variant": "security" },
+    { "id": "packagesToGate", "from": "releasePackages", "to": "approvalGate", "label": "tailles + SHA-256", "classification": "lié au digest", "variant": "security", "labelAt": [300, 450] },
+    { "id": "scheduleToGate", "from": "releaseSchedule", "to": "approvalGate", "label": "JSON + SHA-256", "classification": "révision identique", "variant": "security", "labelAt": [136, 542] },
     { "id": "gateToWorker", "from": "approvalGate", "to": "publicWorker", "label": "déploiement", "classification": "cible autorisée", "variant": "emphasis" },
-    { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "2 uploads", "classification": "clés autorisées", "variant": "security" },
+    { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "snapshot puis pointeur", "classification": "clés autorisées", "variant": "security" },
     { "id": "workerToPages", "from": "publicWorker", "to": "memberPages", "label": "assets statiques", "classification": "public", "variant": "default" },
     { "id": "bucketToDownloads", "from": "releaseBucket", "to": "publicDownloads", "label": "via Worker", "classification": "route bornée", "variant": "security" },
     { "id": "pagesToEvidence", "from": "memberPages", "to": "productionEvidence", "label": "5 × HTTP 200", "classification": "vérifié", "variant": "default" },
@@ -54,6 +56,7 @@
       "items": [
         "Le Worker public sert la surface Workbench sur tobirink.com",
         "Les deux archives 1.0.0 sont disponibles avec leurs hashes locaux",
+        "L’agenda vide valide répond sans inventer de sortie publique",
         "Les routes inconnues restent en 404"
       ]
     },
@@ -62,7 +65,7 @@
       "title": "Limites conservées",
       "items": [
         "Aucune migration D1 ni suppression distante",
-        "Aucun secret ou objet non listé n’est modifié",
+        "Chaque objet R2 modifié figure dans l’allowlist exacte",
         "La version Worker précédente reste disponible pour rollback"
       ]
     }
