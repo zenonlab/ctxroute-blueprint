@@ -65,6 +65,14 @@ fixture et protocole d'états simulés sont des exigences à implémenter, non d
 tests disponibles. L'absence d'instrument énergétique n'empêche pas un diagnostic
 fonctionnel, mais interdit un verdict de sobriété.
 
+Le noyau comportemental source-neutre se vérifie séparément avec
+`cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml` et
+`cargo clippy --manifest-path pocs/theme-behavior-kernel/Cargo.toml --all-targets -- -D warnings`.
+Sa fixture originale couvre huit identités/session, le raccord de piste, deux tours
+de formation, 2 000 pas déterministes, le cadrage et la reprise bornée. Ce gate ne
+qualifie ni renderer, ni apparence, ni connexion PTY ; ses résultats sont consignés
+dans [le reçu dédié](pocs/theme-behavior-kernel-results.md).
+
 Le socle et les tests d'état L1 sont vérifiés séparément. Les scénarios produit
 ci-dessous restent à éprouver au-delà de cette sonde, sans validation automatique implicite.
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces

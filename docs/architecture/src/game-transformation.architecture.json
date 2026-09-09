@@ -15,7 +15,7 @@
     { "id": "coverage", "type": "security", "label": "Rapport de couverture", "sublabel": "Complet · partiel · inconnu", "pos": [660, 270], "size": [260, 80] },
     { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Intentions · contraintes · créations", "pos": [40, 280], "size": [250, 80] },
     { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Contrôleurs · formation · camera rigs", "pos": [1010, 460], "size": [260, 80] },
-    { "id": "runtime", "type": "frontend", "label": "Moteur déterministe", "sublabel": "Horloge · états · trajectoires", "pos": [680, 460], "size": [240, 80] },
+    { "id": "runtime", "type": "frontend", "label": "Moteur déterministe", "sublabel": "Pas fixe · formation · caméra", "pos": [680, 460], "size": [240, 80] },
     { "id": "render-profile", "type": "backend", "label": "Hôte de présentation", "sublabel": "2D/3D · profil source · interpolation", "pos": [350, 460], "size": [250, 80] }
   ],
   "connections": [

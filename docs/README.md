@@ -6,7 +6,9 @@ pas devenir le produit par accumulation de correctifs.
 La cible est maintenant un [cœur de thème unifié avec des connecteurs OS séparés](architecture/platform-connectors.md).
 Le [PoC macOS 2](pocs/macos-connector-poc2.md) dispose d'une première tranche isolée,
 compilée et testée ; sa qualification dans le vrai bureau macOS reste à conduire.
-Le terminal, le moteur de thèmes produit et l'ingestion restent à construire.
+Le [noyau comportemental isolé](pocs/theme-behavior-kernel-results.md) produit
+désormais des snapshots déterministes ; le terminal, le moteur de thèmes produit
+et le raccord graphique restent à construire.
 Le [plan de démarrage des PoCs](05-poc-start-plan.md) fixe les outils et le
 périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 
@@ -17,12 +19,13 @@ périmètre initial : sonde macOS, contrôleur sans GPU, puis scène Rust/wgpu.
 3. [Personnalisation des thèmes](architecture/theme-customization.md) : imports 2D/3D,
    rigs, UI stylée et séparation des assets privés.
 4. [Preuve G1/D1](pocs/theme-design-poc.md) : jeu complet indexé, puis thème sélectif ; la [première passe G1](pocs/game-library-g1-results.md) est reproductible.
-5. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
-6. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
-7. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
-8. [PoC macOS 1](pocs/macos-surface.md) : résultats et limites historiques.
-9. [Note de reprise](session-handoff.md) : état d'exécution local.
-10. [Recherche interaction macOS et observation émulée](research/macos-interaction-and-emulator-boundary.md) : preuves primaires, architecture retenue et essais E6.
+5. [Résultats du noyau comportemental](pocs/theme-behavior-kernel-results.md) : preuve déterministe sans renderer.
+6. [Vision produit](00-project-brief.md) : besoin confirmé et parcours.
+7. [Décisions techniques ouvertes](01-technology-decisions.md) : comparer l'existant.
+8. [Stratégie qualité](02-quality-strategy.md) : preuves et scénarios attendus.
+9. [PoC macOS 1](pocs/macos-surface.md) : résultats et limites historiques.
+10. [Note de reprise](session-handoff.md) : état d'exécution local.
+11. [Recherche interaction macOS et observation émulée](research/macos-interaction-and-emulator-boundary.md) : preuves primaires, architecture retenue et essais E6.
 
 ## Séparer produit et outillage
 

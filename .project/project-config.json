@@ -6,7 +6,7 @@
     "packageManager": "npm"
   },
   "decisions": {
-    "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. The isolated game-theme viewer uses Rust edition 2024 and Bevy 0.19.1; no production language is frozen. Node.js is governance tooling only.",
+    "language": "PoC1: Swift 6, compiler observed 6.3.2. PoC2 macOS: Swift/AppKit adapter around a language-neutral canonical theme contract. The isolated behavior kernel uses Rust edition 2024 without a renderer; the game-theme viewer uses Rust edition 2024 and Bevy 0.19.1. No production language is frozen. Node.js is governance tooling only.",
     "runtime": "PoC1 frozen as evidence. PoC2 targets a native macOS connector app plus a separate wallpaper adapter, deployment target macOS 14 and qualification limited to MAC-01 macOS 26.2. The Bevy viewer is a normal-window pack proof, not a wallpaper connector. Windows, Wayland, GNOME and X11 require distinct connectors behind the same product contract.",
     "frontend": "PoC2 uses one authoritative control surface at a time. Native connector UI owns permissions and recovery; the portable theme owns fully stylable semantic menus, buttons, panels, system_controls and 2D/3D scene presentation. The Bevy reference viewer currently exposes only event-driven orbit, zoom and camera reset. PoC diagnostics are not product design.",
     "backend": "The wallpaper/terminal runtimes contain no game reader or LLM runtime. PoC2 uses a per-login user agent and a sandboxed wallpaper provider with bounded typed XPC and pinned signatures. The isolated E6-A1 offline observer is a Python ctypes frontend plus original C Libretro fixture; it is never loaded by the wallpaper runtime.",
@@ -60,6 +60,7 @@
       "pocs/macos-native-wallpaper/",
       "pocs/emulator-observer/",
       "pocs/game-theme-viewer/",
+      "pocs/theme-behavior-kernel/",
       "packages/",
       "scripts/"
     ],

@@ -1,7 +1,8 @@
 # G1/D1 — jeu complet indexé et premier thème soigné
 
-État au 9 septembre 2026 : **indexeur G1 et harnais de chargement implémentés ;
-export visuel privé rejeté, relations sémantiques et raccord 3D wallpaper non terminés**.
+État au 9 septembre 2026 : **indexeur G1, harnais de chargement et noyau de
+comportements isolé implémentés ; export visuel privé rejeté, relations sémantiques
+et raccord 3D wallpaper non terminés**.
 Cette preuve commence sur le contrat stabilisé du
 [PoC connecteur macOS](macos-connector-poc2.md). Elle suit
 [ADR-0058](../decisions/ADR-0058-complete-game-poc.md) et la
@@ -55,6 +56,22 @@ assets N64 convertis vers ce profil doivent être marqués `diagnostic` et la fe
 l'affiche explicitement. La prochaine preuve ajoute un profil source qualifié par un
 oracle Fast3D/RDP, conformément à
 [ADR-0063](../decisions/ADR-0063-source-render-profiles-and-oracles.md).
+
+## Noyau de comportements isolé
+
+`pocs/theme-behavior-kernel` constitue la preuve préalable au renderer. Une fixture
+originale JSON décrit un circuit fermé, huit instances liées à huit sessions et les
+bornes du directeur caméra. Le crate Rust compile une courbe Catmull–Rom en table de
+longueur cumulée, applique les offsets de formation sur la tangente locale et publie
+des `PresentationSnapshot` sans type Bevy, API OS, asset de jeu ou logique de ROM.
+
+Les sept tests du 9 septembre 2026 passent : raccord position/tangente, refus des
+identités dupliquées, formation finie et ordonnée sur deux tours, égalité de deux
+simulations pendant 2 000 pas, déplacement caméra borné avec huit ancres dans la
+safe area, puis pause/reprise sans rattrapage illimité. Ces résultats ferment la
+sous-preuve logique de D1-26 à D1-28, mais pas leur qualification visuelle sur une
+scène 3D ni le raccord à de vraies sessions. Voir le
+[reçu du noyau](theme-behavior-kernel-results.md).
 
 Cette preuve est volontairement une fenêtre de référence. Elle ne ferme D1-19
 qu'après exécution sur le pack privé puis raccord du même pack à la vraie

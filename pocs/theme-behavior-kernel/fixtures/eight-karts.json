@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "fixed_dt_seconds": 0.03333333333333333,
+  "max_catch_up_steps": 4,
+  "speed_units_per_second": 4.0,
+  "path": {
+    "closed": true,
+    "samples_per_segment": 48,
+    "control_points": [
+      [0.0, 0.0, -12.0],
+      [9.0, 0.0, -10.0],
+      [14.0, 0.0, -3.0],
+      [12.0, 0.0, 7.0],
+      [4.0, 0.0, 12.0],
+      [-6.0, 0.0, 11.0],
+      [-13.0, 0.0, 4.0],
+      [-12.0, 0.0, -6.0],
+      [-6.0, 0.0, -11.0]
+    ]
+  },
+  "camera": {
+    "aspect_ratio": 1.7777777777777777,
+    "fov_y_degrees": 48.0,
+    "safe_fraction_x": 0.78,
+    "safe_fraction_y": 0.72,
+    "min_distance": 7.0,
+    "max_distance": 36.0,
+    "height_ratio": 0.42,
+    "max_translation_per_second": 18.0
+  },
+  "entities": [
+    { "instance_id": "kart.01", "session_id": "session.01", "longitudinal_offset": 0.0, "lateral_offset": -1.05 },
+    { "instance_id": "kart.02", "session_id": "session.02", "longitudinal_offset": 0.0, "lateral_offset": 1.05 },
+    { "instance_id": "kart.03", "session_id": "session.03", "longitudinal_offset": 1.8, "lateral_offset": -1.05 },
+    { "instance_id": "kart.04", "session_id": "session.04", "longitudinal_offset": 1.8, "lateral_offset": 1.05 },
+    { "instance_id": "kart.05", "session_id": "session.05", "longitudinal_offset": 3.6, "lateral_offset": -1.05 },
+    { "instance_id": "kart.06", "session_id": "session.06", "longitudinal_offset": 3.6, "lateral_offset": 1.05 },
+    { "instance_id": "kart.07", "session_id": "session.07", "longitudinal_offset": 5.4, "lateral_offset": -1.05 },
+    { "instance_id": "kart.08", "session_id": "session.08", "longitudinal_offset": 5.4, "lateral_offset": 1.05 }
+  ]
+}

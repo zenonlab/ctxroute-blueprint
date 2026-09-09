@@ -8,6 +8,7 @@ scope:
   - docs/pocs/theme-design-poc.md
   - docs/02-quality-strategy.md
 review: on-change
+revised: true
 ---
 # ADR-0065 — Noyau déterministe de comportements et directeur caméra
 
@@ -52,3 +53,11 @@ l'adaptateur produit les données canoniques nécessaires.
 La promesse reste conditionnelle aux capacités extraites et validées. Les contrôleurs
 complexes demandent des fixtures, invariants et mesures. Bevy peut héberger la première
 preuve, mais ses types, son ECS et son renderer ne deviennent pas le contrat public.
+
+## Implementation evidence
+
+`pocs/theme-behavior-kernel` matérialise la première frontière sans renderer : fixture
+JSON originale, piste fermée compilée, pas fixe, huit instances/session, formation,
+directeur caméra et snapshots sérialisables. Les tests couvrent le raccord, deux tours,
+2 000 pas déterministes, la safe area et la reprise bornée. Cette preuve ne change pas
+la décision et ne qualifie pas encore le raccord Bevy ou wallpaper.
