@@ -6439,7 +6439,7 @@
         {
           "id": "step-4",
           "title": "Restore reproducible sharp dependency resolution",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Clean install and npm ls agree on sharp without invalid packages",
             "Worker and browser builds pass from the clean tree",
@@ -6463,7 +6463,11 @@
             "git diff --check",
             "git commit -m chore(deps): restore reproducible sharp resolution"
           ],
-          "evidence": []
+          "evidence": [
+            "Clean npm ci payload plus postinstall applies the version-bound Miniflare patch and npm ls sharp all is valid at sharp 0.35.4",
+            "npm audit reports zero vulnerabilities; no opaque node_modules artifact is tracked",
+            "Worker 32 of 32 and Chrome Firefox MV3 builds pass from the clean dependency tree"
+          ]
         },
         {
           "id": "step-5",

@@ -1,0 +1,13 @@
+diff --git a/node_modules/miniflare/package.json b/node_modules/miniflare/package.json
+index 81405d7..9aa577f 100644
+--- a/node_modules/miniflare/package.json
++++ b/node_modules/miniflare/package.json
+@@ -31,7 +31,7 @@
+   },
+   "dependencies": {
+     "@cspotcode/source-map-support": "0.8.1",
+-    "sharp": "0.35.2",
++    "sharp": "0.35.4",
+     "undici": "7.29.0",
+     "workerd": "1.20260903.1",
+     "ws": "8.21.0",

@@ -25,6 +25,11 @@ Root commands remain the public entry points, and Node.js 22.13+/npm 10
 remain the supported toolchain. Workspace package manifests are private,
 carry the repository's Apache-2.0 license metadata, and a
 clean clone is validated by `npm ci` and the root validation command.
+An exact transitive security pin may be corrected by a version-bound,
+reviewable `patch-package` diff when the upstream package has not published the
+patch. Its lockfile edge records the same reviewed replacement. The
+clean-install gate must apply it without fuzz, produce a valid
+`npm ls` tree and pass every affected runtime test.
 
 ## Alternatives
 

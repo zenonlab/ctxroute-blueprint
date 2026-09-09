@@ -16,6 +16,17 @@ hook orchestrator; CRG is the code-context MCP, while the independent
 Tree-sitter registry remains Sensor-only. Archify v2.16.0 owns executable
 architecture evidence and desktop visual containment checks.
 
+Miniflare 5.20260903.0-alpha declares vulnerable `sharp@0.35.2` exactly while
+the compatible patched release is 0.35.4. The root resolution installs 0.35.4
+and a version-bound `patch-package` receipt updates only Miniflare's dependency
+declaration after installation. The same reviewed one-line correction is
+recorded on Miniflare's lockfile edge so npm can validate the realized tree. A
+changed Miniflare manifest fails the patch;
+`npm ls sharp --all`, Worker tests and browser builds then guard compatibility.
+Lockfile validation also rejects impossible `libc` selectors on Darwin native
+packages; those selectors prevent clean installs from restoring Lightning CSS
+and Oxlint binaries.
+
 ## Selected stack
 
 | Topic | Decision | Why | Replacement boundary |
