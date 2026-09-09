@@ -95,4 +95,16 @@ describe('cover media routes', () => {
     expect(response.status).toBe(404);
     expect(fixture.transforms).toHaveLength(0);
   });
+
+  it.each(['POST', 'PUT', 'DELETE'])('does not expose R2 ingestion through %s', async (method) => {
+    const fixture = mediaBindings();
+    const response = await createCoverMediaApp(fixture.services).request(
+      `https://api.example/v1/media/covers/${digest}/jpg/cover-sm`,
+      { method },
+    );
+
+    expect(response.status).toBe(404);
+    expect(fixture.reads).toHaveLength(0);
+    expect(fixture.transforms).toHaveLength(0);
+  });
 });

@@ -11,7 +11,7 @@ function validMaster(overrides: Partial<NormalizedCoverMaster> = {}): Normalized
     height: 900,
     metadataStripped: true,
     orientationNormalized: true,
-    rightsStatus: 'licensed',
+    rights: { basis: 'licensed', policyId: 'provider-example-v1' },
     sourceUrl: 'https://provider.example/cover.png',
     width: 600,
     ...overrides,
@@ -40,7 +40,7 @@ describe('R2CoverMasterAdapter', () => {
     const { puts, store } = objectStore();
     const adapter = new R2CoverMasterAdapter(store);
     const unlicensed = validMaster();
-    Reflect.set(unlicensed, 'rightsStatus', 'unknown');
+    Reflect.set(unlicensed.rights, 'basis', 'unknown');
 
     await expect(adapter.ingest(unlicensed)).rejects.toThrow('not permitted');
     expect(puts).toHaveLength(0);
@@ -59,7 +59,8 @@ describe('R2CoverMasterAdapter', () => {
         colorSpace: 'srgb',
         metadataStripped: 'true',
         orientationNormalized: 'true',
-        rightsStatus: 'licensed',
+        rightsBasis: 'licensed',
+        rightsPolicyId: 'provider-example-v1',
       },
       httpMetadata: { cacheControl: 'public, max-age=31536000, immutable', contentType: 'image/png' },
       onlyIf: { etagDoesNotMatch: '*' },
@@ -93,5 +94,17 @@ describe('R2CoverMasterAdapter', () => {
     const { store } = objectStore();
 
     await expect(new R2CoverMasterAdapter(store).ingest(master)).rejects.toThrow('not normalized');
+  });
+
+  it('rejects a missing or malformed operational rights policy identifier', async () => {
+    const { puts, store } = objectStore();
+    const missingRights = validMaster();
+    Reflect.deleteProperty(missingRights, 'rights');
+
+    await expect(new R2CoverMasterAdapter(store).ingest(missingRights)).rejects.toThrow('not permitted');
+    await expect(new R2CoverMasterAdapter(store).ingest(validMaster({
+      rights: { basis: 'licensed', policyId: '../unbounded' },
+    }))).rejects.toThrow('not permitted');
+    expect(puts).toHaveLength(0);
   });
 });

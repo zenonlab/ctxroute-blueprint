@@ -7,7 +7,7 @@
     "quality_profile": "showcase",
     "viewBox": [
       1180,
-      1070
+      1370
     ],
     "views": [
       {
@@ -44,7 +44,19 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB privé : titres localisés, jaquettes HTTPS attribuées et facettes. Lecture bornée à 500 œuvres avant pagination."
+        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Une URL fournisseur ne donne aucun droit de copie R2."
+      },
+      {
+        "id": "cover-rights",
+        "label": "Droits des jaquettes",
+        "focus": [
+          "providerAdapters",
+          "privateStore",
+          "operationalMedia",
+          "rightsGate",
+          "coverR2"
+        ],
+        "note": "Deux chemins séparés : référence fournisseur locale allowlistée, ou master R2 uniquement après preuve de droits au gate opérationnel."
       },
       {
         "id": "recovery-collective",
@@ -187,6 +199,36 @@
       "yOffset": 270,
       "width": 150,
       "tag": "IDs / choix / confirmations"
+    },
+    {
+      "id": "operationalMedia",
+      "type": "external",
+      "label": "Opération média",
+      "stage": 0,
+      "row": 4,
+      "yOffset": 540,
+      "width": 150,
+      "tag": "artefact normalisé"
+    },
+    {
+      "id": "rightsGate",
+      "type": "security",
+      "label": "Gate droits",
+      "stage": 2,
+      "row": 4,
+      "yOffset": 540,
+      "width": 150,
+      "tag": "licence / domaine public"
+    },
+    {
+      "id": "coverR2",
+      "type": "database",
+      "label": "R2 masters privés",
+      "stage": 4,
+      "row": 4,
+      "yOffset": 540,
+      "width": 150,
+      "tag": "SHA-256 immuable"
     }
   ],
   "flows": [
@@ -323,6 +365,20 @@
       "labelAt": [423, 946],
       "classification": "batch indexé",
       "variant": "security"
+    },
+    {
+      "from": "operationalMedia",
+      "to": "rightsGate",
+      "label": "preuve + policyId",
+      "classification": "opérationnel seulement",
+      "variant": "security"
+    },
+    {
+      "from": "rightsGate",
+      "to": "coverR2",
+      "label": "master autorisé",
+      "classification": "aucune donnée favorite",
+      "variant": "security"
     }
   ],
   "cards": [
@@ -362,7 +418,8 @@
         "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Genres typés et totaux éditoriaux explicites uniquement",
-        "Aucune métadonnée de bibliothèque dans sync ou D1"
+        "Aucune métadonnée de bibliothèque dans sync ou D1",
+        "URL fournisseur locale; R2 exige licence ou domaine public"
       ]
     }
   ]

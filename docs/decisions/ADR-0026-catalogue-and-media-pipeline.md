@@ -65,9 +65,19 @@ allowlists the master extension and named variant, reads the immutable master
 from `COVER_BUCKET`, and sends only the server-owned `scale-down` dimensions to
 `COVER_IMAGES`. The response negotiates AVIF/WebP, otherwise preserves the
 master format, and carries immutable cache headers plus a representation ETag.
-No public ingestion endpoint exists. `R2CoverMasterAdapter` gates copying rights
-and normalization before R2 access, then conditionally writes the SHA-256-keyed
-master with checksum, provenance, dimensions, and required attribution.
+No public ingestion endpoint exists, and the Worker composition exposes only
+the read port. `R2CoverMasterAdapter` is reserved for the operational gate. Its
+application contract requires a bounded rights-policy identifier and a
+`licensed` or `public-domain` basis before normalization checks or R2 access,
+then conditionally writes the SHA-256-keyed master with checksum, provenance,
+dimensions, rights policy, and required attribution. A provider image URL alone
+is never a copying grant.
+
+Hydrated provider covers follow a separate path. The extension accepts only the
+fixed HTTPS image origins declared by the provider contract, preserves their
+attribution in IndexedDB, and projects that reference locally through
+WebBridge. A missing or rejected reference uses the local placeholder. These
+references never pass through the Worker and never cause an R2 write.
 
 Public snapshot payloads use the repository-pinned Zod 4.5.4 as a direct
 adapter dependency. Strict parsing at the R2 and cache boundaries rejects

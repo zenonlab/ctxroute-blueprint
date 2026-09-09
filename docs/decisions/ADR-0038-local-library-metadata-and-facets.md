@@ -34,6 +34,10 @@ La même fiche peut conserver un titre d'affichage, au plus seize variantes de
 titre avec leur langue lorsqu'elle est fournie, et une jaquette HTTPS attribuée.
 L'origine de la jaquette est fixée par fournisseur dans le contrat de domaine;
 une origine différente ou une valeur hors limite invalide la réponse complète.
+Cette référence HTTPS attribuée reste locale et est affichée directement. Elle
+ne vaut pas licence de copie : aucun téléchargement, proxy Worker ou stockage
+R2 n'est déclenché par l'hydratation d'un favori. Seul le gate opérationnel
+défini par ADR-0026 peut ingérer un master assorti d'une politique de droits.
 La version 2 des métadonnées ajoute ces champs. La version 1 reste lisible afin
 que les fiches existantes migrent par réhydratation, sans suppression.
 Les totaux représentent uniquement un total éditorial explicite : le dernier

@@ -6685,7 +6685,7 @@
         {
           "id": "step-4",
           "title": "Restore rights-aware cover delivery",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Provider covers render through fixed allowlisted URLs with attribution and bounded fallback behavior",
             "R2 ingestion remains unavailable unless an explicit provider rights policy permits it and is callable only through the operational gate",
@@ -6708,7 +6708,11 @@
             "git diff --check",
             "git commit -m feat(media): restore provider cover delivery"
           ],
-          "evidence": []
+          "evidence": [
+            "R2 and Worker media suites: 17 tests passed including no POST PUT DELETE ingestion route",
+            "Application Cloudflare adapter and Worker typechecks plus ESLint and Oxlint passed",
+            "Rights-aware dataflow passes Archify showcase 9/9; docs decisions and git diff validation passed"
+          ]
         },
         {
           "id": "step-5",

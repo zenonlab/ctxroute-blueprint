@@ -25,8 +25,11 @@ export { defaultQuickPreferences, quickPreferencesSchema } from './ports/quick-p
 export type { QuickPreferences, QuickPreferencesPort } from './ports/quick-preferences-port';
 export type {
   CoverImageRenderPort,
+  CoverMasterIngestionPort,
   CoverMasterReadPort,
   CoverOutputFormat,
+  CoverRightsBasis,
+  NormalizedCoverMaster,
   PublicCatalogueReadPort,
   PublicCatalogueReference,
   PublicCatalogueTitle,
@@ -36,6 +39,7 @@ export type {
   PublicReleaseObjectPort,
   PublicReleasePointerRecord,
   PublicReleaseSnapshotRecord,
+  StoredCoverMaster,
 } from './ports/cloud-data-ports';
 export type {
   ReviewCandidatePort,
