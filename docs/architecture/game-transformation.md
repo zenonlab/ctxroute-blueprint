@@ -366,7 +366,8 @@ Majora's Mask NTSC-U 1.0 est le corpus pilote et le sud de Bourg-Clocher
 (`Z2_CLOCKTOWER`) la première zone. Bourg-Clocher est un ensemble de cinq scènes
 extérieures dans les données ; `Z2_00KEIKOKU` est la Plaine de Termina.
 La [première passe G1](../pocs/game-library-g1-results.md) prouve l'inventaire
-reproductible, pas encore toutes les capacités du tableau ci-dessous. L'étude
+reproductible et qualifie un pont visuel Fast64/Blender dégradé, pas encore toutes
+les capacités du tableau ci-dessous. L'étude
 [OoT → environnement interactif](../research/oot-environment-pilot.md) reste une
 future preuve de réutilisation du même adaptateur Zelda64. SM64 et Sunshine sont
 des adaptations distinctes à étudier seulement lorsqu'un thème le demande.
@@ -391,6 +392,15 @@ Le rapport du PoC doit fixer les révisions des outils, l'identité de l'entrée
 les commandes exécutées, les ressources obtenues, les références manquantes,
 les capacités et les preuves visuelles/audio. Évaluer le code de liaison requis
 avant de fixer formats et stack. Aucun outil n'est adopté sur sa réputation seule.
+
+La sonde `Z2_CLOCKTOWER` confirme cette règle. Fast64 sait contribuer à un dérivé
+géométrique texturé, mais son chemin Majora's Mask amont ne couvre pas les acteurs,
+collisions, chemins, matériaux animés et combineurs rencontrés. Blender est un outil
+de conversion hors ligne ; ni son fichier de travail, ni ses types, ni les types
+Fast64 ne franchissent la frontière du package. Le compilateur commun reçoit des
+ressources et relations canoniques avec une capacité `exact`, `approximated`,
+`missing` ou `unsupported` par catégorie. Un GLB visuellement reconnaissable ne
+permet jamais d'inférer navigation, animation ou comportement.
 
 ## Éléments vérifiés dans les projets existants
 

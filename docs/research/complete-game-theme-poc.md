@@ -1,7 +1,7 @@
 # Recherche — prochain PoC « jeu complet → thème soigné »
 
 État au 9 septembre 2026 : **recherche primaire terminée ; Bevy retenu pour le
-PoC ; première indexation G1 reproductible exécutée**.
+PoC ; première indexation G1 reproductible et pont visuel partiel exécutés**.
 
 ## Verdict
 
@@ -139,6 +139,24 @@ ouvert :
 Le changement de zone ou d'acteur doit réutiliser l'index existant sans rescanner le
 jeu. La suppression d'un asset local doit devenir une dépendance manquante explicite,
 jamais une texture noire ou un crash.
+
+### Résultat de la première sonde de conversion visuelle
+
+Fast64 à la révision `44b7bd9603382f1ac7c0d1c1c5f1b3abe3008405`, exécuté dans
+Blender 5.1.2 arm64, a permis d'obtenir la géométrie et les textures de
+`Z2_CLOCKTOWER` après plusieurs correctifs locaux de compatibilité Majora's Mask.
+Le GLB résultant a été réimporté dans un Blender vierge : 10 maillages, 112 matériaux,
+58 images embarquées et trois attributs de couleur y sont lisibles. Le résultat
+visuel est reconnaissable, mais les groupes de rendu restent fragmentés et les
+acteurs, collisions, chemins, animations de matériaux et combineurs N64 exacts
+manquent.
+
+Le résultat complet et les hashes sont consignés dans les
+[résultats G1](../pocs/game-library-g1-results.md). Il invalide deux raccourcis :
+Fast64 n'est ni un adaptateur Majora's Mask complet dans son état amont, ni une raison
+de coder un importeur universel dans le runtime. Il reste réutilisable comme brique
+hors ligne. La reconstruction des relations doit partir des données de décompilation
+indexées ; le renderer ne reçoit qu'un pack commun et qualifié.
 
 ## Gates avant implémentation large
 

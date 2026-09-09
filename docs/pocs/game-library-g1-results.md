@@ -1,9 +1,9 @@
 # Résultats G1 — bibliothèque locale Majora's Mask
 
-État au 9 septembre 2026 : **première indexation complète réussie ; G1 partiel**.
-Les critères G1-01, G1-02, G1-03 et la répétabilité de G1-06 sont prouvés sur la
-machine MAC-01. Les relations sémantiques profondes et le compilateur D1 restent à
-qualifier ; ce résultat ne prétend donc pas fermer G1-04 à G1-10.
+État au 9 septembre 2026 : **première indexation complète réussie et premier pont
+visuel qualifié ; G1 partiel**. Les critères G1-01, G1-02, G1-03 et la répétabilité
+de G1-06 sont prouvés sur la machine MAC-01. Le pont visuel décrit ci-dessous ne
+ferme ni les relations sémantiques profondes, ni le compilateur D1, ni G1-04 à G1-10.
 
 ## Entrée et chaîne épinglées
 
@@ -80,3 +80,39 @@ C ou un fragment de scène est `partial`, même lorsqu'il a été généré corr
 Les 1 575 entrées opaques sont `unknown`. La prochaine passe doit enrichir les
 relations scène → room → acteur → objet et parser les déclarations Zelda64 sans
 déplacer ces règles dans le schéma commun.
+
+## Qualification du pont visuel South Clock Town
+
+Une sonde hors ligne a importé `Z2_CLOCKTOWER` avec Fast64, puis remplacé les
+graphes de matériaux F3D par un profil glTF volontairement simple avant export.
+La sonde emploie Blender 5.1.2 arm64, archive officielle de SHA-256
+`f104ffee2ba6aee32328e5c203b7e4608d8a1745f7bbcf2766f3b9777e8fbe17`, et Fast64
+à la révision `44b7bd9603382f1ac7c0d1c1c5f1b3abe3008405`.
+
+Le checkout Fast64 amont n'a pas produit cette scène sans modifications locales :
+son chemin Majora's Mask reste incomplet pour les enums, macros d'acteurs, chemins,
+matériaux animés et collisions rencontrés. Ces modifications demeurent sous le
+répertoire privé ignoré `game/` et ne constituent pas un adaptateur redistribuable.
+
+| Observation sur le GLB réimporté dans Blender vierge | Valeur |
+| --- | ---: |
+| taille du GLB autonome | 337 KiB |
+| maillages | 10 |
+| sommets après triangulation/dédoublonnage glTF | 2 070 |
+| polygones | 969 |
+| matériaux | 112 |
+| images embarquées | 58 |
+| attributs de couleur réimportés | 3 |
+| SHA-256 du GLB | `634e65b54b51832ffc82a0ca12aa44babc012ed46425cc0bacccc87aeee6c145` |
+
+Cette preuve valide un **pont géométrie + texture dégradé**, pas un thème. Les
+combineurs N64 sont remplacés par un matériau Principled à texture unique ; acteurs,
+collisions, chemins et matériaux animés sont absents. Les groupes d'affichage
+importés restent fragmentés selon leurs volumes de culling. Fast64/Blender est donc
+un outil optionnel d'inspection et de dérivation visuelle derrière le contrat
+d'adaptateur, pas la fondation universelle du produit.
+
+La prochaine fermeture utile est structurelle : relier les déclarations de scène
+issues de `zeldaret/mm` aux rooms, acteurs, objets, collisions et display lists,
+puis compiler un pack minimal déterministe. Bevy ne doit être branché qu'à ce pack,
+jamais au fichier `.blend` ni aux types Fast64.
