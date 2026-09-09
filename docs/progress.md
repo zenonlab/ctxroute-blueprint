@@ -314,7 +314,7 @@
 - [x] **Restore reproducible sharp dependency resolution** — DONE _(evidence: Clean npm ci payload plus postinstall applies the version-bound Miniflare patch and npm ls sharp all is valid at sharp 0.35.4, npm audit reports zero vulnerabilities; no opaque node_modules artifact is tracked, Worker 32 of 32 and Chrome Firefox MV3 builds pass from the clean dependency tree)_
 - [x] **Certify the corrected local library boundary** — DONE _(evidence: npm run verify passes: 675 workspace tests plus governance coverage, parser equivalence, performance, CRG and integration, Security 21 tests and recovery 30 tests pass; Chrome and Firefox MV3 builds pass, All Archify product views pass showcase 9 of 9; audit reports zero vulnerabilities and boundary diff shows no D1 sync recovery or hook change)_
 
-## Restore the public release snapshot endpoint — ACTIVE
+## Restore the public release snapshot endpoint — DONE
 
 - [x] **Add a bounded release snapshot publication gate** — DONE _(evidence: 19 infrastructure tests pass with fail-closed release publication coverage, npm run verify passes including repeated Chromium IndexedDB contract, production-publication Archify showcase passes 9 of 9 with zero warnings)_
-- [ ] **Publish and verify the empty public snapshot** — PENDING
+- [x] **Publish and verify the empty public snapshot** — DONE _(evidence: Cloudflare plan 45d51fc1 changed only the snapshot and current pointer keys, GET v1 releases returns HTTP 200 revision empty-2026-09-09 and conditional HTTP 304, D1 has no pending migration and both public ZIP hashes remain exact)_

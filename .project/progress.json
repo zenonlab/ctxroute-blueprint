@@ -6510,7 +6510,7 @@
       "schemaVersion": 1,
       "id": "goal-public-release-snapshot",
       "title": "Restore the public release snapshot endpoint",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6544,15 +6544,15 @@
         {
           "id": "step-2",
           "title": "Publish and verify the empty public snapshot",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "The bounded Cloudflare plan changes only the immutable snapshot and current pointer",
             "GET /v1/releases returns a valid empty snapshot with HTTP 200",
             "D1 remains unchanged and public downloads stay healthy"
           ],
           "files": [
-            "build/release-snapshot-empty.json",
-            "build/release-snapshot-current.json",
+            "build/releases/empty-2026-09-09.json",
+            "build/releases/current-empty-2026-09-09.json",
             "build/release-snapshot-cloudflare-plan.json"
           ],
           "commands": [
@@ -6560,7 +6560,11 @@
             "npm run infra:apply",
             "curl https://tobirink.com/v1/releases"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare plan 45d51fc1 changed only the snapshot and current pointer keys",
+            "GET v1 releases returns HTTP 200 revision empty-2026-09-09 and conditional HTTP 304",
+            "D1 has no pending migration and both public ZIP hashes remain exact"
+          ]
         }
       ]
     }
