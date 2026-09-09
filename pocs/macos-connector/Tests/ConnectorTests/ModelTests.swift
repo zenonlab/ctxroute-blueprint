@@ -33,6 +33,7 @@ final class ModelTests: XCTestCase {
         let state = try NativeWire.decode(ThemeState.self, from: legacy)
         XCTAssertTrue(state.muted)
         XCTAssertNil(state.desktopItemsVisible)
+        XCTAssertNil(state.wallpaperVisible)
     }
     func testProviderMachExceptionIsExactAndSandboxRemains() throws {
         let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
@@ -183,6 +184,18 @@ final class ModelTests: XCTestCase {
             action: .desktopItemsUnknown, now: now)
         XCTAssertEqual(session.apply(unknown, now: now).status, .applied)
         XCTAssertNil(session.state.desktopItemsVisible)
+        let occluded = Command(theme: "test", instance: session.instance, generation: 5,
+            action: .wallpaperOccluded, now: now)
+        XCTAssertEqual(session.apply(occluded, now: now).status, .applied)
+        XCTAssertEqual(session.state.wallpaperVisible, false)
+        let visibleAgain = Command(theme: "test", instance: session.instance, generation: 6,
+            action: .wallpaperVisible, now: now)
+        XCTAssertEqual(session.apply(visibleAgain, now: now).status, .applied)
+        XCTAssertEqual(session.state.wallpaperVisible, true)
+        let visibilityUnknown = Command(theme: "test", instance: session.instance, generation: 7,
+            action: .wallpaperVisibilityUnknown, now: now)
+        XCTAssertEqual(session.apply(visibilityUnknown, now: now).status, .applied)
+        XCTAssertNil(session.state.wallpaperVisible)
     }
     func testMailboxRoundTripAndOversize() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

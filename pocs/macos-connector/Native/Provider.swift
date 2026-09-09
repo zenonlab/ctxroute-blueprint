@@ -64,7 +64,8 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
                 surfaces: surfaces.values.filter { $0.themeID == theme.theme_id }.count, configuration: theme)
         }
         let layouts = surfaces.map { id, surface in
-            surface.scene.layout(id: id, display: surface.display, interactive: !sleeping && !surface.suspended)
+            surface.scene.layout(id: id, display: surface.display,
+                interactive: !sleeping && !surface.suspended && sessions[surface.themeID]?.state.wallpaperVisible != false)
         }
         return CatalogStatus(themes: states, layouts: layouts)
     }
@@ -105,7 +106,8 @@ struct Incoming: @unchecked Sendable { let id: Any?; let request: Any? }
     func apply(publishStatus: Bool = true) {
         for surface in surfaces.values {
             guard let state = sessions[surface.themeID]?.state else { continue }
-            surface.scene.apply(state, suspended: sleeping || surface.suspended)
+            surface.scene.apply(state,
+                suspended: sleeping || surface.suspended || state.wallpaperVisible == false)
         }
         CATransaction.flush()
         if publishStatus { publish() }

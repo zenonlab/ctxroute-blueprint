@@ -109,6 +109,9 @@ private final class DesktopGestureEngine: @unchecked Sendable {
     private lazy var tap = DesktopEventTap(handler: { [weak self] type, event in
         guard let self else { return false }
         let outcome = self.engine.consume(type, event)
+        if type == .leftMouseUp || type == .rightMouseUp {
+            Task { @MainActor [weak self] in self?.onPointerActivity?() }
+        }
         if let delivery = outcome.delivery {
             Task { @MainActor [weak self] in
                 self?.trace("intent-dispatched")
@@ -127,6 +130,7 @@ private final class DesktopGestureEngine: @unchecked Sendable {
         }
     }
     var onIntent: ((InteractionIntent, Theme, SurfaceLayout) -> Void)?
+    var onPointerActivity: (() -> Void)?
     var onStatus: ((DesktopTapState, Bool) -> Void)?
     var installed: Bool { tap.isActive }
     var tapLocation: String? { tap.locationName }

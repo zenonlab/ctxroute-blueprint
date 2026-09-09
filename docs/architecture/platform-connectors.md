@@ -105,6 +105,14 @@ porté par chaque événement Core Graphics décide si le geste visait réelleme
 desktop. Une fenêtre de niveau normal garde toujours la priorité. Aucune fenêtre
 d'entrée, transparente ou visible, n'est créée par cette voie.
 
+L'occlusion plein écran ne dépend pas uniquement d'un callback privé du provider.
+Selon [ADR-0057](../decisions/ADR-0057-macos-conservative-occlusion.md), l'agent
+qualifie de façon conservatrice les fenêtres opaques actuellement composées sur les
+écrans des surfaces actives, puis projette cet état par le XPC existant. La détection
+est déclenchée par les événements d'application, de Space, d'écran et de pointeur,
+sans polling. Une ambiguïté conserve le thème actif ; seule l'occlusion totale
+qualifiée suspend son animation.
+
 ### Windows
 
 Connecteur Win32 dédié. Il doit qualifier WorkerW/Explorer sur les versions ciblées,

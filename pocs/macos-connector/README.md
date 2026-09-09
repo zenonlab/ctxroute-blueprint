@@ -5,6 +5,39 @@ Pas de fenêtre de décor superposée, de terminal PTY, de ROM ou de WebView.
 Le PoC1 reste intact. Les gestes macOS sont soumis à Accessibilité et à une
 classification conservatrice du fond Finder ; aucun réglage modifié au lancement.
 
+## Suspension par occlusion — qualification du 9 septembre 2026
+
+Le connecteur qualifie désormais la visibilité des écrans portant une surface active
+sans créer de fenêtre et sans polling. Il relit les fenêtres publiques composées après
+les événements d'application, de Space, d'écran et de relâchement du pointeur. Une
+couverture totale par les fenêtres opaques de couche normale d'un même PID produit
+`wallpaperOccluded` ; une couverture partielle, translucide, multi-application ou
+ambiguë reste visible. Les zones réservées au menu et au Dock sont exclues du test.
+
+Le provider combine ce résultat avec sommeil, session inactive, verrouillage et état
+privé de la surface. Il suspend alors animation et entrée sans détruire ses `CAContext`,
+puis reprend la même scène au retour visible. L'état reste propre à la session du
+thème et transite dans le XPC corrélé existant ; aucune permission ni préférence
+macOS supplémentaire n'est requise. Voir
+[ADR-0057](../../docs/decisions/ADR-0057-macos-conservative-occlusion.md).
+
+Preuve native sur le candidat signé `build.Q4SCpS`, installé avec Orbite sélectionné :
+deux surfaces créées,
+fenêtre opaque de qualification couvrant exactement la zone de travail. La sonde a
+retourné `wallpaper-visibility=occluded`, puis les commandes acquittées
+`wallpaperOccluded` (génération 4) et `wallpaperVisible` (génération 5) après fermeture,
+sans réacquisition des surfaces. Le redémarrage durable de l'agent ne produit plus
+l'état artificiel `Unknown` avant sa première classification. La politique pure
+comporte onze cas. Cette preuve
+valide la transition fonctionnelle ; elle ne remplace pas les mesures énergétiques en
+Joules/Watts ni les essais Spaces, veille et multi-écrans.
+
+Sonde ponctuelle, sans mutation :
+
+```bash
+'$HOME/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app/Contents/MacOS/WallpaperConnector' --probe-visibility
+```
+
 ## Fichiers du bureau — correctif du 9 septembre 2026
 
 L'utilisateur confirme que les intentions du build signé atteignent l'agent, mais

@@ -6,6 +6,19 @@ import ApplicationServices
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
+        if CommandLine.arguments == [CommandLine.arguments[0], "--probe-visibility"] {
+            let displays = NSScreen.screens.compactMap { screen -> CGRect? in
+                guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
+                      let area = DesktopVisibilityPolicy.desktopArea(displayID: id) else { return nil }
+                return area
+            }
+            switch DesktopVisibilityPolicy.current(displays: displays) {
+            case true: print("wallpaper-visibility=visible")
+            case false: print("wallpaper-visibility=occluded")
+            case nil: print("wallpaper-visibility=unknown")
+            }
+            return
+        }
         if CommandLine.arguments == [CommandLine.arguments[0], "--check"] {
             _ = try Theme.catalog()
             let app = NativeWire.appBundle
@@ -102,6 +115,7 @@ import ApplicationServices
     var timeout: Task<Void, Never>?
     let editor = CustomizationModal()
     let input = DesktopInput()
+    let visibility = DesktopVisibility()
     let desktopItems = DesktopItems()
     var desktopItemsMenuItem: NSMenuItem?
     let store = ThemeStore(directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -178,7 +192,9 @@ import ApplicationServices
         statusItem?.menu = statusMenu
         transport.onChange = { [weak self] in self?.receive() }
         input.onIntent = { [weak self] intent, theme, layout in self?.interact(intent, theme: theme, layout: layout) }
+        input.onPointerActivity = { [weak self] in self?.visibility.pointerActivity() }
         input.onStatus = { [weak self] state, trusted in self?.showInputStatus(state, trusted: trusted) }
+        visibility.onChange = { [weak self] in self?.synchronizeNextVisibility() }
         editor.onSave = { [weak self] configuration in
             guard let self else { return }
             send(.configure, configuration: configuration, target: configuration.theme_id) { [weak self] applied in
@@ -327,6 +343,7 @@ import ApplicationServices
         }
     }
     func receive() {
+        visibility.update(transport.status)
         input.catalog = transport.status
         guard let result = transport.status?.theme(pending?.theme_id ?? theme.theme_id) else {
             observed = nil; finish(false); setEnabled(false)
@@ -336,6 +353,7 @@ import ApplicationServices
         guard let pending else {
             restoreNextTheme()
             if self.pending == nil { synchronizeNextDesktopItems() }
+            if self.pending == nil { synchronizeNextVisibility() }
             if self.pending == nil && !confirmedInstances.contains(result.instance) && result.surfaces > 0 { send(.inspect, target: result.theme_id) }
             return
         }
@@ -354,6 +372,7 @@ import ApplicationServices
             "XPC receipt confirmed action=\(pending.action.rawValue, privacy: .public) surfaces=\(result.surfaces) generation=\(result.generation)")
         restoreNextTheme()
         if self.pending == nil { synchronizeNextDesktopItems() }
+        if self.pending == nil { synchronizeNextVisibility() }
     }
     func finish(_ applied: Bool) {
         pending = nil; timeout?.cancel(); themePicker.isEnabled = true
@@ -382,6 +401,18 @@ import ApplicationServices
         let visible = try? desktopItems.isVisible()
         guard let target = transport.status?.themes.first(where: { $0.state.desktopItemsVisible != visible })?.theme_id else { return }
         synchronizeDesktopItems(visible: visible, target: target)
+    }
+    private func synchronizeNextVisibility() {
+        guard pending == nil, let catalog = transport.status else { return }
+        for state in catalog.themes where state.surfaces > 0 {
+            guard let classification = visibility.classification(for: state.theme_id) else { continue }
+            let visible = classification
+            guard state.state.wallpaperVisible != visible else { continue }
+            let action: ThemeAction = visible.map { $0 ? .wallpaperVisible : .wallpaperOccluded }
+                ?? .wallpaperVisibilityUnknown
+            send(action, target: state.theme_id)
+            return
+        }
     }
     func setEnabled(_ enabled: Bool) {
         themePicker.isEnabled = pending == nil

@@ -1,6 +1,6 @@
 # PoC macOS 2 — connecteur natif maintenable
 
-État au 9 septembre 2026 : **tranche interactive validée sur MAC-01 ; clôture complète restante**.
+État au 9 septembre 2026 : **tranche interactive et suspension par occlusion validées sur MAC-01 ; clôture complète restante**.
 Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
 Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
 Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
@@ -127,6 +127,29 @@ compté ensemble.
 | M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
 
 ## Conditions de sortie
+
+### Suspension par occlusion qualifiée — 9 septembre 2026, 12:38
+
+[ADR-0057](../decisions/ADR-0057-macos-conservative-occlusion.md) ajoute une
+classification événementielle et conservatrice dans l'agent. Elle considère la zone
+de travail de chaque écran actif, accepte la réunion des fragments WindowServer d'un
+même PID seulement, et refuse de déduire une couverture à partir de fenêtres
+translucides, partielles ou appartenant à plusieurs applications. Le provider reçoit
+les trois états typés par le XPC déjà qualifié et combine l'occlusion avec ses états
+de sommeil, session et surface. Aucun timer, calque, fenêtre ou droit supplémentaire
+n'est introduit.
+
+Sur le candidat signé `build.Q4SCpS` installé, la sélection Orbite a créé deux
+surfaces puis confirmé `wallpaperVisible`. Une fenêtre opaque temporaire couvrant
+exactement la zone de travail a fait retourner `wallpaper-visibility=occluded` et
+produire la quittance `wallpaperOccluded`, génération 4. Sa fermeture a produit `wallpaperVisible`,
+génération 5, avec les deux surfaces conservées. Une reconnexion attend sa première
+classification au lieu d'émettre un faux état inconnu. Onze cas purs vérifient
+géométries, alpha, couche, PID exclu, multi-écrans et réunion/refus des fragments.
+
+Cette preuve avance M2-03 et M2-07, mais ne les clôt pas : veille/réveil, Spaces,
+multi-écrans réels et delta énergétique en Joules/Watts restent à mesurer. Une
+visibilité inconnue garde volontairement le rendu actif.
 
 ### Qualification fonctionnelle locale — 9 septembre 2026, 11:26
 

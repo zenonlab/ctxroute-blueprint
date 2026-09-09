@@ -1,5 +1,27 @@
 # Reprise de session — Wallpaper
 
+## État courant — suspension par occlusion qualifiée, 9 septembre 2026, 12:38
+
+Le candidat signé `build.Q4SCpS` est installé dans
+`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app` avec la même identité
+locale stable, et Orbite est de nouveau le fond actif. Son
+catalogue contient Orbite, Lagon et Ambre statique ; deux surfaces natives sont
+actives. L'agent persistant conserve Accessibilité et le tap HID actif.
+
+ADR-0057 ajoute une détection conservatrice, événementielle et sans polling de la
+couverture totale des zones de travail. Le test réel d'une fenêtre opaque temporaire
+a produit `wallpaper-visibility=occluded`, une quittance provider
+`wallpaperOccluded` génération 4, puis `wallpaperVisible` génération 5 à la fermeture,
+avec deux surfaces conservées. Le catalogue macOS a nécessité un redémarrage borné de
+WallpaperAgent après réinstallation ; aucun fichier utilisateur n'a été supprimé.
+
+Le paquet installé est identique au candidat pour le lanceur et le provider. SwiftPM
+compte 35 tests passants, le test natif 11 cas d'occlusion, et Archify passe 9/9 sans
+erreur ni avertissement. Le gate complet `npm run verify` passe après la dernière
+modification de code. Les prochaines preuves produit
+restent Spaces, veille/réveil, multi-écrans, priorité d'une icône Finder superposée et
+mesure énergétique incrémentale ; elles ne doivent pas être déclarées acquises.
+
 ## Validation utilisateur de la tranche interactive — 9 septembre 2026, 11:26
 
 Le paquet installé issu de `build.F2Tqc0` est validé fonctionnellement par
