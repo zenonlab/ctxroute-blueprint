@@ -69,6 +69,13 @@ interaction, overlay et profil énergétique restent dans le runtime. L'intentio
 `SetDesktopItemsVisibility` traverse C5 ; son état final vient exclusivement du
 connecteur. Aucun toggle ne déduit le nouvel état en inversant une valeur locale.
 
+[ADR-0065](../decisions/ADR-0065-deterministic-theme-behavior-kernel.md) précise C2 :
+le contrôle active un noyau comportemental à pas fixe et l'hôte reçoit des snapshots
+interpolables. Formation, récupération et directeur caméra échangent identités et
+transforms canoniques, jamais des objets Bevy/Godot ou de l'émulateur. L'horloge,
+l'autorité de transformation et la politique de reprise sont explicites ; aucun état
+complet n'est renvoyé entre modules à chaque frame.
+
 ## Identités, versions et migration
 
 Les [contrôleurs préparés par IA](ai-prepared-behaviors.md) réutilisent C0–C6 :

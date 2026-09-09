@@ -122,6 +122,9 @@ production n'en est tirée avant build release et protocole répété. Voir ADR-
 | D1-23 | les rigs `fixed`, `orbit` et `rail` utilisent le même contrat, respectent leurs bornes et restaurent le preset du thème |
 | D1-24 | la fin du contrôle caméra supprime ses invalidations ; mouvements réduits, pause et occlusion arrêtent la progression attendue |
 | D1-25 | une seconde fixture 2D prouve que variantes de sprite et `parallax_2d` utilisent la même modale sans dépendance au jeu ou à l'émulateur source |
+| D1-26 | huit instances bouclent sur un circuit 3D avec raccord continu, places stables et une seule autorité de transformation |
+| D1-27 | le directeur caméra maintient les ancres du groupe dans la safe area pendant les virages sans téléportation ni correction de trajectoire |
+| D1-28 | mêmes seed, événements et pas produisent les mêmes snapshots ; suspension/reprise n'entraîne ni rattrapage illimité ni rafale d'actions |
 
 ## Hors périmètre
 

@@ -79,9 +79,9 @@ E2 les sonde avec des doubles sans construire les fonctions complètes.
 
 ## Vérification du socle
 
-Les [tests A01–A08](architecture/ai-prepared-behaviors.md#preuves-ciblées-et-prochaine-étape)
+Les [tests A01–A12](architecture/ai-prepared-behaviors.md#preuves-ciblées-et-prochaine-étape)
 qualifient contrôleurs 2D/3D/custom, trajectoires réelles, formation, récupération,
-absence de LLM à l'activation, état inconnu et sécurité des sorties générées.
+absence de LLM à l'activation, état inconnu, cadrage et sécurité des sorties générées.
 Fixtures originales et invariants indépendants du générateur ; tests prévus,
 non exécutés. Mesurer les contrôleurs séparément du rendu et du terminal.
 
@@ -200,6 +200,10 @@ Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructur
 | P31 | Passer de `fixed` à `orbit`, puis à `rail` | Paramètres bornés, reset reproductible et absence de capture globale hors du mode caméra explicite. |
 | P32 | Fermer le contrôle caméra ou masquer le bureau | Aucune invalidation propre à la caméra après stabilisation ; progression suspendue conformément au profil. |
 | P33 | Charger les mêmes contrats depuis une fixture 2D puis 3D | UI et intentions identiques ; seuls l'adaptateur, les ressources et les capacités déclarées diffèrent. |
+| P34 | Boucler plusieurs formations sur le même circuit | Raccord continu en position, tangente, orientation et vitesse ; identités et ordre restent stables. |
+| P35 | Ajouter/retirer une session dans un virage | Transition bornée des slots et du cadrage ; aucun téléport, chevauchement silencieux ou changement d'identité. |
+| P36 | Forcer un groupe trop large pour la safe area | Fallback déclaré appliqué ; ni sortie de piste ni FOV hors bornes pour conserver artificiellement le cadre. |
+| P37 | Rejouer une sortie IA sans modèle ni réseau | Snapshots et diagnostics reproductibles ; capacité ou invariant absent entraîne un refus explicite. |
 
 Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
 par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.

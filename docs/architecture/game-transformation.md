@@ -59,6 +59,12 @@ appels au moteur source. Le thème leur applique ensuite notre identité d'insta
 nos liaisons de sessions et nos règles de caméra. Voir
 [ADR-0064](../decisions/ADR-0064-source-neutral-appearance-and-camera-rigs.md).
 
+Les contrôleurs compilés s'exécutent dans notre noyau comportemental déterministe.
+Formation, raccords de boucle, récupération et cadrage de groupe sont nos capacités
+réutilisables ; l'adaptateur fournit les données et relations nécessaires, pas une
+boucle d'émulateur. Voir
+[ADR-0065](../decisions/ADR-0065-deterministic-theme-behavior-kernel.md).
+
 ## Intention confirmée
 
 L'infrastructure doit permettre de programmer des expériences à partir de jeux

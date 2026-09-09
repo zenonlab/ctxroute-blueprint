@@ -13,10 +13,10 @@
     { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "SQLite · 22 377 blobs privés", "pos": [970, 90], "size": [260, 80] },
     { "id": "qualification", "type": "security", "label": "Qualification par capacité", "sublabel": "Exact · approché · manquant", "pos": [335, 270], "size": [260, 80] },
     { "id": "coverage", "type": "security", "label": "Rapport de couverture", "sublabel": "Complet · partiel · inconnu", "pos": [660, 270], "size": [260, 80] },
-    { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Notre logique et nos créations", "pos": [40, 280], "size": [250, 80] },
-    { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Assets · instances · clips · caméra", "pos": [1010, 460], "size": [260, 80] },
-    { "id": "runtime", "type": "frontend", "label": "Orchestrateur de thème", "sublabel": "Bevy · ECS · interactions", "pos": [680, 460], "size": [240, 80] },
-    { "id": "render-profile", "type": "backend", "label": "Profil de rendu source", "sublabel": "glTF · N64 F3DEX2 · extensible", "pos": [350, 460], "size": [250, 80] }
+    { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Intentions · contraintes · créations", "pos": [40, 280], "size": [250, 80] },
+    { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Contrôleurs · formation · camera rigs", "pos": [1010, 460], "size": [260, 80] },
+    { "id": "runtime", "type": "frontend", "label": "Moteur déterministe", "sublabel": "Horloge · états · trajectoires", "pos": [680, 460], "size": [240, 80] },
+    { "id": "render-profile", "type": "backend", "label": "Hôte de présentation", "sublabel": "2D/3D · profil source · interpolation", "pos": [350, 460], "size": [250, 80] }
   ],
   "connections": [
     { "id": "read", "from": "game", "to": "readers", "label": "inventorier sans exécuter", "labelAt": [305, 184] },
@@ -28,8 +28,8 @@
     { "id": "report-capability", "from": "qualification", "to": "coverage", "label": "aucune dégradation muette", "labelAt": [628, 257] },
     { "id": "audit", "from": "library", "to": "coverage", "label": "mesurer chaque catégorie", "labelAt": [925, 255] },
     { "id": "select", "from": "library", "to": "composition", "label": "résoudre les dépendances", "fromSide": "bottom", "toSide": "top", "labelAt": [1100, 405] },
-    { "id": "execute", "from": "composition", "to": "runtime", "label": "charger le strict nécessaire", "labelAt": [965, 554] },
-    { "id": "draw", "from": "runtime", "to": "render-profile", "label": "dessiner selon le profil", "labelAt": [640, 554] },
-    { "id": "recipe", "from": "recipes", "to": "composition", "label": "résoudre les références locales", "fromSide": "bottom", "toSide": "left", "via": [[165, 400], [985, 400], [985, 500]] }
+    { "id": "execute", "from": "composition", "to": "runtime", "label": "plan d'exécution minimal", "labelAt": [965, 554] },
+    { "id": "draw", "from": "runtime", "to": "render-profile", "label": "états interpolés", "labelAt": [640, 554] },
+    { "id": "recipe", "from": "recipes", "to": "composition", "label": "configurer sans assets privés", "fromSide": "bottom", "toSide": "left", "via": [[165, 400], [985, 400], [985, 500]] }
   ]
 }

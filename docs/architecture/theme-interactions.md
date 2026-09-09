@@ -245,7 +245,7 @@ Le [cas course et formation](ai-prepared-behaviors.md#cas-course--vrais-virages-
 ajoute un comportement spatial réel : trajectoire, virages, place stable par
 session et récupération visuelle. Ce n'est pas un simple mouvement du fond derrière
 des icônes fixes. Les contrôleurs partagent une autorité de transformation explicite
-et ne modifient pas les sessions. Tests A01–A08 complémentaires aux I ci-dessous.
+et ne modifient pas les sessions. Tests A01–A12 complémentaires aux I ci-dessous.
 
 E2 ajoute à la scène synthétique : un objet ouvrant un panneau, un bouton animant
 un autre objet et un effet, puis un retour d'état à la fin. Variante à cible absente

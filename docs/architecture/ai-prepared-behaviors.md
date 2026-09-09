@@ -10,7 +10,7 @@ Voir [ADR-0041](../decisions/ADR-0041-ai-prepared-selective-behaviors.md),
 Direction retenue pour expérimentation, non solution optimale démontrée.
 Le [plan L1–L3](../05-poc-start-plan.md) borne les premières implémentations :
 contrôleurs compilés relus, données originales, événements simulés ; pas de code
-généré exécuté ni de parseur universel. A01–A08 restent des tests à réaliser.
+généré exécuté ni de parseur universel. A01–A12 restent des tests à réaliser.
 
 **L'IA prépare une composition vérifiée ; un runtime déterministe l'exécute.**
 L'utilisateur décrit le résultat voulu, pas une liste de parseurs à assembler.
@@ -28,6 +28,9 @@ Le choix par défaut est **données originales utiles + contrôleurs de thème
 adaptés**, avec portage de logique originale seulement lorsqu'il est pertinent
 et isolable. Le rendu, le mouvement réel, les effets et les panneaux restent
 programmables. Ce choix ne remplace pas une course demandée par des icônes fixes.
+
+La décision complémentaire [ADR-0065](../decisions/ADR-0065-deterministic-theme-behavior-kernel.md)
+sépare le noyau comportemental, le directeur caméra et l'hôte de présentation.
 
 ## Arbitrage des approches
 
@@ -119,6 +122,79 @@ Les extensions ne sont pas des bibliothèques natives arbitraires chargées dans
 le processus ; leur contrat, isolation et quotas doivent être définis avant
 exécution. Aucun choix obligatoire de Wasm ou autre langage n'est acté ici.
 
+## Noyau de comportement propre au thème
+
+Le produit ne crée pas un moteur permanent par console ou émulateur. Il possède un
+petit noyau déterministe indépendant du rendu, composé de capacités activées à la
+demande :
+
+| Capacité | Responsabilité | N'est pas responsable de |
+| --- | --- | --- |
+| Horloge de simulation | pas fixe, pause, reprise et interpolation bornée | cadence de l'écran ou rattrapage infini après veille |
+| État d'entité | identité, rôle, session, apparence et état comportemental | ressource GPU ou processus PTY |
+| Échantillonneur de chemin | progression curviligne, orientation et raccord de boucle | choix artistique du circuit |
+| Solveur de formation | places stables, transitions et enveloppe autorisée | IA compétitive complète du jeu source |
+| Graphe d'actions | événements, états, animations, effets et récupération | appels OS non autorisés |
+| Directeur caméra | rig, cible, cadrage de groupe, safe area et lissage | transformation des règles de simulation |
+| Projection de présentation | snapshot interpolé pour l'hôte 2D/3D | mutation de l'état logique |
+
+Le contrôleur s'exécute sur un pas fixe indépendant du framerate. Le rendu peut
+interpoler entre deux snapshots sans modifier le résultat logique. Après suspension,
+le thème choisit explicitement `freeze`, `resume` ou une avance temporelle bornée ;
+il ne rejoue jamais des milliers de pas ni des actions externes manquées.
+
+Une seule autorité écrit chaque transformation à un instant donné. Le contrôleur de
+formation la possède normalement ; une transition ou une récupération peut la
+prendre temporairement selon un arbitrage explicite, puis la restituer. Caméra,
+apparence et UI observent cette transformation sans devenir des autorités cachées.
+
+### Boucles et grand nombre d'entités
+
+Un chemin bouclé est préparé hors ligne avec longueurs cumulées et repères stables.
+Le raccord final doit conserver au minimum position et tangente ; un saut de position,
+d'orientation ou de vitesse au passage `fin → début` invalide la boucle. Les chemins
+à étages, embranchements ou raccourcis gardent un identifiant de branche et une
+enveloppe navigable au lieu d'être réduits à une simple liste de points.
+
+La progression de groupe est une coordonnée curviligne. Chaque instance reçoit un
+slot longitudinal et latéral stable, borné par l'enveloppe locale. Le solveur travaille
+sur les slots et l'ordre du parcours, pas sur toutes les paires de véhicules. Le
+plafond d'entités visibles, les niveaux de détail et la fréquence du contrôleur sont
+des paramètres de profil ; aucune boucle ou collision générale n'est activée si la
+composition n'en a pas besoin.
+
+### Directeur caméra et maintien dans le cadre
+
+« Garder les karts dans le plan » est une contrainte du directeur caméra, pas une
+raison de déplacer les véhicules hors de leur trajectoire. À chaque snapshot utile,
+le directeur calcule un volume de cadrage à partir des ancres de présentation des
+entités visibles, de l'aspect de l'écran et de la safe area réservée à l'UI. Le rig
+détermine ensuite cible, distance ou zoom nécessaires dans ses bornes déclarées.
+
+Le mouvement est lissé avec des limites de vitesse linéaire et angulaire afin d'éviter
+les téléportations. Un changement de cible, l'ajout d'une session ou un virage serré
+produit une transition, pas un nouveau cadrage instantané. Collision caméra,
+occlusion géométrique et correction de ligne de vue restent des capacités optionnelles.
+
+Si le groupe ne peut pas tenir dans le cadre tout en respectant FOV, circuit et safe
+area, le thème applique un fallback déclaré : élargir dans les bornes, passer à un
+rig de groupe, réduire le nombre d'instances présentées ou paginer. Il ne déforme pas
+la simulation et ne prétend pas conserver une ligne écran impossible.
+
+### Travail de l'IA
+
+L'IA agit dans la préparation hors ligne. Elle reçoit les capacités du noyau, les
+relations extraites, les contraintes du thème et des fixtures de référence. Elle
+configure les primitives existantes ou produit un contrôleur isolé lorsqu'une logique
+manque, puis livre : configuration, dépendances, invariants, traces déterministes et
+tests. Le résultat doit fonctionner sans modèle ni réseau.
+
+L'IA ne choisit pas une position par frame, ne corrige pas la caméra en direct et ne
+certifie pas seule son code. Le validateur rejoue les mêmes entrées avec la même seed,
+contrôle raccord de boucle, enveloppe de piste, stabilité des identités, autorité des
+transforms, cadrage et budget. Une extension non implémentée reste indisponible même
+si le manifeste généré la demande.
+
 ## Cas course : vrais virages, formation stable et sessions
 
 Le besoin est une course dans le monde, pas des véhicules immobiles avec décor
@@ -153,6 +229,11 @@ ne pas traiter les chemins gauche/droite comme des bords sûrs sans vérificatio
    stable dans le monde n'impose pas une ligne de pixels exacte dans tous les
    virages. Si l'alignement écran est indispensable, qualifier caméra et parcours
    compatibles ; ne pas sortir les karts de la route pour forcer cette contrainte.
+
+Le directeur caméra utilise les ancres du groupe et la safe area du thème. Il anticipe
+un horizon borné du chemin pour réduire les corrections dans les virages, mais ne lit
+ni logique de bot ni mémoire de l'émulateur. La caméra suit le snapshot du contrôleur ;
+elle ne devient jamais propriétaire des transformations des véhicules.
 
 En voie étroite, une ligne latérale fixe peut être impossible. Prévoir formation
 en file, autre trajet ou réduction des éléments visibles seulement si le thème
@@ -219,6 +300,10 @@ vers le même contrat. Le cas course complète I01, il ne demande pas trois mote
 | A06 — État inconnu | Silence, événements périmés et déconnexion ne fabriquent ni succès ni relance |
 | A07 — Sortie générée hostile | Référence, import, permission ou quota invalide refusé ; code privé non exporté |
 | A08 — Sobriété | Coût des contrôleurs isolé du rendu et du terminal ; suspendre/reprendre sans saut ni rafale externe |
+| A09 — Raccord de boucle | Position, tangente, orientation et vitesse restent continues au passage fin → début |
+| A10 — Cadrage de groupe | Ajout/retrait et virages gardent les ancres dans la safe area sans téléportation ni sortie de piste |
+| A11 — Déterminisme | Même seed, événements et pas produisent les mêmes snapshots et transitions pour plusieurs tailles de formation |
+| A12 — IA hors ligne | Contrôleur généré rejoué sans modèle/réseau et refusé si invariant, quota ou capacité manque |
 
 E1 définit les fixtures et le périmètre initial ; E2 éprouve le contrôleur minimal
 avec événements synthétiques ; E3 stabilise les contrats ; E4 branche les sessions
