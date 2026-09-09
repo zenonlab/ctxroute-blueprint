@@ -6,7 +6,7 @@ import type { MemberNavigationConfig } from '../../navigation/member-navigation'
 import { LibraryFilters } from '../library-filters';
 import type { LibraryFilterOptions, LibraryFiltersValue } from '../library-filters';
 import { WorkCard } from '../work-card';
-import type { LibraryState, LibraryVariant, LibraryWork } from './library-surface.contract';
+import type { LibraryState, LibraryStatistics, LibraryVariant, LibraryWork } from './library-surface.contract';
 import styles from './Library.module.css';
 
 export interface LibraryProps {
@@ -22,6 +22,7 @@ export interface LibraryProps {
   onOpenRecovery: () => void;
   onRetry: () => void;
   state: LibraryState;
+  statistics?: LibraryStatistics;
   variant?: LibraryVariant;
 }
 
@@ -38,6 +39,7 @@ export function Library({
   onOpenRecovery,
   onRetry,
   state,
+  statistics,
   variant = 'library',
 }: LibraryProps) {
   const usable = state === 'ready' || state === 'review' || state === 'partial' || state === 'offline';
@@ -72,6 +74,14 @@ export function Library({
         {usable ? (
           <>
             <LibraryFilters onChange={onChangeFilters} options={filterOptions} value={filters} />
+            {statistics ? (
+              <dl aria-label="Statistiques de la bibliothèque" className={styles.statistics}>
+                <div><dt>Œuvres</dt><dd>{statistics.total}</dd></div>
+                <div><dt>En cours</dt><dd>{statistics.inProgress}</dd></div>
+                <div><dt>Terminées</dt><dd>{statistics.completed}</dd></div>
+                <div><dt>Métadonnées</dt><dd>{statistics.knownMetadata}</dd></div>
+              </dl>
+            ) : null}
             {state === 'partial' ? <Status tone="accent">Métadonnées incomplètes · données enregistrées disponibles</Status> : null}
             {state === 'offline' ? <Status tone="warning">Hors ligne · recherche et progression disponibles</Status> : null}
             {items.length === 0 ? (
@@ -83,7 +93,7 @@ export function Library({
                     coverAlt={item.coverAlt}
                     coverSrc={item.coverSrc}
                     context={item.mediaType}
-                    detail={item.source}
+                    detail={item.detail ?? item.source}
                     href={item.href ?? `#work-${item.id}`}
                     indicator={item.progress}
                     key={item.id}

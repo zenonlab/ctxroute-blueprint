@@ -6249,7 +6249,7 @@
         {
           "id": "step-2",
           "title": "Implement full-library facets sorting statistics and organizer statuses",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Filtering and sorting happen before pagination over the complete bounded local library query",
             "Genre, status, type, format, year, progress, source and popularity filters and sorts are deterministic; missing values stay visible and sort last",
@@ -6277,7 +6277,11 @@
             "git diff --check",
             "git commit message feat(library): add stable metadata facets and sorting"
           ],
-          "evidence": []
+          "evidence": [
+            "Application 262, UI 127 and extension 114 tests pass; strict catalogue message supports stable seven-facet multi-selection before pagination",
+            "Organizer preview now uses hydrated editorial status, detailed media type and personal progress; targeted organizer and catalogue tests pass",
+            "Chrome and Firefox MV3 builds, all workspace typechecks, accessibility 8, security 21, Sensor SAFE and Archify showcase 9/9 pass"
+          ]
         },
         {
           "id": "step-3",

@@ -303,5 +303,5 @@
 ## Add local library metadata facets sorting and statistics — ACTIVE
 
 - [x] **Add canonical provider metadata and additive local persistence** — DONE _(evidence: Provider contract and four adapters map strict optional status, year, totals, genres and comparable popularity without changing matcher rules, IndexedDB v13 adds metadata indexes; migrations, storage, recovery and all workspace typechecks pass, Domain 24, application 259, contracts 16 and provider adapter 35 tests pass; Archify showcase 9 of 9 and ADR validation pass)_
-- [ ] **Implement full-library facets sorting statistics and organizer statuses** — PENDING
+- [x] **Implement full-library facets sorting statistics and organizer statuses** — DONE _(evidence: Application 262, UI 127 and extension 114 tests pass; strict catalogue message supports stable seven-facet multi-selection before pagination, Organizer preview now uses hydrated editorial status, detailed media type and personal progress; targeted organizer and catalogue tests pass, Chrome and Firefox MV3 builds, all workspace typechecks, accessibility 8, security 21, Sensor SAFE and Archify showcase 9/9 pass)_
 - [ ] **Document and verify the local metadata boundary** — PENDING

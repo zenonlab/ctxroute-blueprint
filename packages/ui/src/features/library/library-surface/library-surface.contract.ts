@@ -7,10 +7,19 @@ export type LibraryState = (typeof libraryStates)[number];
 export interface LibraryWork {
   coverAlt?: string;
   coverSrc?: string;
+  detail?: string;
   href?: string;
   id: string;
   mediaType: string;
   progress?: string;
   source: string;
   title: string;
+}
+
+export interface LibraryStatistics {
+  completed: number;
+  inProgress: number;
+  knownMetadata: number;
+  notStarted: number;
+  total: number;
 }

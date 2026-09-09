@@ -1,5 +1,5 @@
 import { createOrganizerConfiguration } from '@tobirink/domain';
-import type { FavoriteSource, OrganizerConfiguration, OrganizerFolder, OrganizerMediaType, Work } from '@tobirink/domain';
+import type { FavoriteSource, OrganizerConfiguration, OrganizerEditorialStatus, OrganizerFolder, OrganizerMediaType, OrganizerProgressState, Progress, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { buildOrganizerPreview } from './build-organizer-preview';
 import type { OrganizerPreviewItem, OrganizerWorkContext } from './build-organizer-preview';
@@ -15,18 +15,39 @@ export interface OrganizerPreviewSnapshot {
 }
 
 function mediaType(work: Work): OrganizerMediaType {
-  return work.mediaKind === 'anime' ? 'ANIME' : 'MANGA';
+  return work.hydration?.candidate.mediaKind ?? (work.mediaKind === 'anime' ? 'ANIME' : 'MANGA');
 }
 
-function needsUnavailableMetadata(folders: readonly OrganizerFolder[]): boolean {
-  return folders.some((folder) => {
+interface OrganizerMetadataNeeds { progress: boolean; status: boolean }
+
+function needsMetadata(folders: readonly OrganizerFolder[], parentEnabled = true): OrganizerMetadataNeeds {
+  let progress = false;
+  let status = false;
+  for (const folder of folders) {
+    const enabled = parentEnabled && folder.enabled;
+    if (!enabled) continue;
     const conditions = folder.conditions;
-    return Boolean(conditions && (
-      conditions.editorialStatuses.length > 0
-      || conditions.progressStates.length > 0
-      || conditions.minimumStoppedProgress !== undefined
-    )) || needsUnavailableMetadata(folder.children);
-  });
+    status ||= Boolean(conditions && conditions.editorialStatuses.length > 0);
+    progress ||= Boolean(conditions && (conditions.progressStates.length > 0 || conditions.minimumStoppedProgress !== undefined));
+    const children = needsMetadata(folder.children, enabled);
+    status ||= children.status;
+    progress ||= children.progress;
+  }
+  return { progress, status };
+}
+
+function editorialStatus(work: Work): OrganizerEditorialStatus | undefined {
+  const status = work.hydration?.candidate.editorialStatus;
+  if (status === 'ONGOING') return 'Ongoing';
+  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'HIATUS') return 'Hiatus';
+  if (status === 'CANCELLED') return 'Cancelled';
+  return undefined;
+}
+
+function progressState(progress: Progress | undefined): OrganizerProgressState | undefined {
+  if (progress === undefined) return undefined;
+  return progress.maximum !== undefined && progress.value >= progress.maximum ? 'finished' : 'active';
 }
 
 async function readFavoriteSources(storage: Pick<StoragePort, 'listFavoriteSources'>): Promise<{ sources: readonly FavoriteSource[]; truncated: boolean }> {
@@ -62,10 +83,11 @@ export async function readOrganizerPreview(
   configuration: OrganizerConfiguration,
 ): Promise<OrganizerPreviewSnapshot> {
   const validated = createOrganizerConfiguration(configuration);
-  return storage.transaction(['favoriteSources', 'reviews', 'works'], async (session) => {
+  return storage.transaction(['favoriteSources', 'progress', 'reviews', 'works'], async (session) => {
     const { sources, truncated } = await readFavoriteSources(session);
     const contexts: OrganizerWorkContext[] = [];
-    let incomplete = needsUnavailableMetadata(validated.folders);
+    let incomplete = false;
+    const required = needsMetadata(validated.folders);
 
     for (const source of sources) {
       const review = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
@@ -81,7 +103,15 @@ export async function readOrganizerPreview(
         contexts.push({ bookmarkId: source.bookmarkId, recognized: false });
         continue;
       }
-      contexts.push({ bookmarkId: source.bookmarkId, mediaType: mediaType(work), recognized: true });
+      const status = editorialStatus(work);
+      const progress = await session.findProgressByWorkId(work.id);
+      const personalState = progressState(progress);
+      if ((required.status && status === undefined) || (required.progress && personalState === undefined)) incomplete = true;
+      const context: OrganizerWorkContext = { bookmarkId: source.bookmarkId, mediaType: mediaType(work), recognized: true };
+      if (status !== undefined) Object.assign(context, { editorialStatus: status });
+      if (personalState !== undefined) Object.assign(context, { progressState: personalState });
+      if (progress !== undefined) Object.assign(context, { progressNumber: progress.value });
+      contexts.push(context);
     }
 
     return Object.freeze({

@@ -9,8 +9,8 @@ import { Popup } from '../entrypoints/popup';
 import type { PopupWork } from '../entrypoints/popup';
 import { Review } from '../entrypoints/review';
 import type { NavigationTarget } from './messages';
-import { readLibraryPageMessage, readLibrarySearchMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
-import type { LibraryPageResponse } from './messages';
+import { readLibraryCatalogueMessage, readPopupContextMessage, sendExtensionMessage } from './messages';
+import type { LibraryCatalogueResponse } from './messages';
 import { useLocalAgenda } from './use-local-agenda';
 import { useLocalOrganizerSettings } from './use-local-organizer-settings';
 import { useLocalReviewNavigation } from './use-local-review-navigation';
@@ -31,78 +31,69 @@ function LibrarySurface() {
   const [filters, setFilters] = useState<LibraryFiltersValue>({ ...emptyLibraryFilters, query: initialQuery });
   const [loadKey, setLoadKey] = useState(0);
   const [model, setModel] = useState<{
-    items: Extract<LibraryPageResponse, { ok: true }>['snapshot']['items'];
+    facets: Extract<LibraryCatalogueResponse, { ok: true }>['snapshot']['facets'];
+    items: Extract<LibraryCatalogueResponse, { ok: true }>['snapshot']['items'];
     loadingMore: boolean;
-    nextCursor?: string;
+    nextOffset?: number;
     state: 'empty' | 'error' | 'loading' | 'partial' | 'ready';
-  }>({ items: [], loadingMore: false, state: 'loading' });
+    statistics?: Extract<LibraryCatalogueResponse, { ok: true }>['snapshot']['statistics'];
+  }>({ facets: { format: [], genre: [], progress: [], source: [], status: [], type: [], year: [] }, items: [], loadingMore: false, state: 'loading' });
   const navigation = useLocalReviewNavigation('library');
-
-  const filterOptions = useMemo(() => ({
-    progress: [],
-    status: [],
-    type: (['manga', 'anime'] as const).flatMap((value) => {
-      const count = model.items.filter((item) => item.mediaType === value).length;
-      return count > 0 ? [{ count, label: value === 'manga' ? 'Manga' : 'Anime', value }] : [];
-    }),
-  }), [model.items]);
-  const visibleItems = useMemo(() => {
-    const query = filters.query.trim().toLocaleLowerCase('fr');
-    const hasIncludedType = Object.values(filters.type).includes('include');
-    return model.items.filter((item) => {
-      const typeState = filters.type[item.mediaType];
-      const matchesType = typeState !== 'exclude' && (!hasIncludedType || typeState === 'include');
-      return matchesType && (query.length === 0 || item.title.toLocaleLowerCase('fr').includes(query));
-    });
-  }, [filters.query, filters.type, model.items]);
+  const catalogueInput = useMemo(() => ({
+    facets: { format: filters.format, genre: filters.genre, progress: filters.progress, source: filters.source, status: filters.status, type: filters.type, year: filters.year },
+    query: filters.query,
+    sort: filters.sort,
+  }), [filters]);
 
   useEffect(() => {
     let active = true;
-    setModel({ items: [], loadingMore: false, state: 'loading' });
-    const request = initialQuery ? readLibrarySearchMessage(initialQuery) : readLibraryPageMessage();
-    void request.then((snapshot) => {
+    setModel((current) => current.statistics === undefined
+      ? { ...current, items: [], loadingMore: false, state: 'loading' }
+      : current);
+    void readLibraryCatalogueMessage(catalogueInput).then((snapshot) => {
       if (!active) return;
-      if ('truncated' in snapshot) {
-        setModel({ items: snapshot.items, loadingMore: false, state: snapshot.items.length > 0 ? 'ready' : 'empty' });
-        return;
-      }
       setModel({
+        facets: snapshot.facets,
         items: snapshot.items,
         loadingMore: false,
-        nextCursor: snapshot.nextCursor,
-        state: snapshot.missingWorkIds.length > 0 ? 'partial' : snapshot.items.length > 0 ? 'ready' : 'empty',
+        nextOffset: snapshot.nextOffset,
+        state: snapshot.truncated ? 'partial' : snapshot.statistics.total > 0 ? 'ready' : 'empty',
+        statistics: snapshot.statistics,
       });
     }).catch(() => {
-      if (active) setModel({ items: [], loadingMore: false, state: 'error' });
+      if (active) setModel((current) => ({ ...current, items: [], loadingMore: false, state: 'error' }));
     });
     return () => { active = false; };
-  }, [initialQuery, loadKey]);
+  }, [catalogueInput, loadKey]);
 
   const loadMore = useCallback(() => {
-    if (!model.nextCursor || model.loadingMore) return;
+    if (model.nextOffset === undefined || model.loadingMore) return;
     setModel((current) => ({ ...current, loadingMore: true }));
-    void readLibraryPageMessage(model.nextCursor).then((snapshot) => {
+    void readLibraryCatalogueMessage({ ...catalogueInput, offset: model.nextOffset }).then((snapshot) => {
       setModel((current) => ({
+        facets: snapshot.facets,
         items: [...current.items, ...snapshot.items],
         loadingMore: false,
-        nextCursor: snapshot.nextCursor,
-        state: current.state === 'partial' || snapshot.missingWorkIds.length > 0 ? 'partial' : 'ready',
+        nextOffset: snapshot.nextOffset,
+        state: snapshot.truncated ? 'partial' : 'ready',
+        statistics: snapshot.statistics,
       }));
     }).catch(() => setModel((current) => ({ ...current, loadingMore: false })));
-  }, [model.loadingMore, model.nextCursor]);
+  }, [catalogueInput, model.loadingMore, model.nextOffset]);
 
   return (
     <Library
-      filterOptions={filterOptions}
+      filterOptions={model.facets}
       filters={filters}
-      hasMore={Boolean(model.nextCursor)}
-      items={visibleItems}
+      hasMore={model.nextOffset !== undefined}
+      items={model.items}
       navigation={navigation}
       onChangeFilters={setFilters}
       onLoadMore={loadMore}
       onOpenRecovery={() => open('settings')}
       onRetry={() => setLoadKey((key) => key + 1)}
       state={model.state}
+      statistics={model.statistics}
     />
   );
 }

@@ -20,6 +20,7 @@ import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProvid
 import { libraryId, workId } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
+import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-catalogue-runtime';
 import { drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
@@ -183,6 +184,14 @@ export default defineBackground({
           };
         } catch {
           return { error: 'library-page-unavailable', ok: false };
+        }
+      }
+      if (parsed.data.type === 'library.catalogue.read') {
+        try {
+          await privateStorage.ensureReady();
+          return { ok: true, snapshot: await readLocalLibraryCatalogueSnapshot(privateStorage.storage, primaryLibraryId, parsed.data) };
+        } catch {
+          return { error: 'library-catalogue-unavailable', ok: false };
         }
       }
       if (parsed.data.type === 'library.search.read') {

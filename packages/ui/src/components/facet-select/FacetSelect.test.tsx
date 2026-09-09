@@ -26,6 +26,8 @@ describe('FacetSelect', () => {
     expect(component).toMatch(/current === 'include'/);
     expect(component).toMatch(/delete next\[optionValue\]/);
     expect(component).toMatch(/'check'.*'x'.*'circle'/s);
+    expect(component).toMatch(/onClick=\{\(\) => toggleOption\(option\.value\)\}/);
+    expect(component).not.toMatch(/onClick=\{\(\) => \{\s*toggleOption\(option\.value\);\s*closeMenu/u);
   });
 
   it('supports arrows, Escape and focus restoration', () => {

@@ -45,10 +45,10 @@ export type {
 } from './components/navigation';
 export { WorkCard, workCardStates, workCardVariants } from './features/library/work-card';
 export type { WorkCardProps, WorkCardState, WorkCardVariant } from './features/library/work-card';
-export { LibraryFilters, emptyLibraryFilters, libraryFiltersStates, libraryFiltersVariants } from './features/library/library-filters';
-export type { LibraryFilterOptions, LibraryFiltersProps, LibraryFiltersState, LibraryFiltersValue, LibraryFiltersVariant } from './features/library/library-filters';
+export { LibraryFilters, emptyLibraryFilters, libraryFiltersStates, libraryFiltersVariants, librarySortValues } from './features/library/library-filters';
+export type { LibraryFilterOptions, LibraryFiltersProps, LibraryFiltersState, LibraryFiltersValue, LibraryFiltersVariant, LibrarySortValue } from './features/library/library-filters';
 export { Library, libraryStates, libraryVariants } from './features/library/library-surface';
-export type { LibraryProps, LibraryState, LibraryVariant, LibraryWork } from './features/library/library-surface';
+export type { LibraryProps, LibraryState, LibraryStatistics, LibraryVariant, LibraryWork } from './features/library/library-surface';
 export { Agenda, agendaStates, agendaVariants, createAgendaDays, createLocalAgendaPeriod } from './features/agenda';
 export type { AgendaAvailability, AgendaDay, AgendaPeriodItem, AgendaProps, AgendaRelease, AgendaState, AgendaVariant, LocalAgendaPeriod } from './features/agenda';
 export { MemberOverview } from './features/member-overview';
