@@ -6321,6 +6321,174 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-audit-remediation",
+      "title": "Remediate the library metadata and facet audit",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Stabilize facet interactions and pagination",
+          "status": "DONE",
+          "acceptance": [
+            "Reject stale pagination after catalogue input changes",
+            "Keep multi-select facets open accessible and scrollable",
+            "Pass real UI and asynchronous interaction tests"
+          ],
+          "files": [
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/runtime/ExtensionSurface.test.tsx",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "packages/ui/src/components/facet-select/FacetSelect.tsx",
+            "packages/ui/src/components/facet-select/FacetSelect.module.css",
+            "packages/ui/src/components/facet-select/FacetSelect.test.tsx",
+            "packages/ui/src/features/library/library-filters/LibraryFilters.test.tsx",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test:accessibility",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "git diff --check",
+            "git commit -m fix(library): stabilize facets and pagination"
+          ],
+          "evidence": [
+            "UI 127 and extension 117 tests pass including real facet and stale-page interactions",
+            "All workspace typechecks and accessibility 8 of 8 pass",
+            "Chrome and Firefox MV3 builds pass; favorite-resolution Archify showcase 9 of 9"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Preserve provider metadata semantics and message bounds",
+          "status": "TODO",
+          "acceptance": [
+            "Map only MangaDex genre tags as genres",
+            "Do not represent latest units as editorial totals",
+            "Bound domain values and MV3 projections without deleting stored data"
+          ],
+          "files": [
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangadex-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/domain/src/work.ts",
+            "packages/domain/src/work.test.ts",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/library-catalogue-messages.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/domain",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "git diff --check",
+            "git commit -m fix(metadata): preserve provider fact semantics"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Verify bounded IndexedDB catalogue behavior",
+          "status": "TODO",
+          "acceptance": [
+            "Test 500 real IndexedDB works and stable pages of 24",
+            "Measure actual catalogue path and MV3 response size",
+            "Keep Chromium validation repeatable and evidence current"
+          ],
+          "files": [
+            "scripts/performance/extension-performance.test.tsx",
+            "packages/adapters-indexeddb/test/library-catalogue.test.ts",
+            "packages/application/src/library/read-library-catalogue.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:performance",
+            "npm run test:indexeddb",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "git diff --check",
+            "git commit -m test(library): verify bounded indexeddb catalogue"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Restore reproducible sharp dependency resolution",
+          "status": "TODO",
+          "acceptance": [
+            "Clean install and npm ls agree on sharp without invalid packages",
+            "Worker and browser builds pass from the clean tree",
+            "Audit has no high vulnerability and no node_modules patch is committed"
+          ],
+          "files": [
+            "package.json",
+            "package-lock.json",
+            "docs/01-technology-decisions.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm install --package-lock-only",
+            "npm ci",
+            "npm ls sharp --all",
+            "npm test --workspace @tobirink/worker",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "npm audit --audit-level=high",
+            "git diff --check",
+            "git commit -m chore(deps): restore reproducible sharp resolution"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Certify the corrected local library boundary",
+          "status": "TODO",
+          "acceptance": [
+            "Align ADR quality strategy and product diagrams",
+            "Pass favorite-resolution and all Archify showcase checks",
+            "Pass full verify and audit with no D1 sync production secret or user-config change"
+          ],
+          "files": [
+            "docs/decisions/ADR-0038-local-library-metadata-and-facets.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/tobirink.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:architecture",
+            "npm run validate:docs -- --all",
+            "npm run check:coherence",
+            "npm run test:security",
+            "npm run test:recovery",
+            "npm run verify",
+            "npm audit --audit-level=high",
+            "git diff --check",
+            "git commit -m docs(library): certify metadata facet boundaries"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

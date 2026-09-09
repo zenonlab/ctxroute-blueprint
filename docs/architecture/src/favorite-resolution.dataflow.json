@@ -358,7 +358,8 @@
       "dot": "emerald",
       "title": "Bibliothèque locale",
       "items": [
-        "Sept facettes stables et sélection multiple avant pagination",
+        "Sept facettes stables, menus persistants et sélection multiple avant pagination",
+        "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Aucune métadonnée de bibliothèque dans sync ou D1"
       ]

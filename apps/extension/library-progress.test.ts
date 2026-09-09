@@ -30,7 +30,8 @@ describe('offline library and automatic progress', () => {
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).not.toMatch(/library\.page\.read[\s\S]{0,900}fetch\(/);
     expect(background).not.toMatch(/defineContentScript|browser\.scripting/);
-    expect(surface).toMatch(/readLibraryCatalogueMessage\(\{ \.\.\.catalogueInput, offset: model\.nextOffset \}\)/);
+    expect(surface).toMatch(/readCatalogue\(\{ \.\.\.catalogueInput, offset: model\.nextOffset \}\)/);
+    expect(surface).toMatch(/requestGeneration\.current !== generation/);
     expect(surface).toMatch(/facets: \{ format: filters\.format, genre: filters\.genre/);
     expect(surface).toMatch(/current\.statistics === undefined[\s\S]*state: 'loading'[\s\S]*: current/);
     expect(surface).not.toMatch(/items=\{\[\]\}/);

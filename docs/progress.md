@@ -305,3 +305,11 @@
 - [x] **Add canonical provider metadata and additive local persistence** — DONE _(evidence: Provider contract and four adapters map strict optional status, year, totals, genres and comparable popularity without changing matcher rules, IndexedDB v13 adds metadata indexes; migrations, storage, recovery and all workspace typechecks pass, Domain 24, application 259, contracts 16 and provider adapter 35 tests pass; Archify showcase 9 of 9 and ADR validation pass)_
 - [x] **Implement full-library facets sorting statistics and organizer statuses** — DONE _(evidence: Application 262, UI 127 and extension 114 tests pass; strict catalogue message supports stable seven-facet multi-selection before pagination, Organizer preview now uses hydrated editorial status, detailed media type and personal progress; targeted organizer and catalogue tests pass, Chrome and Firefox MV3 builds, all workspace typechecks, accessibility 8, security 21, Sensor SAFE and Archify showcase 9/9 pass)_
 - [x] **Document and verify the local metadata boundary** — DONE _(evidence: Metadata facets statistics and provider popularity remain local to IndexedDB; storage.sync IDs and D1 payloads are unchanged, favorite-resolution dataflow and all product Archify sources pass showcase 9/9 with zero errors and warnings; docs and ADR validation pass, npm run verify passes end to end: 273 governance tests plus 1 skip, 665 workspace tests, Chromium IndexedDB, Chrome/Firefox builds, performance, integration and audit 0)_
+
+## Remediate the library metadata and facet audit — ACTIVE
+
+- [x] **Stabilize facet interactions and pagination** — DONE _(evidence: UI 127 and extension 117 tests pass including real facet and stale-page interactions, All workspace typechecks and accessibility 8 of 8 pass, Chrome and Firefox MV3 builds pass; favorite-resolution Archify showcase 9 of 9)_
+- [ ] **Preserve provider metadata semantics and message bounds** — PENDING
+- [ ] **Verify bounded IndexedDB catalogue behavior** — PENDING
+- [ ] **Restore reproducible sharp dependency resolution** — PENDING
+- [ ] **Certify the corrected local library boundary** — PENDING

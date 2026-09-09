@@ -121,7 +121,6 @@ export function FacetSelect({
       <button
         aria-controls={menuId}
         aria-expanded={open}
-        aria-haspopup="true"
         className={styles.trigger}
         disabled={disabled}
         onClick={() => {

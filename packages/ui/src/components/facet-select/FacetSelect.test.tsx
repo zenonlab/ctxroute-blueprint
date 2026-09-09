@@ -51,6 +51,8 @@ describe('FacetSelect', () => {
     expect(css).toMatch(/backdrop-filter: blur\(var\(--space-3\)\)/);
     expect(css).toMatch(/var\(--color-primary-soft\)/);
     expect(css).toMatch(/var\(--color-danger-soft\)/);
+    expect(css).toMatch(/max-height: calc\(100vh - var\(--space-8\)\)/);
+    expect(css).toMatch(/overflow-y: auto/);
     expect(css).toMatch(/prefers-reduced-motion: reduce/);
     expect(css).not.toMatch(/linear-gradient/);
   });
