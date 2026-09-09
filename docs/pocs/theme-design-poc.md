@@ -117,6 +117,11 @@ production n'en est tirée avant build release et protocole répété. Voir ADR-
 | D1-18 | changement de zone/acteur ne modifie ni les identités de sessions ni les associations approuvées |
 | D1-19 | Bevy rend le même pack et reçoit les mêmes événements en fenêtre puis sur `CAMetalLayer` |
 | D1-20 | la qualification Bevy est motivée par mesures répétées, couverture visuelle et code restant, pas par préférence |
+| D1-21 | la modale remplace deux variantes compatibles de personnage/véhicule et un canal de couleur sans changer l'identité, la session ou la trajectoire de l'instance |
+| D1-22 | une variante incompatible est refusée avec diagnostic ; un thème sans `appearance_set` n'affiche aucun contrôle d'apparence vide |
+| D1-23 | les rigs `fixed`, `orbit` et `rail` utilisent le même contrat, respectent leurs bornes et restaurent le preset du thème |
+| D1-24 | la fin du contrôle caméra supprime ses invalidations ; mouvements réduits, pause et occlusion arrêtent la progression attendue |
+| D1-25 | une seconde fixture 2D prouve que variantes de sprite et `parallax_2d` utilisent la même modale sans dépendance au jeu ou à l'émulateur source |
 
 ## Hors périmètre
 

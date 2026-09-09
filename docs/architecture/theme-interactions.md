@@ -59,6 +59,19 @@ audio, état local et navigation UI. Leur support est déclaré, pas supposé.
 Les actions OS et de sessions restent des intentions soumises au contrôle local.
 Un événement d'animation ne donne pas davantage de droits qu'un bouton.
 
+Les opérations d'apparence et de caméra utilisent des intentions communes :
+`SetAppearanceVariant`, `SetAppearanceChannel`, `SetCameraRig`,
+`SetCameraParameter`, `ResetCamera`, `BeginCameraControl` et `EndCameraControl`.
+Elles ciblent des identités canoniques et ne contiennent aucun appel à un moteur de
+jeu. Une intention est validée contre les variantes, compatibilités et bornes du
+thème avant mutation ; son refus laisse l'état précédent intact.
+
+Le contrôle de caméra est un mode explicite et annulable. Tant qu'il n'est pas actif,
+un glisser conserve sa sémantique normale de bureau ou d'UI. À sa fin, le runtime
+cesse les invalidations liées au geste. Un changement de personnage ou de coloris
+ne détruit ni l'instance, ni son association à une session : seul le composant visuel
+compatible est remplacé.
+
 ## Modèle commun, sans dépendance au moteur
 
 Une liaison décrit conceptuellement : source stable, événement, condition,

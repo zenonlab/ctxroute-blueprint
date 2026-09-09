@@ -1,7 +1,7 @@
 # Architecture de personnalisation — scène, rigs et UI diégétique
 
-État au 8 septembre 2026 : **frontière produit acceptée ; première tranche PoC2
-implémentée, interactions natives encore à qualifier**.
+État au 9 septembre 2026 : **frontière produit, apparences et rigs caméra acceptés ;
+première tranche PoC2 implémentée, interactions natives encore à qualifier**.
 Le PoC2 fournit un brouillon d'objet (nom, couleur, taille, application), une modale
 sur clic droit, un ajout sur vide qualifié et une persistance locale après quittance.
 Il ne réalise pas encore les imports, rigs ni skins d'UI décrits dans cette cible.
@@ -14,6 +14,8 @@ inconnu, œil si visible, œil barré si masqué. Le provider ne lit ni ne modif
 préférences macOS. L'ouverture des Réglages demeure le fallback d'erreur.
 Voir [ADR-0054](../decisions/ADR-0054-macos-theme-interaction.md).
 Décision : [ADR-0050](../decisions/ADR-0050-theme-customization-and-local-assets.md).
+Les variantes d'apparence et les caméras normalisées sont fixées par
+[ADR-0064](../decisions/ADR-0064-source-neutral-appearance-and-camera-rigs.md).
 Les contrôles système intégrés au thème sont précisés par
 [ADR-0051](../decisions/ADR-0051-theme-system-control-shelf.md).
 Le [flux Archify](src/theme-customization.dataflow.json) montre comment une création
@@ -82,6 +84,78 @@ d'os ressemblant ne suffit jamais à déclarer la compatibilité.
 Les objets instanciés reçoivent des identités stables indépendantes de leur ressource.
 Quatre karts peuvent partager un modèle tout en conservant quatre sessions, états,
 couleurs et trajectoires distincts.
+
+## Apparence des personnages et objets
+
+Le runtime ne connaît ni Mario Kart, ni Zelda, ni une console. Après conversion, il
+manipule un `appearance_set` optionnel rattaché à un slot ou à une instance. Cet
+ensemble décrit uniquement des variantes compatibles et les paramètres que l'auteur
+autorise à personnaliser :
+
+- `resource_variant` remplace un personnage, véhicule, sprite ou objet par une autre
+  ressource déclarée compatible ;
+- `material_variant` sélectionne une tenue, texture, livrée ou palette préparée ;
+- `color_channel` expose des canaux sémantiques bornés tels que `primary`, `secondary`,
+  `accent` ou `emissive`, accompagnés de leur masque de matériau ;
+- `animation_set` associe les clips nécessaires au rôle sans changer l'identité de
+  l'instance.
+
+La modale de clic droit ne présente que ces possibilités déclarées. Un thème sans
+personnage n'affiche aucun sélecteur de personnage. Un thème 2D peut proposer des
+variantes de sprite ou d'atlas ; un thème 3D peut proposer modèles, skins et matériaux.
+Changer l'apparence ne change jamais `instance_id`, `session_binding`, ordre de
+formation, trajectoire ou travail terminal en cours.
+
+Une substitution riggée exige une `compatibility_signature` qui couvre le type de
+ressource, le squelette, les clips requis et les points d'ancrage. Le runtime refuse
+une substitution incompatible. Un retargeting n'est accepté que comme dérivé produit
+hors ligne, accompagné de sa table et de son niveau de fidélité. Une couleur ne doit
+jamais être appliquée aveuglément à toute la texture : seuls les canaux et masques
+exportés ou créés par l'auteur sont modifiables.
+
+## Caméras normalisées et contrôlables
+
+La caméra du thème appartient à notre composition, pas au moteur original. Un
+adaptateur peut extraire des caméras, splines, limites ou plans de cadrage du jeu et
+les proposer comme presets ; le compilateur les convertit ensuite vers des
+`camera_rig` indépendants de la source :
+
+| Rig | Usage | Paramètres personnalisables typiques |
+| --- | --- | --- |
+| `fixed` | tableau ou cadrage verrouillé | preset, champ de vision, cible |
+| `orbit` | inspection libre bornée | cible, lacet, tangage, distance, inertie |
+| `follow` | suivi d'une instance stable | cible, offset, anticipation, lissage |
+| `rail` | course ou visite guidée | spline, progression, regard, bouclage |
+| `cinematic` | transition ou séquence | clip, marqueurs, interruption, retour |
+| `parallax_2d` | scène plane ou multi-calques | amplitude, profondeur, lissage |
+
+Chaque rig déclare ses bornes, sa safe area, son comportement en mouvements réduits,
+son fallback et les capacités optionnelles de collision caméra. La modale permet de
+choisir un rig/preset autorisé, d'ajuster ses paramètres bornés et de restaurer les
+valeurs du thème. « Jouer avec la caméra » active un mode d'interaction explicite sur
+la surface qualifiée ; il ne capture jamais le clavier ou la souris utilisés par une
+autre application.
+
+La caméra n'impose aucune boucle permanente. Un geste invalide le rendu seulement
+pendant le déplacement et son inertie bornée. Une caméra fixe revient à zéro frame
+au repos ; une caméra de rail ne reste active que si la recette demande réellement
+une animation continue. Occlusion, pause du mouvement et préférence de mouvements
+réduits arrêtent proprement sa progression selon la politique du thème.
+
+## Frontière commune des convertisseurs
+
+« Tous les émulateurs » désigne ici toutes les sources pour lesquelles un adaptateur
+peut produire le contrat canonique, et non l'embarquement d'un émulateur dans le
+runtime. Décompilations, parseurs statiques, outils communautaires et émulateurs
+instrumentés peuvent servir hors ligne de lecteurs ou d'oracles. Leur sortie passe
+par la même frontière : ressources, profils de rendu, clips, apparences, caméras,
+collisions, chemins, provenance et capacités qualifiées.
+
+Le cœur ne reçoit aucun pointeur mémoire, opcode, type de console ou identifiant de
+moteur source. Il reçoit des identifiants stables et une couverture explicite. Une
+absence produit `missing` ou `unsupported`; elle n'est ni simulée silencieusement ni
+compensée par l'exécution du jeu. Notre graphe d'actions, nos trajectoires d'ambiance,
+nos liens de sessions et notre politique énergétique prennent alors le relais.
 
 ## UI entièrement stylisable, sémantique stable
 
@@ -203,7 +277,9 @@ Le manifeste canonique est organisé par domaines stables :
 | --- | --- |
 | `assets` | ressources originales distribuables et références privées par identifiant |
 | `slots` | exigences de type, rig, matériau, animation, collision ou UI |
+| `appearance_sets` | variantes de ressource, matériaux, canaux de couleur et signatures de compatibilité |
 | `scene` | instances, hiérarchie, caméra, éclairage et couches |
+| `camera_rigs` | rigs normalisés, presets, bornes, fallbacks et préférences de mouvement |
 | `ui` | tokens, composants, panneaux, navigation et accessibilité |
 | `bindings` | événements, conditions, actions, cibles et résultats |
 | `system_controls` | placement, style, ordre et présentation des capacités standard |
@@ -257,9 +333,9 @@ ni avertissement. Le contrôle visuel passe à 1440×900, 1600×1000, 1920×1080
 2048×1320 en clair et sombre. Les captures sombres 1440×900 et 2048×1320 ont été inspectées : étapes,
 branches publique/privée et sorties de présentation sont lisibles sans collision.
 Source SHA-256 :
-`411d2117c6c0c37915a5b20aa681bb99ec2e6605b332dbed96b97558c49caee0`.
+`c6fd99da36550dc894161412601beb61438e217ccc385fec6c3e942e35b0f744`.
 Artefact SHA-256 :
-`11dddffbc223fc7dc9590091628449d2cf2c7d8bbea4f7989ec9f002d9182a30`.
+`d20ca64e43fe6c7fa9300baa93aba7167da2596103d8229cb3b7ed07343ed02d`.
 Le modèle de gestes réside dans la composition du thème ; ce repère de responsabilité
 ne signifie pas que le raccord natif ou le courtier d'actions est livré.
 Les libellés sont en français ; l'interface fixe du viewer reste en anglais.

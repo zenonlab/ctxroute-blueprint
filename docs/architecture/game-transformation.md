@@ -52,6 +52,13 @@ un matériau glTF standard n'est qu'un diagnostic ; le gate exige Fast3D/RDP ou 
 traduction WGSL qualifiée. Voir
 [ADR-0063](../decisions/ADR-0063-source-render-profiles-and-oracles.md).
 
+La sortie de conversion expose aussi les variantes d'apparence compatibles et les
+caméras source utiles sous forme de données normalisées. Les personnages, coloris et
+caméras restent optionnels et qualifiés par capacité ; ils ne deviennent jamais des
+appels au moteur source. Le thème leur applique ensuite notre identité d'instance,
+nos liaisons de sessions et nos règles de caméra. Voir
+[ADR-0064](../decisions/ADR-0064-source-neutral-appearance-and-camera-rigs.md).
+
 ## Intention confirmée
 
 L'infrastructure doit permettre de programmer des expériences à partir de jeux

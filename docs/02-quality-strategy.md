@@ -195,6 +195,11 @@ Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructur
 | P26 | Un outil échoue ou aucun dépôt utile n'est trouvé | Budget d'essais borné et diagnostic honnête ; aucune capacité certifiée sans preuve ni envoi de traces privées au modèle distant. |
 | P27 | Réactiver le thème avec une chaîne déjà validée | Réutilisation des dépendances/adaptateur sans IA ni nouvelle recherche ; versions modifiées déclenchent revalidation. |
 | P28 | Partager le package de thème après préparation locale | Notre logique/créations et références présentes ; données et logique extraites du jeu restent séparées, caches privés non embarqués. |
+| P29 | Changer personnage, véhicule ou coloris depuis la modale | Identité d'instance, session, trajectoire et processus restent inchangés ; seuls les canaux explicitement exposés sont modifiés. |
+| P30 | Choisir une variante au rig incompatible | Refus déterministe avec diagnostic de compatibilité ; aucun remplacement partiel ni animation cassée. |
+| P31 | Passer de `fixed` à `orbit`, puis à `rail` | Paramètres bornés, reset reproductible et absence de capture globale hors du mode caméra explicite. |
+| P32 | Fermer le contrôle caméra ou masquer le bureau | Aucune invalidation propre à la caméra après stabilisation ; progression suspendue conformément au profil. |
+| P33 | Charger les mêmes contrats depuis une fixture 2D puis 3D | UI et intentions identiques ; seuls l'adaptateur, les ressources et les capacités déclarées diffèrent. |
 
 Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
 par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.
