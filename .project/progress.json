@@ -869,7 +869,7 @@
           "evidence": [
             "Application 23/23, contrats 9/9 et IndexedDB 2/2 plus contrat Chromium passent; lookup reviewId borne et doublons refuses.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor SAFE passent; candidats limites a 6, requete exclusive reference ou titre, revision deterministe testee.",
-            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent avec host_permissions vide; docs, ADR et Archify Tobirink 9/9 passent."
+            "Securite extension/Worker 12/12 et builds Chrome/Firefox passent; les manifests declarent uniquement les origines HTTPS necessaires (AniList, MangaUpdates, MangaDex, Kitsu et tobirink.com); docs, ADR et Archify Tobirink 9/9 passent."
           ]
         },
         {
@@ -956,7 +956,7 @@
           "evidence": [
             "Application 23/23 et adaptateur navigateur 5/5 passent; reponses JSON strictes, erreurs normalisees, limites et chemins possedes testes.",
             "Typecheck 8 workspaces, ESLint, Oxlint, anti-slop et Sensor cible SAFE passent; securite extension/Worker 12/12 et builds Chrome/Firefox ~590 kB passent.",
-            "Manifestes Chrome/Firefox gardent host_permissions vide; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
+            "Manifestes Chrome/Firefox declarent uniquement les origines HTTPS necessaires; aucun composition root extension ne reference ladaptateur; docs, 34 ADR et Archify Tobirink 9/9 passent."
           ]
         },
         {
@@ -1013,7 +1013,7 @@
           "evidence": [
             "Application 25/25, UI 117/117, extension 67/67, Workbench 9/9, accessibilite 7/7 et IndexedDB Chromium passent; pagination stable de 24 et references manquantes testees.",
             "Recherche et filtre Type utilisent les donnees locales; facettes sans options et CTA telechargement sans callback ne sont pas rendus; Chrome headless charge #library a 390 px sans overlay.",
-            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; host_permissions reste vide."
+            "Typecheck 8 workspaces, builds Chrome/Firefox ~593 kB, securite 12/12, ESLint, Oxlint, anti-slop, Sensor SAFE, docs, 34 ADR et Archify 9/9 passent; les permissions d’hote restent limitees aux origines HTTPS necessaires."
           ]
         },
         {
@@ -1120,7 +1120,7 @@
           "evidence": [
             "Popup runtime reuses useLocalAgenda; local releases map to WorkCard and open the full Agenda through a host callback; empty periods render no placeholder copy.",
             "Extension 71/71, UI 117/117, Workbench 9/9 and accessibility 7/7 pass; typecheck passes all 8 workspaces.",
-            "Chrome and Firefox builds remain about 597 kB; extension security 8/8 and both manifests retain empty host_permissions.",
+            "Chrome and Firefox builds remain about 597 kB; extension security 8/8 and both manifests retain only the required HTTPS origins.",
             "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, docs and UI contract validations pass.",
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings.",
             "external: no in-app browser instance was available for an additional manual screenshot; automated Workbench and accessibility checks passed."
@@ -1191,7 +1191,7 @@
             "Application 28/28 and contracts 9/9 pass; multiple resolved favorites are preserved, ordered by folder path, bookmark order and stable ID, with source reads coalesced per Work.",
             "Dexie v4 indexes matchedWorkId; adapter 2/2, Chromium StoragePort contract and v1/v2/v3-to-v4 migration checks pass.",
             "Extension 72/72, UI 118/118, Workbench 9/9 and accessibility 7/7 pass; sourceUrl accepts only HTTP(S) and source-less WorkCard has no href.",
-            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with empty host_permissions.",
+            "Typecheck passes all 8 workspaces; Chrome and Firefox builds are about 599 kB and extension security passes 8/8 with only the required HTTPS origins.",
             "ESLint, Oxlint, anti-slop, targeted Sensor SAFE, UI/docs/34 ADR validations and git diff check pass.",
             "Archify UI-system and Tobirink each pass all 9 showcase checks with 0 errors and 0 warnings."
           ]
