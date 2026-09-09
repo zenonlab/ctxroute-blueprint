@@ -387,7 +387,7 @@
       "title": "Contrats clean-room",
       "items": [
         "Règles pures versionnées et 30 écarts documentés",
-        "82 cas synthétiques couvrent la résolution déterministe",
+        "Cinq fournisseurs: progression, identité, jaquette attribuée, lien local",
         "Aucune base, donnée ou exécution FavLib n’est requise"
       ]
     },
@@ -406,6 +406,7 @@
       "items": [
         "Source et artefact atomiques; lien ordinaire terminal sans réseau",
         "Curseurs, reçus et cadences survivent à MV3",
+        "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
         "Panne ou réponse incomplète reste RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"
       ]

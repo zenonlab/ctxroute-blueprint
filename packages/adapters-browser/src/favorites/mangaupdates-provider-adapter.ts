@@ -1,4 +1,4 @@
-import { assertFavoriteProviderSearchQuery, favoriteProviderPage, favoriteProviderPolicy } from '@tobirink/application';
+import { assertFavoriteProviderSearchQuery, favoriteProviderInspectionLimit, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '@tobirink/application';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery } from '@tobirink/application';
 import { createProviderCandidate, createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteMediaKind, ProviderCandidate } from '@tobirink/domain';
@@ -25,7 +25,7 @@ const mangaUpdatesSeriesSchema = z.object({
   url: z.url().optional(),
 }).passthrough();
 const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).passthrough();
-const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(20), total_hits: z.number().int().nonnegative() }).passthrough();
+const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(favoriteProviderInspectionLimit), total_hits: z.number().int().nonnegative() }).passthrough();
 type MangaUpdatesSeries = z.infer<typeof mangaUpdatesSeriesSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 
@@ -70,13 +70,16 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
     if (query.provider !== 'mangaupdates') throw new TypeError('MangaUpdates adapter requires provider mangaupdates.');
     const page = favoriteProviderPage(query.cursor);
     const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, `${seriesEndpoint}/search`, {
-      body: JSON.stringify({ page, perpage: query.limit, search: query.titles[0] }),
+      body: JSON.stringify({ page, perpage: favoriteProviderInspectionLimit, search: query.titles[0] }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, mangaUpdatesSearchSchema));
-    const candidates = response.value.results.map((result) => candidate(result.record));
-    if (candidates.length > query.limit) throw new RangeError('MangaUpdates result exceeds the requested limit.');
-    const truncated = response.value.total_hits > (page - 1) * query.limit + candidates.length;
+    const inspected = response.value.results.map((result) => candidate(result.record));
+    const evidence = inspectFavoriteTitleCandidates({ sourceTitles: query.titles }, inspected);
+    const references = new Set(evidence.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
+    const candidates = inspected.filter((item) => references.has(`${item.provider}:${item.externalId}`));
+    if (candidates.length > query.limit) throw new RangeError('MangaUpdates has more comparable identities than the bounded candidate contract permits.');
+    const truncated = response.value.total_hits > page * favoriteProviderInspectionLimit;
     const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'mangaupdates' as const, truncated };
     return createProviderCandidateEnvelope(truncated ? { ...envelope, nextCursor: String(page + 1) } : envelope);
   }

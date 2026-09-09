@@ -9,6 +9,26 @@ export interface FavoriteEquivalenceManifestCase {
   readonly syntheticUrl: string;
 }
 
+export interface FavoriteProviderEquivalenceFixture {
+  readonly coverAttribution: string;
+  readonly coverUrl: string;
+  readonly externalId: string;
+  readonly id: string;
+  readonly mediaKind: 'ANIME' | 'MANGA' | 'MANHWA';
+  readonly progress: Readonly<{ kind: 'chapter' | 'episode'; value: number }>;
+  readonly provider: 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangadex' | 'mangaupdates';
+  readonly title: string;
+  readonly url: string;
+}
+
+export const favoriteProviderEquivalenceFixtures: readonly FavoriteProviderEquivalenceFixture[] = Object.freeze([
+  Object.freeze({ coverAttribution: 'AniList', coverUrl: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/fixture.jpg', externalId: '154587', id: 'provider-anilist', mediaKind: 'ANIME', progress: Object.freeze({ kind: 'episode' as const, value: 3 }), provider: 'anilist', title: 'Fixture Aurora Episode 3', url: 'https://fixtures.tobirink.invalid/anime/fixture-aurora/episode-3' }),
+  Object.freeze({ coverAttribution: 'MangaUpdates', coverUrl: 'https://cdn.mangaupdates.com/image/fixture.jpg', externalId: '12345', id: 'provider-mangaupdates', mediaKind: 'MANHWA', progress: Object.freeze({ kind: 'chapter' as const, value: 12 }), provider: 'mangaupdates', title: 'Fixture River Chapter 12', url: 'https://fixtures.tobirink.invalid/manga/fixture-river/chapter-12' }),
+  Object.freeze({ coverAttribution: 'MangaDex', coverUrl: 'https://uploads.mangadex.org/covers/12345678-1234-4234-8234-123456789abc/fixture.jpg.512.jpg', externalId: '12345678-1234-4234-8234-123456789abc', id: 'provider-mangadex', mediaKind: 'MANGA', progress: Object.freeze({ kind: 'chapter' as const, value: 8 }), provider: 'mangadex', title: 'Fixture Garden Chapter 8', url: 'https://fixtures.tobirink.invalid/manga/fixture-garden/chapter-8' }),
+  Object.freeze({ coverAttribution: 'Kitsu', coverUrl: 'https://media.kitsu.app/anime/1/poster_image/large-fixture.jpeg', externalId: '1', id: 'provider-kitsu-anime', mediaKind: 'ANIME', progress: Object.freeze({ kind: 'episode' as const, value: 4 }), provider: 'kitsu-anime', title: 'Fixture Sky Episode 4', url: 'https://fixtures.tobirink.invalid/anime/fixture-sky/episode-4' }),
+  Object.freeze({ coverAttribution: 'Kitsu', coverUrl: 'https://media.kitsu.app/manga/2/poster_image/large-fixture.jpeg', externalId: '2', id: 'provider-kitsu-manga', mediaKind: 'MANGA', progress: Object.freeze({ kind: 'chapter' as const, value: 9 }), provider: 'kitsu-manga', title: 'Fixture Paper Chapter 9', url: 'https://fixtures.tobirink.invalid/manga/fixture-paper/chapter-9' }),
+]);
+
 const definitions: readonly (readonly [id: string, expectedBehavior: string])[] = [
   ['P-01', 'same-normalized-key'], ['P-02', 'compact-key'], ['P-03', 'reordered-significant-words'], ['P-04', 'bounded-edit-distance'],
   ['P-05', 'ambiguous-same-level'], ['P-06', 'ignore-popularity'], ['P-07', 'no-prefix-match'], ['P-08', 'no-stemming-match'],

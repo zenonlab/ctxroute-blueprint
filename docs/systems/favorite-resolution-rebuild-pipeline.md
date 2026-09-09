@@ -711,6 +711,20 @@ atomique et indexée, les limites réseau et locales, et l’absence de cascade 
 suppression d’un favori. Chromium valide les migrations et le contrat réel
 IndexedDB.
 
+La certification finale couvre aussi le paquet Chrome réellement chargé avec
+cinq résolutions synthétiques : AniList et MangaDex par référence exacte,
+MangaUpdates comme source manga principale, puis Kitsu Anime et Kitsu Manga
+après `NO_MATCH` complet de la source principale. Les cinq fiches atteignent la
+bibliothèque locale avec leur progression et leur jaquette attribuée; le
+rechargement hors ligne conserve le résultat et la table Review reste vide.
+
+MangaUpdates impose une page minimale de 25 éléments. Cette page est inspectée
+entièrement avant réduction au contrat de 20 candidats comparables. Une page
+sans candidat comparable peut avancer vers son curseur suivant; une réponse
+incomplète ne devient jamais `NO_MATCH`. Le checkpoint sérialise les
+métadonnées v1 et v2 afin qu'une suspension MV3 ne perde ni la couverture, ni
+les variantes de titre, ni les facettes déjà hydratées.
+
 Les trois écarts précédemment critiques sont fermés : inventaire
 `getChildren()` reprenable et journalisé; assertions sémantiques exécutées pour
 les familles `L/Q/B/X` en plus de l’oracle profond 82 / 77 / 4 / 1; reçus,

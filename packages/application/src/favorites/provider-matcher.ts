@@ -4,6 +4,7 @@ import { isWithinFavoriteEditDistance, normalizeFavoriteTitle } from './title-no
 import { readLabelledFavoriteSeason, stripFavoriteSeasonSuffix } from './season-extraction';
 
 export const favoriteMatcherVersion = 'favorite-matcher-v3';
+export const favoriteProviderInspectionLimit = 25;
 
 export interface FavoriteTitleMatchQuery {
   readonly blockedTaxonomy?: readonly string[];
@@ -148,7 +149,7 @@ export function matchFavoriteTitles(query: FavoriteTitleMatchQuery, envelopes: r
 export function inspectFavoriteTitleCandidates(query: FavoriteTitleMatchQuery, input: readonly ProviderCandidate[]): Readonly<{ level: FavoriteMatchMethod; candidateReferences: readonly ProviderCandidateReference[] }> {
   if (query.sourceTitles.length === 0) throw new TypeError('sourceTitles must contain at least one title.');
   if (query.sourceTitles.length > favoriteAliasLimit) throw new RangeError(`sourceTitles accepts at most ${favoriteAliasLimit} titles.`);
-  if (input.length > providerCandidateLimit) throw new RangeError(`matcher accepts at most ${providerCandidateLimit} candidates.`);
+  if (input.length > favoriteProviderInspectionLimit) throw new RangeError(`candidate inspection accepts at most ${favoriteProviderInspectionLimit} candidates.`);
   if (query.explicitSeason !== undefined && (!Number.isSafeInteger(query.explicitSeason) || query.explicitSeason <= 0)) throw new TypeError('explicitSeason must be a positive safe integer.');
   if (query.sourceCanonicalUrl !== undefined) {
     const parsed = new URL(query.sourceCanonicalUrl);

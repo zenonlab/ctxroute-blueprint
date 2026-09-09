@@ -15,20 +15,29 @@ const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 export const providerCandidateSchema = z.strictObject({
   canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(16).optional(), externalId: text,
+  cover: z.strictObject({ attribution: z.string().trim().min(1).max(120), url: z.url().max(32 * 1024) }).optional(),
+  displayTitle: text.optional(),
   format: text.optional(), genres: z.array(text).max(16).optional(), mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
   editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
   startYear: z.number().int().min(1800).max(3000).optional(), endYear: z.number().int().min(1800).max(3000).optional(),
   episodeCount: count.optional(), chapterCount: count.optional(), volumeCount: count.optional(),
-  popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: count }).optional(), metadataVersion: z.literal(1).optional(),
+  popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: count }).optional(), metadataVersion: z.union([z.literal(1), z.literal(2)]).optional(),
   preSerialization: z.boolean(), provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']),
-  season: z.number().int().positive().optional(), titles: z.array(text).min(1).max(16),
-}).transform(({ canonicalUrl, categories, format, genres, season, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
+  season: z.number().int().positive().optional(),
+  titleVariants: z.array(z.strictObject({ language: z.string().trim().min(1).max(120).optional(), title: text })).max(16).optional(),
+  titles: z.array(text).min(1).max(16),
+}).transform(({ canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
   const value: MutableProviderCandidate = candidate;
   if (canonicalUrl !== undefined) value.canonicalUrl = canonicalUrl;
   if (categories !== undefined) value.categories = categories;
+  if (cover !== undefined) value.cover = cover;
+  if (displayTitle !== undefined) value.displayTitle = displayTitle;
   if (format !== undefined) value.format = format;
   if (genres !== undefined) value.genres = genres;
   if (season !== undefined) value.season = season;
+  if (titleVariants !== undefined) value.titleVariants = titleVariants.map((variant) => variant.language === undefined
+    ? { title: variant.title }
+    : { language: variant.language, title: variant.title });
   if (editorialStatus !== undefined) value.editorialStatus = editorialStatus;
   if (startYear !== undefined) value.startYear = startYear;
   if (endYear !== undefined) value.endYear = endYear;
@@ -72,7 +81,7 @@ export async function searchFavoriteProviderPage(
   const page = await port.search(previous?.cursor === undefined ? search : { ...search, cursor: previous.cursor });
   if (page.provider !== provider || page.candidates.length > limit || (page.complete && (page.truncated || page.nextCursor !== undefined))) throw new Error('INVALID_PROVIDER_PAGE');
   if (!page.complete && page.nextCursor === undefined) return { kind: 'ENVELOPE', envelope: page };
-  if (page.nextCursor !== undefined && (page.candidates.length === 0 || favoriteProviderPage(page.nextCursor) <= favoriteProviderPage(previous?.cursor))) throw new Error('PROVIDER_CURSOR_DID_NOT_ADVANCE');
+  if (page.nextCursor !== undefined && favoriteProviderPage(page.nextCursor) <= favoriteProviderPage(previous?.cursor)) throw new Error('PROVIDER_CURSOR_DID_NOT_ADVANCE');
   const evidence = inspectFavoriteTitleCandidates(query, page.candidates);
   const nextLevel = levels.indexOf(evidence.level);
   const previousLevel = levels.indexOf(previous?.level ?? 'bounded-edit-distance');

@@ -424,6 +424,20 @@ classe ces cas synthétiques; le repère historique « environ 40 ambiguïtés,
 rejoint désormais la validation. Toute divergence du corpus doit être expliquée
 par une décision versionnée.
 
+La certification installée ajoute cinq parcours synthétiques, un par identité
+AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga. Chaque parcours
+vérifie l'identité, la progression parsée, le titre d'affichage, la jaquette
+HTTPS attribuée, l'absence de Review artificielle et la projection dans la
+bibliothèque locale. Le lien YouTube témoin reste `UNSUPPORTED` et invisible.
+
+L'audit contre l'API MangaUpdates a confirmé que sa page minimale contient 25
+résultats même lorsque le client demande une limite inférieure. L'adaptateur
+inspecte donc les 25 résultats, ne conserve que les identités comparables au
+meilleur niveau de preuve et poursuit avec un curseur même lorsqu'une page ne
+porte aucune preuve. Il ne choisit jamais la première réponse. Les checkpoints
+acceptent et restaurent désormais tous les champs de métadonnées fournisseur
+v2, dont titre d'affichage, variantes et jaquette.
+
 ## Exécution, validation et publication
 
 Le snapshot synthétique du parser v3 change les versions et fingerprints.

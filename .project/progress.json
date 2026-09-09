@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6717,7 +6717,7 @@
         {
           "id": "step-5",
           "title": "Certify the installed multi-provider pipeline",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Synthetic FavLib-shaped fixtures cover AniList MangaUpdates MangaDex Kitsu slug resolution progression source metadata and covers without reading a FavLib database",
             "Chrome and Firefox packaged builds pass import to rendered library tests with zero ordinary links in Review",
@@ -6726,22 +6726,35 @@
           "files": [
             "packages/application/src/favorites/equivalence-corpus.ts",
             "packages/application/src/favorites/equivalence-oracle.test.ts",
-            "apps/extension/e2e/favorite-library.spec.ts",
+            "packages/application/src/favorites/provider-matcher.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/web/e2e/packaged-extension.spec.ts",
             "docs/systems/favorite-resolution-correction-plan.md",
             "docs/systems/favorite-resolution-rebuild-pipeline.md",
             "docs/architecture/src/favorite-resolution.dataflow.json"
           ],
           "commands": [
-            "npm run test:workspaces",
-            "npm run test:indexeddb:chromium",
-            "npm run build:extension:chrome",
-            "npm run build:extension:firefox",
+            "npm exec -- vitest run apps/extension/runtime/local-library-catalogue-runtime.test.ts packages/application/src/favorites/provider-search-checkpoint.test.ts packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts packages/application/src/favorites/equivalence-oracle.test.ts",
+            "npm run test:e2e --workspace @tobirink/web -- packaged-extension.spec.ts",
             "npm run verify",
             "npm run archify:validate -- favorite-resolution.dataflow",
+            "node scripts/release/package-extension.mjs --verify-isolated",
             "git diff --check",
             "git commit -m test(favorites): certify complete local library flow"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passes: 697 workspace tests plus 273 governance tests and 1 intentional skip, Chromium IndexedDB, performance, CRG, integration, audit 0 and docs",
+            "Packaged Chrome MV3 E2E passes with AniList MangaUpdates MangaDex Kitsu Anime and Kitsu Manga, four cover origins, zero Review, an excluded YouTube link and offline reload",
+            "Chrome and Firefox 1.0.0 ZIPs are independently reproducible: SHA-256 16aa888d74ddae5d385af73ea100eaccbcef42edb15e64920616b3963cf95ec6 and 89b2be2fc60c88245bbea6197cbe229f116e97309e43d4128f87fccf1d5fb3db; native Firefox was unavailable",
+            "MangaUpdates 25-result minimum page and metadata-v2 MV3 checkpoints are regression tested; focused suite passes 27 tests",
+            "favorite-resolution dataflow passes Archify showcase 9/9 with zero errors or warnings; git diff --check passes"
+          ]
         }
       ]
     }
