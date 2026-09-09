@@ -56,7 +56,7 @@ describe('extension performance budgets', () => {
     console.info(JSON.stringify({ favoriteParserP95Ms: { maximum: maximumP95, typical: typicalP95 } }));
   });
 
-  it('renders representative local surfaces inside the 200 ms response budget', () => {
+  it('server-renders representative local surfaces inside the 200 ms UI budget', () => {
     const surfaces = ['library', 'review', 'agenda'] as const;
     const measurements = surfaces.map((name) => {
       const startedAt = performance.now();

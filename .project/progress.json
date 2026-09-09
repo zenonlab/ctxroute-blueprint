@@ -6408,7 +6408,7 @@
         {
           "id": "step-3",
           "title": "Verify bounded IndexedDB catalogue behavior",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Test 500 real IndexedDB works and stable pages of 24",
             "Measure actual catalogue path and MV3 response size",
@@ -6430,7 +6430,11 @@
             "git diff --check",
             "git commit -m test(library): verify bounded indexeddb catalogue"
           ],
-          "evidence": []
+          "evidence": [
+            "Chromium real IndexedDB catalogue reads 500 works filters to 250 and paginates 24 in 34.70 to 37.70 ms across three runs",
+            "The real catalogue snapshot remains below 64 KiB and complete-corpus facet counts are 250 each",
+            "Performance 4 of 4 and Chrome Firefox MV3 builds pass"
+          ]
         },
         {
           "id": "step-4",

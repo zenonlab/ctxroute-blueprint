@@ -139,7 +139,7 @@ try {
   let detail = '';
   while (status === 'pending' && Date.now() < deadline) {
     const evaluation = await runtime.send('Runtime.evaluate', {
-      expression: 'JSON.stringify({ status: document.body.dataset.status, detail: document.body.textContent })',
+      expression: 'JSON.stringify({ status: document.body.dataset.status, detail: document.body.textContent, catalogueMs: document.body.dataset.catalogueMs })',
       returnByValue: true,
     });
     const result = JSON.parse(evaluation.result.value);
@@ -148,7 +148,7 @@ try {
     if (status === 'pending') await delay(50);
   }
   if (status !== 'passed') throw new Error(`IndexedDB browser contract failed with ${status}: ${detail}`);
-  process.stdout.write(`IndexedDB browser contract passed in Chromium for ${fixturePath}.\n`);
+  process.stdout.write(`IndexedDB browser contract passed in Chromium for ${fixturePath}: ${detail}.\n`);
 } finally {
   runtime?.close();
   await stopChrome(launched?.child);
