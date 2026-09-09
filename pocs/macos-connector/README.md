@@ -25,7 +25,11 @@ refuse les gestes. Des micro-fenêtres transparentes au niveau `normal - 1`, san
 pixels, couvrent seulement les boutons et objets du thème : une application normale
 reste au-dessus et macOS arbitre réellement l'exposition. Elles suivent les objets
 animés à 30 Hz seulement dans ce mode, puis sont détruites au réaffichage. Aucun plan
-d'entrée plein écran n'est créé ; le clic droit du vide reste donc natif quand Finder
+d'entrée plein écran n'est créé. Elles utilisent `fullScreenAuxiliary` : l'ancien
+`fullScreenNone` produisait des fenêtres `isVisible` mais absentes de la liste
+WindowServer à l'écran, cause exacte des boutons inertes après masquage. Le test natif
+crée désormais brièvement ces surfaces transparentes et exige leur présence dans
+`CGWindowList(optionOnScreenOnly)`. Le clic droit du vide reste donc natif quand Finder
 est masqué. Les tests injectés couvrent bascules, non-opération idempotente, changement
 externe, refus de synchronisation, absence de quittance, échec de rafraîchissement,
 rollback et projection des proxys. Le bouton montre

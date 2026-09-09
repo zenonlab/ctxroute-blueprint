@@ -103,7 +103,9 @@ reste une implémentation privée du connecteur, jamais une API de thème ni une
 multi-version. Visible, Finder est qualifié par AX. Masqué, le tap refuse les gestes
 et des micro-fenêtres d'entrée transparentes matérialisent seulement les cibles du
 thème au niveau `normal - 1`. Le WindowServer, et non une heuristique d'occlusion,
-décide alors si une application ordinaire les couvre.
+décide alors si une application ordinaire les couvre. Sur macOS, ces régions portent
+`fullScreenAuxiliary` pour appartenir à l'espace de bureau actif ; `fullScreenNone`
+est interdit par un test de composition WindowServer.
 
 ### Windows
 

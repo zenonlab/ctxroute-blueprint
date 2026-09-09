@@ -30,5 +30,19 @@ import AppKit
               if case .activate = $0.intent { return true }
               return false
           }) else { throw ModelError.invalid("hidden input proxy plan") }
-    print("desktop-input-snapshot=PASS cases=5 (projection and hidden proxy plan; no window shown)")
+    NSApplication.shared.setActivationPolicy(.accessory)
+    NSApplication.shared.finishLaunching()
+    let plane = HiddenDesktopInputPlane()
+    plane.replace(hidden)
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    let onScreen = (CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+        as? [[String: Any]])?.filter {
+            ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == getpid()
+                && (($0[kCGWindowName as String] as? String) ?? "").isEmpty
+        } ?? []
+    plane.stop()
+    guard onScreen.count >= targets.count else {
+        throw ModelError.invalid("hidden input proxies not composed by WindowServer")
+    }
+    print("desktop-input-snapshot=PASS cases=6 (projection and transparent proxy composition)")
 }

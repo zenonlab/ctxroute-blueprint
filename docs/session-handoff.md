@@ -19,13 +19,22 @@ matérialisent les boutons et objets. Elles ne dessinent rien, restent derrière
 applications et suivent `ThemeLayout` à 30 Hz uniquement si des objets bougent.
 Un remplacement d'instantané annule toute capture et recrée ou détruit ces régions.
 
+Le premier déploiement de cette bifurcation restait défectueux : les panneaux avaient
+`fullScreenNone`. AppKit les annonçait visibles et `CGWindowList(optionAll)` les
+énumérait, mais aucun n'apparaissait dans `optionOnScreenOnly`. Le correctif remplace
+ce comportement par `fullScreenAuxiliary`, conserve le niveau `normal - 1` et l'alpha
+réellement nul. Un test natif crée les surfaces, laisse tourner la run loop puis exige
+leur composition effective par WindowServer. Il échouait avant le correctif et passe
+désormais avec six cas.
+
 Preuves locales du candidat : diagramme macOS showcase 9/9 sans erreur ni
 avertissement ; 35 XCTest ; politique Finder et projection des proxys passantes ;
-263 tests dépôt passants, aucun échec. Le build signé `build.okvqzD` est installé et
-son prédécesseur conservé dans `replaced.PSV4hG/previous-app.disabled`. L'agent
-persistant PID 32314 exécute le binaire installé. Le réglage expérimental
-`StandardHideDesktopIcons` est restauré à `false` et `CreateDesktop` à `true`.
-Un fond Apple temporaire (`Mac bleu`) est actif : sélectionner Orbite puis qualifier
+263 tests dépôt passants, aucun échec. Le réglage expérimental
+`StandardHideDesktopIcons` est restauré à `false`. Le build corrigé `build.DoRix3`
+est installé ; son prédécesseur est conservé dans
+`replaced.kVS96R/previous-app.disabled` et l'agent diagnostic PID 65709 est actif.
+`CreateDesktop=true` a rétabli les éléments avant l'essai. Un fond Apple temporaire
+(`Noir`) est actif : sélectionner Orbite puis qualifier
 le cycle masquer/réafficher et les clics des deux états avant validation finale.
 
 ## État courant — tap unifié sans fenêtre d'entrée, 9 septembre 2026

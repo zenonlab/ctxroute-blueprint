@@ -53,7 +53,10 @@ fidèlement l'exposition visuelle produite par Afficher le bureau : les fenêtre
 d'applications restent déclarées aux anciennes coordonnées. Le tap global refuse donc
 tous les gestes dans cet état. Le connecteur matérialise uniquement les cibles du
 thème par de petites `NSPanel` transparentes au niveau `normal - 1`, derrière les
-applications ordinaires, sans aucun pixel. Elles sont détruites dès le retour de
+applications ordinaires, sans aucun pixel. Leur comportement de collection doit
+inclure `fullScreenAuxiliary` : avec `fullScreenNone`, AppKit les déclarait visibles
+mais WindowServer les excluait de `optionOnScreenOnly`, supprimant toute interaction.
+Elles sont détruites dès le retour de
 Finder. Une icône Finder garde ainsi la priorité lorsqu'elle existe et une application
 non déplacée reste au-dessus. Le clic droit du vide n'est pas offert dans ce mode :
 une fenêtre plein écran transparente compromettrait les interactions natives.

@@ -73,7 +73,8 @@ import QuartzCore
                 panels[target.key] = panel
             }
             panel.target = target
-            if panel.frame != target.frame { panel.setFrame(target.frame, display: false) }
+            if panel.frame != target.frame { panel.setFrame(target.frame, display: true) }
+            panel.inputView.needsDisplay = true
             if !panel.isVisible { panel.orderFrontRegardless() }
         }
     }
@@ -130,13 +131,13 @@ import QuartzCore
     var onClick: ((PointerButton) -> Void)? {
         didSet { inputView.onClick = onClick }
     }
-    private let inputView = HiddenInputView(frame: .zero)
+    let inputView = HiddenInputView(frame: .zero)
 
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         isFloatingPanel = false
         hidesOnDeactivate = false
         animationBehavior = .none
@@ -146,14 +147,28 @@ import QuartzCore
         isOpaque = false
         backgroundColor = .clear
         contentView = inputView
+        inputView.autoresizingMask = [.width, .height]
     }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
-@MainActor private final class HiddenInputView: NSView {
+@MainActor private final class HiddenInputView: NSButton {
     var onClick: ((PointerButton) -> Void)?
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        title = ""
+        isBordered = false
+        focusRingType = .none
+        target = self
+        action = #selector(primaryClick)
+    }
+    required init?(coder: NSCoder) { nil }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseUp(with event: NSEvent) { onClick?(.left) }
+    @objc private func primaryClick() { onClick?(.left) }
     override func rightMouseUp(with event: NSEvent) { onClick?(.right) }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.clear.setFill()
+        bounds.fill()
+    }
 }
