@@ -1,5 +1,20 @@
 # Reprise de session — Wallpaper
 
+## Validation utilisateur de la tranche interactive — 9 septembre 2026, 11:26
+
+Le paquet installé issu de `build.F2Tqc0` est validé fonctionnellement par
+l'utilisateur : après bascule Fichiers, les boutons restent interactifs. Les traces
+du même agent montrent deux surfaces provider, les commandes
+`desktopItemsHidden`/`desktopItemsVisible` puis `mute`/`unmute` appliquées et
+acquittées. `CreateDesktop=true` est confirmé après l'essai. Agent et provider sont
+toujours actifs.
+
+Verdict borné : le PoC prouve le wallpaper natif animé et ses interactions sans
+fenêtre d'entrée superposée. Il devient une base valide pour le prototype suivant.
+Il ne prouve pas encore la priorité d'une icône Finder superposée, Spaces,
+veille/reprise, révocation TCC, énergie, signature Apple ou compatibilité macOS
+générale. Ne pas transformer cette validation locale en promesse de production.
+
 ## État courant — suppression de la couche d'entrée masquée, 9 septembre 2026
 
 Le défaut utilisateur est requalifié : `CreateDesktop=false` fonctionnait, mais il

@@ -1,6 +1,6 @@
 # PoC macOS 2 — connecteur natif maintenable
 
-État au 8 septembre 2026 : **première tranche implémentée, qualification OS restante**.
+État au 9 septembre 2026 : **tranche interactive validée sur MAC-01 ; clôture complète restante**.
 Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
 Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
 Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
@@ -127,6 +127,21 @@ compté ensemble.
 | M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
 
 ## Conditions de sortie
+
+### Qualification fonctionnelle locale — 9 septembre 2026, 11:26
+
+L'utilisateur confirme sur le paquet installé que les contrôles restent interactifs
+après une bascule Fichiers. Les journaux du même essai montrent deux surfaces natives,
+les transitions `desktopItemsHidden` puis `desktopItemsVisible` appliquées et acquittées,
+ainsi que plusieurs transitions `mute`/`unmute`. La préférence Finder relue après
+l'essai vaut `CreateDesktop=true`. L'agent persistant et le provider restent actifs.
+
+Cette preuve valide la tranche fonctionnelle recherchée : rendu natif, tap unique,
+contrôles Son/Fichiers et absence de fenêtre d'entrée masquée. Elle ne clôt pas à elle
+seule M2-03, M2-04, M2-05, M2-07, M2-08 et M2-10 : priorité d'une icône Finder
+superposée, Spaces, veille/reprise, révocation TCC, mesures énergétiques et distribution
+signée Apple restent à qualifier. Le PoC est donc exploitable comme base du prochain
+prototype, sans constituer encore une validation de production macOS.
 
 ### État courant — XPC natif, 8 septembre 2026, 17:49–17:53
 

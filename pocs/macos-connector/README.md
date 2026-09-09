@@ -131,11 +131,13 @@ Sources primaires revérifiées pour ce correctif :
 - [Plash](https://github.com/sindresorhus/Plash) annonce ne plus publier son code
   source : ne pas le présenter comme une brique actuelle intégrable.
 
-Qualification nécessaire sur le même binaire installé et autorisé : clic son,
-clic droit objet, clic droit vide, masquer/réafficher les fichiers, priorité d'une
-icône Finder superposée, changement de Space, veille/reprise et relance de l'agent.
-La récupération après désactivation native reste à observer : les tests injectés
-ne qualifient ni TCC ni les clics réels. Le PoC reste **non validé** jusque-là.
+Qualification locale du 9 septembre : l'utilisateur confirme que les contrôles
+restent cliquables après masquer/réafficher les fichiers. Les journaux du paquet
+installé confirment deux surfaces natives et les quittances des commandes Fichiers
+et Son. La tranche interactive est donc validée sur MAC-01. Restent à qualifier :
+clic droit objet et vide, priorité d'une icône Finder superposée, changement de Space,
+veille/reprise et révocation/récupération TCC. Le PoC n'est pas qualifié pour la
+production ou la distribution générale tant que ces preuves manquent.
 Cette réparation est interne à l'adaptateur ; contrats inchangés. Le diagramme
 annote seulement « Reprise à qualifier », sans modification de sa topologie.
 
