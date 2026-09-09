@@ -68,6 +68,39 @@ function respondWithExpiringSessions() {
   };
 }
 
+function respondWithFailedRenewal() {
+  let handshakes = 0;
+  const listener = (event: MessageEvent) => {
+    const message = event.data;
+    if (message?.type === 'webbridge.handshake') {
+      handshakes += 1;
+      const response = {
+        expiresAt: Date.now() + 100,
+        nonce: `extension_session_nonce_${handshakes}`,
+        ok: true,
+        protocolVersion: 2,
+        requestId: message.requestId,
+        type: 'tobirink.webbridge.response',
+      };
+      queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId: message.requestId, response, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
+      return;
+    }
+    const request = message?.request;
+    if (!request?.requestId) return;
+    const value = request.type === 'bootstrap.read' && handshakes > 1
+      ? { libraryCount: 'invalid' }
+      : request.type === 'bootstrap.read'
+        ? { availability: 'connected', generation: 1, libraryCount: 7, pendingReviewCount: 0, protocolVersion: 2 }
+        : { candidates: [], context: 'local' };
+    queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
+  };
+  window.addEventListener('message', listener);
+  return {
+    dispose: () => window.removeEventListener('message', listener),
+    handshakeCount: () => handshakes,
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -103,8 +136,17 @@ describe('WebBridgeProvider', () => {
     dispose();
   });
 
-  it('automatically reconnects once, then exposes the recoverable error state', async () => {
+  it('renews every successfully expired session without disconnecting', async () => {
     const responder = respondWithExpiringSessions();
+    render(<WebBridgeProvider><Probe /></WebBridgeProvider>);
+    await waitFor(() => expect(screen.getByTestId('bridge-status').textContent).toBe('connected:7'));
+    await waitFor(() => expect(responder.handshakeCount()).toBeGreaterThanOrEqual(3), { timeout: 1_000 });
+    await waitFor(() => expect(screen.getByTestId('bridge-status').textContent).toBe('connected:7'));
+    responder.dispose();
+  });
+
+  it('stops after one failed automatic renewal and exposes a recoverable error', async () => {
+    const responder = respondWithFailedRenewal();
     render(<WebBridgeProvider><Probe /></WebBridgeProvider>);
     await waitFor(() => expect(screen.getByTestId('bridge-status').textContent).toBe('connected:7'));
     await waitFor(() => expect(screen.getByTestId('bridge-status').textContent).toBe('error:7'), { timeout: 1_000 });

@@ -35,6 +35,6 @@
   "cards": [
     { "dot": "emerald", "title": "Autorité locale", "items": ["IndexedDB reste l’autorité privée unique", "L’installation importe les favoris dans une base neuve", "Le site ne lit jamais le stockage privé directement"] },
     { "dot": "cyan", "title": "Bridge borné", "items": ["Session émise par l’extension, requête et version sont validées", "Library applique recherche normalisée, facette, curseur et limite 24", "Agenda transmet les timestamps et disponibilités locales sans précision inventée"] },
-    { "dot": "amber", "title": "États honnêtes", "items": ["Le popup montre seulement une source observée liée à un Work local", "Incompatibilité et erreur récupérable restent distinctes", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
+    { "dot": "amber", "title": "États honnêtes", "items": ["Le popup montre seulement une source observée liée à un Work local", "Chaque session WebBridge valide réarme le renouvellement suivant", "Un renouvellement échoué reste borné et récupérable", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
   ]
 }

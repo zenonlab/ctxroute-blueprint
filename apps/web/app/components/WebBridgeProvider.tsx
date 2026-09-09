@@ -133,6 +133,7 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       if (!mountedRef.current) return;
       setBootstrap(nextBootstrap);
       setReview(nextReview);
+      automaticReconnectUsedRef.current = false;
       setStatus('connected');
       clearTimeout(expiryTimerRef.current);
       expiryTimerRef.current = setTimeout(() => {

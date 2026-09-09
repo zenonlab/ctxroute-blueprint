@@ -104,6 +104,11 @@ unique `FavoriteSource` observée déjà liée à un `Work` local. Les anciennes
 reprises génériques sans identifiant `Work` sont ignorées lors de la lecture du
 cache; aucune ligne IndexedDB n'est supprimée.
 
+Le WebBridge renouvelle sa session courte après chaque expiration tant que le
+handshake et les projections initiales sont valides. Chaque renouvellement
+réussi réarme le suivant; un renouvellement défaillant s'arrête après cet essai
+et expose l'état récupérable sans boucle de requêtes.
+
 ### 1. Capturer le déclencheur
 
 Le `BookmarkEventAdapter` transforme les événements navigateur en commandes
