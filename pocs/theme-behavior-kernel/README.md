@@ -27,3 +27,9 @@ La fixture est originale et ne contient aucun asset ou code extrait d'un jeu.
 Cette preuve couvre le circuit, la formation, le déterminisme, la suspension et le
 cadrage. Elle ne prouve encore ni rendu visuel, ni animation squelettique, ni picking,
 ni connexion à de vraies sessions terminal.
+
+M3 ajoute les états `idle`, `active`, `busy`, `success`, `error`, `recovering`, une
+réaction de roulis/suspension et cinq familles d'effets bornés. Un identifiant
+d'événement déjà traité ne rejoue aucun effet. Le contrôleur de récupération — rôle
+que le thème peut présenter comme Lakitu — possède temporairement l'autorité puis la
+rend explicitement au trajet ; ce n'est pas l'IA du jeu original.

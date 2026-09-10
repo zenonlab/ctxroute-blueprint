@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
 const EPSILON: f64 = 1.0e-9;
@@ -383,6 +383,46 @@ pub struct EntitySnapshot {
     pub path_distance: f64,
     pub position: Vec3,
     pub forward: Vec3,
+    pub activity: ActivityState,
+    pub authority: MotionAuthority,
+    pub roll_degrees: f64,
+    pub suspension_offset: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityState {
+    Idle,
+    Active,
+    Busy,
+    Success,
+    Error,
+    Recovering,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MotionAuthority {
+    Route,
+    Recovery,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectKind {
+    Particles,
+    Sprite,
+    Sound,
+    Material,
+    CameraImpulse,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ActiveEffect {
+    pub event_id: String,
+    pub session_id: String,
+    pub kind: EffectKind,
+    pub expires_at_tick: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -423,6 +463,7 @@ pub struct PresentationSnapshot {
     pub group_distance: f64,
     pub entities: Vec<EntitySnapshot>,
     pub camera: CameraSnapshot,
+    pub effects: Vec<ActiveEffect>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
@@ -526,6 +567,10 @@ pub struct BehaviorKernel {
     paused: bool,
     occluded: bool,
     counters: RuntimeCounters,
+    activity: BTreeMap<String, ActivityState>,
+    authorities: BTreeMap<String, u64>,
+    effects: VecDeque<ActiveEffect>,
+    handled_events: HashSet<String>,
     snapshot: PresentationSnapshot,
 }
 
@@ -543,6 +588,11 @@ impl BehaviorKernel {
             safe_fraction_x: config.camera.safe_fraction_x,
             safe_fraction_y: config.camera.safe_fraction_y,
         };
+        let activity = config
+            .entities
+            .iter()
+            .map(|entity| (entity.session_id.clone(), ActivityState::Idle))
+            .collect();
         let mut kernel = Self {
             config,
             path,
@@ -553,12 +603,17 @@ impl BehaviorKernel {
             paused: false,
             occluded: false,
             counters: RuntimeCounters::default(),
+            activity,
+            authorities: BTreeMap::new(),
+            effects: VecDeque::new(),
+            handled_events: HashSet::new(),
             snapshot: PresentationSnapshot {
                 tick: 0,
                 simulation_seconds: 0.0,
                 group_distance: 0.0,
                 entities: Vec::new(),
                 camera: placeholder_camera,
+                effects: Vec::new(),
             },
         };
         kernel.rebuild_snapshot();
@@ -603,6 +658,66 @@ impl BehaviorKernel {
         self.set_paused(occluded);
     }
 
+    pub fn apply_activity(
+        &mut self,
+        event_id: &str,
+        session_id: &str,
+        state: ActivityState,
+    ) -> Result<bool, String> {
+        if event_id.is_empty() || event_id.len() > 96 {
+            return Err("event_id must contain 1..=96 characters".into());
+        }
+        if self.handled_events.contains(event_id) {
+            return Ok(false);
+        }
+        let activity = self
+            .activity
+            .get_mut(session_id)
+            .ok_or_else(|| format!("unknown session_id {session_id}"))?;
+        *activity = state;
+        self.handled_events.insert(event_id.to_owned());
+        let kind = match state {
+            ActivityState::Idle | ActivityState::Active => None,
+            ActivityState::Busy => Some(EffectKind::Particles),
+            ActivityState::Success => Some(EffectKind::Sprite),
+            ActivityState::Error => Some(EffectKind::Material),
+            ActivityState::Recovering => Some(EffectKind::CameraImpulse),
+        };
+        if let Some(kind) = kind {
+            if self.effects.len() == 64 {
+                self.effects.pop_front();
+            }
+            self.effects.push_back(ActiveEffect {
+                event_id: event_id.to_owned(),
+                session_id: session_id.to_owned(),
+                kind,
+                expires_at_tick: self.tick + 30,
+            });
+        }
+        self.rebuild_snapshot();
+        Ok(true)
+    }
+
+    pub fn take_recovery_control(
+        &mut self,
+        instance_id: &str,
+        duration_ticks: u64,
+    ) -> Result<(), String> {
+        if !(1..=300).contains(&duration_ticks)
+            || !self
+                .config
+                .entities
+                .iter()
+                .any(|entity| entity.instance_id == instance_id)
+        {
+            return Err("recovery requires a known instance and 1..=300 ticks".into());
+        }
+        self.authorities
+            .insert(instance_id.to_owned(), self.tick + duration_ticks);
+        self.rebuild_snapshot();
+        Ok(())
+    }
+
     pub fn tick_fixed(&mut self) -> &PresentationSnapshot {
         if self.paused {
             return &self.snapshot;
@@ -612,6 +727,9 @@ impl BehaviorKernel {
         self.group_distance = (self.group_distance
             + self.config.speed_units_per_second * self.config.fixed_dt_seconds)
             .rem_euclid(self.path.total_length());
+        self.effects
+            .retain(|effect| effect.expires_at_tick > self.tick);
+        self.authorities.retain(|_, until| *until > self.tick);
         self.rebuild_snapshot();
         &self.snapshot
     }
@@ -655,6 +773,25 @@ impl BehaviorKernel {
                     path_distance: distance,
                     position: pose.position + right * entity.lateral_offset,
                     forward: pose.tangent,
+                    activity: self.activity[&entity.session_id],
+                    authority: if self.authorities.contains_key(&entity.instance_id) {
+                        MotionAuthority::Recovery
+                    } else {
+                        MotionAuthority::Route
+                    },
+                    roll_degrees: if matches!(
+                        self.activity[&entity.session_id],
+                        ActivityState::Active | ActivityState::Busy
+                    ) {
+                        (distance * 0.15).sin() * 4.0
+                    } else {
+                        0.0
+                    },
+                    suspension_offset: if self.activity[&entity.session_id] == ActivityState::Busy {
+                        (distance * 0.4).sin() * 0.04
+                    } else {
+                        0.0
+                    },
                 }
             })
             .collect::<Vec<_>>();
@@ -672,6 +809,7 @@ impl BehaviorKernel {
             group_distance: self.group_distance,
             entities,
             camera,
+            effects: self.effects.iter().cloned().collect(),
         };
     }
 }
@@ -836,5 +974,53 @@ mod tests {
         kernel.tick_fixed();
         assert_eq!(kernel.counters().occlusion_transitions, 2);
         assert_eq!(kernel.counters().pause_transitions, 2);
+    }
+
+    #[test]
+    fn activity_effects_are_bounded_deduplicated_and_pause_with_time() {
+        let mut kernel = BehaviorKernel::new(fixture()).unwrap();
+        assert!(
+            kernel
+                .apply_activity("event.1", "session.01", ActivityState::Busy)
+                .unwrap()
+        );
+        assert!(
+            !kernel
+                .apply_activity("event.1", "session.01", ActivityState::Error)
+                .unwrap()
+        );
+        assert_eq!(kernel.snapshot().effects.len(), 1);
+        assert_eq!(kernel.snapshot().entities[0].activity, ActivityState::Busy);
+        kernel.set_occluded(true);
+        for _ in 0..100 {
+            kernel.tick_fixed();
+        }
+        assert_eq!(kernel.snapshot().effects.len(), 1);
+        kernel.set_occluded(false);
+        for _ in 0..30 {
+            kernel.tick_fixed();
+        }
+        assert!(kernel.snapshot().effects.is_empty());
+    }
+
+    #[test]
+    fn recovery_authority_returns_explicitly_to_route() {
+        let mut kernel = BehaviorKernel::new(fixture()).unwrap();
+        kernel.take_recovery_control("kart.01", 3).unwrap();
+        assert_eq!(
+            kernel.snapshot().entities[0].authority,
+            MotionAuthority::Recovery
+        );
+        kernel.tick_fixed();
+        kernel.tick_fixed();
+        assert_eq!(
+            kernel.snapshot().entities[0].authority,
+            MotionAuthority::Recovery
+        );
+        kernel.tick_fixed();
+        assert_eq!(
+            kernel.snapshot().entities[0].authority,
+            MotionAuthority::Route
+        );
     }
 }

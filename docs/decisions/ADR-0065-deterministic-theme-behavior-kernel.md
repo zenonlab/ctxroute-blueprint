@@ -61,3 +61,8 @@ JSON originale, piste fermée compilée, pas fixe, huit instances/session, forma
 directeur caméra et snapshots sérialisables. Les tests couvrent le raccord, deux tours,
 2 000 pas déterministes, la safe area et la reprise bornée. Cette preuve ne change pas
 la décision et ne qualifie pas encore le raccord Bevy ou wallpaper.
+
+M3 matérialise ensuite les six états d'activité, roulis et suspension déterministes,
+un registre de 64 effets avec déduplication des événements, et une autorité de
+récupération bornée qui revient automatiquement au trajet. Onze tests passent ;
+aucune de ces adaptations n'est présentée comme l'IA originale du jeu.
