@@ -1,5 +1,27 @@
 import Foundation
 
+public enum PortableRole: String, Codable, CaseIterable, Sendable {
+    case themeAudio = "theme.audio"
+    case desktopFiles = "desktop.files"
+    case sessionFocus = "session.focus"
+    case objectLaunch = "object.launch"
+    case themeEdit = "theme.edit"
+}
+
+public struct AppearanceOverride: Codable, Equatable, Sendable {
+    public var character: String?
+    public var vehicle: String?
+    public var color: String?
+    public var texture: String?
+    public var icon: String?
+    public var animation: String?
+    public init(character: String? = nil, vehicle: String? = nil, color: String? = nil,
+                texture: String? = nil, icon: String? = nil, animation: String? = nil) {
+        self.character = character; self.vehicle = vehicle; self.color = color
+        self.texture = texture; self.icon = icon; self.animation = animation
+    }
+}
+
 public struct Theme: Codable, Equatable, Sendable {
     public struct Object: Codable, Equatable, Sendable {
         public let id: String
@@ -10,10 +32,20 @@ public struct Theme: Codable, Equatable, Sendable {
         public var x: Double?
         public var y: Double?
         public var size: Double?
+        public var character: String?
+        public var vehicle: String?
+        public var texture: String?
+        public var icon: String?
+        public var animation: String?
+        public var role: PortableRole?
         public init(id: String, color: String, phase: Double, label: String? = nil,
-                    application: String? = nil, x: Double? = nil, y: Double? = nil, size: Double? = nil) {
+                    application: String? = nil, x: Double? = nil, y: Double? = nil, size: Double? = nil,
+                    character: String? = nil, vehicle: String? = nil, texture: String? = nil,
+                    icon: String? = nil, animation: String? = nil, role: PortableRole? = nil) {
             self.id = id; self.color = color; self.phase = phase; self.label = label
             application_bundle_id = application; self.x = x; self.y = y; self.size = size
+            self.character = character; self.vehicle = vehicle; self.texture = texture
+            self.icon = icon; self.animation = animation; self.role = role
         }
     }
     public struct Controls: Codable, Equatable, Sendable {
@@ -80,6 +112,8 @@ public struct Theme: Codable, Equatable, Sendable {
                   && ((object.x == nil && object.y == nil) ||
                       (object.x.map { (0.05...0.95).contains($0) } == true && object.y.map { (0.05...0.95).contains($0) } == true))
                   && (object.size.map { (24...96).contains($0) } ?? true)
+                  && [object.character, object.vehicle, object.animation].allSatisfy({ $0.map(validID) ?? true })
+                  && [object.texture, object.icon].allSatisfy({ $0.map(validAssetName) ?? true })
               }),
               theme.system_controls.placement == "top_left",
               (1...7).contains(theme.system_controls.items.count),
@@ -87,6 +121,20 @@ public struct Theme: Codable, Equatable, Sendable {
               theme.system_controls.items.allSatisfy({ ["motion", "audio", "interaction", "desktop", "settings", "profile", "overlay"].contains($0) })
         else { throw ModelError.invalid("manifest invariant") }
         return theme
+    }
+
+    public func applying(_ appearance: AppearanceOverride, to objectID: String) throws -> Theme {
+        guard let index = objects.firstIndex(where: { $0.id == objectID }) else {
+            throw ModelError.invalid("unknown object")
+        }
+        var result = self
+        if let value = appearance.character { result.objects[index].character = value }
+        if let value = appearance.vehicle { result.objects[index].vehicle = value }
+        if let value = appearance.color { result.objects[index].color = value }
+        if let value = appearance.texture { result.objects[index].texture = value }
+        if let value = appearance.icon { result.objects[index].icon = value }
+        if let value = appearance.animation { result.objects[index].animation = value }
+        return try Theme.decode(JSONEncoder().encode(result))
     }
 
     private static func validID(_ value: String) -> Bool {

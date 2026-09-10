@@ -5,10 +5,17 @@ import UniformTypeIdentifiers
 @MainActor final class CustomizationModal: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var draft: Theme?
+    private var original: Theme?
     private var objectIndex = 0
     private let name = NSTextField()
     private let color = NSColorWell()
     private let size = NSSlider(value: 44, minValue: 24, maxValue: 96, target: nil, action: nil)
+    private let character = NSTextField()
+    private let vehicle = NSTextField()
+    private let texture = NSTextField()
+    private let icon = NSTextField()
+    private let animation = NSTextField()
+    private let role = NSPopUpButton()
     private let application = NSTextField(labelWithString: "Terminal")
     private let error = NSTextField(wrappingLabelWithString: "")
     private let save = NSButton(title: "Enregistrer", target: nil, action: nil)
@@ -34,15 +41,22 @@ import UniformTypeIdentifiers
                 x: min(0.95, max(0.05, point.x / width)), y: min(0.95, max(0.05, point.y / height))))
             objectIndex = value.objects.count - 1
         }
-        draft = value
+        draft = value; original = theme
         let object = value.objects[objectIndex]
         name.stringValue = object.label ?? "Terminal"
         applicationID = object.application_bundle_id ?? "com.apple.Terminal"
         updateApplicationName()
         color.color = NSColor(cgColor: Scene.color(object.color)) ?? .systemBlue
         size.doubleValue = object.size ?? 44
+        character.stringValue = object.character ?? ""
+        vehicle.stringValue = object.vehicle ?? ""
+        texture.stringValue = object.texture ?? ""
+        icon.stringValue = object.icon ?? ""
+        animation.stringValue = object.animation ?? ""
+        role.removeAllItems(); role.addItems(withTitles: PortableRole.allCases.map(\.rawValue))
+        role.selectItem(withTitle: (object.role ?? .objectLaunch).rawValue)
         error.stringValue = ""; save.isEnabled = true
-        let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 390, height: 340),
+        let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 390, height: 570),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = objectID == nil ? "Ajouter un objet" : "Personnaliser l’objet"
         window.isReleasedWhenClosed = false; window.delegate = self
@@ -55,12 +69,19 @@ import UniformTypeIdentifiers
         for (title, field) in [("Nom", name as NSView), ("Couleur", color), ("Taille", size)] {
             stack.addArrangedSubview(NSTextField(labelWithString: title)); stack.addArrangedSubview(field)
         }
+        let appearanceFields: [(String, NSView)] = [("Personnage", character), ("Véhicule", vehicle),
+            ("Texture", texture), ("Icône", icon), ("Animation", animation), ("Action", role)]
+        for (title, field) in appearanceFields {
+            field.setAccessibilityLabel(title); field.widthAnchor.constraint(equalToConstant: 342).isActive = true
+            stack.addArrangedSubview(NSTextField(labelWithString: title)); stack.addArrangedSubview(field)
+        }
         let picker = NSButton(title: "Choisir l’application…", target: self, action: #selector(pickApplication))
         stack.addArrangedSubview(NSStackView(views: [application, picker]))
         error.textColor = .systemRed; error.font = .systemFont(ofSize: 12); stack.addArrangedSubview(error)
         save.target = self; save.action = #selector(submit); save.keyEquivalent = "\r"
         let cancel = NSButton(title: "Annuler", target: self, action: #selector(close)); cancel.keyEquivalent = "\u{1b}"
-        stack.addArrangedSubview(NSStackView(views: [cancel, save]))
+        let reset = NSButton(title: "Réinitialiser", target: self, action: #selector(resetDraft))
+        stack.addArrangedSubview(NSStackView(views: [cancel, reset, save]))
         window.contentView = stack; panel = window; window.center()
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         window.makeFirstResponder(name)
@@ -86,6 +107,12 @@ import UniformTypeIdentifiers
             Int((rgb.greenComponent * 255).rounded()), Int((rgb.blueComponent * 255).rounded()))
         value.objects[objectIndex].size = size.doubleValue
         value.objects[objectIndex].application_bundle_id = applicationID
+        value.objects[objectIndex].character = optional(character.stringValue)
+        value.objects[objectIndex].vehicle = optional(vehicle.stringValue)
+        value.objects[objectIndex].texture = optional(texture.stringValue)
+        value.objects[objectIndex].icon = optional(icon.stringValue)
+        value.objects[objectIndex].animation = optional(animation.stringValue)
+        value.objects[objectIndex].role = role.selectedItem.flatMap { PortableRole(rawValue: $0.title) }
         do {
             let checked = try Theme.decode(JSONEncoder().encode(value))
             save.isEnabled = false; error.stringValue = "Application au décor…"; onSave?(checked)
@@ -93,6 +120,15 @@ import UniformTypeIdentifiers
     }
     func confirmed() { close() }
     func failed(_ message: String) { save.isEnabled = true; error.stringValue = message }
-    @objc private func close() { panel?.close(); draft = nil }
-    func windowWillClose(_ notification: Notification) { draft = nil }
+    @objc private func resetDraft() {
+        guard let original else { return }
+        panel?.close(); draft = nil; self.original = nil
+        present(theme: original, objectID: original.objects[objectIndex].id)
+    }
+    private func optional(_ value: String) -> String? {
+        let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.isEmpty ? nil : result
+    }
+    @objc private func close() { panel?.close(); draft = nil; original = nil }
+    func windowWillClose(_ notification: Notification) { draft = nil; original = nil }
 }

@@ -26,6 +26,12 @@
           "x": {"type": "number", "minimum": 0.05, "maximum": 0.95},
           "y": {"type": "number", "minimum": 0.05, "maximum": 0.95},
           "size": {"type": "number", "minimum": 24, "maximum": 96}
+          ,"character": {"$ref": "#/$defs/id"}
+          ,"vehicle": {"$ref": "#/$defs/id"}
+          ,"texture": {"$ref": "#/$defs/asset"}
+          ,"icon": {"$ref": "#/$defs/asset"}
+          ,"animation": {"$ref": "#/$defs/id"}
+          ,"role": {"enum": ["theme.audio", "desktop.files", "session.focus", "object.launch", "theme.edit"]}
         },
         "dependentRequired": {"x": ["y"], "y": ["x"]}
       }
@@ -41,6 +47,7 @@
   },
   "$defs": {
     "id": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$"},
-    "color": {"type": "string", "pattern": "^[0-9A-F]{6}$"}
+    "color": {"type": "string", "pattern": "^[0-9A-F]{6}$"},
+    "asset": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}\\.png$"}
   }
 }

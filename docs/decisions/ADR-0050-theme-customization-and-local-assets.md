@@ -14,7 +14,9 @@ scope:
   - docs/document-contracts.json
   - docs/session-handoff.md
   - .project/project-config.json
+  - pocs/macos-connector/
 review: on-change
+revised: true
 ---
 # ADR-0050 — Personnalisation première classe et assets locaux séparés
 
@@ -59,3 +61,11 @@ contenus privés, rendu et intégration système.
 Le PoC macOS 2 reste une preuve de connecteur. Il prépare le manifeste et les identités
 mais n'est pas autorisé à choisir seul le moteur 3D ou à transformer ses boutons
 diagnostiques en design final.
+
+## Implementation evidence
+
+M4 expose les rôles portables `theme.audio`, `desktop.files`, `session.focus`,
+`object.launch` et `theme.edit`. La modale édite personnage, véhicule, coloris,
+texture, icône, animation et rôle, avec brouillon annulable, reset vers l'embarqué,
+validation puis écriture atomique. L'override d'apparence ne touche pas identifiant,
+phase, position, application ou rôle existant.

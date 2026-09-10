@@ -128,6 +128,8 @@ final class CustomizationTests: XCTestCase {
         try store.save(draft)
         XCTAssertEqual(try store.load(for: original), draft)
         XCTAssertEqual(try Theme.load(), original)
+        try store.reset(to: original)
+        XCTAssertEqual(try store.load(for: original), original)
         let url = directory.appendingPathComponent(original.theme_id + ".json")
         try Data(repeating: 0, count: 32_769).write(to: url)
         XCTAssertThrowsError(try store.load(for: original))
@@ -140,5 +142,25 @@ final class CustomizationTests: XCTestCase {
         XCTAssertFalse(result.state.muted)
         XCTAssertFalse(result.state.paused)
         XCTAssertFalse(result.state.highlighted)
+    }
+    func testAppearanceOverridePreservesIdentityMotionAndAction() throws {
+        var original = try Theme.load()
+        original.objects[0].role = .sessionFocus
+        original.objects[0].application_bundle_id = "com.apple.Terminal"
+        let before = original.objects[0]
+        let changed = try original.applying(AppearanceOverride(character: "driver.mario",
+            vehicle: "kart.standard", color: "AA2200", texture: "kart-red.png",
+            icon: "portrait-red.png", animation: "drive.active"), to: before.id)
+        let after = changed.objects[0]
+        XCTAssertEqual(after.id, before.id)
+        XCTAssertEqual(after.phase, before.phase)
+        XCTAssertEqual(after.x, before.x); XCTAssertEqual(after.y, before.y)
+        XCTAssertEqual(after.role, before.role)
+        XCTAssertEqual(after.application_bundle_id, before.application_bundle_id)
+        XCTAssertEqual(after.character, "driver.mario")
+        XCTAssertEqual(after.vehicle, "kart.standard")
+        XCTAssertEqual(after.color, "AA2200")
+        XCTAssertNotEqual(changed, original)
+        XCTAssertEqual(original.objects[0], before)
     }
 }

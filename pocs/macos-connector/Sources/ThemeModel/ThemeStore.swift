@@ -26,4 +26,6 @@ public struct ThemeStore {
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
+    /// Reset is an atomic write of the signed embedded value; it never deletes a file.
+    public func reset(to embedded: Theme) throws { try save(embedded) }
 }
