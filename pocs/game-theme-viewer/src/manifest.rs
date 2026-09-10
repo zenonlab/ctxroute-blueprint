@@ -29,6 +29,47 @@ pub struct AssetDescriptor {
     pub semantic_profile: String,
     pub render_profile: String,
     pub visual_qualification: VisualQualification,
+    pub fidelity: Option<FidelityDescriptor>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FidelityDescriptor {
+    pub source_tables: Vec<String>,
+    pub rig_parts: BTreeMap<String, String>,
+    pub steering_max_degrees: f32,
+    pub alpha_mode: AlphaMode,
+    pub cull_mode: CullMode,
+    pub lod_levels: u8,
+    pub cast_shadows: bool,
+    pub receive_shadows: bool,
+    pub sky_camera: SkyCameraMode,
+    #[serde(default)]
+    pub approximations: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AlphaMode {
+    Opaque,
+    Mask,
+    Blend,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CullMode {
+    Back,
+    Front,
+    None,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SkyCameraMode {
+    Fixed,
+    RotationOnly,
+    World,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -122,7 +163,7 @@ impl ValidatedPack {
         let manifest: ThemeManifest = serde_json::from_slice(&bytes)
             .with_context(|| format!("invalid {}", manifest_path.display()))?;
 
-        if manifest.schema_version != 2 {
+        if !matches!(manifest.schema_version, 2 | 3) {
             bail!(
                 "unsupported theme schema version {}",
                 manifest.schema_version
@@ -173,6 +214,34 @@ impl ValidatedPack {
                     descriptor.render_profile
                 );
             }
+            if manifest.schema_version == 3 {
+                let fidelity = descriptor.fidelity.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("asset {id} requires fidelity metadata in schema v3")
+                })?;
+                if fidelity.source_tables.is_empty()
+                    || fidelity.source_tables.len() > 16
+                    || fidelity.rig_parts.len() > 64
+                    || !fidelity.steering_max_degrees.is_finite()
+                    || !(0.0..=90.0).contains(&fidelity.steering_max_degrees)
+                    || !(1..=8).contains(&fidelity.lod_levels)
+                    || fidelity.approximations.len() > 32
+                    || fidelity
+                        .approximations
+                        .iter()
+                        .any(|value| value.trim().is_empty())
+                {
+                    bail!("asset {id} has invalid fidelity metadata");
+                }
+                for (role, node) in &fidelity.rig_parts {
+                    validate_id("rig role", role)?;
+                    validate_id("rig node", node)?;
+                }
+                if descriptor.visual_qualification == VisualQualification::Qualified
+                    && !fidelity.approximations.is_empty()
+                {
+                    bail!("asset {id} cannot be qualified while approximations remain");
+                }
+            }
         }
 
         let mut instance_ids = std::collections::BTreeSet::new();
@@ -217,7 +286,35 @@ impl ValidatedPack {
         self.manifest.assets.values().any(|asset| {
             asset.visual_qualification == VisualQualification::Diagnostic
                 || asset.semantic_profile != asset.render_profile
+                || asset
+                    .fidelity
+                    .as_ref()
+                    .is_some_and(|value| !value.approximations.is_empty())
         })
+    }
+
+    pub fn shadows_enabled(&self) -> bool {
+        self.manifest.assets.values().any(|asset| {
+            asset
+                .fidelity
+                .as_ref()
+                .is_some_and(|value| value.cast_shadows || value.receive_shadows)
+        })
+    }
+
+    pub fn fidelity_summaries(&self) -> Vec<String> {
+        self.manifest
+            .assets
+            .iter()
+            .filter_map(|(id, asset)| {
+                asset.fidelity.as_ref().map(|value| {
+                    format!(
+                        "{id}: alpha={:?} cull={:?} sky={:?} lod={}",
+                        value.alpha_mode, value.cull_mode, value.sky_camera, value.lod_levels
+                    )
+                })
+            })
+            .collect()
     }
 }
 
@@ -528,5 +625,51 @@ mod tests {
         let error = ValidatedPack::load(directory.path()).unwrap_err();
 
         assert!(error.to_string().contains("unsupported render profile"));
+    }
+
+    #[test]
+    fn schema_v3_requires_fidelity_and_rejects_hidden_approximations() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("scene.glb"), b"fixture").unwrap();
+        let manifest = r#"{
+  "schema_version": 3,
+  "id": "fixture.theme",
+  "display_name": "Fixture",
+  "assets": { "kart": {
+    "path": "scene.glb",
+    "semantic_profile": "gltf.standard",
+    "render_profile": "gltf.standard",
+    "visual_qualification": "qualified",
+    "fidelity": {
+      "source_tables": ["display.table"],
+      "rig_parts": { "driver": "DriverRoot", "wheel.front_left": "WheelFL" },
+      "steering_max_degrees": 35,
+      "alpha_mode": "mask",
+      "cull_mode": "back",
+      "lod_levels": 3,
+      "cast_shadows": true,
+      "receive_shadows": true,
+      "sky_camera": "rotation_only",
+      "approximations": ["driver arms use fallback weights"]
+    }
+  }},
+  "instances": [{ "id": "kart.one", "asset": "kart" }],
+  "camera": { "position": [0, 2, 5], "target": [0, 0, 0] }
+}"#;
+        fs::write(directory.path().join("theme.json"), manifest).unwrap();
+        let error = ValidatedPack::load(directory.path()).unwrap_err();
+        assert!(error.to_string().contains("approximations remain"));
+
+        fs::write(
+            directory.path().join("theme.json"),
+            manifest.replace(
+                r#""visual_qualification": "qualified""#,
+                r#""visual_qualification": "diagnostic""#,
+            ),
+        )
+        .unwrap();
+        let pack = ValidatedPack::load(directory.path()).unwrap();
+        assert!(pack.is_visual_diagnostic());
+        assert!(pack.shadows_enabled());
     }
 }

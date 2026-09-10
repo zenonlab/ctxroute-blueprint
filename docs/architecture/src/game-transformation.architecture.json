@@ -16,7 +16,7 @@
     { "id": "recipes", "type": "external", "label": "Recettes de thème", "sublabel": "Deux courses · zéro asset publié", "pos": [40, 280], "size": [250, 80] },
     { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Contrôleurs · formation · camera rigs", "pos": [1010, 460], "size": [260, 80] },
     { "id": "runtime", "type": "frontend", "label": "Moteur déterministe", "sublabel": "Pas fixe · formation · caméra", "pos": [680, 460], "size": [240, 80] },
-    { "id": "render-profile", "type": "backend", "label": "Hôte de présentation", "sublabel": "2D/3D · profil source · interpolation", "pos": [350, 460], "size": [250, 80] }
+    { "id": "render-profile", "type": "backend", "label": "Hôte de présentation", "sublabel": "Profil v3 · fidélité · interpolation", "pos": [350, 460], "size": [250, 80] }
   ],
   "connections": [
     { "id": "read", "from": "game", "to": "readers", "label": "inventorier sans exécuter", "labelAt": [305, 184] },

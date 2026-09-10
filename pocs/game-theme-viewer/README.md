@@ -12,6 +12,16 @@ Chaque asset déclare ses profils sémantique et de rendu. Ce binaire n'impléme
 une preuve de fidélité. Un profil source qualifié doit être fourni par un adaptateur
 et comparé à un oracle Fast3D/RDP.
 
+Le manifeste v3 ajoute les tables source consultées, les rôles sémantiques du rig,
+le braquage, alpha, culling, LOD, ombres et caméra du ciel. Une qualification est
+refusée tant qu'une approximation est déclarée. Le viewer applique le choix d'ombres ;
+les autres paramètres restent des obligations d'adaptateur vérifiables avant rendu.
+
+Le manifeste v3 ajoute les tables source consultées, les rôles sémantiques du rig,
+le braquage, alpha, culling, LOD, ombres et caméra du ciel. Une qualification est
+refusée tant qu'une approximation est déclarée. Le viewer applique le choix d'ombres ;
+les autres paramètres restent des obligations d'adaptateur vérifiables avant rendu.
+
 ```bash
 cargo run --release --manifest-path pocs/game-theme-viewer/Cargo.toml -- \
   --pack game/packs/clocktower

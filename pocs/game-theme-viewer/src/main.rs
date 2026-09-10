@@ -28,6 +28,7 @@ struct ViewerConfig {
     camera_position: Vec3,
     camera_target: Vec3,
     camera_fov_y_degrees: f32,
+    shadows_enabled: bool,
 }
 
 #[derive(Resource)]
@@ -54,6 +55,7 @@ fn main() -> Result<()> {
     let pack_path = pack_path_from_args()?;
     let pack = ValidatedPack::load(&pack_path)?;
     let diagnostic = pack.is_visual_diagnostic();
+    let shadows_enabled = pack.shadows_enabled();
     let title = if diagnostic {
         format!("DIAGNOSTIC ONLY — {}", pack.manifest.display_name)
     } else {
@@ -92,6 +94,9 @@ fn main() -> Result<()> {
         pack.root.display(),
         pack.manifest.capabilities.len()
     );
+    for summary in pack.fidelity_summaries() {
+        eprintln!("fidelity {summary}");
+    }
     if diagnostic {
         eprintln!(
             "warning: this pack contains a semantic-to-render profile conversion and is not a visual-fidelity proof"
@@ -106,6 +111,7 @@ fn main() -> Result<()> {
             camera_position: initial_position,
             camera_target: target,
             camera_fov_y_degrees: pack.manifest.camera.fov_y_degrees,
+            shadows_enabled,
         })
         .insert_resource(OrbitCamera {
             enabled: pack.manifest.camera.orbit_enabled,
@@ -179,7 +185,7 @@ fn setup(
     commands.spawn((
         DirectionalLight {
             illuminance: 8_000.0,
-            shadow_maps_enabled: false,
+            shadow_maps_enabled: config.shadows_enabled,
             ..default()
         },
         Transform::from_xyz(8.0, 16.0, 10.0).looking_at(config.camera_target, Vec3::Y),
