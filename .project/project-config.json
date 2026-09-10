@@ -89,6 +89,7 @@
       "docs/architecture/src/platform-connectors.architecture.json",
       "docs/architecture/src/macos-native-wallpaper.architecture.json",
       "docs/architecture/src/macos-theme-discovery.dataflow.json",
+      "docs/architecture/src/macos-renderhost.sequence.json",
       "docs/architecture/src/macos-surface-poc.architecture.json",
       "docs/architecture/src/product-roadmap.workflow.json",
       "docs/architecture/src/product-vision.architecture.json",

@@ -54,6 +54,7 @@ if [[ -n "$connector_local_background" ]]; then
 fi
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
   "$connector_source/Sources/ThemeModel/ThemeDiscovery.swift"
+  "$connector_source/Sources/ThemeModel/RenderHost.swift"
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift"
   "$connector_source/Sources/ThemeModel/ThemeStore.swift"
   "$connector_source/Sources/ThemeModel/ProductIdentity.swift"

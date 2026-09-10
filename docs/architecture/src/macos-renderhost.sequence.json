@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Activation d’un thème local sur le bureau macOS",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1060, 820],
+    "views": [
+      { "id": "selection", "label": "Sélection générique", "focus": ["user", "connector", "registry"], "note": "Le manifeste fournit une capacité de renderer, jamais un chemin exécutable." },
+      { "id": "launch", "label": "Lancement borné", "focus": ["connector", "registry", "renderhost"], "note": "Le connecteur lance directement un binaire approuvé, sans shell ni argument libre." },
+      { "id": "desktop", "label": "Ancrage bureau", "focus": ["renderhost", "adapter", "macos"], "note": "L’adaptateur macOS place la fenêtre entre le fond et les icônes Finder." }
+    ]
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "Utilisateur", "sublabel": "sélection locale" },
+    { "id": "connector", "type": "frontend", "label": "Connecteur Swift", "sublabel": "contrôle macOS" },
+    { "id": "registry", "type": "security", "label": "Registre RenderHost", "sublabel": "capacités approuvées" },
+    { "id": "renderhost", "type": "backend", "label": "RenderHost", "sublabel": "Bevy portable" },
+    { "id": "adapter", "type": "backend", "label": "Adaptateur fenêtre", "sublabel": "macOS uniquement" },
+    { "id": "macos", "type": "external", "label": "WindowServer", "sublabel": "bureau et Finder" }
+  ],
+  "segments": [
+    { "from": 150, "to": 330, "label": "Résolution" },
+    { "from": 350, "to": 520, "label": "Démarrage" },
+    { "from": 540, "to": 720, "label": "Qualification desktop" }
+  ],
+  "messages": [
+    { "from": "user", "to": "connector", "y": 180, "label": "activer le thème", "variant": "emphasis" },
+    { "from": "connector", "to": "registry", "y": 225, "label": "résoudre renderer + version", "variant": "security" },
+    { "from": "registry", "to": "connector", "y": 270, "label": "binaire local approuvé", "variant": "return" },
+    { "from": "connector", "to": "renderhost", "y": 380, "label": "lancer avec recette validée", "variant": "emphasis" },
+    { "from": "renderhost", "to": "adapter", "y": 425, "label": "attacher la fenêtre native", "variant": "default" },
+    { "from": "adapter", "to": "macos", "y": 470, "label": "niveau desktop + tous les Spaces", "variant": "emphasis" },
+    { "from": "macos", "to": "adapter", "y": 570, "label": "géométrie et niveaux effectifs", "variant": "return" },
+    { "from": "adapter", "to": "renderhost", "y": 615, "label": "reçu desktop prêt", "variant": "return" },
+    { "from": "renderhost", "to": "connector", "y": 660, "label": "prêt ou erreur bornée", "variant": "dashed" }
+  ],
+  "activations": [
+    { "participant": "connector", "from": 174, "to": 674, "type": "frontend" },
+    { "participant": "registry", "from": 219, "to": 278, "type": "security" },
+    { "participant": "renderhost", "from": 374, "to": 668, "type": "backend" },
+    { "participant": "adapter", "from": 419, "to": 623, "type": "backend" },
+    { "participant": "macos", "from": 464, "to": 578, "type": "external" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Aucun thème codé en dur", "items": ["Le package déclare une capacité de renderer", "Le registre local associe cette capacité à un binaire", "Changer de thème ne change pas le connecteur"] },
+    { "dot": "rose", "title": "Exécution bornée", "items": ["Aucune commande shell brute", "La recette reste contenue dans le package validé", "Un seul processus actif par connecteur"] },
+    { "dot": "cyan", "title": "Priorité macOS", "items": ["La scène reste sous les icônes Finder", "La fenêtre rejoint tous les Spaces", "Le renderer portable ignore les détails AppKit"] }
+  ]
+}

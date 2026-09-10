@@ -114,6 +114,7 @@ import ApplicationServices
     let input = DesktopInput()
     let visibility = DesktopVisibility()
     let desktopItems = DesktopItems()
+    let renderHost = RenderHostController()
     var desktopItemsMenuItem: NSMenuItem?
     let store = ThemeStore(directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("org.orbite.wallpaper/themes", isDirectory: true))
@@ -153,6 +154,11 @@ import ApplicationServices
         libraryControls.addArrangedSubview(NSButton(title: "Ajouter une bibliothèque…", target: self, action: #selector(addThemeLibrary)))
         libraryControls.addArrangedSubview(NSButton(title: "Révéler la recette", target: self, action: #selector(revealThemeRecipe)))
         stack.addArrangedSubview(libraryControls)
+        let renderControls = NSStackView(); renderControls.orientation = .horizontal; renderControls.spacing = 12
+        renderControls.addArrangedSubview(NSButton(title: "Choisir le RenderHost…", target: self, action: #selector(chooseRenderHost)))
+        renderControls.addArrangedSubview(NSButton(title: "Activer sur le bureau", target: self, action: #selector(activateInstalledTheme)))
+        renderControls.addArrangedSubview(NSButton(title: "Arrêter", target: self, action: #selector(stopRenderHost)))
+        stack.addArrangedSubview(renderControls)
         let controls = NSStackView(); controls.orientation = .horizontal; controls.spacing = 12
         pauseButton = NSButton(title: "Suspendre", target: self, action: #selector(pause))
         effectButton = NSButton(title: "Accentuer", target: self, action: #selector(effect))
@@ -247,6 +253,38 @@ import ApplicationServices
         guard installedThemes.indices.contains(index) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([installedThemes[index].entry])
     }
+    @objc func chooseRenderHost() {
+        let index = installedThemePicker.indexOfSelectedItem
+        guard installedThemes.indices.contains(index) else { return }
+        let selected = installedThemes[index]
+        let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false; panel.prompt = "Approuver"
+        guard panel.runModal() == .OK, let executable = panel.url else { return }
+        do {
+            try RenderHostRegistry.register(renderer: selected.package.renderer, executable: executable)
+            libraryStatusLabel.stringValue = "RenderHost approuvé pour \(selected.package.renderer)."
+        } catch {
+            libraryStatusLabel.stringValue = "RenderHost refusé : \(error.localizedDescription)"
+        }
+    }
+    @objc func activateInstalledTheme() {
+        let index = installedThemePicker.indexOfSelectedItem
+        guard installedThemes.indices.contains(index) else { return }
+        do {
+            let selected = installedThemes[index]
+            let request = try RenderHostLaunchRequest.desktop(theme: selected)
+            let launched = try renderHost.activate(request)
+            libraryStatusLabel.stringValue = launched
+                ? "\(selected.package.display_name) lancé sur le bureau."
+                : "\(selected.package.display_name) est déjà actif."
+        } catch {
+            libraryStatusLabel.stringValue = "Activation refusée : \(error.localizedDescription)"
+        }
+    }
+    @objc func stopRenderHost() {
+        renderHost.stop()
+        libraryStatusLabel.stringValue = "RenderHost arrêté."
+    }
     func refreshThemeLibraries() {
         let roots = ThemeLibraries.roots()
         let receipt = ThemeDiscovery.discover(roots: roots)
@@ -256,11 +294,12 @@ import ApplicationServices
         installedThemePicker.isEnabled = !installedThemes.isEmpty
         libraryStatusLabel.stringValue = installedThemes.isEmpty
             ? "Aucun package détecté dans \(roots.count) bibliothèque(s)."
-            : "\(installedThemes.count) package(s) validé(s), \(receipt.rejected.count) refusé(s). Le raccord RenderHost reste à qualifier."
+            : "\(installedThemes.count) package(s) validé(s), \(receipt.rejected.count) refusé(s)."
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         input.stop()
+        renderHost.stop()
         // Stop the job as well, otherwise the provider would wake the agent again.
         let stop = Process()
         stop.executableURL = URL(fileURLWithPath: "/bin/launchctl")
