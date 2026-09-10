@@ -29,7 +29,7 @@
     { "from": "user", "to": "connector", "y": 180, "label": "activer le thème", "variant": "emphasis" },
     { "from": "connector", "to": "registry", "y": 225, "label": "résoudre renderer + version", "variant": "security" },
     { "from": "registry", "to": "connector", "y": 270, "label": "binaire local approuvé", "variant": "return" },
-    { "from": "connector", "to": "renderhost", "y": 380, "label": "lancer avec recette validée", "variant": "emphasis" },
+    { "from": "connector", "to": "renderhost", "y": 380, "label": "remplacer si recette changée, puis lancer", "variant": "emphasis" },
     { "from": "renderhost", "to": "adapter", "y": 425, "label": "attacher la fenêtre native", "variant": "default" },
     { "from": "adapter", "to": "macos", "y": 470, "label": "niveau desktop + tous les Spaces", "variant": "emphasis" },
     { "from": "macos", "to": "adapter", "y": 570, "label": "géométrie et niveaux effectifs", "variant": "return" },
@@ -45,7 +45,7 @@
   ],
   "cards": [
     { "dot": "emerald", "title": "Aucun thème codé en dur", "items": ["Le package déclare une capacité de renderer", "Le registre local associe cette capacité à un binaire", "Changer de thème ne change pas le connecteur"] },
-    { "dot": "rose", "title": "Exécution bornée", "items": ["Aucune commande shell brute", "La recette reste contenue dans le package validé", "Un seul processus actif par connecteur"] },
+    { "dot": "rose", "title": "Exécution bornée", "items": ["Aucune commande shell brute", "Une recette modifiée remplace l’ancien processus", "Un seul processus actif par connecteur"] },
     { "dot": "cyan", "title": "Priorité macOS", "items": ["La scène reste sous les icônes Finder", "La fenêtre rejoint tous les Spaces", "Le renderer portable ignore les détails AppKit"] }
   ]
 }

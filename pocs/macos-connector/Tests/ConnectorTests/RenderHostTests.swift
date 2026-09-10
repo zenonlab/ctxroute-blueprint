@@ -34,4 +34,16 @@ import Testing
             try RenderHostRegistry.resolve(renderer: "bevy-0.19", defaults: defaults)
         }
     }
+
+    @Test @MainActor func changed_recipe_restarts_the_same_theme() throws {
+        let controller = RenderHostController()
+        defer { controller.stop() }
+        let first = RenderHostLaunchRequest(executable: URL(fileURLWithPath: "/bin/sleep"),
+                                            arguments: ["30"], themeID: "fixture")
+        let changed = RenderHostLaunchRequest(executable: URL(fileURLWithPath: "/bin/sleep"),
+                                              arguments: ["29"], themeID: "fixture")
+        #expect(try controller.activate(first))
+        #expect(try !controller.activate(first))
+        #expect(try controller.activate(changed))
+    }
 }
