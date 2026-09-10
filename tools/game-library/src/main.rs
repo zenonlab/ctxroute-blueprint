@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
-use wallpaper_game_library::{IndexOptions, index_library, verify_library};
+use wallpaper_game_library::{IndexOptions, index_library, mkw::extract_course, verify_library};
 
 #[derive(Debug, Parser)]
 #[command(about = "Index locally extracted game data without packaging private assets")]
@@ -35,12 +35,19 @@ enum Command {
         #[arg(long)]
         library: PathBuf,
     },
+    ExtractMkwCourse {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
 enum Adapter {
     Generic,
     Zelda64,
+    Mkw,
 }
 
 fn main() -> Result<()> {
@@ -62,6 +69,7 @@ fn main() -> Result<()> {
                 adapter: match adapter {
                     Adapter::Generic => "generic".into(),
                     Adapter::Zelda64 => "zelda64".into(),
+                    Adapter::Mkw => "mkw".into(),
                 },
                 source_id,
                 source_revision,
@@ -73,6 +81,10 @@ fn main() -> Result<()> {
         }
         Command::Verify { library } => {
             let result = verify_library(&library)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::ExtractMkwCourse { input, output } => {
+            let result = extract_course(&input, &output)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

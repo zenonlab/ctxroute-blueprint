@@ -7,13 +7,13 @@
     "viewBox": [1300, 640]
   },
   "components": [
-    { "id": "game", "type": "external", "label": "ROM locale vérifiée", "sublabel": "Majora’s Mask · NTSC-U 1.0", "pos": [40, 90], "size": [220, 80] },
-    { "id": "readers", "type": "backend", "label": "Lecteurs et adaptateurs", "sublabel": "Zelda64 · outils hors ligne", "pos": [350, 90], "size": [230, 80] },
+    { "id": "game", "type": "external", "label": "Entrée locale vérifiée", "sublabel": "ROM ou archive de course privée", "pos": [40, 90], "size": [220, 80] },
+    { "id": "readers", "type": "backend", "label": "Lecteurs et adaptateurs", "sublabel": "Zelda64 · Yaz0/U8 · hors ligne", "pos": [350, 90], "size": [230, 80] },
     { "id": "observer", "type": "backend", "label": "Oracle source hors ligne", "sublabel": "Fast3D/RDP · vues déterministes", "pos": [660, 90], "size": [220, 80] },
     { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "SQLite · 22 377 blobs privés", "pos": [970, 90], "size": [260, 80] },
     { "id": "qualification", "type": "security", "label": "Qualification par capacité", "sublabel": "Exact · approché · manquant", "pos": [335, 270], "size": [260, 80] },
     { "id": "coverage", "type": "security", "label": "Rapport de couverture", "sublabel": "Complet · partiel · inconnu", "pos": [660, 270], "size": [260, 80] },
-    { "id": "recipes", "type": "external", "label": "Package de thème", "sublabel": "Intentions · contraintes · créations", "pos": [40, 280], "size": [250, 80] },
+    { "id": "recipes", "type": "external", "label": "Recettes de thème", "sublabel": "Deux courses · zéro asset publié", "pos": [40, 280], "size": [250, 80] },
     { "id": "composition", "type": "backend", "label": "Compilateur de thème", "sublabel": "Contrôleurs · formation · camera rigs", "pos": [1010, 460], "size": [260, 80] },
     { "id": "runtime", "type": "frontend", "label": "Moteur déterministe", "sublabel": "Pas fixe · formation · caméra", "pos": [680, 460], "size": [240, 80] },
     { "id": "render-profile", "type": "backend", "label": "Hôte de présentation", "sublabel": "2D/3D · profil source · interpolation", "pos": [350, 460], "size": [250, 80] }

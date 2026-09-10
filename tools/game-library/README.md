@@ -33,3 +33,15 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- verify \
 `--adapter generic` vérifie que le contrat commun fonctionne sur une fixture sans
 identifiant Zelda. `--no-blobs` permet une seconde indexation de contrôle sans
 matérialiser à nouveau le CAS.
+
+L'adaptateur Mario Kart Wii décompresse Yaz0 puis extrait l'archive U8 avec des
+limites strictes et sans exécuter le jeu. Il refuse toute sortie hors de `private/`
+et inventorie circuit, KCL, KMP, textures, animations, menus, portraits, emblèmes,
+boutons, polices, audio, effets et dépendances. Une catégorie absente reste signalée
+dans le rapport.
+
+```bash
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  extract-mkw-course --input private/source/farm_course.szs \
+  --output private/mkw/farm_course
+```

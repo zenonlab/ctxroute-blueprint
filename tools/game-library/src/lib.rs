@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
+pub mod mkw;
+
 const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug)]
@@ -241,7 +243,7 @@ fn validate_options(options: &IndexOptions) -> Result<()> {
         options.source.display()
     );
     ensure!(
-        matches!(options.adapter.as_str(), "generic" | "zelda64"),
+        matches!(options.adapter.as_str(), "generic" | "zelda64" | "mkw"),
         "unsupported adapter"
     );
     ensure!(
@@ -289,7 +291,17 @@ fn classify(path: &str, adapter: &str) -> (String, String, String) {
         .and_then(|value| value.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    let category = if lower.contains("/audio/") {
+    let category = if adapter == "mkw" && extension == "kcl" {
+        "collision"
+    } else if adapter == "mkw" && extension == "kmp" {
+        "route"
+    } else if adapter == "mkw" && matches!(extension.as_str(), "brres" | "tpl") {
+        "texture"
+    } else if adapter == "mkw" && matches!(extension.as_str(), "brlan" | "brlyt") {
+        "ui"
+    } else if adapter == "mkw" && matches!(extension.as_str(), "brstm" | "brsar") {
+        "audio_sample"
+    } else if lower.contains("/audio/") {
         if extension == "wav" {
             "audio_sample"
         } else if extension == "seq" {
@@ -352,8 +364,8 @@ fn classify(path: &str, adapter: &str) -> (String, String, String) {
         ),
         _ => ("unknown", "file type is not classified by the common index"),
     };
-    let reason = if adapter == "zelda64" {
-        format!("zelda64: {reason}")
+    let reason = if matches!(adapter, "zelda64" | "mkw") {
+        format!("{adapter}: {reason}")
     } else {
         reason.into()
     };
