@@ -1,339 +1,79 @@
-# PoC macOS 2 — connecteur natif maintenable
+# PoC 2 — connecteur macOS Swift
 
-État au 10 septembre 2026 : **packaging Swift assaini ; découverte locale générique raccordée ; RenderHost 3D vers le provider restant à qualifier**.
-Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
-Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
-Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
-Ce PoC ne qualifie ni l'App Store, ni une API publique Apple de wallpaper dynamique.
+État au 10 septembre 2026 : **runtime externe raccordé ; aucun thème natif embarqué ; qualification visuelle utilisateur requise**.
 
 ## But
 
-Prouver qu'une application connecteur macOS peut activer un thème portable, alimenter
-un wallpaper natif, exposer une seule surface de contrôle et dégrader proprement les
-interactions non sûres. Le travail repart d'un périmètre propre ; il ne transforme pas
-la sonde accumulée en produit par renommage.
+Qualifier un connecteur Swift qui découvre des thèmes locaux et confie leur rendu desktop à un RenderHost approuvé, sans contenu de thème dans l’application.
 
 ## Livrable borné
 
-Le livrable contient :
-
-- `ThemeFixture`: un manifeste canonique original, sans asset de jeu ;
-- `ThemeModel`: validation et état déterministe sans type AppKit ;
-- `MacConnectorApp`: installation, activation, permissions, diagnostic et réglages ;
-- `MacWallpaperAdapter`: rendu du décor et des objets dans la surface gérée par macOS ;
-- `MacInputAdapter`: capacité séparée, désactivable, qui refuse les clics ambigus ;
-- `ConnectorProtocol`: commandes, quittances, versions et erreurs typées ;
-- un harnais de qualification reproductible.
-
-Depuis [ADR-0072](../decisions/ADR-0072-automatic-local-theme-discovery.md),
-`ThemeDiscovery` indexe les descripteurs `orbite-theme.json` des bibliothèques locales
-configurées. La commande suivante produit le reçu sans lancer l'UI ni le provider :
-
-```sh
-Orbite\ Wallpaper.app/Contents/MacOS/WallpaperConnector --discover-themes /chemin/vers/bibliotheque
-```
-
-Le nom du thème, son identité, son renderer et sa recette viennent du descripteur.
-Le connecteur ne connaît aucun jeu ou dépôt. L'app permet aussi d'ajouter une racine
-avec un sélecteur de dossier et révèle la recette détectée. Détection ne signifie pas
-activation : une recette 3D reste indisponible dans le wallpaper tant que son
-`RenderHost` ne fournit pas la surface native attendue.
-
-Il n'inclut ni terminal custom, ni ROM, ni IA, ni convertisseur, ni multi-OS, ni
-préférence Finder privée dans le parcours principal.
-
-Les contrôles visuels de ce PoC sont volontairement diagnostiques. Ils ne choisissent
-ni le design system, ni le renderer, ni l'apparence des thèmes. Le manifeste prépare
-des identités et slots compatibles avec [D1](theme-design-poc.md), sans implémenter
-l'import 3D ou le rig dans le connecteur.
+Une app AppKit signée, son agent de session, le scanner de packages, le registre local de capacités et le contrôle d’un unique RenderHost enfant.
 
 ## Stack expérimentale
 
-| Couche | Choix PoC2 | Motif | Décision de production ? |
-| --- | --- | --- | --- |
-| App connecteur | Swift 6 + AppKit | intégration native, TCC, packaging et cycle de vie macOS | non |
-| Adaptateur wallpaper | Swift/Objective-C + Core Animation | chemin déjà observé dans WallpaperAgent | non, API privée à qualifier |
-| Modèle de thème | JSON Schema + types Swift purs | manifeste unique et tests sans surface | format à stabiliser |
-| Rendu de fixture | Core Animation | preuve minimale sans introduire un moteur général | non |
-| Communication | XPC nommé agent utilisateur ↔ provider sandboxé, signatures épinglées | transport borné avec quittances corrélées ; ADR-0053 | non |
-| Tests | XCTest + scripts de package/runtime + gestes manuels | couvre logique, identité et comportement OS réel | oui comme stratégie locale |
+Swift 6, AppKit, launchd utilisateur et contrats JSON portables. Le renderer courant reste Bevy 0.19.1 derrière le contrat RenderHost ; il n’est pas lié au binaire Swift.
 
-Le PoC2 n'introduit pas wgpu, Tauri, terminal natif ou FFI Rust. Ces choix seraient
-sans rapport avec la question testée et rendraient le résultat illisible.
+## Résultat courant
 
-Le build accepte désormais un témoin visuel privé via la variable explicite
-`CONNECTOR_LOCAL_BACKGROUND_PATH`, qui doit désigner un PNG absolu, régulier et non
-symbolique. Le fichier est copié uniquement dans le candidat local signé et composé
-par le provider dans son `CAContext`. Son absence conserve le dégradé original. Ce
-chemin prouve le raccord d'un asset au wallpaper ; il ne prouve aucune 3D temps réel.
+Le paquet macOS contient une app AppKit et un agent de session. Le catalogue de trois fixtures et l’extension Apple expérimentale ont été retirés. Ils ne sont plus construits, signés, installés ou proposés dans l’interface.
 
-## Flux attendu
+Le connecteur découvre automatiquement les packages présents dans les bibliothèques choisies par l’utilisateur. Un thème valide fournit son identité, son libellé, sa recette relative et une capacité de renderer. Le chemin du RenderHost est une approbation locale distincte ; le manifeste ne peut fournir ni commande ni chemin d’exécutable.
 
-1. L'application découvre les bibliothèques configurées et valide leurs descripteurs.
-2. Elle interroge les capacités réelles du connecteur et présente leur état.
-3. L'adaptateur wallpaper reçoit une projection immuable de la scène.
-4. Le wallpaper dessine le décor, les objets et, si choisi, le panneau logique.
-5. L'entrée produit une intention par identité, jamais une commande AppKit arbitraire.
-6. Le cœur applique la transition, puis le renderer et l'app observent le même état.
-7. Toute perte de permission désactive `Input` sans arrêter l'animation ni recréer la
-   scène.
+Le RenderHost est lancé directement avec deux arguments bornés : le chemin de la recette validée et `--desktop`. Le contrôleur possède un seul processus enfant et l’arrête lors d’un changement de thème, d’une demande explicite ou de l’arrêt de l’agent.
+
+## Contrats
+
+- `orbite.theme-package/1` décrit le package externe.
+- `orbite.scene-probe/1` et `orbite.theme-package/2` sont les formats d’entrée actuellement acceptés.
+- `renderer` est un identifiant de capacité, jamais une commande.
+- Les packages et assets privés restent hors de l’app et hors Git.
+- Le sélecteur Swift est alimenté uniquement par `ThemeDiscovery`.
+- Les fichiers du bureau restent un réglage Finder réversible ; aucune suppression n’est effectuée.
+
+## Sécurité et limites
+
+La découverte borne le nombre de racines et de manifestes, leur taille, les formats et les identités. Elle refuse les liens symboliques, les traversées de répertoire et les entrées incohérentes.
+
+Le registre de RenderHost accepte uniquement un fichier ordinaire local et exécutable choisi par l’utilisateur. Aucun shell n’est invoqué.
+
+Le positionnement sous les icônes Finder est implémenté dans le RenderHost macOS. Sa stabilité sur Spaces, multi-écran, veille et reprise doit encore être qualifiée sur la machine cible. Le PoC ne prétend plus utiliser le provider des Réglages Wallpaper d’Apple.
 
 ## Règle du panneau unique
 
-La fixture contient un seul `panel_id`. Pour la tranche initiale, le panneau interactif
-est présenté dans l'application connecteur ; le wallpaper ne dessine qu'un indicateur
-de sélection non interactif. Une variante ultérieure peut déplacer la présentation
-dans la scène seulement après qualification du routage de clic. Les deux variantes ne
-sont jamais actives ensemble.
-
-Les contrôles système — permissions, sélection du provider, diagnostic et arrêt —
-restent dans l'app connecteur. Les boutons du thème — animation, effet, session —
-restent dans le panneau logique. Cette distinction empêche de confondre UI produit et
-décor.
-
-## Données et identité
-
-Le manifeste est la seule source éditée. Les projections nécessaires à l'app et à
-l'extension sont générées au build ou décodées par un module partagé ; elles ne sont
-jamais maintenues manuellement en parallèle.
-
-Chaque commande porte `schema_version`, `theme_id`, `scene_instance_id`, `command_id`
-et `generation`. Une quittance tardive d'une ancienne génération est ignorée. Les
-messages ont une taille bornée, aucune URL de fichier libre et aucune commande shell.
-
-L'état durable minimal contient le thème choisi et des préférences non sensibles. Les
-permissions TCC ne sont ni copiées ni contournées. Les caches sont reconstructibles.
-Dans la première tranche, le thème est embarqué et l'état est uniquement en mémoire :
-la persistance des préférences ci-dessus reste à implémenter.
-
-## Politique d'entrée
-
-Le mode par défaut est passif. Les contrôles fixes, les objets mobiles et le clic droit
-sur le vide deviennent interactifs seulement si toutes les conditions sont vraies :
-permission obtenue, tap actif, bureau visible, cible supérieure classifiée comme fond
-Finder autorisé, ancre actuelle confirmée et génération de scène identique. Ils passent
-tous par le même routeur de geste. Aucune fenêtre AppKit proxy n'est créée.
-
-Une icône, une fenêtre, une cible Accessibility inconnue, une erreur AX ou l'absence
-de permission produit un refus ouvert : l'événement original continue et aucune action
-de thème n'est exécutée. Le PoC2 doit tester séparément une icône native superposée à
-chaque type de cible ; un test de géométrie ne suffit pas à qualifier les gestes réels.
-
-## Politique énergétique
-
-Le renderer réagit aux changements d'état. Aucun timer n'est créé pour une scène
-statique. Une scène animée annonce sa fréquence maximale et se suspend sur sommeil,
-session inactive ou surface non présentée lorsque ce signal est fiable.
-
-Les mesures rapportent l'énergie incrémentale par rapport au bureau natif, avec au
-moins cinq passes après préchauffage. Les compteurs de frames et le CPU ne remplacent
-pas les Joules et Watts. Le coût du connecteur, de WallpaperAgent et de tout helper est
-compté ensemble.
+Le connecteur possède une seule fenêtre native de sélection, permission et récupération. Toute UI visuelle propre au thème appartient au RenderHost et à la recette externe.
 
 ## Critères d'acceptation
 
-| ID | Preuve | Résultat requis |
-| --- | --- | --- |
-| M2-01 | Manifeste | une source canonique ; app et wallpaper produisent les mêmes identités et paramètres |
-| M2-02 | Présentation | un seul panneau logique visible et actionnable |
-| M2-03 | Cycle natif | activation, changement de Space, veille/reprise et redémarrage Finder sans second décor |
-| M2-04 | Entrée sûre | icône Finder superposée prioritaire ; contrôles, objets et vide passent par un routeur unique ; autres zones actionnables ou refusées explicitement |
-| M2-05 | TCC | refus, octroi, révocation et reprise donnent un état exact sans polling |
-| M2-06 | Cohérence | commandes idempotentes, quittances corrélées, messages périmés ignorés |
-| M2-07 | Énergie | baseline et delta mesurés pour statique, animé, masqué et app connecteur fermée |
-| M2-08 | Packaging | identités stables, signature reproductible, installation et désinstallation documentées sans suppression automatique |
-| M2-09 | Défaillance | app absente : wallpaper reste sûr ; extension absente : app explique la capacité manquante |
-| M2-10 | Revue visuelle | aucun plan visible devant Finder, aucune duplication de panneau, aucune disparition non expliquée |
-| M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
+- Aucun `theme*.json`, `catalog.json`, asset de thème ou extension wallpaper dans le paquet produit.
+- Une bibliothèque vide affiche zéro thème, sans fallback implicite.
+- Ajouter un package compatible le fait apparaître sans changement Swift.
+- Une recette invalide est refusée et ne lance aucun processus.
+- Une capacité sans RenderHost approuvé échoue explicitement.
+- Le manifeste ne peut choisir ni exécutable ni commande shell.
+- Une nouvelle activation remplace seulement le RenderHost enfant possédé.
+- Le masquage des fichiers Finder reste réversible.
+- SwiftPM, compilation Swift stricte, signature, invariant de paquet et `npm run verify` passent.
 
 ## Conditions de sortie
 
-### Packaging canonique — 10 septembre 2026
-
-[ADR-0071](../decisions/ADR-0071-single-installed-macos-provider.md) retire deux
-sources de faux état natif. Le manifeste versionné ne référence plus le PNG privé
-absent ; un PNG fourni explicitement est validé, copié et ajouté uniquement au
-manifeste du candidat signé. Le test du catalogue Apple charge désormais un bundle
-de ressources neutre au lieu du vrai `.appex`, car `Bundle(path:)` provoquait son
-inscription implicite dans PlugInKit. L'installation retire aussi de LaunchServices
-l'hôte d'un build désinscrit ; sans cette seconde opération, Réglages Système pouvait
-reconstituer l'inscription du provider à partir d'une ancienne fiche d'application.
-
-Le paquet `org.orbite.wallpaper` 1.0.0 build 1 est installé sous
-`~/Applications/Wallpaper Themes/Orbite Wallpaper.app`. PlugInKit retourne
-un seul provider `org.orbite.wallpaper.provider` et son chemin exact appartient à
-cette copie installée. L'ancien paquet reste présent mais désinscrit ; aucun fichier
-n'a été supprimé. Le descripteur privé Mario Kart est détecté par l'agent, tandis que
-le raccord de son renderer Bevy au provider reste non qualifié. Un build
-propre supplémentaire n'a créé aucune inscription. Les 37 XCTest et les contrôles
-natifs de catalogue, signature, lancement, visibilité, hiérarchie Finder et snapshots
-passent. La présence du catalogue et le processus provider sont observés, mais le
-fond actif de la session reste `Black` : aucune connexion XPC ni animation n'est
-revendiquée avant une sélection physique d'Orbite dans Réglages Système. Sur macOS
-26.2, cette sélection n'est pas automatisée par Accessibility, conformément à la
-stratégie qualité qui documente le crash du panneau Apple sur ce chemin.
-
-### Suspension par occlusion qualifiée — 9 septembre 2026, 12:38
-
-[ADR-0057](../decisions/ADR-0057-macos-conservative-occlusion.md) ajoute une
-classification événementielle et conservatrice dans l'agent. Elle considère la zone
-de travail de chaque écran actif, accepte la réunion des fragments WindowServer d'un
-même PID seulement, et refuse de déduire une couverture à partir de fenêtres
-translucides, partielles ou appartenant à plusieurs applications. Le provider reçoit
-les trois états typés par le XPC déjà qualifié et combine l'occlusion avec ses états
-de sommeil, session et surface. Aucun timer, calque, fenêtre ou droit supplémentaire
-n'est introduit.
-
-Sur le candidat signé `build.Q4SCpS` installé, la sélection Orbite a créé deux
-surfaces puis confirmé `wallpaperVisible`. Une fenêtre opaque temporaire couvrant
-exactement la zone de travail a fait retourner `wallpaper-visibility=occluded` et
-produire la quittance `wallpaperOccluded`, génération 4. Sa fermeture a produit `wallpaperVisible`,
-génération 5, avec les deux surfaces conservées. Une reconnexion attend sa première
-classification au lieu d'émettre un faux état inconnu. Onze cas purs vérifient
-géométries, alpha, couche, PID exclu, multi-écrans et réunion/refus des fragments.
-
-Cette preuve avance M2-03 et M2-07, mais ne les clôt pas : veille/réveil, Spaces,
-multi-écrans réels et delta énergétique en Joules/Watts restent à mesurer. Une
-visibilité inconnue garde volontairement le rendu actif.
-
-### Qualification fonctionnelle locale — 9 septembre 2026, 11:26
-
-L'utilisateur confirme sur le paquet installé que les contrôles restent interactifs
-après une bascule Fichiers. Les journaux du même essai montrent deux surfaces natives,
-les transitions `desktopItemsHidden` puis `desktopItemsVisible` appliquées et acquittées,
-ainsi que plusieurs transitions `mute`/`unmute`. La préférence Finder relue après
-l'essai vaut `CreateDesktop=true`. L'agent persistant et le provider restent actifs.
-
-Cette preuve valide la tranche fonctionnelle recherchée : rendu natif, tap unique,
-contrôles Son/Fichiers et absence de fenêtre d'entrée masquée. Elle ne clôt pas à elle
-seule M2-03, M2-04, M2-05, M2-07, M2-08 et M2-10 : priorité d'une icône Finder
-superposée, Spaces, veille/reprise, révocation TCC, mesures énergétiques et distribution
-signée Apple restent à qualifier. Le PoC est donc exploitable comme base du prochain
-prototype, sans constituer encore une validation de production macOS.
-
-### État courant — XPC natif, 8 septembre 2026, 17:49–17:53
-
-[ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md) remplace les fichiers App Group
-par un canal XPC nommé. Build `build.ov2G03` installé et signé ad hoc, sans certificat
-développeur. Sandbox conservée, exception Mach limitée au nom exact de l'agent.
-Agent 49867 et provider 49895 : inspection, pause, reprise, accentuation et atténuation
-ont produit des quittances corrélées pour deux surfaces, révisions 1 à 6. L'interface
-diagnostic est passée de Suspendre à Reprendre puis inversement, et d'Accentuer à
-Atténuer puis inversement. Ce n'est pas une preuve visuelle de l'animation du bureau.
-
-23 XCTest passent ; compilation Swift 6 stricte, catalogue Apple trois thèmes,
-signatures des trois bundles et manifeste identique vérifiés. Le diagnostic a été
-fermé puis le job relancé sans `--diagnostics` ; le provider 49895 est resté actif.
-L'arrêt/reprise du connecteur ne nécessite ni arrêt de Finder ni de WallpaperAgent.
-Job de développement limité à la session : aucun démarrage à la connexion suivante.
-
-M2-06 possède maintenant une preuve native de quittances, pas seulement des fichiers
-de tests. M2-04/05/07/10/11 restent non qualifiés : clics gauche/droite, deux contrôles
-du thème, Finder, effet visible, Spaces et énergie ne sont pas livrés par ce transport.
-La reconnexion à 17:53:58 est confirmée par inspection/quittance révision 7, même
-provider et nouvel agent 50546. Le refus d'un pair étranger reste à éprouver.
-
-### Historique — correctifs du transport App Group
-
-Le modèle conserve la dernière quittance 30 secondes ; les publications sans action
-ne l'effacent plus. Les mailboxes de test ont des notifications inactives par défaut.
-Le préflight refuse les compagnons historiques, les providers historiques et les
-providers PoC2 d'un autre paquet ; l'installation refuse aussi un provider PoC2 actif.
-Aucun processus n'est arrêté implicitement. Le mode strict ad hoc refuse le transport.
-Le build explicite `--development` permet désormais de tester un groupe local distinct
-sans Team ID, avec la sandbox et les contrôles macOS conservés. Le contrôle natif M2-06
-reste à qualifier ; changer le fond n'est jamais présenté comme un correctif de signature.
-Le manifeste accepte un sous-ensemble ordonné de contrôles, sans accorder leurs
-capacités. Les fixtures préparent seulement audio et fichiers en haut à gauche.
-La politique pure des gestes D1-14–16 est implémentée dans `GestureRouter` :
-elle produit seulement des intentions, après relâchement confirmé. Huit tests
-couvrent distinction gauche/droite, vide connu, priorité native, contrôles,
-glisser annulé, permission perdue, scène remplacée et événements incohérents.
-Le seuil de glisser est exprimé en points logiques locaux (4 par défaut), pas
-en pixels globaux. Un geste capturé puis annulé conserve son relâchement associé
-pour éviter de transmettre un événement orphelin. Le connecteur doit requalifier
-la cible et l'autorisation aux deux extrémités ; `unknown` ne vaut jamais `empty`.
-Le routage n'est pas branché au provider : aucun tap, lancement d'app, éditeur,
-audio ou réglage Finder n'est activé par ces tests. M2-04/05 et D1 natif restent
-non qualifiés. Le total courant est 21 XCTest, sans notifications système de test.
-Le build accepte désormais `--sign <empreinte SHA-1> <TEAMID>` ; arguments incomplets,
-identité absente ou signature incohérente sont des erreurs, sans repli ad hoc.
-Le groupe macOS préfixé par le Team ID est généré dans les droits des deux bundles
-et vérifié dans les droits signés par le runtime. Le succès de ce chemin signé reste
-non testé faute d'identité disponible ; il ne lève pas encore le blocage M2-06.
-Preuve locale ad hoc du 8 septembre : build `build.By7pIs`, `--probe-mailbox` retourne
-0 et `local-process-access=read-write provider=unconfirmed`. Même résultat pour
-`test-sandbox-access.sh`, paquet `access.ZKSvLx/Transport Access Probe.app`.
-La sonde sandboxée est un CLI lancé depuis l'environnement de développement, pas
-le provider hébergé par WallpaperAgent. Aucun succès M2-06, geste natif ou consentement
-permanent n'est déduit de ces deux accès. Aucun prompt n'a été accepté automatiquement.
-Cette implémentation reste dans le modèle existant : aucun contrat de transport,
-dépendance ou frontière ne change. Le dataflow de personnalisation précise seulement
-que la composition du thème possède aussi la politique de gestes.
-Les tableaux datés ci-dessous sont historiques, pas un verdict courant de livraison.
-
-### Preuves de la première tranche — 8 septembre 2026
-
-| Critère | État réellement démontré |
-| --- | --- |
-| M2-01 | 4 objets/identités testés ; manifeste identique vérifié par `cmp` dans les bundles |
-| M2-02 | smoke : une fenêtre ; inspection macOS réelle : libellés lisibles et boutons indisponibles sans provider ; aucun panneau dans le renderer |
-| M2-03 | réacquisition et suspension implémentées ; Spaces/veille/Finder non qualifiés |
-| M2-04 | entrée refusée structurellement : aucun tap, aucune fenêtre de décor |
-| M2-05 | TCC non sollicité ; capacité interactive indisponible, cycle de permissions non testé |
-| M2-06 | XCTest : dédoublonnage, conflit d'ID, expiration, génération et instance ; échange avec WallpaperAgent restant |
-| M2-07 | aucune mesure énergétique ; pas de promesse de consommation |
-| M2-08 | compilation Swift 6 sans avertissement, signature stricte, plists et manifeste vérifiés ; installation documentée, non exécutée |
-| M2-09 | refus/timeout prévu dans l'app ; autonomie réelle du provider à observer après sélection |
-| M2-10 | capture du panneau et vignette séparées de la revue du vrai bureau, encore requise |
-| M2-11 | repli vers Réglages macOS ; toggle Finder indisponible, critère de lecture/confirmation non satisfait |
-
-### Correctif du catalogue et tranche multithème — 8 septembre, 15:00
-
-Le catalogue initial échouait dans le vrai décodeur Apple : `sortID` et
-`shouldHideItemLabels` absents. Corrigé et couvert par `test-native.sh`, maintenant
-appelé par le build. Les trois entrées Orbite, Lagon, Ambre statique ont été observées
-dans Réglages Système > Fond d'écran > Wallpaper Connector — PoC 2.
-Le build 3 est installé dans `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`.
-L'ancienne installation est conservée dans `dist/pocs/macos-connector/replaced.9w0TMf/previous-app.disabled`.
-Le provider précédent a été redémarré seul ; aucun service Apple n'a été arrêté.
-
-Orbite était sélectionné dans la session pendant la vérification. Le nouveau provider
-a été lancé par WallpaperAgent et a créé deux CAContext natifs. Cela prouve acquisition
-et catalogue, pas encore animation, absence de flash ou changement entre les trois scènes.
-Cinq XCTest passent, dont catalogue et indépendance des états par thème.
-
-Blocage M2-06 réel : `containermanagerd` rejette le groupe protégé sans Team ID valide ;
-la sandbox journalise `deny file-write-create .../Connector-v1/status.json`.
-L'app ne reçoit donc aucune quittance. Aucune suppression de sandbox, nouvelle
-permission ou signature fictive n'a été appliquée. Le choix d'une identité de signature
-appropriée ou d'un autre transport doit être résolu avant de qualifier les boutons.
-
-Les cinq tests XCTest ne constituent pas onze critères validés. La tranche livrée
-permet de commencer la qualification, elle ne clôt pas M2. Le provider repose sur
-les interfaces privées Apple héritées d'une révision épinglée de Phosphene ; aucune
-garantie publique Apple n'est ajoutée par le découpage du code.
-
-Le PoC2 est réussi si M2-01 à M2-11 possèdent chacun une preuve datée et si les limites
-de l'API wallpaper sont explicitement publiées. Un test automatisé ne remplace pas les
-gestes Finder, Spaces et Mission Control.
-
-Il est à reprendre si le rendu natif fonctionne mais que panneau, permissions ou état
-sont dupliqués. Il échoue pour la cible interactive si la priorité Finder ne peut pas
-être garantie ; dans ce cas le même connecteur reste valable en mode passif et
-l'interaction bascule vers l'app ou un mode modal.
+Le PoC sort de cette tranche lorsqu’un package privé est détecté sans modification Swift, lancé avec son RenderHost approuvé, visible sous Finder, puis arrêté sans processus orphelin. Spaces, multi-écran et reprise restent des qualifications manuelles explicites.
 
 ## Ordre d'implémentation
 
-1. extraire le manifeste canonique et ses tests purs dans un nouveau répertoire ;
-2. créer l'app connecteur avec état de capacités, sans wallpaper ;
-3. créer l'adaptateur wallpaper à partir d'une projection du même manifeste ;
-4. établir le transport corrélé et les reprises de cycle de vie ;
-5. ajouter l'entrée en refus par défaut puis conduire les gestes natifs ;
-6. mesurer l'énergie et produire le verdict avant toute intégration du terminal.
+1. Valider le contrat et la découverte externe.
+2. Résoudre le RenderHost par capacité locale.
+3. Construire et signer l’app et son agent sans ressources de thème.
+4. Migrer l’installation et retirer l’ancien provider.
+5. Qualifier visuellement l’ancrage desktop et le cycle de vie.
 
-Après l'étape 1, D1 peut utiliser le schéma et ses fixtures indépendamment de la
-surface macOS. Le raccord au wallpaper attend que les deux côtés passent leurs gates.
+## Vérification
 
-La première implémentation s'arrête après M2-03 si une duplication visuelle réapparaît :
-elle corrige la frontière avant d'ajouter l'entrée.
+```sh
+swift test --package-path pocs/macos-connector
+bash pocs/macos-connector/build.sh
+```
+
+Le build vérifie l’absence de `Contents/Extensions`, de `theme*.json` et de `catalog.json`, puis exécute `--check` sur le paquet final.
+
+Les décisions sont consignées dans [ADR-0072](../decisions/ADR-0072-automatic-local-theme-discovery.md), [ADR-0073](../decisions/ADR-0073-capability-based-renderhost.md) et [ADR-0074](../decisions/ADR-0074-external-themes-only.md).

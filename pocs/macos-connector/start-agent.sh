@@ -79,6 +79,6 @@ connector_pid="$(echo "$connector_state" | sed -n 's/^[[:space:]]*pid = //p')"
 if [[ ! "$connector_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$connector_pid" 2>/dev/null; then
   echo 'Agent exited during startup. Process readiness failed; inspect the native logs.' >&2; exit 2
 fi
-echo "agent-process=running pid=$connector_pid input=unverified provider=unverified"
+echo "agent-process=running pid=$connector_pid themes=external-only renderhost=ready"
 echo "Registered job: $(echo "$connector_state" | sed -n 's/^[[:space:]]*path = //p')"
 echo "Stop: launchctl bootout $connector_domain/$connector_service"

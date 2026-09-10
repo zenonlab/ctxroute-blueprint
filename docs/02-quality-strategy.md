@@ -6,14 +6,13 @@ Le PoC1 est gelé ; ses tests empêchent une régression historique mais ne cons
 pas le gate de la nouvelle application. Le PoC2 suit M2-01 à M2-11 définis dans
 [sa spécification](pocs/macos-connector-poc2.md#critères-dacceptation).
 
-La qualité est vérifiée en quatre niveaux : modèle pur et manifeste canonique ;
-contrat commande/quittance et générations ; package/identités/cycle de vie ; gestes
-macOS réels. Les clics programmatiques ne qualifient ni Finder, ni Spaces, ni Mission
-Control. La revue visuelle doit confirmer qu'il n'existe qu'un panneau logique et
-aucun plan de décor devant Finder.
+La qualité est vérifiée en quatre niveaux : contrat de package externe ; découverte
+bornée ; résolution locale du RenderHost ; packaging et cycle de vie macOS. Les clics
+programmatiques ne qualifient ni Finder, ni Spaces, ni Mission Control. La revue
+visuelle doit confirmer qu'aucun plan de décor ne passe devant les icônes Finder.
 
-Toute mesure énergétique additionne l'app connecteur, WallpaperAgent, l'extension et
-les helpers. Elle rapporte le delta face au bureau natif, sur au moins cinq passes
+Toute mesure énergétique additionne l'agent connecteur et son RenderHost enfant.
+Elle rapporte le delta face au bureau natif, sur au moins cinq passes
 après préchauffage. La permission refusée et la cible d'entrée inconnue font partie
 du chemin nominal de test, pas uniquement des erreurs.
 
@@ -47,17 +46,15 @@ sur les mêmes caméra, frame d'animation et paramètres de matériau. Il conser
 images, la différence perceptuelle, les modes rencontrés et les exceptions. Une
 seule capture reconnaissable, un import Blender ou un GLB chargé ne qualifie rien.
 
-La CI macOS exécute les tests Swift isolés du PoC2 sans lancer le provider ou les
-Réglages. Le gate local natif reste `bash pocs/macos-connector/build.sh` (app,
-extension, catalogue Apple et signatures). `npm run verify` ne remplace aucun
-de ces contrôles produit. Les tests de transport utilisent des signaux injectés,
-inactifs par défaut, et ne réveillent pas une extension installée.
+La CI macOS exécute les tests Swift isolés du PoC2 sans lancer de thème. Le gate local
+natif reste `bash pocs/macos-connector/build.sh` : app, agent, signatures et absence
+de thèmes ou d'extension embarqués. `npm run verify` ne remplace aucun de ces contrôles.
 
 La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
 exigent un parcours déterministe, le rejet des traversées et formats incohérents,
 la déduplication des identités et des racines issues uniquement de configuration.
 Un test local séparé doit produire un reçu contenant le package privé attendu ; ce
-reçu ne qualifie ni ses pixels, ni son raccord au provider wallpaper.
+reçu ne qualifie ni ses pixels, ni son ancrage desktop par le RenderHost.
 
 Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
 reprise ; compilation native avec avertissements bloquants, puis smoke AppKit
@@ -151,14 +148,12 @@ codes 64/65 distinguent un appel invalide d'un chemin hors périmètre.
 Les résultats réellement obtenus sont consignés dans la
 [note de reprise](session-handoff.md).
 
-Pour le PoC2, ADR-0053 remplace le transport fichiers/Darwin par XPC nommé : le
-critère reste la quittance corrélée du provider courant, pas l'envoi d'un message.
-`swift test --package-path pocs/macos-connector --scratch-path dist/pocs/macos-connector/swift-build`
-couvre modèle, gestes purs et limites d'enveloppe. `build.sh` vérifie catalogue
-Apple, signatures et manifestes des trois bundles. La preuve native doit ajouter
-pause/reprise, perte/reconnexion du lien et refus d'un pair de signature étrangère.
-Ces essais restent distincts de la visibilité réelle, de la priorité Finder et
-des mesures énergétiques ; les scripts du PoC1 ci-dessus ne qualifient pas le PoC2.
+Pour le PoC2 courant, ADR-0074 remplace le provider et son catalogue embarqué par
+des packages externes et un RenderHost choisi par capacité. `swift test --package-path
+pocs/macos-connector --scratch-path dist/pocs/macos-connector/swift-build` couvre le
+modèle, la découverte, le registre et les limites. `build.sh` vérifie signatures et
+absence de ressources de thème dans les deux bundles. Ces essais restent distincts
+de la visibilité réelle, de la priorité Finder et des mesures énergétiques.
 
 Le harnais préparatoire E6-A1 s'exécute avec
 `bash pocs/emulator-observer/test.sh`. Il compile uniquement le core-fixture C

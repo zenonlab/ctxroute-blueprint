@@ -8,9 +8,7 @@ public enum LaunchPolicy {
             guard path.contains("/Contents/") else { return false }
             switch executable {
             case "SurfaceProbe", "NativeWallpaperProbeHost", "NativeWallpaperProbe": return true
-            case "WallpaperConnector": return installing
-            case "WallpaperProvider":
-                return installing || !path.hasPrefix(appPath + "/Contents/Extensions/")
+            case "WallpaperConnector": return installing && !path.hasPrefix(appPath + "/Contents/")
             default: return false
             }
         }

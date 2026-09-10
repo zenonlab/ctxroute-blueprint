@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Runtime macOS alimenté uniquement par les thèmes locaux",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 760],
+    "views": [
+      { "id": "discovery", "label": "Découverte", "focus": ["packages", "scanner", "selection"], "note": "Aucun thème de démonstration n’est embarqué dans l’application." },
+      { "id": "activation", "label": "Activation", "focus": ["selection", "registry", "renderhost", "desktop"], "note": "Le package sélectionné fournit la recette ; le registre fournit seulement le renderer approuvé." }
+    ]
+  },
+  "stages": [
+    { "label": "Bibliothèque privée" },
+    { "label": "Validation" },
+    { "label": "Contrôle Swift" },
+    { "label": "Exécution" },
+    { "label": "Bureau macOS" }
+  ],
+  "nodes": [
+    { "id": "packages", "type": "database", "label": "Packages locaux", "sublabel": "manifestes + assets", "stage": 0, "row": 1, "tag": "hors Git", "width": 132 },
+    { "id": "scanner", "type": "security", "label": "ThemeDiscovery", "sublabel": "parcours borné", "stage": 1, "row": 1, "tag": "fail closed" },
+    { "id": "selection", "type": "frontend", "label": "Sélecteur Swift", "sublabel": "packages détectés", "stage": 2, "row": 0, "tag": "aucune fixture" },
+    { "id": "registry", "type": "security", "label": "Registre renderer", "sublabel": "capacité → binaire", "stage": 2, "row": 2, "tag": "local" },
+    { "id": "renderhost", "type": "backend", "label": "RenderHost", "sublabel": "recette générique", "stage": 3, "row": 1, "tag": "sans shell" },
+    { "id": "desktop", "type": "external", "label": "Surface desktop", "sublabel": "sous les icônes Finder", "stage": 4, "row": 1, "tag": "macOS" }
+  ],
+  "flows": [
+    { "from": "packages", "to": "scanner", "label": "manifestes candidats", "classification": "données locales non fiables", "variant": "security", "labelDy": 53 },
+    { "from": "scanner", "to": "selection", "label": "packages validés", "classification": "métadonnées typées", "variant": "emphasis" },
+    { "from": "selection", "to": "registry", "label": "capacité renderer", "classification": "identifiant borné", "variant": "security", "labelDy": 24 },
+    { "from": "selection", "to": "renderhost", "label": "recette sélectionnée", "classification": "chemin contenu", "variant": "emphasis" },
+    { "from": "registry", "to": "renderhost", "label": "exécutable approuvé", "classification": "fichier ordinaire", "variant": "security" },
+    { "from": "renderhost", "to": "desktop", "label": "images natives", "classification": "fenêtre desktop", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Catalogue unique", "items": ["Seuls les packages locaux apparaissent", "Aucun JSON de thème n’est livré dans l’app", "Ajouter un thème ne modifie pas Swift"] },
+    { "dot": "rose", "title": "Limites nettes", "items": ["Les assets privés restent dans leur package", "Le manifeste ne peut pas choisir un exécutable", "Une recette refusée ne lance aucun processus"] }
+  ]
+}

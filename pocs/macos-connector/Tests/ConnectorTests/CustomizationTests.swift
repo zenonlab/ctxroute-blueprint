@@ -5,7 +5,7 @@ import QuartzCore
 
 final class CustomizationTests: XCTestCase {
     func testDuplicateDesktopSurfacesRequireSemanticConsensus() throws {
-        let theme = try Theme.load()
+        let theme = Theme.fixture()
         let first = SurfaceLayout(id: UUID(), theme: theme.theme_id, display: 1, width: 800, height: 500,
             capturedAt: 100, elapsed: 0, running: true, interactive: true)
         let second = SurfaceLayout(id: UUID(), theme: theme.theme_id, display: 1, width: 800, height: 500,
@@ -20,7 +20,7 @@ final class CustomizationTests: XCTestCase {
                        SurfaceLayout.consensus([second, first], theme: theme, point: point, now: 100)?.id)
     }
     func testDraftValidationAndConfigurationCorrelation() throws {
-        let original = try Theme.load()
+        let original = Theme.fixture()
         var draft = original
         draft.objects[0].label = "Travail"
         draft.objects[0].application_bundle_id = "com.apple.Terminal"
@@ -45,7 +45,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertThrowsError(try Theme.decode(JSONEncoder().encode(draft)))
     }
     func testShelfAndMovingHitGeometry() throws {
-        let theme = try Theme.load()
+        let theme = Theme.fixture()
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 30, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .control(.audio))
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 80, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .control(.desktopItems))
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: 68, y: 70), theme: theme, width: 800, height: 500, elapsed: 0), .empty)
@@ -56,7 +56,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertEqual(ThemeLayout.hit(ScenePoint(x: -1, y: 0), theme: theme, width: 800, height: 500, elapsed: 0), .unknown)
     }
     func testObjectsKeepTheGenerousInvisibleTargetsProvenByPoC1() throws {
-        let theme = try Theme.load(resource: "theme-amber")
+        let theme = Theme.fixture(still: true)
         let center = ThemeLayout.position(theme.objects[0], theme: theme, width: 800, height: 500, elapsed: 0)
         XCTAssertEqual(ThemeLayout.minimumObjectHitWidth, 112)
         XCTAssertEqual(ThemeLayout.minimumObjectHitHeight, 70)
@@ -66,7 +66,7 @@ final class CustomizationTests: XCTestCase {
             theme: theme, width: 800, height: 500, elapsed: 0), .empty)
     }
     @MainActor func testLayoutClockPauseAndFixedObjects() throws {
-        var theme = try Theme.load()
+        var theme = Theme.fixture()
         theme.objects[0].x = 0.3; theme.objects[0].y = 0.7
         let a = ThemeLayout.position(theme.objects[0], theme: theme, width: 800, height: 500, elapsed: 0)
         let b = ThemeLayout.position(theme.objects[0], theme: theme, width: 800, height: 500, elapsed: 30)
@@ -86,7 +86,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertEqual(replacement.layout(id: UUID(), display: 1, interactive: true).elapsed, 12.5, accuracy: 0.02)
     }
     @MainActor func testSquareIconControlsMatchHitRegionsAndMuteState() throws {
-        let scene = Scene(theme: try Theme.load())
+        let scene = Scene(theme: Theme.fixture())
         scene.resize(CGSize(width: 800, height: 500), scale: 2)
         let controls = (scene.root.sublayers ?? []).filter { $0.name?.hasPrefix("control.") == true }
         XCTAssertEqual(controls.count, 2)
@@ -122,12 +122,12 @@ final class CustomizationTests: XCTestCase {
         // Deliberately retain bounded fixtures; repository policy forbids automatic deletion.
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("connector-customization-" + UUID().uuidString)
         let store = ThemeStore(directory: directory)
-        let original = try Theme.load()
+        let original = Theme.fixture()
         XCTAssertNil(try store.load(for: original))
         var draft = original; draft.objects[0].label = "Test"
         try store.save(draft)
         XCTAssertEqual(try store.load(for: original), draft)
-        XCTAssertEqual(try Theme.load(), original)
+        XCTAssertEqual(Theme.fixture(), original)
         try store.reset(to: original)
         XCTAssertEqual(try store.load(for: original), original)
         let url = directory.appendingPathComponent(original.theme_id + ".json")
@@ -136,7 +136,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
     func testMuteIsPerThemeAndNeverChangesOtherStates() throws {
-        let theme = try Theme.load()
+        let theme = Theme.fixture()
         var session = Session(themeID: theme.theme_id)
         let result = session.apply(Command(theme: theme.theme_id, instance: session.instance, generation: 0, action: .unmute))
         XCTAssertFalse(result.state.muted)
@@ -144,7 +144,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertFalse(result.state.highlighted)
     }
     func testAppearanceOverridePreservesIdentityMotionAndAction() throws {
-        var original = try Theme.load()
+        var original = Theme.fixture()
         original.objects[0].role = .sessionFocus
         original.objects[0].application_bundle_id = "com.apple.Terminal"
         let before = original.objects[0]

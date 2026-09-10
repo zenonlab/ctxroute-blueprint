@@ -1,7 +1,9 @@
 # Vision produit — bureau et terminal ludiques
 
-État : PoC macOS 1 gelé, PoC macOS 2 partiellement implémenté et non qualifié, 8 septembre 2026. Nom de travail : Wallpaper.
-Le terminal et le renderer wallpaper produit ne sont pas encore implémentés.
+État : PoC macOS 1 gelé ; connecteur Swift du PoC macOS 2 raccordé à un RenderHost
+externe, sans thème ni provider embarqué, et encore non qualifié visuellement,
+10 septembre 2026. Nom de travail : Wallpaper.
+Le terminal produit n'est pas encore implémenté.
 L'indexeur hors ligne G1 est disponible et sa première passe Majora's Mask est
 reproductible. Un visualiseur Bevy générique charge un GLB privé dans une fenêtre,
 mais cet export est rejeté pour fidélité matérielle et ne vaut pas raccord wallpaper.

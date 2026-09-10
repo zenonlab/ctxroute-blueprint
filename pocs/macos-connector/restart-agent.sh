@@ -1,5 +1,5 @@
 #!/bin/bash
-# Restart only our verified per-session connector, never Finder or WallpaperAgent.
+# Restart only our verified per-session connector, never Finder or a RenderHost we do not own.
 set -euo pipefail
 if [[ $# != 1 ]]; then
   echo 'Usage: restart-agent.sh <installed.app>' >&2
@@ -24,4 +24,4 @@ if [[ -f "$HOME/Library/LaunchAgents/org.orbite.wallpaper.agent.plist" ]]; then
 else
   bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app"
 fi
-echo 'Connector restarted without diagnostics; native receipt still required. Provider is not restarted.'
+echo 'Connector restarted without diagnostics; discovered themes will be refreshed.'

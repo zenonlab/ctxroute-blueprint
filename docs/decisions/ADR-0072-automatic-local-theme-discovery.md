@@ -4,6 +4,7 @@ scope:
   - docs/architecture/src/macos-theme-discovery.dataflow.json
   - docs/pocs/macos-connector-poc2.md
 review: on-change
+revised: true
 ---
 # ADR-0072 — Découverte automatique des packages locaux
 
@@ -25,9 +26,8 @@ sont déterministes. Les racines proviennent des préférences de l'utilisateur,
 convention locale `Application Support/Orbite/Themes`, ou de `ORBITE_THEME_PATHS`
 pour le diagnostic ; aucun chemin de dépôt et aucun nom de jeu n'apparaît dans Swift.
 
-Le catalogue de fixtures natives cesse également de lire `catalog.json` : il découvre
-tous les manifestes compatibles présents dans son bundle. L'ancien fichier reste
-inerte parce que sa suppression exige une confirmation distincte.
+La décision ultérieure [ADR-0074](ADR-0074-external-themes-only.md) retire entièrement
+le catalogue de fixtures natives : aucun manifeste de thème n’est présent dans le bundle.
 
 ## Consequences
 

@@ -19,31 +19,6 @@ final class ModelTests: XCTestCase {
             XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("Usage: restart-agent.sh"))
         }
     }
-    func testNativeWireRoundTripAndBounds() throws {
-        let command = Command(theme: "test", instance: UUID(), generation: 3, action: .pause)
-        XCTAssertEqual(try NativeWire.decode(Command.self, from: NativeWire.encode(command)), command)
-        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data()))
-        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data("{}".utf8)))
-        XCTAssertThrowsError(try NativeWire.decode(Command.self, from: Data(repeating: 32, count: 16_385)))
-        XCTAssertThrowsError(try NativeWire.encode(String(repeating: "x", count: 16_384)))
-        XCTAssertThrowsError(try NativeWire.requirement(for: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
-    }
-    func testThemeStateDecodesStatusFromOlderProvider() throws {
-        let legacy = Data(#"{"paused":false,"highlighted":false,"muted":true}"#.utf8)
-        let state = try NativeWire.decode(ThemeState.self, from: legacy)
-        XCTAssertTrue(state.muted)
-        XCTAssertNil(state.desktopItemsVisible)
-        XCTAssertNil(state.wallpaperVisible)
-    }
-    func testProviderMachExceptionIsExactAndSandboxRemains() throws {
-        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Packaging/Extension.entitlements")
-        let plist = try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: file), format: nil) as? [String: Any])
-        XCTAssertEqual(plist["com.apple.security.app-sandbox"] as? Bool, true)
-        XCTAssertEqual(plist["com.apple.security.temporary-exception.mach-lookup.global-name"] as? [String], [NativeWire.service])
-        XCTAssertNil(plist["com.apple.security.network.client"])
-        XCTAssertNil(plist["com.apple.security.network.server"])
-    }
     func testDevelopmentGroupRequiresExplicitModeAndAdHocSignature() throws {
         let groups = [Mailbox.localGroup]
         XCTAssertEqual(try Mailbox.sharedGroup(team: "", entitlements: groups,
@@ -95,7 +70,7 @@ final class ModelTests: XCTestCase {
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         XCTAssertEqual(process.terminationStatus, 2)
-        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("absolute regular PNG"))
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("no longer accepted"))
     }
     func testSharedGroupMustMatchSignedTeamExactly() throws {
         let group = "AB123CD456.org.wallpaperthemes.connectorpoc2"
@@ -135,7 +110,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(session.generation, 1)
     }
     func testControlPresentationIsNotCapabilityAuthorization() throws {
-        let theme = try Theme.load()
+        let theme = Theme.fixture()
         XCTAssertEqual(theme.system_controls.items, ["audio", "desktop"])
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(theme)) as? [String: Any])
         for items in [["desktop", "audio"], ["settings"]] {
@@ -149,15 +124,15 @@ final class ModelTests: XCTestCase {
     }
     func testConcurrentPrototypePolicy() {
         let app = "/Applications/Wallpaper Connector PoC 2.app"
-        let provider = app + "/Contents/Extensions/WallpaperProvider.appex/Contents/MacOS/WallpaperProvider"
         let old = "/Applications/Old.app/Contents/MacOS/SurfaceProbe"
-        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, provider], installing: false, appPath: app), [old])
-        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, provider], installing: true, appPath: app), [old, provider])
+        let ownAgent = app + "/Contents/Library/LoginItems/Agent.app/Contents/MacOS/WallpaperConnector"
+        let otherAgent = "/Applications/Other.app/Contents/MacOS/WallpaperConnector"
+        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, ownAgent], installing: false, appPath: app), [old])
+        XCTAssertEqual(LaunchPolicy.conflicts(paths: [old, ownAgent, otherAgent], installing: true, appPath: app), [old, otherAgent])
         XCTAssertTrue(LaunchPolicy.conflicts(paths: ["/System/Library/CoreServices/WallpaperAgent.app/Contents/MacOS/WallpaperAgent"], installing: true, appPath: app).isEmpty)
-        XCTAssertEqual(LaunchPolicy.conflicts(paths: [provider], installing: false, appPath: "/Other.app"), [provider])
     }
     func testManifestAndInvalidInputs() throws {
-        let theme = try Theme.load()
+        let theme = Theme.fixture()
         XCTAssertEqual(theme.objects.count, 4)
         XCTAssertNil(theme.background_asset)
         let data = try JSONEncoder().encode(theme)
@@ -284,7 +259,7 @@ final class ModelTests: XCTestCase {
         XCTAssertThrowsError(try box.command())
     }
     @MainActor func testPersistentSceneAndPauseResume() throws {
-        let scene = Scene(theme: try Theme.load())
+        let scene = Scene(theme: Theme.fixture())
         scene.resize(CGSize(width: 800, height: 500))
         let children = scene.root.sublayers?.count
         scene.resize(CGSize(width: 800, height: 500))
@@ -302,18 +277,18 @@ final class ModelTests: XCTestCase {
         scene.resize(CGSize(width: 1200, height: 800))
         XCTAssertEqual(scene.root.sublayers?.count, children)
     }
-    @MainActor func testCatalogAndIndependentThemeStates() throws {
-        let themes = try Theme.catalog()
-        XCTAssertEqual(themes.count, 3)
-        XCTAssertEqual(Set(themes.map(\.theme_id)).count, 3)
-        var first = Session(themeID: themes[0].theme_id)
-        let second = Session(themeID: themes[1].theme_id)
+    @MainActor func testIndependentThemeStatesWithoutBundledCatalog() throws {
+        let firstTheme = Theme.fixture()
+        var secondTheme = Theme.fixture(still: true)
+        secondTheme.objects[0].color = "112233"
+        var first = Session(themeID: firstTheme.theme_id)
+        let second = Session(themeID: "fixture.second")
         _ = first.apply(Command(theme: first.themeID, instance: first.instance, generation: 0, action: .pause))
         XCTAssertTrue(first.state.paused); XCTAssertFalse(second.state.paused)
         let status = CatalogStatus(themes: [ProviderStatus(session: first, surfaces: 1), ProviderStatus(session: second, surfaces: 1)])
         XCTAssertFalse(try XCTUnwrap(status.theme(second.themeID)).state.paused)
         XCTAssertNil(status.theme("unknown"))
-        for theme in themes {
+        for theme in [firstTheme, secondTheme] {
             let scene = Scene(theme: theme); scene.resize(CGSize(width: 800, height: 500))
             XCTAssertEqual(scene.objectIDs, theme.objects.map(\.id))
             if theme.motion_path == "still" {

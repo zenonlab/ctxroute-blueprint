@@ -64,39 +64,6 @@ public struct Theme: Codable, Equatable, Sendable {
     public var objects: [Object]
     public let system_controls: Controls
 
-    public static func load(bundle: Bundle? = nil, resource: String = "theme") throws -> Theme {
-        #if SWIFT_PACKAGE
-        let source = bundle ?? Bundle.module
-        #else
-        let source = bundle ?? Bundle.main
-        #endif
-        guard resource.range(of: "^[a-z-]+$", options: .regularExpression) != nil,
-              let url = source.url(forResource: resource, withExtension: "json") else {
-            throw ModelError.invalid("manifest missing")
-        }
-        return try decode(Data(contentsOf: url))
-    }
-
-    public static func catalog(bundle: Bundle? = nil) throws -> [Theme] {
-        #if SWIFT_PACKAGE
-        let source = bundle ?? Bundle.module
-        #else
-        let source = bundle ?? Bundle.main
-        #endif
-        let candidates = source.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
-        var themes: [Theme] = []
-        for url in candidates.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe), data.count <= 32_768,
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  object["schema_version"] as? Int == 1, object["theme_id"] is String
-            else { continue }
-            themes.append(try decode(data))
-        }
-        guard (1...32).contains(themes.count), Set(themes.map(\.theme_id)).count == themes.count
-        else { throw ModelError.invalid("invalid discovered catalog") }
-        return themes.sorted { ($0.display_name, $0.theme_id) < ($1.display_name, $1.theme_id) }
-    }
-
     public static func decode(_ data: Data) throws -> Theme {
         guard data.count <= 32_768 else { throw ModelError.invalid("manifest too large") }
         let theme = try JSONDecoder().decode(Theme.self, from: data)
@@ -151,8 +118,6 @@ public struct Theme: Codable, Equatable, Sendable {
         value.range(of: "^[a-z][a-z0-9-]{0,63}\\.png$", options: .regularExpression) != nil
     }
 }
-
-public enum ModelError: Error { case invalid(String) }
 
 public struct ThemeState: Codable, Equatable, Sendable {
     public var paused = false
