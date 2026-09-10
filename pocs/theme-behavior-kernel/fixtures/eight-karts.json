@@ -3,6 +3,7 @@
   "fixed_dt_seconds": 0.03333333333333333,
   "max_catch_up_steps": 4,
   "speed_units_per_second": 4.0,
+  "reference_ticks": [0, 30, 90, 180, 300, 450, 600, 900],
   "path": {
     "closed": true,
     "samples_per_segment": 48,

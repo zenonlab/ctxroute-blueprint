@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
@@ -116,6 +117,7 @@ pub struct KernelConfig {
     pub fixed_dt_seconds: f64,
     pub max_catch_up_steps: u32,
     pub speed_units_per_second: f64,
+    pub reference_ticks: [u64; 8],
     pub path: PathConfig,
     pub camera: CameraConfig,
     pub entities: Vec<EntityConfig>,
@@ -137,6 +139,16 @@ impl KernelConfig {
         }
         require_positive("fixed_dt_seconds", self.fixed_dt_seconds)?;
         require_positive("speed_units_per_second", self.speed_units_per_second)?;
+        if self.reference_ticks[0] != 0
+            || self
+                .reference_ticks
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(
+                "reference_ticks must contain eight strictly increasing ticks starting at 0".into(),
+            );
+        }
         if self.max_catch_up_steps == 0 || self.max_catch_up_steps > 16 {
             return Err("max_catch_up_steps must be in 1..=16".into());
         }
@@ -413,6 +425,32 @@ pub struct PresentationSnapshot {
     pub camera: CameraSnapshot,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct RuntimeCounters {
+    pub simulation_steps: u64,
+    pub elapsed_updates: u64,
+    pub catch_up_clamps: u64,
+    pub pause_transitions: u64,
+    pub occlusion_transitions: u64,
+    pub render_submissions: Option<u64>,
+    pub gpu_submissions: Option<u64>,
+    pub allocation_events: Option<u64>,
+    pub pacing_misses: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ReferenceCheckpoint {
+    pub tick: u64,
+    pub snapshot_sha256: String,
+}
+
+pub fn snapshot_sha256(snapshot: &PresentationSnapshot) -> String {
+    let bytes = serde_json::to_vec(snapshot).expect("serializable presentation snapshot");
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
 #[derive(Clone, Debug)]
 struct CameraDirector {
     config: CameraConfig,
@@ -486,6 +524,8 @@ pub struct BehaviorKernel {
     group_distance: f64,
     accumulator: f64,
     paused: bool,
+    occluded: bool,
+    counters: RuntimeCounters,
     snapshot: PresentationSnapshot,
 }
 
@@ -511,6 +551,8 @@ impl BehaviorKernel {
             group_distance: 0.0,
             accumulator: 0.0,
             paused: false,
+            occluded: false,
+            counters: RuntimeCounters::default(),
             snapshot: PresentationSnapshot {
                 tick: 0,
                 simulation_seconds: 0.0,
@@ -535,11 +577,30 @@ impl BehaviorKernel {
         &self.snapshot
     }
 
+    pub fn counters(&self) -> &RuntimeCounters {
+        &self.counters
+    }
+
+    pub fn reference_ticks(&self) -> [u64; 8] {
+        self.config.reference_ticks
+    }
+
     pub fn set_paused(&mut self, paused: bool) {
+        if self.paused != paused {
+            self.counters.pause_transitions += 1;
+        }
         self.paused = paused;
         if !paused {
             self.accumulator = 0.0;
         }
+    }
+
+    pub fn set_occluded(&mut self, occluded: bool) {
+        if self.occluded != occluded {
+            self.counters.occlusion_transitions += 1;
+        }
+        self.occluded = occluded;
+        self.set_paused(occluded);
     }
 
     pub fn tick_fixed(&mut self) -> &PresentationSnapshot {
@@ -547,6 +608,7 @@ impl BehaviorKernel {
             return &self.snapshot;
         }
         self.tick += 1;
+        self.counters.simulation_steps += 1;
         self.group_distance = (self.group_distance
             + self.config.speed_units_per_second * self.config.fixed_dt_seconds)
             .rem_euclid(self.path.total_length());
@@ -558,7 +620,11 @@ impl BehaviorKernel {
         if self.paused || !elapsed_seconds.is_finite() || elapsed_seconds <= 0.0 {
             return 0;
         }
+        self.counters.elapsed_updates += 1;
         let maximum = self.config.fixed_dt_seconds * f64::from(self.config.max_catch_up_steps);
+        if elapsed_seconds > maximum {
+            self.counters.catch_up_clamps += 1;
+        }
         self.accumulator += elapsed_seconds.min(maximum);
         let mut steps = 0;
         while self.accumulator + EPSILON >= self.config.fixed_dt_seconds
@@ -734,5 +800,41 @@ mod tests {
         let steps = kernel.advance_elapsed(60.0);
         assert_eq!(steps, kernel.config.max_catch_up_steps);
         assert_eq!(kernel.snapshot().tick, before_pause.tick + u64::from(steps));
+        assert_eq!(kernel.counters().catch_up_clamps, 1);
+        assert_eq!(kernel.counters().pause_transitions, 2);
+    }
+
+    #[test]
+    fn eight_reference_checkpoints_are_stable() {
+        let mut first = BehaviorKernel::new(fixture()).unwrap();
+        let mut second = BehaviorKernel::new(fixture()).unwrap();
+        let ticks = first.reference_ticks();
+        let mut first_hashes = Vec::new();
+        let mut second_hashes = Vec::new();
+        for target in ticks {
+            while first.snapshot().tick < target {
+                first.tick_fixed();
+            }
+            while second.snapshot().tick < target {
+                second.tick_fixed();
+            }
+            first_hashes.push(snapshot_sha256(first.snapshot()));
+            second_hashes.push(snapshot_sha256(second.snapshot()));
+        }
+        assert_eq!(first_hashes.len(), 8);
+        assert_eq!(first_hashes, second_hashes);
+    }
+
+    #[test]
+    fn occlusion_stops_simulation_and_counts_transitions() {
+        let mut kernel = BehaviorKernel::new(fixture()).unwrap();
+        kernel.set_occluded(true);
+        let frozen = kernel.snapshot().clone();
+        assert_eq!(kernel.advance_elapsed(1.0), 0);
+        assert_eq!(kernel.tick_fixed(), &frozen);
+        kernel.set_occluded(false);
+        kernel.tick_fixed();
+        assert_eq!(kernel.counters().occlusion_transitions, 2);
+        assert_eq!(kernel.counters().pause_transitions, 2);
     }
 }

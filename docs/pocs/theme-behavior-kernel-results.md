@@ -1,6 +1,6 @@
 # Résultats — noyau de comportements de thème
 
-Date : 9 septembre 2026
+Date : 10 septembre 2026
 
 Machine : environnement de développement local macOS, Rust 1.97.1
 
@@ -25,14 +25,15 @@ type propre à Bevy ou à une plateforme.
 
 ```text
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
-7 passed; 0 failed
+9 passed; 0 failed
 
 cargo clippy --manifest-path pocs/theme-behavior-kernel/Cargo.toml --all-targets -- -D warnings
 finished successfully
 
 cargo run --quiet --manifest-path pocs/theme-behavior-kernel/Cargo.toml -- \
-  pocs/theme-behavior-kernel/fixtures/eight-karts.json
-snapshot JSON produced after 600 fixed steps / 20 logical seconds
+  pocs/theme-behavior-kernel/fixtures/eight-karts.json \
+  --receipt dist/qualification/m0-reference.json
+receipt produced with eight deterministic checkpoints through tick 900
 ```
 
 Les assertions couvrent :
@@ -43,7 +44,9 @@ Les assertions couvrent :
 - ordre stable et transformations finies pendant deux tours complets ;
 - snapshots identiques entre deux noyaux sur 2 000 pas identiques ;
 - déplacement de caméra limité à sa vitesse configurée et ancres dans la safe area ;
-- gel complet en pause et au plus quatre pas lors d'une reprise après 60 secondes.
+- gel complet en pause et au plus quatre pas lors d'une reprise après 60 secondes ;
+- huit empreintes de snapshot identiques entre deux exécutions ;
+- arrêt de la simulation et comptage des transitions sous occlusion.
 
 ## Verdict et limites
 

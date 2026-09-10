@@ -6,6 +6,11 @@ une formation stable, un pas de simulation fixe, une reprise bornée et un direc
 caméra. Il ne lit aucune ROM et ne dépend ni de Bevy, ni d'un émulateur, ni d'une API
 de wallpaper.
 
+M0 fige huit ticks de référence dans la recette. Le binaire calcule les empreintes de
+la recette, de lui-même, d'un éventuel arbre d'assets privé et de chaque snapshot.
+Les compteurs distinguent simulation, rattrapage, pause et occlusion ; les champs GPU,
+rendu, allocation et pacing restent explicitement non observés dans ce noyau sans GPU.
+
 Le contrat d'entrée est `fixtures/eight-karts.json`. Le contrat de sortie est un
 `PresentationSnapshot` sérialisable contenant seulement identités, transformations
 et caméra. Un renderer Bevy, Godot ou natif peut donc consommer la même sortie sans
@@ -14,7 +19,8 @@ devenir propriétaire de la simulation.
 ```bash
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
 cargo run --manifest-path pocs/theme-behavior-kernel/Cargo.toml -- \
-  pocs/theme-behavior-kernel/fixtures/eight-karts.json
+  pocs/theme-behavior-kernel/fixtures/eight-karts.json \
+  --receipt dist/qualification/m0-reference.json
 ```
 
 La fixture est originale et ne contient aucun asset ou code extrait d'un jeu.

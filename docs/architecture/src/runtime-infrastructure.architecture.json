@@ -4,21 +4,25 @@
   "meta": {
     "title": "Runtime local — responsabilités séparées",
     "quality_profile": "showcase",
-    "viewBox": [1340, 700]
+    "viewBox": [1340, 760]
   },
   "components": [
     { "id": "prepared", "type": "database", "label": "Composition préparée", "sublabel": "Références et capacités validées", "pos": [40, 100], "size": [260, 80] },
     { "id": "control", "type": "backend", "label": "Contrôle local", "sublabel": "Règles, état et permissions", "pos": [540, 100], "size": [250, 80] },
     { "id": "scene", "type": "frontend", "label": "Scène et panneaux", "sublabel": "Objets, UI, animations et effets", "pos": [1040, 100], "size": [260, 80] },
-    { "id": "terminal", "type": "frontend", "label": "Interface terminal", "sublabel": "Texte et portraits des sessions", "pos": [40, 460], "size": [260, 80] },
-    { "id": "sessions", "type": "backend", "label": "Gestion des sessions", "sublabel": "Identités, PTY, shells et agents", "pos": [540, 460], "size": [250, 80] },
-    { "id": "desktop", "type": "backend", "label": "Adaptateur de bureau", "sublabel": "Capacités OS et replis explicites", "pos": [1040, 460], "size": [260, 80] }
+    { "id": "terminal", "type": "frontend", "label": "Viewer portable", "sublabel": "Bevy derrière le contrat de scène", "pos": [40, 460], "size": [260, 80] },
+    { "id": "sessions", "type": "backend", "label": "Protocole de sessions", "sublabel": "Événements typés · simulateur M5", "pos": [540, 460], "size": [250, 80] },
+    { "id": "desktop", "type": "backend", "label": "Adaptateur de bureau", "sublabel": "macOS qualifié · autres OS séparés", "pos": [1040, 460], "size": [260, 80] },
+    { "id": "evidence", "type": "security", "label": "Reçus de qualification", "sublabel": "Empreintes · compteurs · incertitude", "pos": [540, 625], "size": [250, 80] }
   ],
   "connections": [
     { "id": "load", "from": "prepared", "to": "control", "label": "C1 · sélection résolue" },
     { "id": "scene-command", "from": "control", "to": "scene", "label": "C2 · interactions et état" },
     { "id": "session-command", "from": "control", "to": "sessions", "label": "C3 · sessions disponibles", "labelAt": [665, 320] },
-    { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "C4 · flux et saisie" },
-    { "id": "surface", "from": "scene", "to": "desktop", "label": "C5 · surface et capacités", "labelAt": [1170, 320] }
+    { "id": "terminal-stream", "from": "sessions", "to": "terminal", "label": "C4 · états sans PTY" },
+    { "id": "surface", "from": "scene", "to": "desktop", "label": "C5 · surface et capacités", "labelAt": [1170, 320] },
+    { "id": "measure-runtime", "from": "sessions", "to": "evidence", "label": "snapshots déterministes", "variant": "dashed", "labelAt": [665, 570] },
+    { "id": "measure-desktop", "from": "desktop", "to": "evidence", "label": "énergie et visibilité", "variant": "security", "fromSide": "bottom", "toSide": "right" },
+    { "id": "measure-viewer", "from": "terminal", "to": "evidence", "label": "frames et soumissions", "variant": "dashed", "fromSide": "bottom", "toSide": "left" }
   ]
 }

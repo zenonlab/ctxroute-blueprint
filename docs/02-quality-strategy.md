@@ -73,6 +73,11 @@ de formation, 2 000 pas déterministes, le cadrage et la reprise bornée. Ce gat
 qualifie ni renderer, ni apparence, ni connexion PTY ; ses résultats sont consignés
 dans [le reçu dédié](pocs/theme-behavior-kernel-results.md).
 
+M0 ajoute huit ticks de référence dans la recette et un reçu JSON liant les SHA-256
+de la recette, du binaire, des snapshots et de l'éventuel arbre d'assets privé.
+Les compteurs non observables dans le noyau sans GPU sont `null`, jamais zéro.
+Le test d'occlusion exige zéro nouveau pas logique jusqu'à la reprise.
+
 Le socle et les tests d'état L1 sont vérifiés séparément. Les scénarios produit
 ci-dessous restent à éprouver au-delà de cette sonde, sans validation automatique implicite.
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces
