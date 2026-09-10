@@ -36,6 +36,7 @@ pub struct EffectCatalogReport {
     pub breft_sha256: String,
     pub effects: Vec<NamedEffectResource>,
     pub textures: Vec<NamedEffectResource>,
+    pub effect_metadata: Vec<EffectMetadata>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -45,20 +46,59 @@ pub struct NamedEffectResource {
     pub sha256: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct EffectMetadata {
+    pub id: String,
+    pub volume_type: u8,
+    pub max_frame: u16,
+    pub particle_lifetime_frames: u16,
+    pub emission_rate: f32,
+    pub start_frame: u16,
+    pub rate_step: u16,
+    pub texture_ids: Vec<String>,
+}
+
+struct ParsedEffectTable {
+    name: String,
+    resources: Vec<NamedEffectResource>,
+    spans: Vec<(usize, usize)>,
+}
+
 pub fn inspect_effect_catalog(breff_path: &Path, breft_path: &Path) -> Result<EffectCatalogReport> {
     let breff = read_effect_file(breff_path)?;
     let breft = read_effect_file(breft_path)?;
-    let (effect_set, effects) = parse_effect_table(&breff, b"REFF")?;
-    let (texture_set, textures) = parse_effect_table(&breft, b"REFT")?;
+    let effect_table = parse_effect_table(&breff, b"REFF")?;
+    let texture_table = parse_effect_table(&breft, b"REFT")?;
+    let effect_metadata = effect_table
+        .resources
+        .iter()
+        .zip(effect_table.spans)
+        .map(|(effect, (offset, size))| {
+            parse_effect_metadata(&breff[offset..offset + size], &effect.id)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let texture_ids = texture_table
+        .resources
+        .iter()
+        .map(|texture| texture.id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    ensure!(
+        effect_metadata
+            .iter()
+            .flat_map(|effect| &effect.texture_ids)
+            .all(|texture| texture_ids.contains(texture.as_str())),
+        "BREFF references a texture absent from BREFT"
+    );
     Ok(EffectCatalogReport {
         schema_version: 1,
         adapter: "mkw.breff-breft",
-        effect_set,
-        texture_set,
+        effect_set: effect_table.name,
+        texture_set: texture_table.name,
         breff_sha256: hex::encode(Sha256::digest(&breff)),
         breft_sha256: hex::encode(Sha256::digest(&breft)),
-        effects,
-        textures,
+        effects: effect_table.resources,
+        textures: texture_table.resources,
+        effect_metadata,
     })
 }
 
@@ -73,7 +113,7 @@ fn read_effect_file(path: &Path) -> Result<Vec<u8>> {
     fs::read(path).with_context(|| format!("cannot read {}", path.display()))
 }
 
-fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<(String, Vec<NamedEffectResource>)> {
+fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<ParsedEffectTable> {
     ensure!(
         bytes.get(..4) == Some(magic.as_slice()),
         "invalid effect resource magic"
@@ -102,6 +142,7 @@ fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<(String, Vec<Name
     ensure!(count <= 4096, "effect resource count exceeds limit");
     let mut cursor = table + 8;
     let mut resources = Vec::with_capacity(count);
+    let mut spans = Vec::with_capacity(count);
     let mut names = std::collections::BTreeSet::new();
     for _ in 0..count {
         let name_length = read_u16(bytes, cursor)? as usize;
@@ -132,8 +173,68 @@ fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<(String, Vec<Name
             byte_length,
             sha256: hex::encode(Sha256::digest(payload)),
         });
+        spans.push((data_offset, byte_length));
     }
-    Ok((set_name, resources))
+    Ok(ParsedEffectTable {
+        name: set_name,
+        resources,
+        spans,
+    })
+}
+
+fn parse_effect_metadata(payload: &[u8], id: &str) -> Result<EffectMetadata> {
+    let emitter = 8;
+    ensure!(
+        read_u32(payload, 4)? as usize >= 0x14c,
+        "unsupported BREFF emitter block"
+    );
+    let volume_type = (read_u32(payload, emitter + 4)? & 0xff) as u8;
+    let max_frame = read_u16(payload, emitter + 8)?;
+    let particle_lifetime_frames = read_u16(payload, emitter + 0x0a)?;
+    let emission_rate = read_f32(payload, emitter + 0x10)?;
+    ensure!(
+        emission_rate.is_finite() && emission_rate >= 0.0,
+        "invalid BREFF emission rate"
+    );
+    let start_frame = read_u16(payload, emitter + 0x14)?;
+    let rate_step = read_u16(payload, emitter + 0x18)?;
+    let particle_size_offset = 0x154;
+    let particle_size = read_u32(payload, particle_size_offset)? as usize;
+    let particle = particle_size_offset + 4;
+    ensure!(
+        particle_size >= 0x88 && particle + particle_size <= payload.len(),
+        "invalid BREFF particle block"
+    );
+    let mut cursor = particle + 0x88;
+    let mut texture_ids = Vec::new();
+    for _ in 0..3 {
+        let length = read_u16(payload, cursor)? as usize;
+        cursor += 2;
+        if length == 0 {
+            continue;
+        }
+        if length == 1 && payload.get(cursor) == Some(&0) {
+            cursor += 1;
+            continue;
+        }
+        let value = read_fixed_name(payload, cursor, length)?;
+        cursor = cursor
+            .checked_add(length)
+            .context("BREFF texture name overflow")?;
+        if !value.is_empty() {
+            texture_ids.push(value);
+        }
+    }
+    Ok(EffectMetadata {
+        id: id.to_owned(),
+        volume_type,
+        max_frame,
+        particle_lifetime_frames,
+        emission_rate,
+        start_frame,
+        rate_step,
+        texture_ids,
+    })
 }
 
 fn semantic_resource_name(value: &str) -> bool {
@@ -378,6 +479,10 @@ fn read_u16(bytes: &[u8], offset: usize) -> Result<u16> {
     ))
 }
 
+fn read_f32(bytes: &[u8], offset: usize) -> Result<f32> {
+    Ok(f32::from_bits(read_u32(bytes, offset)?))
+}
+
 fn read_name(bytes: &[u8], offset: usize) -> Result<&str> {
     let suffix = bytes
         .get(offset..)
@@ -534,6 +639,25 @@ mod tests {
         bytes
     }
 
+    fn fixture_effect_payload() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0x210];
+        bytes[4..8].copy_from_slice(&0x14c_u32.to_be_bytes());
+        bytes[12..16].copy_from_slice(&9_u32.to_be_bytes());
+        bytes[16..18].copy_from_slice(&60_u16.to_be_bytes());
+        bytes[18..20].copy_from_slice(&45_u16.to_be_bytes());
+        bytes[24..28].copy_from_slice(&2.5_f32.to_bits().to_be_bytes());
+        bytes[28..30].copy_from_slice(&3_u16.to_be_bytes());
+        bytes[32..34].copy_from_slice(&2_u16.to_be_bytes());
+        bytes[0x154..0x158].copy_from_slice(&0xb8_u32.to_be_bytes());
+        bytes[0x1e0..0x1e2].copy_from_slice(&4_u16.to_be_bytes());
+        bytes[0x1e2..0x1e6].copy_from_slice(b"tex\0");
+        bytes[0x1e6..0x1e8].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x1e8] = 0;
+        bytes[0x1e9..0x1eb].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x1eb] = 0;
+        bytes
+    }
+
     #[test]
     fn extracts_course_collision_and_route_without_game_specific_runtime_code() -> Result<()> {
         let temp = tempfile::tempdir()?;
@@ -568,14 +692,24 @@ mod tests {
 
     #[test]
     fn inventories_named_breff_and_breft_resources_without_exporting_payloads() {
-        let (effect_set, effects) =
-            parse_effect_table(&fixture_effect_table(b"REFF"), b"REFF").unwrap();
-        let (texture_set, textures) =
-            parse_effect_table(&fixture_effect_table(b"REFT"), b"REFT").unwrap();
-        assert_eq!(effect_set, "Set");
-        assert_eq!(texture_set, "Set");
-        assert_eq!(effects[0].id, "effect");
-        assert_eq!(effects[0].byte_length, 3);
-        assert_eq!(effects, textures);
+        let effects = parse_effect_table(&fixture_effect_table(b"REFF"), b"REFF").unwrap();
+        let textures = parse_effect_table(&fixture_effect_table(b"REFT"), b"REFT").unwrap();
+        assert_eq!(effects.name, "Set");
+        assert_eq!(textures.name, "Set");
+        assert_eq!(effects.resources[0].id, "effect");
+        assert_eq!(effects.resources[0].byte_length, 3);
+        assert_eq!(effects.resources, textures.resources);
+    }
+
+    #[test]
+    fn normalizes_emitter_timing_and_texture_dependencies() {
+        let metadata = parse_effect_metadata(&fixture_effect_payload(), "effect").unwrap();
+        assert_eq!(metadata.volume_type, 9);
+        assert_eq!(metadata.max_frame, 60);
+        assert_eq!(metadata.particle_lifetime_frames, 45);
+        assert_eq!(metadata.emission_rate, 2.5);
+        assert_eq!(metadata.start_frame, 3);
+        assert_eq!(metadata.rate_step, 2);
+        assert_eq!(metadata.texture_ids, ["tex"]);
     }
 }

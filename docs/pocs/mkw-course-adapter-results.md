@@ -12,7 +12,7 @@ test produit trois fichiers classés circuit, collision KCL et route KMP.
 
 ```text
 cargo test --manifest-path tools/game-library/Cargo.toml
-7 passed; 0 failed
+8 passed; 0 failed
 
 cargo clippy --manifest-path tools/game-library/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -32,6 +32,9 @@ Le lecteur de catalogue BREFF/BREFT valide les en-têtes, bornes, tables, noms e
 payloads sans les exporter. Sur la source locale, il retrouve 516 effets nommés et
 93 textures, dont `rk_driftSmoke`, les familles d'étincelles bleues/oranges,
 `rk_jumpSmoke` et `rk_miniTurbo`. Le reçu ne contient que noms, tailles et SHA-256.
+Il normalise aussi le volume d'émission, la durée, le débit, les frames et jusqu'à
+trois références de textures par effet, puis refuse une dépendance absente du BREFT.
+Sur la source locale, les 516 dépendances d'effets se ferment sans référence manquante.
 
 ## Gate privé restant
 

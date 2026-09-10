@@ -10,7 +10,7 @@
     { "id": "game", "type": "external", "label": "Entrée locale vérifiée", "sublabel": "ROM ou archive de course privée", "pos": [40, 90], "size": [220, 80] },
     { "id": "readers", "type": "backend", "label": "Lecteurs et adaptateurs", "sublabel": "Yaz0/U8 · BREFF/BREFT · hors ligne", "pos": [350, 90], "size": [230, 80] },
     { "id": "observer", "type": "backend", "label": "Oracle source hors ligne", "sublabel": "Fast3D/RDP · vues déterministes", "pos": [660, 90], "size": [220, 80] },
-    { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "Assets · effets nommés · blobs privés", "pos": [970, 90], "size": [260, 80] },
+    { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "Effets · textures liées · blobs privés", "pos": [970, 90], "size": [260, 80] },
     { "id": "qualification", "type": "security", "label": "Qualification par capacité", "sublabel": "Exact · approché · manquant", "pos": [335, 270], "size": [260, 80] },
     { "id": "coverage", "type": "security", "label": "Rapport de couverture", "sublabel": "Complet · partiel · inconnu", "pos": [660, 270], "size": [260, 80] },
     { "id": "recipes", "type": "external", "label": "Templates et recettes", "sublabel": "Slots · bindings · zéro asset publié", "pos": [40, 280], "size": [250, 80] },

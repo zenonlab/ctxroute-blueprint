@@ -52,5 +52,7 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   --breft private/mkw/common/Effect/RKRace.breft
 ```
 
-La seconde commande émet seulement un catalogue JSON de noms, tailles et empreintes.
-Elle ne copie aucun payload et ne prétend pas encore exécuter les émetteurs NW4R.
+La seconde commande émet seulement un catalogue JSON de noms, tailles, empreintes,
+paramètres d'émission bornés et références de textures. Elle vérifie la fermeture
+BREFF→BREFT, ne copie aucun payload et ne prétend pas encore exécuter les émetteurs
+NW4R.
