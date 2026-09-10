@@ -12,7 +12,7 @@ test produit trois fichiers classés circuit, collision KCL et route KMP.
 
 ```text
 cargo test --manifest-path tools/game-library/Cargo.toml
-5 passed; 0 failed
+6 passed; 0 failed
 
 cargo clippy --manifest-path tools/game-library/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -21,6 +21,12 @@ finished successfully
 Le rapport inventorie aussi textures, animations, menus, portraits, emblèmes,
 boutons, polices, audio, effets et dépendances, et liste les catégories attendues
 absentes au lieu d'en déduire une couverture.
+
+L'archive locale `Common.szs` a également été extraite sans publier ses octets.
+Son répertoire U8 transparent `.` est accepté sans relâcher les contrôles de
+traversée. L'inventaire contient 100 fichiers, dont `RKRace.breff` et
+`RKRace.breft`, classés comme ressources d'effet privées. Cette présence ne vaut
+pas encore décodage, fermeture de dépendances ni fidélité de rendu.
 
 ## Gate privé restant
 

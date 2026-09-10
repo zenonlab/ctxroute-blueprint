@@ -38,7 +38,8 @@ L'adaptateur Mario Kart Wii décompresse Yaz0 puis extrait l'archive U8 avec des
 limites strictes et sans exécuter le jeu. Il refuse toute sortie hors de `private/`
 et inventorie circuit, KCL, KMP, textures, animations, menus, portraits, emblèmes,
 boutons, polices, audio, effets et dépendances. Une catégorie absente reste signalée
-dans le rapport.
+dans le rapport. Les conteneurs BREFF/BREFT sont classés comme effets privés ; leur
+présence dans l'inventaire ne signifie pas qu'ils sont déjà décodés ou rendables.
 
 ```bash
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \

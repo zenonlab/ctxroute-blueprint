@@ -124,6 +124,8 @@ pub struct KernelConfig {
     pub path: PathConfig,
     pub camera: CameraConfig,
     pub entities: Vec<EntityConfig>,
+    #[serde(default)]
+    pub effect_bindings: Vec<EffectBindingConfig>,
 }
 
 impl KernelConfig {
@@ -194,8 +196,31 @@ impl KernelConfig {
                 ));
             }
         }
+        if self.effect_bindings.len() > 64 {
+            return Err("effect_bindings must contain at most 64 entries".into());
+        }
+        let mut effect_bindings = HashSet::new();
+        for binding in &self.effect_bindings {
+            if !semantic_id(&binding.trigger)
+                || !semantic_id(&binding.effect_id)
+                || !(1..=600).contains(&binding.duration_ticks)
+            {
+                return Err("effect binding contains an invalid id or duration".into());
+            }
+            if !effect_bindings.insert((&binding.trigger, &binding.effect_id)) {
+                return Err("effect bindings must be unique by trigger and effect_id".into());
+            }
+        }
         self.camera.validate()
     }
+}
+
+fn semantic_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 96
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -578,10 +603,20 @@ pub enum EffectKind {
     CameraImpulse,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EffectBindingConfig {
+    pub trigger: String,
+    pub effect_id: String,
+    pub kind: EffectKind,
+    pub duration_ticks: u64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ActiveEffect {
     pub event_id: String,
     pub session_id: String,
+    pub effect_id: String,
     pub kind: EffectKind,
     pub expires_at_tick: u64,
 }
@@ -837,22 +872,29 @@ impl BehaviorKernel {
             .ok_or_else(|| format!("unknown session_id {session_id}"))?;
         *activity = state;
         self.handled_events.insert(event_id.to_owned());
-        let kind = match state {
-            ActivityState::Idle | ActivityState::Active => None,
-            ActivityState::Busy => Some(EffectKind::Particles),
-            ActivityState::Success => Some(EffectKind::Sprite),
-            ActivityState::Error => Some(EffectKind::Material),
-            ActivityState::Recovering => Some(EffectKind::CameraImpulse),
+        let trigger = match state {
+            ActivityState::Idle => "activity.idle",
+            ActivityState::Active => "activity.active",
+            ActivityState::Busy => "activity.busy",
+            ActivityState::Success => "activity.success",
+            ActivityState::Error => "activity.error",
+            ActivityState::Recovering => "activity.recovering",
         };
-        if let Some(kind) = kind {
+        for binding in self
+            .config
+            .effect_bindings
+            .iter()
+            .filter(|binding| binding.trigger == trigger)
+        {
             if self.effects.len() == 64 {
                 self.effects.pop_front();
             }
             self.effects.push_back(ActiveEffect {
                 event_id: event_id.to_owned(),
                 session_id: session_id.to_owned(),
-                kind,
-                expires_at_tick: self.tick + 30,
+                effect_id: binding.effect_id.clone(),
+                kind: binding.kind,
+                expires_at_tick: self.tick + binding.duration_ticks,
             });
         }
         self.rebuild_snapshot();
@@ -1150,18 +1192,48 @@ mod tests {
                 .apply_activity("event.1", "session.01", ActivityState::Error)
                 .unwrap()
         );
-        assert_eq!(kernel.snapshot().effects.len(), 1);
+        assert_eq!(kernel.snapshot().effects.len(), 2);
+        assert_eq!(
+            kernel.snapshot().effects[0].effect_id,
+            "session.busy.particles"
+        );
+        assert_eq!(kernel.snapshot().effects[1].effect_id, "session.busy.sound");
         assert_eq!(kernel.snapshot().entities[0].activity, ActivityState::Busy);
         kernel.set_occluded(true);
         for _ in 0..100 {
             kernel.tick_fixed();
         }
-        assert_eq!(kernel.snapshot().effects.len(), 1);
+        assert_eq!(kernel.snapshot().effects.len(), 2);
         kernel.set_occluded(false);
         for _ in 0..30 {
             kernel.tick_fixed();
         }
         assert!(kernel.snapshot().effects.is_empty());
+    }
+
+    #[test]
+    fn activity_does_not_invent_an_effect_without_a_template_binding() {
+        let mut config = fixture();
+        config.effect_bindings.clear();
+        let mut kernel = BehaviorKernel::new(config).unwrap();
+        kernel
+            .apply_activity("event.unbound", "session.01", ActivityState::Busy)
+            .unwrap();
+        assert!(kernel.snapshot().effects.is_empty());
+    }
+
+    #[test]
+    fn duplicate_effect_binding_is_rejected() {
+        let mut config = fixture();
+        config
+            .effect_bindings
+            .push(config.effect_bindings[0].clone());
+        assert!(
+            config
+                .validate()
+                .unwrap_err()
+                .contains("unique by trigger and effect_id")
+        );
     }
 
     #[test]

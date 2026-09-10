@@ -179,7 +179,16 @@ fn parse_u8(bytes: &[u8]) -> Result<Vec<(PathBuf, Vec<u8>)>> {
         }
         let node = read_node(bytes, root_offset + index * 12)?;
         let name = read_name(bytes, string_table + node.name_offset)?;
-        validate_name(name)?;
+        if node.directory && name == "." {
+            ensure!(
+                node.size > index && node.size <= root.size,
+                "invalid U8 transparent root span"
+            );
+            directories.push((String::new(), node.size));
+            continue;
+        }
+        validate_name(name)
+            .with_context(|| format!("invalid U8 entry {index}: {}", name.escape_debug()))?;
         if node.directory {
             ensure!(
                 node.size > index && node.size <= root.size,
@@ -195,7 +204,9 @@ fn parse_u8(bytes: &[u8]) -> Result<Vec<(PathBuf, Vec<u8>)>> {
         ensure!(end <= bytes.len(), "truncated U8 file payload");
         let mut relative = PathBuf::new();
         for (directory, _) in &directories {
-            relative.push(directory);
+            if !directory.is_empty() {
+                relative.push(directory);
+            }
         }
         relative.push(name);
         files.push((relative, bytes[node.data_offset..end].to_vec()));
@@ -291,6 +302,8 @@ fn category(path: &Path) -> &'static str {
         "button"
     } else if matches!(extension.as_str(), "brfnt" | "bfn") || name.contains("font") {
         "font"
+    } else if matches!(extension.as_str(), "breff" | "breft") {
+        "effect"
     } else if matches!(extension.as_str(), "brres" | "tpl") {
         if name.contains("effect") || name.contains("eff") {
             "effect"
@@ -335,6 +348,27 @@ mod tests {
         bytes
     }
 
+    fn fixture_transparent_root_u8() -> Vec<u8> {
+        let root_offset = 0x20_usize;
+        let names = b"\0.\0RKRace.breff\0";
+        let nodes_end = root_offset + 3 * 12;
+        let data_offset = 0x80_usize;
+        let mut bytes = vec![0_u8; data_offset + 1];
+        bytes[0..4].copy_from_slice(&U8_MAGIC.to_be_bytes());
+        bytes[4..8].copy_from_slice(&(root_offset as u32).to_be_bytes());
+        bytes[root_offset..root_offset + 4].copy_from_slice(&0x0100_0000_u32.to_be_bytes());
+        bytes[root_offset + 8..root_offset + 12].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[root_offset + 12..root_offset + 16].copy_from_slice(&0x0100_0001_u32.to_be_bytes());
+        bytes[root_offset + 20..root_offset + 24].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[root_offset + 24..root_offset + 28].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[root_offset + 28..root_offset + 32]
+            .copy_from_slice(&(data_offset as u32).to_be_bytes());
+        bytes[root_offset + 32..root_offset + 36].copy_from_slice(&1_u32.to_be_bytes());
+        bytes[nodes_end..nodes_end + names.len()].copy_from_slice(names);
+        bytes[data_offset] = 1;
+        bytes
+    }
+
     #[test]
     fn extracts_course_collision_and_route_without_game_specific_runtime_code() -> Result<()> {
         let temp = tempfile::tempdir()?;
@@ -357,5 +391,13 @@ mod tests {
         let input = temp.path().join("course.szs");
         fs::write(&input, fixture_u8()).unwrap();
         assert!(extract_course(&input, &temp.path().join("public")).is_err());
+    }
+
+    #[test]
+    fn accepts_common_archive_transparent_root_and_classifies_effect_resources() {
+        let files = parse_u8(&fixture_transparent_root_u8()).unwrap();
+        assert_eq!(files[0].0, PathBuf::from("RKRace.breff"));
+        assert_eq!(category(Path::new("Effect/RKRace.breff")), "effect");
+        assert_eq!(category(Path::new("Effect/RKRace.breft")), "effect");
     }
 }

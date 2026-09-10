@@ -25,7 +25,7 @@ type propre à Bevy ou à une plateforme.
 
 ```text
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
-17 passed; 0 failed
+19 passed; 0 failed
 
 cargo clippy --manifest-path pocs/theme-behavior-kernel/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -48,6 +48,8 @@ Les assertions couvrent :
 - huit empreintes de snapshot identiques entre deux exécutions ;
 - arrêt de la simulation et comptage des transitions sous occlusion.
 - cycle de sessions connexion, activité, erreur, récupération et reconnexion ;
+- absence d'effet inventé sans binding de template et refus des bindings dupliqués ;
+- émission d'identifiants, types et durées d'effets définis par la fixture ;
 - cinq passes M6 alternées, statistiques descriptives et métriques absentes explicites ;
 - refus d'une soumission GPU déclarée pendant pause ou occlusion ;
 - sorties limitées au `private/` ou `dist/` du workspace, sans traversée ni symlink.
@@ -63,3 +65,5 @@ niveau intégration même si leur sous-contrat logique est couvert.
 Le viewer Bevy reste un adaptateur séparé. Sa qualification complète exige encore
 un pack privé fidèle, son raccord à WallpaperAgent et les mesures natives décrites
 dans le préflight M6 ; aucun de ces résultats n'est déduit du test du noyau.
+Le registre prouve seulement le routage déterministe : décoder et rendre les effets
+sources demeure une capacité distincte de l'adaptateur de présentation.

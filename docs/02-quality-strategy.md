@@ -235,6 +235,9 @@ Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructur
 | P35 | Ajouter/retirer une session dans un virage | Transition bornée des slots et du cadrage ; aucun téléport, chevauchement silencieux ou changement d'identité. |
 | P36 | Forcer un groupe trop large pour la safe area | Fallback déclaré appliqué ; ni sortie de piste ni FOV hors bornes pour conserver artificiellement le cadre. |
 | P37 | Rejouer une sortie IA sans modèle ni réseau | Snapshots et diagnostics reproductibles ; capacité ou invariant absent entraîne un refus explicite. |
+| P38 | Déclarer un état sans binding d'effet dans le template | Aucun effet de remplacement inventé ; registre vide et diagnostic de capacité si l'effet est requis. |
+| P39 | Fournir une courbe sans trace d'entrée ni contrôleur de manœuvre | Aucun dérapage émis ; la courbure seule reste une donnée d'anticipation. |
+| P40 | Rejouer demande, maintien puis relâchement d'une manœuvre déclarée | Une seule transition par événement, effets bornés résolus par identifiant et aucun rejeu après reprise. |
 
 Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
 par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.

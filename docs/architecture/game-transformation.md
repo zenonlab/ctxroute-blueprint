@@ -280,6 +280,13 @@ instanciation. Retrouver une propriété déjà conservée ne nécessite pas une
 nouvelle extraction ; comprendre une propriété jusque-là inconnue peut en
 revanche nécessiter un nouveau passage du lecteur.
 
+Les effets suivent la même règle. Les lecteurs inventorient leurs conteneurs,
+textures et relations dans la bibliothèque privée. Le template expose des slots
+et lie des événements sémantiques à des identifiants résolus par le compilateur.
+Le noyau n'invente ni primitive graphique ni association état→effet ; l'hôte ne
+reçoit que des commandes typées et des handles validés. Une ressource absente
+désactive le binding avec diagnostic au lieu de produire un substitut silencieux.
+
 ## Ce que signifie récupérer une mécanique
 
 | Catégorie | Contenu | Limite à préserver |

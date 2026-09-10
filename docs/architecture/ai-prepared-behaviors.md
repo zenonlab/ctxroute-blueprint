@@ -148,6 +148,13 @@ formation la possède normalement ; une transition ou une récupération peut la
 prendre temporairement selon un arbitrage explicite, puis la restituer. Caméra,
 apparence et UI observent cette transformation sans devenir des autorités cachées.
 
+Une manœuvre n'est pas déduite directement de la forme du parcours. Un dérapage,
+par exemple, exige une intention issue d'une trace d'entrée ou d'un contrôleur
+déclaré qui possède ses phases demande, maintien et relâchement. La courbure peut
+servir à anticiper cette demande, jamais à prouver que le bouton a été pressé.
+Les animations, étincelles, sons et impulsions sont alors déclenchés par les
+transitions de la manœuvre via les bindings du template, pas par le noyau.
+
 ### Boucles et grand nombre d'entités
 
 Un chemin bouclé est préparé hors ligne avec longueurs cumulées et repères stables.
