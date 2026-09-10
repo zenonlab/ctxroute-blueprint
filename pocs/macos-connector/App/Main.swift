@@ -6,6 +6,14 @@ import ApplicationServices
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
+        if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--discover-themes" {
+            let roots = CommandLine.arguments.dropFirst(2).map { URL(fileURLWithPath: $0, isDirectory: true) }
+            let receipt = ThemeDiscovery.discover(roots: roots)
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            FileHandle.standardOutput.write(try encoder.encode(receipt)); FileHandle.standardOutput.write(Data("\n".utf8))
+            if receipt.themes.isEmpty { exit(3) }
+            return
+        }
         if CommandLine.arguments == [CommandLine.arguments[0], "--probe-visibility"] {
             let displays = NSScreen.screens.compactMap { screen -> CGRect? in
                 guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
@@ -22,7 +30,7 @@ import ApplicationServices
         if CommandLine.arguments == [CommandLine.arguments[0], "--check"] {
             _ = try Theme.catalog()
             let app = NativeWire.appBundle
-            let agent = app.appendingPathComponent("Contents/Library/LoginItems/Wallpaper Connector Agent.app")
+            let agent = app.appendingPathComponent("Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
             let provider = app.appendingPathComponent("Contents/Extensions/WallpaperProvider.appex")
             _ = try NativeWire.requirement(for: app)
             let expected = try NativeWire.requirement(for: agent)
@@ -31,20 +39,6 @@ import ApplicationServices
                 encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
             guard pin == expected else { throw ModelError.invalid("Packaged agent signature pin mismatch") }
             print("manifest=valid xpc-peers=valid provider=unconfirmed desktop-input=requires-native-qualification")
-            return
-        }
-        if CommandLine.arguments.contains("--probe-mailbox") {
-            _ = try Theme.catalog()
-            print("transport-mode=\(Mailbox.developmentEnabled ? "local-ad-hoc" : "strict")")
-            do {
-                let mailbox = try Mailbox.shared()
-                if CommandLine.arguments.contains("--probe-mailbox") {
-                    try mailbox.verifyAccess()
-                    print("local-process-access=read-write provider=unconfirmed")
-                }
-                print("manifest=valid transport=unconfirmed (provider receipt required)")
-            }
-            catch { print("manifest=valid transport=unavailable: \(error.localizedDescription)"); exit(2) }
             return
         }
         if CommandLine.arguments.count == 3, ["--thumbnail", "--thumbnails"].contains(CommandLine.arguments[1]) {
@@ -78,7 +72,7 @@ import ApplicationServices
             }
             return
         }
-        guard Bundle.main.bundleIdentifier == "org.wallpaperthemes.connectorpoc2.agent" else {
+        guard Bundle.main.bundleIdentifier == ProductIdentity.agentBundleID else {
             print("Utiliser l’agent embarqué enregistré, pas le lanceur en mode agent."); exit(2)
         }
         let app = NSApplication.shared
@@ -107,6 +101,9 @@ import ApplicationServices
     let themes: [Theme]
     var theme: Theme { themes[themePicker.indexOfSelectedItem >= 0 ? themePicker.indexOfSelectedItem : 0] }
     let themePicker = NSPopUpButton()
+    let installedThemePicker = NSPopUpButton()
+    let libraryStatusLabel = NSTextField(wrappingLabelWithString: "Recherche des packages de thèmes…")
+    var installedThemes: [DiscoveredTheme] = []
     let transport: AgentTransport
     var window: NSWindow!
     var statusItem: NSStatusItem?
@@ -119,12 +116,12 @@ import ApplicationServices
     let desktopItems = DesktopItems()
     var desktopItemsMenuItem: NSMenuItem?
     let store = ThemeStore(directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("org.wallpaperthemes.connectorpoc2/themes", isDirectory: true))
+        .appendingPathComponent("org.orbite.wallpaper/themes", isDirectory: true))
     var restoredInstances: Set<UUID> = []
     var confirmedInstances: Set<UUID> = []
     var completion: ((Bool) -> Void)?
-    let statusLabel = NSTextField(wrappingLabelWithString: "Le provider doit être sélectionné dans les réglages Fond d’écran.")
-    let inputStatusLabel = NSTextField(wrappingLabelWithString: "Entrée : diagnostic en attente.")
+    let statusLabel = NSTextField(wrappingLabelWithString: "Choisissez Orbite dans Réglages Système pour activer le décor.")
+    let inputStatusLabel = NSTextField(wrappingLabelWithString: "Interactions du bureau en attente.")
     var pauseButton: NSButton!
     var effectButton: NSButton!
     init(themes: [Theme]) {
@@ -133,22 +130,29 @@ import ApplicationServices
         super.init()
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+        Logger(subsystem: ProductIdentity.logSubsystem, category: "agent").notice(
             "Startup diagnostics=\(CommandLine.arguments.contains("--diagnostics")) accessibility=\(AXIsProcessTrusted()) desktop-input=capability-gated")
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 560),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 720),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "Wallpaper Connector · PoC 2"
+        window.title = ProductIdentity.appName
         window.isReleasedWhenClosed = false
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 18
         stack.edgeInsets = NSEdgeInsets(top: 28, left: 28, bottom: 28, right: 28)
-        let title = NSTextField(labelWithString: "Wallpaper Connector"); title.font = .systemFont(ofSize: 26, weight: .semibold)
-        let subtitle = NSTextField(wrappingLabelWithString: "Diagnostic du provider — ce panneau n’est pas l’interface du thème.")
+        let title = NSTextField(labelWithString: ProductIdentity.appName); title.font = .systemFont(ofSize: 26, weight: .semibold)
+        let subtitle = NSTextField(wrappingLabelWithString: "Un décor vivant, hébergé nativement par macOS.")
         subtitle.textColor = .secondaryLabelColor
         stack.addArrangedSubview(title); stack.addArrangedSubview(subtitle)
         themePicker.addItems(withTitles: themes.map(\.display_name))
         themePicker.target = self; themePicker.action = #selector(changeControlTheme)
-        stack.addArrangedSubview(NSTextField(labelWithString: "Thème à contrôler (le fond se choisit dans macOS)"))
+        stack.addArrangedSubview(NSTextField(labelWithString: "Fixture native à contrôler"))
         stack.addArrangedSubview(themePicker)
+        stack.addArrangedSubview(NSTextField(labelWithString: "Packages de thèmes détectés"))
+        stack.addArrangedSubview(installedThemePicker)
+        libraryStatusLabel.textColor = .secondaryLabelColor; stack.addArrangedSubview(libraryStatusLabel)
+        let libraryControls = NSStackView(); libraryControls.orientation = .horizontal; libraryControls.spacing = 12
+        libraryControls.addArrangedSubview(NSButton(title: "Ajouter une bibliothèque…", target: self, action: #selector(addThemeLibrary)))
+        libraryControls.addArrangedSubview(NSButton(title: "Révéler la recette", target: self, action: #selector(revealThemeRecipe)))
+        stack.addArrangedSubview(libraryControls)
         let controls = NSStackView(); controls.orientation = .horizontal; controls.spacing = 12
         pauseButton = NSButton(title: "Suspendre", target: self, action: #selector(pause))
         effectButton = NSButton(title: "Accentuer", target: self, action: #selector(effect))
@@ -176,7 +180,7 @@ import ApplicationServices
         statusItem?.button?.image = NSImage(systemSymbolName: "circle.hexagongrid", accessibilityDescription: "Orbite — connecteur")
         statusItem?.button?.toolTip = "Orbite — diagnostic du connecteur"
         let statusMenu = NSMenu()
-        let diagnosticItem = statusMenu.addItem(withTitle: "Diagnostic du connecteur…", action: #selector(check), keyEquivalent: "")
+        let diagnosticItem = statusMenu.addItem(withTitle: "Ouvrir Orbite Wallpaper…", action: #selector(check), keyEquivalent: "")
         diagnosticItem.target = self
         let interactionItem = statusMenu.addItem(withTitle: "Activer les interactions…", action: #selector(interactionSettings), keyEquivalent: "")
         interactionItem.target = self
@@ -188,8 +192,9 @@ import ApplicationServices
         restoreItem.target = self
         statusMenu.delegate = self
         statusMenu.addItem(.separator())
-        statusMenu.addItem(withTitle: "Quitter le connecteur", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        statusMenu.addItem(withTitle: "Quitter Orbite Wallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         statusItem?.menu = statusMenu
+        refreshThemeLibraries()
         transport.onChange = { [weak self] in self?.receive() }
         input.onIntent = { [weak self] intent, theme, layout in self?.interact(intent, theme: theme, layout: layout) }
         input.onPointerActivity = { [weak self] in self?.visibility.pointerActivity() }
@@ -229,6 +234,29 @@ import ApplicationServices
                 NSApp.terminate(nil)
             }
         }
+    }
+    @objc func addThemeLibrary() {
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false; panel.prompt = "Ajouter"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try ThemeLibraries.add(url); refreshThemeLibraries() }
+        catch { libraryStatusLabel.stringValue = "Bibliothèque refusée : \(error.localizedDescription)" }
+    }
+    @objc func revealThemeRecipe() {
+        let index = installedThemePicker.indexOfSelectedItem
+        guard installedThemes.indices.contains(index) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([installedThemes[index].entry])
+    }
+    func refreshThemeLibraries() {
+        let roots = ThemeLibraries.roots()
+        let receipt = ThemeDiscovery.discover(roots: roots)
+        installedThemes = receipt.themes
+        installedThemePicker.removeAllItems()
+        installedThemePicker.addItems(withTitles: installedThemes.map(\.package.display_name))
+        installedThemePicker.isEnabled = !installedThemes.isEmpty
+        libraryStatusLabel.stringValue = installedThemes.isEmpty
+            ? "Aucun package détecté dans \(roots.count) bibliothèque(s)."
+            : "\(installedThemes.count) package(s) validé(s), \(receipt.rejected.count) refusé(s). Le raccord RenderHost reste à qualifier."
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -310,7 +338,7 @@ import ApplicationServices
         NSApp.activate(ignoringOtherApps: true)
         refreshAndProbe()
         for layout in transport.status?.layouts ?? [] {
-            Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+            Logger(subsystem: ProductIdentity.logSubsystem, category: "agent").notice(
                 "Layout display=\(layout.display_id ?? 0) size=\(layout.width)x\(layout.height) interactive=\(layout.interactive)")
         }
     }
@@ -368,7 +396,7 @@ import ApplicationServices
         if result.surfaces > 0 { confirmedInstances.insert(result.instance) }
         finish(true)
         statusLabel.stringValue = "Confirmé par le provider · \(result.surfaces) surface(s) · révision \(result.generation)"
-        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "agent").notice(
+        Logger(subsystem: ProductIdentity.logSubsystem, category: "agent").notice(
             "XPC receipt confirmed action=\(pending.action.rawValue, privacy: .public) surfaces=\(result.surfaces) generation=\(result.generation)")
         restoreNextTheme()
         if self.pending == nil { synchronizeNextDesktopItems() }

@@ -53,6 +53,12 @@ extension, catalogue Apple et signatures). `npm run verify` ne remplace aucun
 de ces contrôles produit. Les tests de transport utilisent des signaux injectés,
 inactifs par défaut, et ne réveillent pas une extension installée.
 
+La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
+exigent un parcours déterministe, le rejet des traversées et formats incohérents,
+la déduplication des identités et des racines issues uniquement de configuration.
+Un test local séparé doit produire un reçu contenant le package privé attendu ; ce
+reçu ne qualifie ni ses pixels, ni son raccord au provider wallpaper.
+
 Gate L1 adopté : SwiftPM/XCTest pour configuration bornée, pause, animation et
 reprise ; compilation native avec avertissements bloquants, puis smoke AppKit
 à durée finie. Les gestes Finder restent une preuve manuelle distincte.

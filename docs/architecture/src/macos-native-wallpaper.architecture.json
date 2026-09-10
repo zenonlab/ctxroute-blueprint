@@ -1,34 +1,34 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "Wallpaper macOS Swift — paquet unique", "quality_profile": "showcase", "viewBox": [1280, 760] },
+  "meta": { "title": "Connecteur wallpaper macOS — Swift natif", "quality_profile": "showcase", "viewBox": [1280, 760] },
   "components": [
-    { "id": "picker", "type": "external", "label": "Réglages macOS", "sublabel": "Un seul provider installé", "pos": [40, 110], "size": [230, 80] },
-    { "id": "host", "type": "external", "label": "WallpaperAgent", "sublabel": "Cycle de vie géré par macOS", "pos": [520, 110], "size": [240, 80] },
-    { "id": "package-gate", "type": "security", "label": "Paquet Swift signé", "sublabel": "Build isolé · jamais enregistré", "pos": [750, 20], "size": [190, 70] },
-    { "id": "extension", "type": "backend", "label": "Provider Swift", "sublabel": "App Extension · XPC borné", "pos": [1010, 110], "size": [230, 80] },
-    { "id": "animation", "type": "backend", "label": "Scène native épurée", "sublabel": "Piste · véhicules · effets", "pos": [1010, 530], "size": [230, 80] },
-    { "id": "controls", "type": "frontend", "label": "Adaptateur d’entrée", "sublabel": "Tap unique · aucune fenêtre", "pos": [40, 320], "size": [230, 80] },
-    { "id": "priority", "type": "security", "label": "Priorité macOS", "sublabel": "Finder ou fenêtres natives", "pos": [40, 430], "size": [190, 70] },
-    { "id": "commands", "type": "messagebus", "label": "Commandes bornées", "sublabel": "Requêtes + quittances XPC", "pos": [520, 320], "size": [240, 80] },
-    { "id": "theme", "type": "database", "label": "Catalogue embarqué", "sublabel": "JSON et assets résolus", "pos": [800, 320], "size": [190, 80] },
-    { "id": "hit-testing", "type": "backend", "label": "Routeur de gestes", "sublabel": "Carte immuable · callback borné", "pos": [310, 440], "size": [190, 70] },
-    { "id": "context", "type": "frontend", "label": "Surfaces système", "sublabel": "CAContext · IOSurface", "pos": [520, 530], "size": [240, 80] },
-    { "id": "desktop", "type": "external", "label": "Composition macOS", "sublabel": "CreateDesktop · mode d’entrée adapté", "pos": [40, 530], "size": [230, 80] }
+    { "id": "settings", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection explicite du thème", "pos": [40, 100], "size": [210, 76] },
+    { "id": "wallpaper-agent", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système", "pos": [360, 100], "size": [210, 76] },
+    { "id": "provider", "type": "backend", "label": "Wallpaper Extension", "sublabel": "Swift · sandbox", "pos": [690, 100], "size": [220, 76] },
+    { "id": "surface", "type": "frontend", "label": "Surface native", "sublabel": "Core Animation · CAContext", "pos": [1010, 100], "size": [220, 76] },
+    { "id": "app", "type": "frontend", "label": "Orbite Wallpaper", "sublabel": "App Swift · état et réglages", "pos": [40, 330], "size": [210, 76] },
+    { "id": "xpc", "type": "messagebus", "label": "Canal XPC", "sublabel": "Intentions et quittances bornées", "pos": [360, 330], "size": [210, 76] },
+    { "id": "core", "type": "backend", "label": "WallpaperCore", "sublabel": "États déterministes · aucune API OS", "pos": [690, 330], "size": [220, 76] },
+    { "id": "theme", "type": "database", "label": "ThemePackage", "sublabel": "JSON original · assets privés optionnels", "pos": [1010, 330], "size": [220, 76] },
+    { "id": "installer", "type": "security", "label": "Installateur local", "sublabel": "Signature puis copie canonique", "pos": [40, 550], "size": [210, 76] },
+    { "id": "input", "type": "backend", "label": "MacInputAdapter", "sublabel": "Priorité Finder · capacité explicite", "pos": [360, 550], "size": [210, 76] },
+    { "id": "finder", "type": "external", "label": "Finder", "sublabel": "Icônes et bureau prioritaires", "pos": [690, 550], "size": [220, 76] }
   ],
-  "boundaries": [{ "kind": "region", "label": "Paquet .app / .appex", "wraps": ["extension"], "pad": 20 }],
+  "boundaries": [
+    { "kind": "region", "label": "Orbite Wallpaper.app", "wraps": ["app", "provider", "core", "theme", "xpc", "input"], "pad": 18 }
+  ],
   "connections": [
-    { "from": "picker", "to": "host", "label": "catalogue puis choix" },
-    { "from": "host", "to": "extension", "label": "cycle de vie XPC" },
-    { "from": "package-gate", "to": "extension", "label": "installe une copie canonique", "variant": "security", "labelAt": [1000, 16] },
-    { "from": "extension", "to": "animation", "label": "diagnostic visuel", "labelDy": 24 },
-    { "from": "controls", "to": "hit-testing", "label": "événement souris", "labelAt": [290, 414] },
-    { "from": "priority", "to": "hit-testing", "label": "autorise ou laisse passer", "labelAt": [270, 524] },
-    { "from": "commands", "to": "animation", "label": "état visuel local" },
-    { "from": "animation", "to": "controls", "label": "appliqué", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[1125, 680], [20, 680], [20, 360]], "labelAt": [600, 676] },
-    { "from": "theme", "to": "animation", "label": "composition déclarative" },
-    { "from": "hit-testing", "to": "commands", "label": "intention consommée", "labelAt": [510, 414] },
-    { "from": "animation", "to": "context", "label": "calques / image fixe", "labelDy": 30 },
-    { "from": "context", "to": "desktop", "label": "rendu hébergé" }
+    { "from": "settings", "to": "wallpaper-agent", "label": "choix utilisateur" },
+    { "from": "wallpaper-agent", "to": "provider", "label": "cycle de vie système" },
+    { "from": "provider", "to": "surface", "label": "publie le décor" },
+    { "from": "app", "to": "xpc", "label": "commande typée" },
+    { "from": "xpc", "to": "provider", "label": "échange local" },
+    { "from": "core", "to": "provider", "label": "projection de scène" },
+    { "from": "theme", "to": "core", "label": "recette validée" },
+    { "from": "installer", "to": "app", "label": "installe une copie" },
+    { "from": "app", "to": "input", "label": "active la capacité" },
+    { "from": "finder", "to": "input", "label": "cible native prioritaire", "variant": "security", "labelAt": [630, 640] },
+    { "from": "input", "to": "xpc", "label": "intention autorisée" }
   ]
 }

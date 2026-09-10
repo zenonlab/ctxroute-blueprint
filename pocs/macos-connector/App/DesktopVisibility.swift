@@ -160,10 +160,7 @@ extension DesktopVisibilityPolicy {
 
     fileprivate static func excludedPIDs() -> Set<pid_t> {
         var result: Set<pid_t> = [getpid()]
-        let excludedBundles: Set<String> = [
-            "org.wallpaperthemes.connectorpoc2",
-            "org.wallpaperthemes.connectorpoc2.agent"
-        ]
+        let excludedBundles: Set<String> = [ProductIdentity.appBundleID, ProductIdentity.agentBundleID]
         for app in NSWorkspace.shared.runningApplications where
             app.bundleIdentifier.map(excludedBundles.contains) == true {
             result.insert(app.processIdentifier)

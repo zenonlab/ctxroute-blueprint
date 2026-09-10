@@ -199,7 +199,7 @@ private final class DesktopGestureEngine: @unchecked Sendable {
         guard traceBudget > 0 else { return }
         traceBudget -= 1
         // Fixed decision codes only: no coordinates, object IDs or desktop data.
-        Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "input").notice("\(decision, privacy: .public)")
+        Logger(subsystem: ProductIdentity.logSubsystem, category: "input").notice("\(decision, privacy: .public)")
     }
 }
 

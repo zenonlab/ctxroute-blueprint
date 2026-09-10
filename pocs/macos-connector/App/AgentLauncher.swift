@@ -21,7 +21,7 @@ enum AgentLauncher {
               let data = try? Data(contentsOf: job), data.count <= 16_384,
               let configuration = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               matches(configuration, executable: app.appendingPathComponent(
-                "Contents/Library/LoginItems/Wallpaper Connector Agent.app/Contents/MacOS/WallpaperConnector").path,
+                "Contents/Library/LoginItems/Orbite Wallpaper Agent.app/Contents/MacOS/WallpaperConnector").path,
                 service: service) else { return false }
         guard try run(["bootstrap", domain, job.path]) == 0 else { return false }
         return try run(["kickstart", "\(domain)/\(service)"]) == 0

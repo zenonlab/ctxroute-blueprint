@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "theme_id": "org.wallpaperthemes.poc2.amber",
-  "display_name": "Ambre statique — PoC 2",
+  "display_name": "Ambre statique",
   "panel_id": "theme.controls",
   "background": "32180D",
   "accent": "FFA34D",

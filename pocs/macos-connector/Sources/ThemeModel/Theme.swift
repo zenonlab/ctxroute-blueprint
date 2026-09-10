@@ -83,14 +83,18 @@ public struct Theme: Codable, Equatable, Sendable {
         #else
         let source = bundle ?? Bundle.main
         #endif
-        guard let url = source.url(forResource: "catalog", withExtension: "json") else { throw ModelError.invalid("catalog missing") }
-        let data = try Data(contentsOf: url)
-        guard data.count <= 4096 else { throw ModelError.invalid("catalog size") }
-        let names = try JSONDecoder().decode([String].self, from: data)
-        guard (1...8).contains(names.count) else { throw ModelError.invalid("catalog count") }
-        let themes = try names.map { try load(bundle: source, resource: $0) }
-        guard Set(themes.map(\.theme_id)).count == themes.count else { throw ModelError.invalid("duplicate theme") }
-        return themes
+        let candidates = source.urls(forResourcesWithExtension: "json", subdirectory: nil) ?? []
+        var themes: [Theme] = []
+        for url in candidates.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard let data = try? Data(contentsOf: url, options: .mappedIfSafe), data.count <= 32_768,
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  object["schema_version"] as? Int == 1, object["theme_id"] is String
+            else { continue }
+            themes.append(try decode(data))
+        }
+        guard (1...32).contains(themes.count), Set(themes.map(\.theme_id)).count == themes.count
+        else { throw ModelError.invalid("invalid discovered catalog") }
+        return themes.sorted { ($0.display_name, $0.theme_id) < ($1.display_name, $1.theme_id) }
     }
 
     public static func decode(_ data: Data) throws -> Theme {

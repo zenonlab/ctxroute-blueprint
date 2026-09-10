@@ -9,9 +9,9 @@ connector_fixture_root="$(mktemp -d "$connector_root/dist/pocs/macos-connector/c
 connector_fixture="$connector_fixture_root/CatalogFixture.bundle"
 mkdir -p "$connector_fixture/Contents/Resources"
 plutil -create xml1 "$connector_fixture/Contents/Info.plist"
-plutil -insert CFBundleIdentifier -string org.wallpaperthemes.connectorpoc2.catalog-fixture \
+plutil -insert CFBundleIdentifier -string org.orbite.wallpaper.catalog-fixture \
   "$connector_fixture/Contents/Info.plist"
-plutil -insert CFBundleName -string 'Wallpaper Connector Catalog Fixture' \
+plutil -insert CFBundleName -string 'Orbite Wallpaper Catalog Fixture' \
   "$connector_fixture/Contents/Info.plist"
 plutil -insert CFBundlePackageType -string BNDL "$connector_fixture/Contents/Info.plist"
 cp "$connector_app/Contents/Extensions/WallpaperProvider.appex/Contents/Resources/"*.json \
@@ -20,6 +20,8 @@ cp "$connector_app/Contents/Extensions/WallpaperProvider.appex/Contents/Resource
   "$connector_fixture/Contents/Resources/"
 env -u SDKROOT xcrun swiftc -swift-version 6 -warnings-as-errors -parse-as-library \
   "$connector_source/Sources/ThemeModel/Theme.swift" \
+  "$connector_source/Sources/ThemeModel/ThemeDiscovery.swift" \
+  "$connector_source/Sources/ThemeModel/ProductIdentity.swift" \
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift" \
   "$connector_source/Sources/ThemeModel/GestureRouter.swift" \
   "$connector_source/App/DesktopEventTap.swift" \

@@ -3,7 +3,7 @@ import ExtensionFoundation
 import IOSurface
 import os
 
-func extensionLog(_ text: String) { Logger(subsystem: "org.wallpaperthemes.connectorpoc2", category: "provider").notice("\(text, privacy: .public)") }
+func extensionLog(_ text: String) { Logger(subsystem: ProductIdentity.logSubsystem, category: "provider").notice("\(text, privacy: .public)") }
 func traceLog(_ text: String) { extensionLog(text) }
 
 @main final class ConnectorExtension: NSObject, AppExtension {
@@ -240,7 +240,7 @@ final class WallpaperXPCHandler: NSObject, WallpaperExtensionXPCProtocol {
             let result = makeCatalog(); reply(result, result == nil ? Self.unsupported : nil)
         }
     }
-    static var unsupported: NSError { NSError(domain: "ConnectorPoC2", code: 1,
+    static var unsupported: NSError { NSError(domain: "OrbiteWallpaper", code: 1,
         userInfo: [NSLocalizedDescriptionKey: "Capability or private runtime unavailable"]) }
     func addChoiceRequest(withChoiceRequest r: Any?, onBehalfOfProcess p: Any?, reply: @escaping @Sendable (Any?, Error?) -> Void) { reply(nil, Self.unsupported) }
     func removeChoiceRequest(withChoiceRequest r: Any?, reply: @escaping @Sendable (Error?) -> Void) { reply(Self.unsupported) }

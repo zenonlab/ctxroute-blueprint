@@ -1,6 +1,6 @@
 # PoC macOS 2 — connecteur natif maintenable
 
-État au 10 septembre 2026 : **packaging Swift assaini ; tranche interactive et suspension par occlusion déjà validées sur MAC-01 ; clôture complète restante**.
+État au 10 septembre 2026 : **packaging Swift assaini ; découverte locale générique raccordée ; RenderHost 3D vers le provider restant à qualifier**.
 Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
 Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
 Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
@@ -24,6 +24,20 @@ Le livrable contient :
 - `MacInputAdapter`: capacité séparée, désactivable, qui refuse les clics ambigus ;
 - `ConnectorProtocol`: commandes, quittances, versions et erreurs typées ;
 - un harnais de qualification reproductible.
+
+Depuis [ADR-0072](../decisions/ADR-0072-automatic-local-theme-discovery.md),
+`ThemeDiscovery` indexe les descripteurs `orbite-theme.json` des bibliothèques locales
+configurées. La commande suivante produit le reçu sans lancer l'UI ni le provider :
+
+```sh
+Orbite\ Wallpaper.app/Contents/MacOS/WallpaperConnector --discover-themes /chemin/vers/bibliotheque
+```
+
+Le nom du thème, son identité, son renderer et sa recette viennent du descripteur.
+Le connecteur ne connaît aucun jeu ou dépôt. L'app permet aussi d'ajouter une racine
+avec un sélecteur de dossier et révèle la recette détectée. Détection ne signifie pas
+activation : une recette 3D reste indisponible dans le wallpaper tant que son
+`RenderHost` ne fournit pas la surface native attendue.
 
 Il n'inclut ni terminal custom, ni ROM, ni IA, ni convertisseur, ni multi-OS, ni
 préférence Finder privée dans le parcours principal.
@@ -55,7 +69,7 @@ chemin prouve le raccord d'un asset au wallpaper ; il ne prouve aucune 3D temps 
 
 ## Flux attendu
 
-1. L'application charge et valide le manifeste canonique.
+1. L'application découvre les bibliothèques configurées et valide leurs descripteurs.
 2. Elle interroge les capacités réelles du connecteur et présente leur état.
 3. L'adaptateur wallpaper reçoit une projection immuable de la scène.
 4. Le wallpaper dessine le décor, les objets et, si choisi, le panneau logique.
@@ -145,9 +159,12 @@ inscription implicite dans PlugInKit. L'installation retire aussi de LaunchServi
 l'hôte d'un build désinscrit ; sans cette seconde opération, Réglages Système pouvait
 reconstituer l'inscription du provider à partir d'une ancienne fiche d'application.
 
-Le paquet 0.3.0 build 5 est installé sous
-`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`. PlugInKit retourne
-un seul provider et son chemin exact appartient à cette copie installée ; un build
+Le paquet `org.orbite.wallpaper` 1.0.0 build 1 est installé sous
+`~/Applications/Wallpaper Themes/Orbite Wallpaper.app`. PlugInKit retourne
+un seul provider `org.orbite.wallpaper.provider` et son chemin exact appartient à
+cette copie installée. L'ancien paquet reste présent mais désinscrit ; aucun fichier
+n'a été supprimé. Le descripteur privé Mario Kart est détecté par l'agent, tandis que
+le raccord de son renderer Bevy au provider reste non qualifié. Un build
 propre supplémentaire n'a créé aucune inscription. Les 37 XCTest et les contrôles
 natifs de catalogue, signature, lancement, visibilité, hiérarchie Finder et snapshots
 passent. La présence du catalogue et le processus provider sont observés, mais le

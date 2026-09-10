@@ -5,6 +5,24 @@ Pas de fenêtre de décor superposée, de terminal PTY, de ROM ou de WebView.
 Le PoC1 reste intact. Les gestes macOS sont soumis à Accessibilité et à une
 classification conservatrice du fond Finder ; aucun réglage modifié au lancement.
 
+## Découverte des thèmes locaux — 10 septembre 2026
+
+Le connecteur n'utilise plus `catalog.json` pour choisir ses fixtures embarquées.
+Il découvre aussi les packages externes à partir d'un descripteur
+`orbite-theme.json`, sans nom de jeu ni chemin de dépôt dans Swift. L'app permet
+d'ajouter une bibliothèque locale. Pour un contrôle reproductible sans UI :
+
+```bash
+'dist/pocs/macos-connector/build.XXXXXX/Orbite Wallpaper.app/Contents/MacOS/WallpaperConnector' \
+  --discover-themes /chemin/vers/bibliotheque
+```
+
+Le reçu JSON contient les packages acceptés et refusés. Un package accepté prouve
+son identité, la cohérence du format d'entrée et le confinement de ses chemins ;
+il ne prouve pas que son renderer est raccordé au provider. La recette Mario Kart
+locale déclare `orbite.scene-probe/1` et `bevy-0.19` : elle est détectée, mais son
+passage vers le `CAContext` natif reste explicitement non qualifié.
+
 ## Suspension par occlusion — qualification du 9 septembre 2026
 
 Le connecteur qualifie désormais la visibilité des écrans portant une surface active
@@ -359,34 +377,18 @@ swift test --package-path pocs/macos-connector --scratch-path dist/pocs/macos-co
 bash pocs/macos-connector/build.sh
 ```
 
-Le mode ci-dessus reste strict, ad hoc et sans transport partagé. Pour développer
-sans certificat : `bash pocs/macos-connector/build.sh --development`.
-Ce choix est compilé dans les deux exécutables, pas activable par une variable
-d'environnement ou un argument au lancement. Le groupe de test est
-`group.org.wallpaperthemes.connectorpoc2.local`, avec des signaux Darwin distincts.
-Le runtime exige une vraie signature ad hoc et exactement ce groupe dans ses droits.
-macOS reste seul décisionnaire de l'accès ; aucun droit supplémentaire n'est ajouté.
-
-La sonde `--probe-mailbox` vérifie lecture/écriture dans le processus appelant sans
-envoyer de commande. `bash pocs/macos-connector/test-sandbox-access.sh <build.app>`
-copie le CLI dans un paquet de diagnostic sous `dist/`, signé ad hoc avec les droits
-sandbox du provider et le groupe local. Ce n'est ni une installation ni un hébergement
-par WallpaperAgent. `access-probe.json` ne contient qu'un UUID et reste dans le groupe
-de test ; aucune donnée du bureau n'est lue. Les paquets de diagnostic sont conservés.
+Sans argument, le build utilise une signature ad hoc. Le transport actif est le
+service XPC nommé de l'agent ; les anciennes sondes App Group restent historiques et
+ne sont pas compilées dans l'app native.
 
 Pour préparer une preuve
 signée, choisir une identité existante avec `security find-identity -v -p codesigning`,
-puis passer son empreinte SHA-1 (40 caractères hexadécimaux) et son Team ID :
-`bash pocs/macos-connector/build.sh --sign <empreinte> <TEAMID>`.
+puis passer son empreinte SHA-1 (40 caractères hexadécimaux) :
+`bash pocs/macos-connector/build.sh --sign <empreinte>`.
 Les chevrons désignent des arguments à remplacer, pas une commande prête à exécuter.
 L'identité doit être disponible dans le trousseau ; le script ne crée/importera aucun
-certificat. Le Team ID obtenu après signature est vérifié dans les deux bundles.
-Le groupe signé est `<TEAMID>.org.wallpaperthemes.connectorpoc2`, selon la
-[convention macOS documentée par Apple](https://developer.apple.com/documentation/xcode/accessing-app-group-containers).
-Le runtime exige exactement ce groupe dans ses droits signés. Aucun repli ad hoc
-en cas d'erreur et aucune migration automatique du groupe expérimental précédent.
-Le chemin signé reste non éprouvé sur cette machine faute d'identité disponible :
-seule une quittance réelle du provider pourra qualifier M2-06.
+certificat. Aucun repli ad hoc n'est effectué si l'identité demandée est absente.
+Seule une quittance réelle du provider peut qualifier le transport.
 
 Le build affiche le chemin du nouveau `.app` dans `dist/pocs/macos-connector/build.*`.
 Il ne remplace aucun build, n'installe rien et ne change pas le wallpaper actif.
@@ -401,7 +403,7 @@ compilation des shims seuls n'aurait pas détecté ce problème.
 L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 
 - `--check` : valide le manifeste et le prérequis de signature du transport ; ne prouve jamais une quittance du provider ;
-- `--probe-mailbox` : teste lecture/écriture locale, sans toucher à `command.json`/`status.json` ni notifier le provider ;
+- `--discover-themes <racine> [...]` : découvre les descripteurs locaux et imprime un reçu JSON sans lancer de processus externe ;
 - `--preflight-install` : refuse compagnons et providers concurrents sans les arrêter ;
 - `--thumbnail <chemin.png>` : exporte la fixture, sans animer ni ouvrir une fenêtre ;
 - `--thumbnails <répertoire>` : exporte une vignette par thème du catalogue ;
@@ -418,7 +420,7 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
 
 1. Quitter l'app connecteur, puis exécuter `bash pocs/macos-connector/install.sh`
    suivi du chemin exact du `.app` construit. L'installation vise
-   `~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app` ; une version
+   `~/Applications/Wallpaper Themes/Orbite Wallpaper.app` ; une version
    précédente est déplacée dans `dist/pocs/macos-connector/replaced.*/previous-app.disabled`,
    jamais supprimée. Le script refuse les compagnons et providers encore actifs
    et vérifie signature et catalogue avant remplacement. Un provider chargé doit
@@ -429,7 +431,7 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
    permettait à macOS de les redécouvrir. Ouvrir ensuite l'app et rouvrir les Réglages
    Fond d'écran. Cet enregistrement utilise une interface expérimentale et peut être
    refusé.
-3. Choisir un thème dans « Wallpaper Connector — PoC 2 » (groupe parfois tout en bas).
+3. Choisir une fixture dans « Orbite Wallpaper » (groupe parfois tout en bas).
    Orbite : quatre objets sur ellipse ; Lagon : cinq objets sur une trajectoire en
    huit ; Ambre statique : trois objets immobiles, aucune animation créée.
    Chaque choix possède son manifeste et sa vignette. Observer les

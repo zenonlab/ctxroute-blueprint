@@ -90,7 +90,7 @@ final class DesktopEventTap: @unchecked Sendable {
             CFRunLoopRun()
             CFRunLoopRemoveSource(runLoop, source, .commonModes)
         }
-        thread.name = "org.wallpaperthemes.connectorpoc2.mouse-tap"
+        thread.name = "org.orbite.wallpaper.mouse-tap"
         thread.qualityOfService = .userInteractive
         lock.lock(); self.thread = thread; self.termination = terminated; lock.unlock()
         thread.start()
@@ -122,7 +122,7 @@ final class DesktopEventTap: @unchecked Sendable {
     /// does no work while the tap remains healthy.
     private func startWatchdog() {
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(
-            label: "org.wallpaperthemes.connectorpoc2.mouse-tap.watchdog", qos: .utility))
+            label: "org.orbite.wallpaper.mouse-tap.watchdog", qos: .utility))
         timer.schedule(deadline: .now() + 1.5, repeating: 1.5, leeway: .milliseconds(250))
         timer.setEventHandler { [weak self] in self?.rearmIfNeeded() }
         lock.lock()

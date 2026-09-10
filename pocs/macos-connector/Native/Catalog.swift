@@ -14,14 +14,14 @@ import Foundation
             identifier: theme.theme_id, files: [], configuration: Data(theme.theme_id.utf8)))
         let item = SettingsItem(id: choice, localizedName: theme.display_name, thumbnail: .image(url: thumbnail),
             choice: ChoiceDescriptor(id: choice, provider: provider, identifier: theme.theme_id,
-                name: theme.display_name, localizedDescription: "Scène originale — connecteur PoC 2",
+                name: theme.display_name, localizedDescription: "Scène originale Orbite",
                 thumbnail: .image(url: thumbnail), isDownloaded: true, options: []),
             contentBadge: theme.motion_path == "still" ? .none : .dynamic,
             showInTopLevel: true, sortOrder: index, disposability: .none, contextMenu: nil)
         items.append(item)
     }
     let group = SettingsGroup(id: GroupID(id: "connector-poc2"), items: items,
-        localizedName: "Wallpaper Connector — PoC 2", disposability: .none, sortOrder: 0,
+        localizedName: "Orbite Wallpaper", disposability: .none, sortOrder: 0,
         sortID: GroupSortID(id: "connector-poc2"), shouldHideItemLabels: false)
     let models = SettingsViewModels(desktop: SettingsViewModel(groups: [group],
         refreshPolicy: .default, isModificationDisabled: false), screenSaver: nil)

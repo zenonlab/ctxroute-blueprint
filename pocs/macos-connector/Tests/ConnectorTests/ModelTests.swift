@@ -86,7 +86,7 @@ final class ModelTests: XCTestCase {
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("build.sh")
         let process = Process(); let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [script.path, "--development"]
+        process.arguments = [script.path]
         process.environment = ProcessInfo.processInfo.environment.merging([
             "CONNECTOR_LOCAL_BACKGROUND_PATH": "../private.png"
         ]) { _, new in new }
@@ -171,6 +171,55 @@ final class ModelTests: XCTestCase {
             XCTAssertThrowsError(try Theme.decode(JSONSerialization.data(withJSONObject: invalid)))
         }
         XCTAssertThrowsError(try Theme.decode(Data(repeating: 32, count: 32_769)))
+    }
+    func testThemeDiscoveryUsesPackageDescriptorsInsteadOfBuiltInNames() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let packageRoot = root.appendingPathComponent("anything-at-all", isDirectory: true)
+        try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+        try Data(#"{"format":"orbite.scene-probe/1"}"#.utf8)
+            .write(to: packageRoot.appendingPathComponent("scene.json"))
+        let descriptor = InstalledTheme(id: "local.course", displayName: "Course locale",
+            entry: .init(format: "orbite.scene-probe/1", path: "scene.json"), renderer: "bevy-0.19")
+        try JSONEncoder().encode(descriptor).write(to: packageRoot.appendingPathComponent(ThemeDiscovery.descriptorName))
+
+        let receipt = ThemeDiscovery.discover(roots: [root])
+        XCTAssertEqual(receipt.rejected, [])
+        XCTAssertEqual(receipt.themes.map(\.package.id), ["local.course"])
+        XCTAssertEqual(receipt.themes.first?.entry.lastPathComponent, "scene.json")
+    }
+    func testThemeDiscoveryRejectsFormatMismatchTraversalAndDuplicateIDs() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for (name, entryPath, entryFormat) in [
+            ("a", "scene.json", "orbite.scene-probe/1"),
+            ("b", "scene.json", "orbite.scene-probe/1"),
+            ("escape", "../scene.json", "orbite.scene-probe/1"),
+            ("wrong", "scene.json", "orbite.theme-package/2")
+        ] {
+            let packageRoot = root.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+            try Data(#"{"format":"orbite.scene-probe/1"}"#.utf8)
+                .write(to: packageRoot.appendingPathComponent("scene.json"))
+            let descriptor = InstalledTheme(id: name == "b" ? "a" : name, displayName: name,
+                entry: .init(format: entryFormat, path: entryPath), renderer: "bevy-0.19")
+            try JSONEncoder().encode(descriptor).write(to: packageRoot.appendingPathComponent(ThemeDiscovery.descriptorName))
+        }
+        let receipt = ThemeDiscovery.discover(roots: [root])
+        XCTAssertEqual(receipt.themes.map(\.package.id), ["a"])
+        XCTAssertEqual(receipt.rejected.count, 3)
+        XCTAssertTrue(receipt.rejected.map(\.reason).contains("duplicate theme id"))
+    }
+    func testThemeLibrariesUseConfigurationAndEnvironmentWithoutRepositoryKnowledge() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let second = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "theme-libraries-\(UUID().uuidString)"))
+        try ThemeLibraries.add(root, defaults: defaults)
+        try ThemeLibraries.add(root, defaults: defaults)
+        let roots = ThemeLibraries.roots(defaults: defaults,
+            environment: [ThemeLibraries.environmentKey: second.path], fileManager: .default)
+        XCTAssertEqual(Set(roots.map(\.path)), Set([root.path, second.path]))
     }
     func testCommandsAreCorrelatedIdempotentAndBounded() {
         var session = Session(themeID: "test")

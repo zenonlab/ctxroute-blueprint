@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Découverte des thèmes par le connecteur macOS",
+    "quality_profile": "showcase",
+    "viewBox": [1068, 820],
+    "views": [
+      { "id": "discovery", "label": "Découverte", "focus": ["roots", "scanner", "descriptor", "adapter"], "note": "Le code ne connaît ni jeu, ni dépôt : il inspecte des racines configurées et route selon le format déclaré." },
+      { "id": "activation", "label": "Activation", "focus": ["adapter", "snapshot", "swiftCatalog", "provider"], "note": "Seuls les packages validés alimentent le catalogue immuable consommé par le provider signé." },
+      { "id": "privateAssets", "label": "Assets privés", "focus": ["package", "adapter", "renderer"], "note": "Les assets restent dans la bibliothèque locale et ne sont jamais ajoutés au dépôt Git." }
+    ]
+  },
+  "stages": [
+    { "label": "Bibliothèque locale" },
+    { "label": "Découverte" },
+    { "label": "Validation" },
+    { "label": "Catalogue" },
+    { "label": "Exécution" }
+  ],
+  "nodes": [
+    { "id": "roots", "type": "database", "label": "Racines configurées", "sublabel": "URLs locales persistées", "stage": 0, "row": 0, "tag": "aucun chemin codé" },
+    { "id": "package", "type": "database", "label": "Package de thème", "sublabel": "manifeste + assets privés", "stage": 0, "row": 2, "tag": "hors Git" },
+    { "id": "scanner", "type": "backend", "label": "ThemeDiscovery", "sublabel": "parcours borné et déterministe", "stage": 1, "row": 1, "tag": "Swift", "width": 140 },
+    { "id": "descriptor", "type": "security", "label": "Descripteur minimal", "sublabel": "format, identité, entrée", "stage": 2, "row": 0, "tag": "fail closed" },
+    { "id": "adapter", "type": "backend", "label": "Registre d’adaptateurs", "sublabel": "sélection par format", "stage": 2, "row": 2, "tag": "générique", "width": 156 },
+    { "id": "snapshot", "type": "database", "label": "Instantané validé", "sublabel": "identités stables", "stage": 3, "row": 0, "tag": "local" },
+    { "id": "swiftCatalog", "type": "backend", "label": "Catalogue Swift", "sublabel": "choix macOS immuables", "stage": 3, "row": 2, "tag": "signé" },
+    { "id": "provider", "type": "frontend", "label": "Wallpaper Provider", "sublabel": "surface native macOS", "stage": 4, "row": 0, "tag": "Swift" },
+    { "id": "renderer", "type": "backend", "label": "RenderHost", "sublabel": "runtime par capacité", "stage": 4, "row": 2, "tag": "sans émulateur" }
+  ],
+  "flows": [
+    { "id": "configuredRoots", "from": "roots", "to": "scanner", "label": "URLs autorisées", "classification": "configuration locale", "variant": "security" },
+    { "id": "candidateFiles", "from": "package", "to": "scanner", "label": "manifestes candidats", "classification": "lecture seule" },
+    { "id": "boundedHeader", "from": "scanner", "to": "descriptor", "label": "en-tête JSON borné", "classification": "données non fiables", "variant": "security" },
+    { "id": "formatDispatch", "from": "descriptor", "to": "adapter", "label": "format déclaré", "classification": "contrat typé", "variant": "emphasis", "labelDy": 24 },
+    { "id": "validatedMetadata", "from": "adapter", "to": "snapshot", "label": "métadonnées validées", "classification": "sans asset publié" },
+    { "id": "catalogProjection", "from": "snapshot", "to": "swiftCatalog", "label": "projection déterministe", "classification": "catalogue local", "variant": "emphasis", "labelDy": 24 },
+    { "id": "settingsChoices", "from": "swiftCatalog", "to": "provider", "label": "choix installés", "classification": "configuration signée" },
+    { "id": "renderContract", "from": "adapter", "to": "renderer", "label": "recette et capacités", "classification": "package validé", "variant": "emphasis", "route": "bottom-channel", "labelDy": 24 },
+    { "id": "nativeFrames", "from": "renderer", "to": "provider", "label": "images natives", "classification": "surface locale", "labelAt": [960, 428] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Aucun thème codé en dur", "items": ["Les racines viennent de la configuration locale", "Le format du manifeste sélectionne l’adaptateur", "Ajouter un thème ne modifie pas le connecteur"] },
+    { "dot": "rose", "title": "Frontière privée", "items": ["Les ressources commerciales restent dans la bibliothèque locale", "Git ne reçoit que contrats, logique et fixtures libres", "Toute référence qui sort du package est refusée"] },
+    { "dot": "cyan", "title": "Activation macOS", "items": ["Le catalogue signé est un instantané de packages validés", "Le provider ne recherche jamais un dépôt", "Le renderer reste derrière RenderHost"] }
+  ]
+}

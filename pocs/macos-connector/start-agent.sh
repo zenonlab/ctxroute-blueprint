@@ -17,11 +17,11 @@ for connector_option in "$@"; do
   esac
 done
 connector_app="$(cd "$connector_app" && pwd -P)"
-connector_service=org.wallpaperthemes.connectorpoc2.agent
+connector_service=org.orbite.wallpaper.agent
 connector_domain="gui/$(id -u)"
-test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_app/Contents/Info.plist")" = org.wallpaperthemes.connectorpoc2
+test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_app/Contents/Info.plist")" = org.orbite.wallpaper
 codesign --verify --deep --strict "$connector_app"
-connector_expected="$connector_app/Contents/Library/LoginItems/Wallpaper Connector Agent.app/Contents/MacOS/WallpaperConnector"
+connector_expected="$connector_app/Contents/Library/LoginItems/Orbite Wallpaper Agent.app/Contents/MacOS/WallpaperConnector"
 connector_state="$(launchctl print "$connector_domain/$connector_service" 2>/dev/null || true)"
 if [[ -n "$connector_state" ]] && [[ "$(echo "$connector_state" | sed -n 's/^[[:space:]]*program = //p')" != "$connector_expected" ]]; then
   echo 'Refusing a job registered from a different package.' >&2; exit 2

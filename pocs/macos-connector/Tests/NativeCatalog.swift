@@ -32,7 +32,7 @@ func extensionLog(_ text: String) { FileHandle.standardError.write(Data((text + 
         }
         print("tap-recovery=PASS cases=\(recoveryCases + 1) (injected operations, not native clicks)")
         let executable = "/expected/WallpaperConnector"
-        let service = "org.wallpaperthemes.connectorpoc2.agent"
+        let service = ProductIdentity.service
         let valid: [String: Any] = ["Label": service, "ProgramArguments": [executable, "--agent"],
             "LimitLoadToSessionType": "Aqua", "MachServices": [service: true]]
         guard AgentLauncher.matches(valid, executable: executable, service: service) else {

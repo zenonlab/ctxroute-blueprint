@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "theme_id": "org.wallpaperthemes.poc2.lagoon",
-  "display_name": "Lagon — PoC 2",
+  "display_name": "Lagon",
   "panel_id": "theme.controls",
   "background": "032D35",
   "accent": "4CF3C5",

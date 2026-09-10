@@ -12,11 +12,11 @@ import ThemeModel
 }
 
 public enum NativeWire {
-    public static let service = "org.wallpaperthemes.connectorpoc2.agent"
+    public static let service = ProductIdentity.service
     public static let limit = 16_384
     public static var appBundle: URL {
         let bundle = Bundle.main.bundleURL
-        guard Bundle.main.bundleIdentifier == "org.wallpaperthemes.connectorpoc2.agent" else { return bundle }
+        guard Bundle.main.bundleIdentifier == ProductIdentity.agentBundleID else { return bundle }
         return bundle.deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
     }
