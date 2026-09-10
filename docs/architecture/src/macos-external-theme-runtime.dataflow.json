@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1068, 760],
     "views": [
-      { "id": "discovery", "label": "Découverte", "focus": ["packages", "scanner", "settings"], "note": "L’extension publie uniquement les packages externes validés." },
+      { "id": "discovery", "label": "Découverte", "focus": ["packages", "scanner", "settings"], "note": "L’extension publie les packages externes et leurs covers bornées." },
       { "id": "activation", "label": "Activation", "focus": ["settings", "agent", "desktop"], "note": "Le choix macOS devient une intention typée vers le RenderHost approuvé." }
     ]
   },
@@ -26,12 +26,12 @@
   ],
   "flows": [
     { "from": "packages", "to": "scanner", "label": "manifestes candidats", "classification": "données locales non fiables", "variant": "security", "labelDy": 53 },
-    { "from": "scanner", "to": "settings", "label": "catalogue validé", "classification": "métadonnées typées", "variant": "security", "labelDy": 53 },
+    { "from": "scanner", "to": "settings", "label": "catalogue + covers", "classification": "XPC borné, rafraîchi", "variant": "security", "labelDy": 53 },
     { "from": "settings", "to": "agent", "label": "thème sélectionné", "classification": "intention XPC signée", "variant": "security", "labelDy": 53 },
     { "from": "agent", "to": "desktop", "label": "recette + renderer", "classification": "chemins locaux approuvés", "variant": "emphasis", "labelDy": 53 }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Parcours utilisateur", "items": ["Les packages locaux apparaissent dans Réglages", "La sélection active le RenderHost approuvé", "Ajouter un thème ne modifie pas Swift"] },
+    { "dot": "emerald", "title": "Parcours utilisateur", "items": ["Les packages locaux et leurs covers apparaissent dans Réglages", "Les changements sont poussés sans redémarrage global", "La sélection active le RenderHost approuvé"] },
     { "dot": "rose", "title": "Limites nettes", "items": ["Aucun thème natif n’est embarqué", "L’intégration Wallpaper repose sur une API macOS privée", "Une recette refusée ne lance aucun processus"] }
   ]
 }

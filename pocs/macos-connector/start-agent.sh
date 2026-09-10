@@ -27,6 +27,7 @@ if [[ -n "$connector_state" ]] && [[ "$(echo "$connector_state" | sed -n 's/^[[:
   echo 'Refusing a job registered from a different package.' >&2; exit 2
 fi
 connector_root="$(cd "$(dirname "$0")/../.." && pwd)"
+source "$connector_root/pocs/macos-connector/process-ownership.sh"
 connector_stage="$(mktemp -d "$connector_root/dist/pocs/macos-connector/agent.XXXXXX")"
 connector_job="$connector_stage/agent.plist"
 plutil -create xml1 "$connector_job"
@@ -59,6 +60,7 @@ if [[ "$connector_persistent" == true ]]; then
   fi
   connector_loaded_path="$(echo "$connector_state" | sed -n 's/^[[:space:]]*path = //p')"
   if [[ -n "$connector_state" ]] && { [[ "$connector_loaded_path" != "$connector_login" ]] || ! cmp -s "$connector_job" "$connector_login"; }; then
+    orbite_stop_agent_children "$connector_state"
     launchctl bootout "$connector_domain/$connector_service"
     connector_state=""
   fi

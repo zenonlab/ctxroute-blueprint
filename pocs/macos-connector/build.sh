@@ -46,6 +46,7 @@ connector_sources=(
   "$connector_source/Sources/ConnectorTransport/NativeXPC.swift"
   "$connector_source/App/AgentTransport.swift"
   "$connector_source/App/AgentLauncher.swift"
+  "$connector_source/App/ProviderCover.swift"
   "$connector_source/App/DesktopItems.swift"
   "$connector_source/App/Preflight.swift"
   "$connector_source/App/Main.swift"

@@ -46,4 +46,12 @@ import Testing
         #expect(try !controller.activate(first))
         #expect(try controller.activate(changed))
     }
+
+    @Test @MainActor func immediate_renderhost_exit_is_not_reported_as_activation() {
+        let controller = RenderHostController()
+        let request = RenderHostLaunchRequest(executable: URL(fileURLWithPath: "/usr/bin/false"),
+                                              arguments: [], themeID: "fixture")
+        #expect(throws: (any Error).self) { try controller.activate(request) }
+        #expect(controller.themeID == nil)
+    }
 }

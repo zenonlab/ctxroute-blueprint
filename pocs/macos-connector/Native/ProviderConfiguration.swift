@@ -98,10 +98,18 @@ struct ProviderConfiguration: AppExtensionConfiguration {
         }
 
         connection.exportedInterface = exported
-        connection.remoteObjectInterface = NSXPCInterface(with: (any WallpaperExtensionProxyXPCProtocol).self)
+        let remote = NSXPCInterface(with: (any WallpaperExtensionProxyXPCProtocol).self)
+        remote.setClasses(classes, for: NSSelectorFromString("updateSettingsViewModels:reply:"),
+                          argumentIndex: 0, ofReply: false)
+        connection.remoteObjectInterface = remote
 
+        let host = WallpaperHostConnection(connection)
+        connection.invalidationHandler = {
+            Task { @MainActor in Provider.shared.detach(host) }
+        }
         connection.exportedObject = WallpaperXPCHandler()
         connection.resume()
+        Task { @MainActor in Provider.shared.attach(host) }
         return true
     }
 }

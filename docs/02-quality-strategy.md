@@ -136,7 +136,10 @@ Apple plante avant l'appel au renderer. Une sélection physique et la lecture
 postérieure de `Index.plist` sont requises.
 Le connecteur Orbite ajoute un contrôle distinct du catalogue externe :
 `--provider-catalog` traverse le Mach service signé de l’agent installé et doit
-retourner uniquement les identités découvertes. Le build strict vérifie l’unique
+retourner uniquement les identités découvertes et l’URL locale validée de chaque
+cover, sans sérialiser l’image. Une modification du package doit
+être poussée à Réglages en moins de trois secondes sans tuer un processus Apple.
+Le build strict vérifie l’unique
 `WallpaperProvider.appex`, sa signature, l’absence de ressources de thème et le
 pont privé ; PlugInKit et le lancement effectif du provider restent des preuves
 natives. Le clic final sur la tuile et l’image rendue restent une qualification

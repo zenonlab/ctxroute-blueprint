@@ -66,6 +66,11 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
         process.executableURL = request.executable
         process.arguments = request.arguments
         try process.run()
+        Thread.sleep(forTimeInterval: 0.15)
+        guard process.isRunning else {
+            process.waitUntilExit()
+            throw ModelError.invalid("RenderHost exited during startup (status \(process.terminationStatus))")
+        }
         self.process = process
         activeRequest = request
         themeID = request.themeID

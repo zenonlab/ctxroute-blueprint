@@ -23,6 +23,16 @@ struct Incoming: @unchecked Sendable {
     let request: Any?
 }
 
+final class WallpaperHostConnection: @unchecked Sendable {
+    let id: ObjectIdentifier
+    weak var connection: NSXPCConnection?
+
+    init(_ connection: NSXPCConnection) {
+        id = ObjectIdentifier(connection)
+        self.connection = connection
+    }
+}
+
 @MainActor final class Provider {
     static let shared = Provider()
 
@@ -35,16 +45,83 @@ struct Incoming: @unchecked Sendable {
     private let transport = ProviderTransport()
     private var catalog: [ProviderCatalogItem] = []
     private var surfaces: [UUID: Surface] = [:]
+    private var hosts: [ObjectIdentifier: WallpaperHostConnection] = [:]
+    private var catalogPoll: Task<Void, Never>?
+    private var catalogRefreshInFlight = false
+    private var catalogRefreshNeedsPush = false
+    private var catalogRefreshCompletions: [() -> Void] = []
 
     func settings(completion: @escaping @MainActor (AnyObject?) -> Void) {
-        transport.perform(ProviderRequest(action: .catalog)) { [weak self] response in
-            guard let self, let response, response.accepted, let items = response.catalog else {
-                completion(self.flatMap { makeCatalog(items: $0.catalog) })
-                return
+        refreshCatalog { [weak self] in completion(self.flatMap { makeCatalog(items: $0.catalog) }) }
+    }
+
+    func attach(_ host: WallpaperHostConnection) {
+        hosts[host.id] = host
+        refreshCatalog(push: true)
+        guard catalogPoll == nil else { return }
+        catalogPoll = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard let self else { return }
+                self.pruneHosts()
+                guard !self.hosts.isEmpty else {
+                    self.catalogPoll = nil
+                    return
+                }
+                self.refreshCatalog(push: true)
             }
-            self.catalog = items
-            completion(makeCatalog(items: items))
         }
+    }
+
+    func detach(_ host: WallpaperHostConnection) {
+        hosts.removeValue(forKey: host.id)
+        if hosts.isEmpty {
+            catalogPoll?.cancel()
+            catalogPoll = nil
+        }
+    }
+
+    private func refreshCatalog(push: Bool = false, completion: (() -> Void)? = nil) {
+        if let completion { catalogRefreshCompletions.append(completion) }
+        catalogRefreshNeedsPush = catalogRefreshNeedsPush || push
+        guard !catalogRefreshInFlight else { return }
+        catalogRefreshInFlight = true
+        transport.perform(ProviderRequest(action: .catalog)) { [weak self] response in
+            guard let self else { return }
+            self.catalogRefreshInFlight = false
+            let shouldPush = self.catalogRefreshNeedsPush
+            self.catalogRefreshNeedsPush = false
+            let completions = self.catalogRefreshCompletions
+            self.catalogRefreshCompletions.removeAll(keepingCapacity: true)
+            if let response, response.accepted, let items = response.catalog {
+                let changed = self.catalog != items
+                self.catalog = items
+                if changed {
+                    extensionLog("Catalog changed items=\(items.count) covers=\(items.filter { $0.coverURL != nil }.count)")
+                }
+                if shouldPush && changed { self.publishCatalog() }
+            }
+            completions.forEach { $0() }
+        }
+    }
+
+    private func publishCatalog() {
+        pruneHosts()
+        guard let models = makeCatalog(items: catalog) else { return }
+        extensionLog("Publishing catalog to hosts=\(hosts.count)")
+        for host in hosts.values {
+            guard let connection = host.connection,
+                  let proxy = connection.remoteObjectProxyWithErrorHandler({ error in
+                    extensionLog("Settings refresh failed: \(error)")
+                  }) as? WallpaperExtensionProxyXPCProtocol else { continue }
+            proxy.updateSettingsViewModels(models) { error in
+                if let error { extensionLog("Settings refresh rejected: \(error)") }
+            }
+        }
+    }
+
+    private func pruneHosts() {
+        hosts = hosts.filter { $0.value.connection != nil }
     }
 
     func acquire(_ incoming: Incoming,

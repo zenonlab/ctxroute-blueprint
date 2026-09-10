@@ -46,9 +46,10 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
 ## Critères d'acceptation
 
 - Aucun `theme*.json`, `catalog.json` ou asset de thème dans le paquet produit.
-- L’extension Wallpaper contient seulement le pont natif, une vignette Orbite générée et l’exigence de signature de l’agent.
+- L’extension Wallpaper contient seulement le pont natif, le fallback Orbite généré et l’exigence de signature de l’agent ; une cover éventuelle vient du package externe.
 - Une bibliothèque vide affiche zéro thème, sans fallback implicite.
 - Ajouter un package compatible le fait apparaître sans changement Swift.
+- Modifier le catalogue ou sa cover actualise Réglages sans redémarrer les processus Apple.
 - Une recette invalide est refusée et ne lance aucun processus.
 - Une capacité sans RenderHost approuvé échoue explicitement.
 - Le manifeste ne peut choisir ni exécutable ni commande shell.

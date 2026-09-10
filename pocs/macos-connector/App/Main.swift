@@ -4,6 +4,23 @@ import os
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
+        if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--activate-theme" {
+            let themeID = CommandLine.arguments[2]
+            guard NativeWire.validID(themeID),
+                  try AgentLauncher.start(app: ProductIdentity.appBundle, service: ProductIdentity.service) else {
+                exit(2)
+            }
+            let agent = ProductIdentity.appBundle.appendingPathComponent(
+                "Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
+            guard let response = AgentClient.perform(
+                    ProviderRequest(action: .activate, themeID: themeID), agentBundle: agent),
+                  response.accepted else {
+                print("activation=refused")
+                exit(3)
+            }
+            print("activation=accepted theme=\(themeID)")
+            return
+        }
         if CommandLine.arguments == [CommandLine.arguments[0], "--provider-catalog"] {
             guard try AgentLauncher.start(app: ProductIdentity.appBundle, service: ProductIdentity.service) else {
                 exit(2)
@@ -14,7 +31,11 @@ import os
                   response.accepted, let catalog = response.catalog else { exit(3) }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-            FileHandle.standardOutput.write(try encoder.encode(catalog))
+            let receipt = catalog.map {
+                ProviderCatalogDiagnostic(id: $0.id, displayName: $0.displayName,
+                    hasCover: $0.coverURL != nil, coverPath: $0.coverURL?.path)
+            }
+            FileHandle.standardOutput.write(try encoder.encode(receipt))
             FileHandle.standardOutput.write(Data("\n".utf8))
             return
         }
@@ -182,8 +203,9 @@ import os
         switch request.action {
         case .catalog:
             refresh()
-            let items = themes.map {
-                ProviderCatalogItem(id: $0.package.id, displayName: $0.package.display_name)
+            let items = themes.prefix(64).map {
+                ProviderCatalogItem(id: $0.package.id, displayName: $0.package.display_name,
+                    coverURL: ProviderCover.externalURL(from: $0.thumbnail))
             }
             return ProviderResponse(accepted: true, catalog: items)
         case .activate:
@@ -281,4 +303,11 @@ import os
         renderHost.stop()
         return .terminateNow
     }
+}
+
+private struct ProviderCatalogDiagnostic: Encodable {
+    let id: String
+    let displayName: String
+    let hasCover: Bool
+    let coverPath: String?
 }

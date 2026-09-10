@@ -31,18 +31,23 @@ import Foundation
     }
 }
 
+@MainActor private func thumbnail(for item: ProviderCatalogItem) -> URL? {
+    item.coverURL ?? genericThumbnail()
+}
+
 @MainActor func makeCatalog(items: [ProviderCatalogItem], bundle: Bundle = .main) -> AnyObject? {
-    guard items.count <= 256, items.allSatisfy(\.isValid),
+    guard items.count <= 64, items.allSatisfy(\.isValid),
           Set(items.map(\.id)).count == items.count,
-          let bundleID = bundle.bundleIdentifier,
-          let thumbnail = genericThumbnail() else {
+          let bundleID = bundle.bundleIdentifier else {
         extensionLog("External catalog rejected")
         return nil
     }
     let provider = ChoiceProviderID(rawValue: bundleID)
-    let settingsItems = items.enumerated().map { index, item in
+    let settingsItems = items.enumerated().compactMap { index, item -> SettingsItem? in
+        guard let thumbnail = thumbnail(for: item) else { return nil }
         let choice = ChoiceID(id: item.id, descriptor: ChoiceIDDescriptor(
-            provider: provider, identifier: item.id, files: [], configuration: Data(item.id.utf8)))
+            provider: provider, identifier: item.id, files: [thumbnail],
+            configuration: Data(item.id.utf8)))
         return SettingsItem(id: choice, localizedName: item.displayName, thumbnail: .image(url: thumbnail),
             choice: ChoiceDescriptor(id: choice, provider: provider, identifier: item.id,
                 name: item.displayName, localizedDescription: "Thème Orbite local",

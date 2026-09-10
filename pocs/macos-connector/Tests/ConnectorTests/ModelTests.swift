@@ -23,6 +23,12 @@ final class ModelTests: XCTestCase {
             catalog: items + [items[0]]).isValid)
         XCTAssertFalse(ProviderResponse(accepted: true,
             catalog: [ProviderCatalogItem(id: "../escape", displayName: "Refusé")]).isValid)
+        XCTAssertTrue(ProviderCatalogItem(id: "covered.theme", displayName: "Avec cover",
+            coverURL: URL(fileURLWithPath: "/private/theme/cover.png")).isValid)
+        XCTAssertFalse(ProviderCatalogItem(id: "covered.theme", displayName: "Cover distante",
+            coverURL: URL(string: "https://example.test/cover.png")).isValid)
+        XCTAssertFalse(ProviderCatalogItem(id: "covered.theme", displayName: "Mauvais format",
+            coverURL: URL(fileURLWithPath: "/private/theme/cover.jpg")).isValid)
     }
 
     func testRestartRejectsInvalidArgumentsBeforeChangingJobs() throws {

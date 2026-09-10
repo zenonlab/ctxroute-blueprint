@@ -36,6 +36,12 @@ Catalogue réellement publié par l’agent installé :
 "/chemin/vers/Orbite Wallpaper.app/Contents/MacOS/WallpaperConnector" --provider-catalog
 ```
 
+Diagnostic d’activation typé, sans shell ni commande fournie par le manifeste :
+
+```sh
+"/chemin/vers/Orbite Wallpaper.app/Contents/MacOS/WallpaperConnector" --activate-theme example.course
+```
+
 Le build refuse `CONNECTOR_LOCAL_BACKGROUND_PATH` : les ressources privées restent dans le package externe.
 
 ## Package de thème
@@ -48,16 +54,17 @@ Le descripteur public `orbite-theme.json` utilise `orbite.theme-package/1` :
   "id": "example.course",
   "display_name": "Course locale",
   "entry": { "format": "orbite.scene-probe/1", "path": "scene.json" },
-  "renderer": "bevy-0.19"
+  "renderer": "bevy-0.19",
+  "thumbnail": "cover.png"
 }
 ```
 
-Les chemins restent relatifs au package. Les liens symboliques, traversées, fichiers trop gros, formats incohérents et identités dupliquées sont refusés.
+`thumbnail` est optionnel et pointe vers une cover PNG privée. L’agent transmet uniquement son URL locale validée et le provider la déclare à macOS comme fichier du choix ; il utilise le fallback Orbite seulement si le package n’en fournit pas. Les chemins restent relatifs au package. Les liens symboliques, traversées, fichiers trop gros, formats incohérents et identités dupliquées sont refusés.
 
 ## Packaging et migration
 
-Le paquet produit contient l’app, son agent embarqué et une seule `WallpaperProvider.appex`. Il ne contient aucun `catalog.json`, `theme*.json` ou asset de thème. L’extension génère seulement une vignette Orbite neutre dans son conteneur temporaire.
+Le paquet produit contient l’app, son agent embarqué et une seule `WallpaperProvider.appex`. Il ne contient aucun `catalog.json`, `theme*.json` ou asset de thème. Les covers restent dans les packages externes et sont copiées uniquement dans le cache temporaire du provider.
 
-Lors d’une mise à jour, `install.sh` arrête uniquement le job Orbite attendu, désenregistre l’ancienne extension `org.orbite.wallpaper.provider` si son chemin appartient à Orbite, et conserve l’ancienne app sous `dist/pocs/macos-connector/replaced.*`.
+Le provider relit le catalogue pendant que Réglages est connecté et pousse les modèles modifiés au panneau sous trois secondes, sans tuer Réglages ni WallpaperAgent. Lors d’une mise à jour binaire, `install.sh` décharge aussi l’ancien job de test Orbite `org.orbite.wallpaper.renderhost-test`, arrête les RenderHosts enfants de son propre agent avant cet agent, puis arrête l’ancien processus dont le chemin est exactement celui du provider Orbite. Il désenregistre ensuite l’ancienne extension et conserve l’ancienne app sous `dist/pocs/macos-connector/replaced.*`.
 
 Voir [ADR-0074](../../docs/decisions/ADR-0074-external-themes-only.md), [ADR-0075](../../docs/decisions/ADR-0075-external-catalog-wallpaper-provider.md) et le [diagramme du runtime](../../docs/architecture/src/macos-external-theme-runtime.dataflow.json).

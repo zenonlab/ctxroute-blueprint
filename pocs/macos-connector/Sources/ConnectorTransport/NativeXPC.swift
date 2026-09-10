@@ -39,15 +39,21 @@ public struct ProviderRequest: Codable, Equatable, Sendable {
 public struct ProviderCatalogItem: Codable, Equatable, Sendable {
     public let id: String
     public let displayName: String
+    public let coverURL: URL?
 
-    public init(id: String, displayName: String) {
+    public init(id: String, displayName: String, coverURL: URL? = nil) {
         self.id = id
         self.displayName = displayName
+        self.coverURL = coverURL
     }
 
     public var isValid: Bool {
-        NativeWire.validID(id) && (1...80).contains(displayName.count) &&
-            !displayName.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+        let validCover = coverURL.map {
+            $0.isFileURL && $0.path.hasPrefix("/") && $0.path.utf8.count <= 1_024 &&
+                !$0.path.contains("\0") && $0.pathExtension.lowercased() == "png"
+        } ?? true
+        return NativeWire.validID(id) && (1...80).contains(displayName.count) &&
+            !displayName.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) && validCover
     }
 }
 
@@ -67,7 +73,7 @@ public struct ProviderResponse: Codable, Equatable, Sendable {
     public var isValid: Bool {
         guard schemaVersion == 1, (message?.count ?? 0) <= 160 else { return false }
         guard let catalog else { return true }
-        return catalog.count <= 256 && Set(catalog.map(\.id)).count == catalog.count &&
+        return catalog.count <= 64 && Set(catalog.map(\.id)).count == catalog.count &&
             catalog.allSatisfy(\.isValid)
     }
 }
