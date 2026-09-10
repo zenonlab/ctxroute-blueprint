@@ -392,9 +392,11 @@ Le build affiche le chemin du nouveau `.app` dans `dist/pocs/macos-connector/bui
 Il ne remplace aucun build, n'installe rien et ne change pas le wallpaper actif.
 Il utilise uniquement le SDK Apple et les fichiers versionnés ; aucun téléchargement.
 Le build exécute aussi `test-native.sh <app>` : décodage du catalogue par
-`WallpaperSettingsViewModelsXPC` du macOS hôte. Le test a reproduit l'échec initial
-(`sortID`, puis `shouldHideItemLabels` manquants), désormais corrigé. Une compilation
-des shims seuls n'aurait pas détecté ce problème.
+`WallpaperSettingsViewModelsXPC` du macOS hôte. Les ressources sont copiées dans un
+bundle `BNDL` neutre avant le test ; ouvrir le vrai `.appex` comme un `Bundle`
+inscrivait implicitement chaque build dans PlugInKit. Le test a reproduit l'échec
+initial (`sortID`, puis `shouldHideItemLabels` manquants), désormais corrigé. Une
+compilation des shims seuls n'aurait pas détecté ce problème.
 
 L'exécutable `Contents/MacOS/WallpaperConnector` accepte :
 
@@ -421,10 +423,12 @@ Le slot `top_left` prépare D1 : ce PoC ne dessine pas encore l'étagère sur le
    jamais supprimée. Le script refuse les compagnons et providers encore actifs
    et vérifie signature et catalogue avant remplacement. Un provider chargé doit
    être retiré après sélection explicite d'un autre fond, pas en arrêtant Finder.
-2. Ouvrir cette app. Si le provider n'apparaît pas dans les Réglages Fond d'écran,
-   enregistrer **son chemin exact** avec `pluginkit -a` sur
-   `Contents/Extensions/WallpaperProvider.appex`, puis rouvrir les Réglages.
-   Cet enregistrement utilise une interface expérimentale et peut être refusé.
+2. L'installation enregistre uniquement l'extension de la copie canonique et vérifie
+   que PlugInKit ne retourne que ce chemin. Elle désinscrit également de
+   LaunchServices les hôtes de build déjà observés : retirer seulement leur `.appex`
+   permettait à macOS de les redécouvrir. Ouvrir ensuite l'app et rouvrir les Réglages
+   Fond d'écran. Cet enregistrement utilise une interface expérimentale et peut être
+   refusé.
 3. Choisir un thème dans « Wallpaper Connector — PoC 2 » (groupe parfois tout en bas).
    Orbite : quatre objets sur ellipse ; Lagon : cinq objets sur une trajectoire en
    huit ; Ambre statique : trois objets immobiles, aucune animation créée.

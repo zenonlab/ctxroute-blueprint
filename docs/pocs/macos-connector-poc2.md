@@ -1,6 +1,6 @@
 # PoC macOS 2 — connecteur natif maintenable
 
-État au 9 septembre 2026 : **tranche interactive et suspension par occlusion validées sur MAC-01 ; clôture complète restante**.
+État au 10 septembre 2026 : **packaging Swift assaini ; tranche interactive et suspension par occlusion déjà validées sur MAC-01 ; clôture complète restante**.
 Code et commandes : [connecteur isolé](../../pocs/macos-connector/README.md).
 Périmètre livré : [ADR-0052](../decisions/ADR-0052-macos-poc2-implementation.md).
 Entrée : PoC1 gelé et [architecture des connecteurs](../architecture/platform-connectors.md).
@@ -133,6 +133,28 @@ compté ensemble.
 | M2-11 | Réglage bureau | visibilité Finder lue, demandée et confirmée ; refus/timeout/redémarrage ne deviennent pas succès ; récupération native disponible |
 
 ## Conditions de sortie
+
+### Packaging canonique — 10 septembre 2026
+
+[ADR-0071](../decisions/ADR-0071-single-installed-macos-provider.md) retire deux
+sources de faux état natif. Le manifeste versionné ne référence plus le PNG privé
+absent ; un PNG fourni explicitement est validé, copié et ajouté uniquement au
+manifeste du candidat signé. Le test du catalogue Apple charge désormais un bundle
+de ressources neutre au lieu du vrai `.appex`, car `Bundle(path:)` provoquait son
+inscription implicite dans PlugInKit. L'installation retire aussi de LaunchServices
+l'hôte d'un build désinscrit ; sans cette seconde opération, Réglages Système pouvait
+reconstituer l'inscription du provider à partir d'une ancienne fiche d'application.
+
+Le paquet 0.3.0 build 5 est installé sous
+`~/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app`. PlugInKit retourne
+un seul provider et son chemin exact appartient à cette copie installée ; un build
+propre supplémentaire n'a créé aucune inscription. Les 37 XCTest et les contrôles
+natifs de catalogue, signature, lancement, visibilité, hiérarchie Finder et snapshots
+passent. La présence du catalogue et le processus provider sont observés, mais le
+fond actif de la session reste `Black` : aucune connexion XPC ni animation n'est
+revendiquée avant une sélection physique d'Orbite dans Réglages Système. Sur macOS
+26.2, cette sélection n'est pas automatisée par Accessibility, conformément à la
+stratégie qualité qui documente le crash du panneau Apple sur ce chemin.
 
 ### Suspension par occlusion qualifiée — 9 septembre 2026, 12:38
 

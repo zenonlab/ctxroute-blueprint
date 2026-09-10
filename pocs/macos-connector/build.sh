@@ -65,6 +65,10 @@ if [[ -n "$connector_local_background" ]]; then
   fi
   cp "$connector_local_background" "$connector_app/Contents/Resources/theme-background.png"
   cp "$connector_local_background" "$connector_extension/Contents/Resources/theme-background.png"
+  for connector_bundle in "$connector_app" "$connector_extension"; do
+    plutil -insert background_asset -string theme-background.png \
+      "$connector_bundle/Contents/Resources/theme.json"
+  done
 fi
 connector_shared=("$connector_source/Sources/ThemeModel/Theme.swift"
   "$connector_source/Sources/ThemeModel/ThemeLayout.swift"

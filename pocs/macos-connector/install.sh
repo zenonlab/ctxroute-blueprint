@@ -8,6 +8,8 @@ connector_root="$(cd "$(dirname "$0")/../.." && pwd)"
 connector_source="${1:?Pass the exact built .app path}"
 connector_source="$(cd "$connector_source" && pwd -P)"
 connector_destination="$HOME/Applications/Wallpaper Themes/Wallpaper Connector PoC 2.app"
+connector_source_extension="$connector_source/Contents/Extensions/WallpaperProvider.appex"
+connector_destination_extension="$connector_destination/Contents/Extensions/WallpaperProvider.appex"
 test "$connector_source" != "$connector_destination"
 connector_register="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 connector_identity="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_source/Contents/Info.plist")"
@@ -33,6 +35,22 @@ fi
 bash "$connector_root/pocs/macos-connector/test-native.sh" "$connector_source"
 "$connector_source/Contents/MacOS/WallpaperConnector" --preflight-install
 mkdir -p "$HOME/Applications/Wallpaper Themes" "$connector_root/dist/pocs/macos-connector"
+while IFS= read -r connector_registered_extension; do
+  [[ -n "$connector_registered_extension" ]] || continue
+  case "$connector_registered_extension" in
+    "$connector_destination_extension"|"$connector_source_extension") ;;
+    "$connector_root"/dist/pocs/macos-connector/build.*/"Wallpaper Connector PoC 2.app/Contents/Extensions/WallpaperProvider.appex")
+      pluginkit -r "$connector_registered_extension"
+      connector_registered_host="${connector_registered_extension%/Contents/Extensions/WallpaperProvider.appex}"
+      "$connector_register" -u "$connector_registered_host"
+      ;;
+    *)
+      echo "Refusing unrelated provider registration: $connector_registered_extension" >&2
+      exit 2
+      ;;
+  esac
+done < <(pluginkit -m -A -D -vv -i org.wallpaperthemes.connectorpoc2.extension | \
+  sed -n 's/^[[:space:]]*Path = //p')
 if test -e "$connector_destination"; then
   connector_backup="$(mktemp -d "$connector_root/dist/pocs/macos-connector/replaced.XXXXXX")"
   pluginkit -r "$connector_destination/Contents/Extensions/WallpaperProvider.appex"
@@ -41,8 +59,17 @@ if test -e "$connector_destination"; then
   echo "Previous version preserved: $connector_backup/previous-app.disabled"
 fi
 ditto "$connector_source" "$connector_destination"
+pluginkit -r "$connector_source_extension" 2>/dev/null || true
+"$connector_register" -u "$connector_source"
 "$connector_register" -f "$connector_destination"
-pluginkit -a "$connector_destination/Contents/Extensions/WallpaperProvider.appex"
-pluginkit -m -A -D -v -i org.wallpaperthemes.connectorpoc2.extension
+pluginkit -a "$connector_destination_extension"
+connector_plugins="$(pluginkit -m -A -D -vv -i org.wallpaperthemes.connectorpoc2.extension)"
+connector_paths="$(printf '%s\n' "$connector_plugins" | sed -n 's/^[[:space:]]*Path = //p')"
+if [[ "$connector_paths" != "$connector_destination_extension" ]]; then
+  echo 'PluginKit did not retain exactly the installed provider path.' >&2
+  printf '%s\n' "$connector_plugins" >&2
+  exit 2
+fi
+printf '%s\n' "$connector_plugins"
 echo "Installed: $connector_destination"
 echo 'Reopen the Wallpaper settings pane. The active wallpaper was not changed.'

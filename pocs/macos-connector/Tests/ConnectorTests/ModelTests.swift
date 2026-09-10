@@ -159,14 +159,17 @@ final class ModelTests: XCTestCase {
     func testManifestAndInvalidInputs() throws {
         let theme = try Theme.load()
         XCTAssertEqual(theme.objects.count, 4)
-        XCTAssertEqual(theme.background_asset, "theme-background.png")
+        XCTAssertNil(theme.background_asset)
         let data = try JSONEncoder().encode(theme)
         XCTAssertEqual(try Theme.decode(data), theme)
         let string = String(decoding: data, as: UTF8.self)
         XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "orb.b", with: "orb.a").utf8)))
         XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "101B30", with: "red").utf8)))
-        XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "theme-background.png", with: "../private.png").utf8)))
-        XCTAssertThrowsError(try Theme.decode(Data(string.replacingOccurrences(of: "theme-background.png", with: "theme-background.jpg").utf8)))
+        for asset in ["../private.png", "theme-background.jpg"] {
+            var invalid = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            invalid["background_asset"] = asset
+            XCTAssertThrowsError(try Theme.decode(JSONSerialization.data(withJSONObject: invalid)))
+        }
         XCTAssertThrowsError(try Theme.decode(Data(repeating: 32, count: 32_769)))
     }
     func testCommandsAreCorrelatedIdempotentAndBounded() {

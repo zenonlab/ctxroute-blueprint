@@ -4,7 +4,6 @@
   "display_name": "Orbite — PoC 2",
   "panel_id": "theme.controls",
   "background": "101B30",
-  "background_asset": "theme-background.png",
   "accent": "61DCC3",
   "period_seconds": 24,
   "objects": [
