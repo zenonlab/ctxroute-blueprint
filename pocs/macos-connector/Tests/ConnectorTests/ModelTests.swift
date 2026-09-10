@@ -4,6 +4,27 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testWallpaperProviderWireIsTypedBoundedAndThemeAgnostic() throws {
+        XCTAssertTrue(ProviderRequest(action: .catalog).isValid)
+        XCTAssertTrue(ProviderRequest(action: .show).isValid)
+        XCTAssertTrue(ProviderRequest(action: .activate, themeID: "local.course").isValid)
+        XCTAssertFalse(ProviderRequest(action: .activate).isValid)
+        XCTAssertFalse(ProviderRequest(action: .catalog, themeID: "local.course").isValid)
+
+        let items = [
+            ProviderCatalogItem(id: "local.course", displayName: "Course locale"),
+            ProviderCatalogItem(id: "another.theme", displayName: "Autre thème")
+        ]
+        let response = ProviderResponse(accepted: true, catalog: items)
+        XCTAssertTrue(response.isValid)
+        XCTAssertEqual(try NativeWire.decode(ProviderResponse.self,
+            from: NativeWire.encode(response)), response)
+        XCTAssertFalse(ProviderResponse(accepted: true,
+            catalog: items + [items[0]]).isValid)
+        XCTAssertFalse(ProviderResponse(accepted: true,
+            catalog: [ProviderCatalogItem(id: "../escape", displayName: "Refusé")]).isValid)
+    }
+
     func testRestartRejectsInvalidArgumentsBeforeChangingJobs() throws {
         let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("restart-agent.sh")

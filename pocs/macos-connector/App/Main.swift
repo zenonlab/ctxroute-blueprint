@@ -4,6 +4,20 @@ import os
 
 @main @MainActor enum ConnectorMain {
     static func main() throws {
+        if CommandLine.arguments == [CommandLine.arguments[0], "--provider-catalog"] {
+            guard try AgentLauncher.start(app: ProductIdentity.appBundle, service: ProductIdentity.service) else {
+                exit(2)
+            }
+            let agent = ProductIdentity.appBundle.appendingPathComponent(
+                "Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
+            guard let response = AgentClient.perform(ProviderRequest(action: .catalog), agentBundle: agent),
+                  response.accepted, let catalog = response.catalog else { exit(3) }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            FileHandle.standardOutput.write(try encoder.encode(catalog))
+            FileHandle.standardOutput.write(Data("\n".utf8))
+            return
+        }
         if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--discover-themes" {
             let roots = CommandLine.arguments.dropFirst(2).map { URL(fileURLWithPath: $0, isDirectory: true) }
             let receipt = ThemeDiscovery.discover(roots: roots)
@@ -18,11 +32,12 @@ import os
             let app = ProductIdentity.appBundle
             let agent = app.appendingPathComponent(
                 "Contents/Library/LoginItems/Orbite Wallpaper Agent.app/Contents/MacOS/WallpaperConnector")
-            let extensions = app.appendingPathComponent("Contents/Extensions")
+            let provider = app.appendingPathComponent(
+                "Contents/Extensions/WallpaperProvider.appex/Contents/MacOS/WallpaperProvider")
             guard FileManager.default.isExecutableFile(atPath: agent.path),
-                  !FileManager.default.fileExists(atPath: extensions.path)
+                  FileManager.default.isExecutableFile(atPath: provider.path)
             else { throw ModelError.invalid("external-only package invariant") }
-            print("themes=external-only provider=absent renderhost=capability-selected")
+            print("themes=external-only provider=dynamic renderhost=capability-selected")
             return
         }
         if CommandLine.arguments.contains("--preflight-install") {
@@ -33,6 +48,12 @@ import os
         if !CommandLine.arguments.contains("--agent") {
             guard try AgentLauncher.start(app: ProductIdentity.appBundle, service: ProductIdentity.service) else {
                 print("Agent absent ou configuration refusée : exécuter start-agent.sh sur le paquet installé.")
+                exit(2)
+            }
+            let agent = ProductIdentity.appBundle.appendingPathComponent(
+                "Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
+            guard AgentClient.show(agentBundle: agent) else {
+                print("Agent démarré, mais son interface ne répond pas.")
                 exit(2)
             }
             return
@@ -69,11 +90,12 @@ import os
     private var window: NSWindow!
     private var statusItem: NSStatusItem?
     private var desktopItemsMenuItem: NSMenuItem?
+    private var agentTransport: AgentTransport?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Logger(subsystem: ProductIdentity.logSubsystem, category: "agent")
-            .notice("Startup catalog=external-only provider=absent")
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 430),
+            .notice("Startup catalog=external-only provider=dynamic")
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 520),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = ProductIdentity.appName
         window.isReleasedWhenClosed = false
@@ -100,6 +122,8 @@ import os
         runtime.addArrangedSubview(NSButton(title: "Activer sur le bureau", target: self, action: #selector(activateTheme)))
         runtime.addArrangedSubview(NSButton(title: "Arrêter", target: self, action: #selector(stopTheme)))
         stack.addArrangedSubview(runtime)
+        stack.addArrangedSubview(NSButton(title: "Ouvrir Réglages Fond d’écran…", target: self,
+                                          action: #selector(openWallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers du bureau", target: self,
                                           action: #selector(toggleDesktopItems)))
         window.contentView = stack; window.center()
@@ -123,6 +147,9 @@ import os
 
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
             object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.refresh() } }
+        agentTransport = AgentTransport { [weak self] request in
+            self?.handle(request) ?? ProviderResponse(accepted: false, message: "Agent unavailable")
+        }
         refresh()
         if CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke") { showWindow() }
         if let index = CommandLine.arguments.firstIndex(of: "--smoke"),
@@ -149,6 +176,34 @@ import os
         statusLabel.stringValue = themes.isEmpty
             ? "Aucun package valide dans \(roots.count) bibliothèque(s)."
             : "\(themes.count) thème(s) détecté(s), \(receipt.rejected.count) refusé(s)."
+    }
+
+    private func handle(_ request: ProviderRequest) -> ProviderResponse {
+        switch request.action {
+        case .catalog:
+            refresh()
+            let items = themes.map {
+                ProviderCatalogItem(id: $0.package.id, displayName: $0.package.display_name)
+            }
+            return ProviderResponse(accepted: true, catalog: items)
+        case .activate:
+            refresh()
+            guard let id = request.themeID,
+                  let theme = themes.first(where: { $0.package.id == id }) else {
+                return ProviderResponse(accepted: false, message: "Unknown external theme")
+            }
+            do {
+                _ = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
+                statusLabel.stringValue = "\(theme.package.display_name) actif depuis Réglages."
+                return ProviderResponse(accepted: true)
+            } catch {
+                statusLabel.stringValue = "Activation depuis Réglages refusée : \(error.localizedDescription)"
+                return ProviderResponse(accepted: false, message: error.localizedDescription)
+            }
+        case .show:
+            showWindow()
+            return ProviderResponse(accepted: true)
+        }
     }
 
     @objc private func addLibrary() {
@@ -185,6 +240,10 @@ import os
     }
 
     @objc private func stopTheme() { renderHost.stop(); statusLabel.stringValue = "RenderHost arrêté." }
+    @objc private func openWallpaperSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
+    }
     @objc private func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); refresh() }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -211,7 +270,7 @@ import os
                     throw ModelError.invalid("PNG")
                 }
                 try png.write(to: destination, options: .atomic)
-                print("smoke=passed themes=\(themes.count) provider=absent")
+                print("smoke=passed themes=\(themes.count) provider=dynamic")
             } catch { print("smoke=failed: capture") }
             NSApp.terminate(nil)
         }
@@ -220,8 +279,6 @@ import os
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         renderHost.stop()
-        let stop = Process(); stop.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        stop.arguments = ["bootout", "gui/\(getuid())/\(ProductIdentity.service)"]; try? stop.run()
         return .terminateNow
     }
 }

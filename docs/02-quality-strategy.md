@@ -134,6 +134,13 @@ dans `Index.plist` après sélection, puis création/rendu de la surface. Sur ma
 26.2, ne pas automatiser la sélection par `accessibilityPerformPress` : le panneau
 Apple plante avant l'appel au renderer. Une sélection physique et la lecture
 postérieure de `Index.plist` sont requises.
+Le connecteur Orbite ajoute un contrôle distinct du catalogue externe :
+`--provider-catalog` traverse le Mach service signé de l’agent installé et doit
+retourner uniquement les identités découvertes. Le build strict vérifie l’unique
+`WallpaperProvider.appex`, sa signature, l’absence de ressources de thème et le
+pont privé ; PlugInKit et le lancement effectif du provider restent des preuves
+natives. Le clic final sur la tuile et l’image rendue restent une qualification
+utilisateur, car l’automatisation du panneau Apple demeure exclue.
 Le transport des commandes dispose d'une cinquième preuve distincte : le
 compagnon n'affiche « appliqué par le wallpaper » qu'après réception d'une
 quittance Darwin émise par l'extension ayant au moins une surface active. Ce
