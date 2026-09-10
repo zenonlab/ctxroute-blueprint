@@ -53,19 +53,21 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
 
 @MainActor public final class RenderHostController {
     private var process: Process?
+    private var activeRequest: RenderHostLaunchRequest?
     public private(set) var themeID: String?
 
     public init() {}
 
     @discardableResult
     public func activate(_ request: RenderHostLaunchRequest) throws -> Bool {
-        if process?.isRunning == true, themeID == request.themeID { return false }
+        if process?.isRunning == true, activeRequest == request { return false }
         stop()
         let process = Process()
         process.executableURL = request.executable
         process.arguments = request.arguments
         try process.run()
         self.process = process
+        activeRequest = request
         themeID = request.themeID
         return true
     }
@@ -76,6 +78,7 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
             process?.waitUntilExit()
         }
         process = nil
+        activeRequest = nil
         themeID = nil
     }
 }
