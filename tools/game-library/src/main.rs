@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions, index_library,
-    mkw::{extract_course, inspect_effect_catalog},
+    mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
     verify_library,
 };
 
@@ -50,6 +50,16 @@ enum Command {
         breff: PathBuf,
         #[arg(long)]
         breft: PathBuf,
+    },
+    CompileMkwEffects {
+        #[arg(long)]
+        breff: PathBuf,
+        #[arg(long)]
+        breft: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long = "effect", required = true)]
+        effects: Vec<String>,
     },
 }
 
@@ -99,6 +109,15 @@ fn main() -> Result<()> {
         }
         Command::InspectMkwEffects { breff, breft } => {
             let result = inspect_effect_catalog(&breff, &breft)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::CompileMkwEffects {
+            breff,
+            breft,
+            output,
+            effects,
+        } => {
+            let result = compile_effect_pack(&breff, &breft, &output, &effects)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

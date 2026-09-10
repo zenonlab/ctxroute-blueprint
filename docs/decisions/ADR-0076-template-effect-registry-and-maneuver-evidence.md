@@ -30,6 +30,16 @@ privés. Une fidélité Mario Kart exige ensuite leur décodage, leur fermeture 
 dépendances et une comparaison à l'oracle local. Un primitive Bevy procédural ne peut
 pas être présenté comme remplacement fidèle d'un effet source.
 
+Le compilateur hors ligne matérialise ces dépendances dans un pack résolu générique :
+descripteurs d'émetteurs bornés, pixels RGBA8 et empreintes. Le RenderHost ne connaît
+ni BREFF, ni BREFT, ni identifiant Nintendo ; la recette ne référence que les
+identifiants opaques du pack. Le profil `source-texture-emitter-tracks-v1` exécute les
+textures, paramètres d'émetteur, héritage de translation et pistes particule AB de
+taille, échelle et alpha. Il conserve le nombre et l'empreinte de toutes les pistes
+source ; une dépendance obligatoire ou une piste revendiquée par ce profil mais
+illisible fait échouer la compilation. Les autres pistes restent une capacité
+explicitement absente, jamais un substitut procédural silencieux.
+
 Une courbure ou une surface ne prouve pas une action de conduite. Un dérapage exige
 un événement produit par une trace d'entrée ou par un contrôleur de thème déclaré qui
 modélise au minimum demande, maintien et relâchement de la manœuvre. La courbure peut

@@ -58,10 +58,120 @@ pub struct EffectMetadata {
     pub texture_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ResolvedEffectPackReport {
+    pub schema_version: u32,
+    pub adapter: &'static str,
+    pub output: String,
+    pub pack_sha256: String,
+    pub effects: usize,
+    pub textures: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedEffectPack {
+    format: &'static str,
+    source: ResolvedSource,
+    textures: Vec<ResolvedTexture>,
+    effects: Vec<ResolvedEffect>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedSource {
+    adapter: &'static str,
+    breff_sha256: String,
+    breft_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedTexture {
+    id: String,
+    path: String,
+    sha256: String,
+    width: u16,
+    height: u16,
+    format: &'static str,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedEffect {
+    id: String,
+    source_sha256: String,
+    fidelity: &'static str,
+    max_frame: u16,
+    particle_lifetime_frames: u16,
+    emission_rate: f32,
+    start_frame: u16,
+    rate_step: u16,
+    random_seed: u32,
+    volume: ResolvedVolume,
+    emitter_translation: [f32; 3],
+    emitter_rotation: [f32; 3],
+    emitter_scale: [f32; 3],
+    emitter_direction: [f32; 3],
+    translation_inheritance: f32,
+    velocity: ResolvedVelocity,
+    particle: ResolvedParticle,
+    animation: ResolvedParticleAnimation,
+    source_track_count: usize,
+    source_tracks_sha256: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+struct ResolvedParticleAnimation {
+    size: Option<ResolvedVec2Track>,
+    scale: Option<ResolvedVec2Track>,
+    alpha: Option<ResolvedU8Track>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedVec2Track {
+    repeat: bool,
+    values: Vec<[f32; 2]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedU8Track {
+    repeat: bool,
+    values: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedVolume {
+    kind: &'static str,
+    parameters: [f32; 6],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedVelocity {
+    radial: f32,
+    axis: f32,
+    random: f32,
+    normal: f32,
+    directional: f32,
+    directional_spread: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct ResolvedParticle {
+    texture: String,
+    color: [u8; 4],
+    size: [f32; 2],
+    scale: [f32; 2],
+    rotation: [f32; 3],
+    shape: u8,
+}
+
 struct ParsedEffectTable {
     name: String,
     resources: Vec<NamedEffectResource>,
     spans: Vec<(usize, usize)>,
+}
+
+struct DecodedTexture {
+    width: u16,
+    height: u16,
+    rgba8: Vec<u8>,
 }
 
 pub fn inspect_effect_catalog(breff_path: &Path, breft_path: &Path) -> Result<EffectCatalogReport> {
@@ -99,6 +209,389 @@ pub fn inspect_effect_catalog(breff_path: &Path, breft_path: &Path) -> Result<Ef
         effects: effect_table.resources,
         textures: texture_table.resources,
         effect_metadata,
+    })
+}
+
+pub fn compile_effect_pack(
+    breff_path: &Path,
+    breft_path: &Path,
+    output: &Path,
+    bindings: &[String],
+) -> Result<ResolvedEffectPackReport> {
+    require_private_path(output)?;
+    ensure!(
+        !bindings.is_empty() && bindings.len() <= 32,
+        "1..=32 effect bindings required"
+    );
+    if output.exists() {
+        ensure!(
+            output.read_dir()?.next().is_none(),
+            "output directory must be absent or empty"
+        );
+    }
+    let mut requested = BTreeMap::new();
+    for binding in bindings {
+        let (id, source) = binding
+            .split_once('=')
+            .context("effect binding must be ID=SOURCE_ID")?;
+        ensure!(
+            semantic_resource_name(id) && semantic_resource_name(source),
+            "invalid effect binding"
+        );
+        ensure!(
+            requested.insert(id.to_owned(), source.to_owned()).is_none(),
+            "duplicate resolved effect id"
+        );
+    }
+
+    let breff = read_effect_file(breff_path)?;
+    let breft = read_effect_file(breft_path)?;
+    let effect_table = parse_effect_table(&breff, b"REFF")?;
+    let texture_table = parse_effect_table(&breft, b"REFT")?;
+    let effect_lookup: BTreeMap<_, _> = effect_table
+        .resources
+        .iter()
+        .zip(&effect_table.spans)
+        .map(|(resource, span)| (resource.id.as_str(), (resource, *span)))
+        .collect();
+    let texture_lookup: BTreeMap<_, _> = texture_table
+        .resources
+        .iter()
+        .zip(&texture_table.spans)
+        .map(|(resource, span)| (resource.id.as_str(), (resource, *span)))
+        .collect();
+
+    let mut effects = Vec::with_capacity(requested.len());
+    let mut needed_textures = BTreeMap::<String, String>::new();
+    for (id, source_id) in requested {
+        let (resource, (offset, size)) = effect_lookup
+            .get(source_id.as_str())
+            .with_context(|| format!("effect resource is missing: {source_id}"))?;
+        let effect =
+            parse_resolved_effect(&breff[*offset..*offset + *size], &id, &resource.sha256)?;
+        for source_texture in
+            parse_effect_metadata(&breff[*offset..*offset + *size], &source_id)?.texture_ids
+        {
+            let (texture_resource, _) = texture_lookup
+                .get(source_texture.as_str())
+                .with_context(|| format!("effect texture is missing: {source_texture}"))?;
+            let opaque_id = format!("texture-{}", &texture_resource.sha256[..16]);
+            needed_textures.insert(source_texture, opaque_id);
+        }
+        effects.push(effect);
+    }
+
+    let mut textures = Vec::with_capacity(needed_textures.len());
+    let mut texture_files = Vec::with_capacity(needed_textures.len());
+    for (source_id, id) in &needed_textures {
+        let &(_, (offset, size)) = texture_lookup
+            .get(source_id.as_str())
+            .expect("resolved texture lookup");
+        let decoded = decode_effect_texture(&breft[offset..offset + size])?;
+        let sha256 = hex::encode(Sha256::digest(&decoded.rgba8));
+        let filename = format!("{sha256}.rgba8");
+        texture_files.push((filename.clone(), decoded.rgba8));
+        textures.push(ResolvedTexture {
+            id: id.clone(),
+            path: format!("textures/{filename}"),
+            sha256,
+            width: decoded.width,
+            height: decoded.height,
+            format: "rgba8-srgb",
+        });
+    }
+    for effect in &mut effects {
+        let source_texture = effect.particle.texture.clone();
+        effect.particle.texture = needed_textures
+            .get(&source_texture)
+            .with_context(|| format!("resolved texture is missing: {source_texture}"))?
+            .clone();
+    }
+
+    let pack = ResolvedEffectPack {
+        format: "orbite.resolved-effects/1",
+        source: ResolvedSource {
+            adapter: "mkw.breff-breft",
+            breff_sha256: hex::encode(Sha256::digest(&breff)),
+            breft_sha256: hex::encode(Sha256::digest(&breft)),
+        },
+        textures,
+        effects,
+    };
+    let bytes = serde_json::to_vec_pretty(&pack)?;
+    let textures_dir = output.join("textures");
+    fs::create_dir_all(&textures_dir)?;
+    for (filename, pixels) in texture_files {
+        fs::write(textures_dir.join(filename), pixels)?;
+    }
+    fs::write(output.join("effects.json"), &bytes)?;
+    Ok(ResolvedEffectPackReport {
+        schema_version: 1,
+        adapter: "mkw.breff-breft",
+        output: output.display().to_string(),
+        pack_sha256: hex::encode(Sha256::digest(&bytes)),
+        effects: pack.effects.len(),
+        textures: pack.textures.len(),
+    })
+}
+
+fn parse_resolved_effect(payload: &[u8], id: &str, source_sha256: &str) -> Result<ResolvedEffect> {
+    let emitter = 8;
+    ensure!(
+        read_u32(payload, 4)? as usize >= 0x14c,
+        "unsupported BREFF emitter block"
+    );
+    let particle_size = read_u32(payload, 0x154)? as usize;
+    let particle = 0x158;
+    ensure!(
+        particle_size >= 0x88 && particle + particle_size <= payload.len(),
+        "invalid BREFF particle block"
+    );
+    let metadata = parse_effect_metadata(payload, id)?;
+    ensure!(
+        metadata.texture_ids.len() == 1,
+        "resolved sprite effect requires exactly one texture"
+    );
+    let volume_kind = match metadata.volume_type {
+        0 => "disc",
+        8 => "sphere",
+        9 => "point",
+        other => anyhow::bail!("unsupported emitter volume type {other}"),
+    };
+    let tracks_offset = particle + particle_size;
+    let (track_count, tracks_span) = effect_tracks(payload, tracks_offset)?;
+    let animation = parse_particle_animation(payload, tracks_offset)?;
+    let finite = |values: &[f32]| values.iter().all(|value| value.is_finite());
+    let volume_parameters = read_f32_array(payload, emitter + 0x1c)?;
+    let emitter_translation = read_f32_array(payload, emitter + 0x78)?;
+    let emitter_rotation = read_f32_array(payload, emitter + 0x6c)?;
+    let emitter_scale = read_f32_array(payload, emitter + 0x60)?;
+    let emitter_direction = read_f32_array(payload, emitter + 0x54)?;
+    let size = [
+        read_f32(payload, particle + 0x10)?,
+        read_f32(payload, particle + 0x14)?,
+    ];
+    let scale = [
+        read_f32(payload, particle + 0x18)?,
+        read_f32(payload, particle + 0x1c)?,
+    ];
+    let rotation = read_f32_array(payload, particle + 0x20)?;
+    ensure!(
+        finite(&volume_parameters)
+            && finite(&emitter_translation)
+            && finite(&emitter_rotation)
+            && finite(&emitter_scale)
+            && finite(&emitter_direction)
+            && finite(&size)
+            && finite(&scale)
+            && finite(&rotation),
+        "non-finite BREFF emitter data"
+    );
+    Ok(ResolvedEffect {
+        id: id.to_owned(),
+        source_sha256: source_sha256.to_owned(),
+        fidelity: "source-texture-emitter-tracks-v1",
+        max_frame: metadata.max_frame,
+        particle_lifetime_frames: metadata.particle_lifetime_frames,
+        emission_rate: metadata.emission_rate,
+        start_frame: metadata.start_frame,
+        rate_step: metadata.rate_step,
+        random_seed: read_u32(payload, emitter + 0x88)?,
+        volume: ResolvedVolume {
+            kind: volume_kind,
+            parameters: volume_parameters,
+        },
+        emitter_translation,
+        emitter_rotation,
+        emitter_scale,
+        emitter_direction,
+        translation_inheritance: f32::from(i8::from_be_bytes([payload[emitter + 0x1a]])) / 100.0,
+        velocity: ResolvedVelocity {
+            radial: read_f32(payload, emitter + 0x38)?,
+            axis: read_f32(payload, emitter + 0x3c)?,
+            random: read_f32(payload, emitter + 0x40)?,
+            normal: read_f32(payload, emitter + 0x44)?,
+            directional: read_f32(payload, emitter + 0x4c)?,
+            directional_spread: read_f32(payload, emitter + 0x50)?,
+        },
+        particle: ResolvedParticle {
+            texture: metadata.texture_ids[0].clone(),
+            color: payload[particle..particle + 4]
+                .try_into()
+                .expect("validated particle color"),
+            size,
+            scale,
+            rotation,
+            shape: payload[emitter + 0x140],
+        },
+        animation,
+        source_track_count: track_count,
+        source_tracks_sha256: hex::encode(Sha256::digest(tracks_span)),
+    })
+}
+
+fn parse_particle_animation(payload: &[u8], offset: usize) -> Result<ResolvedParticleAnimation> {
+    let mut cursor = offset;
+    let count = read_u16(payload, cursor)? as usize;
+    cursor += 4;
+    cursor += count * 4;
+    let sizes = cursor;
+    cursor += count * 4;
+    let emitter_count = read_u16(payload, cursor)? as usize;
+    cursor += 4 + emitter_count * 8;
+    let mut animation = ResolvedParticleAnimation::default();
+    for index in 0..count {
+        let size = read_u32(payload, sizes + index * 4)? as usize;
+        let track = payload
+            .get(cursor..cursor + size)
+            .context("truncated particle animation")?;
+        cursor += size;
+        if track.len() < 32 || track[0] != 0xab {
+            continue;
+        }
+        let frames = read_u16(track, 8)? as usize;
+        let key_size = read_u32(track, 0x0c)? as usize;
+        let keys = track
+            .get(32..32 + key_size)
+            .context("truncated particle key table")?;
+        let repeat = track[5] != 0;
+        match (track[1], track[2], track[3]) {
+            (16, 3, 3) if frames > 0 && frames <= 3600 && key_size == frames * 8 => {
+                animation.size = Some(ResolvedVec2Track {
+                    repeat,
+                    values: parse_vec2_keys(keys)?,
+                });
+            }
+            (24, 3, 3) if frames > 0 && frames <= 3600 && key_size == frames * 8 => {
+                animation.scale = Some(ResolvedVec2Track {
+                    repeat,
+                    values: parse_vec2_keys(keys)?,
+                });
+            }
+            (3, 0, 1) if frames > 0 && frames <= 3600 && key_size == frames => {
+                animation.alpha = Some(ResolvedU8Track {
+                    repeat,
+                    values: keys.to_vec(),
+                });
+            }
+            _ => {}
+        }
+    }
+    Ok(animation)
+}
+
+fn parse_vec2_keys(bytes: &[u8]) -> Result<Vec<[f32; 2]>> {
+    bytes
+        .chunks_exact(8)
+        .map(|entry| {
+            let values = [read_f32(entry, 0)?, read_f32(entry, 4)?];
+            ensure!(
+                values.iter().all(|value| value.is_finite()),
+                "non-finite particle animation"
+            );
+            Ok(values)
+        })
+        .collect()
+}
+
+fn read_f32_array<const N: usize>(bytes: &[u8], offset: usize) -> Result<[f32; N]> {
+    let mut values = [0.; N];
+    for (index, value) in values.iter_mut().enumerate() {
+        *value = read_f32(bytes, offset + index * 4)?;
+    }
+    Ok(values)
+}
+
+fn effect_tracks(payload: &[u8], offset: usize) -> Result<(usize, &[u8])> {
+    let mut cursor = offset;
+    let particle_count = read_u16(payload, cursor)? as usize;
+    cursor += 4;
+    let particle_sizes = cursor + particle_count * 4;
+    cursor = particle_sizes + particle_count * 4;
+    let emitter_count = read_u16(payload, cursor)? as usize;
+    cursor += 4;
+    let emitter_sizes = cursor + emitter_count * 4;
+    cursor = emitter_sizes + emitter_count * 4;
+    ensure!(
+        particle_count + emitter_count <= 128,
+        "effect track budget exceeded"
+    );
+    let tracks_start = cursor;
+    for index in 0..particle_count {
+        cursor = cursor
+            .checked_add(read_u32(payload, particle_sizes + index * 4)? as usize)
+            .context("particle track overflow")?;
+    }
+    for index in 0..emitter_count {
+        cursor = cursor
+            .checked_add(read_u32(payload, emitter_sizes + index * 4)? as usize)
+            .context("emitter track overflow")?;
+    }
+    let tracks = payload
+        .get(tracks_start..cursor)
+        .context("truncated effect tracks")?;
+    ensure!(
+        cursor == payload.len(),
+        "trailing or malformed effect tracks"
+    );
+    Ok((particle_count + emitter_count, tracks))
+}
+
+fn decode_effect_texture(payload: &[u8]) -> Result<DecodedTexture> {
+    ensure!(payload.len() >= 0x20, "truncated BREFT texture");
+    let width = read_u16(payload, 4)?;
+    let height = read_u16(payload, 6)?;
+    let data_size = read_u32(payload, 8)? as usize;
+    let format = payload[0x0c];
+    ensure!(
+        width > 0 && height > 0 && width <= 4096 && height <= 4096,
+        "invalid BREFT dimensions"
+    );
+    ensure!(
+        read_u32(payload, 0x10)? == 0,
+        "paletted BREFT textures are unsupported"
+    );
+    let source = payload
+        .get(0x20..0x20 + data_size)
+        .context("truncated BREFT pixels")?;
+    let block = match format {
+        1 => (8_usize, 4_usize, 1_usize),
+        3 => (4, 4, 2),
+        other => anyhow::bail!("unsupported GX texture format {other}"),
+    };
+    let expected = (usize::from(width).div_ceil(block.0) * block.0)
+        * (usize::from(height).div_ceil(block.1) * block.1)
+        * block.2;
+    ensure!(source.len() >= expected, "truncated tiled GX texture");
+    let mut rgba8 = vec![0_u8; usize::from(width) * usize::from(height) * 4];
+    let mut cursor = 0;
+    for block_y in (0..usize::from(height)).step_by(block.1) {
+        for block_x in (0..usize::from(width)).step_by(block.0) {
+            for y in 0..block.1 {
+                for x in 0..block.0 {
+                    let (intensity, alpha) = if format == 1 {
+                        let intensity = source[cursor];
+                        cursor += 1;
+                        (255, intensity)
+                    } else {
+                        let alpha = source[cursor];
+                        let intensity = source[cursor + 1];
+                        cursor += 2;
+                        (intensity, alpha)
+                    };
+                    if block_x + x < usize::from(width) && block_y + y < usize::from(height) {
+                        let destination = ((block_y + y) * usize::from(width) + block_x + x) * 4;
+                        rgba8[destination..destination + 4]
+                            .copy_from_slice(&[intensity, intensity, intensity, alpha]);
+                    }
+                }
+            }
+        }
+    }
+    Ok(DecodedTexture {
+        width,
+        height,
+        rgba8,
     })
 }
 
@@ -154,8 +647,18 @@ fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<ParsedEffectTable
         let data_offset = table
             .checked_add(read_u32(bytes, cursor)? as usize)
             .context("effect data offset overflow")?;
-        let byte_length = read_u32(bytes, cursor + 4)? as usize;
+        let declared_payload_length = read_u32(bytes, cursor + 4)? as usize;
         cursor += 8;
+        let byte_length = if magic == b"REFT" {
+            0x20_usize
+                .checked_add(declared_payload_length)
+                .and_then(|length| {
+                    length.checked_add(read_u32(bytes, data_offset + 0x10).ok()? as usize)
+                })
+                .context("effect texture size overflow")?
+        } else {
+            declared_payload_length
+        };
         let payload = bytes
             .get(
                 data_offset
@@ -620,11 +1123,12 @@ mod tests {
     }
 
     fn fixture_effect_table(magic: &[u8; 4]) -> Vec<u8> {
-        let mut bytes = vec![0_u8; 0x80];
+        let length = if magic == b"REFT" { 0x9b } else { 0x80 };
+        let mut bytes = vec![0_u8; length];
         bytes[0..4].copy_from_slice(magic);
         bytes[4..6].copy_from_slice(&0xfeff_u16.to_be_bytes());
         bytes[6..8].copy_from_slice(&9_u16.to_be_bytes());
-        bytes[8..12].copy_from_slice(&0x80_u32.to_be_bytes());
+        bytes[8..12].copy_from_slice(&(length as u32).to_be_bytes());
         bytes[12..14].copy_from_slice(&0x10_u16.to_be_bytes());
         bytes[14..16].copy_from_slice(&1_u16.to_be_bytes());
         bytes[0x18..0x1c].copy_from_slice(&0x20_u32.to_be_bytes());
@@ -635,7 +1139,15 @@ mod tests {
         bytes[0x42..0x49].copy_from_slice(b"effect\0");
         bytes[0x49..0x4d].copy_from_slice(&0x40_u32.to_be_bytes());
         bytes[0x4d..0x51].copy_from_slice(&3_u32.to_be_bytes());
-        bytes[0x78..0x7b].copy_from_slice(&[1, 2, 3]);
+        if magic == b"REFT" {
+            bytes[0x7c..0x7e].copy_from_slice(&1_u16.to_be_bytes());
+            bytes[0x7e..0x80].copy_from_slice(&3_u16.to_be_bytes());
+            bytes[0x80..0x84].copy_from_slice(&3_u32.to_be_bytes());
+            bytes[0x84] = 1;
+            bytes[0x98..0x9b].copy_from_slice(&[1, 2, 3]);
+        } else {
+            bytes[0x78..0x7b].copy_from_slice(&[1, 2, 3]);
+        }
         bytes
     }
 
@@ -698,7 +1210,8 @@ mod tests {
         assert_eq!(textures.name, "Set");
         assert_eq!(effects.resources[0].id, "effect");
         assert_eq!(effects.resources[0].byte_length, 3);
-        assert_eq!(effects.resources, textures.resources);
+        assert_eq!(effects.resources[0].id, textures.resources[0].id);
+        assert_eq!(textures.resources[0].byte_length, 0x23);
     }
 
     #[test]
@@ -711,5 +1224,61 @@ mod tests {
         assert_eq!(metadata.start_frame, 3);
         assert_eq!(metadata.rate_step, 2);
         assert_eq!(metadata.texture_ids, ["tex"]);
+    }
+
+    #[test]
+    fn decodes_tiled_gx_i8_as_a_bounded_alpha_mask() {
+        let mut payload = vec![0_u8; 0x20 + 32];
+        payload[4..6].copy_from_slice(&8_u16.to_be_bytes());
+        payload[6..8].copy_from_slice(&4_u16.to_be_bytes());
+        payload[8..12].copy_from_slice(&32_u32.to_be_bytes());
+        payload[0x0c] = 1;
+        for (index, value) in payload[0x20..].iter_mut().enumerate() {
+            *value = index as u8;
+        }
+        let decoded = decode_effect_texture(&payload).unwrap();
+        assert_eq!((decoded.width, decoded.height), (8, 4));
+        assert_eq!(&decoded.rgba8[..4], &[255, 255, 255, 0]);
+        assert_eq!(&decoded.rgba8[31 * 4..32 * 4], &[255, 255, 255, 31]);
+    }
+
+    #[test]
+    fn normalizes_supported_particle_tracks_and_preserves_repeat_mode() {
+        fn track(kind: u8, curve: u8, axes: u8, repeat: bool, keys: &[u8]) -> Vec<u8> {
+            let mut track = vec![0_u8; 32 + keys.len()];
+            track[0..4].copy_from_slice(&[0xab, kind, curve, axes]);
+            track[5] = u8::from(repeat);
+            let frames = if axes == 3 {
+                keys.len() / 8
+            } else {
+                keys.len()
+            };
+            track[8..10].copy_from_slice(&(frames as u16).to_be_bytes());
+            track[0x0c..0x10].copy_from_slice(&(keys.len() as u32).to_be_bytes());
+            track[32..].copy_from_slice(keys);
+            track
+        }
+        let vec2_keys = [1.25_f32, 2.5_f32]
+            .into_iter()
+            .flat_map(|value| value.to_bits().to_be_bytes())
+            .collect::<Vec<_>>();
+        let tracks = [
+            track(16, 3, 3, false, &vec2_keys),
+            track(24, 3, 3, true, &vec2_keys),
+            track(3, 0, 1, true, &[255, 64]),
+        ];
+        let mut payload = vec![0_u8; 32];
+        payload[0..2].copy_from_slice(&3_u16.to_be_bytes());
+        for (index, track) in tracks.iter().enumerate() {
+            payload[16 + index * 4..20 + index * 4]
+                .copy_from_slice(&(track.len() as u32).to_be_bytes());
+        }
+        for track in tracks {
+            payload.extend(track);
+        }
+        let animation = parse_particle_animation(&payload, 0).unwrap();
+        assert_eq!(animation.size.unwrap().values, [[1.25, 2.5]]);
+        assert!(animation.scale.unwrap().repeat);
+        assert_eq!(animation.alpha.unwrap().values, [255, 64]);
     }
 }

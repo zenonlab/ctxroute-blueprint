@@ -12,7 +12,7 @@ test produit trois fichiers classés circuit, collision KCL et route KMP.
 
 ```text
 cargo test --manifest-path tools/game-library/Cargo.toml
-8 passed; 0 failed
+10 passed; 0 failed
 
 cargo clippy --manifest-path tools/game-library/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -35,6 +35,19 @@ payloads sans les exporter. Sur la source locale, il retrouve 516 effets nommés
 Il normalise aussi le volume d'émission, la durée, le débit, les frames et jusqu'à
 trois références de textures par effet, puis refuse une dépendance absente du BREFT.
 Sur la source locale, les 516 dépendances d'effets se ferment sans référence manquante.
+
+`compile-mkw-effects` ferme maintenant un sous-ensemble nommé dans un pack privé
+`orbite.resolved-effects/1`. La conversion corrige la portée BREFT (en-tête ressource
+de 0x20 octets en plus des tailles données par la table), décode I8 et IA8 tuilés vers
+RGBA8, remplace les noms Nintendo par des identifiants opaques et lie chaque fichier
+à son SHA-256. Le profil résolu transporte les paramètres d'émetteur, l'héritage de
+translation et les pistes AB de taille, échelle et alpha ; les pistes restantes sont
+comptées et empreintées sans être revendiquées comme exécutées.
+
+La source locale `RKRace` produit un pack de 9 effets et 4 textures, dont fumées de
+dérapage/saut, étincelles bleues/oranges et mini-turbo. Le pack et ses pixels restent
+sous `private/`; seuls le compilateur, ses contrats et ses fixtures synthétiques sont
+commitables.
 
 ## Gate privé restant
 
