@@ -38,3 +38,16 @@ M5 ajoute un simulateur déterministe de sessions. Son protocole se limite aux
 événements typés de connexion, activité et déconnexion et aux intentions `focus` et
 `open`. Les séquences sont monotones, les événements sont idempotents et aucune
 commande shell, PTY ou donnée de terminal n'entre dans le contrat.
+
+M6 fournit `measurement-receipt`, qui valide un échantillonnage des huit scénarios
+en au moins cinq passes alternées, refuse toute soumission GPU déclarée en pause ou
+occlusion, puis calcule moyenne, médiane et écart-type. Les métriques non fournies
+restent absentes et rendent le verdict `non_conclusive` ; elles ne deviennent jamais
+des zéros implicites. L'entrée doit porter le SHA-256 du package et la sortie ajoute
+celui du binaire de reçu.
+
+```bash
+cargo run --manifest-path pocs/theme-behavior-kernel/Cargo.toml \
+  --bin measurement-receipt -- private/measurements/raw.json \
+  --receipt private/measurements/receipt.json
+```

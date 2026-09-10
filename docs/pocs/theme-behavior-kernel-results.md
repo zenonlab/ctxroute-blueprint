@@ -25,7 +25,7 @@ type propre à Bevy ou à une plateforme.
 
 ```text
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
-9 passed; 0 failed
+17 passed; 0 failed
 
 cargo clippy --manifest-path pocs/theme-behavior-kernel/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -47,6 +47,10 @@ Les assertions couvrent :
 - gel complet en pause et au plus quatre pas lors d'une reprise après 60 secondes ;
 - huit empreintes de snapshot identiques entre deux exécutions ;
 - arrêt de la simulation et comptage des transitions sous occlusion.
+- cycle de sessions connexion, activité, erreur, récupération et reconnexion ;
+- cinq passes M6 alternées, statistiques descriptives et métriques absentes explicites ;
+- refus d'une soumission GPU déclarée pendant pause ou occlusion ;
+- sorties limitées au `private/` ou `dist/` du workspace, sans traversée ni symlink.
 
 ## Verdict et limites
 
@@ -56,5 +60,6 @@ skinning, une animation, les collisions, le picking, la télémétrie d'un vrai 
 le renderer Bevy ou une surface wallpaper. D1-26 à D1-28 restent donc ouverts au
 niveau intégration même si leur sous-contrat logique est couvert.
 
-La prochaine preuve doit connecter ces snapshots à une scène Bevy composée
-uniquement d'assets originaux simples, sans réimplémenter la trajectoire dans l'ECS.
+Le viewer Bevy reste un adaptateur séparé. Sa qualification complète exige encore
+un pack privé fidèle, son raccord à WallpaperAgent et les mesures natives décrites
+dans le préflight M6 ; aucun de ces résultats n'est déduit du test du noyau.

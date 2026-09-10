@@ -78,6 +78,13 @@ de la recette, du binaire, des snapshots et de l'éventuel arbre d'assets privé
 Les compteurs non observables dans le noyau sans GPU sont `null`, jamais zéro.
 Le test d'occlusion exige zéro nouveau pas logique jusqu'à la reprise.
 
+M6 ajoute un contrat exécutable de reçu matériel. Il exige les huit scénarios
+`native_desktop`, `static`, `active`, `interaction`, `pause`, `occlusion`, `resume`
+et `multi_display` dans cinq passes au minimum, en inversant leur ordre à chaque
+passage. Il agrège les valeurs brutes sans supprimer les perturbations et refuse une
+soumission GPU non nulle en pause ou occlusion. Une métrique absente produit un reçu
+`non_conclusive`, jamais une valeur nulle interprétable comme mesure.
+
 Le socle et les tests d'état L1 sont vérifiés séparément. Les scénarios produit
 ci-dessous restent à éprouver au-delà de cette sonde, sans validation automatique implicite.
 La [feuille de route](03-product-roadmap.md#preuves-et-traçabilité) associe ces

@@ -6,7 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use theme_behavior_kernel::{
-    BehaviorKernel, KernelConfig, ReferenceCheckpoint, RuntimeCounters, snapshot_sha256,
+    BehaviorKernel, KernelConfig, ReferenceCheckpoint, RuntimeCounters,
+    output::resolve_private_output, snapshot_sha256,
 };
 
 #[derive(Serialize)]
@@ -64,7 +65,7 @@ fn main() -> Result<()> {
     };
     let json = serde_json::to_string_pretty(&receipt)?;
     if let Some(output) = receipt_path {
-        require_private_output(&output)?;
+        let output = resolve_private_output(&output).map_err(anyhow::Error::msg)?;
         if let Some(parent) = output.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -108,15 +109,4 @@ fn hash_tree(root: &Path) -> Result<String> {
         hasher.update([0]);
     }
     Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn require_private_output(path: &Path) -> Result<()> {
-    if path
-        .components()
-        .any(|part| part.as_os_str() == "private" || part.as_os_str() == "dist")
-    {
-        Ok(())
-    } else {
-        bail!("receipts may only be written below private/ or dist/")
-    }
 }
