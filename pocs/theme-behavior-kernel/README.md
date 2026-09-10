@@ -33,3 +33,8 @@ réaction de roulis/suspension et cinq familles d'effets bornés. Un identifiant
 d'événement déjà traité ne rejoue aucun effet. Le contrôleur de récupération — rôle
 que le thème peut présenter comme Lakitu — possède temporairement l'autorité puis la
 rend explicitement au trajet ; ce n'est pas l'IA du jeu original.
+
+M5 ajoute un simulateur déterministe de sessions. Son protocole se limite aux
+événements typés de connexion, activité et déconnexion et aux intentions `focus` et
+`open`. Les séquences sont monotones, les événements sont idempotents et aucune
+commande shell, PTY ou donnée de terminal n'entre dans le contrat.

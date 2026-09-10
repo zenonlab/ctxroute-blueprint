@@ -400,6 +400,164 @@ pub enum ActivityState {
     Recovering,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionPresence {
+    Disconnected,
+    Present,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SessionEvent {
+    Connected {
+        event_id: String,
+        session_id: String,
+        sequence: u64,
+    },
+    Activity {
+        event_id: String,
+        session_id: String,
+        sequence: u64,
+        state: ActivityState,
+    },
+    Disconnected {
+        event_id: String,
+        session_id: String,
+        sequence: u64,
+    },
+}
+
+impl SessionEvent {
+    fn parts(&self) -> (&str, &str, u64) {
+        match self {
+            Self::Connected {
+                event_id,
+                session_id,
+                sequence,
+            }
+            | Self::Activity {
+                event_id,
+                session_id,
+                sequence,
+                ..
+            }
+            | Self::Disconnected {
+                event_id,
+                session_id,
+                sequence,
+            } => (event_id, session_id, *sequence),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SessionIntent {
+    Focus { session_id: String },
+    Open { session_id: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct SessionSnapshot {
+    pub session_id: String,
+    pub presence: SessionPresence,
+    pub activity: ActivityState,
+    pub connection_epoch: u64,
+    pub last_sequence: u64,
+}
+
+#[derive(Debug)]
+pub struct SessionSimulator {
+    sessions: BTreeMap<String, SessionSnapshot>,
+    handled_events: HashSet<String>,
+}
+
+impl SessionSimulator {
+    pub fn new(session_ids: impl IntoIterator<Item = String>) -> Result<Self, String> {
+        let mut sessions = BTreeMap::new();
+        for session_id in session_ids {
+            if session_id.is_empty() || sessions.contains_key(&session_id) {
+                return Err("session simulator requires unique non-empty identities".into());
+            }
+            sessions.insert(
+                session_id.clone(),
+                SessionSnapshot {
+                    session_id,
+                    presence: SessionPresence::Disconnected,
+                    activity: ActivityState::Idle,
+                    connection_epoch: 0,
+                    last_sequence: 0,
+                },
+            );
+        }
+        if sessions.is_empty() || sessions.len() > 64 {
+            return Err("session simulator requires 1..=64 identities".into());
+        }
+        Ok(Self {
+            sessions,
+            handled_events: HashSet::new(),
+        })
+    }
+
+    pub fn apply(&mut self, event: &SessionEvent) -> Result<bool, String> {
+        let (event_id, session_id, sequence) = event.parts();
+        if event_id.is_empty() || event_id.len() > 96 {
+            return Err("session event id must contain 1..=96 characters".into());
+        }
+        if self.handled_events.contains(event_id) {
+            return Ok(false);
+        }
+        let session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("unknown session_id {session_id}"))?;
+        if sequence <= session.last_sequence {
+            return Err("session event sequence must increase".into());
+        }
+        match event {
+            SessionEvent::Connected { .. } => {
+                if session.presence == SessionPresence::Disconnected {
+                    session.connection_epoch += 1;
+                }
+                session.presence = SessionPresence::Present;
+                session.activity = ActivityState::Idle;
+            }
+            SessionEvent::Activity { state, .. } => {
+                if session.presence != SessionPresence::Present {
+                    return Err("activity requires a present session".into());
+                }
+                session.activity = *state;
+            }
+            SessionEvent::Disconnected { .. } => {
+                session.presence = SessionPresence::Disconnected;
+                session.activity = ActivityState::Recovering;
+            }
+        }
+        session.last_sequence = sequence;
+        self.handled_events.insert(event_id.to_owned());
+        Ok(true)
+    }
+
+    pub fn snapshots(&self) -> Vec<SessionSnapshot> {
+        self.sessions.values().cloned().collect()
+    }
+
+    pub fn intent(&self, intent: &SessionIntent) -> Result<SessionSnapshot, String> {
+        let session_id = match intent {
+            SessionIntent::Focus { session_id } | SessionIntent::Open { session_id } => session_id,
+        };
+        let session = self
+            .sessions
+            .get(session_id)
+            .ok_or_else(|| format!("unknown session_id {session_id}"))?;
+        if session.presence != SessionPresence::Present {
+            return Err("session intent requires a present session".into());
+        }
+        Ok(session.clone())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MotionAuthority {
@@ -1022,5 +1180,51 @@ mod tests {
             kernel.snapshot().entities[0].authority,
             MotionAuthority::Route
         );
+    }
+
+    #[test]
+    fn session_simulator_proves_activity_error_recovery_and_reconnection() {
+        let mut simulator = SessionSimulator::new(["session.01".to_owned()]).unwrap();
+        let events = [
+            SessionEvent::Connected {
+                event_id: "e1".into(),
+                session_id: "session.01".into(),
+                sequence: 1,
+            },
+            SessionEvent::Activity {
+                event_id: "e2".into(),
+                session_id: "session.01".into(),
+                sequence: 2,
+                state: ActivityState::Active,
+            },
+            SessionEvent::Activity {
+                event_id: "e3".into(),
+                session_id: "session.01".into(),
+                sequence: 3,
+                state: ActivityState::Error,
+            },
+            SessionEvent::Disconnected {
+                event_id: "e4".into(),
+                session_id: "session.01".into(),
+                sequence: 4,
+            },
+            SessionEvent::Connected {
+                event_id: "e5".into(),
+                session_id: "session.01".into(),
+                sequence: 5,
+            },
+        ];
+        for event in &events {
+            assert!(simulator.apply(event).unwrap());
+        }
+        assert!(!simulator.apply(&events[4]).unwrap());
+        let snapshot = simulator
+            .intent(&SessionIntent::Focus {
+                session_id: "session.01".into(),
+            })
+            .unwrap();
+        assert_eq!(snapshot.presence, SessionPresence::Present);
+        assert_eq!(snapshot.activity, ActivityState::Idle);
+        assert_eq!(snapshot.connection_epoch, 2);
     }
 }
