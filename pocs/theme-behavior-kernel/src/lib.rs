@@ -125,6 +125,8 @@ pub struct KernelConfig {
     pub camera: CameraConfig,
     pub entities: Vec<EntityConfig>,
     #[serde(default)]
+    pub maneuvers: Vec<String>,
+    #[serde(default)]
     pub effect_bindings: Vec<EffectBindingConfig>,
 }
 
@@ -195,6 +197,12 @@ impl KernelConfig {
                     entity.instance_id
                 ));
             }
+        }
+        if self.maneuvers.len() > 32
+            || self.maneuvers.iter().any(|maneuver| !semantic_id(maneuver))
+            || self.maneuvers.iter().collect::<HashSet<_>>().len() != self.maneuvers.len()
+        {
+            return Err("maneuvers must contain at most 32 unique semantic ids".into());
         }
         if self.effect_bindings.len() > 64 {
             return Err("effect_bindings must contain at most 64 entries".into());
@@ -415,6 +423,36 @@ pub struct EntitySnapshot {
     pub authority: MotionAuthority,
     pub roll_degrees: f64,
     pub suspension_offset: f64,
+    pub maneuver: Option<ManeuverSnapshot>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManeuverPhase {
+    Requested,
+    Active,
+    Charged,
+    Released,
+    Cancelled,
+}
+
+impl ManeuverPhase {
+    fn trigger_name(self) -> &'static str {
+        match self {
+            Self::Requested => "requested",
+            Self::Active => "active",
+            Self::Charged => "charged",
+            Self::Released => "released",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ManeuverSnapshot {
+    pub id: String,
+    pub phase: ManeuverPhase,
+    pub started_at_tick: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -765,6 +803,7 @@ pub struct BehaviorKernel {
     counters: RuntimeCounters,
     activity: BTreeMap<String, ActivityState>,
     authorities: BTreeMap<String, u64>,
+    maneuvers: BTreeMap<String, ManeuverSnapshot>,
     effects: VecDeque<ActiveEffect>,
     handled_events: HashSet<String>,
     snapshot: PresentationSnapshot,
@@ -801,6 +840,7 @@ impl BehaviorKernel {
             counters: RuntimeCounters::default(),
             activity,
             authorities: BTreeMap::new(),
+            maneuvers: BTreeMap::new(),
             effects: VecDeque::new(),
             handled_events: HashSet::new(),
             snapshot: PresentationSnapshot {
@@ -880,6 +920,81 @@ impl BehaviorKernel {
             ActivityState::Error => "activity.error",
             ActivityState::Recovering => "activity.recovering",
         };
+        self.emit_effects(trigger, event_id, session_id);
+        self.rebuild_snapshot();
+        Ok(true)
+    }
+
+    pub fn apply_maneuver(
+        &mut self,
+        event_id: &str,
+        instance_id: &str,
+        maneuver_id: &str,
+        phase: ManeuverPhase,
+    ) -> Result<bool, String> {
+        if !semantic_id(event_id) || self.handled_events.contains(event_id) {
+            return if self.handled_events.contains(event_id) {
+                Ok(false)
+            } else {
+                Err("maneuver event id must be a semantic id".into())
+            };
+        }
+        if !self.config.maneuvers.iter().any(|id| id == maneuver_id) {
+            return Err(format!("undeclared maneuver {maneuver_id}"));
+        }
+        let session_id = self
+            .config
+            .entities
+            .iter()
+            .find(|entity| entity.instance_id == instance_id)
+            .map(|entity| entity.session_id.clone())
+            .ok_or_else(|| format!("unknown instance_id {instance_id}"))?;
+        let previous = self.maneuvers.get(instance_id);
+        let valid_transition = match previous.map(|state| (&state.id, state.phase)) {
+            None => phase == ManeuverPhase::Requested,
+            Some((_, ManeuverPhase::Released | ManeuverPhase::Cancelled)) => {
+                phase == ManeuverPhase::Requested
+            }
+            Some((id, ManeuverPhase::Requested)) => {
+                id == maneuver_id
+                    && matches!(phase, ManeuverPhase::Active | ManeuverPhase::Cancelled)
+            }
+            Some((id, ManeuverPhase::Active)) => {
+                id == maneuver_id
+                    && matches!(
+                        phase,
+                        ManeuverPhase::Charged | ManeuverPhase::Released | ManeuverPhase::Cancelled
+                    )
+            }
+            Some((id, ManeuverPhase::Charged)) => {
+                id == maneuver_id
+                    && matches!(phase, ManeuverPhase::Released | ManeuverPhase::Cancelled)
+            }
+        };
+        if !valid_transition {
+            return Err("invalid maneuver transition".into());
+        }
+        let started_at_tick = if phase == ManeuverPhase::Requested {
+            self.tick
+        } else {
+            previous.expect("validated active maneuver").started_at_tick
+        };
+        self.maneuvers.insert(
+            instance_id.to_owned(),
+            ManeuverSnapshot {
+                id: maneuver_id.to_owned(),
+                phase,
+                started_at_tick,
+            },
+        );
+        self.handled_events.insert(event_id.to_owned());
+        let trigger = format!("maneuver.{maneuver_id}.{}", phase.trigger_name());
+        self.emit_effects(&trigger, event_id, &session_id);
+        self.rebuild_snapshot();
+        Ok(true)
+    }
+
+    fn emit_effects(&mut self, trigger: &str, event_id: &str, session_id: &str) {
         for binding in self
             .config
             .effect_bindings
@@ -897,8 +1012,6 @@ impl BehaviorKernel {
                 expires_at_tick: self.tick + binding.duration_ticks,
             });
         }
-        self.rebuild_snapshot();
-        Ok(true)
     }
 
     pub fn take_recovery_control(
@@ -995,6 +1108,7 @@ impl BehaviorKernel {
                     } else {
                         0.0
                     },
+                    maneuver: self.maneuvers.get(&entity.instance_id).cloned(),
                 }
             })
             .collect::<Vec<_>>();
@@ -1234,6 +1348,100 @@ mod tests {
                 .unwrap_err()
                 .contains("unique by trigger and effect_id")
         );
+    }
+
+    #[test]
+    fn maneuver_requires_request_active_charge_release_and_uses_template_effects() {
+        let mut kernel = BehaviorKernel::new(fixture()).unwrap();
+        let original = kernel.snapshot().entities[0].clone();
+        assert!(
+            kernel
+                .apply_maneuver(
+                    "event.drift.request",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Requested,
+                )
+                .unwrap()
+        );
+        assert!(
+            kernel
+                .apply_maneuver(
+                    "event.drift.active",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Active,
+                )
+                .unwrap()
+        );
+        assert_eq!(kernel.snapshot().effects[0].effect_id, "drift.smoke");
+        assert!(
+            kernel
+                .apply_maneuver(
+                    "event.drift.charge",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Charged,
+                )
+                .unwrap()
+        );
+        assert!(
+            kernel
+                .apply_maneuver(
+                    "event.drift.release",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Released,
+                )
+                .unwrap()
+        );
+        let current = &kernel.snapshot().entities[0];
+        assert_eq!(current.session_id, original.session_id);
+        assert_eq!(current.path_distance, original.path_distance);
+        assert_eq!(
+            current.maneuver.as_ref().unwrap().phase,
+            ManeuverPhase::Released
+        );
+        assert_eq!(kernel.snapshot().effects.len(), 3);
+        assert_eq!(kernel.snapshot().effects[2].effect_id, "boost.mini-turbo");
+        assert!(
+            !kernel
+                .apply_maneuver(
+                    "event.drift.release",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Released,
+                )
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn maneuver_rejects_geometry_shortcuts_and_undeclared_actions() {
+        let mut kernel = BehaviorKernel::new(fixture()).unwrap();
+        assert_eq!(
+            kernel
+                .apply_maneuver(
+                    "event.direct.charge",
+                    "kart.01",
+                    "drift-left",
+                    ManeuverPhase::Charged,
+                )
+                .unwrap_err(),
+            "invalid maneuver transition"
+        );
+        assert!(
+            kernel
+                .apply_maneuver(
+                    "event.unknown.request",
+                    "kart.01",
+                    "curve-derived-drift",
+                    ManeuverPhase::Requested,
+                )
+                .unwrap_err()
+                .contains("undeclared maneuver")
+        );
+        assert!(kernel.snapshot().entities[0].maneuver.is_none());
     }
 
     #[test]

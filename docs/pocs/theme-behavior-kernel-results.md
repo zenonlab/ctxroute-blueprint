@@ -25,7 +25,7 @@ type propre à Bevy ou à une plateforme.
 
 ```text
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
-19 passed; 0 failed
+21 passed; 0 failed
 
 cargo clippy --manifest-path pocs/theme-behavior-kernel/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -50,6 +50,8 @@ Les assertions couvrent :
 - cycle de sessions connexion, activité, erreur, récupération et reconnexion ;
 - absence d'effet inventé sans binding de template et refus des bindings dupliqués ;
 - émission d'identifiants, types et durées d'effets définis par la fixture ;
+- séquence de manœuvre déclarée `requested → active → charged → released` ;
+- refus d'une charge directe, d'une manœuvre inconnue et du rejeu d'un événement ;
 - cinq passes M6 alternées, statistiques descriptives et métriques absentes explicites ;
 - refus d'une soumission GPU déclarée pendant pause ou occlusion ;
 - sorties limitées au `private/` ou `dist/` du workspace, sans traversée ni symlink.

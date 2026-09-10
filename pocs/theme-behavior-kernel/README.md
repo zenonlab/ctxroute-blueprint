@@ -12,9 +12,9 @@ Les compteurs distinguent simulation, rattrapage, pause et occlusion ; les champ
 rendu, allocation et pacing restent explicitement non observés dans ce noyau sans GPU.
 
 Le contrat d'entrée est `fixtures/eight-karts.json`. Le contrat de sortie est un
-`PresentationSnapshot` sérialisable contenant seulement identités, transformations
-et caméra. Un renderer Bevy, Godot ou natif peut donc consommer la même sortie sans
-devenir propriétaire de la simulation.
+`PresentationSnapshot` sérialisable contenant identités, transformations, manœuvres
+et commandes d'effets typées. Un renderer Bevy, Godot ou natif peut donc consommer
+la même sortie sans devenir propriétaire de la simulation.
 
 ```bash
 cargo test --manifest-path pocs/theme-behavior-kernel/Cargo.toml
@@ -33,6 +33,11 @@ réaction de roulis/suspension et cinq familles d'effets bornés. Un identifiant
 d'événement déjà traité ne rejoue aucun effet. Le contrôleur de récupération — rôle
 que le thème peut présenter comme Lakitu — possède temporairement l'autorité puis la
 rend explicitement au trajet ; ce n'est pas l'IA du jeu original.
+
+Les manœuvres sont une liste déclarée par le template. Le noyau accepte uniquement
+les transitions `requested → active → charged → released/cancelled` et route chaque
+transition vers les bindings d'effets fournis. Il ne déduit jamais une pression de
+bouton depuis la courbure et ne choisit aucune ressource graphique lui-même.
 
 M5 ajoute un simulateur déterministe de sessions. Son protocole se limite aux
 événements typés de connexion, activité et déconnexion et aux intentions `focus` et

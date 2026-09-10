@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 const U8_MAGIC: u32 = 0x55AA_382D;
 const MAX_DECOMPRESSED_BYTES: usize = 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 65_536;
+const MAX_EFFECT_RESOURCE_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MkwExtractReport {
@@ -23,6 +24,141 @@ pub struct MkwExtractReport {
     pub bytes: u64,
     pub by_category: BTreeMap<String, usize>,
     pub missing_expected_categories: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct EffectCatalogReport {
+    pub schema_version: u32,
+    pub adapter: &'static str,
+    pub effect_set: String,
+    pub texture_set: String,
+    pub breff_sha256: String,
+    pub breft_sha256: String,
+    pub effects: Vec<NamedEffectResource>,
+    pub textures: Vec<NamedEffectResource>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct NamedEffectResource {
+    pub id: String,
+    pub byte_length: usize,
+    pub sha256: String,
+}
+
+pub fn inspect_effect_catalog(breff_path: &Path, breft_path: &Path) -> Result<EffectCatalogReport> {
+    let breff = read_effect_file(breff_path)?;
+    let breft = read_effect_file(breft_path)?;
+    let (effect_set, effects) = parse_effect_table(&breff, b"REFF")?;
+    let (texture_set, textures) = parse_effect_table(&breft, b"REFT")?;
+    Ok(EffectCatalogReport {
+        schema_version: 1,
+        adapter: "mkw.breff-breft",
+        effect_set,
+        texture_set,
+        breff_sha256: hex::encode(Sha256::digest(&breff)),
+        breft_sha256: hex::encode(Sha256::digest(&breft)),
+        effects,
+        textures,
+    })
+}
+
+fn read_effect_file(path: &Path) -> Result<Vec<u8>> {
+    let metadata =
+        fs::metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(metadata.is_file(), "ordinary effect resource file required");
+    ensure!(
+        metadata.len() <= MAX_EFFECT_RESOURCE_BYTES,
+        "effect resource exceeds safety limit"
+    );
+    fs::read(path).with_context(|| format!("cannot read {}", path.display()))
+}
+
+fn parse_effect_table(bytes: &[u8], magic: &[u8; 4]) -> Result<(String, Vec<NamedEffectResource>)> {
+    ensure!(
+        bytes.get(..4) == Some(magic.as_slice()),
+        "invalid effect resource magic"
+    );
+    ensure!(
+        read_u16(bytes, 4)? == 0xfeff,
+        "only big-endian effect resources are supported"
+    );
+    let declared_length = read_u32(bytes, 8)? as usize;
+    ensure!(
+        declared_length == bytes.len() && declared_length >= 16,
+        "invalid effect resource length"
+    );
+    let root = read_u16(bytes, 12)? as usize;
+    ensure!(
+        read_u16(bytes, 14)? == 1,
+        "one effect resource section required"
+    );
+    let table = root
+        .checked_add(8)
+        .and_then(|value| value.checked_add(read_u32(bytes, root + 8).ok()? as usize))
+        .context("effect table offset overflow")?;
+    let set_name_length = read_u16(bytes, root + 0x14)? as usize;
+    let set_name = read_fixed_name(bytes, root + 0x18, set_name_length)?;
+    let count = read_u16(bytes, table + 4)? as usize;
+    ensure!(count <= 4096, "effect resource count exceeds limit");
+    let mut cursor = table + 8;
+    let mut resources = Vec::with_capacity(count);
+    let mut names = std::collections::BTreeSet::new();
+    for _ in 0..count {
+        let name_length = read_u16(bytes, cursor)? as usize;
+        cursor += 2;
+        let id = read_fixed_name(bytes, cursor, name_length)?;
+        cursor = cursor
+            .checked_add(name_length)
+            .context("effect name overflow")?;
+        let data_offset = table
+            .checked_add(read_u32(bytes, cursor)? as usize)
+            .context("effect data offset overflow")?;
+        let byte_length = read_u32(bytes, cursor + 4)? as usize;
+        cursor += 8;
+        let payload = bytes
+            .get(
+                data_offset
+                    ..data_offset
+                        .checked_add(byte_length)
+                        .context("effect data size overflow")?,
+            )
+            .context("effect payload is out of range")?;
+        ensure!(
+            semantic_resource_name(&id) && names.insert(id.clone()),
+            "invalid or duplicate effect resource name"
+        );
+        resources.push(NamedEffectResource {
+            id,
+            byte_length,
+            sha256: hex::encode(Sha256::digest(payload)),
+        });
+    }
+    Ok((set_name, resources))
+}
+
+fn semantic_resource_name(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 255 && value.bytes().all(|byte| byte.is_ascii_graphic())
+}
+
+fn read_fixed_name(bytes: &[u8], offset: usize, length: usize) -> Result<String> {
+    ensure!(
+        (1..=255).contains(&length),
+        "invalid effect resource name length"
+    );
+    let end = offset
+        .checked_add(length)
+        .context("effect resource name overflow")?;
+    let raw = bytes
+        .get(offset..end)
+        .context("truncated effect resource name")?;
+    let raw = raw.strip_suffix(&[0]).unwrap_or(raw);
+    let value = std::str::from_utf8(raw).context("effect resource name is not UTF-8")?;
+    ensure!(
+        semantic_resource_name(value),
+        "unsafe effect resource name: {}",
+        value.escape_debug()
+    );
+    Ok(value.to_owned())
 }
 
 #[derive(Clone, Copy)]
@@ -233,6 +369,15 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
     ))
 }
 
+fn read_u16(bytes: &[u8], offset: usize) -> Result<u16> {
+    let slice = bytes
+        .get(offset..offset + 2)
+        .context("truncated big-endian integer")?;
+    Ok(u16::from_be_bytes(
+        slice.try_into().expect("two-byte slice"),
+    ))
+}
+
 fn read_name(bytes: &[u8], offset: usize) -> Result<&str> {
     let suffix = bytes
         .get(offset..)
@@ -369,6 +514,26 @@ mod tests {
         bytes
     }
 
+    fn fixture_effect_table(magic: &[u8; 4]) -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0x80];
+        bytes[0..4].copy_from_slice(magic);
+        bytes[4..6].copy_from_slice(&0xfeff_u16.to_be_bytes());
+        bytes[6..8].copy_from_slice(&9_u16.to_be_bytes());
+        bytes[8..12].copy_from_slice(&0x80_u32.to_be_bytes());
+        bytes[12..14].copy_from_slice(&0x10_u16.to_be_bytes());
+        bytes[14..16].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x18..0x1c].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[0x24..0x26].copy_from_slice(&4_u16.to_be_bytes());
+        bytes[0x28..0x2c].copy_from_slice(b"Set\0");
+        bytes[0x3c..0x3e].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x40..0x42].copy_from_slice(&7_u16.to_be_bytes());
+        bytes[0x42..0x49].copy_from_slice(b"effect\0");
+        bytes[0x49..0x4d].copy_from_slice(&0x40_u32.to_be_bytes());
+        bytes[0x4d..0x51].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[0x78..0x7b].copy_from_slice(&[1, 2, 3]);
+        bytes
+    }
+
     #[test]
     fn extracts_course_collision_and_route_without_game_specific_runtime_code() -> Result<()> {
         let temp = tempfile::tempdir()?;
@@ -399,5 +564,18 @@ mod tests {
         assert_eq!(files[0].0, PathBuf::from("RKRace.breff"));
         assert_eq!(category(Path::new("Effect/RKRace.breff")), "effect");
         assert_eq!(category(Path::new("Effect/RKRace.breft")), "effect");
+    }
+
+    #[test]
+    fn inventories_named_breff_and_breft_resources_without_exporting_payloads() {
+        let (effect_set, effects) =
+            parse_effect_table(&fixture_effect_table(b"REFF"), b"REFF").unwrap();
+        let (texture_set, textures) =
+            parse_effect_table(&fixture_effect_table(b"REFT"), b"REFT").unwrap();
+        assert_eq!(effect_set, "Set");
+        assert_eq!(texture_set, "Set");
+        assert_eq!(effects[0].id, "effect");
+        assert_eq!(effects[0].byte_length, 3);
+        assert_eq!(effects, textures);
     }
 }

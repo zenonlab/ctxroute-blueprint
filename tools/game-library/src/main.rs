@@ -2,7 +2,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
-use wallpaper_game_library::{IndexOptions, index_library, mkw::extract_course, verify_library};
+use wallpaper_game_library::{
+    IndexOptions, index_library,
+    mkw::{extract_course, inspect_effect_catalog},
+    verify_library,
+};
 
 #[derive(Debug, Parser)]
 #[command(about = "Index locally extracted game data without packaging private assets")]
@@ -40,6 +44,12 @@ enum Command {
         input: PathBuf,
         #[arg(long)]
         output: PathBuf,
+    },
+    InspectMkwEffects {
+        #[arg(long)]
+        breff: PathBuf,
+        #[arg(long)]
+        breft: PathBuf,
     },
 }
 
@@ -85,6 +95,10 @@ fn main() -> Result<()> {
         }
         Command::ExtractMkwCourse { input, output } => {
             let result = extract_course(&input, &output)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectMkwEffects { breff, breft } => {
+            let result = inspect_effect_catalog(&breff, &breft)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

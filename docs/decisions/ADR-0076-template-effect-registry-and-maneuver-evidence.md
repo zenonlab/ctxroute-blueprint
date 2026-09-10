@@ -35,6 +35,8 @@ un événement produit par une trace d'entrée ou par un contrôleur de thème d
 modélise au minimum demande, maintien et relâchement de la manœuvre. La courbure peut
 alimenter l'anticipation de ce contrôleur, mais ne devient jamais directement un
 signal de dérapage. Sans trace ou contrôleur qualifié, aucun dérapage n'est émis.
+Le contrat commun représente les phases `requested`, `active`, `charged`, `released`
+et `cancelled`, impose leur ordre et conserve au plus une manœuvre par entité.
 
 ## Consequences
 

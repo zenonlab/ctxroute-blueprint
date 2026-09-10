@@ -12,7 +12,7 @@ test produit trois fichiers classés circuit, collision KCL et route KMP.
 
 ```text
 cargo test --manifest-path tools/game-library/Cargo.toml
-6 passed; 0 failed
+7 passed; 0 failed
 
 cargo clippy --manifest-path tools/game-library/Cargo.toml --all-targets -- -D warnings
 finished successfully
@@ -27,6 +27,11 @@ Son répertoire U8 transparent `.` est accepté sans relâcher les contrôles de
 traversée. L'inventaire contient 100 fichiers, dont `RKRace.breff` et
 `RKRace.breft`, classés comme ressources d'effet privées. Cette présence ne vaut
 pas encore décodage, fermeture de dépendances ni fidélité de rendu.
+
+Le lecteur de catalogue BREFF/BREFT valide les en-têtes, bornes, tables, noms et
+payloads sans les exporter. Sur la source locale, il retrouve 516 effets nommés et
+93 textures, dont `rk_driftSmoke`, les familles d'étincelles bleues/oranges,
+`rk_jumpSmoke` et `rk_miniTurbo`. Le reçu ne contient que noms, tailles et SHA-256.
 
 ## Gate privé restant
 

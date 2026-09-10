@@ -39,11 +39,15 @@
     { "instance_id": "kart.07", "session_id": "session.07", "longitudinal_offset": 5.4, "lateral_offset": -1.05 },
     { "instance_id": "kart.08", "session_id": "session.08", "longitudinal_offset": 5.4, "lateral_offset": 1.05 }
   ],
+  "maneuvers": ["drift-left", "drift-right", "jump", "boost"],
   "effect_bindings": [
     { "trigger": "activity.busy", "effect_id": "session.busy.particles", "kind": "particles", "duration_ticks": 30 },
     { "trigger": "activity.busy", "effect_id": "session.busy.sound", "kind": "sound", "duration_ticks": 1 },
     { "trigger": "activity.success", "effect_id": "session.success.sprite", "kind": "sprite", "duration_ticks": 30 },
     { "trigger": "activity.error", "effect_id": "session.error.material", "kind": "material", "duration_ticks": 30 },
-    { "trigger": "activity.recovering", "effect_id": "session.recovering.camera", "kind": "camera_impulse", "duration_ticks": 30 }
+    { "trigger": "activity.recovering", "effect_id": "session.recovering.camera", "kind": "camera_impulse", "duration_ticks": 30 },
+    { "trigger": "maneuver.drift-left.active", "effect_id": "drift.smoke", "kind": "particles", "duration_ticks": 15 },
+    { "trigger": "maneuver.drift-left.charged", "effect_id": "drift.spark.blue", "kind": "particles", "duration_ticks": 30 },
+    { "trigger": "maneuver.drift-left.released", "effect_id": "boost.mini-turbo", "kind": "particles", "duration_ticks": 12 }
   ]
 }

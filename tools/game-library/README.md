@@ -45,4 +45,12 @@ présence dans l'inventaire ne signifie pas qu'ils sont déjà décodés ou rend
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   extract-mkw-course --input private/source/farm_course.szs \
   --output private/mkw/farm_course
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-mkw-effects \
+  --breff private/mkw/common/Effect/RKRace.breff \
+  --breft private/mkw/common/Effect/RKRace.breft
 ```
+
+La seconde commande émet seulement un catalogue JSON de noms, tailles et empreintes.
+Elle ne copie aucun payload et ne prétend pas encore exécuter les émetteurs NW4R.
