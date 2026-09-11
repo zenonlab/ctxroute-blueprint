@@ -31,7 +31,8 @@
           "providerAdapters",
           "titleMatcher",
           "reviewGate",
-          "privateStore"
+          "privateStore",
+          "libraryProjectionRepair"
         ],
         "note": "Anime/manga indépendants; Kitsu après NO_MATCH. Hydratation et pagination reprenables; tranches jusqu'au budget, file privée locale."
       },
@@ -42,9 +43,10 @@
           "sourceEvidence",
           "durableQueue",
           "providerAdapters",
-          "privateStore"
+          "privateStore",
+          "libraryProjectionRepair"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les covers manquantes avancent par curseur et tranches bornées."
+        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les covers manquantes et la projection bibliothèque avancent par curseur et tranches bornées."
       },
       {
         "id": "cover-rights",

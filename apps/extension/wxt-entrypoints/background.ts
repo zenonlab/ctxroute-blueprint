@@ -17,7 +17,8 @@ import {
   HttpFavoriteCollectiveAdapter,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
-import { libraryId, workId } from '@tobirink/domain';
+import { addWork, createLibrary, libraryId, workId } from '@tobirink/domain';
+import type { Work } from '@tobirink/domain';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-catalogue-runtime';
@@ -49,6 +50,22 @@ export default defineBackground({
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
+    const repairLibraryProjection = async () => {
+      const works: Work[] = [];
+      let afterId: Parameters<typeof privateStorage.storage.listWorks>[0]['afterId'];
+      for (let page = 0; page < 5; page += 1) {
+        const batch = await privateStorage.storage.listWorks(afterId === undefined ? { limit: 100 } : { afterId, limit: 100 });
+        works.push(...batch);
+        afterId = batch.at(-1)?.id;
+        if (batch.length < 100) break;
+      }
+      if (works.length === 0) return;
+      await privateStorage.storage.transaction(['libraries'], async (session) => {
+        let library = await session.getLibrary(primaryLibraryId) ?? createLibrary(primaryLibraryId);
+        for (const work of works) if (!library.workIds.includes(work.id)) library = addWork(library, work.id);
+        await session.putLibrary(library);
+      });
+    };
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
@@ -86,6 +103,7 @@ export default defineBackground({
       await ensureReminderAlarm();
       await privateStorage.ensureReady();
       await reconcileFavorites();
+      await repairLibraryProjection();
       await resumeNotifications();
     });
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
@@ -103,7 +121,7 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
+      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(), repairLibraryProjection()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);
