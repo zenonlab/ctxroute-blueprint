@@ -21,7 +21,19 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
         }
     }
     public struct Choice: Codable, Equatable, Sendable {
-        public enum Kind: String, Codable, Sendable { case character, vehicle }
+        public struct Kind: RawRepresentable, Codable, Equatable, Hashable, Sendable {
+            public let rawValue: String
+            public init(rawValue: String) { self.rawValue = rawValue }
+            public init(from decoder: Decoder) throws {
+                rawValue = try decoder.singleValueContainer().decode(String.self)
+            }
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+            public static let character = Kind(rawValue: "character")
+            public static let vehicle = Kind(rawValue: "vehicle")
+        }
         public struct Appearance: Codable, Equatable, Sendable {
             public let part: String
             public let material: String?
@@ -130,6 +142,16 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
         selection?.stages.first { $0.kind == kind }
     }
 
+    public var effectiveStages: [Selection.Stage] {
+        if let selection { return selection.stages }
+        var seen = Set<Choice.Kind>()
+        return choices.compactMap { choice in
+            guard seen.insert(choice.kind).inserted else { return nil }
+            return Selection.Stage(id: choice.kind.rawValue, label: choice.kind.rawValue.capitalized,
+                                   kind: choice.kind, columns: 6)
+        }
+    }
+
     public func compatibleChoices(kind: Choice.Kind, selected: [Choice.Kind: String]) -> [Choice] {
         let candidates = choices.filter { $0.kind == kind }
         guard let selection, let targetStage = stage(for: kind) else { return candidates }
@@ -170,11 +192,12 @@ public enum ThemeInterfaceLoader {
         let data = try boundedRegularFile(manifestURL, maximum: manifestLimit)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
         let models = manifest.models ?? []
-        guard ["orbite.theme-interface/2", "orbite.theme-interface/3", "orbite.theme-interface/4"].contains(manifest.format),
+        guard ["orbite.theme-interface/2", "orbite.theme-interface/3", "orbite.theme-interface/4",
+               "orbite.theme-interface/5"].contains(manifest.format),
               requiredSlots.isSubset(of: Set(manifest.slots.keys)),
               (1...128).contains(manifest.assets.count), manifest.choices.count <= 64,
               models.count <= 64,
-              manifest.format == "orbite.theme-interface/4" || models.isEmpty,
+              ["orbite.theme-interface/4", "orbite.theme-interface/5"].contains(manifest.format) || models.isEmpty,
               manifest.targets.count <= 16,
               Set(manifest.assets.map(\.id)).count == manifest.assets.count,
               Set(models.map(\.id)).count == models.count,
@@ -212,7 +235,10 @@ public enum ThemeInterfaceLoader {
             modelIDs.insert(model.id)
         }
         guard manifest.slots.values.allSatisfy({ resolved[$0] != nil }),
-              manifest.choices.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
+              manifest.choices.allSatisfy({ validID($0.id) && validID($0.kind.rawValue)
+                  && (manifest.format == "orbite.theme-interface/5"
+                      || [.character, .vehicle].contains($0.kind))
+                  && (1...80).contains($0.label.count)
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
                   && resolved[$0.preview] != nil
                   && $0.attributes.count <= 8
@@ -244,11 +270,15 @@ public enum ThemeInterfaceLoader {
         let stages = selection.stages
         let stageIDs = Set(stages.map(\.id))
         let stageKinds = Set(stages.map(\.kind))
-        guard (1...4).contains(stages.count), stageIDs.count == stages.count,
+        guard (1...8).contains(stages.count), stageIDs.count == stages.count,
               stageKinds.count == stages.count,
-              stages.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
+              stages.allSatisfy({ validID($0.id) && validID($0.kind.rawValue)
+                  && (manifest.format == "orbite.theme-interface/5"
+                      || [.character, .vehicle].contains($0.kind))
+                  && (1...80).contains($0.label.count)
                   && (2...10).contains($0.columns) }),
-              selection.compatibility.count <= 8 else {
+              selection.compatibility.count <= 16,
+              Set(manifest.choices.map(\.kind)) == stageKinds else {
             throw ModelError.invalid("invalid selection pipeline")
         }
         for rule in selection.compatibility {

@@ -57,6 +57,19 @@ par les deux loaders : empreintes PNG côté Swift, puis existence des cibles, p
 et matériaux côté renderer. Ces contrôles ne lancent pas le wallpaper et ne
 qualifient ni TCC, ni Finder, ni le compositeur macOS.
 
+Le gate de correction utilise `orbite.correction-record/1`. Avant une modification
+à risque, `node scripts/verify-active-theme.mjs` relie les hashes du descripteur,
+de l'entrée, de l'interface, de la miniature, du binaire et du PID observé. Un champ
+`experimental`, un test non nul, un inconnu résiduel ou une qualification visuelle
+absente interdit le statut `qualified`. Deux échecs de la même hypothèse renvoient au
+diagnostic de la source au lieu d'autoriser un nouvel offset compensatoire.
+
+L'interface v5 ajoute un test de menu source-neutre avec des catégories `outfit` et
+`companion`. Le gate vérifie l'ordre déclaré, la compatibilité, la migration des
+anciens overrides et l'absence de branche AppKit par catégorie. Le build natif avec
+warnings bloquants reste nécessaire, car SwiftPM ne compile pas les sources de
+l'application AppKit.
+
 La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
 exigent un parcours déterministe, le rejet des traversées et formats incohérents,
 la déduplication des identités et des racines issues uniquement de configuration.

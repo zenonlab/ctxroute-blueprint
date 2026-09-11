@@ -366,7 +366,7 @@ import os
         do {
             try interfaceStore.save(overrides, interface: interface.manifest)
             if let theme = selectedTheme { try pushRuntimeControls(for: theme) }
-            statusLabel.stringValue = "Personnage, kart et session enregistrés sans changer l’identité du véhicule."
+            statusLabel.stringValue = "Apparence et session enregistrées sans changer l’identité de la cible."
         } catch { statusLabel.stringValue = "Enregistrement refusé : \(error.localizedDescription)" }
     }
 

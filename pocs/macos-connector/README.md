@@ -67,4 +67,14 @@ Le paquet produit contient l’app, son agent embarqué et une seule `WallpaperP
 
 Le provider relit le catalogue pendant que Réglages est connecté et pousse les modèles modifiés au panneau sous trois secondes, sans tuer Réglages ni WallpaperAgent. Lors d’une mise à jour binaire, `install.sh` décharge aussi l’ancien job de test Orbite `org.orbite.wallpaper.renderhost-test`, arrête les RenderHosts enfants de son propre agent avant cet agent, puis arrête l’ancien processus dont le chemin est exactement celui du provider Orbite. Il désenregistre ensuite l’ancienne extension et conserve l’ancienne app sous `dist/pocs/macos-connector/replaced.*`.
 
+## Menu de personnalisation automatique
+
+Un package peut référencer une interface `orbite.theme-interface/5`. Ses étapes
+déclarent l'ordre, le libellé, la catégorie opaque, le nombre de colonnes et les
+compatibilités. Le connecteur crée toutes les sections à partir de ces données ;
+ajouter une catégorie ne demande aucune branche Swift. Les choix persistés utilisent
+`selections`, tandis que les anciens overrides personnage/véhicule sont migrés à la
+lecture. Le [schéma v5 et son exemple neutre](../../docs/templates/theme-interface-v5.schema.json)
+constituent le template de création.
+
 Voir [ADR-0074](../../docs/decisions/ADR-0074-external-themes-only.md), [ADR-0075](../../docs/decisions/ADR-0075-external-catalog-wallpaper-provider.md) et le [diagramme du runtime](../../docs/architecture/src/macos-external-theme-runtime.dataflow.json).

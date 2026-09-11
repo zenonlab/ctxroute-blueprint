@@ -1,0 +1,51 @@
+{
+  "format": "orbite.theme-interface/5",
+  "assets": [
+    {
+      "id": "ui.fixture",
+      "path": "ui/fixture.png",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "slots": {
+    "theme.audio": "ui.fixture",
+    "display.brightness": "ui.fixture",
+    "slider.track": "ui.fixture",
+    "slider.thumb": "ui.fixture",
+    "desktop.files.visible": "ui.fixture",
+    "desktop.files.hidden": "ui.fixture",
+    "visual.motion.pause": "ui.fixture",
+    "visual.motion.resume": "ui.fixture",
+    "customizer.panel": "ui.fixture"
+  },
+  "choices": [
+    {
+      "id": "outfit.blue",
+      "label": "Tenue bleue",
+      "kind": "outfit",
+      "preview": "ui.fixture",
+      "appearance": null,
+      "attributes": { "family": "cool" }
+    },
+    {
+      "id": "companion.ice",
+      "label": "Compagnon glace",
+      "kind": "companion",
+      "preview": "ui.fixture",
+      "appearance": null,
+      "attributes": { "family": "cool" }
+    }
+  ],
+  "targets": [
+    { "id": "object.primary", "label": "Objet principal", "session_id": null }
+  ],
+  "selection": {
+    "stages": [
+      { "id": "look", "label": "Choisir une tenue", "kind": "outfit", "columns": 4 },
+      { "id": "ally", "label": "Choisir un compagnon", "kind": "companion", "columns": 3 }
+    ],
+    "compatibility": [
+      { "source_stage": "look", "target_stage": "ally", "attribute": "family" }
+    ]
+  }
+}

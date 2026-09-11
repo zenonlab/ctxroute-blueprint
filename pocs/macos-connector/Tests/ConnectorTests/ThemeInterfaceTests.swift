@@ -128,4 +128,71 @@ final class ThemeInterfaceTests: XCTestCase {
             selected: [.character: "driver.light"]).map(\.id), ["vehicle.light"])
         XCTAssertTrue(manifest.compatibleChoices(kind: .vehicle, selected: [:]).isEmpty)
     }
+
+    func testInterfaceV5AcceptsArbitraryOrderedMenuKinds() throws {
+        let outfit = ThemeInterfaceManifest.Choice.Kind(rawValue: "outfit")
+        let companion = ThemeInterfaceManifest.Choice.Kind(rawValue: "companion")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [], slots: [:],
+            choices: [
+                .init(id: "outfit.blue", label: "Bleu", kind: outfit, preview: "outfit",
+                      attributes: ["family": "cool"]),
+                .init(id: "companion.ice", label: "Glace", kind: companion, preview: "companion",
+                      attributes: ["family": "cool"])
+            ], selection: .init(stages: [
+                .init(id: "look", label: "Choisir une tenue", kind: outfit, columns: 4),
+                .init(id: "ally", label: "Choisir un compagnon", kind: companion, columns: 3)
+            ], compatibility: [
+                .init(sourceStage: "look", targetStage: "ally", attribute: "family")
+            ]))
+
+        XCTAssertEqual(manifest.effectiveStages.map(\.kind), [outfit, companion])
+        XCTAssertEqual(manifest.compatibleChoices(kind: companion,
+            selected: [outfit: "outfit.blue"]).map(\.id), ["companion.ice"])
+    }
+
+    func testInterfaceV5LoaderDoesNotKnowMenuKindNames() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("theme-interface-v5-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let png = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])
+        try png.write(to: root.appendingPathComponent("preview.png"))
+        let digest = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
+        let asset = ThemeInterfaceManifest.Asset(id: "preview", path: "preview.png", sha256: digest)
+        let slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
+        let outfit = ThemeInterfaceManifest.Choice.Kind(rawValue: "outfit")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
+            slots: slots, choices: [
+                .init(id: "outfit.blue", label: "Tenue bleue", kind: outfit, preview: asset.id)
+            ], selection: .init(stages: [
+                .init(id: "look", label: "Choisir une tenue", kind: outfit, columns: 4)
+            ]))
+        let url = root.appendingPathComponent("interface.json")
+        try JSONEncoder().encode(manifest).write(to: url)
+
+        XCTAssertEqual(try ThemeInterfaceLoader.load(url).manifest.effectiveStages.first?.kind, outfit)
+    }
+
+    func testLegacyOverridesMigrateToGenericSelections() throws {
+        let bytes = Data(#"{"schema_version":1,"theme_id":"fixture.theme","targets":{"target.one":{"character":"driver.one","vehicle":"vehicle.one","session_id":"session.one"}}}"#.utf8)
+        let decoded = try JSONDecoder().decode(ThemeInterfaceOverrides.self, from: bytes)
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [], slots: [:],
+            choices: [
+                .init(id: "driver.one", label: "Pilote", kind: .character, preview: "driver"),
+                .init(id: "vehicle.one", label: "Véhicule", kind: .vehicle, preview: "vehicle")
+            ], targets: [.init(id: "target.one", label: "Cible", session_id: nil)],
+            selection: .init(stages: [
+                .init(id: "driver", label: "Pilote", kind: .character, columns: 2),
+                .init(id: "vehicle", label: "Véhicule", kind: .vehicle, columns: 2)
+            ]))
+
+        let migrated = try decoded.validated(for: "fixture.theme", interface: manifest)
+        XCTAssertEqual(migrated.schema_version, 2)
+        XCTAssertEqual(migrated.targets["target.one"]?.selections,
+                       ["character": "driver.one", "vehicle": "vehicle.one"])
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(migrated)) as? [String: Any]
+        let targets = encoded?["targets"] as? [String: [String: Any]]
+        XCTAssertNotNil(targets?["target.one"]?["selections"])
+        XCTAssertNil(targets?["target.one"]?["character"])
+        XCTAssertNil(targets?["target.one"]?["vehicle"])
+    }
 }

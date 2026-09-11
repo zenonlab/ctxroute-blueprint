@@ -240,6 +240,16 @@ import AppKit
     }
 }
 
+@MainActor private final class ChoiceStageSection {
+    let descriptor: ThemeInterfaceManifest.Selection.Stage
+    let title = NSTextField(labelWithString: "")
+    let grid = GameChoiceGrid()
+
+    init(_ descriptor: ThemeInterfaceManifest.Selection.Stage) {
+        self.descriptor = descriptor
+    }
+}
+
 @MainActor final class VehicleCustomizationPanel: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var themeID = ""
@@ -248,10 +258,7 @@ import AppKit
     private var sessions: [TerminalSessionSnapshot] = []
     private var editingTargetID: String?
     private let target = GameChoiceStrip()
-    private let character = GameChoiceGrid()
-    private let vehicle = GameChoiceGrid()
-    private let characterTitle = NSTextField(labelWithString: "")
-    private let vehicleTitle = NSTextField(labelWithString: "")
+    private var stageSections: [ChoiceStageSection] = []
     private let selectionStack = NSStackView()
     private let session = NSPopUpButton()
     private let sessionStatus = NSTextField(wrappingLabelWithString: "")
@@ -288,8 +295,9 @@ import AppKit
         editingTargetID = nil
         let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
         selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
+        configureSelectionStack(interface.manifest)
         target.configure(entries: interface.manifest.targets.map { item in
-            let choiceID = overrides.targets[item.id]?.vehicle
+            let choiceID = overrides.targets[item.id].flatMap { preferredPreviewChoice(in: $0)?.id }
             let choice = interface.manifest.choices.first { $0.id == choiceID }
             let image = choice.flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
                 ?? targetIcon
@@ -297,9 +305,6 @@ import AppKit
         }, selected: targetID ?? interface.manifest.targets.first?.id,
                          selectionImage: selectionImage,
                          cellSize: .init(width: 190, height: 54))
-        configureCharacterGrid(selected: nil)
-        configureVehicleGrid(selected: nil)
-        configureSelectionStack(interface.manifest)
         configureSessionMenu(selected: nil)
         focusSession.target = self
         focusSession.action = #selector(sendSessionIntent(_:))
@@ -312,8 +317,6 @@ import AppKit
         skin(cancel, slot: "customizer.action.cancel", interface: interface)
         skin(resetButton, slot: "customizer.action.reset", interface: interface)
         skin(save, slot: "customizer.action.save", interface: interface)
-        character.onChange = { [weak self] in self?.characterChanged() }
-        vehicle.onChange = { [weak self] in self?.vehicleChanged() }
         target.onChange = { [weak self] in self?.targetChanged() }
         session.target = self
         session.action = #selector(sessionChanged)
@@ -322,10 +325,6 @@ import AppKit
             NSLayoutConstraint.activate([
                 target.widthAnchor.constraint(equalToConstant: 660),
                 target.heightAnchor.constraint(equalToConstant: 60),
-                character.widthAnchor.constraint(equalToConstant: 660),
-                character.heightAnchor.constraint(equalToConstant: 292),
-                vehicle.widthAnchor.constraint(equalToConstant: 660),
-                vehicle.heightAnchor.constraint(equalToConstant: 150),
                 session.widthAnchor.constraint(equalToConstant: 330)
             ])
         }
@@ -354,19 +353,29 @@ import AppKit
         stack.addArrangedSubview(NSStackView(views: [cancel, resetButton, save]))
         let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 708, height: 840),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Personnaliser le véhicule"
+        window.title = "Personnaliser le thème"
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.collectionBehavior.insert(.moveToActiveSpace)
         let content = ThemePanelContentView(pattern: interface.asset(for: "customizer.background.pattern")
             .flatMap(NSImage.init(contentsOf:)))
-        content.addSubview(stack)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = stack
+        content.addSubview(scroll)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor)
+            scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: content.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)
         ])
         window.contentView = content
         panel = window
@@ -374,32 +383,6 @@ import AppKit
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func configureCharacterGrid(selected: String?) {
-        guard let interface else { return }
-        let stage = interface.manifest.stage(for: .character)
-        let choices = interface.manifest.compatibleChoices(kind: .character, selected: selectedChoices())
-        character.configure(choices.map { choiceEntry($0, in: interface) },
-            columns: stage?.columns ?? 6,
-            selected: choices.contains(where: { $0.id == selected }) ? selected : nil,
-            cellSize: .init(width: 101, height: 66), selectionImage: selectionImage)
-        characterTitle.stringValue = stage?.label ?? "Personnage"
-    }
-
-    private func configureVehicleGrid(selected: String?) {
-        guard let interface else { return }
-        let stage = interface.manifest.stage(for: .vehicle)
-        let choices = interface.manifest.compatibleChoices(kind: .vehicle,
-            selected: character.selectedID.map { [.character: $0] } ?? [:])
-        vehicle.configure(choices.map { choiceEntry($0, in: interface) },
-            columns: stage?.columns ?? 6, selected: choices.contains(where: { $0.id == selected }) ? selected : nil,
-            cellSize: .init(width: 101, height: 64), selectionImage: selectionImage)
-        let waitsForPriorChoice = choices.isEmpty && interface.manifest.selection?.compatibility.contains {
-            $0.target_stage == stage?.id
-        } == true
-        let suffix = waitsForPriorChoice ? " — choix précédent requis" : ""
-        vehicleTitle.stringValue = (stage?.label ?? "Véhicule") + suffix
     }
 
     private func configureSelectionStack(_ manifest: ThemeInterfaceManifest) {
@@ -410,38 +393,80 @@ import AppKit
         selectionStack.orientation = .vertical
         selectionStack.alignment = .leading
         selectionStack.spacing = 6
-        let stages = manifest.selection?.stages ?? [
-            .init(id: "character", label: "Personnage", kind: .character, columns: 6),
-            .init(id: "vehicle", label: "Véhicule", kind: .vehicle, columns: 6)
-        ]
-        for stage in stages {
-            switch stage.kind {
-            case .character:
-                selectionStack.addArrangedSubview(characterTitle)
-                selectionStack.addArrangedSubview(character)
-            case .vehicle:
-                selectionStack.addArrangedSubview(vehicleTitle)
-                selectionStack.addArrangedSubview(vehicle)
-            }
+        stageSections = manifest.effectiveStages.map(ChoiceStageSection.init)
+        for section in stageSections {
+            let kind = section.descriptor.kind
+            section.grid.onChange = { [weak self] in self?.stageChanged(kind) }
+            section.grid.widthAnchor.constraint(equalToConstant: 660).isActive = true
+            section.grid.heightAnchor.constraint(equalToConstant: 150).isActive = true
+            selectionStack.addArrangedSubview(section.title)
+            selectionStack.addArrangedSubview(section.grid)
+            configureStage(section, selected: nil)
         }
     }
 
     private func selectedChoices() -> [ThemeInterfaceManifest.Choice.Kind: String] {
-        var result: [ThemeInterfaceManifest.Choice.Kind: String] = [:]
-        if let id = character.selectedID { result[.character] = id }
-        if let id = vehicle.selectedID { result[.vehicle] = id }
-        return result
+        Dictionary(uniqueKeysWithValues: stageSections.compactMap { section in
+            section.grid.selectedID.map { (section.descriptor.kind, $0) }
+        })
     }
 
     private func refreshStages(after kind: ThemeInterfaceManifest.Choice.Kind) {
-        guard let stages = interface?.manifest.selection?.stages,
-              let index = stages.firstIndex(where: { $0.kind == kind }) else { return }
-        for stage in stages.dropFirst(index + 1) {
-            switch stage.kind {
-            case .character: configureCharacterGrid(selected: character.selectedID)
-            case .vehicle: configureVehicleGrid(selected: vehicle.selectedID)
-            }
+        guard let index = stageSections.firstIndex(where: { $0.descriptor.kind == kind }) else { return }
+        for section in stageSections.dropFirst(index + 1) {
+            configureStage(section, selected: section.grid.selectedID)
         }
+    }
+
+    private func configureStage(_ section: ChoiceStageSection, selected: String?) {
+        guard let interface else { return }
+        let choices = interface.manifest.compatibleChoices(kind: section.descriptor.kind,
+                                                            selected: selectedChoices())
+        let accepted = choices.contains { $0.id == selected } ? selected : nil
+        section.grid.configure(choices.map { choiceEntry($0, in: interface) },
+            columns: section.descriptor.columns, selected: accepted,
+            cellSize: .init(width: 101, height: 64), selectionImage: selectionImage)
+        let waits = choices.isEmpty && interface.manifest.selection?.compatibility.contains {
+            $0.target_stage == section.descriptor.id
+        } == true
+        section.title.stringValue = section.descriptor.label + (waits ? " — choix précédent requis" : "")
+    }
+
+    private func preferredPreviewChoice(in value: ThemeTargetOverride) -> ThemeInterfaceManifest.Choice? {
+        guard let interface else { return nil }
+        let ordered = stageSections.reversed().compactMap { value.selections[$0.descriptor.kind.rawValue] }
+        return ordered.compactMap { id in interface.manifest.choices.first { $0.id == id } }.first
+    }
+
+    private func selectedChoiceIDs() -> [String] {
+        stageSections.compactMap(\.grid.selectedID)
+    }
+
+    private func stageChanged(_ kind: ThemeInterfaceManifest.Choice.Kind) {
+        refreshStages(after: kind)
+        updateTargetPreview()
+        previewCurrentSelection()
+    }
+
+    private func restoreSelections(_ selections: [String: String]) {
+        for section in stageSections {
+            let selected = selections[section.descriptor.kind.rawValue]
+            section.grid.select(id: selected)
+            configureStage(section, selected: selected)
+        }
+    }
+
+    private func currentSelections() -> [String: String] {
+        Dictionary(uniqueKeysWithValues: stageSections.compactMap { section in
+            section.grid.selectedID.map { (section.descriptor.kind.rawValue, $0) }
+        })
+    }
+
+    private func choiceForPreview() -> ThemeInterfaceManifest.Choice? {
+        guard let interface else { return nil }
+        return selectedChoiceIDs().reversed().compactMap { id in
+            interface.manifest.choices.first { $0.id == id }
+        }.first
     }
 
     private func choiceEntry(_ choice: ThemeInterfaceManifest.Choice,
@@ -489,22 +514,9 @@ import AppKit
         editingTargetID = id
         let embedded = interface.manifest.targets.first { $0.id == id }
         let value = overrides.targets[id]
-        character.select(id: value?.character)
-        configureVehicleGrid(selected: value?.vehicle)
+        restoreSelections(value?.selections ?? [:])
         configureSessionMenu(selected: value?.session_id ?? embedded?.session_id)
         updateSessionStatus()
-    }
-
-    @objc private func characterChanged() {
-        refreshStages(after: .character)
-        updateTargetPreview()
-        previewCurrentSelection()
-    }
-
-    @objc private func vehicleChanged() {
-        refreshStages(after: .vehicle)
-        updateTargetPreview()
-        previewCurrentSelection()
     }
 
     @objc private func sessionChanged() {
@@ -550,8 +562,7 @@ import AppKit
 
     private func updateTargetPreview() {
         guard let interface, let id = editingTargetID else { return }
-        let image = vehicle.selectedID
-            .flatMap { selected in interface.manifest.choices.first { $0.id == selected } }
+        let image = choiceForPreview()
             .flatMap { interface.assets[$0.preview] }
             .flatMap(NSImage.init(contentsOf:))
             ?? interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
@@ -561,8 +572,8 @@ import AppKit
     private func captureCurrentSelection() {
         guard var overrides, let id = editingTargetID else { return }
         let sessionID = session.selectedItem?.representedObject as? String
-        overrides.set(ThemeTargetOverride(character: character.selectedID,
-            vehicle: vehicle.selectedID, sessionID: sessionID?.isEmpty == true ? nil : sessionID), for: id)
+        overrides.set(ThemeTargetOverride(selections: currentSelections(),
+            sessionID: sessionID?.isEmpty == true ? nil : sessionID), for: id)
         self.overrides = overrides
     }
 
@@ -575,7 +586,7 @@ import AppKit
                 error.stringValue = previewError
                 return
             }
-            let selected = [character.selectedID, vehicle.selectedID].compactMap { $0 }
+            let selected = selectedChoiceIDs()
             let unresolved = interface.manifest.choices.filter {
                 selected.contains($0.id) && $0.appearance == nil
             }.map(\.label)

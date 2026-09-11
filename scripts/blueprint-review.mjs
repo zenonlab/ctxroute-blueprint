@@ -12,6 +12,8 @@ export const REQUIRED_SKILL_RUNTIME = Object.freeze([
   'scripts/verify-blueprint-skills.mjs',
   '.agents/skills/blueprint-audit/SKILL.md',
   '.agents/skills/blueprint-audit/blueprint.json',
+  '.agents/skills/methodical-corrector/SKILL.md',
+  '.agents/skills/methodical-corrector/blueprint.json',
   '.agents/skills/session-auditor/SKILL.md',
   '.agents/skills/session-auditor/blueprint.json',
   '.agents/skills/skill-creator/SKILL.md',

@@ -39,6 +39,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 ## Development
 
 - Read existing files before writing.
+- For a reproducible visual, runtime, adapter, package, or activation defect, invoke `methodical-corrector`. Record the active artifact, source of truth, end-to-end trace, owning layer, and one falsifiable hypothesis before product edits. After two failed attempts on the same hypothesis, restart diagnosis instead of stacking compensations.
 - Read the relevant documents and diagrams before changing code.
 - For changes that materially alter a boundary, contract, dependency, or system flow, read the Archify architecture source and relevant ADRs. A routine feature or internal implementation change does not require Archify by itself.
 - Reuse existing functions, components, and patterns.

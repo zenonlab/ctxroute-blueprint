@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orbite.local/schemas/theme-interface-v5.json",
+  "title": "Orbite declarative theme interface v5",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "assets", "slots", "choices", "targets", "selection"],
+  "properties": {
+    "format": { "const": "orbite.theme-interface/5" },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "sha256"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "path": { "$ref": "#/$defs/relativePath" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "sha256", "clip_indices"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "path": { "$ref": "#/$defs/relativeGlbPath" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "clip_indices": {
+            "type": "array",
+            "maxItems": 16,
+            "items": { "type": "integer", "minimum": 0, "maximum": 63 }
+          }
+        }
+      }
+    },
+    "slots": {
+      "type": "object",
+      "minProperties": 9,
+      "maxProperties": 128,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/id" }
+    },
+    "choices": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "kind", "preview"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "kind": { "$ref": "#/$defs/id" },
+          "preview": { "$ref": "#/$defs/id" },
+          "appearance": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["part"],
+                "properties": {
+                  "part": { "$ref": "#/$defs/id" },
+                  "material": { "$ref": "#/$defs/id" },
+                  "tint": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": { "type": "number", "minimum": 0, "maximum": 2 }
+                  },
+                  "model": { "$ref": "#/$defs/id" }
+                },
+                "dependentRequired": { "material": ["tint"], "tint": ["material"] },
+                "anyOf": [
+                  { "required": ["model"], "properties": { "model": { "$ref": "#/$defs/id" } } },
+                  {
+                    "required": ["material", "tint"],
+                    "properties": {
+                      "material": { "$ref": "#/$defs/id" },
+                      "tint": {
+                        "type": "array",
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "items": { "type": "number", "minimum": 0, "maximum": 2 }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "attributes": {
+            "type": "object",
+            "maxProperties": 8,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "session_id": { "type": ["string", "null"], "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stages"],
+      "properties": {
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "kind", "columns"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "kind": { "$ref": "#/$defs/id" },
+              "columns": { "type": "integer", "minimum": 2, "maximum": 10 }
+            }
+          }
+        },
+        "compatibility": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_stage", "target_stage", "attribute"],
+            "properties": {
+              "source_stage": { "$ref": "#/$defs/id" },
+              "target_stage": { "$ref": "#/$defs/id" },
+              "attribute": { "$ref": "#/$defs/id" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relativePath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}\\.png$" },
+    "relativeGlbPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}\\.glb$" }
+  }
+}

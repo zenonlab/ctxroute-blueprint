@@ -1,17 +1,46 @@
 import Foundation
 
 public struct ThemeTargetOverride: Codable, Equatable, Sendable {
-    public var character: String?
-    public var vehicle: String?
+    public var selections: [String: String]
     public var session_id: String?
 
-    public init(character: String? = nil, vehicle: String? = nil, sessionID: String? = nil) {
-        self.character = character
-        self.vehicle = vehicle
+    public init(selections: [String: String] = [:], character: String? = nil,
+                vehicle: String? = nil, sessionID: String? = nil) {
+        self.selections = selections
+        if let character { self.selections["character"] = character }
+        if let vehicle { self.selections["vehicle"] = vehicle }
         session_id = sessionID
     }
 
-    public var isEmpty: Bool { character == nil && vehicle == nil && session_id == nil }
+    public var character: String? {
+        get { selections["character"] }
+        set { selections["character"] = newValue }
+    }
+    public var vehicle: String? {
+        get { selections["vehicle"] }
+        set { selections["vehicle"] = newValue }
+    }
+    public var isEmpty: Bool { selections.isEmpty && session_id == nil }
+
+    private enum CodingKeys: String, CodingKey { case selections, character, vehicle, session_id }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        selections = try values.decodeIfPresent([String: String].self, forKey: .selections) ?? [:]
+        if let character = try values.decodeIfPresent(String.self, forKey: .character) {
+            selections["character"] = character
+        }
+        if let vehicle = try values.decodeIfPresent(String.self, forKey: .vehicle) {
+            selections["vehicle"] = vehicle
+        }
+        session_id = try values.decodeIfPresent(String.self, forKey: .session_id)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(selections, forKey: .selections)
+        try values.encodeIfPresent(session_id, forKey: .session_id)
+    }
 }
 
 public struct ThemeInterfaceOverrides: Codable, Equatable, Sendable {
@@ -20,7 +49,7 @@ public struct ThemeInterfaceOverrides: Codable, Equatable, Sendable {
     public var targets: [String: ThemeTargetOverride]
 
     public init(themeID: String, targets: [String: ThemeTargetOverride] = [:]) {
-        schema_version = 1
+        schema_version = 2
         theme_id = themeID
         self.targets = targets
     }
@@ -35,15 +64,18 @@ public struct ThemeInterfaceOverrides: Codable, Equatable, Sendable {
 
     public func validated(for themeID: String, interface: ThemeInterfaceManifest) throws -> Self {
         let targetIDs = Set(interface.targets.map(\.id))
-        let characters = Set(interface.choices.filter { $0.kind == .character }.map(\.id))
-        let vehicles = Set(interface.choices.filter { $0.kind == .vehicle }.map(\.id))
-        guard schema_version == 1, theme_id == themeID, targets.count <= interface.targets.count,
+        let choices = Dictionary(grouping: interface.choices, by: { $0.kind.rawValue })
+            .mapValues { Set($0.map(\.id)) }
+        guard [1, 2].contains(schema_version), theme_id == themeID,
+              targets.count <= interface.targets.count,
               Set(targets.keys).isSubset(of: targetIDs), targets.values.allSatisfy({ value in
-                  (value.character.map(characters.contains) ?? true)
-                      && (value.vehicle.map(vehicles.contains) ?? true)
+                  value.selections.count <= 8
+                      && value.selections.allSatisfy { kind, choice in
+                          Self.validID(kind) && choices[kind]?.contains(choice) == true
+                      }
                       && (value.session_id.map(Self.validID) ?? true)
               }) else { throw ModelError.invalid("invalid theme interface overrides") }
-        return self
+        return ThemeInterfaceOverrides(themeID: themeID, targets: targets)
     }
 
     private static func validID(_ value: String) -> Bool {

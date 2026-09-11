@@ -120,6 +120,15 @@ de clips correspondant aux slots de cette pièce. Le RenderHost effectue la subs
 par instance et restaure le modèle original au reset. L'identité de session, le chemin
 et l'action restent portés par l'instance, jamais par le modèle.
 
+La version 5 retire les deux dernières catégories connues du connecteur. `kind` est
+un identifiant opaque déclaré par le thème et chaque étape devient une section de
+menu AppKit construite automatiquement dans l'ordre du manifeste. Les overrides v2
+conservent une table `selections` par catégorie ; les anciens champs `character` et
+`vehicle` sont migrés à la lecture. Une nouvelle catégorie telle que `outfit`,
+`companion`, `scene` ou `palette` ne demande donc aucune modification Swift. Chaque
+catégorie de choix doit apparaître exactement une fois dans les étapes, ce qui évite
+les choix chargés mais inaccessibles dans le menu.
+
 Une substitution riggée exige une `compatibility_signature` qui couvre le type de
 ressource, le squelette, les clips requis et les points d'ancrage. Le runtime refuse
 une substitution incompatible. Un retargeting n'est accepté que comme dérivé produit
@@ -262,6 +271,11 @@ déclarer un retrait explicite. Ce retrait est visible dans le manifeste et dans
 review ; il ne peut pas être produit silencieusement par omission. Les thèmes officiels
 conservent l'accès à audio, mouvement, verrouillage, profil énergétique et réglages,
 sans imposer leur présence permanente dans le coin de l'écran.
+
+Toute correction du contrat, d'un adaptateur ou du rendu suit désormais le
+[protocole méthodique](../methodical-correction.md). La qualification lie les hashes
+du package et du processus actif à une matrice visuelle ; compilation et capture
+isolée ne suffisent plus.
 
 ## Symbiose avec un jeu sans fusion des contenus
 

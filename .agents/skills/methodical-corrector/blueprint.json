@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "skillId": "methodical-corrector",
+  "version": "1.0.0",
+  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "mutationAuthority": "orchestrator",
+  "validations": [
+    {
+      "id": "methodical-corrector-tests",
+      "executable": "node",
+      "args": ["--test", "tests/methodical-corrector.test.mjs"],
+      "cwd": ".",
+      "timeout_ms": 30000
+    }
+  ]
+}
