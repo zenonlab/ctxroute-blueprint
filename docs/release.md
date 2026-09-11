@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current local candidate is `1.0.12`, not yet published. `apps/extension/package.json` is the only
+The current published release is `1.0.12`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -36,9 +36,9 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
-### Robust pipeline candidate — 2026-09-12
+### Robust pipeline release — 2026-09-12
 
-Candidate `1.0.12` remains local. It restores D1 exact-ID hydration recovery,
+Release `1.0.12` restores D1 exact-ID hydration recovery,
 independent provider restoration, dated internal retries, root release routes,
 honest MangaDex pagination and linked MangaUpdates hydration. Provider response
 limits are 512 KiB, separate from the 64 KiB bridge. Library reads, message
@@ -73,11 +73,20 @@ database was imported or committed. The synthetic equivalence snapshot changes
 only adapter versions and their fingerprints; it is not evidence of parity
 with the user's private corpus.
 
-Production remains on the previously published `1.0.11` Worker and archives.
-Publishing `1.0.12`, populating R2 associations and verifying the user's actual
-installed profile remain separate operations. No D1 migration is needed for
-this candidate and no user data was deleted. The user's `.codex/config.toml`
-change remains outside these commits.
+After the user's explicit deployment request, gate plan
+`808bb95417403e2a782da2c72af17453634ecc5b0e647b5f1d7fc30b0fcacdda`
+published both ZIPs and Worker `a7fa4736-3915-4608-b97e-ddb7a99da750`.
+Public downloads return HTTP 200 and match both hashes above; `/download`
+advertises 1.0.12 and `/library` and `/agenda` return HTTP 200.
+The Playwright run against the production base URL passes 7/7; provider data
+and bridge fixtures remain synthetic. Previous Worker
+`6d02c19a-9760-44ae-ab89-26e82bbc77e0` and the 1.0.11 archives remain the
+rollback references; its deployment snapshot is retained locally.
+
+No D1 migration was applied and no user data was deleted. Populating R2 cover
+associations and verifying the user's actual installed profile remain separate
+operations. Publishing a ZIP does not update an unpacked browser installation.
+The user's `.codex/config.toml` change remains outside these commits.
 
 ### Comix route correction candidate — 2026-09-11
 

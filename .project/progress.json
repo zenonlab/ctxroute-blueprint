@@ -7179,6 +7179,38 @@
             "Two isolated builds reproduce Chrome 4b6642dfe4008ccb1d2ca1a57bfbdf48ebdc41d79e537d2bdbe3a37456cb961b and Firefox 014de4344a0e7781eef8b74e3ee2a09b1073a9d6e3d6ff39dfc37a6d6d29aaf7",
             "Local candidate only: actual private profile, production publication and populated R2 associations remain unverified; external step-8 unchanged"
           ]
+        },
+        {
+          "id": "step-18",
+          "title": "Publish verified 1.0.12 Worker and extension archives",
+          "status": "DONE",
+          "acceptance": [
+            "Exact approved archive hashes served publicly",
+            "Worker version and site journeys verified; prior Worker retained for rollback",
+            "No D1 migration or private-profile recovery claimed"
+          ],
+          "files": [
+            "docs/release.md",
+            "docs/progress.md",
+            ".project/progress.json",
+            "apps/web/out",
+            "apps/extension/.output/packages"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "npm exec -- playwright test",
+            "npm run validate:docs",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Explicit user deployment request; gate 808bb95417403e2a782da2c72af17453634ecc5b0e647b5f1d7fc30b0fcacdda published both 1.0.12 ZIPs and Worker a7fa4736-3915-4608-b97e-ddb7a99da750",
+            "Public ZIP downloads HTTP 200 and exact certified SHA-256; download page advertises 1.0.12; library and agenda HTTP 200",
+            "Playwright against production base URL passes 7/7 with synthetic provider and bridge fixtures; previous Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0 retained for rollback",
+            "No D1 migration, cover ingestion, user-profile mutation or Git push; actual installed private library remains unverified in step-8"
+          ]
         }
       ]
     }
