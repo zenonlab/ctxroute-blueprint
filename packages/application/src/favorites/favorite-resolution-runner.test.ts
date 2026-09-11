@@ -125,6 +125,20 @@ describe('runFavoriteResolutionSlice', () => {
     await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [source?.matchedWorkId] });
   });
 
+  it('records a terminal retryable result when an invariant failure blocks a task', async () => {
+    const { outbox, storage, task } = await fixture();
+    const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'invariant-search', provider: 'anilist', truncated: false });
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => envelope }),
+      hydration: hydrationPorts({ hydrate: async () => ({ ...candidate, externalId: 'wrong-id' }) }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'invariant-token',
+    });
+    expect(result).toEqual({ blocked: 1, completed: 0, retried: 0 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'BLOCKED' });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' });
+  });
+
   it('persists bookmark progression with the hydrated provider maximum', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([{ ...favorite, title: 'Frieren épisode 7' }], storage, now);

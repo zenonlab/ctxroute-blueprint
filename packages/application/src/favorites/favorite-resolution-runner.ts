@@ -320,11 +320,20 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
       else if (result === 'retried') retried += 1;
       else blocked += 1;
     } catch (error) {
-      const changed = await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
+      const changed = await dependencies.storage.transaction(['favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources'], async (session) => {
         const current = await session.getFavoriteResolutionTask(task.id);
         if (current?.state !== 'CLAIMED' || current.claimToken !== token || current.idempotencyKey !== task.idempotencyKey
           || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) return false;
+        const payload = parseFavoriteResolutionTaskPayload(task.payload);
+        const source = await session.getFavoriteSource(payload.sourceId);
+        const record = await session.getFavoriteParseArtifact(payload.sourceId);
+        if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) return false;
         await session.putFavoriteResolutionTask(blockTask(current, token, error instanceof Error ? error.message : 'UNKNOWN_RESOLUTION_FAILURE'));
+        await session.putFavoriteSource(createFavoriteSource({
+          ...source,
+          resolution: { kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' },
+          resolutionVersions: favoriteResolutionVersions(record.artifact),
+        }));
         return true;
       });
       if (changed) blocked += 1;

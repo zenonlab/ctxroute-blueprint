@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes attribuées; covers et projection avancent par curseur borné."
+        "note": "Toute tâche bloquée conserve RETRYABLE afin d’éviter un compteur de traitement fantôme."
       },
       {
         "id": "cover-rights",
