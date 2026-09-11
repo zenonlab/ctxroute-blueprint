@@ -2,7 +2,7 @@ import AppKit
 
 @MainActor private final class GameChoiceStrip: NSView {
     private let stack = NSStackView()
-    private var buttons: [NSButton] = []
+    private var entries: [(button: NSButton, cursor: NSImageView)] = []
     private(set) var selectedID: String?
     var onChange: (() -> Void)?
 
@@ -32,9 +32,10 @@ import AppKit
 
     required init?(coder: NSCoder) { nil }
 
-    func configure(entries: [(String, String, NSImage?)], selected: String?) {
+    func configure(entries choices: [(String, String, NSImage?)], selected: String?,
+                   selectionImage: NSImage?) {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        buttons = entries.map { id, label, image in
+        entries = choices.map { id, label, image in
             let button = NSButton(title: label, target: self, action: #selector(chosen(_:)))
             button.identifier = NSUserInterfaceItemIdentifier(id)
             button.image = image
@@ -47,21 +48,40 @@ import AppKit
             button.setAccessibilityLabel(label)
             button.widthAnchor.constraint(equalToConstant: 96).isActive = true
             button.heightAnchor.constraint(equalToConstant: 104).isActive = true
-            stack.addArrangedSubview(button)
-            return button
+            let cursor = NSImageView(image: selectionImage ?? NSImage())
+            cursor.imageScaling = .scaleProportionallyDown
+            cursor.isHidden = true
+            cursor.setAccessibilityElement(false)
+            cursor.translatesAutoresizingMaskIntoConstraints = false
+            let card = NSView()
+            card.addSubview(button)
+            card.addSubview(cursor)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                card.widthAnchor.constraint(equalToConstant: 96),
+                card.heightAnchor.constraint(equalToConstant: 104),
+                button.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+                button.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+                button.topAnchor.constraint(equalTo: card.topAnchor),
+                button.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+                cursor.widthAnchor.constraint(equalToConstant: 30),
+                cursor.heightAnchor.constraint(equalToConstant: 30),
+                cursor.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: 5),
+                cursor.topAnchor.constraint(equalTo: card.topAnchor, constant: -5)
+            ])
+            stack.addArrangedSubview(card)
+            return (button, cursor)
         }
         select(id: selected)
     }
 
     func select(id: String?) {
         selectedID = id
-        for button in buttons {
+        for entry in entries {
+            let button = entry.button
             let active = button.identifier?.rawValue == (id ?? "")
             button.state = active ? .on : .off
-            button.wantsLayer = true
-            button.layer?.borderWidth = active ? 3 : 0
-            button.layer?.borderColor = active ? NSColor.systemYellow.cgColor : nil
-            button.layer?.cornerRadius = 8
+            entry.cursor.isHidden = !active
         }
     }
 
@@ -109,21 +129,25 @@ import AppKit
         self.overrides = overrides
         self.sessions = sessions
         let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
+        let selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
         target.configure(entries: interface.manifest.targets.map { item in
             let choiceID = overrides.targets[item.id]?.vehicle
             let choice = interface.manifest.choices.first { $0.id == choiceID }
             let image = choice.flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
                 ?? targetIcon
             return (item.id, item.label, image)
-        }, selected: targetID ?? interface.manifest.targets.first?.id)
+        }, selected: targetID ?? interface.manifest.targets.first?.id,
+                         selectionImage: selectionImage)
         let fallback = interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
-        character.configure(entries: choices(.character, in: interface, fallback: fallback), selected: nil)
-        vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback), selected: nil)
+        character.configure(entries: choices(.character, in: interface, fallback: fallback),
+                            selected: nil, selectionImage: selectionImage)
+        vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback),
+                          selected: nil, selectionImage: selectionImage)
         session.configure(entries: [("", "Aucune session",
                                      icon(for: "session.state.none", in: interface, size: 64))] + sessions.map {
             ($0.id, "\($0.display_name) — \($0.state.rawValue)",
              icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 64))
-        }, selected: nil)
+        }, selected: nil, selectionImage: selectionImage)
         focusSession.target = self
         focusSession.action = #selector(sendSessionIntent(_:))
         focusSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.focus.rawValue)

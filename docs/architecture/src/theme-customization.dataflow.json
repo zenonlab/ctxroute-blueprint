@@ -34,7 +34,7 @@
     { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
     { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },
     { "from": "runtime", "to": "renderer", "label": "apparence → · cibles ←", "variant": "emphasis", "labelAt": [855, 108] },
-    { "from": "runtime", "to": "ui", "label": "modale · icônes ROM · sélection", "labelAt": [925, 220] },
+    { "from": "runtime", "to": "ui", "label": "modale · cartes et curseur ROM", "labelAt": [925, 220] },
     { "from": "runtime", "to": "capabilities", "label": "focus/open corrélés", "variant": "security", "labelAt": [680, 270] },
     { "from": "capabilities", "to": "connector", "label": "actions autorisées", "variant": "security", "route": "straight", "labelAt": [855, 428] },
     { "from": "capabilities", "to": "ui", "label": "snapshot monotone confirmé", "variant": "dashed" }
