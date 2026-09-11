@@ -24,8 +24,8 @@ under an existing version can leave installed browsers with stale cached code.
 Every corrective extension build increments the extension package version
 (`1.0.1`, `1.0.2` for the initial cover repair, `1.0.3` for resumable cover
 repair, `1.0.4` for resolution during sync restoration, then `1.0.5` for
-library projection reconstruction, and `1.0.6` for rejecting non-media generic
-links). The
+library projection reconstruction, `1.0.6` for rejecting non-media generic
+links, and `1.0.7` for explicit MangaUpdates hydration fallback). The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare
