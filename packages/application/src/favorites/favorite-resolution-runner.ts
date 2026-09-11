@@ -24,12 +24,25 @@ export const favoriteResolutionAttemptLimit = 8;
 export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
 export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 
-export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string, afterId?: Work['id']) {
+export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string, afterId?: Work['id'], candidates?: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>) {
   const works = await storage.listWorks(afterId === undefined ? { limit: 10 } : { afterId, limit: 10 });
   let repaired = 0;
   let skipped = 0;
   for (const work of works) {
-    if (work.hydration?.candidate.cover !== undefined) { skipped += 1; continue; }
+    const currentCandidate = work.hydration?.candidate;
+    if (currentCandidate?.provider === 'mangadex' && candidates?.mangaupdates !== undefined && currentCandidate.titles.length > 0) {
+      try {
+        const envelope = await candidates.mangaupdates.search({ provider: 'mangaupdates', titles: currentCandidate.titles, limit: 6 });
+        const preferred = envelope.candidates.find((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME' && value.cover !== undefined && value.preSerialization !== true);
+        if (preferred !== undefined) {
+          const references = [...new Map([...work.externalReferences, { provider: preferred.provider, externalId: preferred.externalId }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+          await storage.putWork(createWork({ ...work, externalReferences: references, hydration: { ...work.hydration!, candidate: preferred, hydratedAt: now() } }));
+          repaired += 1;
+          continue;
+        }
+      } catch { /* keep the current provider cover when the preference lookup is unavailable */ }
+    }
+    if (currentCandidate?.cover !== undefined) { skipped += 1; continue; }
     const reference = work.externalReferences.find((item) => item.provider in hydration);
     const provider = reference === undefined ? undefined : (['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga'] as const).find((value) => value === reference.provider);
     const adapter = provider === undefined ? undefined : hydration[provider];

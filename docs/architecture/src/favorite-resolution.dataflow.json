@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Toute tâche bloquée conserve RETRYABLE afin d’éviter un compteur de traitement fantôme."
+        "note": "Toute tâche bloquée conserve RETRYABLE; les œuvres manga MangaDex tentent aussi la cover MangaUpdates."
       },
       {
         "id": "cover-rights",
