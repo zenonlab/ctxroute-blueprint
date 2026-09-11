@@ -51,9 +51,14 @@ périmés sont refusés et le simulateur conserve la dernière intention accept�
 preuve bornée, sans contenu de session. Des slots optionnels `session.state.*` et
 `session.action.*` habillent le catalogue et ses actions avec les images du package ;
 leur absence retombe sur du texte, jamais sur un pictogramme système embarqué.
-Le simulateur initialise son catalogue depuis les `session_id` des cibles découvertes,
-sans identité ni libellé de thème compilé dans le connecteur. Un snapshot reçu du
-provider garde priorité sur cette initialisation idempotente.
+Le catalogue contient exclusivement les snapshots reçus du provider de terminal ou
+de processus. Une cible peut référencer un `session_id` connu, mais le package de
+thème ne crée jamais une session et ne peut pas fabriquer un état de processus.
+
+Les choix sont prévisualisés dans le RenderHost sans écrire le store. Annuler ou
+fermer le panneau restaure atomiquement les overrides persistés ; enregistrer les
+valide puis les écrit. Réinitialiser écrit un document d'overrides vide et pousse
+immédiatement cette restauration au RenderHost.
 
 La luminosité est une valeur absolue bornée de 0 à 1 et non un toggle. Le contrôle
 de thème émet `setBrightness`; son adaptateur ne doit jamais prétendre modifier un

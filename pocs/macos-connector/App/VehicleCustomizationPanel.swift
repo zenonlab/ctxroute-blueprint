@@ -124,39 +124,35 @@ import AppKit
         let image: NSImage?
     }
 
-    private let grid = NSGridView()
+    private let scroll = NSScrollView()
+    private var grid = NSGridView()
     private var entries: [(button: NSButton, card: NSView, cursor: NSImageView)] = []
     private(set) var selectedID: String?
     var onChange: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
-        scroll.documentView = grid
         addSubview(scroll)
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        grid.rowSpacing = 7
-        grid.columnSpacing = 7
         NSLayoutConstraint.activate([
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             scroll.topAnchor.constraint(equalTo: topAnchor),
-            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
-            grid.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
-            grid.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
-            grid.topAnchor.constraint(equalTo: scroll.contentView.topAnchor)
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+        installGrid(NSGridView())
     }
 
     required init?(coder: NSCoder) { nil }
 
     func configure(_ choices: [Entry], columns: Int, selected: String?,
                    cellSize: NSSize, selectionImage: NSImage?) {
-        while grid.numberOfRows > 0 { grid.removeRow(at: 0) }
+        // Replacing the document grid keeps removed cell constraints from
+        // overlapping during rapid staged selection.
+        let nextGrid = NSGridView()
         entries.removeAll(keepingCapacity: true)
         let safeColumns = max(2, min(columns, 10))
         for start in stride(from: 0, to: choices.count, by: safeColumns) {
@@ -204,9 +200,24 @@ import AppKit
                 entries.append((button, card, cursor))
                 cells.append(card)
             }
-            grid.addRow(with: cells)
+            nextGrid.addRow(with: cells)
         }
+        installGrid(nextGrid)
         select(id: selected)
+    }
+
+    private func installGrid(_ nextGrid: NSGridView) {
+        grid.removeFromSuperview()
+        grid = nextGrid
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.rowSpacing = 7
+        grid.columnSpacing = 7
+        scroll.documentView = grid
+        NSLayoutConstraint.activate([
+            grid.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            grid.topAnchor.constraint(equalTo: scroll.contentView.topAnchor)
+        ])
     }
 
     func select(id: String?) {
@@ -251,8 +262,12 @@ import AppKit
     private let save = NSButton(title: "Enregistrer", target: nil, action: nil)
     private let error = NSTextField(wrappingLabelWithString: "")
     private var selectionImage: NSImage?
+    private var fixedLayoutInstalled = false
+    private var restorePreviewOnClose = false
     var onSave: ((ThemeInterfaceOverrides) -> Void)?
     var onReset: (() -> Void)?
+    var onPreview: ((ThemeInterfaceOverrides) -> String?)?
+    var onCancelPreview: (() -> Void)?
     var onSessionIntent: ((TerminalSessionIntent) -> String)?
 
     func present(themeID: String, interface: ResolvedThemeInterface,
@@ -269,6 +284,7 @@ import AppKit
         self.interface = interface
         self.overrides = overrides
         self.sessions = sessions
+        restorePreviewOnClose = true
         editingTargetID = nil
         let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
         selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
@@ -301,13 +317,18 @@ import AppKit
         target.onChange = { [weak self] in self?.targetChanged() }
         session.target = self
         session.action = #selector(sessionChanged)
-        target.widthAnchor.constraint(equalToConstant: 660).isActive = true
-        target.heightAnchor.constraint(equalToConstant: 60).isActive = true
-        character.widthAnchor.constraint(equalToConstant: 660).isActive = true
-        character.heightAnchor.constraint(equalToConstant: 292).isActive = true
-        vehicle.widthAnchor.constraint(equalToConstant: 660).isActive = true
-        vehicle.heightAnchor.constraint(equalToConstant: 150).isActive = true
-        session.widthAnchor.constraint(equalToConstant: 330).isActive = true
+        if !fixedLayoutInstalled {
+            fixedLayoutInstalled = true
+            NSLayoutConstraint.activate([
+                target.widthAnchor.constraint(equalToConstant: 660),
+                target.heightAnchor.constraint(equalToConstant: 60),
+                character.widthAnchor.constraint(equalToConstant: 660),
+                character.heightAnchor.constraint(equalToConstant: 292),
+                vehicle.widthAnchor.constraint(equalToConstant: 660),
+                vehicle.heightAnchor.constraint(equalToConstant: 150),
+                session.widthAnchor.constraint(equalToConstant: 330)
+            ])
+        }
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -316,7 +337,7 @@ import AppKit
         stack.addArrangedSubview(NSTextField(labelWithString: "Véhicule dans la scène"))
         stack.addArrangedSubview(target)
         stack.addArrangedSubview(selectionStack)
-        stack.addArrangedSubview(NSTextField(labelWithString: "Session (optionnel)"))
+        stack.addArrangedSubview(NSTextField(labelWithString: "Session terminal / processus (optionnel)"))
         stack.addArrangedSubview(session)
         sessionStatus.textColor = .secondaryLabelColor
         stack.addArrangedSubview(sessionStatus)
@@ -324,7 +345,7 @@ import AppKit
         error.textColor = .systemRed
         stack.addArrangedSubview(error)
         cancel.target = self
-        cancel.action = #selector(close)
+        cancel.action = #selector(cancelChanges)
         resetButton.target = self
         resetButton.action = #selector(reset)
         save.target = self
@@ -471,23 +492,32 @@ import AppKit
         character.select(id: value?.character)
         configureVehicleGrid(selected: value?.vehicle)
         configureSessionMenu(selected: value?.session_id ?? embedded?.session_id)
-        sessionChanged()
+        updateSessionStatus()
     }
 
     @objc private func characterChanged() {
         refreshStages(after: .character)
         updateTargetPreview()
+        previewCurrentSelection()
     }
 
     @objc private func vehicleChanged() {
         refreshStages(after: .vehicle)
         updateTargetPreview()
+        previewCurrentSelection()
     }
 
     @objc private func sessionChanged() {
+        updateSessionStatus()
+        previewCurrentSelection()
+    }
+
+    private func updateSessionStatus() {
         guard let id = session.selectedItem?.representedObject as? String,
               let snapshot = sessions.first(where: { $0.id == id }) else {
-            sessionStatus.stringValue = "Aucune session liée."
+            sessionStatus.stringValue = sessions.isEmpty
+                ? "Aucune session publiée par le provider terminal."
+                : "Aucune session liée."
             focusSession.isEnabled = false
             openSession.isEnabled = false
             return
@@ -531,9 +561,29 @@ import AppKit
     private func captureCurrentSelection() {
         guard var overrides, let id = editingTargetID else { return }
         let sessionID = session.selectedItem?.representedObject as? String
-        overrides.targets[id] = ThemeTargetOverride(character: character.selectedID,
-            vehicle: vehicle.selectedID, sessionID: sessionID?.isEmpty == true ? nil : sessionID)
+        overrides.set(ThemeTargetOverride(character: character.selectedID,
+            vehicle: vehicle.selectedID, sessionID: sessionID?.isEmpty == true ? nil : sessionID), for: id)
         self.overrides = overrides
+    }
+
+    private func previewCurrentSelection() {
+        captureCurrentSelection()
+        guard let interface, let overrides else { return }
+        do {
+            let checked = try overrides.validated(for: themeID, interface: interface.manifest)
+            if let previewError = onPreview?(checked) {
+                error.stringValue = previewError
+                return
+            }
+            let selected = [character.selectedID, vehicle.selectedID].compactMap { $0 }
+            let unresolved = interface.manifest.choices.filter {
+                selected.contains($0.id) && $0.appearance == nil
+            }.map(\.label)
+            error.stringValue = unresolved.isEmpty ? ""
+                : "Aucun modèle 3D converti pour : \(unresolved.joined(separator: ", "))."
+        } catch let previewError {
+            error.stringValue = "Aperçu refusé : \(previewError.localizedDescription)"
+        }
     }
 
     @objc private func submit() {
@@ -543,11 +593,36 @@ import AppKit
             guard let interface else { return }
             self.overrides = try overrides.validated(for: themeID, interface: interface.manifest)
             onSave?(self.overrides!)
+            restorePreviewOnClose = false
             close()
         } catch { self.error.stringValue = "Choix invalide : \(error.localizedDescription)" }
     }
 
-    @objc private func reset() { onReset?(); close() }
+    @objc private func reset() {
+        guard let interface else { return }
+        overrides = ThemeInterfaceOverrides(themeID: themeID)
+        editingTargetID = nil
+        let selected = target.selectedID ?? interface.manifest.targets.first?.id
+        let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
+        target.configure(entries: interface.manifest.targets.map { ($0.id, $0.label, targetIcon) },
+                         selected: selected, selectionImage: selectionImage,
+                         cellSize: .init(width: 190, height: 54))
+        targetChanged()
+        onReset?()
+        error.stringValue = ""
+    }
+
+    @objc private func cancelChanges() {
+        onCancelPreview?()
+        restorePreviewOnClose = false
+        close()
+    }
+
     @objc private func close() { panel?.close(); panel = nil; editingTargetID = nil }
-    func windowWillClose(_ notification: Notification) { panel = nil; editingTargetID = nil }
+    func windowWillClose(_ notification: Notification) {
+        if restorePreviewOnClose { onCancelPreview?() }
+        restorePreviewOnClose = false
+        panel = nil
+        editingTargetID = nil
+    }
 }

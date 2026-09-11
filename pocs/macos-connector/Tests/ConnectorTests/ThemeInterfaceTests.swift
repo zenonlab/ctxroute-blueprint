@@ -71,6 +71,12 @@ final class ThemeInterfaceTests: XCTestCase {
         var invalid = value
         invalid.targets["vehicle.one"]?.vehicle = "kart.unknown"
         XCTAssertThrowsError(try invalid.validated(for: "fixture.theme", interface: manifest))
+
+        var normalized = ThemeInterfaceOverrides(themeID: "fixture.theme", targets: [
+            "vehicle.one": .init(character: "driver.fixture")
+        ])
+        normalized.set(.init(), for: "vehicle.one")
+        XCTAssertTrue(normalized.targets.isEmpty)
     }
 
     func testSelectionPipelineFiltersNextStageByDeclaredAttribute() throws {

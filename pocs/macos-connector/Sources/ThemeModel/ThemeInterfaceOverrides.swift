@@ -10,6 +10,8 @@ public struct ThemeTargetOverride: Codable, Equatable, Sendable {
         self.vehicle = vehicle
         session_id = sessionID
     }
+
+    public var isEmpty: Bool { character == nil && vehicle == nil && session_id == nil }
 }
 
 public struct ThemeInterfaceOverrides: Codable, Equatable, Sendable {
@@ -21,6 +23,14 @@ public struct ThemeInterfaceOverrides: Codable, Equatable, Sendable {
         schema_version = 1
         theme_id = themeID
         self.targets = targets
+    }
+
+    public mutating func set(_ value: ThemeTargetOverride, for targetID: String) {
+        if value.isEmpty {
+            targets.removeValue(forKey: targetID)
+        } else {
+            targets[targetID] = value
+        }
     }
 
     public func validated(for themeID: String, interface: ThemeInterfaceManifest) throws -> Self {

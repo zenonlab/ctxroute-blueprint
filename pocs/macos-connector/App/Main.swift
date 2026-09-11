@@ -191,6 +191,8 @@ import os
         }
         customization.onSave = { [weak self] overrides in self?.saveInterfaceOverrides(overrides) }
         customization.onReset = { [weak self] in self?.resetInterfaceOverrides() }
+        customization.onPreview = { [weak self] overrides in self?.previewInterfaceOverrides(overrides) }
+        customization.onCancelPreview = { [weak self] in self?.restorePersistedInterfaceOverrides() }
         customization.onSessionIntent = { [weak self] intent in
             self?.performSessionIntent(intent) ?? "Simulateur de sessions indisponible."
         }
@@ -227,7 +229,6 @@ import os
         let receipt = ThemeDiscovery.discover(roots: roots)
         let selectedID = selectedTheme?.package.id
         themes = receipt.themes
-        synchronizeSessionSimulator()
         themePicker.removeAllItems(); themePicker.addItems(withTitles: themes.map(\.package.display_name))
         if let selectedID, let index = themes.firstIndex(where: { $0.package.id == selectedID }) {
             themePicker.selectItem(at: index)
@@ -237,21 +238,6 @@ import os
             ? "Aucun package valide dans \(roots.count) bibliothèque(s)."
             : "\(themes.count) thème(s) détecté(s), \(receipt.rejected.count) refusé(s)."
         configureThemeControls()
-    }
-
-    private func synchronizeSessionSimulator() {
-        let states: [TerminalSessionState] = [.active, .busy, .recovering]
-        var labels: [String: String] = [:]
-        for theme in themes {
-            for target in theme.interface?.manifest.targets ?? [] {
-                if let id = target.session_id, labels[id] == nil { labels[id] = target.label }
-            }
-        }
-        let snapshots = labels.sorted { $0.key < $1.key }.enumerated().map { index, binding in
-            TerminalSessionSnapshot(id: binding.key, displayName: binding.value,
-                state: states[index % states.count], sequence: 1)
-        }
-        terminalSessions.seed(snapshots)
     }
 
     private func configureThemeControls() {
@@ -375,6 +361,24 @@ import os
         } catch { statusLabel.stringValue = "Enregistrement refusé : \(error.localizedDescription)" }
     }
 
+    private func previewInterfaceOverrides(_ overrides: ThemeInterfaceOverrides) -> String? {
+        guard let theme = selectedTheme, let interface = theme.interface else {
+            return "Aucun thème actif à prévisualiser."
+        }
+        do {
+            let checked = try overrides.validated(for: theme.package.id, interface: interface.manifest)
+            try sendRuntimeControls(for: theme, overrides: checked)
+            return nil
+        } catch {
+            return "Aperçu indisponible : \(error.localizedDescription)"
+        }
+    }
+
+    private func restorePersistedInterfaceOverrides() {
+        guard let theme = selectedTheme else { return }
+        try? pushRuntimeControls(for: theme)
+    }
+
     private func resetInterfaceOverrides() {
         guard let theme = selectedTheme, let interface = theme.interface else { return }
         do {
@@ -455,13 +459,18 @@ import os
     }
 
     private func pushRuntimeControls(for theme: DiscoveredTheme) throws {
+        let overrides = try theme.interface.map {
+            try interfaceStore.load(themeID: theme.package.id, interface: $0.manifest)
+        }
+        try sendRuntimeControls(for: theme, overrides: overrides)
+    }
+
+    private func sendRuntimeControls(for theme: DiscoveredTheme,
+                                     overrides: ThemeInterfaceOverrides?) throws {
         guard renderHost.themeID == theme.package.id else { return }
         let audioVolume = themeAudioVolume(id: theme.package.id)
         let brightness = UserDefaults.standard.object(forKey: "ThemeBrightness.\(theme.package.id)") as? Double ?? 0.8
         let visualPaused = UserDefaults.standard.object(forKey: "ThemeVisualPaused.\(theme.package.id)") as? Bool ?? false
-        let overrides = try theme.interface.map {
-            try interfaceStore.load(themeID: theme.package.id, interface: $0.manifest)
-        }
         try renderHost.update(audioVolume: audioVolume, desktopItemsVisible: try? desktopItems.isVisible(),
                               brightness: brightness, visualPaused: visualPaused, overrides: overrides)
         desktopInput.setVisualPaused(visualPaused)
