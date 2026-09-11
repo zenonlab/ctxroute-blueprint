@@ -141,9 +141,7 @@ import os
         themePicker.action = #selector(themeSelectionChanged)
         stack.addArrangedSubview(themePicker)
         themeControls.onAudioVolume = { [weak self] value in self?.setThemeAudioVolume(value) }
-        themeControls.onDesktop = { [weak self] in self?.toggleDesktopItems() }
         themeControls.onBrightness = { [weak self] value in self?.setThemeBrightness(value) }
-        themeControls.onVisualPause = { [weak self] in self?.toggleVisualPause() }
         stack.addArrangedSubview(themeControls)
         statusLabel.textColor = .secondaryLabelColor; stack.addArrangedSubview(statusLabel)
 
@@ -260,10 +258,7 @@ import os
         }
         guard let id = selectedTheme?.package.id else { return }
         themeControls.setAudioVolume(themeAudioVolume(id: id))
-        themeControls.setDesktopVisible(try? desktopItems.isVisible(), interface: interface)
         themeControls.setBrightness(UserDefaults.standard.object(forKey: "ThemeBrightness.\(id)") as? Double ?? 0.8)
-        themeControls.setVisualPaused(UserDefaults.standard.object(forKey: "ThemeVisualPaused.\(id)") as? Bool ?? false,
-                                      interface: interface)
     }
 
     @objc private func themeSelectionChanged() { configureThemeControls() }
@@ -470,7 +465,6 @@ import os
     @objc private func toggleDesktopItems() {
         do {
             let visible = try desktopItems.toggle()
-            themeControls.setDesktopVisible(visible, interface: selectedTheme?.interface)
             if let theme = selectedTheme { try? pushRuntimeControls(for: theme) }
             statusLabel.stringValue = visible ? "Fichiers du bureau affichés." : "Fichiers du bureau masqués."
         } catch { statusLabel.stringValue = "Réglage Finder non confirmé ; aucun fichier n’a été supprimé." }
@@ -481,7 +475,6 @@ import os
         let key = "ThemeVisualPaused.\(theme.package.id)"
         let paused = !(UserDefaults.standard.object(forKey: key) as? Bool ?? false)
         UserDefaults.standard.set(paused, forKey: key)
-        themeControls.setVisualPaused(paused, interface: theme.interface)
         try? pushRuntimeControls(for: theme)
         statusLabel.stringValue = paused ? "Visuel en pause." : "Visuel repris."
     }
