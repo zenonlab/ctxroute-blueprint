@@ -38,33 +38,20 @@ import AppKit
         super.init(frame: frameRect)
         orientation = .vertical
         alignment = .leading
-        spacing = 8
-        let audioRow = sliderRow(icon: audioIcon, slider: audio, label: "Volume du thème",
-                                 action: #selector(changeAudioVolume))
+        spacing = 6
+        let audioRow = sliderRow(icon: audioIcon, slider: audio, button: desktop,
+                                 label: "Volume du thème",
+                                 buttonLabel: "Afficher ou masquer les fichiers du bureau",
+                                 sliderAction: #selector(changeAudioVolume),
+                                 buttonAction: #selector(toggleDesktop))
         let brightnessRow = sliderRow(icon: brightnessIcon, slider: brightness,
+                                      button: visualPause,
                                       label: "Luminosité du thème",
-                                      action: #selector(changeBrightness))
+                                      buttonLabel: "Mettre en pause ou reprendre le visuel",
+                                      sliderAction: #selector(changeBrightness),
+                                      buttonAction: #selector(toggleVisualPause))
         addArrangedSubview(audioRow)
         addArrangedSubview(brightnessRow)
-        let buttonRow = NSStackView()
-        buttonRow.orientation = .horizontal
-        buttonRow.alignment = .centerY
-        buttonRow.spacing = 16
-        buttonRow.edgeInsets = NSEdgeInsets(top: 0, left: 59, bottom: 0, right: 0)
-        for (button, label, action) in [
-            (desktop, "Afficher ou masquer les fichiers du bureau", #selector(toggleDesktop)),
-            (visualPause, "Mettre en pause ou reprendre le visuel", #selector(toggleVisualPause))
-        ] {
-            button.target = self
-            button.action = action
-            button.isBordered = false
-            button.imageScaling = .scaleProportionallyDown
-            button.setAccessibilityLabel(label)
-            button.widthAnchor.constraint(equalToConstant: 42).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 42).isActive = true
-            buttonRow.addArrangedSubview(button)
-        }
-        addArrangedSubview(buttonRow)
         unavailable.textColor = .secondaryLabelColor
         addArrangedSubview(unavailable)
         setSkin(nil)
@@ -72,23 +59,32 @@ import AppKit
 
     required init?(coder: NSCoder) { nil }
 
-    private func sliderRow(icon: NSImageView, slider: NSSlider, label: String,
-                           action: Selector) -> NSStackView {
+    private func sliderRow(icon: NSImageView, slider: NSSlider, button: NSButton,
+                           label: String, buttonLabel: String,
+                           sliderAction: Selector, buttonAction: Selector) -> NSStackView {
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 10
+        row.spacing = 8
         icon.imageScaling = .scaleProportionallyDown
         icon.setAccessibilityLabel(label)
         icon.widthAnchor.constraint(equalToConstant: 32).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 32).isActive = true
         slider.target = self
-        slider.action = action
+        slider.action = sliderAction
         slider.isContinuous = true
         slider.setAccessibilityLabel(label)
-        slider.widthAnchor.constraint(equalToConstant: 176).isActive = true
+        slider.widthAnchor.constraint(equalToConstant: 208).isActive = true
+        button.target = self
+        button.action = buttonAction
+        button.isBordered = false
+        button.imageScaling = .scaleProportionallyDown
+        button.setAccessibilityLabel(buttonLabel)
+        button.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 42).isActive = true
         row.addArrangedSubview(icon)
         row.addArrangedSubview(slider)
+        row.addArrangedSubview(button)
         return row
     }
 
