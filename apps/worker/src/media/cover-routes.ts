@@ -1,4 +1,5 @@
 import { COVER_CONTENT_TYPES } from '@tobirink/adapters-cloudflare';
+import { favoritePublicReferenceSchema } from '@tobirink/application';
 import { Hono } from 'hono';
 import { cloudPolicy } from '../cloud-policy';
 import type { WorkerRuntime, WorkerServices } from '../composition';
@@ -45,6 +46,18 @@ function routeServices(context: { get(key: 'services'): WorkerServices }, inject
 
 export function createCoverMediaApp(injected?: CoverServices): Hono<WorkerRuntime> {
   const app = new Hono<WorkerRuntime>();
+
+  app.get('/v1/media/provider-covers/:provider/:externalId/:variant', async (context) => {
+    if (new URL(context.req.url).search.length > 0) return noStoreJson(context, 'query-parameters-not-supported', 400);
+    const reference = favoritePublicReferenceSchema.safeParse({ provider: context.req.param('provider'), externalId: context.req.param('externalId') });
+    const variant = context.req.param('variant');
+    if (!reference.success || !isVariant(variant)) return noStoreJson(context, 'cover-not-found', 404);
+    const master = await routeServices(context, injected).coverMasters.findMaster?.(reference.data);
+    if (master === undefined || !HASH_PATTERN.test(master.digest) || !isExtension(master.extension)) return noStoreJson(context, 'cover-not-found', 404);
+    context.header('Cache-Control', 'public, max-age=300');
+    context.header('X-Content-Type-Options', 'nosniff');
+    return context.redirect(`/v1/media/covers/${master.digest}/${master.extension}/${variant}`, 302);
+  });
 
   app.get('/v1/media/covers/:digest/:extension/:variant', async (context) => {
     const requestUrl = new URL(context.req.url);

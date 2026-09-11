@@ -1,4 +1,4 @@
-import { readAgendaPeriod, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
+import { providerCoverFallbackPath, readAgendaPeriod, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
 import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, Work, WorkId } from '@tobirink/domain';
@@ -53,6 +53,8 @@ async function mapLibraryItem(storage: StoragePort, item: { readonly progress?: 
     if (sourceUrl !== undefined) base.sourceUrl = sourceUrl;
   }
   if (candidate === undefined) return base;
+  const fallback = providerCoverFallbackPath(candidate);
+  if (fallback !== undefined) base.coverFallbackUrl = new URL(fallback, 'https://tobirink.com').href;
   const canonicalUrl = projectedUrl(candidate.canonicalUrl, 2048);
   const coverUrl = projectedUrl(candidate.cover?.url, 4096);
   if (canonicalUrl !== undefined) base.canonicalUrl = canonicalUrl;

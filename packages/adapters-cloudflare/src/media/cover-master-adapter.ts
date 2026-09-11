@@ -4,6 +4,7 @@ import type {
   NormalizedCoverMaster,
   StoredCoverMaster,
 } from '@tobirink/application';
+import { favoritePublicReferenceSchema } from '@tobirink/application';
 
 export const COVER_CONTENT_TYPES = ['image/avif', 'image/jpeg', 'image/png', 'image/webp'] as const satisfies readonly CoverOutputFormat[];
 
@@ -23,7 +24,7 @@ export interface CoverObjectStore {
     options: {
       customMetadata: Record<string, string>;
       httpMetadata: { cacheControl: string; contentType: string };
-      onlyIf: { etagDoesNotMatch: '*' };
+      onlyIf: { etagDoesNotMatch: '*' } | { etagMatches: string };
       sha256: ArrayBufferView;
     },
   ): Promise<StoredCoverObject | null>;
@@ -71,12 +72,16 @@ export class R2CoverMasterAdapter implements CoverMasterIngestionPort {
 
   async ingest(master: NormalizedCoverMaster): Promise<StoredCoverMaster> {
     assertNormalizedMaster(master);
+    if (master.publicReference !== undefined) favoritePublicReferenceSchema.parse(master.publicReference);
     const normalizedBytes = Uint8Array.from(master.bytes);
     const checksum = await crypto.subtle.digest('SHA-256', normalizedBytes);
     const digest = hex(checksum);
     const key = `covers/masters/sha256/${digest}.${EXTENSIONS[master.contentType]}`;
     const existing = await this.bucket.head(key);
-    if (existing) return this.result(master, digest, key, false);
+    if (existing) {
+      await this.associate(master, digest);
+      return this.result(master, digest, key, false);
+    }
 
     const baseMetadata = {
       colorSpace: master.colorSpace,
@@ -101,7 +106,22 @@ export class R2CoverMasterAdapter implements CoverMasterIngestionPort {
       onlyIf: { etagDoesNotMatch: '*' },
       sha256: new Uint8Array(checksum),
     });
+    await this.associate(master, digest);
     return this.result(master, digest, key, stored !== null);
+  }
+
+  private async associate(master: NormalizedCoverMaster, digest: string): Promise<void> {
+    if (master.publicReference === undefined) return;
+    const reference = favoritePublicReferenceSchema.parse(master.publicReference);
+    const key = `covers/references/${reference.provider}/${reference.externalId}.json`;
+    const existing = await this.bucket.head(key);
+    const bytes = new TextEncoder().encode(JSON.stringify({ schemaVersion: 1, digest, extension: EXTENSIONS[master.contentType] }));
+    const sha256 = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    const result = await this.bucket.put(key, bytes, {
+      customMetadata: {}, httpMetadata: { cacheControl: 'public, max-age=300', contentType: 'application/json' },
+      onlyIf: existing === null ? { etagDoesNotMatch: '*' } : { etagMatches: existing.etag }, sha256,
+    });
+    if (result === null) throw new Error('Cover reference changed concurrently; retry ingestion.');
   }
 
   private result(

@@ -40,7 +40,7 @@
           "bridge",
           "site"
         ],
-        "note": "La bibliothèque filtre et trie le corpus local avant pagination. Le site reçoit une projection typée, sans accès D1 ni secret."
+        "note": "Corpus local filtré avant pagination; cover fournisseur puis secours Worker par ID public associé à un master R2."
       }
     ]
   },

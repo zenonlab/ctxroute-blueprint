@@ -7,6 +7,7 @@ export type LibraryState = (typeof libraryStates)[number];
 export interface LibraryWork {
   coverAlt?: string;
   coverSrc?: string;
+  coverFallbackSrc?: string;
   detail?: string;
   href?: string;
   id: string;

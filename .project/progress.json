@@ -7103,7 +7103,7 @@
         {
           "id": "step-16",
           "title": "Connect cover recovery to the existing media boundary",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Provider cover failures have a verified bounded recovery path",
             "No unvalidated asset or arbitrary URL ingestion",
@@ -7118,7 +7118,11 @@
             "docs/decisions",
             "docs/architecture/src/tobirink.architecture.json",
             "docs/systems/favorite-resolution-rebuild-pipeline.md",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "packages/adapters-cloudflare/src/media",
+            "packages/contracts/src/web-bridge.ts",
+            "apps/web/app/library",
+            "apps/extension/entrypoints/options"
           ],
           "commands": [
             "npm exec -- vitest run",
@@ -7127,7 +7131,11 @@
             "git diff --check",
             "git commit"
           ],
-          "evidence": []
+          "evidence": [
+            "36 media/collective/projection tests and actual DOM cover fallback test pass; all workspace typechecks and Oxlint pass",
+            "Archify dataflow and architecture showcase, docs and diff checks pass",
+            "Recovery uses validated public ID and bounded R2 association; operational ingestion preserved; no production media populated"
+          ]
         },
         {
           "id": "step-17",

@@ -29,6 +29,15 @@ latency and cost.
 
 ## Decision
 
+Provider cover recovery uses a validated public provider ID to read one R2
+reference object, bounded to 4 KiB, then redirects to the existing immutable
+digest route. Approved master ingestion writes that association with an ETag
+condition; interrupted association writes can resume after the master exists.
+The public route never ingests an image or accepts a caller-supplied URL.
+Library cards try the provider URL followed by one Worker fallback and retain
+the failed state until the image references change. Existing rights and
+normalization requirements remain enforced by master ingestion.
+
 Use D1 only for normalized public catalogue rows and media descriptors. Use
 prepared statements, bounded projections, stable cursor pagination, and indexes
 that match measured query shapes. Verify hot queries with
@@ -76,8 +85,9 @@ is never a copying grant.
 Hydrated provider covers follow a separate path. The extension accepts only the
 fixed HTTPS image origins declared by the provider contract, preserves their
 attribution in IndexedDB, and projects that reference locally through
-WebBridge. A missing or rejected reference uses the local placeholder. These
-references never pass through the Worker and never cause an R2 write.
+WebBridge. A missing or failed cover attempts the ID-based Worker recovery
+route once before using the local placeholder. Provider URLs never pass
+through the Worker and never cause an R2 write.
 
 Public snapshot payloads use the repository-pinned Zod 4.5.4 as a direct
 adapter dependency. Strict parsing at the R2 and cache boundaries rejects

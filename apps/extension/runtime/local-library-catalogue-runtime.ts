@@ -1,4 +1,4 @@
-import { readLibraryCatalogue } from '@tobirink/application';
+import { providerCoverFallbackPath, readLibraryCatalogue } from '@tobirink/application';
 import type { LibraryCatalogueQuery, StoragePort } from '@tobirink/application';
 import type { LibraryId, ProviderEditorialStatus } from '@tobirink/domain';
 import type { LibraryCatalogueRequest } from './library-catalogue-messages';
@@ -13,6 +13,7 @@ const statusLabels: Readonly<Record<ProviderEditorialStatus, string>> = Object.f
 });
 
 interface ProjectedLibraryItem {
+  coverFallbackSrc?: string;
   coverAlt?: string;
   coverSrc?: string;
   detail?: string;
@@ -67,6 +68,8 @@ export async function readLocalLibraryCatalogueSnapshot(
     const coverSrc = displayUrl(candidate?.cover?.url, 4096);
     const href = displayUrl(candidate?.canonicalUrl, 8192);
     const item: ProjectedLibraryItem = base;
+    const fallback = candidate === undefined ? undefined : providerCoverFallbackPath(candidate);
+    if (fallback !== undefined) item.coverFallbackSrc = new URL(fallback, 'https://tobirink.com').href;
     if (coverSrc !== undefined) {
       item.coverAlt = displayText(`Couverture de ${work.preferredTitle} — ${candidate?.cover?.attribution ?? candidate?.provider ?? 'source'}`, 500);
       item.coverSrc = coverSrc;

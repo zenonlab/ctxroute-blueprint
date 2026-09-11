@@ -39,6 +39,7 @@ export const webLibraryItemSchema = z.object({
   canonicalUrl: z.string().url().max(2048).optional(),
   chapterCount: z.number().int().nonnegative().optional(),
   coverAttribution: boundedText(120).optional(),
+  coverFallbackUrl: z.string().url().max(4096).optional(),
   coverUrl: z.string().url().max(4096).optional(),
   editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
   endYear: z.number().int().min(1800).max(3000).optional(),

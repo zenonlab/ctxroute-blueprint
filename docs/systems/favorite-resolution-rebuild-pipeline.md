@@ -872,6 +872,18 @@ requête concurrente et sans appliquer une ancienne réponse après un changemen
 de filtres. Les lectures portent sur l'appartenance locale au début du parcours;
 les ajouts concurrents apparaissent au rafraîchissement suivant.
 
+Le secours cover utilise `/v1/media/provider-covers/:provider/:id/cover-md`.
+L'ID public est validé avant une lecture R2 précise; aucun titre, URL de
+favori ou paramètre de téléchargement n'est accepté. L'ingestion opérationnelle
+d'un master autorisé peut associer cet ID au digest et au format du master.
+L'association JSON est limitée à 4 KiB; sa mise à jour conditionnelle sur ETag
+détecte les écritures concurrentes. Une interruption après le master se reprend
+sans réécrire celui-ci. Le Worker redirige vers ses variantes fixes existantes.
+La carte tente sa cover fournisseur puis ce secours une seule fois, conserve
+son échec lors d'un rafraîchissement et réessaie si les références changent.
+Sans association ingérée, R2 répond 404; cette correction n'affirme pas que le
+catalogue de covers est déjà peuplé ou publié.
+
 La reconstruction est terminée seulement quand :
 
 - tout événement favori atteint un état terminal ou une reprise datée;

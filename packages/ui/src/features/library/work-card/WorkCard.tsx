@@ -9,6 +9,7 @@ import styles from './WorkCard.module.css';
 export interface WorkCardProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'children' | 'href' | 'title'> {
   coverAlt?: string;
   coverSrc?: string;
+  coverFallbackSrc?: string;
   context: string;
   detail?: string;
   href?: string;
@@ -34,6 +35,7 @@ export function WorkCard({
   className,
   coverAlt,
   coverSrc,
+  coverFallbackSrc,
   context,
   detail = 'Source inconnue',
   href,
@@ -51,7 +53,10 @@ export function WorkCard({
   const frameRef = useRef(0);
   const pointRef = useRef<ReturnType<typeof pointInRect> | null>(null);
   const [touchFlipped, setTouchFlipped] = useState(false);
-  const [failedCover, setFailedCover] = useState<string>();
+  const [coverFailure, setCoverFailure] = useState<{ key: string; stage: number }>();
+  const coverKey = `${coverSrc ?? ''}|${coverFallbackSrc ?? ''}`;
+  const coverStage = coverFailure?.key === coverKey ? coverFailure.stage : 0;
+  const activeCover = coverStage === 0 ? coverSrc ?? coverFallbackSrc : coverStage === 1 && coverSrc !== coverFallbackSrc && coverSrc !== undefined ? coverFallbackSrc : undefined;
   const flippable = variant === 'review' && Boolean(reviewActions);
   const classes = [
     styles.card,
@@ -109,8 +114,8 @@ export function WorkCard({
   const poster = (
     <span className={styles.poster}>
       <span className={styles.visual}>
-        {coverSrc && failedCover !== coverSrc
-          ? <img alt={coverAlt ?? `Couverture de ${title}`} decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedCover(coverSrc)} src={coverSrc} />
+        {activeCover
+          ? <img alt={coverAlt ?? `Couverture de ${title}`} decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={() => setCoverFailure({ key: coverKey, stage: coverStage + 1 })} src={activeCover} />
           : (
             <span aria-label={`Couverture indisponible pour ${title}`} className={styles.placeholder} role="img">
               <Icon aria-hidden="true" name={fallbackIcon[variant]} size="lg" />

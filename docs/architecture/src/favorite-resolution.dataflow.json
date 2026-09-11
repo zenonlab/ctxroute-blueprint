@@ -56,7 +56,7 @@
           "rightsGate",
           "coverR2"
         ],
-        "note": "Deux chemins séparés : référence fournisseur locale allowlistée, ou master R2 uniquement après preuve de droits au gate opérationnel."
+        "note": "Cover fournisseur puis un essai R2 par ID public; association ID→master à l’ingestion opérationnelle uniquement."
       },
       {
         "id": "recovery-collective",

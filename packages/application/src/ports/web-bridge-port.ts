@@ -40,6 +40,7 @@ export interface WebLibraryItem {
   canonicalUrl?: string;
   chapterCount?: number;
   coverAttribution?: string;
+  coverFallbackUrl?: string;
   coverUrl?: string;
   editorialStatus?: 'UPCOMING' | 'ONGOING' | 'HIATUS' | 'COMPLETED' | 'CANCELLED' | 'UNKNOWN';
   endYear?: number;

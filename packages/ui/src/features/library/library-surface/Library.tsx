@@ -83,6 +83,7 @@ export function Library({
                   <WorkCard
                     coverAlt={item.coverAlt}
                     coverSrc={item.coverSrc}
+                    coverFallbackSrc={item.coverFallbackSrc}
                     context={item.mediaType}
                     detail={item.detail ?? item.source}
                     href={item.href}

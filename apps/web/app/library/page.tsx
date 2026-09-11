@@ -57,6 +57,7 @@ function LibrarySurface() {
   const items: readonly LibraryWork[] = page?.items.map((item) => ({
     coverAlt: item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined,
     coverSrc: item.coverUrl,
+    coverFallbackSrc: item.coverFallbackUrl,
     detail: [item.format, item.startYear, item.provider].filter(Boolean).join(' · ') || undefined,
     href: item.sourceUrl ?? item.canonicalUrl ?? `/library/_?work=${encodeURIComponent(item.workId)}`,
     id: item.workId,

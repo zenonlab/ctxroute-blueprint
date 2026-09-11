@@ -27,7 +27,7 @@ function objectStore() {
     },
     async put(key, _value, options) {
       puts.push({ key, options });
-      if (keys.has(key)) return null;
+      if (keys.has(key) && 'etagDoesNotMatch' in options.onlyIf) return null;
       keys.add(key);
       return { etag: 'new', key };
     },
@@ -36,6 +36,15 @@ function objectStore() {
 }
 
 describe('R2CoverMasterAdapter', () => {
+  it('associates an approved master with a public provider ID and resumes after an existing master', async () => {
+    const { puts, store } = objectStore();
+    const adapter = new R2CoverMasterAdapter(store);
+    const master = validMaster({ publicReference: { provider: 'mangaupdates', externalId: '12345' } });
+    await adapter.ingest(master);
+    await adapter.ingest(master);
+    expect(puts.map(value => value.key)).toEqual([expect.stringContaining('covers/masters/sha256/'), 'covers/references/mangaupdates/12345.json', 'covers/references/mangaupdates/12345.json']);
+    expect(puts[2]?.options.onlyIf).toEqual({ etagMatches: 'existing' });
+  });
   it('checks copying rights before touching object storage', async () => {
     const { puts, store } = objectStore();
     const adapter = new R2CoverMasterAdapter(store);

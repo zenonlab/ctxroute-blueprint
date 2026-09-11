@@ -7,8 +7,8 @@ import { stripFavoriteSeasonSuffix } from '../favorites/season-extraction';
 
 const decimalId = z.string().regex(/^[1-9]\d{0,18}$/u);
 export const favoritePublicReferenceSchema = z.discriminatedUnion('provider', [
-  z.strictObject({ provider: z.literal('anilist'), externalId: decimalId.refine((id) => BigInt(id) <= 2147483647n) }),
-  z.strictObject({ provider: z.literal('mangaupdates'), externalId: decimalId.refine((id) => BigInt(id) <= 9223372036854775807n) }),
+  z.strictObject({ provider: z.literal('anilist'), externalId: decimalId.refine((id) => /^[1-9]\d{0,18}$/u.test(id) && BigInt(id) <= 2147483647n) }),
+  z.strictObject({ provider: z.literal('mangaupdates'), externalId: decimalId.refine((id) => /^[1-9]\d{0,18}$/u.test(id) && BigInt(id) <= 9223372036854775807n) }),
   z.strictObject({ provider: z.literal('mangadex'), externalId: z.uuid().toLowerCase() }),
   z.strictObject({ provider: z.literal('kitsu-anime'), externalId: decimalId }),
   z.strictObject({ provider: z.literal('kitsu-manga'), externalId: decimalId }),
