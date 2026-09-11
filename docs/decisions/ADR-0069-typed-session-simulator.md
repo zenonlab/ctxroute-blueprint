@@ -23,3 +23,9 @@ Présence, activité, erreur, récupération et reconnexion sont testables sans 
 Le provider terminal réel pourra implémenter ce contrat ultérieurement. Les tests purs
 macOS de Finder, surfaces et visibilité ne valent toujours pas qualification physique
 de Spaces, veille ou multi-écran.
+
+## Implementation evidence
+
+`TerminalSessionSimulator` refuse les événements dupliqués ou non monotones et les
+intentions corrélées rejouées. Les états couvrent `idle`, `active`, `busy`, `success`,
+`error`, `recovering` et `disconnected`; aucun champ ne porte le contenu d'un terminal.

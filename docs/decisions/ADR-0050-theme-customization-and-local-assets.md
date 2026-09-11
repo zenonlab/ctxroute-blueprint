@@ -68,4 +68,5 @@ M4 expose les rôles portables `theme.audio`, `desktop.files`, `session.focus`,
 `object.launch` et `theme.edit`. La modale édite personnage, véhicule, coloris,
 texture, icône, animation et rôle, avec brouillon annulable, reset vers l'embarqué,
 validation puis écriture atomique. L'override d'apparence ne touche pas identifiant,
-phase, position, application ou rôle existant.
+phase, position, application, session ou rôle existant. ADR-0077 ajoute un manifeste
+d'interface privé vérifié par empreinte et des choix fournis par le package.

@@ -18,6 +18,13 @@ public enum ThemeLayout {
     public static func control(_ index: Int) -> LayoutRect {
         LayoutRect(x: 24 + Double(index) * 48, y: 56, width: 40, height: 40)
     }
+    public static func brightnessControl(_ index: Int) -> LayoutRect {
+        LayoutRect(x: 24 + Double(index) * 48, y: 56, width: 136, height: 40)
+    }
+    public static func brightnessValue(at point: ScenePoint, index: Int = 2) -> Double {
+        let rect = brightnessControl(index)
+        return min(1, max(0, (point.x - rect.x - 12) / (rect.width - 24)))
+    }
     public static func position(_ object: Theme.Object, theme: Theme, width: Double, height: Double,
                                 elapsed: Double) -> ScenePoint {
         if let x = object.x, let y = object.y { return ScenePoint(x: x * width, y: y * height) }
@@ -35,9 +42,11 @@ public enum ThemeLayout {
                            elapsed: Double) -> SceneHit {
         guard point.isFinite, width > 0, height > 0, elapsed.isFinite,
               point.x >= 0, point.y >= 0, point.x < width, point.y < height else { return .unknown }
-        for (index, control) in theme.system_controls.items.enumerated() where Self.control(index).contains(point) {
+        for (index, control) in theme.system_controls.items.enumerated()
+            where (control == "brightness" ? Self.brightnessControl(index) : Self.control(index)).contains(point) {
             if control == "audio" { return .control(.audio) }
             if control == "desktop" { return .control(.desktopItems) }
+            if control == "brightness" { return .control(.brightness) }
         }
         let objectHits = theme.objects.enumerated().compactMap { index, object -> (Int, String, Double)? in
             let center = position(object, theme: theme, width: width, height: height, elapsed: elapsed)

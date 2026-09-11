@@ -37,15 +37,17 @@ public struct Theme: Codable, Equatable, Sendable {
         public var texture: String?
         public var icon: String?
         public var animation: String?
+        public var session_id: String?
         public var role: PortableRole?
         public init(id: String, color: String, phase: Double, label: String? = nil,
                     application: String? = nil, x: Double? = nil, y: Double? = nil, size: Double? = nil,
                     character: String? = nil, vehicle: String? = nil, texture: String? = nil,
-                    icon: String? = nil, animation: String? = nil, role: PortableRole? = nil) {
+                    icon: String? = nil, animation: String? = nil, sessionID: String? = nil,
+                    role: PortableRole? = nil) {
             self.id = id; self.color = color; self.phase = phase; self.label = label
             application_bundle_id = application; self.x = x; self.y = y; self.size = size
             self.character = character; self.vehicle = vehicle; self.texture = texture
-            self.icon = icon; self.animation = animation; self.role = role
+            self.icon = icon; self.animation = animation; session_id = sessionID; self.role = role
         }
     }
     public struct Controls: Codable, Equatable, Sendable {
@@ -84,12 +86,15 @@ public struct Theme: Codable, Equatable, Sendable {
                       (object.x.map { (0.05...0.95).contains($0) } == true && object.y.map { (0.05...0.95).contains($0) } == true))
                   && (object.size.map { (24...96).contains($0) } ?? true)
                   && [object.character, object.vehicle, object.animation].allSatisfy({ $0.map(validID) ?? true })
+                  && (object.session_id.map(validID) ?? true)
                   && [object.texture, object.icon].allSatisfy({ $0.map(validAssetName) ?? true })
               }),
               theme.system_controls.placement == "top_left",
               (1...7).contains(theme.system_controls.items.count),
               Set(theme.system_controls.items).count == theme.system_controls.items.count,
-              theme.system_controls.items.allSatisfy({ ["motion", "audio", "interaction", "desktop", "settings", "profile", "overlay"].contains($0) })
+              theme.system_controls.items.allSatisfy({ ["motion", "audio", "interaction", "desktop", "brightness", "settings", "profile", "overlay"].contains($0) }),
+              (!theme.system_controls.items.contains("brightness") ||
+               theme.system_controls.items == ["audio", "desktop", "brightness"])
         else { throw ModelError.invalid("manifest invariant") }
         return theme
     }
@@ -125,13 +130,14 @@ public struct ThemeState: Codable, Equatable, Sendable {
     public var muted = true
     public var desktopItemsVisible: Bool?
     public var wallpaperVisible: Bool?
+    public var brightness: Double?
     public init() {}
 }
 
 public enum ThemeAction: String, Codable, Sendable {
     case pause, resume, highlight, unhighlight, inspect, configure, mute, unmute
     case desktopItemsVisible, desktopItemsHidden, desktopItemsUnknown
-    case wallpaperVisible, wallpaperOccluded, wallpaperVisibilityUnknown
+    case wallpaperVisible, wallpaperOccluded, wallpaperVisibilityUnknown, setBrightness
 }
 
 public struct Command: Codable, Equatable, Sendable {
@@ -143,12 +149,15 @@ public struct Command: Codable, Equatable, Sendable {
     public let expires_at: Date
     public let action: ThemeAction
     public let configuration: Theme?
+    public let value: Double?
     public init(theme: String, instance: UUID, generation: Int, action: ThemeAction,
-                id: UUID = UUID(), now: Date = Date(), configuration: Theme? = nil) {
+                id: UUID = UUID(), now: Date = Date(), configuration: Theme? = nil,
+                value: Double? = nil) {
         schema_version = 1; theme_id = theme; scene_instance_id = instance
         command_id = id; self.generation = generation; self.action = action
         expires_at = now.addingTimeInterval(5)
         self.configuration = configuration
+        self.value = value
     }
 }
 
@@ -195,6 +204,11 @@ public struct Session: Sendable {
                   let data = try? JSONEncoder().encode(configuration), (try? Theme.decode(data)) != nil
             else { return reject(command, "invalid configuration") }
         } else if command.configuration != nil { return reject(command, "unexpected configuration") }
+        if command.action == .setBrightness {
+            guard let value = command.value, value.isFinite, (0...1).contains(value) else {
+                return reject(command, "invalid brightness")
+            }
+        } else if command.value != nil { return reject(command, "unexpected value") }
         switch command.action {
         case .pause: state.paused = true
         case .resume: state.paused = false
@@ -210,6 +224,7 @@ public struct Session: Sendable {
         case .wallpaperVisible: state.wallpaperVisible = true
         case .wallpaperOccluded: state.wallpaperVisible = false
         case .wallpaperVisibilityUnknown: state.wallpaperVisible = nil
+        case .setBrightness: state.brightness = command.value
         }
         generation += 1
         let receipt = Receipt(command: command, status: .applied, state: state, reason: nil)

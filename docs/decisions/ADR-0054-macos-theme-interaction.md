@@ -57,6 +57,13 @@ l'absence de fenêtre attachée et un niveau desktop négatif autorisent le hit-
 Le connecteur ne crée aucune `NSPanel`, fenêtre transparente ou autre couche d'entrée.
 Cette règle vaut pour contrôles, objets et clic droit vide.
 
+Pour un RenderHost externe, la géométrie n'est jamais recalculée en Swift. Le
+renderer publie sur stdout des instantanés typés, bornés et monotones contenant les
+rectangles des contrôles et les projections de ses cibles 3D. L'agent les refuse
+après expiration, conserve la priorité Finder ci-dessus, puis route gauche/droite
+vers une intention unique. Le flux inverse des réglages utilise stdin et ne contient
+aucune commande shell.
+
 Clic gauche sur objet : application associée. Clic droit sur objet : modale unique
 préremplie. Clic droit sur vide qualifié : même modale en ajout. L'édition est un
 brouillon ; Annuler ne mute rien, Enregistrer valide, envoie une commande corrélée,

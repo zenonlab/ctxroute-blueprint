@@ -31,6 +31,7 @@
           ,"texture": {"$ref": "#/$defs/asset"}
           ,"icon": {"$ref": "#/$defs/asset"}
           ,"animation": {"$ref": "#/$defs/id"}
+          ,"session_id": {"$ref": "#/$defs/id"}
           ,"role": {"enum": ["theme.audio", "desktop.files", "session.focus", "object.launch", "theme.edit"]}
         },
         "dependentRequired": {"x": ["y"], "y": ["x"]}
@@ -41,8 +42,10 @@
       "properties": {
         "placement": {"const": "top_left"},
         "items": {"type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true,
-          "items": {"enum": ["motion", "audio", "interaction", "desktop", "settings", "profile", "overlay"]}}
-      }
+          "items": {"enum": ["motion", "audio", "interaction", "desktop", "brightness", "settings", "profile", "overlay"]}}
+      },
+      "if": {"properties": {"items": {"contains": {"const": "brightness"}}}},
+      "then": {"properties": {"items": {"const": ["audio", "desktop", "brightness"]}}}
     }
   },
   "$defs": {

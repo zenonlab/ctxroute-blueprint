@@ -107,6 +107,13 @@ import os
     private let statusLabel = NSTextField(wrappingLabelWithString: "Recherche des packages de thèmes…")
     private let desktopItems = DesktopItems()
     private let renderHost = RenderHostController()
+    private let themeControls = ThemeControlsView()
+    private let customization = VehicleCustomizationPanel()
+    private let desktopInput = RenderHostDesktopInput()
+    private let interfaceStore = ThemeInterfaceOverrideStore(directory: FileManager.default.urls(
+        for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Orbite/ThemeOverrides", isDirectory: true))
+    private var terminalSessions = TerminalSessionSimulator()
     private var themes: [DiscoveredTheme] = []
     private var window: NSWindow!
     private var statusItem: NSStatusItem?
@@ -130,7 +137,13 @@ import os
         subtitle.textColor = .secondaryLabelColor
         stack.addArrangedSubview(title); stack.addArrangedSubview(subtitle)
         stack.addArrangedSubview(NSTextField(labelWithString: "Thèmes détectés"))
+        themePicker.target = self
+        themePicker.action = #selector(themeSelectionChanged)
         stack.addArrangedSubview(themePicker)
+        themeControls.onAudio = { [weak self] in self?.toggleThemeAudio() }
+        themeControls.onDesktop = { [weak self] in self?.toggleDesktopItems() }
+        themeControls.onBrightness = { [weak self] value in self?.setThemeBrightness(value) }
+        stack.addArrangedSubview(themeControls)
         statusLabel.textColor = .secondaryLabelColor; stack.addArrangedSubview(statusLabel)
 
         let libraries = NSStackView(); libraries.orientation = .horizontal; libraries.spacing = 12
@@ -143,6 +156,10 @@ import os
         runtime.addArrangedSubview(NSButton(title: "Activer sur le bureau", target: self, action: #selector(activateTheme)))
         runtime.addArrangedSubview(NSButton(title: "Arrêter", target: self, action: #selector(stopTheme)))
         stack.addArrangedSubview(runtime)
+        stack.addArrangedSubview(NSButton(title: "Personnaliser les véhicules…", target: self,
+                                          action: #selector(customizeVehicles)))
+        stack.addArrangedSubview(NSButton(title: "Activer les clics du wallpaper…", target: self,
+                                          action: #selector(enableWallpaperInput)))
         stack.addArrangedSubview(NSButton(title: "Ouvrir Réglages Fond d’écran…", target: self,
                                           action: #selector(openWallpaperSettings)))
         stack.addArrangedSubview(NSButton(title: "Afficher / masquer les fichiers du bureau", target: self,
@@ -153,7 +170,7 @@ import os
         let submenu = NSMenu(); submenu.addItem(withTitle: "Quitter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         root.submenu = submenu; NSApp.mainMenu = menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem?.button?.image = NSImage(systemSymbolName: "circle.hexagongrid", accessibilityDescription: "Orbite")
+        statusItem?.button?.title = "Orbite"
         let statusMenu = NSMenu(); statusMenu.delegate = self
         let open = statusMenu.addItem(withTitle: "Ouvrir Orbite Wallpaper…", action: #selector(showWindow), keyEquivalent: "")
         open.target = self
@@ -171,6 +188,15 @@ import os
         agentTransport = AgentTransport { [weak self] request in
             self?.handle(request) ?? ProviderResponse(accepted: false, message: "Agent unavailable")
         }
+        seedSessionSimulator()
+        customization.onSave = { [weak self] overrides in self?.saveInterfaceOverrides(overrides) }
+        customization.onReset = { [weak self] in self?.resetInterfaceOverrides() }
+        renderHost.onHitSnapshot = { [weak self] snapshot in
+            guard let self else { return }
+            self.desktopInput.update(snapshot: snapshot, desktopItemsVisible: try? self.desktopItems.isVisible())
+        }
+        desktopInput.onAction = { [weak self] action in self?.handleDesktopAction(action) }
+        desktopInput.startIfAuthorized()
         refresh()
         if CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke") { showWindow() }
         if let index = CommandLine.arguments.firstIndex(of: "--smoke"),
@@ -197,6 +223,129 @@ import os
         statusLabel.stringValue = themes.isEmpty
             ? "Aucun package valide dans \(roots.count) bibliothèque(s)."
             : "\(themes.count) thème(s) détecté(s), \(receipt.rejected.count) refusé(s)."
+        configureThemeControls()
+    }
+
+    private func seedSessionSimulator() {
+        for (index, value) in [
+            ("session.alpha", "Terminal Alpha", TerminalSessionState.active),
+            ("session.beta", "Terminal Beta", TerminalSessionState.busy),
+            ("session.gamma", "Terminal Gamma", TerminalSessionState.recovering)
+        ].enumerated() {
+            _ = terminalSessions.receive(TerminalSessionEvent(snapshot: .init(id: value.0,
+                displayName: value.1, state: value.2, sequence: UInt64(index + 1))))
+        }
+    }
+
+    private func configureThemeControls() {
+        let interface = selectedTheme?.interface
+        themeControls.setSkin(interface)
+        if let image = interface?.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:)) {
+            image.size = NSSize(width: 18, height: 18)
+            image.isTemplate = false
+            statusItem?.button?.image = image
+            statusItem?.button?.title = ""
+            statusItem?.button?.setAccessibilityLabel(ProductIdentity.appName)
+        } else {
+            statusItem?.button?.image = nil
+            statusItem?.button?.title = "Orbite"
+        }
+        guard let id = selectedTheme?.package.id else { return }
+        let muted = UserDefaults.standard.object(forKey: "ThemeMuted.\(id)") as? Bool ?? true
+        themeControls.setMuted(muted, interface: interface)
+        themeControls.setDesktopVisible(try? desktopItems.isVisible(), interface: interface)
+        themeControls.setBrightness(UserDefaults.standard.object(forKey: "ThemeBrightness.\(id)") as? Double ?? 0.8)
+    }
+
+    @objc private func themeSelectionChanged() { configureThemeControls() }
+
+    private func toggleThemeAudio() {
+        guard let theme = selectedTheme else { return }
+        let key = "ThemeMuted.\(theme.package.id)"
+        let next = !(UserDefaults.standard.object(forKey: key) as? Bool ?? true)
+        UserDefaults.standard.set(next, forKey: key)
+        themeControls.setMuted(next, interface: theme.interface)
+        try? pushRuntimeControls(for: theme)
+        statusLabel.stringValue = next ? "Audio du thème coupé." : "Audio du thème activé."
+    }
+
+    private func setThemeBrightness(_ value: Double) {
+        guard let id = selectedTheme?.package.id else { return }
+        UserDefaults.standard.set(min(1, max(0, value)), forKey: "ThemeBrightness.\(id)")
+        if let theme = selectedTheme { try? pushRuntimeControls(for: theme) }
+        statusLabel.stringValue = "Luminosité du thème : \(Int((value * 100).rounded())) %."
+    }
+
+    @objc private func customizeVehicles() {
+        presentCustomization(targetID: nil)
+    }
+
+    private func presentCustomization(targetID: String?) {
+        guard let theme = selectedTheme, let interface = theme.interface else {
+            statusLabel.stringValue = "Ce package ne fournit pas de catalogue UI privé."
+            return
+        }
+        do {
+            let overrides = try interfaceStore.load(themeID: theme.package.id,
+                                                    interface: interface.manifest)
+            customization.present(themeID: theme.package.id, interface: interface,
+                overrides: overrides, sessions: terminalSessions.catalog, targetID: targetID)
+        } catch { statusLabel.stringValue = "Personnalisation refusée : \(error.localizedDescription)" }
+    }
+
+    @objc private func enableWallpaperInput() {
+        desktopInput.requestPermissionAndStart()
+        statusLabel.stringValue = "Clics du wallpaper activés si Accessibilité est autorisée."
+    }
+
+    private func handleDesktopAction(_ action: RenderHostDesktopAction) {
+        switch action {
+        case .audio:
+            toggleThemeAudio()
+        case .desktopFiles:
+            toggleDesktopItems()
+        case .brightness(let value):
+            themeControls.setBrightness(value)
+            setThemeBrightness(value)
+        case .target(let id, let context):
+            if context {
+                presentCustomization(targetID: id)
+            } else {
+                focusSession(for: id)
+            }
+        }
+    }
+
+    private func focusSession(for targetID: String) {
+        guard let theme = selectedTheme, let interface = theme.interface,
+              let target = interface.manifest.targets.first(where: { $0.id == targetID }) else { return }
+        let overrides = try? interfaceStore.load(themeID: theme.package.id, interface: interface.manifest)
+        guard let sessionID = overrides?.targets[targetID]?.session_id ?? target.session_id else {
+            statusLabel.stringValue = "Aucune session liée à \(target.label)."
+            return
+        }
+        let intent = TerminalSessionIntent(sessionID: sessionID, kind: .focus)
+        statusLabel.stringValue = terminalSessions.accept(intent)
+            ? "Session \(sessionID) focalisée par intention simulée."
+            : "Session \(sessionID) indisponible ou intention déjà traitée."
+    }
+
+    private func saveInterfaceOverrides(_ overrides: ThemeInterfaceOverrides) {
+        guard let interface = selectedTheme?.interface else { return }
+        do {
+            try interfaceStore.save(overrides, interface: interface.manifest)
+            if let theme = selectedTheme { try pushRuntimeControls(for: theme) }
+            statusLabel.stringValue = "Personnage, kart et session enregistrés sans changer l’identité du véhicule."
+        } catch { statusLabel.stringValue = "Enregistrement refusé : \(error.localizedDescription)" }
+    }
+
+    private func resetInterfaceOverrides() {
+        guard let theme = selectedTheme, let interface = theme.interface else { return }
+        do {
+            try interfaceStore.reset(themeID: theme.package.id, interface: interface.manifest)
+            try pushRuntimeControls(for: theme)
+            statusLabel.stringValue = "Personnalisation réinitialisée aux valeurs du thème."
+        } catch { statusLabel.stringValue = "Réinitialisation refusée : \(error.localizedDescription)" }
     }
 
     private func handle(_ request: ProviderRequest) -> ProviderResponse {
@@ -216,6 +365,7 @@ import os
             }
             do {
                 _ = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
+                try pushRuntimeControls(for: theme)
                 statusLabel.stringValue = "\(theme.package.display_name) actif depuis Réglages."
                 return ProviderResponse(accepted: true)
             } catch {
@@ -256,12 +406,28 @@ import os
         guard let theme = selectedTheme else { statusLabel.stringValue = "Aucun thème détecté."; return }
         do {
             let launched = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
+            try pushRuntimeControls(for: theme)
             statusLabel.stringValue = launched ? "\(theme.package.display_name) actif sur le bureau."
                 : "\(theme.package.display_name) est déjà actif."
         } catch { statusLabel.stringValue = "Activation refusée : \(error.localizedDescription)" }
     }
 
-    @objc private func stopTheme() { renderHost.stop(); statusLabel.stringValue = "RenderHost arrêté." }
+    @objc private func stopTheme() {
+        renderHost.stop()
+        desktopInput.update(snapshot: nil, desktopItemsVisible: nil)
+        statusLabel.stringValue = "RenderHost arrêté."
+    }
+
+    private func pushRuntimeControls(for theme: DiscoveredTheme) throws {
+        guard renderHost.themeID == theme.package.id else { return }
+        let muted = UserDefaults.standard.object(forKey: "ThemeMuted.\(theme.package.id)") as? Bool ?? true
+        let brightness = UserDefaults.standard.object(forKey: "ThemeBrightness.\(theme.package.id)") as? Double ?? 0.8
+        let overrides = try theme.interface.map {
+            try interfaceStore.load(themeID: theme.package.id, interface: $0.manifest)
+        }
+        try renderHost.update(muted: muted, desktopItemsVisible: try? desktopItems.isVisible(),
+                              brightness: brightness, overrides: overrides)
+    }
     @objc private func openWallpaperSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") else { return }
         NSWorkspace.shared.open(url)
@@ -276,6 +442,8 @@ import os
     @objc private func toggleDesktopItems() {
         do {
             let visible = try desktopItems.toggle()
+            themeControls.setDesktopVisible(visible, interface: selectedTheme?.interface)
+            if let theme = selectedTheme { try? pushRuntimeControls(for: theme) }
             statusLabel.stringValue = visible ? "Fichiers du bureau affichés." : "Fichiers du bureau masqués."
         } catch { statusLabel.stringValue = "Réglage Finder non confirmé ; aucun fichier n’a été supprimé." }
     }
@@ -301,6 +469,7 @@ import os
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         renderHost.stop()
+        desktopInput.stop()
         return .terminateNow
     }
 }

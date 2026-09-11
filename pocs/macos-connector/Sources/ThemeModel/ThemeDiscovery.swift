@@ -16,15 +16,17 @@ public struct InstalledTheme: Codable, Equatable, Sendable {
     public let entry: Entry
     public let renderer: String
     public let thumbnail: String?
+    public let interface: String?
 
     public init(format: String = "orbite.theme-package/1", id: String, displayName: String,
-                entry: Entry, renderer: String, thumbnail: String? = nil) {
+                entry: Entry, renderer: String, thumbnail: String? = nil, interface: String? = nil) {
         self.format = format
         self.id = id
         display_name = displayName
         self.entry = entry
         self.renderer = renderer
         self.thumbnail = thumbnail
+        self.interface = interface
     }
 }
 
@@ -33,6 +35,16 @@ public struct DiscoveredTheme: Codable, Equatable, Sendable {
     public let descriptor: URL
     public let entry: URL
     public let thumbnail: URL?
+    public let interface: ResolvedThemeInterface?
+
+    public init(package: InstalledTheme, descriptor: URL, entry: URL, thumbnail: URL?,
+                interface: ResolvedThemeInterface? = nil) {
+        self.package = package
+        self.descriptor = descriptor
+        self.entry = entry
+        self.thumbnail = thumbnail
+        self.interface = interface
+    }
 }
 
 public struct ThemeDiscoveryReceipt: Codable, Equatable, Sendable {
@@ -112,7 +124,11 @@ public enum ThemeDiscovery {
                   values.isSymbolicLink != true, let size = values.fileSize, (1...16_777_216).contains(size)
             else { throw ModelError.invalid("bounded PNG thumbnail required") }
         }
-        return DiscoveredTheme(package: package, descriptor: descriptor, entry: entry, thumbnail: thumbnail)
+        let interface = try package.interface.map { path in
+            try ThemeInterfaceLoader.load(contained(path, root: root))
+        }
+        return DiscoveredTheme(package: package, descriptor: descriptor, entry: entry,
+                               thumbnail: thumbnail, interface: interface)
     }
 
     private static let supportedEntryFormats = Set(["orbite.scene-probe/1", "orbite.theme-package/2"])

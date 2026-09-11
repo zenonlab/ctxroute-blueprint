@@ -80,6 +80,19 @@ final class GestureTests: XCTestCase {
             XCTAssertFalse(router.begin(button: .right, point: point, hit: .control(control), scene: scene, inputAuthorized: true))
         }
     }
+    func testBrightnessDragProducesOneBoundedAbsoluteIntent() {
+        var router = makeRouter()
+        let start = ScenePoint(x: 132, y: 70)
+        let end = ScenePoint(x: 244, y: 70)
+        XCTAssertTrue(router.begin(button: .left, point: start, hit: .control(.brightness),
+                                   scene: scene, inputAuthorized: true))
+        router.move(to: end)
+        XCTAssertEqual(router.end(button: .left, point: end, hit: .control(.brightness),
+                                  scene: scene, inputAuthorized: true).intent,
+                       .setBrightness(1))
+        XCTAssertFalse(router.end(button: .left, point: end, hit: .control(.brightness),
+                                  scene: scene, inputAuthorized: true).consumed)
+    }
     func testTapInterruptionDropsOldGestureButNextClickWorks() {
         for button in [PointerButton.left, .right] {
             var router = makeRouter()

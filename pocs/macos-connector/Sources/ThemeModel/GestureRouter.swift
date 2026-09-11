@@ -10,7 +10,7 @@ public struct ScenePoint: Equatable, Sendable {
 }
 
 public enum PointerButton: Sendable { case left, right }
-public enum ShelfControl: Sendable { case audio, desktopItems }
+public enum ShelfControl: Sendable { case audio, desktopItems, brightness }
 public enum SceneHit: Equatable, Sendable {
     case native, unknown, empty
     case object(String)
@@ -21,6 +21,7 @@ public enum InteractionIntent: Equatable, Sendable {
     case customize(String)
     case add(ScenePoint)
     case toggle(ShelfControl)
+    case setBrightness(Double)
 }
 public struct GestureResult: Equatable, Sendable {
     public let consumed: Bool
@@ -60,6 +61,7 @@ public struct GestureRouter: Sendable {
     }
     public mutating func move(to point: ScenePoint) {
         guard let capture else { return }
+        if capture.hit == .control(.brightness) { return }
         if !point.isFinite || capture.start.distance(to: point) > dragThreshold { cancel() }
     }
     /// Cancellation retains only the obligation to consume the matching up event.
@@ -78,8 +80,9 @@ public struct GestureRouter: Sendable {
             return GestureResult(consumed: false, intent: nil)
         }
         capture = nil
+        let isBrightness = active.hit == .control(.brightness)
         guard !active.cancelled, inputAuthorized, self.scene == scene, active.scene == scene,
-              point.isFinite, active.start.distance(to: point) <= dragThreshold,
+              point.isFinite, (isBrightness || active.start.distance(to: point) <= dragThreshold),
               compatibleRelease(active.hit, hit), isKnown(active.hit) else {
             return GestureResult(consumed: true, intent: nil)
         }
@@ -87,6 +90,7 @@ public struct GestureRouter: Sendable {
         switch active.hit {
         case .object(let id): intent = button == .left ? .activate(id) : .customize(id)
         case .empty: intent = .add(point)
+        case .control(.brightness): intent = .setBrightness(ThemeLayout.brightnessValue(at: point))
         case .control(let control): intent = .toggle(control)
         case .native, .unknown: return GestureResult(consumed: true, intent: nil)
         }

@@ -20,7 +20,12 @@ Le paquet macOS contient une app AppKit, un agent de session et une extension Wa
 
 Le connecteur découvre automatiquement les packages présents dans les bibliothèques choisies par l’utilisateur. Un thème valide fournit son identité, son libellé, sa recette relative et une capacité de renderer. Le chemin du RenderHost est une approbation locale distincte ; le manifeste ne peut fournir ni commande ni chemin d’exécutable.
 
-Le RenderHost est lancé directement avec deux arguments bornés : le chemin de la recette validée et `--desktop`. Le contrôleur possède un seul processus enfant et l’arrête lors d’un changement de thème, d’une demande explicite ou de l’arrêt de l’agent.
+Le RenderHost est lancé directement avec le chemin de la recette validée,
+`--desktop` et, lorsqu'il existe, le manifeste d'interface privé validé. Le
+contrôleur possède un seul processus enfant et l'arrête lors d'un changement de
+thème, d'une demande explicite ou de l'arrêt de l'agent. Il transmet les réglages et
+overrides par JSON borné sur stdin et reçoit les cibles de hit-test par JSON borné
+sur stdout.
 
 ## Contrats
 
@@ -29,7 +34,9 @@ Le RenderHost est lancé directement avec deux arguments bornés : le chemin de 
 - `renderer` est un identifiant de capacité, jamais une commande.
 - Les packages et assets privés restent hors de l’app et hors Git.
 - Le sélecteur Swift est alimenté uniquement par `ThemeDiscovery`.
-- Les fichiers du bureau restent un réglage Finder réversible ; aucune suppression n’est effectuée.
+- Les fichiers du bureau restent un réglage Finder réversible ; aucune suppression n'est effectuée.
+- `orbite.theme-interface/1` fournit les images privées, choix d'apparence, cibles
+  et sessions sans introduire de nom de jeu dans Swift.
 
 ## Sécurité et limites
 
@@ -55,6 +62,11 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
 - Le manifeste ne peut choisir ni exécutable ni commande shell.
 - Une nouvelle activation remplace seulement le RenderHost enfant possédé.
 - Le masquage des fichiers Finder reste réversible.
+- Audio, fichiers et luminosité utilisent seulement les images du package privé.
+- Un clic droit qualifié sur un kart ouvre le customiseur prérempli ; gauche focalise
+  sa session simulée sans double action.
+- Sauvegarde, annulation et reset ne changent ni l'identité, ni le trajet, ni la
+  session hors du champ explicitement sélectionné.
 - SwiftPM, compilation Swift stricte, signature, invariant de paquet et `npm run verify` passent.
 
 ## Conditions de sortie

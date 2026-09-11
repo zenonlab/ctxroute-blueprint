@@ -50,6 +50,13 @@ La CI macOS exécute les tests Swift isolés du PoC2 sans lancer de thème. Le g
 natif reste `bash pocs/macos-connector/build.sh` : app, agent, signatures et absence
 de thèmes ou d'extension embarqués. `npm run verify` ne remplace aucun de ces contrôles.
 
+Le flux RenderHost externe ajoute des tests purs pour le framing stdout monotone,
+le hit-test au premier plan, le drag absolu de luminosité, la persistance atomique
+des overrides et le simulateur de sessions. Le package privé est vérifié séparément
+par les deux loaders : empreintes PNG côté Swift, puis existence des cibles, parts
+et matériaux côté renderer. Ces contrôles ne lancent pas le wallpaper et ne
+qualifient ni TCC, ni Finder, ni le compositeur macOS.
+
 La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
 exigent un parcours déterministe, le rejet des traversées et formats incohérents,
 la déduplication des identités et des racines issues uniquement de configuration.

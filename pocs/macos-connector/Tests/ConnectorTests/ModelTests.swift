@@ -144,6 +144,10 @@ final class ModelTests: XCTestCase {
             json["system_controls"] = ["placement": "top_left", "items": items]
             XCTAssertNoThrow(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
         }
+        json["system_controls"] = ["placement": "top_left", "items": ["audio", "desktop", "brightness"]]
+        XCTAssertNoThrow(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
+        json["system_controls"] = ["placement": "top_left", "items": ["brightness", "audio", "desktop"]]
+        XCTAssertThrowsError(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
         for items in [["shell"], ["audio", "audio"], []] {
             json["system_controls"] = ["placement": "top_left", "items": items]
             XCTAssertThrowsError(try Theme.decode(JSONSerialization.data(withJSONObject: json)))
@@ -269,6 +273,13 @@ final class ModelTests: XCTestCase {
             action: .wallpaperVisibilityUnknown, now: now)
         XCTAssertEqual(session.apply(visibilityUnknown, now: now).status, .applied)
         XCTAssertNil(session.state.wallpaperVisible)
+        let brightness = Command(theme: "test", instance: session.instance, generation: 8,
+            action: .setBrightness, now: now, value: 0.42)
+        XCTAssertEqual(session.apply(brightness, now: now).status, .applied)
+        XCTAssertEqual(session.state.brightness, 0.42)
+        let invalidBrightness = Command(theme: "test", instance: session.instance, generation: 9,
+            action: .setBrightness, now: now, value: 2)
+        XCTAssertEqual(session.apply(invalidBrightness, now: now).status, .rejected)
     }
     func testMailboxRoundTripAndOversize() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
