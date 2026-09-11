@@ -131,6 +131,11 @@ import os
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = ProductIdentity.appName
         window.isReleasedWhenClosed = false
+        renderHost.onTermination = { [weak self] status in
+            guard let self else { return }
+            self.desktopInput.update(snapshot: nil, desktopItemsVisible: nil)
+            self.statusLabel.stringValue = "RenderHost terminé (code (status)). Réactivez le thème pour reprendre."
+        }
 
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 16
         stack.edgeInsets = NSEdgeInsets(top: 28, left: 28, bottom: 28, right: 28)
