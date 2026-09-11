@@ -20,10 +20,10 @@ describe('shared Library surface', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/iu);
   });
 
-  it('shows local statistics and structured card details', () => {
-    expect(component).toContain('Statistiques de la bibliothèque');
-    expect(component).toContain('statistics.inProgress');
-    expect(component).toContain('statistics.completed');
+  it('keeps structured card details without a counter banner', () => {
+    expect(component).not.toContain('Statistiques de la bibliothèque');
+    expect(component).not.toContain('statistics.inProgress');
+    expect(component).not.toContain('statistics.completed');
     expect(component).toContain('item.detail ?? item.source');
   });
 

@@ -147,7 +147,7 @@
       "id": "ui",
       "type": "frontend",
       "label": "UI extension",
-      "sublabel": "Bibliothèque filtrée / stats / Review",
+      "sublabel": "Bibliothèque filtrée / Review",
       "pos": [
         430,
         640
