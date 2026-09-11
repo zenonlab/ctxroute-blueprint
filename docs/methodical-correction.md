@@ -49,12 +49,57 @@ Les cardinalités sont exactes. Une collection vide reste vide ; une sortie uniq
 n'est pas dupliquée pour satisfaire un tableau de taille deux. `missing`,
 `unsupported` et `unknown` restent distincts.
 
+### Relations et placements dérivés
+
+Toute relation variant selon plusieurs ressources est matérialisée dans un manifeste
+`orbite.source-relations/1`. Ses axes sont ouverts : acteur, support, état, variante,
+équipement ou toute autre dimension décrite par la source. Le validateur exige une
+cellule pour chaque combinaison et chaque type de relation déclaré. Une relation
+absente est `missing`, `unsupported`, `unknown` ou `not_applicable` avec sa preuve ;
+elle ne reçoit jamais une valeur par défaut implicite.
+
+Chercher les preuves dans cet ordre : table source, métadonnée source, puis code ou
+script source exporté en lecture seule. Quand aucune table n'existe, l'adaptateur
+transforme les branches du code exporté en lignes explicites et conserve symbole,
+hash de source, exporteur, version et étapes de dérivation. La géométrie et
+l'observation peuvent produire un diagnostic `partial`, jamais un statut `qualified`.
+Le code exporté, les octets et les résultats privés restent hors Git ; le template ne
+contient que le contrat, le validateur et des fixtures libres.
+
+Chaque placement conserve position, rotation, échelle, unité et espace de coordonnées.
+Les conversions d'axe ou d'unité appartiennent à l'adaptateur et sont testées une fois.
+Le renderer consomme ces relations ; il ne reconnaît aucune catégorie de jeu et ne
+possède aucun offset, socket ou multiplicateur de secours.
+
+```bash
+node scripts/verify-source-relations.mjs /chemin/source-relations.json
+```
+
+### Qualification visuelle matricielle
+
+Une capture portant le nom d'un état ne prouve ni la présence ni la fidélité de son
+résultat. Le reçu `orbite.visual-qualification/2` déclare ses axes et couvre leur
+produit cartésien. Chaque cellule lie l'oracle et la capture par SHA-256 et vérifie les
+assertions demandées : visibilité, origine, échelle, densité, orientation, apparence,
+timing et occlusion. `qualified` exige toutes les cellules et assertions en succès.
+
+```bash
+node scripts/verify-visual-qualification.mjs /chemin/visual-qualification.json
+```
+
 ## Menus automatiques
 
 Le connecteur construit les menus à partir des étapes et capacités du manifeste.
 Une étape déclare sa catégorie, son libellé, son ordre, sa présentation et ses règles
 de compatibilité. Ajouter `outfit`, `companion`, `vehicle` ou `scene` ne demande
 aucune branche dans AppKit.
+
+Le préparateur génère les choix depuis le catalogue canonique et les axes de relations
+résolus. Chaque catégorie reste un identifiant ouvert. Une variante sans cellule
+qualifiée est exclue avec diagnostic ; elle n'est ni masquée silencieusement après le
+clic, ni compensée par le premier modèle compatible. L'interface transporte uniquement
+les étapes, choix, attributs et compatibilités ; le connecteur ne déduit rien des noms
+de fichiers et ne possède aucune liste de catégories métier.
 
 Les contrôles système proviennent du catalogue de capacités. Leur comportement est
 stable et leur peau appartient au thème. Une capacité absente ne crée aucun bouton ;
@@ -70,11 +115,14 @@ node scripts/verify-active-theme.mjs --package /chemin/orbite-theme.json \
 node scripts/verify-correction-record.mjs /chemin/correction-record.json
 ```
 
-Le premier outil ne démarre et n'arrête aucun processus. Le second vérifie la
-complétude et la cohérence des preuves ; il ne prétend pas inspecter les pixels.
+Le premier outil ne démarre et n'arrête aucun processus. Son reçu v2 prouve
+l'intégrité des artefacts actifs et conserve la qualification à `unreviewed` ; il ne
+confond plus chargement réussi et fidélité. Le second vérifie la complétude et la
+cohérence des preuves ; il ne prétend pas inspecter les pixels.
 
 Les structures attendues sont dans
 [correction-record.schema.json](templates/correction-record.schema.json),
+[source-relations.schema.json](templates/source-relations.schema.json),
 [visual-qualification.schema.json](templates/visual-qualification.schema.json) et
 leurs exemples synthétiques voisins. Le menu déclaratif est documenté par
 [theme-interface-v5.schema.json](templates/theme-interface-v5.schema.json) et son

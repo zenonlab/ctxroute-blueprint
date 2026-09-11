@@ -1,0 +1,172 @@
+{
+  "format": "orbite.source-relations/1",
+  "id": "fixture-carrier-assembly",
+  "status": "qualified",
+  "artifact": {
+    "id": "fixture-library",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "adapter": {
+      "id": "fixture.adapter",
+      "version": "1.2.0",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "sources": [
+    { "id": "input", "classification": "input", "reference": "private/source/input.bin", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "id": "assembly-table", "classification": "table", "reference": "private/source/assembly.bin", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "parent_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "id": "exported-controller", "classification": "code", "reference": "private/source/exported-controller.txt", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "parent_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  ],
+  "axes": [
+    { "id": "occupant", "values": ["occupant.light", "occupant.heavy"] },
+    { "id": "carrier", "values": ["carrier.open", "carrier.closed"] }
+  ],
+  "relation_kinds": [
+    { "id": "occupant.mount", "minimum": 1, "maximum": 1 },
+    { "id": "effect.origin", "minimum": 1, "maximum": 2 }
+  ],
+  "entries": [
+    {
+      "id": "light-open-mount",
+      "coordinates": { "occupant": "occupant.light", "carrier": "carrier.open" },
+      "relation_kind": "occupant.mount",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_table",
+        "reference": "private/source/assembly.bin",
+        "source_id": "assembly-table",
+        "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "records[0]",
+        "steps": ["Decode the selected record without changing its coordinate space."]
+      },
+      "placements": [
+        { "id": "mount", "position": [0, 1.1, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "light-open-effect",
+      "coordinates": { "occupant": "occupant.light", "carrier": "carrier.open" },
+      "relation_kind": "effect.origin",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_code",
+        "reference": "private/source/exported-controller.txt",
+        "source_id": "exported-controller",
+        "source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "symbol": "resolve_effect_origins",
+        "exporter": { "id": "fixture.exporter", "version": "2.0.0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+        "steps": ["Export the source routine read-only.", "Evaluate its variant branches into explicit rows."]
+      },
+      "placements": [
+        { "id": "origin.left", "position": [-0.4, 0.2, -1], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" },
+        { "id": "origin.right", "position": [0.4, 0.2, -1], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "light-closed-mount",
+      "coordinates": { "occupant": "occupant.light", "carrier": "carrier.closed" },
+      "relation_kind": "occupant.mount",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_table",
+        "reference": "private/source/assembly.bin",
+        "source_id": "assembly-table",
+        "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "records[1]",
+        "steps": ["Decode the selected record without changing its coordinate space."]
+      },
+      "placements": [
+        { "id": "mount", "position": [0, 0.9, -0.1], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "light-closed-effect",
+      "coordinates": { "occupant": "occupant.light", "carrier": "carrier.closed" },
+      "relation_kind": "effect.origin",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_code",
+        "reference": "private/source/exported-controller.txt",
+        "source_id": "exported-controller",
+        "source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "symbol": "resolve_effect_origins",
+        "exporter": { "id": "fixture.exporter", "version": "2.0.0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+        "steps": ["Export the source routine read-only.", "Evaluate its variant branches into explicit rows."]
+      },
+      "placements": [
+        { "id": "origin.center", "position": [0, 0.3, -1.2], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "heavy-open-mount",
+      "coordinates": { "occupant": "occupant.heavy", "carrier": "carrier.open" },
+      "relation_kind": "occupant.mount",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_table",
+        "reference": "private/source/assembly.bin",
+        "source_id": "assembly-table",
+        "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "records[2]",
+        "steps": ["Decode the selected record without changing its coordinate space."]
+      },
+      "placements": [
+        { "id": "mount", "position": [0, 1, 0], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "heavy-open-effect",
+      "coordinates": { "occupant": "occupant.heavy", "carrier": "carrier.open" },
+      "relation_kind": "effect.origin",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_code",
+        "reference": "private/source/exported-controller.txt",
+        "source_id": "exported-controller",
+        "source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "symbol": "resolve_effect_origins",
+        "exporter": { "id": "fixture.exporter", "version": "2.0.0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+        "steps": ["Export the source routine read-only.", "Evaluate its variant branches into explicit rows."]
+      },
+      "placements": [
+        { "id": "origin.left", "position": [-0.5, 0.2, -1], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" },
+        { "id": "origin.right", "position": [0.5, 0.2, -1], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "heavy-closed-mount",
+      "coordinates": { "occupant": "occupant.heavy", "carrier": "carrier.closed" },
+      "relation_kind": "occupant.mount",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_table",
+        "reference": "private/source/assembly.bin",
+        "source_id": "assembly-table",
+        "source_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "records[3]",
+        "steps": ["Decode the selected record without changing its coordinate space."]
+      },
+      "placements": [
+        { "id": "mount", "position": [0, 0.8, -0.1], "rotation_degrees": [0, 0, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    },
+    {
+      "id": "heavy-closed-effect",
+      "coordinates": { "occupant": "occupant.heavy", "carrier": "carrier.closed" },
+      "relation_kind": "effect.origin",
+      "status": "resolved",
+      "derivation": {
+        "kind": "source_code",
+        "reference": "private/source/exported-controller.txt",
+        "source_id": "exported-controller",
+        "source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "symbol": "resolve_effect_origins",
+        "exporter": { "id": "fixture.exporter", "version": "2.0.0", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+        "steps": ["Export the source routine read-only.", "Evaluate its variant branches into explicit rows."]
+      },
+      "placements": [
+        { "id": "origin.center", "position": [0, 0.3, -1.3], "rotation_degrees": [0, 180, 0], "scale": [1, 1, 1], "coordinate_space": "carrier-local", "unit": "metre" }
+      ]
+    }
+  ],
+  "on_unresolved": "reject"
+}

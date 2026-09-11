@@ -258,6 +258,11 @@ Compléments du banc d'essai [infrastructure](architecture/runtime-infrastructur
 | P38 | Déclarer un état sans binding d'effet dans le template | Aucun effet de remplacement inventé ; registre vide et diagnostic de capacité si l'effet est requis. |
 | P39 | Fournir une courbe sans trace d'entrée ni contrôleur de manœuvre | Aucun dérapage émis ; la courbure seule reste une donnée d'anticipation. |
 | P40 | Rejouer demande, maintien puis relâchement d'une manœuvre déclarée | Une seule transition par événement, effets bornés résolus par identifiant et aucun rejeu après reprise. |
+| P41 | Préparer une relation variant sur plusieurs catégories de ressources | Chaque combinaison et type de relation possède une cellule ; aucune valeur globale n'est recopiée silencieusement. |
+| P42 | Ne trouver aucune table de placement dans les données | Le code ou script source est exporté en lecture seule, ses branches deviennent une table dérivée avec symbole, outil, version et hashes. |
+| P43 | Ne trouver ni table, ni code source interprétable | La relation reste `unknown`, `missing` ou `unsupported` et l'activation concernée est refusée ; aucune mesure géométrique n'est promue en vérité source. |
+| P44 | Capturer un état dont l'effet attendu est invisible ou mal ancré | La cellule visuelle échoue sur visibilité ou origine même si la capture et le processus existent. |
+| P45 | Changer de variante avec les mêmes ressources visuelles | La matrice vérifie séparément origine, échelle, densité, orientation, apparence et timing pour chaque combinaison déclarée. |
 
 Une référence d'émulateur ne valide aucun de ces scénarios. Publier la couverture
 par système/jeu/version/adaptateur et capacité selon la cartographie des consoles.

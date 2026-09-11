@@ -1,16 +1,32 @@
 {
-  "format": "orbite.visual-qualification/1",
+  "format": "orbite.visual-qualification/2",
   "artifact_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "oracle": "fixtures/vehicle-assembly/oracles/synthetic-bike-rear.png",
+  "oracle": "Deterministic source renderer using the same state and camera.",
+  "axes": [
+    { "id": "carrier", "values": ["carrier.open"] },
+    { "id": "signal", "values": ["signal.active"] },
+    { "id": "view", "values": ["rear"] }
+  ],
+  "required_assertions": ["visibility", "origin", "scale", "density", "orientation", "appearance", "timing"],
   "captures": [
     {
-      "id": "rear-active-120",
-      "view": "rear",
-      "instant": "tick-120",
-      "path": "dist/captures/synthetic-bike-rear-120.png",
+      "id": "open-active-rear",
+      "coordinates": { "carrier": "carrier.open", "signal": "signal.active", "view": "rear" },
+      "oracle_path": "fixtures/carrier-assembly/oracles/open-active-rear.png",
+      "oracle_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "path": "dist/captures/open-active-rear.png",
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "assertions": [
+        { "kind": "visibility", "expected": "The declared visual is identifiable.", "result": "pass", "measurement": "Detected in the declared region." },
+        { "kind": "origin", "expected": "The visual starts at the declared local origin.", "result": "pass", "measurement": "Anchor delta is within the profile tolerance." },
+        { "kind": "scale", "expected": "The source-relative extent is preserved.", "result": "pass", "measurement": "Extent is within the profile tolerance." },
+        { "kind": "density", "expected": "The visible instance count matches the oracle interval.", "result": "pass", "measurement": "Count is within the profile tolerance." },
+        { "kind": "orientation", "expected": "The visual follows the declared local direction.", "result": "pass", "measurement": "Direction is within the profile tolerance." },
+        { "kind": "appearance", "expected": "Color, alpha and compositing match the selected profile.", "result": "pass", "measurement": "Region comparison passed." },
+        { "kind": "timing", "expected": "Entry, lifetime and exit match the source timeline.", "result": "pass", "measurement": "All sampled instants passed." }
+      ],
       "result": "pass",
-      "note": "Une sortie centrale, orientée vers l'arrière."
+      "note": "All required assertions are tied to this exact matrix cell."
     }
   ],
   "verdict": "qualified",

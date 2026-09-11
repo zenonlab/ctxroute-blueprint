@@ -62,6 +62,8 @@
     "skills:verify": "node scripts/verify-blueprint-skills.mjs",
     "corrector:test": "node --test tests/methodical-corrector.test.mjs",
     "corrector:verify": "node scripts/verify-correction-record.mjs",
+    "relations:verify": "node scripts/verify-source-relations.mjs",
+    "visual:verify": "node scripts/verify-visual-qualification.mjs",
     "theme:receipt": "node scripts/verify-active-theme.mjs",
     "hooks:performance": "node scripts/hook-performance.mjs",
     "blueprint:review": "node scripts/blueprint-review.mjs",

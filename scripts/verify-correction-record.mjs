@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { verifySourceRelations } from './verify-source-relations.mjs';
+import { verifyVisualQualification } from './verify-visual-qualification.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -34,10 +36,9 @@ function linked(base, value) {
 export async function verifyCorrectionRecord(path, { checkLinks = true } = {}) {
   const absolute = resolve(path);
   const root = await realpath(dirname(absolute));
-  const [recordFile, schemaFile, visualSchemaFile] = await Promise.all([
+  const [recordFile, schemaFile] = await Promise.all([
     regularJSON(absolute),
-    regularJSON(resolve(repositoryRoot, 'docs/templates/correction-record.schema.json')),
-    regularJSON(resolve(repositoryRoot, 'docs/templates/visual-qualification.schema.json'))
+    regularJSON(resolve(repositoryRoot, 'docs/templates/correction-record.schema.json'))
   ]);
   const record = recordFile.value;
   const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schemaFile.value);
@@ -48,25 +49,35 @@ export async function verifyCorrectionRecord(path, { checkLinks = true } = {}) {
   const failures = record.validations.filter(validation => validation.exit_code !== 0);
   let artifact = null;
   let visual = null;
+  let relations = null;
   if (checkLinks) {
     const artifactFile = await regularJSON(linked(root, record.active_artifact_receipt), 1_048_576, root);
     artifact = artifactFile.value;
-    if (artifact.format !== 'orbite.active-theme-receipt/1') throw new Error('invalid active artifact receipt');
+    if (!['orbite.active-theme-receipt/1', 'orbite.active-theme-receipt/2'].includes(artifact.format)) {
+      throw new Error('invalid active artifact receipt');
+    }
+    if (record.source_relations) {
+      const relationsPath = linked(root, record.source_relations);
+      relations = await verifySourceRelations(relationsPath);
+    }
     if (record.visual_qualification) {
-      const visualFile = await regularJSON(linked(root, record.visual_qualification), 1_048_576, root);
+      const visualPath = linked(root, record.visual_qualification);
+      const visualFile = await regularJSON(visualPath, 1_048_576, root);
       visual = visualFile.value;
-      const validateVisual = new Ajv2020({ allErrors: true, strict: true }).compile(visualSchemaFile.value);
-      if (!validateVisual(visual)) {
-        throw new Error(`visual qualification schema: ${validateVisual.errors.map(error => `${error.instancePath} ${error.message}`).join('; ')}`);
-      }
+      await verifyVisualQualification(visualPath);
       const receiptDigest = createHash('sha256').update(artifactFile.bytes).digest('hex');
       if (visual.artifact_receipt_sha256 !== receiptDigest) {
         throw new Error('visual qualification references a different active artifact receipt');
       }
     }
   }
+  const artifactVerified = artifact?.format === 'orbite.active-theme-receipt/2' ?
+    artifact.integrity_verified === true : artifact?.qualified === true;
+  const spatialCorrection = record.source_of_truth.coordinate_space !== null &&
+    record.source_of_truth.coordinate_space !== undefined;
   if (record.status === 'qualified' && (failures.length > 0 || record.unknowns?.length ||
-      !record.visual_qualification || (artifact && !artifact.qualified) ||
+      !record.visual_qualification || (artifact && !artifactVerified) ||
+      (spatialCorrection && (!record.source_relations || relations?.status !== 'qualified')) ||
       (visual && visual.verdict !== 'qualified'))) {
     throw new Error('qualified correction contains failed, unknown, experimental, or unqualified evidence');
   }

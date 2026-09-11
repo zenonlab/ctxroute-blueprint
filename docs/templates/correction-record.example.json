@@ -1,5 +1,5 @@
 {
-  "format": "orbite.correction-record/1",
+  "format": "orbite.correction-record/2",
   "id": "synthetic-bike-exhaust",
   "status": "qualified",
   "symptom": "La fixture moto affiche deux sorties alors que la source en déclare une.",
@@ -10,6 +10,7 @@
     "Rendre la vue arrière au tick 120."
   ],
   "active_artifact_receipt": "dist/receipts/synthetic-bike-active.json",
+  "source_relations": "dist/receipts/synthetic-bike-relations.json",
   "source_of_truth": {
     "classification": "source",
     "reference": "fixtures/vehicle-assembly/synthetic-bike.json#exhaust",

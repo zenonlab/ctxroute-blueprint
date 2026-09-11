@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orbite.local/schemas/source-relations-v1.json",
+  "title": "Orbite source-derived relations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "status", "artifact", "sources", "axes", "relation_kinds", "entries", "on_unresolved"],
+  "properties": {
+    "format": { "const": "orbite.source-relations/1" },
+    "id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["draft", "partial", "qualified"] },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_sha256", "adapter"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version", "sha256"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "classification", "reference", "sha256"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "classification": { "enum": ["input", "table", "metadata", "code", "geometry", "observation"] },
+          "reference": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "parent_sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "axes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "values"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "relation_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "minimum", "maximum"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "minimum": { "type": "integer", "minimum": 0, "maximum": 32 },
+          "maximum": { "type": "integer", "minimum": 0, "maximum": 32 }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "coordinates", "relation_kind", "status", "derivation", "placements"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "coordinates": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 6,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": { "$ref": "#/$defs/id" }
+          },
+          "relation_kind": { "$ref": "#/$defs/id" },
+          "status": { "enum": ["resolved", "not_applicable", "missing", "unsupported", "unknown"] },
+          "derivation": { "$ref": "#/$defs/derivation" },
+          "placements": {
+            "type": "array",
+            "maxItems": 32,
+            "items": { "$ref": "#/$defs/placement" }
+          }
+        }
+      }
+    },
+    "on_unresolved": { "const": "reject" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "vector3": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "derivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference", "source_id", "source_sha256", "steps"],
+      "properties": {
+        "kind": { "enum": ["source_table", "source_code", "source_metadata", "geometry", "observation"] },
+        "reference": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "source_id": { "$ref": "#/$defs/id" },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "locator": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "exporter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version", "sha256"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "source_code" } }, "required": ["kind"] },
+          "then": { "properties": { "symbol": true, "exporter": true }, "required": ["symbol", "exporter"] }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["source_table", "source_metadata"] } }, "required": ["kind"] },
+          "then": { "properties": { "locator": true }, "required": ["locator"] }
+        }
+      ]
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "position", "rotation_degrees", "scale", "coordinate_space", "unit"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "position": { "$ref": "#/$defs/vector3" },
+        "rotation_degrees": { "$ref": "#/$defs/vector3" },
+        "scale": { "$ref": "#/$defs/vector3" },
+        "coordinate_space": { "$ref": "#/$defs/id" },
+        "unit": { "$ref": "#/$defs/id" }
+      }
+    }
+  }
+}

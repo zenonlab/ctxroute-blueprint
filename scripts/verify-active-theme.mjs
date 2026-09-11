@@ -147,10 +147,11 @@ export async function inspectActiveTheme({ packagePath, binaryPath, pid, process
   }
 
   return {
-    format: 'orbite.active-theme-receipt/1',
+    format: 'orbite.active-theme-receipt/2',
     generated_at: new Date().toISOString(),
     theme_id: packageValue.id,
-    qualified: experimental.length === 0,
+    integrity_verified: experimental.length === 0,
+    qualification: 'unreviewed',
     artifacts,
     process,
     experimental_fields: experimental
@@ -172,7 +173,7 @@ async function main() {
   const output = `${JSON.stringify(receipt, null, 2)}\n`;
   if (options.output) await writeFile(resolve(options.output), output, { flag: 'wx', mode: 0o600 });
   process.stdout.write(output);
-  if (!receipt.qualified) process.exitCode = 2;
+  if (!receipt.integrity_verified) process.exitCode = 2;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

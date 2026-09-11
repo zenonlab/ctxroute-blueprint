@@ -44,6 +44,13 @@ le renderer. Les relations scène → acteur → modèle → animation restent r
 le compilateur local et chaque dérivé conserve sa qualification. Voir
 [ADR-0062](../decisions/ADR-0062-data-driven-bevy-scene-pack.md).
 
+Les placements, attachements, origines d'effets et autres relations variant selon
+plusieurs ressources passent par une matrice source-neutre. Elle cite une table, une
+métadonnée ou, si aucune table n'existe, le symbole d'un code source exporté en lecture
+seule et l'outil qui l'a transformé en lignes. Chaque combinaison déclarée possède une
+cellule ; les inconnues restent bloquantes et le runtime n'applique aucun offset de
+secours. Voir [ADR-0080](../decisions/ADR-0080-source-derived-relation-matrices.md).
+
 Le format de scène n'efface pas le pipeline graphique d'origine. Chaque asset porte
 un `semantic_profile`, un `render_profile` et une `visual_qualification`. Bevy garde
 l'orchestration universelle, tandis qu'un adaptateur de rendu isolé implémente les

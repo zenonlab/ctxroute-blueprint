@@ -1,14 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://orbite.local/schemas/visual-qualification-v1.json",
+  "$id": "https://orbite.local/schemas/visual-qualification-v2.json",
   "title": "Orbite visual qualification",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "artifact_receipt_sha256", "oracle", "captures", "verdict", "reviewer"],
+  "required": ["format", "artifact_receipt_sha256", "oracle", "axes", "required_assertions", "captures", "verdict", "reviewer"],
   "properties": {
-    "format": { "const": "orbite.visual-qualification/1" },
+    "format": { "const": "orbite.visual-qualification/2" },
     "artifact_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "oracle": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "axes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "values"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "values": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "required_assertions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/assertionKind" }
+    },
     "captures": {
       "type": "array",
       "minItems": 1,
@@ -16,13 +43,36 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "view", "instant", "path", "sha256", "result"],
+        "required": ["id", "coordinates", "oracle_path", "oracle_sha256", "path", "sha256", "assertions", "result"],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
-          "view": { "type": "string", "minLength": 1, "maxLength": 96 },
-          "instant": { "type": "string", "minLength": 1, "maxLength": 96 },
+          "id": { "$ref": "#/$defs/id" },
+          "coordinates": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 6,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": { "$ref": "#/$defs/id" }
+          },
+          "oracle_path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "oracle_sha256": { "$ref": "#/$defs/sha256" },
           "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
-          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "expected", "result"],
+              "properties": {
+                "kind": { "$ref": "#/$defs/assertionKind" },
+                "expected": { "type": "string", "minLength": 1, "maxLength": 500 },
+                "result": { "enum": ["pass", "fail", "not_observable"] },
+                "measurement": { "type": ["string", "null"], "maxLength": 500 }
+              }
+            }
+          },
           "result": { "enum": ["pass", "fail", "not_observable"] },
           "note": { "type": ["string", "null"], "maxLength": 500 }
         }
@@ -30,5 +80,10 @@
     },
     "verdict": { "enum": ["qualified", "failed", "non_conclusive"] },
     "reviewer": { "type": "string", "minLength": 1, "maxLength": 96 }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "assertionKind": { "enum": ["visibility", "origin", "scale", "density", "orientation", "appearance", "timing", "occlusion"] }
   }
 }
