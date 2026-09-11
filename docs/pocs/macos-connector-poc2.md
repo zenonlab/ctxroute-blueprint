@@ -63,6 +63,8 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
 - Une nouvelle activation remplace seulement le RenderHost enfant possédé.
 - Le masquage des fichiers Finder reste réversible.
 - Audio, fichiers et luminosité utilisent seulement les images du package privé.
+- Les choix personnage/véhicule sont une galerie illustrée par ce même package,
+  avec une image de menu source distincte du matériau appliqué dans la scène.
 - Un clic droit qualifié sur un kart ouvre le customiseur prérempli ; gauche focalise
   sa session simulée sans double action.
 - Sauvegarde, annulation et reset ne changent ni l'identité, ni le trajet, ni la

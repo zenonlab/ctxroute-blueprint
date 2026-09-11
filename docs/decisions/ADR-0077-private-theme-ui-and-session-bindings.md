@@ -24,7 +24,9 @@ Le descripteur externe peut référencer un manifeste optionnel
 privés, vérifiés par chemin contenu, fichier ordinaire, taille et SHA-256. Les slots
 obligatoires couvrent audio, fichiers du bureau, luminosité, piste, curseur et fond
 du customiseur. Les choix de personnage et véhicule restent des données du package.
-Le noyau ne connaît aucun nom de jeu ni chemin de ROM.
+Le noyau ne connaît aucun nom de jeu ni chemin de ROM. Le customiseur présente ces
+choix comme une galerie d'images du package ; il ne fabrique pas de pictogramme
+système et conserve les sessions dans un contrôle séparé.
 
 Un choix peut déclarer une application visuelle bornée par `part`, matériau et
 teinte RGBA. Le RenderHost vérifie que la cible, le part et le matériau existent

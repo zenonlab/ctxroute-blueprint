@@ -1,5 +1,77 @@
 import AppKit
 
+@MainActor private final class GameChoiceStrip: NSView {
+    private let stack = NSStackView()
+    private var buttons: [NSButton] = []
+    private(set) var selectedID: String?
+    var onChange: (() -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        stack.orientation = .horizontal
+        stack.alignment = .top
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasHorizontalScroller = true
+        scroll.documentView = stack
+        addSubview(scroll)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: scroll.contentView.bottomAnchor),
+            stack.heightAnchor.constraint(equalTo: scroll.contentView.heightAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func configure(entries: [(String, String, NSImage?)], selected: String?) {
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        buttons = entries.map { id, label, image in
+            let button = NSButton(title: label, target: self, action: #selector(chosen(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier(id)
+            button.image = image
+            button.imagePosition = .imageAbove
+            button.imageScaling = .scaleProportionallyDown
+            button.bezelStyle = .regularSquare
+            button.font = .systemFont(ofSize: 11, weight: .medium)
+            button.lineBreakMode = .byTruncatingTail
+            button.toolTip = label
+            button.setAccessibilityLabel(label)
+            button.widthAnchor.constraint(equalToConstant: 96).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 104).isActive = true
+            stack.addArrangedSubview(button)
+            return button
+        }
+        select(id: selected)
+    }
+
+    func select(id: String?) {
+        selectedID = id
+        for button in buttons {
+            let active = button.identifier?.rawValue == (id ?? "")
+            button.state = active ? .on : .off
+            button.wantsLayer = true
+            button.layer?.borderWidth = active ? 3 : 0
+            button.layer?.borderColor = active ? NSColor.systemYellow.cgColor : nil
+            button.layer?.cornerRadius = 8
+        }
+    }
+
+    @objc private func chosen(_ sender: NSButton) {
+        let value = sender.identifier?.rawValue ?? ""
+        select(id: value.isEmpty ? nil : value)
+        onChange?()
+    }
+}
+
 @MainActor final class VehicleCustomizationPanel: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var themeID = ""
@@ -7,8 +79,8 @@ import AppKit
     private var overrides: ThemeInterfaceOverrides?
     private var sessions: [TerminalSessionSnapshot] = []
     private let target = NSPopUpButton()
-    private let character = NSPopUpButton()
-    private let vehicle = NSPopUpButton()
+    private let character = GameChoiceStrip()
+    private let vehicle = GameChoiceStrip()
     private let session = NSPopUpButton()
     private let preview = NSImageView()
     private let error = NSTextField(wrappingLabelWithString: "")
@@ -30,23 +102,26 @@ import AppKit
         self.overrides = overrides
         self.sessions = sessions
         fill(target, entries: interface.manifest.targets.map { ($0.id, $0.label, nil) })
-        fill(character, entries: choices(.character, in: interface))
-        fill(vehicle, entries: choices(.vehicle, in: interface))
+        let fallback = interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
+        character.configure(entries: choices(.character, in: interface, fallback: fallback), selected: nil)
+        vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback), selected: nil)
         fill(session, entries: [("", "Aucune session", nil)] + sessions.map {
             ($0.id, "\($0.display_name) — \($0.state.rawValue)", nil)
         })
         if let targetID { select(target, id: targetID) }
         target.target = self
         target.action = #selector(targetChanged)
-        character.target = self
-        character.action = #selector(choiceChanged)
-        vehicle.target = self
-        vehicle.action = #selector(choiceChanged)
+        character.onChange = { [weak self] in self?.choiceChanged() }
+        vehicle.onChange = { [weak self] in self?.choiceChanged() }
         preview.imageScaling = .scaleProportionallyUpOrDown
         preview.widthAnchor.constraint(equalToConstant: 320).isActive = true
         preview.heightAnchor.constraint(equalToConstant: 130).isActive = true
-        [target, character, vehicle, session].forEach {
+        [target, session].forEach {
             $0.widthAnchor.constraint(equalToConstant: 320).isActive = true
+        }
+        [character, vehicle].forEach {
+            $0.widthAnchor.constraint(equalToConstant: 320).isActive = true
+            $0.heightAnchor.constraint(equalToConstant: 112).isActive = true
         }
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -66,7 +141,7 @@ import AppKit
         let save = NSButton(title: "Enregistrer", target: self, action: #selector(submit))
         save.keyEquivalent = "\r"
         stack.addArrangedSubview(NSStackView(views: [cancel, reset, save]))
-        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 530),
+        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 720),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Personnaliser le véhicule"
         window.isReleasedWhenClosed = false
@@ -81,8 +156,9 @@ import AppKit
     }
 
     private func choices(_ kind: ThemeInterfaceManifest.Choice.Kind,
-                         in interface: ResolvedThemeInterface) -> [(String, String, NSImage?)] {
-        [("", "Valeur du thème", nil)] + interface.manifest.choices.filter { $0.kind == kind }.map {
+                         in interface: ResolvedThemeInterface,
+                         fallback: NSImage?) -> [(String, String, NSImage?)] {
+        [("", "Thème", fallback)] + interface.manifest.choices.filter { $0.kind == kind }.map {
             ($0.id, $0.label, interface.assets[$0.preview].flatMap(NSImage.init(contentsOf:)))
         }
     }
@@ -108,8 +184,8 @@ import AppKit
         guard let interface, let overrides, let id = selectedID(target) else { return }
         let embedded = interface.manifest.targets.first { $0.id == id }
         let value = overrides.targets[id]
-        select(character, id: value?.character)
-        select(vehicle, id: value?.vehicle)
+        character.select(id: value?.character)
+        vehicle.select(id: value?.vehicle)
         select(session, id: value?.session_id ?? embedded?.session_id)
         updatePreview()
     }
@@ -117,7 +193,7 @@ import AppKit
     @objc private func choiceChanged() { updatePreview() }
     private func updatePreview() {
         guard let interface else { return }
-        let selected = selectedID(vehicle) ?? selectedID(character)
+        let selected = vehicle.selectedID ?? character.selectedID
         preview.image = interface.manifest.choices.first { $0.id == selected }
             .flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
             ?? interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
@@ -125,8 +201,8 @@ import AppKit
 
     @objc private func submit() {
         guard var overrides, let id = selectedID(target) else { return }
-        overrides.targets[id] = ThemeTargetOverride(character: selectedID(character),
-            vehicle: selectedID(vehicle), sessionID: selectedID(session))
+        overrides.targets[id] = ThemeTargetOverride(character: character.selectedID,
+            vehicle: vehicle.selectedID, sessionID: selectedID(session))
         do {
             guard let interface else { return }
             self.overrides = try overrides.validated(for: themeID, interface: interface.manifest)
