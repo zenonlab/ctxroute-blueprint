@@ -106,9 +106,10 @@ describe('createFavoriteResolutionRuntime', () => {
       ensureReady: async () => ({ schemaVersion: 7 }),
       hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
-      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'inventory-session',
+      outbox: { block: vi.fn(), claimNext: vi.fn(async () => undefined), retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'inventory-session',
     } as const;
     await expect(createFavoriteResolutionRuntime({ ...dependencies, bookmarks: { readBookmarkBatch: firstReader } })()).rejects.toThrow('suspended');
+    expect(dependencies.outbox.claimNext).toHaveBeenCalledOnce();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor, sessionId: 'inventory-session', status: 'active' });
 
     const resumedReader = vi.fn(async () => ({ complete: true, records: [] as const }));

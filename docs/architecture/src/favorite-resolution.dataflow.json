@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Images sans référent; préférence MU après preuve unique complète. Reprise des tâches bloquées avec reçu local."
+        "note": "Inventaire et résolution isolés; reprises datées distinctes pour fournisseur, collectif et erreur interne."
       },
       {
         "id": "cover-rights",

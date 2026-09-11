@@ -7000,7 +7000,7 @@
         {
           "id": "step-13",
           "title": "Make inventory recovery and task diagnostics resumable",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Resolution continues despite independent inventory failure",
             "Task diagnostics distinguish internal failures from provider delays",
@@ -7017,7 +7017,9 @@
             "packages/ui/src/features",
             "apps/extension/entrypoints/options",
             "docs/systems/favorite-resolution-rebuild-pipeline.md",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts"
           ],
           "commands": [
             "npm exec -- vitest run",
@@ -7026,7 +7028,11 @@
             "git diff --check",
             "git commit"
           ],
-          "evidence": []
+          "evidence": [
+            "45 queue recovery and status tests pass; 43 recovery import domain tests pass; 16 storage/import tests pass",
+            "All workspace typechecks, Oxlint, docs and Archify showcase pass",
+            "Old recovery receipts preserved; internal failures retain dated retries; failed provider does not block another provider restoration"
+          ]
         },
         {
           "id": "step-14",

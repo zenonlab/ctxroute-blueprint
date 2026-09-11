@@ -17,7 +17,7 @@ export async function correctImportedReview(session: StorageSession, source: Fav
   const blocked = task?.state === 'BLOCKED' && review === undefined && source.matchedWorkId === undefined
     && (source.resolution === undefined || source.resolution.kind === 'RETRYABLE');
   if (!artificial && !faultyAutomatic && !blocked) return source;
-  const id = `${source.id}:${blocked ? 'queue-recovery-109' : 'correction-v1'}`;
+  const id = `${source.id}:${blocked ? 'queue-recovery-v2' : 'correction-v1'}`;
   const previous = await session.getFavoriteResolutionReceipt(id);
   if (previous) return source;
   const base = { schemaVersion: 1 as const, source };

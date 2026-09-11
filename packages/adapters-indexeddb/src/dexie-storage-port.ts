@@ -60,7 +60,11 @@ export class DexieStoragePort implements StoragePort {
           const table = this.database.favoriteSources;
           const observed = await table.where('presence').equals('observed').count();
           const counts = await Promise.all(['RESOLVED', 'REVIEW_REQUIRED', 'RETRYABLE', 'UNSUPPORTED'].map((kind) => table.where(['presence', 'resolution.kind']).equals(['observed', kind]).count()));
-          return { processing: Math.max(0, observed - counts.reduce((sum, count) => sum + count, 0)), retryable: counts[2] ?? 0, unsupported: counts[3] ?? 0 };
+          const [internalErrors, collectivePending] = await Promise.all(['INTERNAL_FAILURE', 'COLLECTIVE_UNAVAILABLE'].map(reason => table.where(['presence', 'resolution.kind']).equals(['observed', 'RETRYABLE']).filter(source => source.resolution?.kind === 'RETRYABLE' && source.resolution.reason === reason).count()));
+          const result: Awaited<ReturnType<StoragePort['readFavoriteResolutionCounts']>> = { processing: Math.max(0, observed - counts.reduce((sum, count) => sum + count, 0)), retryable: counts[2] ?? 0, unsupported: counts[3] ?? 0 };
+          if (internalErrors) result.internalErrors = internalErrors;
+          if (collectivePending) result.collectivePending = collectivePending;
+          return result;
         });
       },
       ...createDexieFavoriteResolutionSession(this.database, requireStore),

@@ -39,12 +39,15 @@ describe('importFavoriteSources', () => {
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     if (!task || !source) throw new Error('Missing fixture');
     await storage.putFavoriteResolutionTask(blockTask(claimTask(task, 'old', importedAt, '2026-09-06T00:01:00.000Z'), 'old', 'AUTOMATIC_ATTEMPT_LIMIT'));
+    const oldReceipt = { completedAt: importedAt, effectDigest: 'correction:blocked-task', id: `${source.id}:queue-recovery-109`, idempotencyKey: `${source.id}:queue-recovery-109`, sourceId: source.id };
+    await storage.putFavoriteResolutionReceipt(oldReceipt);
     await importFavoriteSources([favorite], storage, importedAt);
     expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY', attempt: 0 });
-    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-109`);
+    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`);
     expect(receipt).toMatchObject({ correction: { task: { state: 'BLOCKED', blockedReason: 'AUTOMATIC_ATTEMPT_LIMIT' } } });
     await importFavoriteSources([favorite], storage, importedAt);
-    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-109`)).toEqual(receipt);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`)).toEqual(receipt);
+    expect(await storage.getFavoriteResolutionReceipt(oldReceipt.id)).toEqual(oldReceipt);
   });
   it('archives an artificial import Review with a before-image and resumes resolution once', async () => {
     const storage = new MemoryStoragePort();

@@ -45,36 +45,42 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let coverRepairAfterId: Work['id'] | undefined;
   const runOnce = () => dependencies.ensureReady()
     .then(async () => {
-        await dependencies.beforeInventory?.();
-        const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
-        const checkpoint = stored?.status === 'active'
-          ? stored
-          : { id: 'favorite-inventory' as const, sessionId: dependencies.token(), startedAt: dependencies.now(), status: 'active' as const };
-        let cursor = checkpoint.cursor;
-        let complete = false;
-        for (let sliceIndex = 0; sliceIndex < 8 && !complete; sliceIndex += 1) {
-          const slice = await dependencies.bookmarks.readBookmarkBatch(cursor, 100);
-          const favorites = normalizeBookmarks(slice.records);
-          await importFavoriteSources(favorites, dependencies.storage, dependencies.now(), dependencies.sourceAdapters);
-          await dependencies.storage.transaction(['favoriteInventoryMarks'], async (transaction) => {
-            for (const favorite of favorites.filter((item) => item.state === 'eligible')) {
-              await transaction.putFavoriteInventoryMark({ bookmarkId: favorite.bookmarkId, sessionId: checkpoint.sessionId });
-            }
-          });
-          complete = slice.complete;
-          cursor = slice.cursor;
-          const nextCheckpoint = cursor === undefined
-            ? { id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: complete ? 'complete' as const : 'active' as const }
-            : { cursor, id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: 'active' as const };
-          await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
+        let inventoryFailure: Error | undefined;
+        try {
+          await dependencies.beforeInventory?.();
+          const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
+          const checkpoint = stored?.status === 'active'
+            ? stored
+            : { id: 'favorite-inventory' as const, sessionId: dependencies.token(), startedAt: dependencies.now(), status: 'active' as const };
+          let cursor = checkpoint.cursor;
+          let complete = false;
+          for (let sliceIndex = 0; sliceIndex < 8 && !complete; sliceIndex += 1) {
+            const slice = await dependencies.bookmarks.readBookmarkBatch(cursor, 100);
+            const favorites = normalizeBookmarks(slice.records);
+            await importFavoriteSources(favorites, dependencies.storage, dependencies.now(), dependencies.sourceAdapters);
+            await dependencies.storage.transaction(['favoriteInventoryMarks'], async (transaction) => {
+              for (const favorite of favorites.filter((item) => item.state === 'eligible')) {
+                await transaction.putFavoriteInventoryMark({ bookmarkId: favorite.bookmarkId, sessionId: checkpoint.sessionId });
+              }
+            });
+            complete = slice.complete;
+            cursor = slice.cursor;
+            const nextCheckpoint = cursor === undefined
+              ? { id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: complete ? 'complete' as const : 'active' as const }
+              : { cursor, id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: 'active' as const };
+            await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
+          }
+          if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
+        } catch (error) {
+          inventoryFailure = error instanceof Error ? error : new Error('INVENTORY_UNAVAILABLE');
         }
-        if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
         await dependencies.identityRecovery?.prepare();
         await runFavoriteResolutionSlice(dependencies);
         const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
         coverRepairAfterId = repairedCovers.nextAfterId;
         if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
         await dependencies.identityRecovery?.publish();
+        if (inventoryFailure !== undefined) throw inventoryFailure;
     });
   return function reconcileFavorites(bookmarkMutation = false): Promise<void> {
     if (active !== undefined) {

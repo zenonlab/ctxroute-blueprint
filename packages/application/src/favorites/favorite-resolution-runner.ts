@@ -3,7 +3,7 @@ import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '
 import type { StoragePort } from '../ports/storage-port';
 import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
-import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
+import { parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
@@ -111,7 +111,7 @@ async function retryClaim(
   task: DurableTask,
   token: string,
   retryAt: string,
-  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' = 'PROVIDER_UNAVAILABLE',
+  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'COLLECTIVE_UNAVAILABLE' = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
   const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
   await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
@@ -278,7 +278,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   if (local.kind === 'AMBIGUOUS') {
-    if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
+    if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt, 'COLLECTIVE_UNAVAILABLE');
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
       candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
     });
@@ -301,7 +301,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   const { decision: outcome, envelopes } = lanes;
   // Save provider evidence while the collective is unavailable, but do not
   // replace a personal decision that could not be consulted.
-  if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
+  if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt, 'COLLECTIVE_UNAVAILABLE');
   if (outcome.kind === 'AMBIGUOUS') {
     const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
@@ -353,7 +353,7 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
       if (result === 'completed') completed += 1;
       else if (result === 'retried') retried += 1;
       else blocked += 1;
-    } catch (error) {
+    } catch {
       const changed = await dependencies.storage.transaction(['favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources'], async (session) => {
         const current = await session.getFavoriteResolutionTask(task.id);
         if (current?.state !== 'CLAIMED' || current.claimToken !== token || current.idempotencyKey !== task.idempotencyKey
@@ -362,15 +362,16 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
         const source = await session.getFavoriteSource(payload.sourceId);
         const record = await session.getFavoriteParseArtifact(payload.sourceId);
         if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) return false;
-        await session.putFavoriteResolutionTask(blockTask(current, token, error instanceof Error ? error.message : 'UNKNOWN_RESOLUTION_FAILURE'));
+        const retryAt = new Date(timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** Math.min(10, Math.max(0, current.attempt - 1))))).toISOString();
+        await session.putFavoriteResolutionTask({ ...retryTask(current, token, retryAt), blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
         await session.putFavoriteSource(createFavoriteSource({
           ...source,
-          resolution: { kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' },
+          resolution: { kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' },
           resolutionVersions: favoriteResolutionVersions(record.artifact),
         }));
         return true;
       });
-      if (changed) blocked += 1;
+      if (changed) retried += 1;
       else break;
     }
   }

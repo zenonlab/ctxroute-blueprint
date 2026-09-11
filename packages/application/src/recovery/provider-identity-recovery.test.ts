@@ -14,6 +14,24 @@ const ids = { ...emptySyncedProviderIds(), anilist: ['1', '2', '3'] };
 const candidate = (id: string) => ({ provider: 'anilist' as const, externalId: id, mediaKind: 'ANIME' as const, preSerialization: false, titles: [`Synthetic Series ${id}`] });
 
 describe('provider identities after private database reset', () => {
+  it('restores a different provider while retaining unavailable IDs for a later wake', async () => {
+    const storage = new MemoryStoragePort();
+    const state = checkpoints();
+    let clock = '2026-09-08T00:00:00.000Z';
+    const anilist = vi.fn(async () => candidate('1')).mockRejectedValueOnce(new Error('offline'));
+    const manga = { ...candidate('2'), provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const };
+    const mangaupdates = vi.fn(async () => manga);
+    const dependencies = { checkpoints: state, storage, now: () => clock, hydration: { anilist: { hydrate: anilist }, mangaupdates: { hydrate: mangaupdates }, mangadex: unused, 'kitsu-anime': unused, 'kitsu-manga': unused } };
+    const mixed = { ...emptySyncedProviderIds(), anilist: ['1'], mangaUpdates: ['2'] };
+    expect(await restoreProviderIdentities(mixed, dependencies)).toMatchObject({ kind: 'RETRYABLE', hydrated: 1 });
+    expect(mangaupdates).toHaveBeenCalledOnce();
+    expect((await state.read())?.restoration?.deferred).toHaveLength(1);
+    clock = '2026-09-08T00:15:00.000Z';
+    expect(await restoreProviderIdentities(mixed, dependencies)).toMatchObject({ kind: 'COMPLETE', hydrated: 1 });
+    expect(mangaupdates).toHaveBeenCalledOnce();
+    expect(anilist).toHaveBeenCalledTimes(2);
+  });
+
   it('hydrates exact IDs in bounded resumable slices without inventing favorites, Reviews or Library entries', async () => {
     const storage = new MemoryStoragePort();
     const state = checkpoints();
@@ -40,7 +58,7 @@ describe('provider identities after private database reset', () => {
       .mockResolvedValueOnce(candidate('1')).mockRejectedValueOnce(new Error('offline'));
     const dependencies = { checkpoints: state, hydration: { anilist: { hydrate }, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused }, now: () => clock, storage };
     expect(await restoreProviderIdentities(ids, dependencies)).toMatchObject({ kind: 'RETRYABLE', hydrated: 1 });
-    expect(await state.read()).toMatchObject({ restoration: { index: 1, complete: false } });
+    expect(await state.read()).toMatchObject({ restoration: { index: 3, complete: false, deferred: [{ index: 1, retryAt: Date.parse('2026-09-08T00:15:00.000Z') }, { index: 2, retryAt: Date.parse('2026-09-08T00:15:00.000Z') }] } });
     expect(await restoreProviderIdentities(ids, dependencies)).toMatchObject({ kind: 'RETRYABLE', hydrated: 0 });
     expect(hydrate).toHaveBeenCalledTimes(2);
     clock = '2026-09-08T00:15:00.000Z';

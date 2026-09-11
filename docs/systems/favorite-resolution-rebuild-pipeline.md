@@ -835,6 +835,13 @@ du collectif : un choix personnel inaccessible ne doit pas être remplacé
 silencieusement. Une panne d'hydratation après un lookup réussi ne déclenche
 pas de nouvelle décision d'identité.
 
+Les erreurs internes et l'indisponibilité collective ont des motifs distincts
+des pannes fournisseurs. Une tâche valide conserve une reprise datée même
+après une erreur interne. L'échec d'inventaire reste signalé au réveil, mais
+la résolution des sources déjà importées est exécutée avant ce signalement.
+La restauration sync conserve les indices différés et poursuit les identités
+des autres fournisseurs, avec au plus deux appels d'hydratation par tranche.
+
 La reconstruction est terminée seulement quand :
 
 - tout événement favori atteint un état terminal ou une reprise datée;

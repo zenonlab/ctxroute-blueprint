@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const resolutionStatusMessageSchema = z.strictObject({ type: z.literal('favorite.status.read'), version: z.literal(1) });
 export const resolutionStatusResponseSchema = z.discriminatedUnion('ok', [
-  z.strictObject({ ok: z.literal(true), counts: z.strictObject({ processing: z.number().int().nonnegative(), retryable: z.number().int().nonnegative(), unsupported: z.number().int().nonnegative() }) }),
+  z.strictObject({ ok: z.literal(true), counts: z.strictObject({ processing: z.number().int().nonnegative(), retryable: z.number().int().nonnegative(), unsupported: z.number().int().nonnegative(), internalErrors: z.number().int().nonnegative().optional(), collectivePending: z.number().int().nonnegative().optional() }) }),
   z.strictObject({ ok: z.literal(false), error: z.string() }),
 ]);
 

@@ -184,7 +184,7 @@ describe('runFavoriteResolutionSlice', () => {
     await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [source?.matchedWorkId] });
   });
 
-  it('records a terminal retryable result when an invariant failure blocks a task', async () => {
+  it('schedules an internal failure separately from a provider outage', async () => {
     const { outbox, storage, task } = await fixture();
     const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'invariant-search', provider: 'anilist', truncated: false });
     const result = await runFavoriteResolutionSlice({
@@ -192,10 +192,11 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: hydrationPorts({ hydrate: async () => ({ ...candidate, externalId: 'wrong-id' }) }),
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'invariant-token',
     });
-    expect(result).toEqual({ blocked: 1, completed: 0, retried: 0 });
-    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'BLOCKED' });
+    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:30.000Z', blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
-    expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' });
+    expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+    expect(await storage.readFavoriteResolutionCounts()).toMatchObject({ internalErrors: 1 });
   });
 
   it('persists bookmark progression with the hydrated provider maximum', async () => {
