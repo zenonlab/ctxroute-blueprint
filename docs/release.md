@@ -48,6 +48,13 @@ Two isolated builds reproduce both archives:
 - Chrome: 283267 bytes, SHA-256 `66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea`.
 - Firefox: 283311 bytes, SHA-256 `69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb`.
 
+`npm run verify` passes. Gate plan
+`45d191ea218c83a1832adbbd8338da5a09ad4a07627fdd76fa16e73e0a7d6070`
+published both ZIPs and Worker `6d02c19a-9760-44ae-ab89-26e82bbc77e0`.
+Public downloads match the hashes above, `/download` advertises 1.0.11,
+and `/library` returns HTTP 200. No D1 migration was applied. Previous Worker
+`63799f79-d60f-448f-8291-2ca46f091dad` remains the rollback reference.
+
 The user's site tab was observed empty. Its installed extension version and
 queue diagnostics remain unavailable through the browser control adapter;
 these local tests do not certify recovery of the complete private library.

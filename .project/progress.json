@@ -6843,9 +6843,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Gate 2b25ce4cd70d15a02ed4715fee463696912978b2ee0131406bedc06842d96672 published 1.0.10 ZIPs and Worker 63799f79-d60f-448f-8291-2ca46f091dad; no D1 migration",
-            "Public downloads match tested Chrome 82401ff3a8dfb1e122d0a63dcfd451f1eb42f6d01e2d6b8fc5e9a56f7da17612 and Firefox 58bd2bb00d3a9e7b82e9ebeae63d5469cf5984b9ba5a7b297d45084b355d9f3e; /download advertises 1.0.10",
-            "external: Chrome control cannot claim internal extension manager; user-installed extension reload and full private library rendering remain unverified"
+            "Gate 45d191ea218c83a1832adbbd8338da5a09ad4a07627fdd76fa16e73e0a7d6070 published 1.0.11 ZIPs and Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0; no D1 migration; previous Worker retained as rollback reference",
+            "Public Chrome SHA256 66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea and Firefox SHA256 69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb equal reproducible artifacts; download advertises 1.0.11; library HTTP 200",
+            "external: User library DOM is empty; browser control cannot access internal extension manager. Installed version, queue diagnostics and actual private-library recovery remain unverified; user asked to open Options"
           ]
         },
         {
