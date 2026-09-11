@@ -33,6 +33,12 @@ describe('independent provider lanes', () => {
     expect(candidates['kitsu-anime'].search).toHaveBeenCalledOnce();
   });
 
+  it('uses Kitsu after a terminal provider refusal', async () => {
+    const candidates = { ...ports(), anilist: provider('anilist'), 'kitsu-anime': provider('kitsu-anime', [candidate('kitsu-anime')]) };
+    candidates.anilist.search.mockRejectedValue(new Error('Favorite provider request failed with HTTP 403.'));
+    expect(await resolveFavoriteProviderLanes(candidates, query, 'ANIME')).toMatchObject({ kind: 'COMPLETE', decision: { matchedReference: { provider: 'kitsu-anime' } } });
+  });
+
   it('stops on a primary ambiguity', async () => {
     const candidates = { ...ports(), anilist: provider('anilist', [candidate('anilist', '1'), candidate('anilist', '2')]) };
     expect(await resolveFavoriteProviderLanes(candidates, query, 'ANIME')).toMatchObject({ decision: { kind: 'AMBIGUOUS' } });

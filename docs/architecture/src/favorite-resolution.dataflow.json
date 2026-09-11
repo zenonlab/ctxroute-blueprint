@@ -34,7 +34,7 @@
           "privateStore",
           "libraryProjectionRepair"
         ],
-        "note": "Anime/manga indépendants; Kitsu après NO_MATCH. Hydratation et pagination reprenables; tranches jusqu'au budget, file privée locale."
+        "note": "Anime/manga indépendants; Kitsu après NO_MATCH ou refus fournisseur terminal HTTP 403. Hydratation et pagination reprenables; tranches jusqu'au budget, file privée locale."
       },
       {
         "id": "bounded-convergence",
