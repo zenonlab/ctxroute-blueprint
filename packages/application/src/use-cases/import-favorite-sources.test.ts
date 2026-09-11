@@ -4,6 +4,7 @@ import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
 import { blockTask, claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from '../favorites/site-rules';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
 const favorite: ImportableFavorite = {
@@ -16,6 +17,20 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
+  it('requeues a previously unsupported Comix source after the site rule update', async () => {
+    const storage = new MemoryStoragePort();
+    const input = { ...favorite, title: 'Synthetic Journey Chapter 101', url: 'https://comix.to/title/ab123-synthetic-journey/1234567-chapter-101' };
+    await importFavoriteSources([input], storage, importedAt);
+    const [before] = await storage.listFavoriteSources({ limit: 1 });
+    expect(before?.resolution?.kind).toBe('UNSUPPORTED');
+    await importFavoriteSources([input], storage, importedAt, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
+    const [after] = await storage.listFavoriteSources({ limit: 1 });
+    expect(after?.id).toBe(before?.id);
+    expect(after?.resolution).toBeUndefined();
+    expect((await storage.getFavoriteResolutionTask('favorite-resolution_4_3432'))?.state).toBe('READY');
+    expect((await storage.listReviews({ status: 'pending', limit: 20 })).length).toBe(0);
+  });
+
   it('recovers an old blocked task once and preserves its previous state in a receipt', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([favorite], storage, importedAt);

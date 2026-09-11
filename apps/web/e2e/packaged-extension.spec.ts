@@ -44,12 +44,18 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     headless: true,
   });
   try {
+    let comixAnimeSearches = 0;
     const coverRequests: string[] = [];
     await context.route(/^https:\/\/(s4\.anilist\.co|cdn\.mangaupdates\.com|uploads\.mangadex\.org|media\.kitsu\.app)\//u, async (route) => {
       coverRequests.push(route.request().headers().referer ?? '');
       await route.fulfill({ body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1cAAAAASUVORK5CYII=', 'base64'), contentType: 'image/png', status: 200 });
     });
     await context.route('https://graphql.anilist.co/**', async (route) => {
+      if (route.request().postData()?.toLowerCase().includes('fixture river')) {
+        comixAnimeSearches += 1;
+        await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Synthetic anime provider outage', status: 403 }] }) });
+        return;
+      }
       const exactHydration = route.request().postData()?.includes('"id":154587') === true;
       await route.fulfill({
         body: JSON.stringify(exactHydration
@@ -78,7 +84,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await worker.evaluate(async () => {
       await chrome.bookmarks.create({ title: '(3) CES STREAMERS QUI GHOSTENT M. LE MAIRE ft. Dach', url: 'https://www.youtube.com/watch?v=fixture' });
       await chrome.bookmarks.create({ title: 'Frieren: Beyond Journey’s End', url: 'https://anilist.co/anime/154587/frieren-beyond-journeys-end' });
-      await chrome.bookmarks.create({ title: 'Fixture River Chapter 12', url: 'https://fixtures.tobirink.invalid/manga/fixture-river/chapter-12' });
+      await chrome.bookmarks.create({ title: 'Fixture River Chapter 12', url: 'https://comix.to/title/ab123-fixture-river/1234567-chapter-12' });
       await chrome.bookmarks.create({ title: 'Fixture Garden Chapter 8', url: 'https://mangadex.org/title/12345678-1234-4234-8234-123456789abc/fixture-garden' });
       await chrome.bookmarks.create({ title: 'Fixture Sky Episode 4', url: 'https://fixtures.tobirink.invalid/anime/fixture-sky/episode-4' });
       await chrome.bookmarks.create({ title: 'Fixture Paper Chapter 9', url: 'https://fixtures.tobirink.invalid/manga/fixture-paper/chapter-9' });
@@ -112,6 +118,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible({ timeout: 30_000 });
     for (const title of ['Fixture River', 'Fixture Garden', 'Fixture Sky', 'Fixture Paper']) await expect(privateLibrary.getByText(title).first()).toBeVisible();
+    expect(comixAnimeSearches).toBe(0);
     await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
     for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'uploads.mangadex.org', 'media.kitsu.app']) {
       await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('alt', /Couverture/u);

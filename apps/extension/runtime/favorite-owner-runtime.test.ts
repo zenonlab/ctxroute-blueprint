@@ -29,6 +29,17 @@ function fixture() {
 }
 
 describe('owner background recovery', () => {
+  it('keeps newer bundled rules when the owner cache is older and still fresh', async () => {
+    const test = fixture();
+    await test.runtime().enable();
+    const state = await test.local.read();
+    if (!state) throw new Error('Missing owner fixture');
+    await test.local.save({ ...state, rules: { ...bundledFavoriteSiteRules, version: 1, rules: [] }, rulesReadAt: Date.now() });
+    const runtime = test.runtime();
+    await runtime.maintain();
+    expect(runtime.rules).toEqual(bundledFavoriteSiteRules);
+  });
+
   it('prefetches fifty keys in one batch and reuses the persisted lookup cache', async () => {
     const test = fixture(); await test.runtime().enable();
     await importFavoriteSources(Array.from({ length: 50 }, (_, index) => ({ bookmarkId: `prefetch-${index}`, folderPath: [], order: index, state: 'eligible' as const, title: `Synthetic Series ${index}`, url: `https://reader.example/anime/synthetic-series-${index}` })), test.storage, '2026-09-08T00:00:00.000Z');

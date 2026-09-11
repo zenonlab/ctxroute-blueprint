@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.10`. `apps/extension/package.json` is the only
+The current candidate is `1.0.11`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -36,6 +36,22 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### Comix route correction candidate — 2026-09-11
+
+Candidate `1.0.11` recognizes exact Comix title/chapter routes as manga and
+keeps newer bundled rules when an older owner cache is present. Forty targeted
+tests pass, including reimport of an unsupported source without data deletion.
+The packaged Chromium journey resolves its synthetic Comix bookmark through
+MangaUpdates and verifies that no anime query is issued for that title.
+Two isolated builds reproduce both archives:
+
+- Chrome: 283267 bytes, SHA-256 `66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea`.
+- Firefox: 283311 bytes, SHA-256 `69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb`.
+
+The user's site tab was observed empty. Its installed extension version and
+queue diagnostics remain unavailable through the browser control adapter;
+these local tests do not certify recovery of the complete private library.
+
 ### MangaUpdates transport candidate — 2026-09-11
 
 Candidate `1.0.10` restores the API-specific Origin header rule, keeps HTTP
@@ -49,8 +65,14 @@ Two isolated builds reproduce both archives:
 - Chrome: 283003 bytes, SHA-256 `82401ff3a8dfb1e122d0a63dcfd451f1eb42f6d01e2d6b8fc5e9a56f7da17612`.
 - Firefox: 283048 bytes, SHA-256 `58bd2bb00d3a9e7b82e9ebeae63d5469cf5984b9ba5a7b297d45084b355d9f3e`.
 
-Publication and the user's installed-profile reload are separate from these
-local checks. Previously stored MangaDex identities remain preserved; this
+`npm run verify` passes. Gate plan
+`2b25ce4cd70d15a02ed4715fee463696912978b2ee0131406bedc06842d96672`
+published both ZIPs and Worker `63799f79-d60f-448f-8291-2ca46f091dad`.
+Public downloads match the hashes above and `/download` advertises 1.0.10.
+No D1 migration was applied. Previous Worker
+`0721e450-0098-43fd-ae64-923640b332f1` remains the rollback reference.
+The user's installed-profile reload remains unverified.
+Previously stored MangaDex identities remain preserved; this
 candidate does not certify complete migration of that private library.
 
 ### Cover and queue correction candidate — 2026-09-11

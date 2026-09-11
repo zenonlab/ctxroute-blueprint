@@ -62,6 +62,14 @@ déclarative embarquée. Cette compatibilité existait dans FavLib; les sondes
 du 11 septembre 2026 répondent 403 avec Origin et 200 sans cet en-tête.
 La permission `declarativeNetRequestWithHostAccess` réutilise l'accès hôte
 déjà accordé; aucun relais Worker ou titre stocké côté serveur n'est ajouté.
+La version 2 des règles embarquées reconnaît les routes Comix `/title/`
+avec un préfixe opaque de cinq caractères et le segment optionnel
+`identifiant-chapter-numéro`. Ces deux formats sont des options fermées du
+parseur de règles, jamais des expressions régulières exécutables à distance.
+L'URL canonique conserve l'identifiant; le titre recherché l'exclut. Le type
+MANGA évite une recherche anime injustifiée. Les règles locales validées les
+plus récentes priment sur un cache propriétaire plus ancien. L'import existant
+réenfile les artefacts dont le fingerprint change sans effacer leurs sources.
 Kitsu n'arbitre pas l'ambiguïté principale. Le matcher s'arrête au premier
 niveau probant : ID, URL, titre exact, saison corroborée, tokens réordonnés,
 distance bornée. Plusieurs identités distinctes sont ambiguës. Popularité,

@@ -65,6 +65,22 @@ Le rapprochement existant reste conservateur, et ne remplace pas une migration
 complète des choix automatiques antérieurs. La vérification de la bibliothèque
 privée installée reste distincte de ces tests de transport et de résolution.
 
+### Routes Comix et panne de la lane anime
+
+La forme Comix `/title/identifiant-titre/identifiant-chapter-numéro` était
+rejetée par l'analyse générique; la fiche sans chapitre gardait UNKNOWN et
+son préfixe opaque dans le titre. Les règles embarquées v2 déclarent ces deux
+routes comme MANGA, retirent seulement le préfixe opaque de cinq caractères
+du slug recherché et conservent l'URL canonique exacte. Les chapitres zéro
+et décimaux restent des progressions, les nombres du titre restent intacts.
+Les pages de collection ne deviennent pas des œuvres.
+
+Un rescan des anciennes sources UNSUPPORTED change leur fingerprint et les
+réenfile sans suppression ni Review artificielle. Un cache propriétaire de
+règles plus ancien ne peut pas remplacer la version embarquée. Le parcours
+installé utilise une URL Comix synthétique et refuse une recherche anime de
+ce titre afin de détecter une régression de classification.
+
 
 Le runtime actuel possède déjà des fondations réutilisables :
 

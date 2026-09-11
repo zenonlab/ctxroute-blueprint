@@ -114,7 +114,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
       if (stored === undefined || stored.status === 'revoked') return;
       let state = await this.flush(stored.status === 'pending' ? await this.activate(stored) : stored);
       if (state.status !== 'enabled') return;
-      this.rules = state.rules ?? bundledFavoriteSiteRules;
+      this.rules = state.rules !== undefined && state.rules.version > bundledFavoriteSiteRules.version ? state.rules : bundledFavoriteSiteRules;
       if (Date.now() - (state.rulesReadAt ?? 0) > 86400000) {
         try {
           const rules = await this.http.readRules();
