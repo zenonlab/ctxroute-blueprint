@@ -62,6 +62,9 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
     private var controlGeneration: UInt64 = 0
     public private(set) var themeID: String?
     public var onHitSnapshot: ((RenderHostHitSnapshot) -> Void)?
+    /// Called on the main actor when the active process exits after startup.
+    /// The controller has already cleared its active request before invoking it.
+    public var onTermination: ((Int32) -> Void)?
 
     public init() {}
 
@@ -76,6 +79,14 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
         process.arguments = request.arguments
         process.standardInput = input
         process.standardOutput = output
+        process.terminationHandler = { [weak self, weak process] terminated in
+            Task { @MainActor [weak self, weak process] in
+                guard let self, let process, self.process === process else { return }
+                let status = terminated.terminationStatus
+                self.clearProcessState()
+                self.onTermination?(status)
+            }
+        }
         let reader = RenderHostOutputReader { [weak self] snapshot in
             Task { @MainActor [weak self] in self?.onHitSnapshot?(snapshot) }
         }
@@ -119,6 +130,10 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
             process?.terminate()
             process?.waitUntilExit()
         }
+        clearProcessState()
+    }
+
+    private func clearProcessState() {
         process = nil
         try? input?.close()
         output?.fileHandleForReading.readabilityHandler = nil

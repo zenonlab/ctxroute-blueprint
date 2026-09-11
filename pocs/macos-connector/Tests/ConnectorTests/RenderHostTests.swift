@@ -54,4 +54,26 @@ import Testing
         #expect(throws: (any Error).self) { try controller.activate(request) }
         #expect(controller.themeID == nil)
     }
+
+    @Test @MainActor func unexpected_renderhost_exit_clears_active_state_and_notifies() async throws {
+        let controller = RenderHostController()
+        defer { controller.stop() }
+        let exited = ActorBox<Int32>()
+        controller.onTermination = { status in
+            Task { await exited.store(status) }
+        }
+        let request = RenderHostLaunchRequest(executable: URL(fileURLWithPath: "/bin/sh"),
+                                              arguments: ["-c", "sleep 0.25"], themeID: "fixture")
+        #expect(try controller.activate(request))
+        #expect(controller.themeID == "fixture")
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(controller.themeID == nil)
+        #expect(await exited.value == 0)
+    }
+}
+
+private actor ActorBox<Value: Sendable> {
+    private(set) var value: Value?
+
+    func store(_ value: Value) { self.value = value }
 }

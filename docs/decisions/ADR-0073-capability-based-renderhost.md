@@ -3,6 +3,7 @@ scope:
   - pocs/macos-connector/**
   - docs/architecture/src/macos-renderhost.sequence.json
 review: on-change
+revised: true
 ---
 # ADR-0073 — Résoudre le RenderHost par capacité locale
 
@@ -15,6 +16,10 @@ Le connecteur Swift associe localement cet identifiant à un fichier exécutable
 Il lance directement le RenderHost avec la recette validée et l’argument typé `--desktop`, sans shell.
 
 Un seul processus RenderHost appartient au connecteur ; une nouvelle activation arrête uniquement ce processus enfant.
+Si ce processus se termine de façon inattendue après son démarrage, le contrôleur invalide
+atomiquement l'identité active et publie un événement de terminaison sur l'acteur principal.
+Le provider peut ainsi afficher l'état d'erreur ou proposer une reconnexion sans lancer de
+redémarrage automatique non borné.
 
 ## Conséquences
 

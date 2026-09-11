@@ -34,7 +34,7 @@
     { "from": "adapter", "to": "macos", "y": 470, "label": "niveau desktop + tous les Spaces", "variant": "emphasis" },
     { "from": "macos", "to": "adapter", "y": 570, "label": "géométrie et niveaux effectifs", "variant": "return" },
     { "from": "adapter", "to": "renderhost", "y": 615, "label": "reçu desktop prêt", "variant": "return" },
-    { "from": "renderhost", "to": "connector", "y": 660, "label": "prêt ou erreur bornée", "variant": "dashed" }
+    { "from": "renderhost", "to": "connector", "y": 660, "label": "prêt, erreur ou terminaison signalée", "variant": "dashed" }
   ],
   "activations": [
     { "participant": "connector", "from": 174, "to": 674, "type": "frontend" },
@@ -45,7 +45,7 @@
   ],
   "cards": [
     { "dot": "emerald", "title": "Aucun thème codé en dur", "items": ["Le package déclare une capacité de renderer", "Le registre local associe cette capacité à un binaire", "Changer de thème ne change pas le connecteur"] },
-    { "dot": "rose", "title": "Exécution bornée", "items": ["Aucune commande shell brute", "Une recette modifiée remplace l’ancien processus", "Un seul processus actif par connecteur"] },
+    { "dot": "rose", "title": "Exécution bornée", "items": ["Aucune commande shell brute", "Une recette modifiée remplace l’ancien processus", "Une terminaison inattendue invalide l’état actif", "Un seul processus actif par connecteur"] },
     { "dot": "cyan", "title": "Priorité macOS", "items": ["La scène reste sous les icônes Finder", "La fenêtre rejoint tous les Spaces", "Le renderer portable ignore les détails AppKit"] }
   ]
 }
