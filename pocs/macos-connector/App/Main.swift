@@ -13,9 +13,13 @@ import os
             let agent = ProductIdentity.appBundle.appendingPathComponent(
                 "Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
             guard let response = AgentClient.perform(
-                    ProviderRequest(action: .activate, themeID: themeID), agentBundle: agent),
-                  response.accepted else {
-                print("activation=refused")
+                    ProviderRequest(action: .activate, themeID: themeID), agentBundle: agent) else {
+                print("activation=refused reason=agent-unavailable")
+                exit(3)
+            }
+            guard response.accepted else {
+                let reason = response.message ?? "agent-rejected"
+                print("activation=refused reason=\(reason)")
                 exit(3)
             }
             print("activation=accepted theme=\(themeID)")
