@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Une URL fournisseur ne donne aucun droit de copie R2."
+        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les œuvres sans cover sont réhydratées par tranches bornées."
       },
       {
         "id": "cover-rights",

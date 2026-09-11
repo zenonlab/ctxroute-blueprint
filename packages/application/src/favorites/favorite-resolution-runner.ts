@@ -1,4 +1,4 @@
-import { createFavoriteSource } from '@tobirink/domain';
+import { createFavoriteSource, createWork } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
@@ -23,6 +23,31 @@ export const favoriteResolutionClaimMs = 60_000;
 export const favoriteResolutionAttemptLimit = 8;
 export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
 export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
+
+export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string) {
+  const works = await storage.listWorks({ limit: 10 });
+  let repaired = 0;
+  let skipped = 0;
+  for (const work of works) {
+    if (work.hydration?.candidate.cover !== undefined) { skipped += 1; continue; }
+    const reference = work.externalReferences.find((item) => item.provider in hydration);
+    const provider = reference === undefined ? undefined : (['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga'] as const).find((value) => value === reference.provider);
+    const adapter = provider === undefined ? undefined : hydration[provider];
+    if (reference === undefined || provider === undefined || adapter === undefined || work.hydration === undefined) { skipped += 1; continue; }
+    try {
+      const candidate = await adapter.hydrate({ externalId: reference.externalId, provider });
+      if (candidate === undefined) { skipped += 1; continue; }
+      if (candidate.cover === undefined) {
+        await storage.putWork(createWork({ ...work, hydration: { ...work.hydration, candidate, hydratedAt: now() } }));
+        skipped += 1;
+        continue;
+      }
+      await storage.putWork(createWork({ ...work, hydration: { ...work.hydration, candidate, hydratedAt: now() } }));
+      repaired += 1;
+    } catch { skipped += 1; }
+  }
+  return Object.freeze({ inspected: works.length, repaired, skipped });
+}
 
 export interface FavoriteResolutionRunnerDependencies {
   readonly collective?: FavoriteCollectiveLookupPort;

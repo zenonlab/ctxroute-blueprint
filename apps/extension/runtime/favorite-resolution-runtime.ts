@@ -1,4 +1,4 @@
-import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
+import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import type { LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
@@ -70,6 +70,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
         if (dependencies.identityRecovery !== undefined && await dependencies.identityRecovery.prepare() !== 'READY') return;
         await runFavoriteResolutionSlice(dependencies);
+        await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now);
         await dependencies.identityRecovery?.publish();
     });
   return function reconcileFavorites(bookmarkMutation = false): Promise<void> {
