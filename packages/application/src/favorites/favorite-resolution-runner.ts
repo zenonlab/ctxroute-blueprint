@@ -128,6 +128,27 @@ async function preferMangaUpdatesHydration(
   }
 }
 
+async function hydrateExplicitReference(
+  dependencies: FavoriteResolutionRunnerDependencies,
+  reference: { readonly provider: ResolutionProvider; readonly externalId: string },
+  artifact: FavoriteParseArtifact,
+): Promise<ProviderCandidate | undefined> {
+  const hydration = dependencies.hydration[reference.provider];
+  if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
+  try {
+    return await hydration.hydrate(reference);
+  } catch (error) {
+    // MangaUpdates currently exposes the public series record through its
+    // bounded search endpoint; a direct GET may answer 405. Preserve the
+    // exact public ID and use search only as a hydration transport fallback.
+    if (reference.provider !== 'mangaupdates' || !(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error;
+    const search = dependencies.candidates.mangaupdates;
+    if (search === undefined) throw error;
+    const envelope = await search.search({ provider: 'mangaupdates', titles: providerTitles(artifact), limit: 20 });
+    return envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+  }
+}
+
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
   const [source, record] = await Promise.all([
@@ -157,7 +178,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const cached = await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
     const fresh = freshHydration(cached?.hydration?.hydratedAt, dependencies.now());
     let candidate: ProviderCandidate | undefined;
-    try { candidate = fresh ? cached?.hydration?.candidate : await hydration.hydrate(reference); } catch (error) {
+    try { candidate = fresh ? cached?.hydration?.candidate : await hydrateExplicitReference(dependencies, reference, artifact); } catch (error) {
       const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
       return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
     }
