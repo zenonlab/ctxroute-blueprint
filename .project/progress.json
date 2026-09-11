@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -7140,7 +7140,7 @@
         {
           "id": "step-17",
           "title": "Certify the robust pipeline and prepare immutable artifacts",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Synthetic large-library and interrupted multi-provider journeys pass",
             "Complete verification and reproducible archives",
@@ -7155,7 +7155,12 @@
             "docs/release.md",
             "docs/decisions/ADR-0039-extension-release-versioning.md",
             "docs/systems/favorite-resolution-rebuild-pipeline.md",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.test.ts"
           ],
           "commands": [
             "npm exec -- vitest run",
@@ -7167,7 +7172,13 @@
             "npm run package:extension",
             "npm run build --workspace @tobirink/web"
           ],
-          "evidence": []
+          "evidence": [
+            "Complete verify passes: workspace tests, typechecks, performance, CRG, integration, dependency audit zero vulnerabilities and Archify showcase 9/9",
+            "Final 1.0.12 Chromium packaged journey and Firefox 151 isolated installed smoke pass; six website journeys, website build and Chromium IndexedDB migrations pass",
+            "1400 synthetic works pass runtime message pagination; MangaDex to MangaUpdates upgrades preserve identity; zero Reviews at import",
+            "Two isolated builds reproduce Chrome 4b6642dfe4008ccb1d2ca1a57bfbdf48ebdc41d79e537d2bdbe3a37456cb961b and Firefox 014de4344a0e7781eef8b74e3ee2a09b1073a9d6e3d6ff39dfc37a6d6d29aaf7",
+            "Local candidate only: actual private profile, production publication and populated R2 associations remain unverified; external step-8 unchanged"
+          ]
         }
       ]
     }

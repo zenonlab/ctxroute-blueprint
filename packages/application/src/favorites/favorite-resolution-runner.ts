@@ -222,7 +222,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
     }
     if (candidate !== undefined) {
-      if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      const cachedCrossReference = fresh && candidate.linkedReferences?.some(value => value.provider === reference.provider && value.externalId === reference.externalId);
+      if ((candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) && !cachedCrossReference) throw new Error('HYDRATION_REFERENCE_MISMATCH');
       try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
         return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
       }
@@ -230,11 +231,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      const identity = candidate.provider === reference.provider && cached?.id !== undefined
+      const identity = cached?.id !== undefined
         ? { workId: cached.id, references: [reference] }
-        : fresh && cached?.hydration?.hydratedAt !== undefined
-          ? { hydratedAt: cached.hydration.hydratedAt, references: [reference] }
-          : { references: [reference] };
+        : { references: [reference] };
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, identity);
       return 'completed';
     }

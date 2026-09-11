@@ -17,7 +17,7 @@ const facetsSchema = z.strictObject({
 
 export const libraryCatalogueMessageSchema = z.strictObject({
   facets: facetsSchema.optional(),
-  offset: z.number().int().min(0).max(500).optional(),
+  offset: z.number().int().nonnegative().optional(),
   query: z.string().max(300).optional(),
   sort: z.enum(['ADDED_DESC', 'PROGRESS_DESC', 'POPULARITY_DESC', 'TITLE_ASC', 'TITLE_DESC', 'YEAR_DESC']),
   type: z.literal('library.catalogue.read'),
@@ -25,7 +25,7 @@ export const libraryCatalogueMessageSchema = z.strictObject({
 });
 
 const facetOptionSchema = z.strictObject({
-  count: z.number().int().min(0).max(500),
+  count: z.number().int().nonnegative(),
   label: z.string().min(1).max(200),
   value: z.string().min(1).max(120),
 });
@@ -55,15 +55,15 @@ export const libraryCatalogueResponseSchema = z.discriminatedUnion('ok', [
         source: z.string().min(1).max(64),
         title: z.string().min(1).max(300),
       })).max(24),
-      nextOffset: z.number().int().min(1).max(500).optional(),
+      nextOffset: z.number().int().positive().optional(),
       statistics: z.strictObject({
-        completed: z.number().int().min(0).max(500),
-        inProgress: z.number().int().min(0).max(500),
-        knownMetadata: z.number().int().min(0).max(500),
-        notStarted: z.number().int().min(0).max(500),
-        total: z.number().int().min(0).max(500),
+        completed: z.number().int().nonnegative(),
+        inProgress: z.number().int().nonnegative(),
+        knownMetadata: z.number().int().nonnegative(),
+        notStarted: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
       }),
-      total: z.number().int().min(0).max(500),
+      total: z.number().int().nonnegative(),
       truncated: z.boolean(),
     }),
   }),

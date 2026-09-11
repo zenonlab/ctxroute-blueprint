@@ -884,6 +884,12 @@ son échec lors d'un rafraîchissement et réessaie si les références changent
 Sans association ingérée, R2 répond 404; cette correction n'affirme pas que le
 catalogue de covers est déjà peuplé ou publié.
 
+La migration de métadonnées MangaDex→MangaUpdates conserve l'identité locale
+d'une œuvre existante et ses références. La lecture suivante reconnaît la
+référence MangaDex liée dans le cache primaire, sans créer de doublon. Les
+schémas de messages Bibliothèque acceptent les compteurs et curseurs au-delà
+de 500; la limite de 24 éléments par réponse reste inchangée.
+
 La reconstruction est terminée seulement quand :
 
 - tout événement favori atteint un état terminal ou une reprise datée;

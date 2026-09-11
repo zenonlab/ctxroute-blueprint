@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.11`. `apps/extension/package.json` is the only
+The current local candidate is `1.0.12`, not yet published. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +35,49 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Robust pipeline candidate — 2026-09-12
+
+Candidate `1.0.12` remains local. It restores D1 exact-ID hydration recovery,
+independent provider restoration, dated internal retries, root release routes,
+honest MangaDex pagination and linked MangaUpdates hydration. Provider response
+limits are 512 KiB, separate from the 64 KiB bridge. Library reads, message
+schemas and repair no longer stop at 500 works. Primary metadata upgrades
+preserve existing work identity. Cover failures attempt one ID-based Worker
+lookup for an already ingested R2 master; no production covers were populated.
+
+The packaged Chromium journey passes with five resolved synthetic works,
+MangaUpdates metadata for the explicit MangaDex cross-reference, provider
+covers without referrers, zero imported Reviews, excluded ordinary YouTube
+and offline reload. A separate synthetic 1 400-work IndexedDB projection in
+that installed extension validates its late cursor through the runtime message
+boundary. This projection test does not claim 1 400 live provider resolutions.
+Six website journeys pass, including connection states and persistent facets.
+The Firefox 151 isolated installation smoke passes health, ordinary bookmark
+exclusion, empty Review queue and zero imported Review.
+
+The complete `npm run verify` chain passes, including workspace tests,
+typechecks, performance checks, CRG smoke, integration and dependency audit
+(zero vulnerabilities). Archify showcase passes 9/9. The separate Chromium
+IndexedDB migration suite and the production website build pass. Native
+Firefox evidence is the installed smoke above, not the complete migration suite.
+
+Two isolated builds reproduce the final local archives:
+
+- Chrome: 285247 bytes, SHA-256 `4b6642dfe4008ccb1d2ca1a57bfbdf48ebdc41d79e537d2bdbe3a37456cb961b`.
+- Firefox: 285292 bytes, SHA-256 `014de4344a0e7781eef8b74e3ee2a09b1073a9d6e3d6ff39dfc37a6d6d29aaf7`.
+
+The source comparison used FavLib read-only, including historical `3267de2`,
+to identify omitted release routes and retry isolation. No FavLib private
+database was imported or committed. The synthetic equivalence snapshot changes
+only adapter versions and their fingerprints; it is not evidence of parity
+with the user's private corpus.
+
+Production remains on the previously published `1.0.11` Worker and archives.
+Publishing `1.0.12`, populating R2 associations and verifying the user's actual
+installed profile remain separate operations. No D1 migration is needed for
+this candidate and no user data was deleted. The user's `.codex/config.toml`
+change remains outside these commits.
 
 ### Comix route correction candidate — 2026-09-11
 

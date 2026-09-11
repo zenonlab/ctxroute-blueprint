@@ -1,10 +1,21 @@
 import { createLibrary, createWork, libraryId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { describe, expect, it } from 'vitest';
-import { libraryCatalogueResponseSchema } from './library-catalogue-messages';
+import { libraryCatalogueMessageSchema, libraryCatalogueResponseSchema } from './library-catalogue-messages';
 import { readLocalLibraryCatalogueSnapshot } from './local-library-catalogue-runtime';
 
 describe('local library catalogue projection', () => {
+  it('validates the full 1400-work projection and its late cursor at the actual UI boundary', async () => {
+    const storage = new MemoryStoragePort();
+    const ids = Array.from({ length: 1400 }, (_, index) => workId(`work_full${String(index).padStart(4, '0')}`));
+    for (const id of ids) await storage.putWork(createWork({ id, externalReferences: [], preferredTitle: id, mediaKind: 'manga' }));
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), ids));
+    const request = libraryCatalogueMessageSchema.parse({ type: 'library.catalogue.read', version: 1, offset: 1392, sort: 'TITLE_ASC' });
+    const snapshot = await readLocalLibraryCatalogueSnapshot(storage, libraryId('library_primary'), request);
+    expect(snapshot.items).toHaveLength(8);
+    expect(snapshot.total).toBe(1400);
+    expect(libraryCatalogueResponseSchema.safeParse({ ok: true, snapshot }).success).toBe(true);
+  });
   it('bounds display strings without changing the stored work', async () => {
     const storage = new MemoryStoragePort();
     const title = `Synthetic ${'a'.repeat(390)}`;

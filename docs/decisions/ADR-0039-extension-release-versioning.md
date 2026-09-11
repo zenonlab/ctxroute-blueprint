@@ -30,7 +30,9 @@ excluding pre-serialization matches; `1.0.9` fixes cover referrer handling,
 unique complete MangaUpdates matching and blocked-queue recovery; `1.0.10`
 restores the MangaUpdates Origin transport rule, accepts absent cover URLs
 and prevents HTTP 403 from selecting a fallback; `1.0.11` recognizes Comix
-title/chapter routes as manga and prevents cached site-rule downgrade). The
+title/chapter routes as manga and prevents cached site-rule downgrade;
+`1.0.12` restores durable recovery, honest provider pagination, primary linked
+identities, complete library projection and bounded Worker cover recovery). The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare

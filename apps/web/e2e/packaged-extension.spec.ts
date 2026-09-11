@@ -24,7 +24,7 @@ const kitsuResource = (type: 'anime' | 'manga') => ({
 });
 const mangaDexPayload = {
   data: {
-    attributes: { altTitles: [], contentRating: 'safe', originalLanguage: 'ja', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }], title: { en: 'Fixture Garden' }, year: 2021 },
+    attributes: { altTitles: [], contentRating: 'safe', links: { mu: '1gdu' }, originalLanguage: 'ja', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }], title: { en: 'Fixture Garden' }, year: 2021 },
     id: mangaDexId, relationships: [{ attributes: { fileName: 'fixture.jpg' }, id: '12345678-1234-4234-8234-123456789abd', type: 'cover_art' }], type: 'manga',
   },
   result: 'ok',
@@ -67,11 +67,12 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     });
     await context.route('https://api.mangaupdates.com/**', async (route) => {
       const search = route.request().method() === 'POST';
-      await route.fulfill({ body: JSON.stringify(search ? { results: [{ record: mangaUpdatesSeries }], total_hits: 1 } : mangaUpdatesSeries), contentType: 'application/json', status: 200 });
+      const exact = new URL(route.request().url()).pathname.endsWith('/67890') ? { ...mangaUpdatesSeries, image: { url: { original: 'https://cdn.mangaupdates.com/image/fixture-garden.jpg' } }, series_id: 67890, title: 'Fixture Garden', url: 'https://www.mangaupdates.com/series/1gdu/fixture-garden' } : mangaUpdatesSeries;
+      await route.fulfill({ body: JSON.stringify(search ? { results: [{ record: mangaUpdatesSeries }], total_hits: 1 } : exact), contentType: 'application/json', status: 200 });
     });
     await context.route('https://api.mangadex.org/**', async (route) => {
       const search = new URL(route.request().url()).pathname === '/manga';
-      await route.fulfill({ body: JSON.stringify(search ? { result: 'ok', data: [] } : mangaDexPayload), contentType: 'application/json', status: 200 });
+      await route.fulfill({ body: JSON.stringify(search ? { result: 'ok', data: [], limit: 20, offset: 0, total: 0 } : mangaDexPayload), contentType: 'application/json', status: 200 });
     });
     await context.route('https://kitsu.io/api/edge/**', async (route) => {
       const type = route.request().url().includes('/manga') ? 'manga' : 'anime';
@@ -120,13 +121,15 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     for (const title of ['Fixture River', 'Fixture Garden', 'Fixture Sky', 'Fixture Paper']) await expect(privateLibrary.getByText(title).first()).toBeVisible();
     expect(comixAnimeSearches).toBe(0);
     await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
-    for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'uploads.mangadex.org', 'media.kitsu.app']) {
+    for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'media.kitsu.app']) {
       await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('alt', /Couverture/u);
       await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('referrerpolicy', 'no-referrer');
     }
     await expect.poll(() => privateLibrary.locator('img').evaluateAll((images) => images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
     expect(coverRequests.length).toBeGreaterThanOrEqual(5);
     expect(coverRequests.every((referer) => referer === '')).toBe(true);
+    await expect(privateLibrary.locator('img[src^="https://uploads.mangadex.org/"]')).toHaveCount(0);
+    await expect(privateLibrary.locator('img[src^="https://cdn.mangaupdates.com/"]')).toHaveCount(2);
     expect(await privateLibrary.evaluate(async () => {
       const database = await new Promise<IDBDatabase>((resolveDatabase, reject) => {
         const request = indexedDB.open('tobirink-private');
@@ -145,6 +148,29 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await context.setOffline(true);
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible();
+
+    const largeProjection = await privateLibrary.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((ready, reject) => {
+        const request = indexedDB.open('tobirink-private');
+        request.onsuccess = () => ready(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const ids = Array.from({ length: 1400 }, (_, index) => `work_bulk${String(index).padStart(4, '0')}`);
+      await new Promise<void>((ready, reject) => {
+        const transaction = database.transaction(['works', 'libraries'], 'readwrite');
+        for (const id of ids) transaction.objectStore('works').put({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: id });
+        const existing = transaction.objectStore('libraries').get('library_primary');
+        existing.onsuccess = () => transaction.objectStore('libraries').put({ id: 'library_primary', workIds: [...(existing.result?.workIds ?? []), ...ids] });
+        transaction.oncomplete = () => ready();
+        transaction.onerror = () => reject(transaction.error);
+      });
+      database.close();
+      return chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, query: 'work_bulk', sort: 'TITLE_ASC', offset: 1392 });
+    });
+    expect(largeProjection.ok).toBe(true);
+    expect(largeProjection.snapshot.total).toBe(1400);
+    expect(largeProjection.snapshot.items).toHaveLength(8);
+    expect(largeProjection.snapshot.items.at(-1).id).toBe('work_bulk1399');
   } finally {
     await context.close();
   }
