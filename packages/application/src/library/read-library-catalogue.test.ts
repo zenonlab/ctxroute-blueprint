@@ -14,6 +14,21 @@ function work(id: string, input: { genre: string; popularity: number; status: 'C
 }
 
 describe('readLibraryCatalogue', () => {
+  it('sorts and facets 1400 works with only 100 concurrent reads per transaction', async () => {
+    const storage = new MemoryStoragePort();
+    const works = Array.from({ length: 1400 }, (_, index) => work(String(index), { genre: index === 1399 ? 'Last Genre' : 'Drama', popularity: index, status: 'ONGOING', title: `Synthetic ${String(index).padStart(4, '0')}`, year: 2020 }));
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), works.map(value => value.id)));
+    for (const item of works) await storage.putWork(item);
+    let active = 0; let peak = 0;
+    const getWork = storage.getWork.bind(storage);
+    storage.getWork = async id => { active += 1; peak = Math.max(active, peak); try { return await getWork(id); } finally { active -= 1; } };
+    const snapshot = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), sort: 'POPULARITY_DESC' });
+    expect(snapshot.total).toBe(1400);
+    expect(snapshot.truncated).toBe(false);
+    expect(snapshot.items[0]?.work.id).toBe(works[1399]?.id);
+    expect(snapshot.facets.genre).toContainEqual({ value: 'last genre', label: 'Last Genre', count: 1 });
+    expect(peak).toBeLessThanOrEqual(100);
+  });
   it('filters before pagination while keeping stable multi-select facets', async () => {
     const storage = new MemoryStoragePort();
     const works = [

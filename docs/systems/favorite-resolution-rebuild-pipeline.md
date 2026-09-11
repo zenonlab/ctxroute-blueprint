@@ -93,8 +93,8 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
-- le WebBridge v3 limite les parcours Bibliothèque à 500 œuvres, les pages à
-  24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
+- le WebBridge v3 parcourt toute la Bibliothèque par lectures locales de 100,
+  limite les pages à 24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
@@ -494,19 +494,19 @@ central ne décide silencieusement entre deux analyses.
 | Parser | brut + preuves → artefact | 64 Kio, 64 transformations, 32 diagnostics | motif stable, aucune exception opaque | empreinte sémantique | matrice P à R + oracle profond |
 | Import | artefact → source et tâche sans Review | 100/transaction | rollback transactionnel | ID source + empreinte | relecture et décision existante |
 | Claim | tâches dues → tâches réservées | 8/20 s, claim 60 s | expiration durable | clé unique d’effet | deux workers, lanes isolées, claim expiré |
-| Transport | requête publique → enveloppe complète | 20 candidats, 64 Kio, 8 s | tronqué fail-closed, erreur typée | clé tâche + requête | timeout, 403, 429, JSON invalide, page manquante |
+| Transport | requête publique → enveloppe complète | 20 candidats, 512 Kio, 8 s | tronqué fail-closed, erreur typée | clé tâche + requête | timeout, 403, 429, JSON invalide, page manquante |
 | Matcher | artefact + candidats → décision | 20 | ambiguïté explicite | fonction pure | permutations et égalités |
 | Review | décision → choix confirmé | 6 candidats, 100 pending | conflit de révision | review + révision + choix | stale, skip, no-match, resolve |
-| Hydratation | ID exact → `Work` | 1 fiche, 64 Kio, 8 s | retry sans rematch | fournisseur + ID + version | replay après commit réseau |
+| Hydratation | ID exact → `Work` | 1 fiche, 512 Kio, 8 s | retry sans rematch | fournisseur + ID + version | replay après commit réseau |
 | Langue locale | document déjà observé → preuve | 24 déclarations, 160 caractères, texte ≥ 80 | `undetected` ou `ambiguous` | entrée + version analyseur | L-01 à L-05 |
 | Taxonomie | fiche hydratée → admissible/bloquée | listes fermées versionnées | blocage éditorial explicite | fiche + version politique | C-01/C-02 |
-| Projection | stores → snapshot UI | 24/500/100, 64 Kio | état partiel | lecture pure | limites, données manquantes, vide |
+| Projection | stores → snapshot UI | 100/transaction, 24/page, 64 Kio | reprise au prochain rafraîchissement | lecture pure | 1 400 œuvres, données manquantes, vide |
 | Réconciliation | pages locales → tâches manquantes | 100/page, 8 créées/réveil | curseur durable | index uniques | interruption à chaque checkpoint |
 
 Les limites nouvelles sont normatives : 8 secondes par requête, 20 candidats,
 8 tâches et 20 secondes par réveil, claim de 60 secondes, huit tentatives,
 backoff de 30 secondes à 6 heures, AniList 2 200 ms, MangaUpdates 3 000 ms et
-batch AniList de 50. Les limites déjà actives de 100, 6, 24, 500 et 64 Kio ne
+batch AniList de 50. Les limites déjà actives de 100, 6, 24 et 64 Kio ne
 doivent pas être dupliquées sous forme de constantes concurrentes.
 
 L’outbox conserve l’artefact courant et au plus son prédécesseur par source;
@@ -861,6 +861,16 @@ Les réponses fournisseur sont limitées à 512 KiB, vérifiés sur les octets l
 et l'en-tête déclaré. La limite de transport WebBridge reste 64 KiB. Une
 requête publique MangaDex de 20 résultats mesurée pendant l'audit produisait
 119 663 octets : la précédente limite de 64 KiB rejetait des pages valides.
+
+La Bibliothèque lit toutes ses identités par transactions de 100 œuvres,
+puis filtre et trie globalement avant de projeter 24 entrées. Un curseur après
+500 reste valide. Sa réparation ajoute uniquement des œuvres liées à une
+source observée résolue; une fiche issue seulement de sync reste un cache.
+Chaque lot réparé est conservé après interruption et la reprise est idempotente.
+Le site relit sa page toutes les 15 secondes lorsqu'il est visible, sans
+requête concurrente et sans appliquer une ancienne réponse après un changement
+de filtres. Les lectures portent sur l'appartenance locale au début du parcours;
+les ajouts concurrents apparaissent au rafraîchissement suivant.
 
 La reconstruction est terminée seulement quand :
 

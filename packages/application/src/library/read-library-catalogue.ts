@@ -1,6 +1,6 @@
 import type { Progress, ProviderCandidate, Work } from '@tobirink/domain';
-import type { StoragePort, StorageReadPort } from '../ports/storage-port';
-import { libraryCataloguePageLimit, libraryCatalogueScanLimit, libraryFacetLimit } from './library-catalogue-contract';
+import type { StoragePort } from '../ports/storage-port';
+import { libraryCataloguePageLimit, libraryCatalogueReadBatchSize, libraryFacetLimit } from './library-catalogue-contract';
 import type { LibraryCatalogueItem, LibraryCatalogueQuery, LibraryCatalogueSnapshot, LibraryFacetName, LibraryFacetOption, LibraryFacetState, LibrarySort } from './library-catalogue-contract';
 
 function key(value: string): string {
@@ -103,20 +103,28 @@ function buildFacets(items: readonly LibraryCatalogueItem[]): LibraryCatalogueSn
   return Object.freeze(result);
 }
 
-async function readCatalogueSnapshot(storage: StorageReadPort, input: LibraryCatalogueQuery): Promise<LibraryCatalogueSnapshot> {
+async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalogueQuery): Promise<LibraryCatalogueSnapshot> {
   const library = await storage.getLibrary(input.libraryId);
   if (library === undefined) return { facets: buildFacets([]), items: [], statistics: { completed: 0, inProgress: 0, knownMetadata: 0, notStarted: 0, total: 0 }, total: 0, truncated: false };
   const limit = input.limit ?? libraryCataloguePageLimit;
   const offset = input.offset ?? 0;
   if (!Number.isInteger(limit) || limit < 1 || limit > libraryCataloguePageLimit || !Number.isInteger(offset) || offset < 0) throw new RangeError('Library catalogue pagination is invalid.');
-  const selectedIds = library.workIds.slice(0, libraryCatalogueScanLimit);
-  const records = await Promise.all(selectedIds.map(async (id, addedOrder) => {
-    const work = await storage.getWork(id);
-    if (work === undefined) return undefined;
-    const progress = await storage.findProgressByWorkId(id);
-    return progress === undefined ? { addedOrder, work } : { addedOrder, progress, work };
-  }));
-  const corpus = records.filter((item): item is LibraryCatalogueItem => item !== undefined);
+  const corpus: LibraryCatalogueItem[] = [];
+  for (let start = 0; start < library.workIds.length; start += libraryCatalogueReadBatchSize) {
+    const batch = library.workIds.slice(start, start + libraryCatalogueReadBatchSize);
+    const records = await storage.transaction(['progress', 'works'], async (session) => {
+      const items: LibraryCatalogueItem[] = [];
+      for (const [index, id] of batch.entries()) {
+        const work = await session.getWork(id);
+        if (work === undefined) continue;
+        const progress = await session.findProgressByWorkId(id);
+        const addedOrder = start + index;
+        items.push(progress === undefined ? { addedOrder, work } : { addedOrder, progress, work });
+      }
+      return items;
+    });
+    corpus.push(...records);
+  }
   const normalizedQuery = key(input.query ?? '');
   const filtered = corpus.filter((item) => (normalizedQuery.length === 0 || key(item.work.preferredTitle).includes(normalizedQuery))
     && facetNames.every((facet) => matchesFacet(item, facet, input.facets?.[facet])));
@@ -135,11 +143,11 @@ async function readCatalogueSnapshot(storage: StorageReadPort, input: LibraryCat
       total: corpus.length,
     }),
     total: ordered.length,
-    truncated: library.workIds.length > libraryCatalogueScanLimit,
+    truncated: false,
   };
   return Object.freeze(end < ordered.length ? { ...snapshot, nextOffset: end } : snapshot);
 }
 
 export function readLibraryCatalogue(storage: StoragePort, input: LibraryCatalogueQuery): Promise<LibraryCatalogueSnapshot> {
-  return storage.transaction(['libraries', 'progress', 'works'], async (session) => readCatalogueSnapshot(session, input));
+  return readCatalogueSnapshot(storage, input);
 }

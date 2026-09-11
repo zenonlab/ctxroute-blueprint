@@ -2,9 +2,10 @@
 
 import { Library } from '@tobirink/ui';
 import type { LibraryFiltersValue, LibraryState, LibraryWork } from '@tobirink/ui';
-import type { WebLibraryPage, WebLibraryQuery } from '@tobirink/contracts/web-bridge';
+import type { WebLibraryQuery } from '@tobirink/contracts/web-bridge';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useLibraryRefresh } from './use-library-refresh';
 import { BridgeState, WebMemberShell, useWebMemberNavigation } from '../components/SiteShell';
 import { WebBridgeProvider, useWebBridge } from '../components/WebBridgeProvider';
 
@@ -31,9 +32,6 @@ function LibrarySurface() {
   const searchParams = useSearchParams();
   const { readLibrary, status } = useWebBridge();
   const navigation = useWebMemberNavigation();
-  const [page, setPage] = useState<WebLibraryPage>();
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const cursor = searchParams.get('cursor')?.slice(0, 128) || undefined;
   const [filters, setFilters] = useState<LibraryFiltersValue>(() => filtersFrom(searchParams));
@@ -54,12 +52,7 @@ function LibrarySurface() {
     window.history.replaceState(null, '', params.size > 0 ? `/library?${params.toString()}` : '/library');
   };
 
-  useEffect(() => {
-    if (status !== 'connected') return;
-    setLoading(true);
-    setFailed(false);
-    void readLibrary(query).then(setPage).catch(() => setFailed(true)).finally(() => setLoading(false));
-  }, [query, readLibrary, retryCount, status]);
+  const { page, loading, failed } = useLibraryRefresh(readLibrary, status === 'connected', query, retryCount);
   const nextCursor = page?.cursor;
   const items: readonly LibraryWork[] = page?.items.map((item) => ({
     coverAlt: item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined,

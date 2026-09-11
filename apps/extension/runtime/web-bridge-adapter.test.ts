@@ -67,12 +67,18 @@ describe('WebBridge private projections', () => {
     expect(period).toMatchObject({ entries: [{ availability: 'official', occursAt: '2026-09-08T18:30:00.000Z', releaseLabel: 'Épisode 7', sourceUrl: 'https://reader.example/work_weekly' }], from: '2026-09-07', to: '2026-09-14' });
   });
 
-  it('caps the local library scan at 500 works', async () => {
+  it('reads all 1400 library entries and accepts cursors after the former cap', async () => {
     const storage = new MemoryStoragePort();
-    const ids = Array.from({ length: 501 }, (_, index) => workId(`work_scan${String(index).padStart(4, '0')}`));
+    const ids = Array.from({ length: 1400 }, (_, index) => workId(`work_scan${String(index).padStart(4, '0')}`));
     await storage.putLibrary(createLibrary(primaryLibraryId, ids));
-    const result = await createWebBridgeRequestHandler(storage)({ type: 'library.read', requestId: 'request_cap', query: { facet: 'all', limit: 24, sort: 'ADDED_DESC' } });
-    expect(result).toMatchObject({ statistics: { total: 0 }, truncated: true });
+    for (const id of ids) await storage.putWork(createWork({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: id }));
+    const handler = createWebBridgeRequestHandler(storage);
+    const result = await handler({ type: 'library.read', requestId: 'request_cap', query: { cursor: 'offset:1392', facet: 'all', limit: 24, sort: 'TITLE_ASC' } });
+    expect(result).toMatchObject({ statistics: { total: 1400 }, total: 1400, truncated: false, hasMore: false });
+    if (!('items' in result)) throw new Error('expected-library-page');
+    expect(result.items).toHaveLength(8);
+    const search = await handler({ type: 'library.read', requestId: 'request_search_last', query: { search: 'scan1399', facet: 'all', limit: 24, sort: 'TITLE_ASC' } });
+    expect(search).toMatchObject({ total: 1, items: [{ workId: ids[1399] }] });
   });
 
   it('truncates a large Agenda projection below the transport ceiling', async () => {

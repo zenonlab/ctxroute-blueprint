@@ -7,7 +7,6 @@ import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from './lo
 import type { WebBridgeRequestHandler, WebBridgeValue } from './web-bridge-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
-const libraryScanLimit = 500;
 const projectionByteLimit = 60 * 1024;
 
 function localMidnight(dateOnly: string): string {
@@ -79,7 +78,7 @@ function libraryOffset(cursor: string | undefined): number {
   if (cursor === undefined) return 0;
   const match = /^offset:(\d{1,6})$/u.exec(cursor);
   const offset = Number(match?.[1]);
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset > libraryScanLimit) throw new Error('invalid-library-cursor');
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('invalid-library-cursor');
   return offset;
 }
 

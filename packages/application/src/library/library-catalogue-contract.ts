@@ -1,6 +1,7 @@
 import type { LibraryId, Progress, Work } from '@tobirink/domain';
 
 export const libraryCatalogueScanLimit = 500;
+export const libraryCatalogueReadBatchSize = 100;
 export const libraryCataloguePageLimit = 24;
 export const libraryFacetLimit = 64;
 

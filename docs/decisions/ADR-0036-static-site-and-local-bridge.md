@@ -48,9 +48,13 @@ library/search/facet, agenda, and Review snapshots are readable; the sole
 write is the atomic `review.decision.write` command. The site receives
 serializable projections and never forwards them to the Worker.
 
-`bootstrap.read` exposes only Library and Review counts. `library.read` scans
-at most 500 local works, applies accent-insensitive search, the anime/manga
-facet and cursor before returning at most 24 items. `agenda.read` is the sole
+`bootstrap.read` exposes only Library and Review counts. `library.read` reads
+the complete local membership in transactions of at most 100 works, applies
+accent-insensitive search, facets and cursor before returning at most 24 items.
+The membership is captured before the traversal; concurrent additions appear
+on the next refresh. The visible Library refreshes every 15 seconds, with one
+request in flight and stale responses discarded on query changes.
+`agenda.read` is the sole
 Agenda projection and accepts exactly one date-only Monday-to-Monday half-open
 week; it reads at most 100 dated entries. Both projections retain only locally
 available progress, favorite-source, release-label, availability and HTTP(S)

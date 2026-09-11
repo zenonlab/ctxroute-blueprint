@@ -7069,7 +7069,7 @@
         {
           "id": "step-15",
           "title": "Project the complete library with bounded reads",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "At least 1400 works remain searchable sortable and pageable",
             "Projection recovery does not stop at 500",
@@ -7083,7 +7083,9 @@
             "apps/web/app/components",
             "packages/ui/src/features/library",
             "docs/systems/favorite-resolution-rebuild-pipeline.md",
-            "docs/architecture/src/favorite-resolution.dataflow.json"
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "apps/web/tests/LibraryPage.test.tsx"
           ],
           "commands": [
             "npm exec -- vitest run",
@@ -7092,7 +7094,11 @@
             "git diff --check",
             "git commit"
           ],
-          "evidence": []
+          "evidence": [
+            "10 library and bridge tests pass including 1400 works and interrupted repair at 600; live UI refresh test passes",
+            "All workspace typechecks, Oxlint, documentation and Archify showcase pass",
+            "No deletion; membership-only sync cache excluded from repair; query changes discard stale responses"
+          ]
         },
         {
           "id": "step-16",

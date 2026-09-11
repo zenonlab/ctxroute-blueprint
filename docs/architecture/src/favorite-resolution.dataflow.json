@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Inventaire et résolution isolés; reprises datées distinctes pour fournisseur, collectif et erreur interne."
+        "note": "Projection depuis les favoris observés; bibliothèque entière par lots de 100; lecture UI de 24 entrées actualisée sans chevauchement."
       },
       {
         "id": "cover-rights",
