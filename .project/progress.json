@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6892,7 +6892,7 @@
         {
           "id": "step-10",
           "title": "Package verified MangaUpdates transport release 1.0.10",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Versioned archives preserve 1.0.9",
             "Installed transport test and package E2E pass",
@@ -6915,7 +6915,11 @@
             "git diff --check",
             "git commit -m chore(extension): prepare MangaUpdates transport release 1.0.10"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed; installed Chromium live transport 403 before rule and 200 with 25 results after rule",
+            "Current 1.0.10 packaged multi-provider E2E passed; two isolated builds reproduce both SHA256 hashes; static site build passed",
+            "Existing 1.0.9 ZIPs preserved; no private library migration claimed"
+          ]
         }
       ]
     }

@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.9`. `apps/extension/package.json` is the only
+The current candidate is `1.0.10`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +35,23 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### MangaUpdates transport candidate — 2026-09-11
+
+Candidate `1.0.10` restores the API-specific Origin header rule, keeps HTTP
+403 retryable instead of selecting MangaDex, and accepts absent provider image
+URLs. Installed Chromium 153 reproduces 403 with the rule disabled and 200
+with 25 results when enabled. A separate live public query passes through the
+real adapter, paginated checkpoints and matcher and resolves to MangaUpdates.
+The packaged multi-provider import, WebBridge and offline journey passes.
+Two isolated builds reproduce both archives:
+
+- Chrome: 283003 bytes, SHA-256 `82401ff3a8dfb1e122d0a63dcfd451f1eb42f6d01e2d6b8fc5e9a56f7da17612`.
+- Firefox: 283048 bytes, SHA-256 `58bd2bb00d3a9e7b82e9ebeae63d5469cf5984b9ba5a7b297d45084b355d9f3e`.
+
+Publication and the user's installed-profile reload are separate from these
+local checks. Previously stored MangaDex identities remain preserved; this
+candidate does not certify complete migration of that private library.
 
 ### Cover and queue correction candidate — 2026-09-11
 
