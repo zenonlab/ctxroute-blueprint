@@ -106,6 +106,14 @@ variantes de sprite ou d'atlas ; un thème 3D peut proposer modèles, skins et m
 Changer l'apparence ne change jamais `instance_id`, `session_binding`, ordre de
 formation, trajectoire ou travail terminal en cours.
 
+Le manifeste d'interface v3 peut ordonner plusieurs étapes de galerie et relier deux
+étapes par un attribut de compatibilité. Par exemple, une première ressource expose
+`class=light` et la galerie suivante ne montre que les ressources portant la même
+valeur. Ces identifiants sont opaques pour le connecteur : le même mécanisme convient
+à une classe de poids, un rig, un biome ou toute autre compatibilité préparée par un
+adaptateur. La session reste un lien secondaire et ne devient jamais une étape
+d'apparence.
+
 Une substitution riggée exige une `compatibility_signature` qui couvre le type de
 ressource, le squelette, les clips requis et les points d'ancrage. Le runtime refuse
 une substitution incompatible. Un retargeting n'est accepté que comme dérivé produit

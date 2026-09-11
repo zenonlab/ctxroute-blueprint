@@ -1,5 +1,26 @@
 import AppKit
 
+@MainActor private final class ThemePanelContentView: NSView {
+    private let pattern: NSImage?
+
+    init(pattern: NSImage?) {
+        self.pattern = pattern
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        dirtyRect.fill()
+        guard let pattern else { return }
+        NSGraphicsContext.saveGraphicsState()
+        NSColor(patternImage: pattern).withAlphaComponent(0.22).setFill()
+        dirtyRect.fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
 @MainActor private final class GameChoiceStrip: NSView {
     private let stack = NSStackView()
     private var entries: [(button: NSButton, cursor: NSImageView)] = []
@@ -33,21 +54,21 @@ import AppKit
     required init?(coder: NSCoder) { nil }
 
     func configure(entries choices: [(String, String, NSImage?)], selected: String?,
-                   selectionImage: NSImage?) {
+                   selectionImage: NSImage?, cellSize: NSSize = .init(width: 96, height: 104)) {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         entries = choices.map { id, label, image in
             let button = NSButton(title: label, target: self, action: #selector(chosen(_:)))
             button.identifier = NSUserInterfaceItemIdentifier(id)
             button.image = image
-            button.imagePosition = .imageAbove
+            button.imagePosition = cellSize.height < 80 ? .imageLeading : .imageAbove
             button.imageScaling = .scaleProportionallyDown
             button.bezelStyle = .regularSquare
             button.font = .systemFont(ofSize: 11, weight: .medium)
             button.lineBreakMode = .byTruncatingTail
             button.toolTip = label
             button.setAccessibilityLabel(label)
-            button.widthAnchor.constraint(equalToConstant: 96).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 104).isActive = true
+            button.widthAnchor.constraint(equalToConstant: cellSize.width).isActive = true
+            button.heightAnchor.constraint(equalToConstant: cellSize.height).isActive = true
             let cursor = NSImageView(image: selectionImage ?? NSImage())
             cursor.imageScaling = .scaleProportionallyDown
             cursor.isHidden = true
@@ -58,8 +79,8 @@ import AppKit
             card.addSubview(cursor)
             button.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
-                card.widthAnchor.constraint(equalToConstant: 96),
-                card.heightAnchor.constraint(equalToConstant: 104),
+                card.widthAnchor.constraint(equalToConstant: cellSize.width),
+                card.heightAnchor.constraint(equalToConstant: cellSize.height),
                 button.leadingAnchor.constraint(equalTo: card.leadingAnchor),
                 button.trailingAnchor.constraint(equalTo: card.trailingAnchor),
                 button.topAnchor.constraint(equalTo: card.topAnchor),
@@ -96,6 +117,118 @@ import AppKit
     }
 }
 
+@MainActor private final class GameChoiceGrid: NSView {
+    struct Entry {
+        let id: String
+        let label: String
+        let image: NSImage?
+    }
+
+    private let grid = NSGridView()
+    private var entries: [(button: NSButton, card: NSView, cursor: NSImageView)] = []
+    private(set) var selectedID: String?
+    var onChange: (() -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = grid
+        addSubview(scroll)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.rowSpacing = 7
+        grid.columnSpacing = 7
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+            grid.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            grid.topAnchor.constraint(equalTo: scroll.contentView.topAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func configure(_ choices: [Entry], columns: Int, selected: String?,
+                   cellSize: NSSize, selectionImage: NSImage?) {
+        while grid.numberOfRows > 0 { grid.removeRow(at: 0) }
+        entries.removeAll(keepingCapacity: true)
+        let safeColumns = max(2, min(columns, 10))
+        for start in stride(from: 0, to: choices.count, by: safeColumns) {
+            var cells: [NSView] = []
+            for offset in 0..<safeColumns {
+                let index = start + offset
+                guard index < choices.count else {
+                    let spacer = NSView()
+                    spacer.widthAnchor.constraint(equalToConstant: cellSize.width).isActive = true
+                    spacer.heightAnchor.constraint(equalToConstant: cellSize.height).isActive = true
+                    cells.append(spacer)
+                    continue
+                }
+                let choice = choices[index]
+                let card = NSView()
+                card.wantsLayer = true
+                card.layer?.cornerRadius = 9
+                card.layer?.borderWidth = 2
+                let button = NSButton(image: choice.image ?? NSImage(), target: self,
+                                      action: #selector(chosen(_:)))
+                button.identifier = NSUserInterfaceItemIdentifier(choice.id)
+                button.isBordered = false
+                button.imageScaling = .scaleProportionallyDown
+                button.toolTip = choice.label
+                button.setAccessibilityLabel(choice.label)
+                let cursor = NSImageView(image: selectionImage ?? NSImage())
+                cursor.imageScaling = .scaleProportionallyDown
+                cursor.isHidden = true
+                cursor.setAccessibilityElement(false)
+                card.addSubview(button)
+                card.addSubview(cursor)
+                [button, cursor].forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
+                NSLayoutConstraint.activate([
+                    card.widthAnchor.constraint(equalToConstant: cellSize.width),
+                    card.heightAnchor.constraint(equalToConstant: cellSize.height),
+                    button.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 4),
+                    button.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -4),
+                    button.topAnchor.constraint(equalTo: card.topAnchor, constant: 4),
+                    button.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -4),
+                    cursor.widthAnchor.constraint(equalToConstant: 25),
+                    cursor.heightAnchor.constraint(equalToConstant: 25),
+                    cursor.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: 4),
+                    cursor.topAnchor.constraint(equalTo: card.topAnchor, constant: -4)
+                ])
+                entries.append((button, card, cursor))
+                cells.append(card)
+            }
+            grid.addRow(with: cells)
+        }
+        select(id: selected)
+    }
+
+    func select(id: String?) {
+        selectedID = id
+        for entry in entries {
+            let active = entry.button.identifier?.rawValue == id
+            entry.button.state = active ? .on : .off
+            entry.cursor.isHidden = !active
+            entry.card.layer?.borderColor = active
+                ? NSColor.systemCyan.cgColor : NSColor.white.withAlphaComponent(0.24).cgColor
+            entry.card.layer?.backgroundColor = active
+                ? NSColor.systemBlue.withAlphaComponent(0.32).cgColor
+                : NSColor.black.withAlphaComponent(0.16).cgColor
+        }
+    }
+
+    @objc private func chosen(_ sender: NSButton) {
+        select(id: sender.identifier?.rawValue)
+        onChange?()
+    }
+}
+
 @MainActor final class VehicleCustomizationPanel: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var themeID = ""
@@ -104,17 +237,20 @@ import AppKit
     private var sessions: [TerminalSessionSnapshot] = []
     private var editingTargetID: String?
     private let target = GameChoiceStrip()
-    private let character = GameChoiceStrip()
-    private let vehicle = GameChoiceStrip()
-    private let session = GameChoiceStrip()
+    private let character = GameChoiceGrid()
+    private let vehicle = GameChoiceGrid()
+    private let characterTitle = NSTextField(labelWithString: "")
+    private let vehicleTitle = NSTextField(labelWithString: "")
+    private let selectionStack = NSStackView()
+    private let session = NSPopUpButton()
     private let sessionStatus = NSTextField(wrappingLabelWithString: "")
     private let focusSession = NSButton(title: "Focaliser", target: nil, action: nil)
     private let openSession = NSButton(title: "Ouvrir", target: nil, action: nil)
     private let cancel = NSButton(title: "Annuler", target: nil, action: nil)
     private let resetButton = NSButton(title: "Réinitialiser", target: nil, action: nil)
     private let save = NSButton(title: "Enregistrer", target: nil, action: nil)
-    private let preview = NSImageView()
     private let error = NSTextField(wrappingLabelWithString: "")
+    private var selectionImage: NSImage?
     var onSave: ((ThemeInterfaceOverrides) -> Void)?
     var onReset: (() -> Void)?
     var onSessionIntent: ((TerminalSessionIntent) -> String)?
@@ -135,7 +271,7 @@ import AppKit
         self.sessions = sessions
         editingTargetID = nil
         let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
-        let selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
+        selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
         target.configure(entries: interface.manifest.targets.map { item in
             let choiceID = overrides.targets[item.id]?.vehicle
             let choice = interface.manifest.choices.first { $0.id == choiceID }
@@ -143,17 +279,12 @@ import AppKit
                 ?? targetIcon
             return (item.id, item.label, image)
         }, selected: targetID ?? interface.manifest.targets.first?.id,
-                         selectionImage: selectionImage)
-        let fallback = interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
-        character.configure(entries: choices(.character, in: interface, fallback: fallback),
-                            selected: nil, selectionImage: selectionImage)
-        vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback),
-                          selected: nil, selectionImage: selectionImage)
-        session.configure(entries: [("", "Aucune session",
-                                     icon(for: "session.state.none", in: interface, size: 64))] + sessions.map {
-            ($0.id, "\($0.display_name) — \($0.state.rawValue)",
-             icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 64))
-        }, selected: nil, selectionImage: selectionImage)
+                         selectionImage: selectionImage,
+                         cellSize: .init(width: 190, height: 54))
+        configureCharacterGrid(selected: nil)
+        configureVehicleGrid(selected: nil)
+        configureSelectionStack(interface.manifest)
+        configureSessionMenu(selected: nil)
         focusSession.target = self
         focusSession.action = #selector(sendSessionIntent(_:))
         focusSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.focus.rawValue)
@@ -165,28 +296,28 @@ import AppKit
         skin(cancel, slot: "customizer.action.cancel", interface: interface)
         skin(resetButton, slot: "customizer.action.reset", interface: interface)
         skin(save, slot: "customizer.action.save", interface: interface)
-        character.onChange = { [weak self] in self?.choiceChanged() }
-        vehicle.onChange = { [weak self] in self?.choiceChanged() }
+        character.onChange = { [weak self] in self?.characterChanged() }
+        vehicle.onChange = { [weak self] in self?.vehicleChanged() }
         target.onChange = { [weak self] in self?.targetChanged() }
-        session.onChange = { [weak self] in self?.sessionChanged() }
-        preview.imageScaling = .scaleProportionallyUpOrDown
-        preview.widthAnchor.constraint(equalToConstant: 320).isActive = true
-        preview.heightAnchor.constraint(equalToConstant: 130).isActive = true
-        [target, character, vehicle, session].forEach {
-            $0.widthAnchor.constraint(equalToConstant: 320).isActive = true
-            $0.heightAnchor.constraint(equalToConstant: 112).isActive = true
-        }
+        session.target = self
+        session.action = #selector(sessionChanged)
+        target.widthAnchor.constraint(equalToConstant: 660).isActive = true
+        target.heightAnchor.constraint(equalToConstant: 60).isActive = true
+        character.widthAnchor.constraint(equalToConstant: 660).isActive = true
+        character.heightAnchor.constraint(equalToConstant: 292).isActive = true
+        vehicle.widthAnchor.constraint(equalToConstant: 660).isActive = true
+        vehicle.heightAnchor.constraint(equalToConstant: 150).isActive = true
+        session.widthAnchor.constraint(equalToConstant: 330).isActive = true
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 10
+        stack.spacing = 6
         stack.edgeInsets = .init(top: 20, left: 24, bottom: 20, right: 24)
-        stack.addArrangedSubview(preview)
-        for (title, control) in [("Véhicule dans la scène", target), ("Personnage", character),
-                                 ("Kart", vehicle), ("Session terminal", session)] {
-            stack.addArrangedSubview(NSTextField(labelWithString: title))
-            stack.addArrangedSubview(control)
-        }
+        stack.addArrangedSubview(NSTextField(labelWithString: "Véhicule dans la scène"))
+        stack.addArrangedSubview(target)
+        stack.addArrangedSubview(selectionStack)
+        stack.addArrangedSubview(NSTextField(labelWithString: "Session (optionnel)"))
+        stack.addArrangedSubview(session)
         sessionStatus.textColor = .secondaryLabelColor
         stack.addArrangedSubview(sessionStatus)
         stack.addArrangedSubview(NSStackView(views: [focusSession, openSession]))
@@ -200,13 +331,23 @@ import AppKit
         save.action = #selector(submit)
         save.keyEquivalent = "\r"
         stack.addArrangedSubview(NSStackView(views: [cancel, resetButton, save]))
-        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 880),
+        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 708, height: 840),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Personnaliser le véhicule"
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.collectionBehavior.insert(.moveToActiveSpace)
-        window.contentView = stack
+        let content = ThemePanelContentView(pattern: interface.asset(for: "customizer.background.pattern")
+            .flatMap(NSImage.init(contentsOf:)))
+        content.addSubview(stack)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: content.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor)
+        ])
+        window.contentView = content
         panel = window
         targetChanged()
         window.center()
@@ -214,11 +355,95 @@ import AppKit
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func choices(_ kind: ThemeInterfaceManifest.Choice.Kind,
-                         in interface: ResolvedThemeInterface,
-                         fallback: NSImage?) -> [(String, String, NSImage?)] {
-        [("", "Thème", fallback)] + interface.manifest.choices.filter { $0.kind == kind }.map {
-            ($0.id, $0.label, interface.assets[$0.preview].flatMap(NSImage.init(contentsOf:)))
+    private func configureCharacterGrid(selected: String?) {
+        guard let interface else { return }
+        let stage = interface.manifest.stage(for: .character)
+        let choices = interface.manifest.compatibleChoices(kind: .character, selected: selectedChoices())
+        character.configure(choices.map { choiceEntry($0, in: interface) },
+            columns: stage?.columns ?? 6,
+            selected: choices.contains(where: { $0.id == selected }) ? selected : nil,
+            cellSize: .init(width: 101, height: 66), selectionImage: selectionImage)
+        characterTitle.stringValue = stage?.label ?? "Personnage"
+    }
+
+    private func configureVehicleGrid(selected: String?) {
+        guard let interface else { return }
+        let stage = interface.manifest.stage(for: .vehicle)
+        let choices = interface.manifest.compatibleChoices(kind: .vehicle,
+            selected: character.selectedID.map { [.character: $0] } ?? [:])
+        vehicle.configure(choices.map { choiceEntry($0, in: interface) },
+            columns: stage?.columns ?? 6, selected: choices.contains(where: { $0.id == selected }) ? selected : nil,
+            cellSize: .init(width: 101, height: 64), selectionImage: selectionImage)
+        let waitsForPriorChoice = choices.isEmpty && interface.manifest.selection?.compatibility.contains {
+            $0.target_stage == stage?.id
+        } == true
+        let suffix = waitsForPriorChoice ? " — choix précédent requis" : ""
+        vehicleTitle.stringValue = (stage?.label ?? "Véhicule") + suffix
+    }
+
+    private func configureSelectionStack(_ manifest: ThemeInterfaceManifest) {
+        selectionStack.arrangedSubviews.forEach {
+            selectionStack.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        selectionStack.orientation = .vertical
+        selectionStack.alignment = .leading
+        selectionStack.spacing = 6
+        let stages = manifest.selection?.stages ?? [
+            .init(id: "character", label: "Personnage", kind: .character, columns: 6),
+            .init(id: "vehicle", label: "Véhicule", kind: .vehicle, columns: 6)
+        ]
+        for stage in stages {
+            switch stage.kind {
+            case .character:
+                selectionStack.addArrangedSubview(characterTitle)
+                selectionStack.addArrangedSubview(character)
+            case .vehicle:
+                selectionStack.addArrangedSubview(vehicleTitle)
+                selectionStack.addArrangedSubview(vehicle)
+            }
+        }
+    }
+
+    private func selectedChoices() -> [ThemeInterfaceManifest.Choice.Kind: String] {
+        var result: [ThemeInterfaceManifest.Choice.Kind: String] = [:]
+        if let id = character.selectedID { result[.character] = id }
+        if let id = vehicle.selectedID { result[.vehicle] = id }
+        return result
+    }
+
+    private func refreshStages(after kind: ThemeInterfaceManifest.Choice.Kind) {
+        guard let stages = interface?.manifest.selection?.stages,
+              let index = stages.firstIndex(where: { $0.kind == kind }) else { return }
+        for stage in stages.dropFirst(index + 1) {
+            switch stage.kind {
+            case .character: configureCharacterGrid(selected: character.selectedID)
+            case .vehicle: configureVehicleGrid(selected: vehicle.selectedID)
+            }
+        }
+    }
+
+    private func choiceEntry(_ choice: ThemeInterfaceManifest.Choice,
+                             in interface: ResolvedThemeInterface) -> GameChoiceGrid.Entry {
+        .init(id: choice.id, label: choice.label,
+              image: interface.assets[choice.preview].flatMap(NSImage.init(contentsOf:)))
+    }
+
+    private func configureSessionMenu(selected: String?) {
+        guard let interface else { return }
+        session.removeAllItems()
+        session.addItem(withTitle: "Aucune session")
+        session.lastItem?.representedObject = ""
+        session.lastItem?.image = icon(for: "session.state.none", in: interface, size: 20)
+        for snapshot in sessions {
+            session.addItem(withTitle: "\(snapshot.display_name) — \(stateLabel(snapshot.state))")
+            session.lastItem?.representedObject = snapshot.id
+            session.lastItem?.image = icon(for: "session.state.\(snapshot.state.rawValue)", in: interface, size: 20)
+        }
+        if let index = session.itemArray.firstIndex(where: { ($0.representedObject as? String) == selected }) {
+            session.selectItem(at: index)
+        } else {
+            session.selectItem(at: 0)
         }
     }
 
@@ -244,19 +469,24 @@ import AppKit
         let embedded = interface.manifest.targets.first { $0.id == id }
         let value = overrides.targets[id]
         character.select(id: value?.character)
-        vehicle.select(id: value?.vehicle)
-        session.select(id: value?.session_id ?? embedded?.session_id)
-        updatePreview()
+        configureVehicleGrid(selected: value?.vehicle)
+        configureSessionMenu(selected: value?.session_id ?? embedded?.session_id)
         sessionChanged()
     }
 
-    @objc private func choiceChanged() {
-        updatePreview()
+    @objc private func characterChanged() {
+        refreshStages(after: .character)
+        updateTargetPreview()
+    }
+
+    @objc private func vehicleChanged() {
+        refreshStages(after: .vehicle)
         updateTargetPreview()
     }
 
     @objc private func sessionChanged() {
-        guard let id = session.selectedID, let snapshot = sessions.first(where: { $0.id == id }) else {
+        guard let id = session.selectedItem?.representedObject as? String,
+              let snapshot = sessions.first(where: { $0.id == id }) else {
             sessionStatus.stringValue = "Aucune session liée."
             focusSession.isEnabled = false
             openSession.isEnabled = false
@@ -268,7 +498,7 @@ import AppKit
     }
 
     @objc private func sendSessionIntent(_ sender: NSButton) {
-        guard let id = session.selectedID,
+        guard let id = session.selectedItem?.representedObject as? String, !id.isEmpty,
               let rawKind = sender.identifier?.rawValue,
               let kind = TerminalSessionIntentKind(rawValue: rawKind) else { return }
         let message = onSessionIntent?(TerminalSessionIntent(sessionID: id, kind: kind))
@@ -288,14 +518,6 @@ import AppKit
         }
     }
 
-    private func updatePreview() {
-        guard let interface else { return }
-        let selected = vehicle.selectedID ?? character.selectedID
-        preview.image = interface.manifest.choices.first { $0.id == selected }
-            .flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
-            ?? interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
-    }
-
     private func updateTargetPreview() {
         guard let interface, let id = editingTargetID else { return }
         let image = vehicle.selectedID
@@ -308,8 +530,9 @@ import AppKit
 
     private func captureCurrentSelection() {
         guard var overrides, let id = editingTargetID else { return }
+        let sessionID = session.selectedItem?.representedObject as? String
         overrides.targets[id] = ThemeTargetOverride(character: character.selectedID,
-            vehicle: vehicle.selectedID, sessionID: session.selectedID)
+            vehicle: vehicle.selectedID, sessionID: sessionID?.isEmpty == true ? nil : sessionID)
         self.overrides = overrides
     }
 

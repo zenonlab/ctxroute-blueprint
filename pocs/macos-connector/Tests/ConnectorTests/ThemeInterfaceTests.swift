@@ -72,4 +72,27 @@ final class ThemeInterfaceTests: XCTestCase {
         invalid.targets["vehicle.one"]?.vehicle = "kart.unknown"
         XCTAssertThrowsError(try invalid.validated(for: "fixture.theme", interface: manifest))
     }
+
+    func testSelectionPipelineFiltersNextStageByDeclaredAttribute() throws {
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/3", assets: [], slots: [:],
+            choices: [
+                .init(id: "driver.light", label: "Pilote léger", kind: .character, preview: "driver",
+                      attributes: ["weight": "light"]),
+                .init(id: "driver.heavy", label: "Pilote lourd", kind: .character, preview: "driver",
+                      attributes: ["weight": "heavy"]),
+                .init(id: "vehicle.light", label: "Véhicule léger", kind: .vehicle, preview: "vehicle",
+                      attributes: ["weight": "light"]),
+                .init(id: "vehicle.heavy", label: "Véhicule lourd", kind: .vehicle, preview: "vehicle",
+                      attributes: ["weight": "heavy"])
+            ], selection: .init(stages: [
+                .init(id: "driver", label: "Choisir un pilote", kind: .character, columns: 6),
+                .init(id: "machine", label: "Choisir un véhicule", kind: .vehicle, columns: 6)
+            ], compatibility: [
+                .init(sourceStage: "driver", targetStage: "machine", attribute: "weight")
+            ]))
+
+        XCTAssertEqual(manifest.compatibleChoices(kind: .vehicle,
+            selected: [.character: "driver.light"]).map(\.id), ["vehicle.light"])
+        XCTAssertTrue(manifest.compatibleChoices(kind: .vehicle, selected: [:]).isEmpty)
+    }
 }

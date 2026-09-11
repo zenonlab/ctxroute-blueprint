@@ -25,14 +25,63 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
         public let kind: Kind
         public let preview: String
         public let appearance: Appearance?
+        public let attributes: [String: String]
 
         public init(id: String, label: String, kind: Kind, preview: String,
-                    appearance: Appearance? = nil) {
+                    appearance: Appearance? = nil, attributes: [String: String] = [:]) {
             self.id = id
             self.label = label
             self.kind = kind
             self.preview = preview
             self.appearance = appearance
+            self.attributes = attributes
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id, label, kind, preview, appearance, attributes
+        }
+
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            id = try values.decode(String.self, forKey: .id)
+            label = try values.decode(String.self, forKey: .label)
+            kind = try values.decode(Kind.self, forKey: .kind)
+            preview = try values.decode(String.self, forKey: .preview)
+            appearance = try values.decodeIfPresent(Appearance.self, forKey: .appearance)
+            attributes = try values.decodeIfPresent([String: String].self, forKey: .attributes) ?? [:]
+        }
+    }
+    public struct Selection: Codable, Equatable, Sendable {
+        public struct Stage: Codable, Equatable, Sendable {
+            public let id: String
+            public let label: String
+            public let kind: Choice.Kind
+            public let columns: Int
+
+            public init(id: String, label: String, kind: Choice.Kind, columns: Int) {
+                self.id = id
+                self.label = label
+                self.kind = kind
+                self.columns = columns
+            }
+        }
+        public struct Compatibility: Codable, Equatable, Sendable {
+            public let source_stage: String
+            public let target_stage: String
+            public let attribute: String
+
+            public init(sourceStage: String, targetStage: String, attribute: String) {
+                source_stage = sourceStage
+                target_stage = targetStage
+                self.attribute = attribute
+            }
+        }
+        public let stages: [Stage]
+        public let compatibility: [Compatibility]
+
+        public init(stages: [Stage], compatibility: [Compatibility] = []) {
+            self.stages = stages
+            self.compatibility = compatibility
         }
     }
     public struct Target: Codable, Equatable, Sendable {
@@ -46,14 +95,35 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
     public let slots: [String: String]
     public let choices: [Choice]
     public let targets: [Target]
+    public let selection: Selection?
 
     public init(format: String, assets: [Asset], slots: [String: String], choices: [Choice],
-                targets: [Target] = []) {
+                targets: [Target] = [], selection: Selection? = nil) {
         self.format = format
         self.assets = assets
         self.slots = slots
         self.choices = choices
         self.targets = targets
+        self.selection = selection
+    }
+
+    public func stage(for kind: Choice.Kind) -> Selection.Stage? {
+        selection?.stages.first { $0.kind == kind }
+    }
+
+    public func compatibleChoices(kind: Choice.Kind, selected: [Choice.Kind: String]) -> [Choice] {
+        let candidates = choices.filter { $0.kind == kind }
+        guard let selection, let targetStage = stage(for: kind) else { return candidates }
+        let rules = selection.compatibility.filter { $0.target_stage == targetStage.id }
+        return candidates.filter { candidate in
+            rules.allSatisfy { rule in
+                guard let sourceStage = selection.stages.first(where: { $0.id == rule.source_stage }),
+                      let selectedID = selected[sourceStage.kind],
+                      let source = choices.first(where: { $0.kind == sourceStage.kind && $0.id == selectedID }),
+                      let sourceValue = source.attributes[rule.attribute] else { return false }
+                return candidate.attributes[rule.attribute] == sourceValue
+            }
+        }
     }
 }
 
@@ -77,9 +147,9 @@ public enum ThemeInterfaceLoader {
     public static func load(_ manifestURL: URL) throws -> ResolvedThemeInterface {
         let data = try boundedRegularFile(manifestURL, maximum: 65_536)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
-        guard manifest.format == "orbite.theme-interface/2",
+        guard ["orbite.theme-interface/2", "orbite.theme-interface/3"].contains(manifest.format),
               requiredSlots.isSubset(of: Set(manifest.slots.keys)),
-              (1...64).contains(manifest.assets.count), manifest.choices.count <= 64,
+              (1...128).contains(manifest.assets.count), manifest.choices.count <= 64,
               manifest.targets.count <= 16,
               Set(manifest.assets.map(\.id)).count == manifest.assets.count,
               Set(manifest.choices.map { "\($0.kind.rawValue):\($0.id)" }).count == manifest.choices.count,
@@ -103,6 +173,8 @@ public enum ThemeInterfaceLoader {
               manifest.choices.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
                   && resolved[$0.preview] != nil
+                  && $0.attributes.count <= 8
+                  && $0.attributes.allSatisfy { validID($0.key) && validID($0.value) }
                   && ($0.appearance.map { appearance in
                       validID(appearance.part) && validID(appearance.material)
                           && appearance.tint.count == 4
@@ -112,7 +184,40 @@ public enum ThemeInterfaceLoader {
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
                   && ($0.session_id.map(validID) ?? true) })
         else { throw ModelError.invalid("unresolved interface slot") }
+        try validateSelection(manifest)
         return ResolvedThemeInterface(manifest: manifest, manifestURL: manifestURL, assets: resolved)
+    }
+
+    private static func validateSelection(_ manifest: ThemeInterfaceManifest) throws {
+        guard let selection = manifest.selection else {
+            guard manifest.format == "orbite.theme-interface/2" else {
+                throw ModelError.invalid("selection pipeline required")
+            }
+            return
+        }
+        let stages = selection.stages
+        let stageIDs = Set(stages.map(\.id))
+        let stageKinds = Set(stages.map(\.kind))
+        guard (1...4).contains(stages.count), stageIDs.count == stages.count,
+              stageKinds.count == stages.count,
+              stages.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
+                  && (2...10).contains($0.columns) }),
+              selection.compatibility.count <= 8 else {
+            throw ModelError.invalid("invalid selection pipeline")
+        }
+        for rule in selection.compatibility {
+            guard validID(rule.attribute), rule.source_stage != rule.target_stage,
+                  let sourceIndex = stages.firstIndex(where: { $0.id == rule.source_stage }),
+                  let targetIndex = stages.firstIndex(where: { $0.id == rule.target_stage }),
+                  sourceIndex < targetIndex else {
+                throw ModelError.invalid("invalid selection compatibility")
+            }
+            let relevantKinds = [stages[sourceIndex].kind, stages[targetIndex].kind]
+            guard manifest.choices.filter({ relevantKinds.contains($0.kind) })
+                .allSatisfy({ $0.attributes[rule.attribute] != nil }) else {
+                throw ModelError.invalid("missing selection attribute")
+            }
+        }
     }
 
     private static func boundedRegularFile(_ url: URL, maximum: Int) throws -> Data {

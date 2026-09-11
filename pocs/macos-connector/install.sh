@@ -66,7 +66,7 @@ if [[ -x "$connector_old_provider_binary" ]]; then
         ;;
     esac
   done < <(pgrep -x WallpaperProvider 2>/dev/null || true)
-  for connector_pid in "${connector_provider_pids[@]}"; do
+  for connector_pid in ${connector_provider_pids[*]-}; do
     for _ in {1..30}; do
       kill -0 "$connector_pid" 2>/dev/null || break
       sleep 0.1

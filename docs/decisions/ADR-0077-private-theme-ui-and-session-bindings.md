@@ -20,13 +20,21 @@ Swift. Le modèle de personnalisation ne portait pas non plus l'identité de ses
 ## Decision
 
 Le descripteur externe peut référencer un manifeste optionnel
-`orbite.theme-interface/1`. Ce manifeste associe des slots sémantiques aux PNG
+`orbite.theme-interface/2` ou `/3`. Ce manifeste associe des slots sémantiques aux PNG
 privés, vérifiés par chemin contenu, fichier ordinaire, taille et SHA-256. Les slots
 obligatoires couvrent audio, fichiers du bureau, luminosité, piste, curseur et fond
 du customiseur. Les choix de personnage et véhicule restent des données du package.
 Le noyau ne connaît aucun nom de jeu ni chemin de ROM. Le customiseur présente ces
 choix comme une galerie d'images du package ; il ne fabrique pas de pictogramme
 système et conserve les sessions dans un contrôle séparé.
+
+La version 3 ajoute une pipeline de sélection ordonnée. Chaque étape déclare son
+identité, son rôle de choix, son libellé et son nombre de colonnes. Une règle de
+compatibilité relie deux étapes par un attribut borné ; le customiseur filtre l'étape
+suivante en comparant les valeurs déclarées par les choix. L'ordre, la grille et les
+catégories viennent donc du package, jamais d'une liste de personnages, de véhicules
+ou de noms de jeu compilée dans Swift. La version 2 reste lisible sans pipeline pour
+les packages existants.
 
 Un choix peut déclarer une application visuelle bornée par `part`, matériau et
 teinte RGBA. Le RenderHost vérifie que la cible, le part et le matériau existent
@@ -53,8 +61,9 @@ de thème émet `setBrightness`; son adaptateur ne doit jamais prétendre modifi
 
 ## Consequences
 
-Un autre jeu peut remplacer tous les visuels et choix par sa propre bibliothèque
-privée sans recompilation du connecteur. Un package sans manifeste UI reste valide,
+Un autre jeu peut remplacer tous les visuels, étapes, attributs et choix par sa propre
+bibliothèque privée sans recompilation du connecteur. Un package sans manifeste UI
+reste valide,
 mais aucune interface habillée ne peut être revendiquée. La présence d'un PNG ne
 confère aucune capacité OS et la sélection d'une session ne change ni trajet ni
 apparence.
