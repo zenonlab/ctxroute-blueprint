@@ -51,6 +51,7 @@ final class TerminalSessionsTests: XCTestCase {
         let open = TerminalSessionIntent(sessionID: "session.new", kind: .open)
         XCTAssertTrue(simulator.accept(open))
         XCTAssertEqual(simulator.lastAcceptedIntent, open)
+        XCTAssertFalse(simulator.accept(.init(sessionID: "session.unknown", kind: .focus)))
 
         _ = simulator.receive(.init(snapshot: .init(id: "session.alpha", displayName: "Alpha",
                                                     state: .disconnected, sequence: 2)))

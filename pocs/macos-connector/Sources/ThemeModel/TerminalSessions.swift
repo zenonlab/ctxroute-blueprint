@@ -84,7 +84,9 @@ public struct TerminalSessionSimulator: Sendable {
                                       options: .regularExpression) != nil else { return false }
         switch intent.kind {
         case .focus:
-            guard sessions[intent.session_id]?.state != .disconnected else { return false }
+            guard let session = sessions[intent.session_id], session.state != .disconnected else {
+                return false
+            }
         case .open:
             break
         }
