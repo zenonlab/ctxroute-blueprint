@@ -9,7 +9,7 @@ const config = {
   d1: [{ binding: 'CATALOGUE_DB', name: 'public-catalogue' }],
   r2: [{ binding: 'COVERS', name: 'public-covers' }],
 };
-const releaseVersion = '1.0.1';
+const releaseVersion = '1.0.2';
 
 function test_derive_operation_targets() {
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async () => '' });

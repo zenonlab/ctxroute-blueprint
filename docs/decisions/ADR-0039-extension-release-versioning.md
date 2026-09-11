@@ -12,6 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
+- Revised: 2026-09-11
 
 ## Context
 
@@ -20,7 +21,8 @@ under an existing version can leave installed browsers with stale cached code.
 
 ## Decision
 
-Every corrective extension build increments the extension package version. The
+Every corrective extension build increments the extension package version
+(`1.0.1`, then `1.0.2` for the missing-cover repair). The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare
