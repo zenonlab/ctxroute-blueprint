@@ -165,11 +165,13 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     if (candidate !== undefined) {
       if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      candidate = await preferMangaUpdatesHydration(dependencies, candidate);
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, { workId: cached?.id, hydratedAt: fresh ? cached?.hydration?.hydratedAt : undefined });
+      const identity = { workId: cached?.id, hydratedAt: fresh ? cached?.hydration?.hydratedAt : undefined, references: [reference] };
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, identity);
       return 'completed';
     }
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:explicit-id-not-found');

@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "MangaUpdates puis MangaDex puis Kitsu; une identité MangaDex tente une hydratation MangaUpdates exacte avant commit."
+        "note": "Une identité MangaDex tente MangaUpdates avant commit et conserve les références; la recherche suit MU puis MD puis Kitsu."
       },
       {
         "id": "bounded-convergence",
