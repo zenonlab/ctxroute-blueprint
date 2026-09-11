@@ -44,6 +44,33 @@ final class ThemeInterfaceTests: XCTestCase {
             desktopItemsVisible: nil, brightness: 0.8, visualPaused: false))
     }
 
+    func testInterfaceV4AcceptsDigestPinnedModelBinding() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("theme-interface-model-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let png = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])
+        let glb = Data([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0])
+        try png.write(to: root.appendingPathComponent("preview.png"))
+        try glb.write(to: root.appendingPathComponent("driver.glb"))
+        let digest: (Data) -> String = { bytes in
+            SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        }
+        let asset = ThemeInterfaceManifest.Asset(id: "preview", path: "preview.png", sha256: digest(png))
+        let slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/4", assets: [asset],
+            models: [.init(id: "model.driver", path: "driver.glb", sha256: digest(glb),
+                           clipIndices: [0, 1, 2])], slots: slots,
+            choices: [.init(id: "driver.fixture", label: "Pilote", kind: .character, preview: asset.id,
+                            appearance: .init(part: "driver", model: "model.driver"))],
+            selection: .init(stages: [
+                .init(id: "driver", label: "Choisir", kind: .character, columns: 2)
+            ]))
+        let url = root.appendingPathComponent("interface.json")
+        try JSONEncoder().encode(manifest).write(to: url)
+
+        XCTAssertEqual(try ThemeInterfaceLoader.load(url).manifest.models?.first?.clip_indices, [0, 1, 2])
+    }
+
     func testInterfaceRejectsMissingSemanticSlotAndTraversal() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("theme-interface-invalid-\(UUID().uuidString)", isDirectory: true)

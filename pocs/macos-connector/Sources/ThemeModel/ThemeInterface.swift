@@ -7,17 +7,33 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
         public let path: String
         public let sha256: String
     }
+    public struct ModelAsset: Codable, Equatable, Sendable {
+        public let id: String
+        public let path: String
+        public let sha256: String
+        public let clip_indices: [Int]
+
+        public init(id: String, path: String, sha256: String, clipIndices: [Int] = []) {
+            self.id = id
+            self.path = path
+            self.sha256 = sha256
+            clip_indices = clipIndices
+        }
+    }
     public struct Choice: Codable, Equatable, Sendable {
         public enum Kind: String, Codable, Sendable { case character, vehicle }
         public struct Appearance: Codable, Equatable, Sendable {
             public let part: String
-            public let material: String
-            public let tint: [Double]
+            public let material: String?
+            public let tint: [Double]?
+            public let model: String?
 
-            public init(part: String, material: String, tint: [Double]) {
+            public init(part: String, material: String? = nil, tint: [Double]? = nil,
+                        model: String? = nil) {
                 self.part = part
                 self.material = material
                 self.tint = tint
+                self.model = model
             }
         }
         public let id: String
@@ -92,15 +108,18 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
 
     public let format: String
     public let assets: [Asset]
+    public let models: [ModelAsset]?
     public let slots: [String: String]
     public let choices: [Choice]
     public let targets: [Target]
     public let selection: Selection?
 
-    public init(format: String, assets: [Asset], slots: [String: String], choices: [Choice],
-                targets: [Target] = [], selection: Selection? = nil) {
+    public init(format: String, assets: [Asset], models: [ModelAsset]? = nil,
+                slots: [String: String], choices: [Choice], targets: [Target] = [],
+                selection: Selection? = nil) {
         self.format = format
         self.assets = assets
+        self.models = models
         self.slots = slots
         self.choices = choices
         self.targets = targets
@@ -147,11 +166,15 @@ public enum ThemeInterfaceLoader {
     public static func load(_ manifestURL: URL) throws -> ResolvedThemeInterface {
         let data = try boundedRegularFile(manifestURL, maximum: 65_536)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
-        guard ["orbite.theme-interface/2", "orbite.theme-interface/3"].contains(manifest.format),
+        let models = manifest.models ?? []
+        guard ["orbite.theme-interface/2", "orbite.theme-interface/3", "orbite.theme-interface/4"].contains(manifest.format),
               requiredSlots.isSubset(of: Set(manifest.slots.keys)),
               (1...128).contains(manifest.assets.count), manifest.choices.count <= 64,
+              models.count <= 64,
+              manifest.format == "orbite.theme-interface/4" || models.isEmpty,
               manifest.targets.count <= 16,
               Set(manifest.assets.map(\.id)).count == manifest.assets.count,
+              Set(models.map(\.id)).count == models.count,
               Set(manifest.choices.map { "\($0.kind.rawValue):\($0.id)" }).count == manifest.choices.count,
               Set(manifest.targets.map(\.id)).count == manifest.targets.count
         else { throw ModelError.invalid("invalid theme interface manifest") }
@@ -169,6 +192,22 @@ public enum ThemeInterfaceLoader {
             else { throw ModelError.invalid("interface PNG digest mismatch") }
             resolved[asset.id] = url
         }
+        var modelIDs = Set<String>()
+        var modelBytes = 0
+        for model in models {
+            guard validID(model.id), validDigest(model.sha256), model.clip_indices.count <= 16,
+                  model.clip_indices.allSatisfy({ (0...63).contains($0) }) else {
+                throw ModelError.invalid("invalid interface model")
+            }
+            let url = try contained(model.path, root: root, extension: "glb")
+            let bytes = try boundedRegularFile(url, maximum: 67_108_864)
+            modelBytes += bytes.count
+            guard modelBytes <= 536_870_912 else { throw ModelError.invalid("interface GLB budget") }
+            guard bytes.starts(with: [0x67, 0x6c, 0x54, 0x46]),
+                  SHA256.hash(data: bytes).map({ String(format: "%02x", $0) }).joined() == model.sha256
+            else { throw ModelError.invalid("interface GLB digest mismatch") }
+            modelIDs.insert(model.id)
+        }
         guard manifest.slots.values.allSatisfy({ resolved[$0] != nil }),
               manifest.choices.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
@@ -176,9 +215,13 @@ public enum ThemeInterfaceLoader {
                   && $0.attributes.count <= 8
                   && $0.attributes.allSatisfy { validID($0.key) && validID($0.value) }
                   && ($0.appearance.map { appearance in
-                      validID(appearance.part) && validID(appearance.material)
-                          && appearance.tint.count == 4
-                          && appearance.tint.allSatisfy { $0.isFinite && (0...2).contains($0) }
+                      validID(appearance.part)
+                          && (appearance.material.map(validID) ?? true)
+                          && (appearance.tint.map { $0.count == 4
+                              && $0.allSatisfy { $0.isFinite && (0...2).contains($0) } } ?? true)
+                          && (appearance.material != nil) == (appearance.tint != nil)
+                          && (appearance.model.map(modelIDs.contains) ?? true)
+                          && (appearance.material != nil || appearance.model != nil)
                   } ?? true) }),
               manifest.targets.allSatisfy({ validID($0.id) && (1...80).contains($0.label.count)
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
@@ -229,10 +272,12 @@ public enum ThemeInterfaceLoader {
         return try Data(contentsOf: url, options: .mappedIfSafe)
     }
 
-    private static func contained(_ path: String, root: URL) throws -> URL {
+    private static func contained(_ path: String, root: URL, extension requiredExtension: String = "png") throws -> URL {
         guard !path.isEmpty, path.utf8.count <= 240, !path.hasPrefix("/"), !path.contains("\\"),
               !path.contains(":"), !path.split(separator: "/").contains(".."),
-              path.lowercased().hasSuffix(".png") else { throw ModelError.invalid("relative PNG required") }
+              path.lowercased().hasSuffix(".\(requiredExtension)") else {
+            throw ModelError.invalid("relative \(requiredExtension.uppercased()) required")
+        }
         let candidate = root.appendingPathComponent(path).resolvingSymlinksInPath()
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
         guard candidate.path.hasPrefix(prefix) else { throw ModelError.invalid("interface asset escapes package") }

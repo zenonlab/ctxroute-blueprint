@@ -114,6 +114,12 @@ valeur. Ces identifiants sont opaques pour le connecteur : le même mécanisme c
 adaptateur. La session reste un lien secondaire et ne devient jamais une étape
 d'apparence.
 
+La version 4 matérialise `resource_variant` sans connaissance du jeu dans Swift :
+le package associe un choix à un GLB privé digesté, une pièce sémantique et les indices
+de clips correspondant aux slots de cette pièce. Le RenderHost effectue la substitution
+par instance et restaure le modèle original au reset. L'identité de session, le chemin
+et l'action restent portés par l'instance, jamais par le modèle.
+
 Une substitution riggée exige une `compatibility_signature` qui couvre le type de
 ressource, le squelette, les clips requis et les points d'ancrage. Le runtime refuse
 une substitution incompatible. Un retargeting n'est accepté que comme dérivé produit
@@ -337,13 +343,7 @@ partagent pas leurs types d'UI ou leur cycle de vie natif.
 ## Validation documentaire
 
 Le dataflow Archify passe le profil `showcase` avec 9 contrôles sur 9, sans erreur
-ni avertissement. Le contrôle visuel passe à 1440×900, 1600×1000, 1920×1080 et
-2048×1320 en clair et sombre. Les captures sombres 1440×900 et 2048×1320 ont été inspectées : étapes,
-branches publique/privée et sorties de présentation sont lisibles sans collision.
-Source SHA-256 :
-`c6fd99da36550dc894161412601beb61438e217ccc385fec6c3e942e35b0f744`.
-Artefact SHA-256 :
-`d20ca64e43fe6c7fa9300baa93aba7167da2596103d8229cb3b7ed07343ed02d`.
+ni avertissement après l'ajout du flux de modèles digestés et de restauration.
 Le modèle de gestes réside dans la composition du thème ; ce repère de responsabilité
 ne signifie pas que le raccord natif ou le courtier d'actions est livré.
 Les libellés sont en français ; l'interface fixe du viewer reste en anglais.

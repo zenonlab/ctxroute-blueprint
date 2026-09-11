@@ -20,7 +20,7 @@ Swift. Le modèle de personnalisation ne portait pas non plus l'identité de ses
 ## Decision
 
 Le descripteur externe peut référencer un manifeste optionnel
-`orbite.theme-interface/2` ou `/3`. Ce manifeste associe des slots sémantiques aux PNG
+`orbite.theme-interface/2`, `/3` ou `/4`. Ce manifeste associe des slots sémantiques aux PNG
 privés, vérifiés par chemin contenu, fichier ordinaire, taille et SHA-256. Les slots
 obligatoires couvrent audio, fichiers du bureau, luminosité, piste, curseur et fond
 du customiseur. Les choix de personnage et véhicule restent des données du package.
@@ -36,8 +36,16 @@ catégories viennent donc du package, jamais d'une liste de personnages, de véh
 ou de noms de jeu compilée dans Swift. La version 2 reste lisible sans pipeline pour
 les packages existants.
 
-Un choix peut déclarer une application visuelle bornée par `part`, matériau et
-teinte RGBA. Le RenderHost vérifie que la cible, le part et le matériau existent
+La version 4 ajoute des modèles GLB privés, bornés à 64 ressources de 64 Mio et
+512 Mio cumulés,
+contenus dans le package et vérifiés par SHA-256. Une apparence peut référencer un
+modèle et une liste bornée d'indices de clips en plus du matériau. Swift valide ces
+données mais ne les interprète pas : le RenderHost remplace uniquement la pièce
+sémantique déclarée et reconstruit ses slots d'animation. Le catalogue reste la seule
+source des identités propres au jeu.
+
+Un choix peut déclarer une application visuelle bornée par `part`, ressource, matériau
+et teinte RGBA. Le RenderHost vérifie que la cible, le part et le matériau existent
 dans la scène résolue, clone le matériau par instance et restaure l'original au
 reset. Une variante ne peut donc modifier ni l'identité, ni la trajectoire, ni la
 session d'un véhicule.
