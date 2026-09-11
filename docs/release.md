@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.8`. `apps/extension/package.json` is the only
+The current candidate is `1.0.9`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +35,26 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Cover and queue correction candidate — 2026-09-11
+
+Candidate `1.0.9` passes `npm run verify`, the current-archive multi-provider
+Playwright journey and the installed Chromium Review smoke test. Two isolated
+builds produce identical archives:
+
+- Chrome: 282615 bytes, SHA-256 `e4c7412a62ac49239d2e8a12204570d82c0c54ee2f82e32eb60deed844b1b2fe`.
+- Firefox: 282663 bytes, SHA-256 `372956d453f152a1f44e420fb75594ddb8dc995863423fdfc38c5ce6738b102b`.
+
+Live Chrome inspection reproduced a MangaDex replacement image served with
+HTTP 200; the same public diagnostic URL without a Referer decoded as the real
+512-by-728 cover. The packaged journey checks decoded images and absent Referer
+headers for the provider fixtures. Native Firefox installation was not verified
+for this candidate. This evidence does not certify the complete private library.
+
+Publication remains pending: the repository infrastructure inspection failed
+with Cloudflare authentication error 10000. No candidate upload or Worker deploy
+was performed. The browser control adapter also cannot claim Chrome's internal
+extension manager, so the user's installed extension has not been reloaded.
 
 ### Favorites queue correction — 2026-09-11
 

@@ -160,7 +160,9 @@ async function hydrateExplicitReference(
     const search = dependencies.candidates.mangaupdates;
     if (search === undefined) throw error;
     const envelope = await search.search({ provider: 'mangaupdates', titles: providerTitles(artifact), limit: 20 });
-    return envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+    const exact = envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+    if (exact === undefined && (!envelope.complete || envelope.truncated)) throw new Error('INCOMPLETE_HYDRATION_SEARCH');
+    return exact;
   }
 }
 
@@ -233,7 +235,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     let candidate = fresh ? local.candidate : undefined;
     if (!fresh) {
       if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
-      try { candidate = await hydration.hydrate(local.candidate); } catch (error) {
+      try { candidate = await hydrateExplicitReference(dependencies, local.candidate, artifact); } catch (error) {
         const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
         return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
       }
@@ -296,7 +298,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   const provider = outcome.matchedReference.provider;
   let candidate: ProviderCandidate | undefined;
-  try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch (error) {
+  try { candidate = await hydrateExplicitReference(dependencies, { externalId: outcome.matchedReference.externalId, provider }, artifact); } catch (error) {
     const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
     return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
   }

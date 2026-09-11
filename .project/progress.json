@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6793,7 +6793,7 @@
         {
           "id": "step-7",
           "title": "Verify and package release 1.0.9",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Full verify passes",
             "Chrome and Firefox archives are reproducible and hashed",
@@ -6815,12 +6815,16 @@
             "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.9.zip",
             "git commit -m chore(extension): prepare verified 1.0.9 release"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed on final product changes; current 1.0.9 packaged multi-provider E2E and installed Chromium Review smoke passed",
+            "Two isolated builds matched both Chrome and Firefox 1.0.9 archive hashes; live Chrome no-referrer diagnostic decoded actual 512x728 cover",
+            "Native Firefox installation and complete private library parity remain unverified; release documentation records boundaries"
+          ]
         },
         {
           "id": "step-8",
           "title": "Publish approved artifacts and verify installed rendering",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Gate publishes only versioned ZIPs and matching Worker assets",
             "Public hashes equal tested artifacts",
@@ -6838,7 +6842,10 @@
             "Browser reload and image inspection",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "external: Cloudflare infra:inspect rejected authentication with API error 10000; user asked to restore Wrangler login; no upload or deployment performed",
+            "external: Chrome browser adapter refuses chrome://extensions internal tab; installed user extension reload cannot be executed through available browser control"
+          ]
         }
       ]
     }

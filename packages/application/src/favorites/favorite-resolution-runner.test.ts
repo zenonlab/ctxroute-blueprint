@@ -260,11 +260,11 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source?.reviewId).toBeUndefined();
   });
 
-  it('hydrates an explicit MangaUpdates ID through bounded search after a 405 response', async () => {
+  it.each([true, false])('hydrates a MangaUpdates ID through bounded search after a 405 response (explicit %s)', async (explicit) => {
     const storage = new MemoryStoragePort();
     const manga = { externalId: '12345', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Synthetic Manga'], displayTitle: 'Synthetic Manga' };
     const novel = { ...manga, externalId: '54321', preSerialization: true, titles: ['Synthetic Manga (Novel)'], displayTitle: 'Synthetic Manga (Novel)' };
-    const explicitFavorite = { ...favorite, bookmarkId: 'explicit-mu', title: 'Synthetic Manga', url: 'https://www.mangaupdates.com/series/abc123/synthetic-manga' };
+    const explicitFavorite = { ...favorite, bookmarkId: 'explicit-mu', title: 'Synthetic Manga', url: explicit ? 'https://www.mangaupdates.com/series/abc123/synthetic-manga' : 'https://reader.example/manga/synthetic-manga' };
     await importFavoriteSources([explicitFavorite], storage, now, [{
       analyze: (input, url) => createSourceEvidence({ aliases: [{ provenance: 'stable-url-slug', value: 'Synthetic Manga' }], diagnostics: [], explicitProviderReference: { externalId: '12345', provider: 'mangaupdates' }, key: input.sourceKey, mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], sourceAdapter: 'test-mu', strategy: 'exact-origin', title: 'Synthetic Manga' }),
       id: 'test-mu', origins: ['https://www.mangaupdates.com'],

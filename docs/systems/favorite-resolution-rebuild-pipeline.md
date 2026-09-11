@@ -42,6 +42,10 @@ Les anciens blocages sont repris une fois avec un reçu conservant les données
 précédentes; les décisions humaines restent protégées. Une panne répétée garde
 une échéance de reprise avec délai plafonné au lieu d’arrêter définitivement la file.
 Une restauration sync indisponible ne bloque plus les favoris locaux déjà importés.
+Le repli HTTP 405 MangaUpdates conserve l’ID exact aussi après une recherche par
+titre ou un alias local; une page incomplète ne peut pas prouver un introuvable.
+Le test navigateur multi-fournisseurs lit la version courante du paquet et
+vérifie les images décodées ainsi que l’absence de référent.
 
 
 Le runtime actuel possède déjà des fondations réutilisables :

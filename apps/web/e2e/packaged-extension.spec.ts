@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
@@ -33,7 +33,8 @@ const mangaDexPayload = {
 test('the packaged Chrome extension imports, resolves, bridges and survives offline', async () => {
   test.setTimeout(90_000);
   const repository = resolve(import.meta.dirname, '../../..');
-  const archive = resolve(repository, 'apps/extension/.output/packages/tobirink-chrome-mv3-1.0.0.zip');
+  const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
+  const archive = resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
   const extensionPath = mkdtempSync(resolve(tmpdir(), 'tobirink-packaged-extension-'));
   const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-chromium-profile-'));
   execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
@@ -43,6 +44,11 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     headless: true,
   });
   try {
+    const coverRequests: string[] = [];
+    await context.route(/^https:\/\/(s4\.anilist\.co|cdn\.mangaupdates\.com|uploads\.mangadex\.org|media\.kitsu\.app)\//u, async (route) => {
+      coverRequests.push(route.request().headers().referer ?? '');
+      await route.fulfill({ body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1cAAAAASUVORK5CYII=', 'base64'), contentType: 'image/png', status: 200 });
+    });
     await context.route('https://graphql.anilist.co/**', async (route) => {
       const exactHydration = route.request().postData()?.includes('"id":154587') === true;
       await route.fulfill({
@@ -58,7 +64,8 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
       await route.fulfill({ body: JSON.stringify(search ? { results: [{ record: mangaUpdatesSeries }], total_hits: 1 } : mangaUpdatesSeries), contentType: 'application/json', status: 200 });
     });
     await context.route('https://api.mangadex.org/**', async (route) => {
-      await route.fulfill({ body: JSON.stringify(mangaDexPayload), contentType: 'application/json', status: 200 });
+      const search = new URL(route.request().url()).pathname === '/manga';
+      await route.fulfill({ body: JSON.stringify(search ? { result: 'ok', data: [] } : mangaDexPayload), contentType: 'application/json', status: 200 });
     });
     await context.route('https://kitsu.io/api/edge/**', async (route) => {
       const type = route.request().url().includes('/manga') ? 'manga' : 'anime';
@@ -108,7 +115,11 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
     for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'uploads.mangadex.org', 'media.kitsu.app']) {
       await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('alt', /Couverture/u);
+      await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('referrerpolicy', 'no-referrer');
     }
+    await expect.poll(() => privateLibrary.locator('img').evaluateAll((images) => images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
+    expect(coverRequests.length).toBeGreaterThanOrEqual(5);
+    expect(coverRequests.every((referer) => referer === '')).toBe(true);
     expect(await privateLibrary.evaluate(async () => {
       const database = await new Promise<IDBDatabase>((resolveDatabase, reject) => {
         const request = indexedDB.open('tobirink-private');

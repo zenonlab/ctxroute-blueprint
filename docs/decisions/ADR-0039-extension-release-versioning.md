@@ -26,7 +26,8 @@ Every corrective extension build increments the extension package version
 repair, `1.0.4` for resolution during sync restoration, then `1.0.5` for
 library projection reconstruction, `1.0.6` for rejecting non-media generic
 links, `1.0.7` for explicit MangaUpdates hydration fallback, and `1.0.8` for
-excluding pre-serialization matches). The
+excluding pre-serialization matches; `1.0.9` fixes cover referrer handling,
+unique complete MangaUpdates matching and blocked-queue recovery). The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare
