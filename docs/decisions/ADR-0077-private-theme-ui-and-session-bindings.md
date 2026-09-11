@@ -40,7 +40,9 @@ les intentions corrélées `focus` et `open`; il ne transporte ni PTY, ni texte,
 commande shell. Le customiseur expose l'état et la séquence du dernier instantané,
 puis permet d'émettre explicitement ces deux intentions. Les doublons et événements
 périmés sont refusés et le simulateur conserve la dernière intention acceptée comme
-preuve bornée, sans contenu de session.
+preuve bornée, sans contenu de session. Des slots optionnels `session.state.*` et
+`session.action.*` habillent le catalogue et ses actions avec les images du package ;
+leur absence retombe sur du texte, jamais sur un pictogramme système embarqué.
 
 La luminosité est une valeur absolue bornée de 0 à 1 et non un toggle. Le contrôle
 de thème émet `setBrightness`; son adaptateur ne doit jamais prétendre modifier un

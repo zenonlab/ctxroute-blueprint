@@ -11,7 +11,9 @@ final class ThemeInterfaceTests: XCTestCase {
         let digest = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
         try png.write(to: root.appendingPathComponent("fixture.png"))
         let asset = ThemeInterfaceManifest.Asset(id: "fixture.icon", path: "fixture.png", sha256: digest)
-        let slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
+        var slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
+        slots["session.action.focus"] = asset.id
+        slots["session.state.active"] = asset.id
         let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/1", assets: [asset],
             slots: slots, choices: [
                 .init(id: "driver.fixture", label: "Pilote libre", kind: .character, preview: asset.id),
@@ -23,6 +25,8 @@ final class ThemeInterfaceTests: XCTestCase {
 
         let resolved = try ThemeInterfaceLoader.load(manifestURL)
         XCTAssertEqual(resolved.asset(for: "slider.thumb"), root.appendingPathComponent("fixture.png"))
+        XCTAssertEqual(resolved.asset(for: "session.action.focus"), root.appendingPathComponent("fixture.png"))
+        XCTAssertEqual(resolved.asset(for: "session.state.active"), root.appendingPathComponent("fixture.png"))
         XCTAssertEqual(resolved.manifest.choices.count, 2)
         XCTAssertEqual(resolved.manifest.choices[1].appearance?.material, "mat_body")
 

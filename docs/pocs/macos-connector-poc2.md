@@ -69,6 +69,8 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
   sa session simulée sans double action.
 - Le customiseur affiche l'état et la séquence de la session choisie ; `Focaliser` et
   `Ouvrir` émettent des intentions typées vers le simulateur, sans PTY ni texte terminal.
+- Les états et actions de session utilisent les slots illustrés du package privé ; aucun
+  symbole système n'est substitué lorsqu'un slot est absent.
 - Sauvegarde, annulation et reset ne changent ni l'identité, ni le trajet, ni la
   session hors du champ explicitement sélectionné.
 - SwiftPM, compilation Swift stricte, signature, invariant de paquet et `npm run verify` passent.

@@ -110,7 +110,8 @@ import AppKit
         character.configure(entries: choices(.character, in: interface, fallback: fallback), selected: nil)
         vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback), selected: nil)
         fill(session, entries: [("", "Aucune session", nil)] + sessions.map {
-            ($0.id, "\($0.display_name) — \($0.state.rawValue)", nil)
+            ($0.id, "\($0.display_name) — \($0.state.rawValue)",
+             icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 18))
         })
         if let targetID { select(target, id: targetID) }
         target.target = self
@@ -123,6 +124,8 @@ import AppKit
         openSession.target = self
         openSession.action = #selector(sendSessionIntent(_:))
         openSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.open.rawValue)
+        skin(focusSession, slot: "session.action.focus", interface: interface)
+        skin(openSession, slot: "session.action.open", interface: interface)
         character.onChange = { [weak self] in self?.choiceChanged() }
         vehicle.onChange = { [weak self] in self?.choiceChanged() }
         preview.imageScaling = .scaleProportionallyUpOrDown
@@ -185,6 +188,20 @@ import AppKit
             popup.lastItem?.representedObject = id
             popup.lastItem?.image = image
         }
+    }
+
+    private func skin(_ button: NSButton, slot: String, interface: ResolvedThemeInterface) {
+        button.image = icon(for: slot, in: interface, size: 22)
+        button.imagePosition = button.image == nil ? .noImage : .imageLeading
+        button.imageScaling = .scaleProportionallyDown
+    }
+
+    private func icon(for slot: String, in interface: ResolvedThemeInterface,
+                      size: CGFloat) -> NSImage? {
+        guard let url = interface.asset(for: slot), let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: size, height: size)
+        image.isTemplate = false
+        return image
     }
 
     private func select(_ popup: NSPopUpButton, id: String?) {
