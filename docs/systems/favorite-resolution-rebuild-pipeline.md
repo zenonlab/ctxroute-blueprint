@@ -47,6 +47,24 @@ titre ou un alias local; une page incomplète ne peut pas prouver un introuvable
 Le test navigateur multi-fournisseurs lit la version courante du paquet et
 vérifie les images décodées ainsi que l’absence de référent.
 
+### Diagnostic du fallback MangaDex systématique
+
+Le 11 septembre 2026, une recherche publique MangaUpdates répond 403 avec
+un Origin d'extension et 200 sans Origin. Le manifeste FavLib embarquait une
+règle déclarative supprimant cet en-tête pour l'API MangaUpdates; TobiRink
+l'avait omise. Le résolveur aggravait ce défaut en passant au fournisseur
+suivant sur tout HTTP 403. La règle locale est restaurée, sans relais Worker,
+et les refus restent RETRYABLE. Le test installé active et désactive la règle
+dans un profil Chromium isolé et reproduit 403 puis 200 avec 25 résultats.
+
+Le décodage réel a aussi révélé des URL de couverture `null` dans une page
+de résultats. Ces absences sont acceptées sans perdre les identités de la page;
+le contrat de candidat continue à omettre la couverture indisponible.
+Les œuvres MangaDex déjà stockées ne sont pas supprimées par ce correctif.
+Le rapprochement existant reste conservateur, et ne remplace pas une migration
+complète des choix automatiques antérieurs. La vérification de la bibliothèque
+privée installée reste distincte de ces tests de transport et de résolution.
+
 
 Le runtime actuel possède déjà des fondations réutilisables :
 

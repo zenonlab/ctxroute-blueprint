@@ -26,12 +26,8 @@ async function resolveLane(
       if (result.kind === 'PAGE_PENDING') return result;
       envelope = result.envelope;
     } catch (error) {
-      // A terminal provider refusal (for example a documented temporary API
-      // shutdown returned as 403) permits the controlled fallback lane. Rate
-      // limits, timeouts and transport failures remain retryable and never
-      // become an implicit NO_MATCH.
-      const terminalRefusal = error instanceof Error && /HTTP 403\b/u.test(error.message);
-      if (terminalRefusal && provider === providers[0] && providers.length > 1) continue;
+      // An HTTP refusal cannot prove an exhausted search. Keep the primary
+      // lane retryable instead of silently granting authority to its fallback.
       if (error instanceof FavoriteProviderRetryError) return { kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE', retryAt: error.retryAt };
       return { kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' };
     }

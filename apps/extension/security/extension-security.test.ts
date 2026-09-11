@@ -15,6 +15,7 @@ const generatedManifestSchema = z.object({
     }),
   }).optional(),
   content_security_policy: z.object({ extension_pages: z.string() }),
+  declarative_net_request: z.object({ rule_resources: z.array(z.object({ id: z.string(), enabled: z.boolean(), path: z.string() })) }),
   host_permissions: z.array(z.string()).optional(),
   externally_connectable: z.object({ matches: z.array(z.string()).min(1) }),
   content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })),
@@ -38,8 +39,12 @@ describe('extension security boundary', () => {
     ['firefox-mv3', firefoxManifest],
   ])('generates a bounded %s manifest', async (_target, loadManifest) => {
     const value = await loadManifest();
-    const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
+    const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage', 'declarativeNetRequestWithHostAccess']);
     expect(value.manifest_version).toBe(3);
+    expect(value.permissions).toContain('declarativeNetRequestWithHostAccess');
+    expect(value.declarative_net_request.rule_resources).toEqual([{ id: 'mangaupdates_transport', enabled: true, path: 'rules/mangaupdates-transport.json' }]);
+    const rules = JSON.parse(await readFile(`.output/${_target}/rules/mangaupdates-transport.json`, 'utf8'));
+    expect(rules).toEqual([{ id: 1, priority: 1, action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] }, condition: { urlFilter: '|https://api.mangaupdates.com/v1/', resourceTypes: ['xmlhttprequest'] } }]);
     if (_target === 'chrome-mv3') expect(value.minimum_chrome_version).toBe('140');
     expect(value.host_permissions ?? []).toEqual([
       'https://api.mangadex.org/*',

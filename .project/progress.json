@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "BLOCKED",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6843,9 +6843,79 @@
             "git diff --check"
           ],
           "evidence": [
-            "external: Cloudflare infra:inspect rejected authentication with API error 10000; user asked to restore Wrangler login; no upload or deployment performed",
-            "external: Chrome browser adapter refuses chrome://extensions internal tab; installed user extension reload cannot be executed through available browser control"
+            "Gate plan 8b4518333f37265a97114c96d62c93fee2b449b0dd857a53ca635c0f6a4cc64b published both 1.0.9 ZIPs and Worker 0721e450-0098-43fd-ae64-923640b332f1; no D1 migration",
+            "Public Chrome and Firefox downloads return 200 and exactly match tested SHA256 hashes; /download advertises 1.0.9 and /library returns 200",
+            "external: Chrome control cannot claim internal extension manager; user-installed extension reload and complete private library rendering remain unverified"
           ]
+        },
+        {
+          "id": "step-9",
+          "title": "Restore MangaUpdates transport and reject error-driven fallback",
+          "status": "DONE",
+          "acceptance": [
+            "Installed Chromium sends MangaUpdates requests without Origin",
+            "403 never selects a fallback provider",
+            "Tests and Archify validate; existing private records preserved"
+          ],
+          "files": [
+            "apps/extension/wxt.config.ts",
+            "apps/extension/public/rules/mangaupdates-transport.json",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/scripts/installed-mangaupdates.mjs",
+            "packages/application/src/favorites/resolve-provider-lanes.ts",
+            "packages/application/src/favorites/resolve-provider-lanes.test.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "scripts/performance/extension-performance.test.tsx"
+          ],
+          "commands": [
+            "npm run build --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test --workspace @tobirink/extension",
+            "npm exec -- vitest run packages/application/src/favorites/resolve-provider-lanes.test.ts",
+            "node apps/extension/scripts/installed-mangaupdates.mjs",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs",
+            "git diff --check",
+            "git commit -m fix(favorites): restore MangaUpdates primary transport",
+            "npm run verify"
+          ],
+          "evidence": [
+            "Installed Chromium rule disabled=403, enabled=200 and 25 results; real MangaUpdates pagination and matching passed",
+            "20 targeted tests including nullable images passed; full validation and workspace tests passed; performance gate corrected for added rule file and passed",
+            "CRG integration dependency audit and Archify showcase 9/9 passed; zero vulnerabilities; git diff check clean"
+          ]
+        },
+        {
+          "id": "step-10",
+          "title": "Package verified MangaUpdates transport release 1.0.10",
+          "status": "TODO",
+          "acceptance": [
+            "Versioned archives preserve 1.0.9",
+            "Installed transport test and package E2E pass",
+            "Hashes and release boundaries documented"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "apps/extension/.output",
+            "apps/web/out"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "node apps/extension/scripts/installed-mangaupdates.mjs",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m chore(extension): prepare MangaUpdates transport release 1.0.10"
+          ],
+          "evidence": []
         }
       ]
     }

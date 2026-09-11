@@ -54,7 +54,14 @@ puis Kitsu Manga. Une référence AniList manga explicite reste hydratable.
 Type inconnu : lanes indépendantes, aucune validation unilatérale si l'autre
 lane manque; deux identités de types différents imposent Review.
 
-Panne, 429, timeout et réponse incomplète n'autorisent pas le fallback.
+Panne, 403, 429, timeout et réponse incomplète n'autorisent pas le fallback.
+Un 403 ne prouve ni un arrêt documenté du fournisseur ni un NO_MATCH.
+Le transport navigateur retire seulement l'en-tête Origin des requêtes XHR
+vers l'origine exacte `https://api.mangaupdates.com/v1/` au moyen d'une règle
+déclarative embarquée. Cette compatibilité existait dans FavLib; les sondes
+du 11 septembre 2026 répondent 403 avec Origin et 200 sans cet en-tête.
+La permission `declarativeNetRequestWithHostAccess` réutilise l'accès hôte
+déjà accordé; aucun relais Worker ou titre stocké côté serveur n'est ajouté.
 Kitsu n'arbitre pas l'ambiguïté principale. Le matcher s'arrête au premier
 niveau probant : ID, URL, titre exact, saison corroborée, tokens réordonnés,
 distance bornée. Plusieurs identités distinctes sont ambiguës. Popularité,

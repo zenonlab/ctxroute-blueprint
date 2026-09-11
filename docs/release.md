@@ -51,10 +51,18 @@ HTTP 200; the same public diagnostic URL without a Referer decoded as the real
 headers for the provider fixtures. Native Firefox installation was not verified
 for this candidate. This evidence does not certify the complete private library.
 
-Publication remains pending: the repository infrastructure inspection failed
-with Cloudflare authentication error 10000. No candidate upload or Worker deploy
-was performed. The browser control adapter also cannot claim Chrome's internal
-extension manager, so the user's installed extension has not been reloaded.
+Publication completed through gate plan
+`8b4518333f37265a97114c96d62c93fee2b449b0dd857a53ca635c0f6a4cc64b`:
+Worker `0721e450-0098-43fd-ae64-923640b332f1` serves the updated site and both
+versioned ZIPs are uploaded. Public downloads return HTTP 200 and match the
+hashes above; `/download` advertises 1.0.9 and `/library` returns HTTP 200.
+Cloudflare credentials were loaded in memory from the user-designated legacy
+environment file; no secret was copied into this repository. No D1 migration
+was applied. Retain previous Worker version
+`037cb356-d934-4814-b283-ae09e43e6582` as the rollback reference.
+The browser control adapter cannot claim Chrome's internal extension manager,
+so the user's installed extension has not been reloaded. Installed private
+library certification remains pending that reload.
 
 ### Favorites queue correction — 2026-09-11
 

@@ -39,7 +39,10 @@ export default defineConfig({
     ],
     icons: extensionIcons,
     name: 'Tobirink',
-    permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'],
+    permissions: ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab', 'declarativeNetRequestWithHostAccess'],
+    declarative_net_request: {
+      rule_resources: [{ id: 'mangaupdates_transport', enabled: true, path: 'rules/mangaupdates-transport.json' }],
+    },
     action: { default_icon: extensionIcons },
     version: extensionPackage.version,
   }),

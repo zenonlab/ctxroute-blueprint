@@ -33,10 +33,21 @@ describe('independent provider lanes', () => {
     expect(candidates['kitsu-anime'].search).toHaveBeenCalledOnce();
   });
 
-  it('uses Kitsu after a terminal provider refusal', async () => {
-    const candidates = { ...ports(), anilist: provider('anilist'), 'kitsu-anime': provider('kitsu-anime', [candidate('kitsu-anime')]) };
-    candidates.anilist.search.mockRejectedValue(new Error('Favorite provider request failed with HTTP 403.'));
-    expect(await resolveFavoriteProviderLanes(candidates, query, 'ANIME')).toMatchObject({ kind: 'COMPLETE', decision: { matchedReference: { provider: 'kitsu-anime' } } });
+  it.each(['ANIME', 'MANGA', 'UNKNOWN'] as const)('keeps a primary 403 retryable for %s', async (kind) => {
+    const candidates = { ...ports(), mangadex: provider('mangadex', [candidate('mangadex')]), 'kitsu-anime': provider('kitsu-anime', [candidate('kitsu-anime')]) };
+    const primary = kind === 'ANIME' ? 'anilist' : 'mangaupdates';
+    candidates[primary].search.mockRejectedValue(new Error('Favorite provider request failed with HTTP 403.'));
+    expect(await resolveFavoriteProviderLanes(candidates, query, kind)).toMatchObject({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
+    expect(candidates.mangadex.search).not.toHaveBeenCalled();
+    expect(candidates['kitsu-manga'].search).not.toHaveBeenCalled();
+    if (kind === 'ANIME') expect(candidates['kitsu-anime'].search).not.toHaveBeenCalled();
+  });
+
+  it('retains MangaUpdates authority when both manga providers could match', async () => {
+    const candidates = { ...ports(), mangaupdates: provider('mangaupdates', [candidate('mangaupdates')]), mangadex: provider('mangadex', [candidate('mangadex')]) };
+    expect(await resolveFavoriteProviderLanes(candidates, query, 'MANGA')).toMatchObject({ kind: 'COMPLETE', decision: { matchedReference: { provider: 'mangaupdates' } } });
+    expect(candidates.mangadex.search).not.toHaveBeenCalled();
+    expect(candidates['kitsu-manga'].search).not.toHaveBeenCalled();
   });
 
   it('stops on a primary ambiguity', async () => {

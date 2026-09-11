@@ -11,7 +11,7 @@ const seriesEndpoint = `${mangaUpdatesApiOrigin}/v1/series`;
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
 const mangaUpdatesImageSchema = z.object({
-  url: z.object({ original: z.url().optional(), thumb: z.url().optional() }).passthrough(),
+  url: z.object({ original: z.url().nullish(), thumb: z.url().nullish() }).passthrough(),
 }).passthrough();
 const mangaUpdatesSeriesSchema = z.object({
   associated: z.array(z.object({ title: nonEmptyString }).strict()).max(16).optional().default([]),
@@ -49,7 +49,7 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
     titleVariants: [{ title: series.title }, ...series.associated.map((item) => ({ title: item.title }))].slice(0, 16),
   };
   const coverUrl = series.image?.url.original ?? series.image?.url.thumb;
-  if (coverUrl !== undefined) result.cover = { attribution: 'MangaUpdates', url: coverUrl };
+  if (coverUrl != null) result.cover = { attribution: 'MangaUpdates', url: coverUrl };
   if (series.url !== undefined) result.canonicalUrl = series.url;
   if (series.genres.length > 0) result.genres = series.genres.map((item) => item.genre);
   if (series.categories.length > 0) result.categories = series.categories.map((item) => item.category);

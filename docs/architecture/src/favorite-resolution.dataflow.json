@@ -407,7 +407,7 @@
         "Source et artefact atomiques; lien ordinaire terminal sans réseau",
         "Curseurs, reçus et cadences survivent à MV3",
         "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
-        "Panne ou réponse incomplète reste RETRYABLE",
+        "API MU sans Origin; panne, 403 ou page incomplète : RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"
       ]
     },

@@ -76,7 +76,7 @@ describe('extension performance budgets', () => {
     const packages = [packageMetrics('chrome-mv3'), packageMetrics('firefox-mv3')];
 
     for (const bundle of packages) {
-      expect(bundle.files).toBe(20);
+      expect(bundle.files).toBe(21);
       expect(bundle.compressedBytes).toBeLessThan(bundleBudgetBytes);
     }
 
