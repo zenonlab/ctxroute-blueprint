@@ -85,6 +85,9 @@ import AppKit
     private let sessionStatus = NSTextField(wrappingLabelWithString: "")
     private let focusSession = NSButton(title: "Focaliser", target: nil, action: nil)
     private let openSession = NSButton(title: "Ouvrir", target: nil, action: nil)
+    private let cancel = NSButton(title: "Annuler", target: nil, action: nil)
+    private let resetButton = NSButton(title: "Réinitialiser", target: nil, action: nil)
+    private let save = NSButton(title: "Enregistrer", target: nil, action: nil)
     private let preview = NSImageView()
     private let error = NSTextField(wrappingLabelWithString: "")
     var onSave: ((ThemeInterfaceOverrides) -> Void)?
@@ -105,11 +108,13 @@ import AppKit
         self.interface = interface
         self.overrides = overrides
         self.sessions = sessions
-        fill(target, entries: interface.manifest.targets.map { ($0.id, $0.label, nil) })
+        let targetIcon = icon(for: "customizer.target", in: interface, size: 22)
+        fill(target, entries: interface.manifest.targets.map { ($0.id, $0.label, targetIcon) })
         let fallback = interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
         character.configure(entries: choices(.character, in: interface, fallback: fallback), selected: nil)
         vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback), selected: nil)
-        fill(session, entries: [("", "Aucune session", nil)] + sessions.map {
+        fill(session, entries: [("", "Aucune session",
+                                 icon(for: "session.state.none", in: interface, size: 18))] + sessions.map {
             ($0.id, "\($0.display_name) — \($0.state.rawValue)",
              icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 18))
         })
@@ -126,6 +131,9 @@ import AppKit
         openSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.open.rawValue)
         skin(focusSession, slot: "session.action.focus", interface: interface)
         skin(openSession, slot: "session.action.open", interface: interface)
+        skin(cancel, slot: "customizer.action.cancel", interface: interface)
+        skin(resetButton, slot: "customizer.action.reset", interface: interface)
+        skin(save, slot: "customizer.action.save", interface: interface)
         character.onChange = { [weak self] in self?.choiceChanged() }
         vehicle.onChange = { [weak self] in self?.choiceChanged() }
         preview.imageScaling = .scaleProportionallyUpOrDown
@@ -154,11 +162,14 @@ import AppKit
         stack.addArrangedSubview(NSStackView(views: [focusSession, openSession]))
         error.textColor = .systemRed
         stack.addArrangedSubview(error)
-        let cancel = NSButton(title: "Annuler", target: self, action: #selector(close))
-        let reset = NSButton(title: "Réinitialiser", target: self, action: #selector(reset))
-        let save = NSButton(title: "Enregistrer", target: self, action: #selector(submit))
+        cancel.target = self
+        cancel.action = #selector(close)
+        resetButton.target = self
+        resetButton.action = #selector(reset)
+        save.target = self
+        save.action = #selector(submit)
         save.keyEquivalent = "\r"
-        stack.addArrangedSubview(NSStackView(views: [cancel, reset, save]))
+        stack.addArrangedSubview(NSStackView(views: [cancel, resetButton, save]))
         let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 720),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Personnaliser le véhicule"
@@ -194,6 +205,7 @@ import AppKit
         button.image = icon(for: slot, in: interface, size: 22)
         button.imagePosition = button.image == nil ? .noImage : .imageLeading
         button.imageScaling = .scaleProportionallyDown
+        button.bezelStyle = .regularSquare
     }
 
     private func icon(for slot: String, in interface: ResolvedThemeInterface,
