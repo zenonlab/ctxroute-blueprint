@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Pause et reprise du wallpaper macOS",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1060, 600]
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "Utilisateur", "sublabel": "clic bureau" },
+    { "id": "tap", "type": "security", "label": "Tap macOS", "sublabel": "priorité Finder" },
+    { "id": "connector", "type": "frontend", "label": "Connecteur Swift", "sublabel": "état visuel" },
+    { "id": "renderhost", "type": "backend", "label": "RenderHost Bevy", "sublabel": "boucle réactive" }
+  ],
+  "segments": [
+    { "from": 150, "to": 335, "label": "Pause confirmée" },
+    { "from": 355, "to": 525, "label": "Reprise sans rattrapage" }
+  ],
+  "messages": [
+    { "from": "renderhost", "to": "connector", "y": 180, "label": "instantané de cibles frais", "variant": "return" },
+    { "from": "user", "to": "tap", "y": 225, "label": "clic pause", "variant": "emphasis" },
+    { "from": "tap", "to": "connector", "y": 270, "label": "visual.motion", "variant": "security" },
+    { "from": "connector", "to": "renderhost", "y": 315, "label": "paused=true + réveil unique", "variant": "emphasis" },
+    { "from": "user", "to": "tap", "y": 380, "label": "clic lecture sur cible conservée", "variant": "emphasis" },
+    { "from": "tap", "to": "connector", "y": 425, "label": "visual.motion", "variant": "security" },
+    { "from": "connector", "to": "renderhost", "y": 470, "label": "paused=false + réveil unique", "variant": "emphasis" },
+    { "from": "renderhost", "to": "connector", "y": 510, "label": "nouvel instantané sans saut temporel", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "tap", "from": 218, "to": 432, "type": "security" },
+    { "participant": "connector", "from": 174, "to": 520, "type": "frontend" },
+    { "participant": "renderhost", "from": 174, "to": 520, "type": "backend" }
+  ]
+}

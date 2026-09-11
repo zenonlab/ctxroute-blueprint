@@ -20,6 +20,7 @@ private final class RenderHostGestureState: @unchecked Sendable {
     private let lock = NSLock()
     private var snapshot: RenderHostHitSnapshot?
     private var receivedAt = 0.0
+    private var visualPaused = false
     private var desktopItemsVisible: Bool?
     private var finderPID: pid_t?
     private var capture: Capture?
@@ -38,6 +39,8 @@ private final class RenderHostGestureState: @unchecked Sendable {
     }
 
     func resetGesture() { lock.withLock { capture = nil } }
+
+    func setVisualPaused(_ paused: Bool) { lock.withLock { visualPaused = paused } }
 
     func consume(_ type: CGEventType, event: CGEvent) -> Bool {
         lock.withLock {
@@ -80,12 +83,15 @@ private final class RenderHostGestureState: @unchecked Sendable {
     }
 
     private func hit(_ point: CGPoint) -> RenderHostHitSnapshot.Target? {
-        guard let snapshot, CACurrentMediaTime() - receivedAt <= 0.5 else { return nil }
+        guard let snapshot else { return nil }
         let bounds = CGDisplayBounds(CGMainDisplayID())
         guard bounds.width > 0, bounds.height > 0, bounds.contains(point) else { return nil }
         let x = (point.x - bounds.minX) * snapshot.width / bounds.width
         let y = (point.y - bounds.minY) * snapshot.height / bounds.height
-        return snapshot.hit(x: x, y: y)
+        guard let target = snapshot.hit(x: x, y: y) else { return nil }
+        let fresh = CACurrentMediaTime() - receivedAt <= 0.5
+        let pausedResume = visualPaused && target.kind == .control && target.id == "visual.motion"
+        return fresh || pausedResume ? target : nil
     }
 
     private func sliderValue(_ point: CGPoint, target: RenderHostHitSnapshot.Target) -> Double {
@@ -167,6 +173,8 @@ private final class RenderHostGestureState: @unchecked Sendable {
             .first { $0.bundleIdentifier == "com.apple.finder" }?.processIdentifier
         state.update(snapshot: snapshot, desktopItemsVisible: desktopItemsVisible, finderPID: finder)
     }
+
+    func setVisualPaused(_ paused: Bool) { state.setVisualPaused(paused) }
 
     func requestPermissionAndStart() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String

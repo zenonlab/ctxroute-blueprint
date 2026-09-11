@@ -464,6 +464,7 @@ import os
         }
         try renderHost.update(audioVolume: audioVolume, desktopItemsVisible: try? desktopItems.isVisible(),
                               brightness: brightness, visualPaused: visualPaused, overrides: overrides)
+        desktopInput.setVisualPaused(visualPaused)
     }
     @objc private func openWallpaperSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") else { return }

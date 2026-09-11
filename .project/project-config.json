@@ -90,6 +90,7 @@
       "docs/architecture/src/macos-native-wallpaper.architecture.json",
       "docs/architecture/src/macos-theme-discovery.dataflow.json",
       "docs/architecture/src/macos-renderhost.sequence.json",
+      "docs/architecture/src/macos-pause-resume.sequence.json",
       "docs/architecture/src/macos-external-theme-runtime.dataflow.json",
       "docs/architecture/src/macos-surface-poc.architecture.json",
       "docs/architecture/src/product-roadmap.workflow.json",
