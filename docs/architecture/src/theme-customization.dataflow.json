@@ -23,7 +23,7 @@
     { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "apparence · slot UI · session stable", "stage": 3, "row": 0, "width": 170 },
     { "id": "capabilities", "type": "security", "label": "Courtiers typés", "sublabel": "OS · sessions · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "instances · matériaux · cibles", "stage": 4, "row": 0, "width": 160 },
-    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "contrôles · galerie privée · aperçu", "stage": 4, "row": 1, "width": 160 },
+    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "galerie · session · état", "stage": 4, "row": 1, "width": 160 },
     { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
   ],
   "flows": [
@@ -34,9 +34,9 @@
     { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
     { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },
     { "from": "runtime", "to": "renderer", "label": "apparence → · cibles ←", "variant": "emphasis", "labelAt": [855, 108] },
-    { "from": "runtime", "to": "ui", "label": "modale et états", "labelAt": [925, 220] },
-    { "from": "runtime", "to": "capabilities", "label": "intentions OS / session", "variant": "security", "labelAt": [680, 270] },
+    { "from": "runtime", "to": "ui", "label": "modale et sélection", "labelAt": [925, 220] },
+    { "from": "runtime", "to": "capabilities", "label": "focus/open corrélés", "variant": "security", "labelAt": [680, 270] },
     { "from": "capabilities", "to": "connector", "label": "actions autorisées", "variant": "security", "route": "straight", "labelAt": [855, 428] },
-    { "from": "capabilities", "to": "ui", "label": "état confirmé", "variant": "dashed" }
+    { "from": "capabilities", "to": "ui", "label": "snapshot monotone confirmé", "variant": "dashed" }
   ]
 }

@@ -191,6 +191,9 @@ import os
         seedSessionSimulator()
         customization.onSave = { [weak self] overrides in self?.saveInterfaceOverrides(overrides) }
         customization.onReset = { [weak self] in self?.resetInterfaceOverrides() }
+        customization.onSessionIntent = { [weak self] intent in
+            self?.performSessionIntent(intent) ?? "Simulateur de sessions indisponible."
+        }
         renderHost.onHitSnapshot = { [weak self] snapshot in
             guard let self else { return }
             self.desktopInput.update(snapshot: snapshot, desktopItemsVisible: try? self.desktopItems.isVisible())
@@ -324,10 +327,18 @@ import os
             statusLabel.stringValue = "Aucune session liée à \(target.label)."
             return
         }
-        let intent = TerminalSessionIntent(sessionID: sessionID, kind: .focus)
-        statusLabel.stringValue = terminalSessions.accept(intent)
-            ? "Session \(sessionID) focalisée par intention simulée."
-            : "Session \(sessionID) indisponible ou intention déjà traitée."
+        statusLabel.stringValue = performSessionIntent(
+            TerminalSessionIntent(sessionID: sessionID, kind: .focus))
+    }
+
+    private func performSessionIntent(_ intent: TerminalSessionIntent) -> String {
+        let accepted = terminalSessions.accept(intent)
+        let action = intent.kind == .focus ? "Focalisation" : "Ouverture"
+        let message = accepted
+            ? "\(action) de \(intent.session_id) transmise au simulateur."
+            : "\(action) refusée : session indisponible ou intention déjà traitée."
+        statusLabel.stringValue = message
+        return message
     }
 
     private func saveInterfaceOverrides(_ overrides: ThemeInterfaceOverrides) {

@@ -67,6 +67,8 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
   avec une image de menu source distincte du matériau appliqué dans la scène.
 - Un clic droit qualifié sur un kart ouvre le customiseur prérempli ; gauche focalise
   sa session simulée sans double action.
+- Le customiseur affiche l'état et la séquence de la session choisie ; `Focaliser` et
+  `Ouvrir` émettent des intentions typées vers le simulateur, sans PTY ni texte terminal.
 - Sauvegarde, annulation et reset ne changent ni l'identité, ni le trajet, ni la
   session hors du champ explicitement sélectionné.
 - SwiftPM, compilation Swift stricte, signature, invariant de paquet et `npm run verify` passent.

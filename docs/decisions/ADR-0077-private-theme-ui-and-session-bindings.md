@@ -37,7 +37,10 @@ session d'un véhicule.
 Une instance peut porter `session_id`. Les changements d'apparence conservent cette
 identité. Le protocole de session accepte uniquement des instantanés monotones et
 les intentions corrélées `focus` et `open`; il ne transporte ni PTY, ni texte, ni
-commande shell. Les doublons et événements périmés sont refusés.
+commande shell. Le customiseur expose l'état et la séquence du dernier instantané,
+puis permet d'émettre explicitement ces deux intentions. Les doublons et événements
+périmés sont refusés et le simulateur conserve la dernière intention acceptée comme
+preuve bornée, sans contenu de session.
 
 La luminosité est une valeur absolue bornée de 0 à 1 et non un toggle. Le contrôle
 de thème émet `setBrightness`; son adaptateur ne doit jamais prétendre modifier un

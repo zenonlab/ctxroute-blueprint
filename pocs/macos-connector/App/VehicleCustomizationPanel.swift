@@ -82,10 +82,14 @@ import AppKit
     private let character = GameChoiceStrip()
     private let vehicle = GameChoiceStrip()
     private let session = NSPopUpButton()
+    private let sessionStatus = NSTextField(wrappingLabelWithString: "")
+    private let focusSession = NSButton(title: "Focaliser", target: nil, action: nil)
+    private let openSession = NSButton(title: "Ouvrir", target: nil, action: nil)
     private let preview = NSImageView()
     private let error = NSTextField(wrappingLabelWithString: "")
     var onSave: ((ThemeInterfaceOverrides) -> Void)?
     var onReset: (() -> Void)?
+    var onSessionIntent: ((TerminalSessionIntent) -> String)?
 
     func present(themeID: String, interface: ResolvedThemeInterface,
                  overrides: ThemeInterfaceOverrides, sessions: [TerminalSessionSnapshot],
@@ -111,6 +115,14 @@ import AppKit
         if let targetID { select(target, id: targetID) }
         target.target = self
         target.action = #selector(targetChanged)
+        session.target = self
+        session.action = #selector(sessionChanged)
+        focusSession.target = self
+        focusSession.action = #selector(sendSessionIntent(_:))
+        focusSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.focus.rawValue)
+        openSession.target = self
+        openSession.action = #selector(sendSessionIntent(_:))
+        openSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.open.rawValue)
         character.onChange = { [weak self] in self?.choiceChanged() }
         vehicle.onChange = { [weak self] in self?.choiceChanged() }
         preview.imageScaling = .scaleProportionallyUpOrDown
@@ -134,6 +146,9 @@ import AppKit
             stack.addArrangedSubview(NSTextField(labelWithString: title))
             stack.addArrangedSubview(control)
         }
+        sessionStatus.textColor = .secondaryLabelColor
+        stack.addArrangedSubview(sessionStatus)
+        stack.addArrangedSubview(NSStackView(views: [focusSession, openSession]))
         error.textColor = .systemRed
         stack.addArrangedSubview(error)
         let cancel = NSButton(title: "Annuler", target: self, action: #selector(close))
@@ -188,9 +203,44 @@ import AppKit
         vehicle.select(id: value?.vehicle)
         select(session, id: value?.session_id ?? embedded?.session_id)
         updatePreview()
+        sessionChanged()
     }
 
     @objc private func choiceChanged() { updatePreview() }
+
+    @objc private func sessionChanged() {
+        guard let id = selectedID(session), let snapshot = sessions.first(where: { $0.id == id }) else {
+            sessionStatus.stringValue = "Aucune session liée."
+            focusSession.isEnabled = false
+            openSession.isEnabled = false
+            return
+        }
+        sessionStatus.stringValue = "\(snapshot.display_name) · \(stateLabel(snapshot.state)) · événement \(snapshot.sequence)"
+        focusSession.isEnabled = snapshot.state != .disconnected
+        openSession.isEnabled = true
+    }
+
+    @objc private func sendSessionIntent(_ sender: NSButton) {
+        guard let id = selectedID(session),
+              let rawKind = sender.identifier?.rawValue,
+              let kind = TerminalSessionIntentKind(rawValue: rawKind) else { return }
+        let message = onSessionIntent?(TerminalSessionIntent(sessionID: id, kind: kind))
+            ?? "Provider de sessions indisponible."
+        sessionStatus.stringValue = message
+    }
+
+    private func stateLabel(_ state: TerminalSessionState) -> String {
+        switch state {
+        case .idle: "en attente"
+        case .active: "active"
+        case .busy: "occupée"
+        case .success: "terminée"
+        case .error: "en erreur"
+        case .recovering: "récupération"
+        case .disconnected: "déconnectée"
+        }
+    }
+
     private func updatePreview() {
         guard let interface else { return }
         let selected = vehicle.selectedID ?? character.selectedID

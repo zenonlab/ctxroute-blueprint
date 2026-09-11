@@ -32,12 +32,16 @@ final class TerminalSessionsTests: XCTestCase {
                                                     state: .active, sequence: 1)))
         let focus = TerminalSessionIntent(sessionID: "session.alpha", kind: .focus)
         XCTAssertTrue(simulator.accept(focus))
+        XCTAssertEqual(simulator.lastAcceptedIntent, focus)
         XCTAssertFalse(simulator.accept(focus))
-        XCTAssertTrue(simulator.accept(.init(sessionID: "session.new", kind: .open)))
+        let open = TerminalSessionIntent(sessionID: "session.new", kind: .open)
+        XCTAssertTrue(simulator.accept(open))
+        XCTAssertEqual(simulator.lastAcceptedIntent, open)
 
         _ = simulator.receive(.init(snapshot: .init(id: "session.alpha", displayName: "Alpha",
                                                     state: .disconnected, sequence: 2)))
         XCTAssertFalse(simulator.accept(.init(sessionID: "session.alpha", kind: .focus)))
+        XCTAssertEqual(simulator.lastAcceptedIntent, open)
     }
 
     func testAppearanceChangePreservesSessionIdentity() throws {

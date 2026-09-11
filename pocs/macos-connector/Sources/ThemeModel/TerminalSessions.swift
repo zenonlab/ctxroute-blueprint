@@ -53,6 +53,7 @@ public struct TerminalSessionIntent: Codable, Equatable, Sendable {
 /// Deterministic protocol model for M5. It owns no PTY and stores no terminal text.
 public struct TerminalSessionSimulator: Sendable {
     public private(set) var sessions: [String: TerminalSessionSnapshot] = [:]
+    public private(set) var lastAcceptedIntent: TerminalSessionIntent?
     private var eventIDs: Set<UUID> = []
     private var intentIDs: Set<UUID> = []
 
@@ -81,6 +82,7 @@ public struct TerminalSessionSimulator: Sendable {
             break
         }
         intentIDs.insert(intent.intent_id)
+        lastAcceptedIntent = intent
         return true
     }
 
