@@ -70,7 +70,8 @@ public struct ResolvedThemeInterface: Codable, Equatable, Sendable {
 public enum ThemeInterfaceLoader {
     public static let requiredSlots = Set([
         "theme.audio", "display.brightness", "slider.track", "slider.thumb",
-        "customizer.panel"
+        "desktop.files.visible", "desktop.files.hidden",
+        "visual.motion.pause", "visual.motion.resume", "customizer.panel"
     ])
 
     public static func load(_ manifestURL: URL) throws -> ResolvedThemeInterface {
