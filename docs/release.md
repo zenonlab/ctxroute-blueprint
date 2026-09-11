@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.0`. `apps/extension/package.json` is the only
+The current candidate is `1.0.1`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +35,14 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Favorites queue correction — 2026-09-11
+
+Release `1.0.1` contains the deterministic favorite-resolution correction:
+generic media slugs are retained as `UNKNOWN` for independent provider lanes,
+and the local queue drains up to 100 claims per wake while remaining bounded by
+the 20-second MV3 wake budget. The package is versioned separately so browsers
+cannot serve the immutable `1.0.0` archive after an update.
 
 ### FavLib correction deployment — 2026-09-08
 

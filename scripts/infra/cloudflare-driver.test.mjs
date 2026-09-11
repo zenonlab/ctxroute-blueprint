@@ -9,6 +9,7 @@ const config = {
   d1: [{ binding: 'CATALOGUE_DB', name: 'public-catalogue' }],
   r2: [{ binding: 'COVERS', name: 'public-covers' }],
 };
+const releaseVersion = '1.0.1';
 
 function test_derive_operation_targets() {
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async () => '' });
@@ -23,8 +24,8 @@ function test_derive_operation_targets() {
     run: async () => '',
   });
   assert.deepEqual(releaseDriver.listOperations().filter(operation => operation.kind === 'r2-publish').map(operation => operation.target), [
-    'r2:public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
-    'r2:public-releases/downloads/tobirink-firefox-mv3-1.0.0.zip',
+    `r2:public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`,
+    `r2:public-releases/downloads/tobirink-firefox-mv3-${releaseVersion}.zip`,
   ]);
 }
 
@@ -76,19 +77,19 @@ async function test_release_publish_is_hashed_and_translated() {
   const calls = [];
   const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
   const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return 'uploaded'; } });
-  const actions = driver.resolveOperations(['r2-publish:tobirink-chrome-mv3-1.0.0.zip']);
+  const actions = driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`]);
   const preview = await driver.preview(actions);
   assert.deepEqual(preview.artifacts, [{
-    target: 'r2:public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
+    target: `r2:public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`,
     sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2',
     size: 3,
   }]);
   await driver.apply(actions);
   assert.deepEqual(calls, [[
-    'r2', 'object', 'put', 'public-releases/downloads/tobirink-chrome-mv3-1.0.0.zip',
-    '--file', fileURLToPath(new URL('../../apps/extension/.output/packages/tobirink-chrome-mv3-1.0.0.zip', import.meta.url)),
+    'r2', 'object', 'put', `public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`,
+    '--file', fileURLToPath(new URL(`../../apps/extension/.output/packages/tobirink-chrome-mv3-${releaseVersion}.zip`, import.meta.url)),
     '--content-type', 'application/zip',
-    '--content-disposition', 'attachment; filename="tobirink-chrome-mv3-1.0.0.zip"',
+    '--content-disposition', `attachment; filename="tobirink-chrome-mv3-${releaseVersion}.zip"`,
     '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force',
   ]]);
 }
