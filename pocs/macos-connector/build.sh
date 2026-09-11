@@ -69,7 +69,7 @@ env -u SDKROOT xcrun swiftc "${connector_flags[@]}" "${connector_sources[@]}" \
 
 cp "$connector_app/Contents/MacOS/WallpaperConnector" "$connector_agent/Contents/MacOS/WallpaperConnector"
 cp "$connector_app/Contents/Info.plist" "$connector_agent/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier org.orbite.wallpaper.agent' "$connector_agent/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier org.wallpaperthemes.connectorpoc2.agent' "$connector_agent/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleName Orbite Wallpaper Agent' "$connector_agent/Contents/Info.plist"
 codesign --sign "$connector_identity" --entitlements "$connector_stage/App.entitlements" "$connector_agent"
 codesign -dr - "$connector_agent" 2>&1 |

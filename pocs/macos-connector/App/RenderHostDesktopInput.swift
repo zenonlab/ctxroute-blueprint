@@ -37,6 +37,8 @@ private final class RenderHostGestureState: @unchecked Sendable {
         }
     }
 
+    func resetGesture() { lock.withLock { capture = nil } }
+
     func consume(_ type: CGEventType, event: CGEvent) -> Bool {
         lock.withLock {
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -126,15 +128,38 @@ private final class RenderHostGestureState: @unchecked Sendable {
 
 @MainActor final class RenderHostDesktopInput {
     private let state: RenderHostGestureState
+    private var screensAwake = true
+    private var sessionActive = true
+    private var lifecycleObservers: [NSObjectProtocol] = []
     private lazy var tap = DesktopEventTap(handler: { [state] type, event in
         state.consume(type, event: event)
-    }, stateHandler: { _ in })
+    }, stateHandler: { [weak self] value in
+        Task { @MainActor [weak self] in self?.record(value) }
+    })
+    private(set) var tapState = DesktopTapState.stopped
     var onAction: ((RenderHostDesktopAction) -> Void)?
+    var onStatus: ((DesktopTapState, Bool) -> Void)?
+    var installed: Bool { tap.isActive }
 
     init() {
         let delivery = MainActorDelivery()
         state = RenderHostGestureState { action in delivery.send(action) }
         delivery.owner = self
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didActivateApplicationNotification,
+                     NSWorkspace.activeSpaceDidChangeNotification,
+                     NSWorkspace.didLaunchApplicationNotification,
+                     NSWorkspace.didTerminateApplicationNotification,
+                     NSWorkspace.screensDidSleepNotification,
+                     NSWorkspace.screensDidWakeNotification,
+                     NSWorkspace.sessionDidResignActiveNotification,
+                     NSWorkspace.sessionDidBecomeActiveNotification] {
+            lifecycleObservers.append(center.addObserver(forName: name, object: nil, queue: .main) {
+                [weak self] notification in
+                let notificationName = notification.name
+                Task { @MainActor in self?.handleLifecycle(notificationName) }
+            })
+        }
     }
 
     func update(snapshot: RenderHostHitSnapshot?, desktopItemsVisible: Bool?) {
@@ -145,14 +170,45 @@ private final class RenderHostGestureState: @unchecked Sendable {
 
     func requestPermissionAndStart() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        guard AXIsProcessTrustedWithOptions([key: true] as CFDictionary) else { return }
-        _ = tap.start()
+        guard AXIsProcessTrustedWithOptions([key: true] as CFDictionary) else {
+            record(.permissionMissing)
+            return
+        }
+        tap.stop()
+        install()
     }
-    func startIfAuthorized() {
-        guard AXIsProcessTrusted() else { return }
-        _ = tap.start()
-    }
+    func startIfAuthorized() { install() }
     func stop() { state.update(snapshot: nil, desktopItemsVisible: nil, finderPID: nil); tap.stop() }
+
+    private func install() {
+        guard AXIsProcessTrusted() else { record(.permissionMissing); return }
+        guard screensAwake, sessionActive else { record(.stopped); return }
+        if !tap.start() { record(.creationFailed) }
+    }
+
+    private func handleLifecycle(_ name: NSNotification.Name) {
+        state.resetGesture()
+        switch name {
+        case NSWorkspace.screensDidSleepNotification:
+            screensAwake = false
+            tap.stop()
+        case NSWorkspace.screensDidWakeNotification:
+            screensAwake = true
+        case NSWorkspace.sessionDidResignActiveNotification:
+            sessionActive = false
+            tap.stop()
+        case NSWorkspace.sessionDidBecomeActiveNotification:
+            sessionActive = true
+        default:
+            break
+        }
+        if screensAwake && sessionActive { install() }
+    }
+
+    private func record(_ value: DesktopTapState) {
+        tapState = value
+        onStatus?(value, AXIsProcessTrusted())
+    }
 
     private final class MainActorDelivery: @unchecked Sendable {
         weak var owner: RenderHostDesktopInput?

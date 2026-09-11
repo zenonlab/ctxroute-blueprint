@@ -199,8 +199,17 @@ import os
             self.desktopInput.update(snapshot: snapshot, desktopItemsVisible: try? self.desktopItems.isVisible())
         }
         desktopInput.onAction = { [weak self] action in self?.handleDesktopAction(action) }
+        desktopInput.onStatus = { [weak self] state, trusted in
+            guard let self, state == .permissionMissing || state == .creationFailed || state == .disabled else { return }
+            self.statusLabel.stringValue = trusted
+                ? "Entrée wallpaper indisponible (\(state.rawValue))."
+                : "Autorisez Orbite Wallpaper Agent dans Accessibilité."
+        }
         desktopInput.startIfAuthorized()
         refresh()
+        if !desktopInput.installed {
+            statusLabel.stringValue = "Autorisez Orbite Wallpaper Agent dans Accessibilité."
+        }
         if CommandLine.arguments.contains("--diagnostics") || CommandLine.arguments.contains("--smoke") { showWindow() }
         if let index = CommandLine.arguments.firstIndex(of: "--smoke"),
            CommandLine.arguments.indices.contains(index + 1) {

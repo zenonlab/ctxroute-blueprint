@@ -4,6 +4,12 @@ import ConnectorTransport
 import SceneRenderer
 
 final class ModelTests: XCTestCase {
+    func testQualifiedAgentIdentityRemainsStableAcrossProductRebrand() {
+        XCTAssertEqual(ProductIdentity.appBundleID, "org.orbite.wallpaper")
+        XCTAssertEqual(ProductIdentity.agentBundleID, "org.wallpaperthemes.connectorpoc2.agent")
+        XCTAssertEqual(ProductIdentity.service, ProductIdentity.agentBundleID)
+    }
+
     func testWallpaperProviderWireIsTypedBoundedAndThemeAgnostic() throws {
         XCTAssertTrue(ProviderRequest(action: .catalog).isValid)
         XCTAssertTrue(ProviderRequest(action: .show).isValid)

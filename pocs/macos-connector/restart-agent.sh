@@ -8,7 +8,8 @@ fi
 connector_app="$(cd "$1" && pwd -P)"
 connector_root="$(cd "$(dirname "$0")/../.." && pwd)"
 source "$connector_root/pocs/macos-connector/process-ownership.sh"
-connector_job="gui/$(id -u)/org.orbite.wallpaper.agent"
+connector_service=org.wallpaperthemes.connectorpoc2.agent
+connector_job="gui/$(id -u)/$connector_service"
 test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_app/Contents/Info.plist")" = org.orbite.wallpaper
 codesign --verify --deep --strict "$connector_app"
 connector_expected="$connector_app/Contents/Library/LoginItems/Orbite Wallpaper Agent.app/Contents/MacOS/WallpaperConnector"
@@ -21,7 +22,7 @@ if connector_state="$(launchctl print "$connector_job" 2>/dev/null)"; then
   orbite_stop_agent_children "$connector_state"
   launchctl bootout "$connector_job"
 fi
-if [[ -f "$HOME/Library/LaunchAgents/org.orbite.wallpaper.agent.plist" ]]; then
+if [[ -f "$HOME/Library/LaunchAgents/$connector_service.plist" ]]; then
   bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app" --persistent
 else
   bash "$connector_root/pocs/macos-connector/start-agent.sh" "$connector_app"

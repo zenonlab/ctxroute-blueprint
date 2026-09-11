@@ -17,7 +17,7 @@ for connector_option in "$@"; do
   esac
 done
 connector_app="$(cd "$connector_app" && pwd -P)"
-connector_service=org.orbite.wallpaper.agent
+connector_service=org.wallpaperthemes.connectorpoc2.agent
 connector_domain="gui/$(id -u)"
 test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$connector_app/Contents/Info.plist")" = org.orbite.wallpaper
 codesign --verify --deep --strict "$connector_app"
