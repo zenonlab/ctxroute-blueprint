@@ -5,8 +5,8 @@ import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from 
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
-const unavailableCandidates = { anilist: unavailable, 'kitsu-anime': unavailable, 'kitsu-manga': unavailable, mangaupdates: unavailable } as const;
-const emptyHydration = { anilist: noHydration, 'kitsu-anime': noHydration, 'kitsu-manga': noHydration, mangaupdates: noHydration } as const;
+const unavailableCandidates = { anilist: unavailable, 'kitsu-anime': unavailable, 'kitsu-manga': unavailable, mangadex: unavailable, mangaupdates: unavailable } as const;
+const emptyHydration = { anilist: noHydration, 'kitsu-anime': noHydration, 'kitsu-manga': noHydration, mangadex: noHydration, mangaupdates: noHydration } as const;
 
 function resolutionTaskId(bookmarkId: string): string {
   const hexadecimal = [...new TextEncoder().encode(bookmarkId)].map((byte) => byte.toString(16).padStart(2, '0')).join('');

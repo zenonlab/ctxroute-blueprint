@@ -15,7 +15,7 @@ describe('provider identity recovery orchestration', () => {
     const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
     const runtime = createProviderIdentityRecoveryRuntime({
       checkpoints: { read: async () => state, save: async (value) => { state = value; } },
-      hydration: { anilist: { hydrate }, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused },
+      hydration: { anilist: { hydrate }, mangadex: unused, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused },
       now: () => '2026-09-08T00:00:00.000Z', publisher: { publish }, storage: new MemoryStoragePort(),
       sync: { readAll: async () => values, write: vi.fn() },
     });
@@ -30,7 +30,7 @@ describe('provider identity recovery orchestration', () => {
   it('does not treat a rejected storage access restriction as an empty snapshot', async () => {
     const unused = { hydrate: vi.fn() };
     const runtime = createProviderIdentityRecoveryRuntime({
-      checkpoints: { read: async () => undefined, save: vi.fn() }, hydration: { anilist: unused, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused },
+      checkpoints: { read: async () => undefined, save: vi.fn() }, hydration: { anilist: unused, mangadex: unused, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused },
       now: () => '2026-09-08T00:00:00.000Z', publisher: { publish: vi.fn() }, storage: new MemoryStoragePort(),
       sync: { readAll: async () => { throw new Error('Access level rejected'); }, write: vi.fn() },
     });

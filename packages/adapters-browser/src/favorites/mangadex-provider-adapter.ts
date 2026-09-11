@@ -1,9 +1,9 @@
 import { favoriteProviderPolicy } from '@tobirink/application';
-import type { FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteSourceAdapter } from '@tobirink/application';
+import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, FavoriteSourceAdapter } from '@tobirink/application';
 import { createProviderCandidate, createSourceEvidence } from '@tobirink/domain';
 import type { ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson } from './provider-http';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from './provider-http';
 import type { FavoriteProviderFetch } from './provider-http';
 
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
@@ -26,6 +26,8 @@ const hydrationSchema = z.object({
     }).passthrough()).max(64).optional().default([]),
   }),
 });
+type MangaDexData = z.infer<typeof hydrationSchema>['data'];
+const searchSchema = z.object({ result: z.literal('ok'), data: z.array(z.record(z.string(), z.json())).max(20) });
 
 export const mangaDexSourceAdapter: FavoriteSourceAdapter = {
   id: 'mangadex-url-v1', origins: ['https://mangadex.org', 'https://www.mangadex.org'],
@@ -43,8 +45,28 @@ export const mangaDexSourceAdapter: FavoriteSourceAdapter = {
   },
 };
 
-export class MangaDexFavoriteProviderAdapter implements FavoriteProviderHydrationPort {
+export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
   constructor(private readonly fetcher: FavoriteProviderFetch = fetch, private readonly gate = new FavoriteProviderRateGate('mangadex')) {}
+
+  async search(input: FavoriteProviderSearchQuery) {
+    if (input.provider !== 'mangadex') throw new TypeError('MangaDex adapter requires provider mangadex.');
+    const title = input.titles[0]?.trim();
+    if (!title) throw new TypeError('MangaDex search requires a title.');
+    const url = new URL('https://api.mangadex.org/manga'); url.searchParams.set('title', title.slice(0, 200)); url.searchParams.set('limit', '20'); url.searchParams.append('includes[]', 'cover_art');
+    const response = await this.gate.run(favoriteProviderPolicy.mangadex.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, url.toString(), { headers: { Accept: 'application/json' }, method: 'GET' }, searchSchema));
+    const candidates = response.value.data.map((data) => this.candidateFromData(hydrationSchema.parse({ result: 'ok', data }).data));
+    return { candidates: candidates.slice(0, input.limit), complete: true, digest: response.digest, provider: 'mangadex' as const, truncated: false };
+  }
+
+  private candidateFromData(data: MangaDexData): ProviderCandidate {
+    const id = data.id.toLowerCase(); const attributes = data.attributes;
+    const variants = [...Object.entries(attributes.title), ...attributes.altTitles.flatMap((value) => Object.entries(value))].map(([language, title]) => ({ language, title }));
+    const titles = [...new Set(variants.map((variant) => variant.title))];
+    const result: MutableCandidate = { canonicalUrl: `https://mangadex.org/title/${id}`, categories: attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic' ? ['Adult'] : [], externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA', preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2, displayTitle: attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'] ?? titles[0], titleVariants: variants.slice(0, 16) };
+    const fileName = data.relationships.find((relationship) => relationship.type === 'cover_art')?.attributes?.fileName;
+    if (fileName !== undefined) result.cover = { attribution: 'MangaDex', url: `https://uploads.mangadex.org/covers/${id}/${encodeURIComponent(fileName)}.512.jpg` };
+    return createProviderCandidate(result, 'mangadex');
+  }
 
   async hydrate(reference: FavoriteProviderReference): Promise<ProviderCandidate | undefined> {
     if (reference.provider !== 'mangadex') throw new TypeError('MangaDex hydration requires a MangaDex reference.');

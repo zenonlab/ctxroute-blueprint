@@ -51,7 +51,7 @@ export const providerCandidateSchema = z.strictObject({
 export const favoriteSearchCheckpointSchema = z.strictObject({
   candidates: z.array(providerCandidateSchema).max(20), complete: z.boolean(), cursor: z.string().min(1).max(20).optional(),
   digest: z.string().min(1).max(128), level: z.enum(levels), pages: z.number().int().min(0).max(1000),
-  provider: z.enum(['anilist', 'mangaupdates', 'kitsu-anime', 'kitsu-manga']),
+  provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']),
   startedAt: z.number().int().nonnegative(), titleIndex: z.number().int().min(0).max(15), version: z.literal(1),
 });
 export type FavoriteSearchCheckpoint = z.infer<typeof favoriteSearchCheckpointSchema>;

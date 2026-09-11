@@ -1,7 +1,7 @@
 import { favoriteAliasLimit, favoriteTitleByteLimit, providerCandidateLimit, utf8ByteLength } from '@tobirink/domain';
 import type { FavoriteMediaKind, FavoriteProvider, ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
 
-export type ResolutionProvider = Extract<FavoriteProvider, 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangaupdates'>;
+export type ResolutionProvider = Extract<FavoriteProvider, 'anilist' | 'kitsu-anime' | 'kitsu-manga' | 'mangadex' | 'mangaupdates'>;
 export type FavoriteProviderReference = Readonly<{ externalId: string; provider: FavoriteProvider }>;
 export type FavoriteProviderHydrationPorts = Readonly<Record<ResolutionProvider, FavoriteProviderHydrationPort> & Partial<Record<'mangadex', FavoriteProviderHydrationPort>>>;
 
@@ -49,11 +49,11 @@ export function routeFavoriteProviderTiers(mediaKind: FavoriteMediaKind): readon
     tier('anilist', 'mangaupdates'),
     tier('kitsu-anime', 'kitsu-manga'),
   ]);
-  return Object.freeze([tier('mangaupdates'), tier('kitsu-manga')]);
+  return Object.freeze([tier('mangaupdates'), tier('mangadex'), tier('kitsu-manga')]);
 }
 
 export function assertFavoriteProviderSearchQuery(query: FavoriteProviderSearchQuery): FavoriteProviderSearchQuery {
-  if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangaupdates'].includes(query.provider)) throw new TypeError('provider search accepts only a resolution provider.');
+  if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangadex', 'mangaupdates'].includes(query.provider)) throw new TypeError('provider search accepts only a resolution provider.');
   if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > providerCandidateLimit) throw new RangeError(`provider search limit must be between 1 and ${providerCandidateLimit}.`);
   if (query.titles.length < 1 || query.titles.length > favoriteAliasLimit) throw new RangeError(`provider search requires between 1 and ${favoriteAliasLimit} titles.`);
   if (query.titles.some((title) => title.trim().length === 0 || utf8ByteLength(title) > favoriteTitleByteLimit)) throw new TypeError('provider search titles must be non-empty and bounded.');

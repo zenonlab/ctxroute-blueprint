@@ -50,10 +50,10 @@ export async function resolveFavoriteProviderLanes(
   checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<ProviderLaneResult> {
   if (mediaKind === 'ANIME') return resolveLane(ports, query, ['anilist', 'kitsu-anime'], 20, checkpoints);
-  if (mediaKind !== 'UNKNOWN') return resolveLane(ports, query, ['mangaupdates', 'kitsu-manga'], 20, checkpoints);
+  if (mediaKind !== 'UNKNOWN') return resolveLane(ports, query, ['mangaupdates', 'mangadex', 'kitsu-manga'], 20, checkpoints);
   const lanes = await Promise.all([
     resolveLane(ports, { ...query, mediaKind: 'ANIME' }, ['anilist', 'kitsu-anime'], 10, checkpoints),
-    resolveLane(ports, { ...query, mediaKind: 'MANGA' }, ['mangaupdates', 'kitsu-manga'], 10, checkpoints),
+    resolveLane(ports, { ...query, mediaKind: 'MANGA' }, ['mangaupdates', 'mangadex', 'kitsu-manga'], 10, checkpoints),
   ]);
   const retry = lanes.find((lane) => lane.kind === 'RETRYABLE');
   if (retry?.kind === 'RETRYABLE') return retry;

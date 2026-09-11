@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "Kitsu suit NO_MATCH ou refus HTTP 403 terminal; pannes et 429 restent en retry. Hydratation et pagination reprenables."
+        "note": "MangaUpdates puis MangaDex puis Kitsu; refus HTTP 403 terminal autorise le repli, pannes et 429 restent en retry."
       },
       {
         "id": "bounded-convergence",

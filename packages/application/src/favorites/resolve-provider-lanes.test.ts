@@ -13,7 +13,7 @@ function provider(provider: ResolutionProvider, candidates: readonly ProviderCan
 }
 
 function ports() {
-  return { anilist: provider('anilist'), 'kitsu-anime': provider('kitsu-anime'), 'kitsu-manga': provider('kitsu-manga'), mangaupdates: provider('mangaupdates') };
+  return { anilist: provider('anilist'), 'kitsu-anime': provider('kitsu-anime'), 'kitsu-manga': provider('kitsu-manga'), mangadex: provider('mangadex'), mangaupdates: provider('mangaupdates') };
 }
 
 const query = { sourceTitles: ['Synthetic Journey'] };

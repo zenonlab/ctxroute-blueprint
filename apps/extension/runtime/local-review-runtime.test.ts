@@ -17,7 +17,7 @@ async function fixture() {
   await storage.putFavoriteSource(terminalSource);
   const snapshot = await readLocalReviewCandidates(storage, { libraryId: library, reviewId: review.id });
   const hydrate = vi.fn(async () => ({ canonicalUrl: 'https://anilist.co/anime/123', externalId: '123', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic different title'] }));
-  const ports: FavoriteProviderHydrationPorts = { anilist: { hydrate }, 'kitsu-anime': { hydrate }, 'kitsu-manga': { hydrate }, mangaupdates: { hydrate } };
+  const ports: FavoriteProviderHydrationPorts = { anilist: { hydrate }, 'kitsu-anime': { hydrate }, 'kitsu-manga': { hydrate }, mangadex: { hydrate }, mangaupdates: { hydrate } };
   return { hydrate, library, ports, review, snapshot, source: terminalSource, storage };
 }
 
