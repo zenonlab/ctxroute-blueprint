@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "MangaUpdates puis MangaDex puis Kitsu; chaque candidat retenu est hydraté avant commit."
+        "note": "MangaUpdates puis MangaDex puis Kitsu; une identité MangaDex tente une hydratation MangaUpdates exacte avant commit."
       },
       {
         "id": "bounded-convergence",

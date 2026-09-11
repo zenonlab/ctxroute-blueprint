@@ -111,6 +111,25 @@ async function retryClaim(
   return exhausted ? 'blocked' : 'retried';
 }
 
+async function preferMangaUpdatesHydration(
+  dependencies: FavoriteResolutionRunnerDependencies,
+  candidate: ProviderCandidate,
+): Promise<ProviderCandidate> {
+  if (candidate.provider !== 'mangadex') return candidate;
+  const mangaUpdates = dependencies.candidates.mangaupdates;
+  const hydration = dependencies.hydration.mangaupdates;
+  if (!mangaUpdates || !hydration) return candidate;
+  try {
+    const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
+    const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME');
+    if (exact.length !== 1) return candidate;
+    const hydrated = await hydration.hydrate({ provider: 'mangaupdates', externalId: exact[0]!.externalId });
+    return hydrated ?? candidate;
+  } catch {
+    return candidate;
+  }
+}
+
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
   const [source, record] = await Promise.all([
@@ -246,6 +265,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+  candidate = await preferMangaUpdatesHydration(dependencies, candidate);
   if (hasExactBlockedProviderTaxonomy(candidate)) {
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     return 'completed';
