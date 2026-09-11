@@ -59,6 +59,13 @@ public struct TerminalSessionSimulator: Sendable {
 
     public init() {}
 
+    /// Adds package-discovered bindings without replacing provider events already received.
+    public mutating func seed(_ snapshots: [TerminalSessionSnapshot]) {
+        for snapshot in snapshots where snapshot.isValid && sessions[snapshot.id] == nil {
+            sessions[snapshot.id] = snapshot
+        }
+    }
+
     @discardableResult
     public mutating func receive(_ event: TerminalSessionEvent) -> Bool {
         guard event.snapshot.isValid, !eventIDs.contains(event.event_id) else { return false }

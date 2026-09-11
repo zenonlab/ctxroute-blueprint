@@ -16,7 +16,7 @@
   "nodes": [
     { "id": "creator", "type": "frontend", "label": "Création ouverte", "sublabel": "code · studio · modèles", "stage": 0, "row": 0, "width": 150 },
     { "id": "game", "type": "external", "label": "Import local du jeu", "sublabel": "2D/3D · rigs · caméras source", "stage": 0, "row": 2, "width": 150 },
-    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "slots · variantes · camera rigs", "stage": 1, "row": 0, "width": 150 },
+    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "slots · variantes · session_id", "stage": 1, "row": 0, "width": 150 },
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "convertit vers l'IR canonique", "stage": 1, "row": 2, "width": 150 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "apparences · rigs · compatibilité", "stage": 2, "row": 0, "width": 160 },
     { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · clips · atlas UI source", "stage": 2, "row": 2, "width": 160 },
@@ -29,7 +29,7 @@
   "flows": [
     { "from": "creator", "to": "recipe", "label": "design" },
     { "from": "game", "to": "importer", "label": "assets locaux", "variant": "security", "labelAt": [208, 428] },
-    { "from": "recipe", "to": "resolver", "label": "slots, variantes et rigs", "labelAt": [420, 200] },
+    { "from": "recipe", "to": "resolver", "label": "slots, variantes et liaisons", "labelAt": [420, 200] },
     { "from": "importer", "to": "library", "label": "assets validés", "variant": "security", "labelAt": [420, 428] },
     { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
     { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },

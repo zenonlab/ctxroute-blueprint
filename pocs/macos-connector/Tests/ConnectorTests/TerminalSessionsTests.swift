@@ -2,6 +2,20 @@ import XCTest
 @testable import ThemeModel
 
 final class TerminalSessionsTests: XCTestCase {
+    func testArbitraryPackageBindingsSeedWithoutThemeSpecificIDsOrOverwritingEvents() {
+        var simulator = TerminalSessionSimulator()
+        let first = TerminalSessionSnapshot(id: "project.delta", displayName: "Projet Delta",
+                                            state: .active, sequence: 1)
+        simulator.seed([first])
+        XCTAssertEqual(simulator.catalog, [first])
+
+        let provider = TerminalSessionSnapshot(id: first.id, displayName: first.display_name,
+                                               state: .success, sequence: 2)
+        XCTAssertTrue(simulator.receive(.init(snapshot: provider)))
+        simulator.seed([first])
+        XCTAssertEqual(simulator.sessions[first.id], provider)
+    }
+
     func testMonotoneEventsCoverRecoveryAndReconnectWithoutPTYData() {
         var simulator = TerminalSessionSimulator()
         let states: [TerminalSessionState] = [.idle, .active, .busy, .error, .recovering,

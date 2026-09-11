@@ -43,6 +43,9 @@ périmés sont refusés et le simulateur conserve la dernière intention accept�
 preuve bornée, sans contenu de session. Des slots optionnels `session.state.*` et
 `session.action.*` habillent le catalogue et ses actions avec les images du package ;
 leur absence retombe sur du texte, jamais sur un pictogramme système embarqué.
+Le simulateur initialise son catalogue depuis les `session_id` des cibles découvertes,
+sans identité ni libellé de thème compilé dans le connecteur. Un snapshot reçu du
+provider garde priorité sur cette initialisation idempotente.
 
 La luminosité est une valeur absolue bornée de 0 à 1 et non un toggle. Le contrôle
 de thème émet `setBrightness`; son adaptateur ne doit jamais prétendre modifier un

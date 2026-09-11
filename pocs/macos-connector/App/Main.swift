@@ -188,7 +188,6 @@ import os
         agentTransport = AgentTransport { [weak self] request in
             self?.handle(request) ?? ProviderResponse(accepted: false, message: "Agent unavailable")
         }
-        seedSessionSimulator()
         customization.onSave = { [weak self] overrides in self?.saveInterfaceOverrides(overrides) }
         customization.onReset = { [weak self] in self?.resetInterfaceOverrides() }
         customization.onSessionIntent = { [weak self] intent in
@@ -218,6 +217,7 @@ import os
         let receipt = ThemeDiscovery.discover(roots: roots)
         let selectedID = selectedTheme?.package.id
         themes = receipt.themes
+        synchronizeSessionSimulator()
         themePicker.removeAllItems(); themePicker.addItems(withTitles: themes.map(\.package.display_name))
         if let selectedID, let index = themes.firstIndex(where: { $0.package.id == selectedID }) {
             themePicker.selectItem(at: index)
@@ -229,15 +229,19 @@ import os
         configureThemeControls()
     }
 
-    private func seedSessionSimulator() {
-        for (index, value) in [
-            ("session.alpha", "Terminal Alpha", TerminalSessionState.active),
-            ("session.beta", "Terminal Beta", TerminalSessionState.busy),
-            ("session.gamma", "Terminal Gamma", TerminalSessionState.recovering)
-        ].enumerated() {
-            _ = terminalSessions.receive(TerminalSessionEvent(snapshot: .init(id: value.0,
-                displayName: value.1, state: value.2, sequence: UInt64(index + 1))))
+    private func synchronizeSessionSimulator() {
+        let states: [TerminalSessionState] = [.active, .busy, .recovering]
+        var labels: [String: String] = [:]
+        for theme in themes {
+            for target in theme.interface?.manifest.targets ?? [] {
+                if let id = target.session_id, labels[id] == nil { labels[id] = target.label }
+            }
         }
+        let snapshots = labels.sorted { $0.key < $1.key }.enumerated().map { index, binding in
+            TerminalSessionSnapshot(id: binding.key, displayName: binding.value,
+                state: states[index % states.count], sequence: 1)
+        }
+        terminalSessions.seed(snapshots)
     }
 
     private func configureThemeControls() {
