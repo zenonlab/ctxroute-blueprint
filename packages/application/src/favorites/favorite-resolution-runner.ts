@@ -117,14 +117,12 @@ async function preferMangaUpdatesHydration(
 ): Promise<ProviderCandidate> {
   if (candidate.provider !== 'mangadex') return candidate;
   const mangaUpdates = dependencies.candidates.mangaupdates;
-  const hydration = dependencies.hydration.mangaupdates;
-  if (!mangaUpdates || !hydration) return candidate;
+  if (!mangaUpdates) return candidate;
   try {
     const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
     const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME');
     if (exact.length !== 1) return candidate;
-    const hydrated = await hydration.hydrate({ provider: 'mangaupdates', externalId: exact[0]!.externalId });
-    return hydrated ?? candidate;
+    return exact[0]!;
   } catch {
     return candidate;
   }
