@@ -239,6 +239,28 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source?.reviewId).toBeUndefined();
   });
 
+  it('hydrates an explicit MangaUpdates ID through bounded search after a 405 response', async () => {
+    const storage = new MemoryStoragePort();
+    const manga = { externalId: '12345', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Synthetic Manga'], displayTitle: 'Synthetic Manga' };
+    const explicitFavorite = { ...favorite, bookmarkId: 'explicit-mu', title: 'Synthetic Manga', url: 'https://www.mangaupdates.com/series/abc123/synthetic-manga' };
+    await importFavoriteSources([explicitFavorite], storage, now, [{
+      analyze: (input, url) => createSourceEvidence({ aliases: [{ provenance: 'stable-url-slug', value: 'Synthetic Manga' }], diagnostics: [], explicitProviderReference: { externalId: '12345', provider: 'mangaupdates' }, key: input.sourceKey, mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], sourceAdapter: 'test-mu', strategy: 'exact-origin', title: 'Synthetic Manga' }),
+      id: 'test-mu', origins: ['https://www.mangaupdates.com'],
+    }]);
+    const [imported] = await storage.listFavoriteSources({ limit: 1 });
+    const task = imported === undefined ? undefined : await storage.getFavoriteResolutionTask(imported.id.replace(/^source_/u, 'favorite-resolution_'));
+    if (task === undefined) throw new Error('Expected explicit MangaUpdates task.');
+    const result = await runFavoriteResolutionSlice({
+      candidates: { ...candidatePorts({ search: async () => createProviderCandidateEnvelope({ candidates: [manga], complete: true, digest: 'mu-search', provider: 'mangaupdates', truncated: false }) }), mangaupdates: { search: async () => createProviderCandidateEnvelope({ candidates: [manga], complete: true, digest: 'mu-search', provider: 'mangaupdates', truncated: false }) } },
+      hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => { throw new Error('Favorite provider request failed with HTTP 405.'); } } },
+      libraryId: libraryId('library_primary'), now: () => now, outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'mu-token',
+    });
+    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect(source?.reviewId).toBeUndefined();
+  });
+
   it('applies blocked taxonomy after exact hydration without creating a Work', async () => {
     const storage = new MemoryStoragePort();
     const explicitFavorite = { ...favorite, bookmarkId: 'blocked', url: 'https://anilist.co/anime/154587/frieren' };
