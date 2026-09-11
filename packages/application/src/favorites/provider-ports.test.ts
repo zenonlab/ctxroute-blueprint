@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { assertFavoriteProviderSearchQuery, favoriteProviderPolicy, routeFavoriteProviderTiers, routeFavoriteProviders } from './provider-ports';
 
 describe('favorite provider ports', () => {
-  it('X-01 keeps MangaDex outside the enabled provider routes', () => {
-    expect(routeFavoriteProviders('MANGA')).toEqual(['mangaupdates', 'kitsu-manga']);
+  it('X-01 routes MangaDex as the bounded manga fallback', () => {
+    expect(routeFavoriteProviders('MANGA')).toEqual(['mangaupdates', 'mangadex', 'kitsu-manga']);
     expect(routeFavoriteProviders('UNKNOWN')).not.toContain('mangadex');
   });
   it.each([
     ['ANIME', ['anilist', 'kitsu-anime']],
-    ['MANGA', ['mangaupdates', 'kitsu-manga']],
-    ['MANHWA', ['mangaupdates', 'kitsu-manga']],
-    ['MANHUA', ['mangaupdates', 'kitsu-manga']],
+    ['MANGA', ['mangaupdates', 'mangadex', 'kitsu-manga']],
+    ['MANHWA', ['mangaupdates', 'mangadex', 'kitsu-manga']],
+    ['MANHUA', ['mangaupdates', 'mangadex', 'kitsu-manga']],
     ['UNKNOWN', ['anilist', 'mangaupdates', 'kitsu-anime', 'kitsu-manga']],
   ] as const)('routes %s through its bounded lane', (mediaKind, providers) => {
     expect(routeFavoriteProviders(mediaKind)).toEqual(providers);
