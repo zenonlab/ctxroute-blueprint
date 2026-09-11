@@ -31,10 +31,9 @@
           "providerAdapters",
           "titleMatcher",
           "reviewGate",
-          "privateStore",
-          "libraryProjectionRepair"
+          "privateStore"
         ],
-        "note": "Anime/manga indépendants; Kitsu après NO_MATCH ou refus fournisseur terminal HTTP 403. Hydratation et pagination reprenables; tranches jusqu'au budget, file privée locale."
+        "note": "Kitsu suit NO_MATCH ou refus HTTP 403 terminal; pannes et 429 restent en retry. Hydratation et pagination reprenables."
       },
       {
         "id": "bounded-convergence",
@@ -43,10 +42,9 @@
           "sourceEvidence",
           "durableQueue",
           "providerAdapters",
-          "privateStore",
-          "libraryProjectionRepair"
+          "privateStore"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les covers manquantes et la projection bibliothèque avancent par curseur et tranches bornées."
+        "note": "IndexedDB privé : titres, facettes et jaquettes attribuées; covers et projection avancent par curseur borné."
       },
       {
         "id": "cover-rights",
