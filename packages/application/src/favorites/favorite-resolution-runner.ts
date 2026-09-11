@@ -120,7 +120,7 @@ async function preferMangaUpdatesHydration(
   if (!mangaUpdates) return candidate;
   try {
     const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
-    const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME');
+    const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME' && !value.preSerialization);
     if (exact.length !== 1) return candidate;
     return exact[0]!;
   } catch {
