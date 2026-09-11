@@ -20,7 +20,7 @@
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "convertit vers l'IR canonique", "stage": 1, "row": 2, "width": 150 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "apparences · rigs · compatibilité", "stage": 2, "row": 0, "width": 160 },
     { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · clips · icônes UI source", "stage": 2, "row": 2, "width": 160 },
-    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "apparence · slot UI · session stable", "stage": 3, "row": 0, "width": 170 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "brouillon atomique · session stable", "stage": 3, "row": 0, "width": 170 },
     { "id": "capabilities", "type": "security", "label": "Courtiers typés", "sublabel": "OS · sessions · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "instances · matériaux · cibles", "stage": 4, "row": 0, "width": 160 },
     { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "sélecteurs ROM · actions · sessions", "stage": 4, "row": 1, "width": 160 },

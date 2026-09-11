@@ -98,6 +98,7 @@ import AppKit
     private var interface: ResolvedThemeInterface?
     private var overrides: ThemeInterfaceOverrides?
     private var sessions: [TerminalSessionSnapshot] = []
+    private var editingTargetID: String?
     private let target = GameChoiceStrip()
     private let character = GameChoiceStrip()
     private let vehicle = GameChoiceStrip()
@@ -128,6 +129,7 @@ import AppKit
         self.interface = interface
         self.overrides = overrides
         self.sessions = sessions
+        editingTargetID = nil
         let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
         let selectionImage = interface.asset(for: "selector.cursor").flatMap(NSImage.init(contentsOf:))
         target.configure(entries: interface.manifest.targets.map { item in
@@ -232,7 +234,9 @@ import AppKit
     }
 
     @objc private func targetChanged() {
+        captureCurrentSelection()
         guard let interface, let overrides, let id = target.selectedID else { return }
+        editingTargetID = id
         let embedded = interface.manifest.targets.first { $0.id == id }
         let value = overrides.targets[id]
         character.select(id: value?.character)
@@ -285,10 +289,16 @@ import AppKit
             ?? interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
     }
 
-    @objc private func submit() {
-        guard var overrides, let id = target.selectedID else { return }
+    private func captureCurrentSelection() {
+        guard var overrides, let id = editingTargetID else { return }
         overrides.targets[id] = ThemeTargetOverride(character: character.selectedID,
             vehicle: vehicle.selectedID, sessionID: session.selectedID)
+        self.overrides = overrides
+    }
+
+    @objc private func submit() {
+        captureCurrentSelection()
+        guard let overrides else { return }
         do {
             guard let interface else { return }
             self.overrides = try overrides.validated(for: themeID, interface: interface.manifest)
@@ -298,6 +308,6 @@ import AppKit
     }
 
     @objc private func reset() { onReset?(); close() }
-    @objc private func close() { panel?.close(); panel = nil }
-    func windowWillClose(_ notification: Notification) { panel = nil }
+    @objc private func close() { panel?.close(); panel = nil; editingTargetID = nil }
+    func windowWillClose(_ notification: Notification) { panel = nil; editingTargetID = nil }
 }
