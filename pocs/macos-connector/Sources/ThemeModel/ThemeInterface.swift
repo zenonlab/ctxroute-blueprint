@@ -157,6 +157,9 @@ public struct ResolvedThemeInterface: Codable, Equatable, Sendable {
 }
 
 public enum ThemeInterfaceLoader {
+    // A placement matrix is still bounded, but can legitimately contain all
+    // character × vehicle bindings for a theme (972 entries in the MKW adapter).
+    private static let manifestLimit = 1_048_576
     public static let requiredSlots = Set([
         "theme.audio", "display.brightness", "slider.track", "slider.thumb",
         "desktop.files.visible", "desktop.files.hidden",
@@ -164,7 +167,7 @@ public enum ThemeInterfaceLoader {
     ])
 
     public static func load(_ manifestURL: URL) throws -> ResolvedThemeInterface {
-        let data = try boundedRegularFile(manifestURL, maximum: 65_536)
+        let data = try boundedRegularFile(manifestURL, maximum: manifestLimit)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
         let models = manifest.models ?? []
         guard ["orbite.theme-interface/2", "orbite.theme-interface/3", "orbite.theme-interface/4"].contains(manifest.format),

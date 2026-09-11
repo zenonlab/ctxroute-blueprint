@@ -18,7 +18,7 @@
     { "label": "Bureau macOS" }
   ],
   "nodes": [
-    { "id": "packages", "type": "database", "label": "Packages locaux", "sublabel": "manifestes + assets", "stage": 0, "row": 1, "tag": "hors Git", "width": 132 },
+    { "id": "packages", "type": "database", "label": "Packages locaux", "sublabel": "manifestes + placements", "stage": 0, "row": 1, "tag": "hors Git", "width": 132 },
     { "id": "scanner", "type": "security", "label": "ThemeDiscovery", "sublabel": "parcours borné", "stage": 1, "row": 1, "tag": "fail closed" },
     { "id": "settings", "type": "external", "label": "Réglages macOS", "sublabel": "WallpaperProvider.appex", "stage": 2, "row": 1, "tag": "API privée", "width": 154 },
     { "id": "agent", "type": "security", "label": "Agent Swift", "sublabel": "sélection + registre", "stage": 3, "row": 1, "tag": "XPC signé", "width": 132 },
