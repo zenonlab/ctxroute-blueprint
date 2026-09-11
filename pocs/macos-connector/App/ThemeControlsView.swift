@@ -38,7 +38,7 @@ import AppKit
         super.init(frame: frameRect)
         orientation = .vertical
         alignment = .leading
-        spacing = 8
+        spacing = 2
         let audioRow = sliderRow(icon: audioIcon, slider: audio, label: "Volume du thème",
                                  action: #selector(changeAudioVolume))
         let brightnessRow = sliderRow(icon: brightnessIcon, slider: brightness,
@@ -49,8 +49,7 @@ import AppKit
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.alignment = .centerY
-        buttonRow.spacing = 16
-        buttonRow.edgeInsets = NSEdgeInsets(top: 0, left: 59, bottom: 0, right: 0)
+        buttonRow.spacing = 4
         for (button, label, action) in [
             (desktop, "Afficher ou masquer les fichiers du bureau", #selector(toggleDesktop)),
             (visualPause, "Mettre en pause ou reprendre le visuel", #selector(toggleVisualPause))
@@ -77,7 +76,7 @@ import AppKit
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 10
+        row.spacing = 4
         icon.imageScaling = .scaleProportionallyDown
         icon.setAccessibilityLabel(label)
         icon.widthAnchor.constraint(equalToConstant: 32).isActive = true
@@ -86,7 +85,7 @@ import AppKit
         slider.action = action
         slider.isContinuous = true
         slider.setAccessibilityLabel(label)
-        slider.widthAnchor.constraint(equalToConstant: 176).isActive = true
+        slider.widthAnchor.constraint(equalToConstant: 192).isActive = true
         row.addArrangedSubview(icon)
         row.addArrangedSubview(slider)
         return row

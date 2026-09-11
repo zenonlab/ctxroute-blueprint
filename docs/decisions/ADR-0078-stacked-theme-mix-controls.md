@@ -21,7 +21,7 @@ codé dans le connecteur.
 
 `orbite.theme-interface/2` décrit deux lignes de réglage puis une ligne de commandes :
 un orbe audio et sa barre, un orbe de luminosité et sa barre, puis deux boutons
-centrés pour Finder et la pause. La première barre règle le volume audio global du
+rapprochés pour Finder et la pause. La première barre règle le volume audio global du
 thème, musique et effets ensemble ; la seconde règle sa luminosité.
 Les deux valeurs sont absolues,
 finies et bornées entre zéro et un. Elles ne modifient jamais le volume matériel ni
