@@ -75,7 +75,8 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
       method: 'POST',
     }, mangaUpdatesSearchSchema));
     const inspected = response.value.results.map((result) => candidate(result.record));
-    const evidence = inspectFavoriteTitleCandidates({ sourceTitles: query.titles }, inspected);
+    const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
+    const evidence = inspectFavoriteTitleCandidates(matchQuery, inspected);
     const references = new Set(evidence.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = inspected.filter((item) => references.has(`${item.provider}:${item.externalId}`));
     if (candidates.length > query.limit) throw new RangeError('MangaUpdates has more comparable identities than the bounded candidate contract permits.');

@@ -29,6 +29,15 @@ revues, précisée puis remplacée par le contrat TobiRink du 2026-09-08.
 
 ## Décision
 
+La version `source-adapter-v3` réanalyse aussi les routes de sortie racine
+bornées, sans supposer manga lorsque la catégorie manque. Les checkpoints
+sont séparés par fournisseur et usage (résolution ou métadonnées), liés au
+digest de la requête, et couvrent les cinq fournisseurs. Les références
+croisées modernes MangaDex→MangaUpdates sont converties depuis le slug base36;
+un ancien identifiant décimal `series.html` ne devient jamais un ID API.
+L'hydratation MangaUpdates exacte reste prioritaire; ses erreurs gardent la
+tâche réessayable. La complétude MangaDex suit `offset`, `limit` et `total`.
+
 Le [plan de correction v3](../systems/favorite-resolution-correction-plan.md)
 possède la pipeline, les 30 écarts, migrations et critères d'équivalence.
 La [spécification](../systems/favorite-parsing-resolution-spec.md) conserve les

@@ -842,6 +842,26 @@ la résolution des sources déjà importées est exécutée avant ce signalement
 La restauration sync conserve les indices différés et poursuit les identités
 des autres fournisseurs, avec au plus deux appels d'hydratation par tranche.
 
+Les formes racine `/titre/chapter-12` et `/titre-chapter-12` apportent une
+preuve de sortie même sans catégorie. Elles restent de type inconnu en
+l'absence de règle exacte. Les liens racine ordinaires restent exclus.
+La pagination MangaDex utilise les champs officiels `limit`, `offset` et
+`total`; toute page incohérente reste réessayable. Une limite locale de
+candidats ne constitue jamais une preuve de fin de recherche.
+
+Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
+références publiques validées et utilisés pour hydrater exactement la source
+principale. Les anciens IDs décimaux ne sont pas convertis en IDs API.
+Cette préférence s'applique aux sources explicites, aliases locaux, réponses
+collectives et recherches. Chaque checkpoint est lié au digest de sa requête;
+résolution et enrichissement disposent de tranches distinctes pour les cinq
+fournisseurs. Une panne primaire conserve la reprise datée.
+
+Les réponses fournisseur sont limitées à 512 KiB, vérifiés sur les octets lus
+et l'en-tête déclaré. La limite de transport WebBridge reste 64 KiB. Une
+requête publique MangaDex de 20 résultats mesurée pendant l'audit produisait
+119 663 octets : la précédente limite de 64 KiB rejetait des pages valides.
+
 La reconstruction est terminée seulement quand :
 
 - tout événement favori atteint un état terminal ou une reprise datée;

@@ -1,4 +1,4 @@
-import { createFavoriteSource, createWork } from '@tobirink/domain';
+import { createFavoriteSource, createProviderCandidate, createWork } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
@@ -34,7 +34,7 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
     const currentCandidate = work.hydration?.candidate;
     if (currentCandidate?.provider === 'mangadex' && candidates?.mangaupdates !== undefined && currentCandidate.titles.length > 0) {
       try {
-        const preferred = await preferMangaUpdatesHydration({ candidates }, currentCandidate);
+        const preferred = await preferMangaUpdatesHydration({ candidates, hydration }, currentCandidate);
         if (preferred.provider === 'mangaupdates' && preferred.cover !== undefined && work.hydration !== undefined) {
           const references = [...new Map([...work.externalReferences, { provider: preferred.provider, externalId: preferred.externalId }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
           await storage.putWork(createWork({ ...work, externalReferences: references, hydration: { ...work.hydration, candidate: preferred, hydratedAt: now(), providerTitleKeys: [...new Set(preferred.titles.map((title) => normalizeFavoriteTitle(title).normalized))] } }));
@@ -133,21 +133,31 @@ async function retryClaim(
 }
 
 async function preferMangaUpdatesHydration(
-  dependencies: Pick<FavoriteResolutionRunnerDependencies, 'candidates'>,
+  dependencies: Pick<FavoriteResolutionRunnerDependencies, 'candidates' | 'hydration'>,
   candidate: ProviderCandidate,
+  checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<ProviderCandidate> {
   if (candidate.provider !== 'mangadex') return candidate;
   const mangaUpdates = dependencies.candidates.mangaupdates;
   if (!mangaUpdates) return candidate;
-  try {
-    const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
-    if (envelope.provider !== 'mangaupdates') return candidate;
-    const decision = matchFavoriteTitles({ sourceTitles: candidate.titles, mediaKind: candidate.mediaKind, preSerialization: false }, [envelope]);
-    if (decision.kind !== 'MATCH') return candidate;
-    return envelope.candidates.find((value) => value.provider === decision.matchedReference.provider && value.externalId === decision.matchedReference.externalId) ?? candidate;
-  } catch {
-    return candidate;
+  const reference = candidate.linkedReferences?.find(value => value.provider === 'mangaupdates');
+  let preferred: ProviderCandidate | undefined;
+  if (reference !== undefined) {
+    try { preferred = await dependencies.hydration.mangaupdates.hydrate(reference); }
+    catch (error) { if (!(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error; }
   }
+  if (preferred === undefined) {
+    const query: MutableFavoriteTitleMatchQuery = { sourceTitles: candidate.titles, mediaKind: candidate.mediaKind, preSerialization: false };
+    if (reference !== undefined) query.explicitProviderReference = reference;
+    const result = await searchFavoriteProviderPage(mangaUpdates, query, 'mangaupdates', 20, checkpoints);
+    if (result.kind === 'PAGE_PENDING') throw new FavoriteProviderRetryError('Primary metadata search has another page.', (checkpoints?.now() ?? Date.now()) + 1_000);
+    const decision = matchFavoriteTitles(query, [result.envelope]);
+    if (decision.kind !== 'MATCH') return candidate;
+    preferred = result.envelope.candidates.find(value => value.externalId === decision.matchedReference.externalId);
+  }
+  if (preferred === undefined) return candidate;
+  if (preferred.provider !== 'mangaupdates' || (reference !== undefined && preferred.externalId !== reference.externalId)) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+  return createProviderCandidate({ ...preferred, linkedReferences: [{ provider: 'mangadex', externalId: candidate.externalId }] }, 'mangaupdates');
 }
 
 async function hydrateExplicitReference(
@@ -179,6 +189,7 @@ async function hydrateExplicitReference(
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
   const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
+  const metadataCheckpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now, 'metadata');
   const [source, record] = await Promise.all([
     dependencies.storage.getFavoriteSource(payload.sourceId),
     dependencies.storage.getFavoriteParseArtifact(payload.sourceId),
@@ -212,7 +223,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     if (candidate !== undefined) {
       if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-      candidate = await preferMangaUpdatesHydration(dependencies, candidate);
+      try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+        return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
@@ -255,6 +268,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:cached-id-not-found');
     } else {
       if (candidate.provider !== local.candidate.provider || candidate.externalId !== local.candidate.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+        return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
       } else {
@@ -273,8 +289,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   if (collective.kind === 'RESOLVED') {
-    if (hasExactBlockedProviderTaxonomy(collective.candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
-    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, collective.candidate, undefined, { references: collective.references });
+    let candidate = collective.candidate;
+    try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+      return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+    }
+    if (hasExactBlockedProviderTaxonomy(candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, candidate, undefined, { references: collective.references });
     return 'completed';
   }
   if (local.kind === 'AMBIGUOUS') {
@@ -324,7 +344,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-  candidate = await preferMangaUpdatesHydration(dependencies, candidate);
+  try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+    return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+  }
   if (hasExactBlockedProviderTaxonomy(candidate)) {
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     return 'completed';

@@ -2,7 +2,7 @@ import { favoriteProviderPolicy, FavoriteProviderRetryError } from '@tobirink/ap
 import type { FavoriteProvider } from '@tobirink/domain';
 import type { z } from 'zod';
 
-export const favoriteProviderResponseByteLimit = 64 * 1024;
+export const favoriteProviderResponseByteLimit = 512 * 1024;
 export type FavoriteProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export interface FavoriteProviderJson<TValue> { readonly digest: string; readonly value: TValue }

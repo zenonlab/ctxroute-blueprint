@@ -20,6 +20,12 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
+  it.each(['synthetic-series/chapter-12', 'synthetic-series-chapter-12', 'synthetic-series/chapter/12'])('recognizes root release evidence without inventing a media type: %s', path => {
+    expect(extractFavoriteSourceEvidence(input('root-release', `https://fixtures.tobirink.invalid/${path}`))).toMatchObject({ mediaKind: 'UNKNOWN', stableSlug: 'synthetic-series', release: { value: 12, kind: 'chapter' } });
+  });
+  it.each(['ordinary-link', 'watch?v=synthetic', 'blog/ordinary-link'])('still rejects ordinary links: %s', path => {
+    expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
+  });
   it.each([
     ['not a URL', 'INVALID_URL'],
     ['ftp://fixtures.tobirink.invalid/anime/frieren', 'NON_WEB_URL'],

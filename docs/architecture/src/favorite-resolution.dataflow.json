@@ -20,7 +20,7 @@
           "parseArtifact",
           "titleMatcher"
         ],
-        "note": "Règles versionnées : origine exacte et segments bornés, sans code distant. URL, titre, saison et progression restent séparés."
+        "note": "Routes bornées, pagination complète et références croisées publiques validées avant hydratation exacte."
       },
       {
         "id": "durable-resolution",

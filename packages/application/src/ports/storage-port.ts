@@ -104,7 +104,7 @@ export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRe
   if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
   const record = { ...input, artifact: createFavoriteParseArtifact(input.artifact), sourceId: favoriteSourceId(input.sourceId) };
   if (input.searchCheckpoints !== undefined) {
-    if (input.searchCheckpoints.length > 4 || new Set(input.searchCheckpoints.map((item) => item.provider)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
+    if (input.searchCheckpoints.length > 10 || new Set(input.searchCheckpoints.map((item) => `${item.provider}:${item.purpose ?? 'resolution'}`)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
     record.searchCheckpoints = Object.freeze(input.searchCheckpoints.map((item) => favoriteSearchCheckpointSchema.parse(item)));
   }
   return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });

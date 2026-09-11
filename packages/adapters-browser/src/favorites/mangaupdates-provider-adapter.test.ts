@@ -4,6 +4,11 @@ import { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './ma
 const series = { associated: [{ title: 'Synthetic Alias' }], categories: [{ category: 'Fantasy' }], genres: [{ genre: 'Adventure' }], image: { url: { original: 'https://cdn.mangaupdates.com/image/i1.jpg', thumb: 'https://cdn.mangaupdates.com/image/i1-thumb.jpg' } }, latest_chapter: 84, series_id: 12345, status: 'Complete', title: 'Synthetic Series', type: 'Manhwa', url: 'https://www.mangaupdates.com/series/abc123/synthetic-series', year: 2020 };
 
 describe('MangaUpdatesFavoriteProviderAdapter', () => {
+  it('retains an exact ID even when the title differs from the source slug', async () => {
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: series }], total_hits: 1 }));
+    const result = await adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Unrelated Source Slug'], explicitProviderReference: { provider: 'mangaupdates', externalId: '12345' } });
+    expect(result.candidates.map(value => value.externalId)).toEqual(['12345']);
+  });
   it('preserves comparable identities when a provider record has null cover URLs', async () => {
     const withoutCover = { ...series, image: { url: { original: null, thumb: null } } };
     const fetcher = vi.fn(async () => Response.json({ results: [{ record: withoutCover }, { record: { ...series, series_id: 67890, title: 'Unrelated Journey' } }], total_hits: 2 }));

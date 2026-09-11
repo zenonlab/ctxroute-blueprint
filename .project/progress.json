@@ -7037,7 +7037,7 @@
         {
           "id": "step-14",
           "title": "Restore media route coverage and honest provider pagination",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Synthetic historical release routes resolve without admitting ordinary links",
             "MangaDex completeness follows actual pagination",
@@ -7060,7 +7060,11 @@
             "git diff --check",
             "git commit"
           ],
-          "evidence": []
+          "evidence": [
+            "Provider/parser/checkpoint tests pass; snapshot changes only adapter version and semantic fingerprints",
+            "Exact MangaDex to MangaUpdates references retained; legacy IDs rejected; five provider lanes and metadata checkpoints supported",
+            "All workspace typechecks, Oxlint, documentation and Archify showcase 9/9 pass; git diff --check clean"
+          ]
         },
         {
           "id": "step-15",

@@ -50,6 +50,21 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('hydrates the linked primary ID from an exact MangaDex source and preserves both references', async () => {
+    const { storage, outbox } = await fixture();
+    const mdId = '12345678-1234-4234-8234-123456789abc';
+    const primary = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, externalId: '12345' };
+    const md = { ...primary, provider: 'mangadex' as const, externalId: mdId, linkedReferences: [{ provider: 'mangaupdates' as const, externalId: '12345' }] };
+    const sourceAdapter = { id: 'fixture-md', origins: ['https://mangadex.org'], analyze: () => createSourceEvidence({ aliases: [], canonicalUrl: `https://mangadex.org/title/${mdId}`, diagnostics: [], explicitProviderReference: { provider: 'mangadex', externalId: mdId }, key: 'fixture', mediaKind: 'MANGA', origin: 'https://mangadex.org', path: `/title/${mdId}`, proofs: ['CATEGORY_PATH'], sourceAdapter: 'fixture-md', strategy: 'exact-origin' }) };
+    await importFavoriteSources([{ ...favorite, url: `https://mangadex.org/title/${mdId}` }], storage, now, [sourceAdapter]);
+    const hydratedIds: string[] = [];
+    const result = await runFavoriteResolutionSlice({ candidates: candidatePorts(unusedSearch), hydration: { ...hydrationPorts(unusedHydration), mangadex: { hydrate: async () => md }, mangaupdates: { hydrate: async (reference) => { hydratedIds.push(reference.externalId); return primary; } } }, libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'cross-reference' });
+    expect(result.completed).toBe(1);
+    expect(hydratedIds).toEqual(['12345']);
+    const works = await storage.listWorks({ limit: 10 });
+    expect(works).toHaveLength(1);
+    expect(works[0]).toMatchObject({ hydration: { candidate: { provider: 'mangaupdates' } }, externalReferences: expect.arrayContaining([{ provider: 'mangadex', externalId: mdId }, { provider: 'mangaupdates', externalId: '12345' }]) });
+  });
   it('resumes the exact MangaUpdates identity from D1 after a paginated 405 recovery', async () => {
     const { storage, task, outbox } = await fixture();
     await importFavoriteSources([{ ...favorite, url: 'https://reader.example/manga/frieren' }], storage, now);
