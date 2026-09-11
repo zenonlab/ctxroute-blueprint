@@ -8,6 +8,8 @@ import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite
 import { repairMissingFavoriteCovers, runFavoriteResolutionSlice } from './favorite-resolution-runner';
 import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { FavoriteProviderRetryError } from './provider-ports';
+import type { FavoriteProviderSearchQuery } from './provider-ports';
+import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
 
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
@@ -48,6 +50,56 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('resumes the exact MangaUpdates identity from D1 after a paginated 405 recovery', async () => {
+    const { storage, task, outbox } = await fixture();
+    await importFavoriteSources([{ ...favorite, url: 'https://reader.example/manga/frieren' }], storage, now);
+    const manga = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const };
+    const pages: (string | undefined)[] = [];
+    let clock = now;
+    const dependencies = {
+      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => keys.map(key => ({ fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: 'MANGA' as const, references: [{ provider: manga.provider, externalId: manga.externalId }], scope: 'owner' as const })) },
+      candidates: { ...candidatePorts(unusedSearch), mangaupdates: { search: async (query: FavoriteProviderSearchQuery) => {
+        pages.push(query.cursor);
+        return createProviderCandidateEnvelope(query.cursor === undefined
+          ? { candidates: [], complete: false, digest: 'page-1', nextCursor: '2', provider: 'mangaupdates', truncated: true }
+          : { candidates: [manga], complete: true, digest: 'page-2', provider: 'mangaupdates', truncated: false });
+      } } },
+      hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => { throw new Error('HTTP 405'); } } },
+      libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-manga',
+    };
+    await runFavoriteResolutionSlice(dependencies);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:01.000Z' });
+    clock = '2026-09-07T12:00:02.000Z';
+    await runFavoriteResolutionSlice(dependencies);
+    expect(pages).toEqual([undefined, '2']);
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+
+  it('checkpoints provider evidence during a D1 outage and consults the owner before committing', async () => {
+    const { outbox, storage } = await fixture();
+    let clock = now;
+    let offline = true;
+    let searches = 0;
+    const dependencies = {
+      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => {
+        if (offline) throw new Error('D1 unavailable');
+        return keys.map(key => ({ fingerprint: key.fingerprint, kind: 'MISS' as const }));
+      } },
+      candidates: candidatePorts({ search: async () => { searches += 1; return createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'saved-evidence', provider: 'anilist', truncated: false }); } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-outage',
+    };
+    await runFavoriteResolutionSlice(dependencies);
+    expect(searches).toBe(1);
+    expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
+    offline = false;
+    clock = '2026-09-07T12:16:00.000Z';
+    await runFavoriteResolutionSlice(dependencies);
+    expect(searches).toBe(1);
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
+  });
+
   it('keeps a provider outage scheduled after eight attempts', async () => {
     const { storage, task, outbox } = await fixture();
     await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });

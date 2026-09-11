@@ -319,7 +319,7 @@
 - [x] **Add a bounded release snapshot publication gate** — DONE _(evidence: 19 infrastructure tests pass with fail-closed release publication coverage, npm run verify passes including repeated Chromium IndexedDB contract, production-publication Archify showcase passes 9 of 9 with zero warnings)_
 - [x] **Publish and verify the empty public snapshot** — DONE _(evidence: Cloudflare plan 45d51fc1 changed only the snapshot and current pointer keys, GET v1 releases returns HTTP 200 revision empty-2026-09-09 and conditional HTTP 304, D1 has no pending migration and both public ZIP hashes remain exact)_
 
-## Restore the complete local favorite-to-library pipeline — BLOCKED
+## Restore the complete local favorite-to-library pipeline — ACTIVE
 
 - [x] **Persist complete resolved favorite state** — DONE _(evidence: Vitest targeted resolution WebBridge collective and domain suite: 36 passed, All 9 workspace typechecks passed, ESLint and complete documentation validation passed)_
 - [x] **Preserve provider display metadata and covers** — DONE _(evidence: Provider domain Work library and resolution Vitest suites: 50 passed across 7 files, All 9 workspace typechecks and ESLint passed, Complete docs validation and favorite-resolution Archify showcase 9/9 passed)_
@@ -332,3 +332,9 @@
 - [x] **Restore MangaUpdates transport and reject error-driven fallback** — DONE _(evidence: Installed Chromium rule disabled=403, enabled=200 and 25 results; real MangaUpdates pagination and matching passed, 20 targeted tests including nullable images passed; full validation and workspace tests passed; performance gate corrected for added rule file and passed, CRG integration dependency audit and Archify showcase 9/9 passed; zero vulnerabilities; git diff check clean)_
 - [x] **Package verified MangaUpdates transport release 1.0.10** — DONE _(evidence: npm run verify passed; installed Chromium live transport 403 before rule and 200 with 25 results after rule, Current 1.0.10 packaged multi-provider E2E passed; two isolated builds reproduce both SHA256 hashes; static site build passed, Existing 1.0.9 ZIPs preserved; no private library migration claimed)_
 - [x] **Recognize Comix manga routes and retain newest validated rules** — DONE _(evidence: 40 targeted tests pass including previously unsupported source requeue, chapter zero/decimal and cached-rule downgrade prevention, npm run verify passed; 1.0.11 packaged Chromium E2E resolves synthetic Comix through MangaUpdates with zero anime searches for that title, Two isolated builds reproduce both archive hashes; Archify showcase 9/9; user installed-profile recovery remains unverified)_
+- [x] **Unify collective hydration and isolate collective outages** — DONE _(evidence: 36 resolver and collective tests pass including 405 two-page recovery and owner outage checkpoint reuse, All workspace typechecks pass; docs validation and Archify showcase 9/9 pass, Collective failure now permits investigation but deliberately defers final decision until owner lookup recovers; no installed-profile recovery claimed)_
+- [ ] **Make inventory recovery and task diagnostics resumable** — PENDING
+- [ ] **Restore media route coverage and honest provider pagination** — PENDING
+- [ ] **Project the complete library with bounded reads** — PENDING
+- [ ] **Connect cover recovery to the existing media boundary** — PENDING
+- [ ] **Certify the robust pipeline and prepare immutable artifacts** — PENDING

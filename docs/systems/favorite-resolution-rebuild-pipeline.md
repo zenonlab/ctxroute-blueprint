@@ -823,6 +823,18 @@ identités réellement inexploitable.
 
 ## Définition de terminé
 
+### Corrections de robustesse du 12 septembre 2026
+
+Les références provenant du collectif suivent le même chemin d'hydratation
+que les références explicites et les résultats locaux. Le secours HTTP 405
+MangaUpdates conserve l'ID exact, avance par pages avec checkpoint et ne
+transforme jamais une page incomplète en introuvable.
+Si le lookup collectif échoue, la recherche fournisseur peut avancer et
+conserver ses pages localement. Sa décision finale attend toutefois le retour
+du collectif : un choix personnel inaccessible ne doit pas être remplacé
+silencieusement. Une panne d'hydratation après un lookup réussi ne déclenche
+pas de nouvelle décision d'identité.
+
 La reconstruction est terminée seulement quand :
 
 - tout événement favori atteint un état terminal ou une reprise datée;

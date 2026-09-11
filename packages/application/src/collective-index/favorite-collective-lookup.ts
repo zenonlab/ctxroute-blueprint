@@ -1,7 +1,7 @@
 import type { FavoriteParseArtifact, ProviderCandidate } from '@tobirink/domain';
 import { z } from 'zod';
 import { FavoriteProviderRetryError } from '../favorites/provider-ports';
-import type { FavoriteProviderHydrationPorts } from '../favorites/provider-ports';
+import type { FavoriteProviderHydrationPorts, FavoriteProviderHydrationPort } from '../favorites/provider-ports';
 import { isProviderCandidateCompatible } from '../favorites/provider-matcher';
 import { stripFavoriteSeasonSuffix } from '../favorites/season-extraction';
 
@@ -39,12 +39,13 @@ export async function favoriteCollectiveKey(artifact: FavoriteParseArtifact): Pr
 
 type CollectiveIdentity =
   | { readonly kind: 'MISS' }
-  | { readonly kind: 'RETRYABLE'; readonly retryAt?: number }
+  | { readonly kind: 'RETRYABLE'; readonly stage: 'LOOKUP' | 'HYDRATION'; readonly retryAt?: number }
   | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND' }
   | { readonly kind: 'RESOLVED'; readonly candidate: ProviderCandidate; readonly references: readonly FavoritePublicReference[]; readonly scope: 'owner' | 'shared' };
 
-export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollectiveLookupPort | undefined, artifact: FavoriteParseArtifact, hydration: FavoriteProviderHydrationPorts, ownerOnly = false): Promise<CollectiveIdentity> {
+export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollectiveLookupPort | undefined, artifact: FavoriteParseArtifact, hydration: FavoriteProviderHydrationPorts, ownerOnly = false, hydrate?: FavoriteProviderHydrationPort['hydrate']): Promise<CollectiveIdentity> {
   if (port === undefined) return { kind: 'MISS' };
+  let stage: 'LOOKUP' | 'HYDRATION' = 'LOOKUP';
   try {
     const key = await favoriteCollectiveKey(artifact);
     const results = z.array(favoriteCollectiveLookupResultSchema).length(1).parse(await port.lookup([key]));
@@ -58,13 +59,14 @@ export async function resolveFavoriteCollectiveIdentity(port: FavoriteCollective
     if (reference === undefined || result.references.some((value) => !priorities.includes(value.provider))) throw new Error('Collective identity has incompatible providers.');
     const adapter = hydration[reference.provider];
     if (adapter === undefined) throw new Error('Collective hydration provider is unavailable.');
-    const candidate = await adapter.hydrate(reference);
+    stage = 'HYDRATION';
+    const candidate = await (hydrate === undefined ? adapter.hydrate(reference) : hydrate(reference));
     if (candidate === undefined) return { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' };
     if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('Collective hydration identity mismatch.');
     if (!isProviderCandidateCompatible({ mediaKind: result.mediaKind, sourceTitles: candidate.titles }, candidate)
       || (artifact.mediaKind !== 'UNKNOWN' && !isProviderCandidateCompatible({ mediaKind: artifact.mediaKind, sourceTitles: candidate.titles }, candidate))) return { kind: 'MISS' };
     return { kind: 'RESOLVED', candidate, references: result.references, scope: result.scope };
   } catch (error) {
-    return error instanceof FavoriteProviderRetryError ? { kind: 'RETRYABLE', retryAt: error.retryAt } : { kind: 'RETRYABLE' };
+    return error instanceof FavoriteProviderRetryError ? { kind: 'RETRYABLE', stage, retryAt: error.retryAt } : { kind: 'RETRYABLE', stage };
   }
 }

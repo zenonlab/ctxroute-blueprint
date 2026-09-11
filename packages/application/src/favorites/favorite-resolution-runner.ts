@@ -13,7 +13,8 @@ import { normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
-import { createFavoriteSearchCheckpointPort } from './provider-search-checkpoint';
+import { createFavoriteSearchCheckpointPort, searchFavoriteProviderPage } from './provider-search-checkpoint';
+import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
@@ -99,6 +100,12 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   return Object.freeze([...new Set(titles)]);
 }
 
+function hydrationRetryAt(retryAt: number | undefined, now: string): number {
+  return retryAt !== undefined
+    ? Math.max(timestamp(now) + 1_000, retryAt)
+    : timestamp(now) + favoriteProviderPolicy.negativeTtlMs;
+}
+
 async function retryClaim(
   dependencies: FavoriteResolutionRunnerDependencies,
   task: DurableTask,
@@ -147,6 +154,7 @@ async function hydrateExplicitReference(
   dependencies: FavoriteResolutionRunnerDependencies,
   reference: { readonly provider: ResolutionProvider; readonly externalId: string },
   artifact: FavoriteParseArtifact,
+  checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<ProviderCandidate | undefined> {
   const hydration = dependencies.hydration[reference.provider];
   if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
@@ -159,7 +167,9 @@ async function hydrateExplicitReference(
     if (reference.provider !== 'mangaupdates' || !(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error;
     const search = dependencies.candidates.mangaupdates;
     if (search === undefined) throw error;
-    const envelope = await search.search({ provider: 'mangaupdates', titles: providerTitles(artifact), limit: 20 });
+    const result = await searchFavoriteProviderPage(search, { sourceTitles: providerTitles(artifact), explicitProviderReference: reference }, 'mangaupdates', 20, checkpoints);
+    if (result.kind === 'PAGE_PENDING') throw new FavoriteProviderRetryError('Exact identity hydration has another page.', timestamp(dependencies.now()) + 1_000);
+    const envelope = result.envelope;
     const exact = envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
     if (exact === undefined && (!envelope.complete || envelope.truncated)) throw new Error('INCOMPLETE_HYDRATION_SEARCH');
     return exact;
@@ -168,6 +178,7 @@ async function hydrateExplicitReference(
 
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
+  const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
   const [source, record] = await Promise.all([
     dependencies.storage.getFavoriteSource(payload.sourceId),
     dependencies.storage.getFavoriteParseArtifact(payload.sourceId),
@@ -195,8 +206,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const cached = await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
     const fresh = freshHydration(cached?.hydration?.hydratedAt, dependencies.now());
     let candidate: ProviderCandidate | undefined;
-    try { candidate = fresh ? cached?.hydration?.candidate : await hydrateExplicitReference(dependencies, reference, artifact); } catch (error) {
-      const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+    try { candidate = fresh ? cached?.hydration?.candidate : await hydrateExplicitReference(dependencies, reference, artifact, checkpoints); } catch (error) {
+      const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
       return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
     }
     if (candidate !== undefined) {
@@ -235,8 +246,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     let candidate = fresh ? local.candidate : undefined;
     if (!fresh) {
       if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
-      try { candidate = await hydrateExplicitReference(dependencies, local.candidate, artifact); } catch (error) {
-        const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+      try { candidate = await hydrateExplicitReference(dependencies, local.candidate, artifact, checkpoints); } catch (error) {
+        const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
         return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
       }
     }
@@ -252,8 +263,11 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     return 'completed';
   }
-  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS');
-  if (collective.kind === 'RETRYABLE') return retryClaim(dependencies, task, token, new Date(Math.max(collective.retryAt ?? 0, timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs)).toISOString());
+  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS', (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
+  const collectiveRetryAt = collective.kind === 'RETRYABLE'
+    ? new Date(collective.retryAt === undefined ? timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs : Math.max(timestamp(dependencies.now()) + 1_000, collective.retryAt)).toISOString()
+    : undefined;
+  if (collective.kind === 'RETRYABLE' && collective.stage === 'HYDRATION' && collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
   if (collective.kind === 'REVIEW_REQUIRED') {
     await persistFavoriteResolutionCompletion(dependencies, task, token, collective, `review:collective-${collective.reason.toLowerCase()}`);
     return 'completed';
@@ -264,12 +278,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   if (local.kind === 'AMBIGUOUS') {
+    if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
       candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
     });
     return 'completed';
   }
-  const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
   const lanes = await resolveFavoriteProviderLanes(dependencies.candidates, matchQuery, artifact.mediaKind, checkpoints);
   if (lanes.kind === 'PAGE_PENDING') {
     await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
@@ -285,6 +299,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt, lanes.reason);
   }
   const { decision: outcome, envelopes } = lanes;
+  // Save provider evidence while the collective is unavailable, but do not
+  // replace a personal decision that could not be consulted.
+  if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
   if (outcome.kind === 'AMBIGUOUS') {
     const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
@@ -298,8 +315,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   const provider = outcome.matchedReference.provider;
   let candidate: ProviderCandidate | undefined;
-  try { candidate = await hydrateExplicitReference(dependencies, { externalId: outcome.matchedReference.externalId, provider }, artifact); } catch (error) {
-    const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+  try { candidate = await hydrateExplicitReference(dependencies, { externalId: outcome.matchedReference.externalId, provider }, artifact, checkpoints); } catch (error) {
+    const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
     return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
   }
   if (candidate === undefined) {

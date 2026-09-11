@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "BLOCKED",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6966,6 +6966,184 @@
             "npm run verify passed; 1.0.11 packaged Chromium E2E resolves synthetic Comix through MangaUpdates with zero anime searches for that title",
             "Two isolated builds reproduce both archive hashes; Archify showcase 9/9; user installed-profile recovery remains unverified"
           ]
+        },
+        {
+          "id": "step-12",
+          "title": "Unify collective hydration and isolate collective outages",
+          "status": "DONE",
+          "acceptance": [
+            "D1 MangaUpdates identity uses exact-ID transport recovery",
+            "Unavailable collective does not prevent local provider investigation or overwrite inaccessible owner choices",
+            "Incomplete hydration search resumes safely"
+          ],
+          "files": [
+            "packages/application/src/collective-index/favorite-collective-lookup.ts",
+            "packages/application/src/collective-index/favorite-collective-lookup.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "36 resolver and collective tests pass including 405 two-page recovery and owner outage checkpoint reuse",
+            "All workspace typechecks pass; docs validation and Archify showcase 9/9 pass",
+            "Collective failure now permits investigation but deliberately defers final decision until owner lookup recovers; no installed-profile recovery claimed"
+          ]
+        },
+        {
+          "id": "step-13",
+          "title": "Make inventory recovery and task diagnostics resumable",
+          "status": "TODO",
+          "acceptance": [
+            "Resolution continues despite independent inventory failure",
+            "Task diagnostics distinguish internal failures from provider delays",
+            "Restoration advances past deferred provider identities without losing them"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "packages/application/src/recovery",
+            "packages/application/src/favorites",
+            "packages/adapters-indexeddb/src",
+            "packages/contracts/src",
+            "packages/domain/src",
+            "packages/ui/src/features",
+            "apps/extension/entrypoints/options",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-14",
+          "title": "Restore media route coverage and honest provider pagination",
+          "status": "TODO",
+          "acceptance": [
+            "Synthetic historical release routes resolve without admitting ordinary links",
+            "MangaDex completeness follows actual pagination",
+            "Cross-provider identity references remain validated",
+            "Primary ambiguity or outage never becomes fallback evidence"
+          ],
+          "files": [
+            "packages/application/src/favorites",
+            "packages/adapters-browser/src/favorites",
+            "packages/domain/src",
+            "packages/application/src/ports",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-15",
+          "title": "Project the complete library with bounded reads",
+          "status": "TODO",
+          "acceptance": [
+            "At least 1400 works remain searchable sortable and pageable",
+            "Projection recovery does not stop at 500",
+            "UI refresh and diagnostics reflect ongoing resolution"
+          ],
+          "files": [
+            "packages/application/src/library",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/web/app/library",
+            "apps/web/app/components",
+            "packages/ui/src/features/library",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-16",
+          "title": "Connect cover recovery to the existing media boundary",
+          "status": "TODO",
+          "acceptance": [
+            "Provider cover failures have a verified bounded recovery path",
+            "No unvalidated asset or arbitrary URL ingestion",
+            "Media operations remain behind the existing Worker gate"
+          ],
+          "files": [
+            "packages/ui/src/features/library",
+            "packages/application/src",
+            "packages/adapters-browser/src",
+            "apps/worker/src/media",
+            "apps/extension/runtime",
+            "docs/decisions",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-17",
+          "title": "Certify the robust pipeline and prepare immutable artifacts",
+          "status": "TODO",
+          "acceptance": [
+            "Synthetic large-library and interrupted multi-provider journeys pass",
+            "Complete verification and reproducible archives",
+            "Installed private profile and publication status reported separately"
+          ],
+          "files": [
+            "apps/web/e2e",
+            "apps/extension/scripts",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web"
+          ],
+          "evidence": []
         }
       ]
     }

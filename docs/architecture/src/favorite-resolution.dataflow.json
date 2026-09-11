@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "MangaDex tente MU avant commit et conserve les références; MU 405 utilise sa recherche bornée sur l’ID exact."
+        "note": "D1 et résolution partagent l’hydratation; MU 405 reprend sa recherche paginée sur ID exact."
       },
       {
         "id": "bounded-convergence",
