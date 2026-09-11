@@ -78,10 +78,10 @@ import AppKit
     private var interface: ResolvedThemeInterface?
     private var overrides: ThemeInterfaceOverrides?
     private var sessions: [TerminalSessionSnapshot] = []
-    private let target = NSPopUpButton()
+    private let target = GameChoiceStrip()
     private let character = GameChoiceStrip()
     private let vehicle = GameChoiceStrip()
-    private let session = NSPopUpButton()
+    private let session = GameChoiceStrip()
     private let sessionStatus = NSTextField(wrappingLabelWithString: "")
     private let focusSession = NSButton(title: "Focaliser", target: nil, action: nil)
     private let openSession = NSButton(title: "Ouvrir", target: nil, action: nil)
@@ -98,7 +98,7 @@ import AppKit
                  overrides: ThemeInterfaceOverrides, sessions: [TerminalSessionSnapshot],
                  targetID: String? = nil) {
         if panel?.isVisible == true, self.themeID == themeID {
-            if let targetID { select(target, id: targetID); targetChanged() }
+            if let targetID { target.select(id: targetID); targetChanged() }
             panel?.makeKeyAndOrderFront(nil)
             return
         }
@@ -108,21 +108,22 @@ import AppKit
         self.interface = interface
         self.overrides = overrides
         self.sessions = sessions
-        let targetIcon = icon(for: "customizer.target", in: interface, size: 22)
-        fill(target, entries: interface.manifest.targets.map { ($0.id, $0.label, targetIcon) })
+        let targetIcon = interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
+        target.configure(entries: interface.manifest.targets.map { item in
+            let choiceID = overrides.targets[item.id]?.vehicle
+            let choice = interface.manifest.choices.first { $0.id == choiceID }
+            let image = choice.flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
+                ?? targetIcon
+            return (item.id, item.label, image)
+        }, selected: targetID ?? interface.manifest.targets.first?.id)
         let fallback = interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
         character.configure(entries: choices(.character, in: interface, fallback: fallback), selected: nil)
         vehicle.configure(entries: choices(.vehicle, in: interface, fallback: fallback), selected: nil)
-        fill(session, entries: [("", "Aucune session",
-                                 icon(for: "session.state.none", in: interface, size: 18))] + sessions.map {
+        session.configure(entries: [("", "Aucune session",
+                                     icon(for: "session.state.none", in: interface, size: 64))] + sessions.map {
             ($0.id, "\($0.display_name) — \($0.state.rawValue)",
-             icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 18))
-        })
-        if let targetID { select(target, id: targetID) }
-        target.target = self
-        target.action = #selector(targetChanged)
-        session.target = self
-        session.action = #selector(sessionChanged)
+             icon(for: "session.state.\($0.state.rawValue)", in: interface, size: 64))
+        }, selected: nil)
         focusSession.target = self
         focusSession.action = #selector(sendSessionIntent(_:))
         focusSession.identifier = NSUserInterfaceItemIdentifier(TerminalSessionIntentKind.focus.rawValue)
@@ -136,13 +137,12 @@ import AppKit
         skin(save, slot: "customizer.action.save", interface: interface)
         character.onChange = { [weak self] in self?.choiceChanged() }
         vehicle.onChange = { [weak self] in self?.choiceChanged() }
+        target.onChange = { [weak self] in self?.targetChanged() }
+        session.onChange = { [weak self] in self?.sessionChanged() }
         preview.imageScaling = .scaleProportionallyUpOrDown
         preview.widthAnchor.constraint(equalToConstant: 320).isActive = true
         preview.heightAnchor.constraint(equalToConstant: 130).isActive = true
-        [target, session].forEach {
-            $0.widthAnchor.constraint(equalToConstant: 320).isActive = true
-        }
-        [character, vehicle].forEach {
+        [target, character, vehicle, session].forEach {
             $0.widthAnchor.constraint(equalToConstant: 320).isActive = true
             $0.heightAnchor.constraint(equalToConstant: 112).isActive = true
         }
@@ -170,7 +170,7 @@ import AppKit
         save.action = #selector(submit)
         save.keyEquivalent = "\r"
         stack.addArrangedSubview(NSStackView(views: [cancel, resetButton, save]))
-        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 720),
+        let window = NSPanel(contentRect: .init(x: 0, y: 0, width: 368, height: 880),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Personnaliser le véhicule"
         window.isReleasedWhenClosed = false
@@ -192,15 +192,6 @@ import AppKit
         }
     }
 
-    private func fill(_ popup: NSPopUpButton, entries: [(String, String, NSImage?)]) {
-        popup.removeAllItems()
-        for (id, label, image) in entries {
-            popup.addItem(withTitle: label)
-            popup.lastItem?.representedObject = id
-            popup.lastItem?.image = image
-        }
-    }
-
     private func skin(_ button: NSButton, slot: String, interface: ResolvedThemeInterface) {
         button.image = icon(for: slot, in: interface, size: 22)
         button.imagePosition = button.image == nil ? .noImage : .imageLeading
@@ -216,21 +207,13 @@ import AppKit
         return image
     }
 
-    private func select(_ popup: NSPopUpButton, id: String?) {
-        guard let id, let item = popup.itemArray.first(where: { $0.representedObject as? String == id }) else {
-            popup.selectItem(at: 0)
-            return
-        }
-        popup.select(item)
-    }
-
     @objc private func targetChanged() {
-        guard let interface, let overrides, let id = selectedID(target) else { return }
+        guard let interface, let overrides, let id = target.selectedID else { return }
         let embedded = interface.manifest.targets.first { $0.id == id }
         let value = overrides.targets[id]
         character.select(id: value?.character)
         vehicle.select(id: value?.vehicle)
-        select(session, id: value?.session_id ?? embedded?.session_id)
+        session.select(id: value?.session_id ?? embedded?.session_id)
         updatePreview()
         sessionChanged()
     }
@@ -238,7 +221,7 @@ import AppKit
     @objc private func choiceChanged() { updatePreview() }
 
     @objc private func sessionChanged() {
-        guard let id = selectedID(session), let snapshot = sessions.first(where: { $0.id == id }) else {
+        guard let id = session.selectedID, let snapshot = sessions.first(where: { $0.id == id }) else {
             sessionStatus.stringValue = "Aucune session liée."
             focusSession.isEnabled = false
             openSession.isEnabled = false
@@ -250,7 +233,7 @@ import AppKit
     }
 
     @objc private func sendSessionIntent(_ sender: NSButton) {
-        guard let id = selectedID(session),
+        guard let id = session.selectedID,
               let rawKind = sender.identifier?.rawValue,
               let kind = TerminalSessionIntentKind(rawValue: rawKind) else { return }
         let message = onSessionIntent?(TerminalSessionIntent(sessionID: id, kind: kind))
@@ -279,9 +262,9 @@ import AppKit
     }
 
     @objc private func submit() {
-        guard var overrides, let id = selectedID(target) else { return }
+        guard var overrides, let id = target.selectedID else { return }
         overrides.targets[id] = ThemeTargetOverride(character: character.selectedID,
-            vehicle: vehicle.selectedID, sessionID: selectedID(session))
+            vehicle: vehicle.selectedID, sessionID: session.selectedID)
         do {
             guard let interface else { return }
             self.overrides = try overrides.validated(for: themeID, interface: interface.manifest)
@@ -293,8 +276,4 @@ import AppKit
     @objc private func reset() { onReset?(); close() }
     @objc private func close() { panel?.close(); panel = nil }
     func windowWillClose(_ notification: Notification) { panel = nil }
-    private func selectedID(_ popup: NSPopUpButton) -> String? {
-        guard let id = popup.selectedItem?.representedObject as? String, !id.isEmpty else { return nil }
-        return id
-    }
 }
