@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "Anime et manga indépendants; Kitsu après NO_MATCH complet. Hydratation exacte et pagination reprenable dans IndexedDB."
+        "note": "Anime/manga indépendants; Kitsu après NO_MATCH. Hydratation et pagination reprenables; tranches jusqu'au budget, file privée locale."
       },
       {
         "id": "bounded-convergence",

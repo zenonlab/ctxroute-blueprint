@@ -15,7 +15,9 @@ import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
 import { createFavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 
-export const favoriteResolutionSliceLimit = 8;
+// Cheap local/terminal tasks may drain in one wake; the time budget remains
+// authoritative for provider I/O and MV3 suspension safety.
+export const favoriteResolutionSliceLimit = 100;
 export const favoriteResolutionWakeBudgetMs = 20_000;
 export const favoriteResolutionClaimMs = 60_000;
 export const favoriteResolutionAttemptLimit = 8;

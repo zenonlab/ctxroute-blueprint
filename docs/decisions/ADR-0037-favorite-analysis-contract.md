@@ -94,6 +94,21 @@ survivent à MV3; réseau au-moins-une-fois et effets locaux idempotents.
 Les migrations des anciens v6/v7/v8 sont additives et préservent les décisions
 humaines; les pending d'import sont masquées et réenfilées avec reçus.
 
+L'audit vivant du 2026-09-11 impose une précision opérationnelle : la limite
+de 100 claims est une limite **par tranche**, jamais une limite de progression
+de la file. L'inventaire ne doit pas monopoliser un réveil; après chaque lot,
+le runtime exécute des tranches de résolution jusqu'au budget et persiste une
+continuation lorsque des tâches restent disponibles. Une alarme reprend cette
+continuation même sans événement de favori. Il n'existe pas aujourd'hui de
+queue Worker privée : le Worker traite le collectif et la distribution
+déclarative; une queue Cloudflare privée nécessiterait un ADR séparé.
+
+Une URL sans route connue ne suffit pas à conclure `IDENTITY_MISSING` lorsque
+le titre du favori ou un slug local fournit une requête bornée. Le parseur doit
+produire `UNKNOWN` et laisser les lanes anime et manga décider selon leurs
+preuves. `UNSUPPORTED` reste réservé aux dispositions explicitement exclues,
+aux routes utilitaires et aux identités numériques sans titre exploitable.
+
 ## Conséquences
 
 TobiRink ne lit aucune base ni aucun export FavLib pendant sa validation. Les

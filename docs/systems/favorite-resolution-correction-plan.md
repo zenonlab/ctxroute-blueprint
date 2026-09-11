@@ -18,6 +18,62 @@ Ce contrat remplace les prescriptions contradictoires des versions 1/2 de
 la spécification et de la pipeline. Les règles pures de parsing et les 82 cas
 de la spécification constituent le corpus de régression clean-room.
 
+## Audit de l'installation vivante — 2026-09-11
+
+L'inspection de l'installation publiée a révélé un écart entre le contrat
+documenté et le comportement attendu. La résolution des favoris est une
+outbox **IndexedDB dans l'extension**; le Worker ne possède ni consumer, ni
+Cron de résolution par favori, ni queue Cloudflare. Ses routes `/v2/favorites/*`
+servent le collectif owner-scoped et les règles, pas les tâches privées.
+
+Le runtime appelle l'inventaire puis un seul `runFavoriteResolutionSlice` par
+réveil. Ce slice est limité à huit tâches et l'alarme est cadencée à une minute.
+Un import de 1 400 favoris peut donc laisser plus de 1 000 sources observées
+sans résultat pendant plusieurs heures. L'inventaire et le drainage doivent
+devenir deux boucles reprenables : chaque réveil continue la résolution jusqu'à
+son budget, puis programme explicitement le prochain réveil lorsqu'il reste
+des tâches.
+
+La table D1 `favorite_site_rules` a été inspectée en lecture seule :
+`published = 1` contient actuellement zéro ligne. L'extension utilise donc ses
+règles intégrées (Anime-Sama) tant qu'un propriétaire n'est pas appairé et que
+des règles validées ne sont pas publiées par la gate.
+
+Le parseur générique exige aujourd'hui un segment de catégorie (`anime`,
+`manga`, `series`, `title`, etc.) ou une preuve de sortie. Il classe ainsi
+comme `UNSUPPORTED/IDENTITY_MISSING` des liens de lecture valides dont le slug
+et le titre du favori suffisent pourtant à lancer une recherche bornée. Le
+fallback sera élargi de façon contrôlée : titre du favori et slug local peuvent
+produire un artefact `UNKNOWN` recherché dans les deux lanes; seuls les liens
+ordinaires, routes utilitaires et identités purement numériques restent exclus.
+
+Ces constats proviennent uniquement du code TobiRink, d'une inspection SQL
+Cloudflare sans écriture et d'une lecture en lecture seule des ADR/parser
+FavLib. Aucun titre, URL ou contenu privé FavLib n'est copié dans le dépôt.
+
+## Registre des changements de règles
+
+La comparaison avec les règles FavLib historiques distingue les écarts
+volontaires des régressions introduites pendant la reconstruction :
+
+| Règle | FavLib historique | TobiRink actuel | Décision |
+| --- | --- | --- | --- |
+| Route inconnue avec slug et titre | conserve le slug, déduit un type prudent et lance une recherche bornée | rejette souvent l'URL comme `IDENTITY_MISSING` avant la recherche | **Régression à corriger** : produire `UNKNOWN` et rechercher dans les deux lanes |
+| Lien ordinaire/utilitaire | disposition `excluded` explicite | disposition `UNSUPPORTED` sans toujours distinguer l'identité absente | **À clarifier** : séparer exclusion prouvée et identité à reprendre |
+| Débit de résolution | file persistante avec reprise et lots jusqu'à épuisement | huit tâches maximum par réveil, une seule tranche après l'inventaire | **Régression à corriger** : continuation durable indépendante de l'inventaire |
+| File serveur | queue/cron faisaient partie de l'architecture Cloudflare historique | aucune queue Worker privée; outbox IndexedDB locale | **Choix produit à confirmer** : ne pas prétendre qu'une queue Worker existe |
+| Priorité fournisseur | AniList/MangaUpdates principaux, fallback contrôlé | même ordre, Kitsu limité au repli | **Conservé** |
+| Preuve de sélection | premier résultat et popularité exclus | même interdiction dans le matcher | **Conservé** |
+| Données privées | tâches et favoris dans l'instance privée | tâches et favoris dans IndexedDB, D1 minimal | **Conservé et durci** |
+| Règles de sites | document déclaratif distribué et versionné | document prévu mais aucune ligne publiée en D1 | **Incomplet en production** : publier une révision validée par la gate |
+
+Le type par défaut de FavLib ne doit pas être copié aveuglément : lorsqu'aucune
+preuve ne distingue anime et manga, TobiRink doit conserver `UNKNOWN` et faire
+fonctionner les deux lanes indépendamment. En revanche, l'absence de catégorie
+dans le chemin ne constitue pas une preuve que le lien est non média. Cette
+nuance permet de restaurer la couverture FavLib sans réintroduire sa sélection
+par défaut ou ses heuristiques non bornées.
+
 ## Autorités et frontières
 
 | Donnée | Autorité | Reconstruction et règle |
@@ -118,7 +174,7 @@ liste des candidats affichés est exhaustive.
 Les cadences sont persistées avant l'effet : AniList au moins 2 200 ms,
 MangaUpdates 3 000 ms; Kitsu et MangaDex ont chacun une lane bornée avec
 `Retry-After` prioritaire. Une requête dure au plus 8 s, un réveil 20 s et
-huit tâches, un claim 60 s. Après huit erreurs automatiques, la tâche reste
+100 claims au maximum, un claim 60 s. Après huit erreurs automatiques, la tâche reste
 reprenable manuellement, classée `RETRYABLE`, hors cloche.
 
 ## Règles de sites

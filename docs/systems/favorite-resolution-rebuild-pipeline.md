@@ -743,6 +743,29 @@ compaction bornée, cadence fournisseur, preuve de langue locale et candidats
 ambigus persistés. La validité reste conditionnée au passage du gate racine
 `npm run verify`; elle n’autorise ni publication ni déploiement.
 
+## Audit de l'installation vivante — 2026-09-11
+
+L'outbox de résolution est locale à IndexedDB. Le Worker ne possède pas de
+consumer ni de Cron pour les tâches privées; ses routes `/v2/favorites/*`
+concernent le collectif owner-scoped et la distribution des règles. Un réveil
+du background effectue l'inventaire puis une seule tranche de huit tâches, ce
+qui explique un compteur élevé de sources « en cours » après un import massif.
+La correction doit séparer les curseurs d'inventaire et de résolution, drainer
+des tranches successives dans le budget du réveil et persister une continuation
+jusqu'à épuisement des tâches dues.
+
+L'inspection D1 en lecture seule du 2026-09-11 indique zéro règle publiée,
+zéro propriétaire et zéro installation. Tant qu'un document de règles validé
+n'est pas publié par la gate, seule la règle intégrée Anime-Sama est active.
+
+Le parseur générique refuse une URL sans segment de catégorie ou marqueur de
+sortie avant d'examiner suffisamment le titre du favori. Un lien de lecture
+valide peut donc devenir `UNSUPPORTED/IDENTITY_MISSING` alors qu'une recherche
+`UNKNOWN` bornée serait possible. La prochaine version conserve le slug et le
+titre dans l'artefact privé, lance les lanes anime et manga indépendantes, et
+réserve `UNSUPPORTED` aux routes utilitaires, ressources ordinaires ou
+identités réellement inexploitable.
+
 ## Définition de terminé
 
 La reconstruction est terminée seulement quand :

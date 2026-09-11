@@ -96,9 +96,6 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
   }
   const category = decoded[identityIndex - 1]?.toLowerCase();
-  if ((category === undefined || !routeCategorySegments.has(category)) && release === undefined) {
-    return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
-  }
   const mediaKind = category === undefined ? 'UNKNOWN' : (categoryKinds[category] ?? 'UNKNOWN');
   const title = displayTitle(stableSlug);
   const proofs: SourceEvidence['proofs'] = [
