@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6755,6 +6755,90 @@
             "MangaUpdates 25-result minimum page and metadata-v2 MV3 checkpoints are regression tested; focused suite passes 27 tests",
             "favorite-resolution dataflow passes Archify showcase 9/9 with zero errors or warnings; git diff --check passes"
           ]
+        },
+        {
+          "id": "step-6",
+          "title": "Correct proven cover delivery and queue regressions",
+          "status": "DONE",
+          "acceptance": [
+            "Cover rendering omits private referrer and handles load errors",
+            "MangaUpdates preference requires complete unique identity proof",
+            "Old blocked resolution tasks recover with additive receipt"
+          ],
+          "files": [
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/favorites/correct-imported-review.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "packages/ui/src/features/library/work-card/WorkCard.tsx",
+            "packages/ui/src/features/library/work-card/WorkCard.test.tsx",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md"
+          ],
+          "commands": [
+            "npm exec -- vitest run packages/application/src/favorites/favorite-resolution-runner.test.ts packages/application/src/use-cases/import-favorite-sources.test.ts apps/extension/runtime/favorite-resolution-runtime.test.ts packages/ui/src/features/library/work-card/WorkCard.test.tsx",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m fix(favorites): verify cover identity and recover blocked tasks"
+          ],
+          "evidence": [
+            "57 targeted tests passed including ambiguous incomplete unrelated covers and blocked-task recovery",
+            "All workspace typechecks ESLint Oxlint docs and git diff checks passed",
+            "favorite-resolution Archify showcase 9/9; live Chrome confirmed replacement images and Referer-dependent GET response"
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Verify and package release 1.0.9",
+          "status": "TODO",
+          "acceptance": [
+            "Full verify passes",
+            "Chrome and Firefox archives are reproducible and hashed",
+            "Installed browser smoke passes"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "apps/extension/.output/packages",
+            "apps/web/out"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.9.zip",
+            "git commit -m chore(extension): prepare verified 1.0.9 release"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-8",
+          "title": "Publish approved artifacts and verify installed rendering",
+          "status": "TODO",
+          "acceptance": [
+            "Gate publishes only versioned ZIPs and matching Worker assets",
+            "Public hashes equal tested artifacts",
+            "Live cover rendering verified and reload outcome recorded"
+          ],
+          "files": [
+            ".ctxroute/state/pipeline-release-cloudflare.json",
+            "docs/release.md",
+            "apps/extension/.output"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "Browser reload and image inspection",
+            "git diff --check"
+          ],
+          "evidence": []
         }
       ]
     }

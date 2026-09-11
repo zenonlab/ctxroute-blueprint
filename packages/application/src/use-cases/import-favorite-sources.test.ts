@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
-import { claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
+import { blockTask, claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
@@ -16,6 +16,21 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
+  it('recovers an old blocked task once and preserves its previous state in a receipt', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const taskId = 'favorite-resolution_4_3432';
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!task || !source) throw new Error('Missing fixture');
+    await storage.putFavoriteResolutionTask(blockTask(claimTask(task, 'old', importedAt, '2026-09-06T00:01:00.000Z'), 'old', 'AUTOMATIC_ATTEMPT_LIMIT'));
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY', attempt: 0 });
+    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-109`);
+    expect(receipt).toMatchObject({ correction: { task: { state: 'BLOCKED', blockedReason: 'AUTOMATIC_ATTEMPT_LIMIT' } } });
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-109`)).toEqual(receipt);
+  });
   it('archives an artificial import Review with a before-image and resumes resolution once', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([favorite], storage, importedAt);

@@ -27,6 +27,23 @@ sont historiques et ne décrivent plus le manifest installé.
 
 ## État implémenté vérifié
 
+### Correctif de livraison 1.0.9
+
+Le contrôle dans Chrome a montré que MangaDex renvoie une image promotionnelle
+avec HTTP 200 lorsque le référent est le site. Les cartes demandent les images
+avec `referrerPolicy="no-referrer"` pour ne pas transmettre la navigation privée.
+Un échec de chargement affiche le placeholder accessible. Une URL présente ou
+un HTTP 200 ne suffisent pas à certifier visuellement une couverture.
+
+La préférence MangaUpdates réutilise le matcher : enveloppe complète,
+identité unique compatible et aucun choix par ordre API ou disponibilité d’image.
+Une réparation ne remplace pas une jaquette existante par un candidat sans image.
+Les anciens blocages sont repris une fois avec un reçu conservant les données
+précédentes; les décisions humaines restent protégées. Une panne répétée garde
+une échéance de reprise avec délai plafonné au lieu d’arrêter définitivement la file.
+Une restauration sync indisponible ne bloque plus les favoris locaux déjà importés.
+
+
 Le runtime actuel possède déjà des fondations réutilisables :
 
 - `WebExtensionBookmarkImportAdapter` parcourt l’arbre avec

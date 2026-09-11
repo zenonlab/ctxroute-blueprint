@@ -13,15 +13,17 @@ export async function correctImportedReview(session: StorageSession, source: Fav
   const faultyAutomatic = automatic && versions !== undefined
     && (['favorite-parser-v1', 'favorite-parser-v2'].includes(versions.parser)
       || ['favorite-matcher-v1', 'favorite-matcher-v2'].includes(versions.matcher));
-  if (!artificial && !faultyAutomatic) return source;
-  const id = `${source.id}:correction-v1`;
+  const task = await session.getFavoriteResolutionTask(taskId);
+  const blocked = task?.state === 'BLOCKED' && review === undefined && source.matchedWorkId === undefined
+    && (source.resolution === undefined || source.resolution.kind === 'RETRYABLE');
+  if (!artificial && !faultyAutomatic && !blocked) return source;
+  const id = `${source.id}:${blocked ? 'queue-recovery-109' : 'correction-v1'}`;
   const previous = await session.getFavoriteResolutionReceipt(id);
   if (previous) return source;
   const base = { schemaVersion: 1 as const, source };
   const correction = review === undefined ? base : { ...base, review };
   const artifact = await session.getFavoriteParseArtifact(source.id);
-  const task = await session.getFavoriteResolutionTask(taskId);
-  const receipt = { completedAt: now, correction, effectDigest: artificial ? 'correction:import-pending' : 'correction:faulty-automatic', id, idempotencyKey: id, sourceId: source.id };
+  const receipt = { completedAt: now, correction, effectDigest: blocked ? 'correction:blocked-task' : artificial ? 'correction:import-pending' : 'correction:faulty-automatic', id, idempotencyKey: id, sourceId: source.id };
   const withArtifact = artifact === undefined ? receipt : { ...receipt, correction: { ...correction, artifact } };
   await session.putFavoriteResolutionReceipt(task === undefined ? withArtifact : { ...withArtifact, correction: { ...withArtifact.correction, task } });
   const { matchedWorkId: _work, resolution: _resolution, resolutionVersions: _versions, reviewId: _review, ...unresolved } = source;

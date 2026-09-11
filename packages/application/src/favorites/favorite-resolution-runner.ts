@@ -8,7 +8,8 @@ import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
-import { hasExactBlockedProviderTaxonomy } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, matchFavoriteTitles } from './provider-matcher';
+import { normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
@@ -32,11 +33,10 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
     const currentCandidate = work.hydration?.candidate;
     if (currentCandidate?.provider === 'mangadex' && candidates?.mangaupdates !== undefined && currentCandidate.titles.length > 0) {
       try {
-        const envelope = await candidates.mangaupdates.search({ provider: 'mangaupdates', titles: currentCandidate.titles, limit: 6 });
-        const preferred = envelope.candidates.find((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME' && value.cover !== undefined && value.preSerialization !== true);
-        if (preferred !== undefined) {
+        const preferred = await preferMangaUpdatesHydration({ candidates }, currentCandidate);
+        if (preferred.provider === 'mangaupdates' && preferred.cover !== undefined && work.hydration !== undefined) {
           const references = [...new Map([...work.externalReferences, { provider: preferred.provider, externalId: preferred.externalId }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
-          await storage.putWork(createWork({ ...work, externalReferences: references, hydration: { ...work.hydration!, candidate: preferred, hydratedAt: now() } }));
+          await storage.putWork(createWork({ ...work, externalReferences: references, hydration: { ...work.hydration, candidate: preferred, hydratedAt: now(), providerTitleKeys: [...new Set(preferred.titles.map((title) => normalizeFavoriteTitle(title).normalized))] } }));
           repaired += 1;
           continue;
         }
@@ -115,17 +115,18 @@ async function retryClaim(
     if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
       || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
       || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
-    await session.putFavoriteResolutionTask(exhausted ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT') : retryTask(current, token, retryAt));
+    const scheduledAt = exhausted ? new Date(Math.max(timestamp(retryAt), timestamp(dependencies.now()) + favoriteResolutionMaximumBackoffMs)).toISOString() : retryAt;
+    await session.putFavoriteResolutionTask(retryTask(current, token, scheduledAt));
     await session.putFavoriteSource(createFavoriteSource({
-      ...source, resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : reason },
+      ...source, resolution: { kind: 'RETRYABLE', reason },
       resolutionVersions: favoriteResolutionVersions(record.artifact),
     }));
   });
-  return exhausted ? 'blocked' : 'retried';
+  return 'retried';
 }
 
 async function preferMangaUpdatesHydration(
-  dependencies: FavoriteResolutionRunnerDependencies,
+  dependencies: Pick<FavoriteResolutionRunnerDependencies, 'candidates'>,
   candidate: ProviderCandidate,
 ): Promise<ProviderCandidate> {
   if (candidate.provider !== 'mangadex') return candidate;
@@ -133,9 +134,10 @@ async function preferMangaUpdatesHydration(
   if (!mangaUpdates) return candidate;
   try {
     const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
-    const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME' && !value.preSerialization);
-    if (exact.length !== 1) return candidate;
-    return exact[0]!;
+    if (envelope.provider !== 'mangaupdates') return candidate;
+    const decision = matchFavoriteTitles({ sourceTitles: candidate.titles, mediaKind: candidate.mediaKind, preSerialization: false }, [envelope]);
+    if (decision.kind !== 'MATCH') return candidate;
+    return envelope.candidates.find((value) => value.provider === decision.matchedReference.provider && value.externalId === decision.matchedReference.externalId) ?? candidate;
   } catch {
     return candidate;
   }

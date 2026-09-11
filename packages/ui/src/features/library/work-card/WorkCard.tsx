@@ -51,6 +51,7 @@ export function WorkCard({
   const frameRef = useRef(0);
   const pointRef = useRef<ReturnType<typeof pointInRect> | null>(null);
   const [touchFlipped, setTouchFlipped] = useState(false);
+  const [failedCover, setFailedCover] = useState<string>();
   const flippable = variant === 'review' && Boolean(reviewActions);
   const classes = [
     styles.card,
@@ -108,8 +109,8 @@ export function WorkCard({
   const poster = (
     <span className={styles.poster}>
       <span className={styles.visual}>
-        {coverSrc
-          ? <img alt={coverAlt ?? `Couverture de ${title}`} decoding="async" loading="lazy" src={coverSrc} />
+        {coverSrc && failedCover !== coverSrc
+          ? <img alt={coverAlt ?? `Couverture de ${title}`} decoding="async" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedCover(coverSrc)} src={coverSrc} />
           : (
             <span aria-label={`Couverture indisponible pour ${title}`} className={styles.placeholder} role="img">
               <Icon aria-hidden="true" name={fallbackIcon[variant]} size="lg" />

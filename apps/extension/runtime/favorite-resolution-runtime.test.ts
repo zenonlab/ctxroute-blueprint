@@ -15,8 +15,8 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('continues bounded resolution while identity restoration is still pending', async () => {
-    const prepare = vi.fn(async (): Promise<'READY' | 'PENDING'> => 'READY').mockResolvedValueOnce('PENDING');
+  it.each(['PENDING', 'RETRYABLE'] as const)('continues bounded resolution while identity restoration is %s', async (status) => {
+    const prepare = vi.fn(async (): Promise<'READY' | 'PENDING' | 'RETRYABLE'> => 'READY').mockResolvedValueOnce(status);
     const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
     const claimNext = vi.fn(async () => undefined);
     const reconcile = createFavoriteResolutionRuntime({

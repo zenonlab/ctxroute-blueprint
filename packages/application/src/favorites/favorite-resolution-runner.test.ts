@@ -48,6 +48,13 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('keeps a provider outage scheduled after eight attempts', async () => {
+    const { storage, task, outbox } = await fixture();
+    await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
+    await runFavoriteResolutionSlice({ candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'eighth' });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T18:00:00.000Z' });
+    expect(await storage.readFavoriteResolutionCounts()).toEqual({ processing: 0, retryable: 1, unsupported: 0 });
+  });
   it('uses the owner-scoped lookup before title search and preserves its public references', async () => {
     const { outbox, storage } = await fixture();
     let searches = 0;
@@ -410,13 +417,26 @@ describe('runFavoriteResolutionSlice', () => {
 });
 
 describe('repairMissingFavoriteCovers', () => {
+  it.each(['ambiguous', 'incomplete', 'unrelated', 'no-cover'] as const)('preserves the existing work for a %s MangaUpdates result', async (scenario) => {
+    const storage = new MemoryStoragePort();
+    const mangadex = { ...candidate, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', mediaKind: 'MANGA' as const, cover: { attribution: 'MangaDex', url: 'https://uploads.mangadex.org/covers/fixture.jpg' } };
+    const work = createWork({ id: workId('work_cover_guard'), preferredTitle: 'Frieren', mediaKind: 'manga', externalReferences: [{ provider: 'mangadex', externalId: mangadex.externalId }], hydration: { candidate: mangadex, favoriteAliasKeys: [], hydratedAt: now, matcherVersion: 'matcher-v1', providerTitleKeys: [] } });
+    await storage.putWork(work);
+    const base = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, titles: scenario === 'unrelated' ? ['Unrelated Title'] : ['Frieren'] };
+    const preferred = scenario === 'no-cover' ? base : { ...base, cover: { attribution: 'MangaUpdates', url: 'https://cdn.mangaupdates.com/image/fixture.jpg' } };
+    const candidates = scenario === 'ambiguous' ? [preferred, { ...preferred, externalId: '87654' }] : [preferred];
+    const input = { candidates, complete: scenario !== 'incomplete', truncated: scenario === 'incomplete', digest: 'guard', provider: 'mangaupdates' as const };
+    const envelope = createProviderCandidateEnvelope(scenario === 'incomplete' ? { ...input, nextCursor: '2' } : input);
+    await repairMissingFavoriteCovers(storage, hydrationPorts(unusedHydration), () => now, undefined, { ...candidatePorts(unusedSearch), mangaupdates: { search: async () => envelope } });
+    expect(await storage.getWork(work.id)).toEqual(work);
+  });
   it('prefers a bounded MangaUpdates cover for an existing MangaDex work', async () => {
     const storage = new MemoryStoragePort();
     const mangadex = { ...candidate, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', mediaKind: 'MANGA' as const, cover: { attribution: 'MangaDex', url: 'https://uploads.mangadex.org/covers/12345678-1234-4234-8234-123456789abc/old.512.jpg' } };
     await storage.putWork(createWork({ externalReferences: [{ provider: 'mangadex', externalId: mangadex.externalId }], id: workId('work_mangadex-cover'), mediaKind: 'manga', preferredTitle: 'Synthetic Series', hydration: { candidate: mangadex, favoriteAliasKeys: [], hydratedAt: now, matcherVersion: 'matcher-v1', providerTitleKeys: [] } }));
     const preferred = { ...mangadex, provider: 'mangaupdates' as const, externalId: '12345', cover: { attribution: 'MangaUpdates', url: 'https://cdn.mangaupdates.com/image/series.jpg' } };
-    const hydration = hydrationPorts({ hydrate: async () => mangadex });
-    const candidates = candidatePorts({ search: async () => createProviderCandidateEnvelope({ candidates: [mangadex], complete: true, digest: 'md', provider: 'anilist', truncated: false }) });
+    const hydration = hydrationPorts(unusedHydration);
+    const candidates = candidatePorts(unusedSearch);
     const result = await repairMissingFavoriteCovers(storage, { ...hydration, mangadex: { hydrate: async () => mangadex }, mangaupdates: { hydrate: async () => preferred } }, () => now, undefined, { ...candidates, mangadex: { search: async () => createProviderCandidateEnvelope({ candidates: [mangadex], complete: true, digest: 'md', provider: 'mangadex', truncated: false }) }, mangaupdates: { search: async () => createProviderCandidateEnvelope({ candidates: [preferred], complete: true, digest: 'mu', provider: 'mangaupdates', truncated: false }) } });
     expect(result.repaired).toBe(1);
     await expect(storage.getWork(workId('work_mangadex-cover'))).resolves.toMatchObject({ hydration: { candidate: { provider: 'mangaupdates', externalId: '12345', cover: { attribution: 'MangaUpdates' } } }, externalReferences: expect.arrayContaining([{ provider: 'mangadex', externalId: mangadex.externalId }, { provider: 'mangaupdates', externalId: '12345' }]) });

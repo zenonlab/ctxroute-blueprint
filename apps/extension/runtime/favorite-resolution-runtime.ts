@@ -69,8 +69,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
         }
         if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
-        const recoveryStatus = dependencies.identityRecovery === undefined ? 'READY' : await dependencies.identityRecovery.prepare();
-        if (recoveryStatus === 'RETRYABLE') return;
+        await dependencies.identityRecovery?.prepare();
         await runFavoriteResolutionSlice(dependencies);
         const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
         coverRepairAfterId = repairedCovers.nextAfterId;

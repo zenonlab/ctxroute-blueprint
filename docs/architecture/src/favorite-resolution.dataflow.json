@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "Toute tâche bloquée conserve RETRYABLE; les œuvres manga MangaDex tentent aussi la cover MangaUpdates."
+        "note": "Images sans référent; préférence MU après preuve unique complète. Reprise des tâches bloquées avec reçu local."
       },
       {
         "id": "cover-rights",
@@ -133,7 +133,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "identités prouvées · 8 tâches"
+      "tag": "100 tâches / 20 s"
     },
     {
       "id": "providerAdapters",
