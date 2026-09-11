@@ -170,7 +170,11 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      const identity = { workId: cached?.id, hydratedAt: fresh ? cached?.hydration?.hydratedAt : undefined, references: [reference] };
+      const identity = candidate.provider === reference.provider && cached?.id !== undefined
+        ? { workId: cached.id, references: [reference] }
+        : fresh && cached?.hydration?.hydratedAt !== undefined
+          ? { hydratedAt: cached.hydration.hydratedAt, references: [reference] }
+          : { references: [reference] };
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, identity);
       return 'completed';
     }
