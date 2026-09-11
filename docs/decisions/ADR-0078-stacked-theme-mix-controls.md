@@ -19,11 +19,10 @@ codé dans le connecteur.
 
 ## Decision
 
-`orbite.theme-interface/2` décrit deux lignes pleines. La première contient l'orbe
-audio, sa barre et le bouton Finder ; la seconde contient l'orbe de luminosité, sa
-barre et le bouton pause. Les barres utilisent la largeur disponible entre l'orbe
-et la commande. La première règle le volume audio global du thème, musique et
-effets ensemble ; la seconde règle sa luminosité.
+`orbite.theme-interface/2` décrit deux lignes de réglage puis une ligne de commandes :
+un orbe audio et sa barre, un orbe de luminosité et sa barre, puis deux boutons
+centrés pour Finder et la pause. La première barre règle le volume audio global du
+thème, musique et effets ensemble ; la seconde règle sa luminosité.
 Les deux valeurs sont absolues,
 finies et bornées entre zéro et un. Elles ne modifient jamais le volume matériel ni
 la luminosité physique du Mac.
@@ -39,8 +38,8 @@ Le message Swift vers le RenderHost passe en schéma 2 et transporte
 `audio_volume`, `brightness` et `visual_paused`. Le RenderHost arrête son horloge
 de simulation lorsqu'il est en pause et écarte le premier delta à la reprise. La
 visibilité Finder reste une capacité macOS séparée et réversible ; la pause reste
-un état explicite du protocole. Chaque bouton termine une ligne sans se confondre
-avec la valeur continue qui le précède. Un manifeste v1
+un état explicite du protocole. Leurs boutons sont regroupés sous les réglages pour
+ne pas être confondus avec les valeurs continues. Un manifeste v1
 doit être migré explicitement : le connecteur ne lui invente ni icône ni commande.
 
 ## Consequences
