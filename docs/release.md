@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.3`. `apps/extension/package.json` is the only
+The current candidate is `1.0.4`. `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 

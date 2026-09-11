@@ -15,7 +15,7 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('waits for exact identity restoration before claiming resolution tasks and publishing new IDs', async () => {
+  it('continues bounded resolution while identity restoration is still pending', async () => {
     const prepare = vi.fn(async (): Promise<'READY' | 'PENDING'> => 'READY').mockResolvedValueOnce('PENDING');
     const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
     const claimNext = vi.fn(async () => undefined);
@@ -26,10 +26,10 @@ describe('createFavoriteResolutionRuntime', () => {
       sourceAdapters: [], storage: new MemoryStoragePort(), token: () => 'recovery-token',
     });
     await reconcile();
-    expect(claimNext).not.toHaveBeenCalled(); expect(publish).not.toHaveBeenCalled();
-    await reconcile();
     expect(claimNext).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledOnce();
-    expect(prepare.mock.invocationCallOrder[1]).toBeLessThan(claimNext.mock.invocationCallOrder[0] ?? 0);
+    await reconcile();
+    expect(claimNext).toHaveBeenCalledTimes(2); expect(publish).toHaveBeenCalledTimes(2);
+    expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(claimNext.mock.invocationCallOrder[0] ?? 0);
     expect(claimNext.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0] ?? 0);
   });
   it('persists the latest bookmark mutation before requesting convergence', async () => {

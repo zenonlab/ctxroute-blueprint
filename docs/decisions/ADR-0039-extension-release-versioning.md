@@ -22,8 +22,8 @@ under an existing version can leave installed browsers with stale cached code.
 ## Decision
 
 Every corrective extension build increments the extension package version
-(`1.0.1`, `1.0.2` for the initial cover repair, then `1.0.3` for resumable
-cover repair). The
+(`1.0.1`, `1.0.2` for the initial cover repair, `1.0.3` for resumable cover
+repair, then `1.0.4` for resolution during sync restoration). The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare
