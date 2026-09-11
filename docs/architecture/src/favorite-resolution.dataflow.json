@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "MangaUpdates puis MangaDex puis Kitsu; refus HTTP 403 terminal autorise le repli, pannes et 429 restent en retry."
+        "note": "MangaUpdates puis MangaDex puis Kitsu; chaque candidat retenu est hydraté avant commit."
       },
       {
         "id": "bounded-convergence",

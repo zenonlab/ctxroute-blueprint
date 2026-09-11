@@ -236,7 +236,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const provider = outcome.matchedReference.provider;
-  if (provider === 'mangadex') throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
   let candidate: ProviderCandidate | undefined;
   try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch (error) {
     const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
