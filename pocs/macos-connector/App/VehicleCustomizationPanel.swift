@@ -85,6 +85,10 @@ import AppKit
         }
     }
 
+    func setImage(_ image: NSImage?, for id: String) {
+        entries.first { $0.button.identifier?.rawValue == id }?.button.image = image
+    }
+
     @objc private func chosen(_ sender: NSButton) {
         let value = sender.identifier?.rawValue ?? ""
         select(id: value.isEmpty ? nil : value)
@@ -246,7 +250,10 @@ import AppKit
         sessionChanged()
     }
 
-    @objc private func choiceChanged() { updatePreview() }
+    @objc private func choiceChanged() {
+        updatePreview()
+        updateTargetPreview()
+    }
 
     @objc private func sessionChanged() {
         guard let id = session.selectedID, let snapshot = sessions.first(where: { $0.id == id }) else {
@@ -287,6 +294,16 @@ import AppKit
         preview.image = interface.manifest.choices.first { $0.id == selected }
             .flatMap { interface.assets[$0.preview] }.flatMap(NSImage.init(contentsOf:))
             ?? interface.asset(for: "customizer.panel").flatMap(NSImage.init(contentsOf:))
+    }
+
+    private func updateTargetPreview() {
+        guard let interface, let id = editingTargetID else { return }
+        let image = vehicle.selectedID
+            .flatMap { selected in interface.manifest.choices.first { $0.id == selected } }
+            .flatMap { interface.assets[$0.preview] }
+            .flatMap(NSImage.init(contentsOf:))
+            ?? interface.asset(for: "customizer.target").flatMap(NSImage.init(contentsOf:))
+        target.setImage(image, for: id)
     }
 
     private func captureCurrentSelection() {
