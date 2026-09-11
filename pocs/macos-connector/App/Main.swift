@@ -140,9 +140,10 @@ import os
         themePicker.target = self
         themePicker.action = #selector(themeSelectionChanged)
         stack.addArrangedSubview(themePicker)
-        themeControls.onAudio = { [weak self] in self?.toggleThemeAudio() }
+        themeControls.onAudioVolume = { [weak self] value in self?.setThemeAudioVolume(value) }
         themeControls.onDesktop = { [weak self] in self?.toggleDesktopItems() }
         themeControls.onBrightness = { [weak self] value in self?.setThemeBrightness(value) }
+        themeControls.onVisualPause = { [weak self] in self?.toggleVisualPause() }
         stack.addArrangedSubview(themeControls)
         statusLabel.textColor = .secondaryLabelColor; stack.addArrangedSubview(statusLabel)
 
@@ -258,22 +259,31 @@ import os
             statusItem?.button?.title = "Orbite"
         }
         guard let id = selectedTheme?.package.id else { return }
-        let muted = UserDefaults.standard.object(forKey: "ThemeMuted.\(id)") as? Bool ?? true
-        themeControls.setMuted(muted, interface: interface)
+        themeControls.setAudioVolume(themeAudioVolume(id: id))
         themeControls.setDesktopVisible(try? desktopItems.isVisible(), interface: interface)
         themeControls.setBrightness(UserDefaults.standard.object(forKey: "ThemeBrightness.\(id)") as? Double ?? 0.8)
+        themeControls.setVisualPaused(UserDefaults.standard.object(forKey: "ThemeVisualPaused.\(id)") as? Bool ?? false,
+                                      interface: interface)
     }
 
     @objc private func themeSelectionChanged() { configureThemeControls() }
 
-    private func toggleThemeAudio() {
+    private func themeAudioVolume(id: String) -> Double {
+        let key = "ThemeAudioVolume.\(id)"
+        if let value = UserDefaults.standard.object(forKey: key) as? Double {
+            return min(1, max(0, value))
+        }
+        let legacyMuted = UserDefaults.standard.object(forKey: "ThemeMuted.\(id)") as? Bool
+        return legacyMuted == true ? 0 : 0.8
+    }
+
+    private func setThemeAudioVolume(_ value: Double) {
         guard let theme = selectedTheme else { return }
-        let key = "ThemeMuted.\(theme.package.id)"
-        let next = !(UserDefaults.standard.object(forKey: key) as? Bool ?? true)
-        UserDefaults.standard.set(next, forKey: key)
-        themeControls.setMuted(next, interface: theme.interface)
+        let bounded = min(1, max(0, value))
+        UserDefaults.standard.set(bounded, forKey: "ThemeAudioVolume.\(theme.package.id)")
+        themeControls.setAudioVolume(bounded)
         try? pushRuntimeControls(for: theme)
-        statusLabel.stringValue = next ? "Audio du thème coupé." : "Audio du thème activé."
+        statusLabel.stringValue = "Volume du thème : \(Int((bounded * 100).rounded())) %."
     }
 
     private func setThemeBrightness(_ value: Double) {
@@ -307,10 +317,12 @@ import os
 
     private func handleDesktopAction(_ action: RenderHostDesktopAction) {
         switch action {
-        case .audio:
-            toggleThemeAudio()
+        case .audioVolume(let value):
+            setThemeAudioVolume(value)
         case .desktopFiles:
             toggleDesktopItems()
+        case .visualPause:
+            toggleVisualPause()
         case .brightness(let value):
             themeControls.setBrightness(value)
             setThemeBrightness(value)
@@ -435,13 +447,14 @@ import os
 
     private func pushRuntimeControls(for theme: DiscoveredTheme) throws {
         guard renderHost.themeID == theme.package.id else { return }
-        let muted = UserDefaults.standard.object(forKey: "ThemeMuted.\(theme.package.id)") as? Bool ?? true
+        let audioVolume = themeAudioVolume(id: theme.package.id)
         let brightness = UserDefaults.standard.object(forKey: "ThemeBrightness.\(theme.package.id)") as? Double ?? 0.8
+        let visualPaused = UserDefaults.standard.object(forKey: "ThemeVisualPaused.\(theme.package.id)") as? Bool ?? false
         let overrides = try theme.interface.map {
             try interfaceStore.load(themeID: theme.package.id, interface: $0.manifest)
         }
-        try renderHost.update(muted: muted, desktopItemsVisible: try? desktopItems.isVisible(),
-                              brightness: brightness, overrides: overrides)
+        try renderHost.update(audioVolume: audioVolume, desktopItemsVisible: try? desktopItems.isVisible(),
+                              brightness: brightness, visualPaused: visualPaused, overrides: overrides)
     }
     @objc private func openWallpaperSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Wallpaper-Settings.extension") else { return }
@@ -461,6 +474,16 @@ import os
             if let theme = selectedTheme { try? pushRuntimeControls(for: theme) }
             statusLabel.stringValue = visible ? "Fichiers du bureau affichés." : "Fichiers du bureau masqués."
         } catch { statusLabel.stringValue = "Réglage Finder non confirmé ; aucun fichier n’a été supprimé." }
+    }
+
+    private func toggleVisualPause() {
+        guard let theme = selectedTheme else { return }
+        let key = "ThemeVisualPaused.\(theme.package.id)"
+        let paused = !(UserDefaults.standard.object(forKey: key) as? Bool ?? false)
+        UserDefaults.standard.set(paused, forKey: key)
+        themeControls.setVisualPaused(paused, interface: theme.interface)
+        try? pushRuntimeControls(for: theme)
+        statusLabel.stringValue = paused ? "Visuel en pause." : "Visuel repris."
     }
 
     private func captureSmoke(destination: URL) {

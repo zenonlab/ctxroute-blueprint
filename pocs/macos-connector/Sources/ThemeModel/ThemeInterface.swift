@@ -69,16 +69,16 @@ public struct ResolvedThemeInterface: Codable, Equatable, Sendable {
 
 public enum ThemeInterfaceLoader {
     public static let requiredSlots = Set([
-        "theme.audio.muted", "theme.audio.unmuted",
+        "theme.audio", "display.brightness", "slider.track", "slider.thumb",
         "desktop.files.visible", "desktop.files.hidden",
-        "display.brightness", "slider.track", "slider.thumb", "customizer.panel"
+        "visual.motion.pause", "visual.motion.resume", "customizer.panel"
     ])
 
     public static func load(_ manifestURL: URL) throws -> ResolvedThemeInterface {
         let data = try boundedRegularFile(manifestURL, maximum: 65_536)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
-        guard manifest.format == "orbite.theme-interface/1",
-              (requiredSlots.isSubset(of: Set(manifest.slots.keys))),
+        guard manifest.format == "orbite.theme-interface/2",
+              requiredSlots.isSubset(of: Set(manifest.slots.keys)),
               (1...64).contains(manifest.assets.count), manifest.choices.count <= 64,
               manifest.targets.count <= 16,
               Set(manifest.assets.map(\.id)).count == manifest.assets.count,

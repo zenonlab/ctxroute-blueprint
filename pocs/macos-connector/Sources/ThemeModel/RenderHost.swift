@@ -97,14 +97,16 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
         return true
     }
 
-    public func update(muted: Bool, desktopItemsVisible: Bool?, brightness: Double,
+    public func update(audioVolume: Double, desktopItemsVisible: Bool?, brightness: Double,
+                       visualPaused: Bool,
                        overrides: ThemeInterfaceOverrides? = nil) throws {
         guard process?.isRunning == true, let input else {
             throw ModelError.invalid("RenderHost is not running")
         }
-        let state = try RenderHostControlState(generation: controlGeneration, muted: muted,
+        let state = try RenderHostControlState(generation: controlGeneration, audioVolume: audioVolume,
                                                desktopItemsVisible: desktopItemsVisible,
-                                               brightness: brightness, overrides: overrides)
+                                               brightness: brightness, visualPaused: visualPaused,
+                                               overrides: overrides)
         var data = try JSONEncoder().encode(state)
         guard data.count <= 65_535 else { throw ModelError.invalid("RenderHost control state too large") }
         data.append(0x0a)

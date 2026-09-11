@@ -14,7 +14,7 @@ final class ThemeInterfaceTests: XCTestCase {
         var slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
         slots["session.action.focus"] = asset.id
         slots["session.state.active"] = asset.id
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/1", assets: [asset],
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/2", assets: [asset],
             slots: slots, choices: [
                 .init(id: "driver.fixture", label: "Pilote libre", kind: .character, preview: asset.id),
                 .init(id: "kart.fixture", label: "Kart libre", kind: .vehicle, preview: asset.id,
@@ -32,6 +32,16 @@ final class ThemeInterfaceTests: XCTestCase {
 
         try Data(png + [2]).write(to: root.appendingPathComponent("fixture.png"))
         XCTAssertThrowsError(try ThemeInterfaceLoader.load(manifestURL))
+    }
+
+    func testControlV2CarriesOneThemeMixBrightnessAndPause() throws {
+        let state = try RenderHostControlState(generation: 7, audioVolume: 0.35,
+            desktopItemsVisible: false, brightness: 0.8, visualPaused: true)
+        XCTAssertEqual(state.schema_version, 2)
+        XCTAssertEqual(state.audio_volume, 0.35)
+        XCTAssertTrue(state.visual_paused)
+        XCTAssertThrowsError(try RenderHostControlState(generation: 8, audioVolume: 1.1,
+            desktopItemsVisible: nil, brightness: 0.8, visualPaused: false))
     }
 
     func testInterfaceRejectsMissingSemanticSlotAndTraversal() throws {

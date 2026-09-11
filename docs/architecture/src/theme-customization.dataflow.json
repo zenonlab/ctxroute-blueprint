@@ -16,14 +16,14 @@
   "nodes": [
     { "id": "creator", "type": "frontend", "label": "Création ouverte", "sublabel": "code · studio · modèles", "stage": 0, "row": 0, "width": 150 },
     { "id": "game", "type": "external", "label": "Import local du jeu", "sublabel": "2D/3D · rigs · caméras source", "stage": 0, "row": 2, "width": 150 },
-    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "slots · variantes · session_id", "stage": 1, "row": 0, "width": 150 },
+    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "slots v2 · variantes · session_id", "stage": 1, "row": 0, "width": 160 },
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "convertit vers l'IR canonique", "stage": 1, "row": 2, "width": 150 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "apparences · rigs · compatibilité", "stage": 2, "row": 0, "width": 160 },
     { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · clips · icônes UI source", "stage": 2, "row": 2, "width": 160 },
-    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "brouillon atomique · session stable", "stage": 3, "row": 0, "width": 170 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "volume · lumière · pause · brouillon", "stage": 3, "row": 0, "width": 180 },
     { "id": "capabilities", "type": "security", "label": "Courtiers typés", "sublabel": "OS · sessions · restauration", "stage": 3, "row": 2, "width": 170 },
     { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "instances · matériaux · cibles", "stage": 4, "row": 0, "width": 160 },
-    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "vignettes ROM synchronisées · sessions", "stage": 4, "row": 1, "width": 180 },
+    { "id": "ui", "type": "frontend", "label": "UI diégétique", "sublabel": "2 barres · 2 boutons · sessions", "stage": 4, "row": 1, "width": 180 },
     { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
   ],
   "flows": [
@@ -33,8 +33,8 @@
     { "from": "importer", "to": "library", "label": "assets validés", "variant": "security", "labelAt": [420, 428] },
     { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
     { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },
-    { "from": "runtime", "to": "renderer", "label": "apparence → · cibles ←", "variant": "emphasis", "labelAt": [855, 108] },
-    { "from": "runtime", "to": "ui", "label": "modale · cartes et curseur ROM", "labelAt": [925, 220] },
+    { "from": "runtime", "to": "renderer", "label": "volume, lumière, pause → · cibles ←", "variant": "emphasis", "labelAt": [855, 108] },
+    { "from": "runtime", "to": "ui", "label": "pile de contrôles et curseur privés", "labelAt": [925, 220] },
     { "from": "runtime", "to": "capabilities", "label": "focus/open corrélés", "variant": "security", "labelAt": [680, 270] },
     { "from": "capabilities", "to": "connector", "label": "actions autorisées", "variant": "security", "route": "straight", "labelAt": [855, 428] },
     { "from": "capabilities", "to": "ui", "label": "snapshot monotone confirmé", "variant": "dashed" }

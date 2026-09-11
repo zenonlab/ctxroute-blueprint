@@ -3,9 +3,10 @@ import AppKit
 import QuartzCore
 
 enum RenderHostDesktopAction: Sendable {
-    case audio
+    case audioVolume(Double)
     case desktopFiles
     case brightness(Double)
+    case visualPause
     case target(String, context: Bool)
 }
 
@@ -44,8 +45,8 @@ private final class RenderHostGestureState: @unchecked Sendable {
             }
             if type == .leftMouseDragged || type == .rightMouseDragged {
                 guard var current = capture else { return false }
-                if current.hit.kind == .control && current.hit.id == "display.brightness" {
-                    deliver(.brightness(brightness(event.location, target: current.hit)))
+                if current.hit.kind == .control, isSlider(current.hit.id) {
+                    deliverSlider(current.hit.id, point: event.location, target: current.hit)
                 } else if hypot(event.location.x - current.start.x, event.location.y - current.start.y) > 4 {
                     current.cancelled = true
                     capture = current
@@ -58,14 +59,15 @@ private final class RenderHostGestureState: @unchecked Sendable {
                 guard capture == nil, authorized(event), let hit = hit(event.location),
                       allowed(hit: hit, button: button) else { return false }
                 capture = Capture(button: button, hit: hit, start: event.location, cancelled: false)
-                if button == .left && hit.id == "display.brightness" {
-                    deliver(.brightness(brightness(event.location, target: hit)))
+                if button == .left, isSlider(hit.id) {
+                    deliverSlider(hit.id, point: event.location, target: hit)
                 }
                 return true
             }
             guard let current = capture, current.button == button else { return false }
             capture = nil
             guard !current.cancelled, authorized(event) else { return true }
+            if isSlider(current.hit.id) { return true }
             dispatch(hit: current.hit, button: button, point: event.location)
             return true
         }
@@ -84,22 +86,29 @@ private final class RenderHostGestureState: @unchecked Sendable {
         return snapshot.hit(x: x, y: y)
     }
 
-    private func brightness(_ point: CGPoint, target: RenderHostHitSnapshot.Target) -> Double {
+    private func sliderValue(_ point: CGPoint, target: RenderHostHitSnapshot.Target) -> Double {
         let bounds = CGDisplayBounds(CGMainDisplayID())
         guard let snapshot, bounds.width > 0 else { return 0 }
         let x = (point.x - bounds.minX) * snapshot.width / bounds.width
         return min(1, max(0, (x - target.x) / target.width))
     }
 
-    private func dispatch(hit: RenderHostHitSnapshot.Target, button: CGMouseButton, point: CGPoint) {
+    private func isSlider(_ id: String) -> Bool {
+        id == "theme.audio" || id == "display.brightness"
+    }
+
+    private func deliverSlider(_ id: String, point: CGPoint, target: RenderHostHitSnapshot.Target) {
+        let value = sliderValue(point, target: target)
+        deliver(id == "theme.audio" ? .audioVolume(value) : .brightness(value))
+    }
+
+    private func dispatch(hit: RenderHostHitSnapshot.Target, button: CGMouseButton, point _: CGPoint) {
         if hit.kind == .target {
             deliver(.target(hit.id, context: button == .right))
-        } else if hit.id == "theme.audio" {
-            deliver(.audio)
         } else if hit.id == "desktop.files" {
             deliver(.desktopFiles)
-        } else if hit.id == "display.brightness" {
-            deliver(.brightness(brightness(point, target: hit)))
+        } else if hit.id == "visual.motion" {
+            deliver(.visualPause)
         }
     }
 

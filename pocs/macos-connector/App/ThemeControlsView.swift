@@ -22,23 +22,33 @@ import AppKit
 /// Native presentation of semantic theme controls. A missing private skin hides
 /// image controls instead of substituting SF Symbols or bundled artwork.
 @MainActor final class ThemeControlsView: NSStackView {
-    private let audio = NSButton()
+    private let audioIcon = NSImageView()
+    private let audio = NSSlider(value: 0.8, minValue: 0, maxValue: 1, target: nil, action: nil)
     private let desktop = NSButton()
+    private let visualPause = NSButton()
     private let brightnessIcon = NSImageView()
     private let brightness = NSSlider(value: 0.8, minValue: 0, maxValue: 1, target: nil, action: nil)
     private let unavailable = NSTextField(labelWithString: "Interface privée absente")
-    var onAudio: (() -> Void)?
+    var onAudioVolume: ((Double) -> Void)?
     var onDesktop: (() -> Void)?
     var onBrightness: ((Double) -> Void)?
+    var onVisualPause: (() -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        orientation = .horizontal
-        alignment = .centerY
-        spacing = 10
+        orientation = .vertical
+        alignment = .leading
+        spacing = 8
+        let audioRow = sliderRow(icon: audioIcon, slider: audio, label: "Volume du thème",
+                                 action: #selector(changeAudioVolume))
+        let brightnessRow = sliderRow(icon: brightnessIcon, slider: brightness,
+                                      label: "Luminosité du thème",
+                                      action: #selector(changeBrightness))
+        addArrangedSubview(audioRow)
+        addArrangedSubview(brightnessRow)
         for (button, label, action) in [
-            (audio, "Audio du thème", #selector(toggleAudio)),
-            (desktop, "Fichiers du bureau", #selector(toggleDesktop))
+            (desktop, "Afficher ou masquer les fichiers du bureau", #selector(toggleDesktop)),
+            (visualPause, "Mettre en pause ou reprendre le visuel", #selector(toggleVisualPause))
         ] {
             button.target = self
             button.action = action
@@ -49,17 +59,6 @@ import AppKit
             button.heightAnchor.constraint(equalToConstant: 42).isActive = true
             addArrangedSubview(button)
         }
-        brightnessIcon.imageScaling = .scaleProportionallyDown
-        brightnessIcon.setAccessibilityLabel("Luminosité du thème")
-        brightnessIcon.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        brightnessIcon.heightAnchor.constraint(equalToConstant: 32).isActive = true
-        addArrangedSubview(brightnessIcon)
-        brightness.target = self
-        brightness.action = #selector(changeBrightness)
-        brightness.isContinuous = true
-        brightness.setAccessibilityLabel("Luminosité du thème")
-        brightness.widthAnchor.constraint(equalToConstant: 176).isActive = true
-        addArrangedSubview(brightness)
         unavailable.textColor = .secondaryLabelColor
         addArrangedSubview(unavailable)
         setSkin(nil)
@@ -67,35 +66,51 @@ import AppKit
 
     required init?(coder: NSCoder) { nil }
 
+    private func sliderRow(icon: NSImageView, slider: NSSlider, label: String,
+                           action: Selector) -> NSStackView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        icon.imageScaling = .scaleProportionallyDown
+        icon.setAccessibilityLabel(label)
+        icon.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        slider.target = self
+        slider.action = action
+        slider.isContinuous = true
+        slider.setAccessibilityLabel(label)
+        slider.widthAnchor.constraint(equalToConstant: 176).isActive = true
+        row.addArrangedSubview(icon)
+        row.addArrangedSubview(slider)
+        return row
+    }
+
     func setSkin(_ interface: ResolvedThemeInterface?) {
         guard let interface else {
-            [audio, desktop, brightnessIcon, brightness].forEach { $0.isHidden = true }
+            [audioIcon, audio, desktop, visualPause, brightnessIcon, brightness].forEach { $0.isHidden = true }
             unavailable.isHidden = false
             return
         }
-        audio.image = interface.asset(for: "theme.audio.muted").flatMap(NSImage.init(contentsOf:))
+        audioIcon.image = interface.asset(for: "theme.audio").flatMap(NSImage.init(contentsOf:))
         desktop.image = interface.asset(for: "desktop.files.visible").flatMap(NSImage.init(contentsOf:))
+        visualPause.image = interface.asset(for: "visual.motion.pause").flatMap(NSImage.init(contentsOf:))
         brightnessIcon.image = interface.asset(for: "display.brightness").flatMap(NSImage.init(contentsOf:))
-        if let cell = brightness.cell as? ThemeImageSliderCell {
-            cell.trackImage = interface.asset(for: "slider.track").flatMap(NSImage.init(contentsOf:))
-            cell.thumbImage = interface.asset(for: "slider.thumb").flatMap(NSImage.init(contentsOf:))
-        } else {
-            let cell = ThemeImageSliderCell()
+        for slider in [audio, brightness] {
+            let value = slider.doubleValue
+            let cell = (slider.cell as? ThemeImageSliderCell) ?? ThemeImageSliderCell()
             cell.minValue = 0
             cell.maxValue = 1
-            cell.doubleValue = brightness.doubleValue
+            cell.doubleValue = value
             cell.trackImage = interface.asset(for: "slider.track").flatMap(NSImage.init(contentsOf:))
             cell.thumbImage = interface.asset(for: "slider.thumb").flatMap(NSImage.init(contentsOf:))
-            brightness.cell = cell
+            slider.cell = cell
         }
-        [audio, desktop, brightnessIcon, brightness].forEach { $0.isHidden = false }
+        [audioIcon, audio, desktop, visualPause, brightnessIcon, brightness].forEach { $0.isHidden = false }
         unavailable.isHidden = true
     }
 
-    func setMuted(_ muted: Bool, interface: ResolvedThemeInterface?) {
-        let slot = muted ? "theme.audio.muted" : "theme.audio.unmuted"
-        audio.image = interface?.asset(for: slot).flatMap(NSImage.init(contentsOf:))
-    }
+    func setAudioVolume(_ value: Double) { audio.doubleValue = min(1, max(0, value)) }
 
     func setDesktopVisible(_ visible: Bool?, interface: ResolvedThemeInterface?) {
         let slot = visible == false ? "desktop.files.hidden" : "desktop.files.visible"
@@ -104,7 +119,13 @@ import AppKit
 
     func setBrightness(_ value: Double) { brightness.doubleValue = min(1, max(0, value)) }
 
-    @objc private func toggleAudio() { onAudio?() }
+    func setVisualPaused(_ paused: Bool, interface: ResolvedThemeInterface?) {
+        let slot = paused ? "visual.motion.resume" : "visual.motion.pause"
+        visualPause.image = interface?.asset(for: slot).flatMap(NSImage.init(contentsOf:))
+    }
+
+    @objc private func changeAudioVolume() { onAudioVolume?(audio.doubleValue) }
     @objc private func toggleDesktop() { onDesktop?() }
     @objc private func changeBrightness() { onBrightness?(brightness.doubleValue) }
+    @objc private func toggleVisualPause() { onVisualPause?() }
 }
