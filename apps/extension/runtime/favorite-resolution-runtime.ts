@@ -1,6 +1,6 @@
 import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
-import type { LibraryId } from '@tobirink/domain';
+import type { LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
 import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
@@ -42,6 +42,7 @@ export function subscribeFavoriteBookmarkMutations(
 export function createFavoriteResolutionRuntime(dependencies: FavoriteResolutionRuntimeDependencies) {
   let active: Promise<void> | undefined;
   let mutationQueued = false;
+  let coverRepairAfterId: Work['id'] | undefined;
   const runOnce = () => dependencies.ensureReady()
     .then(async () => {
         await dependencies.beforeInventory?.();
@@ -70,7 +71,9 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
         if (dependencies.identityRecovery !== undefined && await dependencies.identityRecovery.prepare() !== 'READY') return;
         await runFavoriteResolutionSlice(dependencies);
-        await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now);
+        const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId);
+        coverRepairAfterId = repairedCovers.nextAfterId;
+        if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
         await dependencies.identityRecovery?.publish();
     });
   return function reconcileFavorites(bookmarkMutation = false): Promise<void> {

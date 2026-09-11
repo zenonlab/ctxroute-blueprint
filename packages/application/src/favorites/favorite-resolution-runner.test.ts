@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createProviderCandidateEnvelope, createSourceEvidence, libraryId } from '@tobirink/domain';
+import { createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '../tasks';
 import { blockTask, claimTask, isTaskAvailable, retryTask } from '../tasks';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite-source-presence';
-import { runFavoriteResolutionSlice } from './favorite-resolution-runner';
+import { repairMissingFavoriteCovers, runFavoriteResolutionSlice } from './favorite-resolution-runner';
 import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { FavoriteProviderRetryError } from './provider-ports';
 
@@ -369,5 +369,29 @@ describe('runFavoriteResolutionSlice', () => {
     }
     expect(requestedPages).toEqual(Array.from({ length: 10 }, (_, index) => String(index + 1)));
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+  });
+});
+
+describe('repairMissingFavoriteCovers', () => {
+  it('advances by work id so later pages are eventually repaired', async () => {
+    const storage = new MemoryStoragePort();
+    for (let index = 0; index < 11; index += 1) {
+      const workCandidate = { ...candidate, externalId: String(index) };
+      await storage.putWork(createWork({
+        externalReferences: [{ externalId: String(index), provider: 'anilist' }],
+        id: workId(`work_cover_${String(index).padStart(2, '0')}`), mediaKind: 'anime', preferredTitle: `Work ${index}`,
+        hydration: { candidate: workCandidate, favoriteAliasKeys: [], hydratedAt: now, matcherVersion: 'matcher-v1', providerTitleKeys: [] },
+      }));
+    }
+    const calls: string[] = [];
+    const hydration = hydrationPorts({ hydrate: async ({ externalId }: { externalId: string }) => { calls.push(externalId); return { ...candidate, externalId, cover: { attribution: 'AniList', url: `https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/${externalId}.jpg` } }; } });
+    const first = await repairMissingFavoriteCovers(storage, hydration, () => now);
+    expect(first.inspected).toBe(10);
+    expect(first.nextAfterId).toBe(workId('work_cover_09'));
+    const second = await repairMissingFavoriteCovers(storage, hydration, () => now, first.nextAfterId);
+    expect(second.inspected).toBe(1);
+    expect(second.repaired).toBe(1);
+    expect(calls).toHaveLength(11);
+    expect((await storage.getWork(workId('work_cover_10')))?.hydration?.candidate.cover?.url).toContain('/10.jpg');
   });
 });

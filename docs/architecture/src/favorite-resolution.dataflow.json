@@ -44,7 +44,7 @@
           "providerAdapters",
           "privateStore"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les œuvres sans cover sont réhydratées par tranches bornées."
+        "note": "IndexedDB privé : titres, facettes et jaquettes HTTPS attribuées. Les covers manquantes avancent par curseur et tranches bornées."
       },
       {
         "id": "cover-rights",

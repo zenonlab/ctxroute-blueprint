@@ -1,5 +1,5 @@
 import { createFavoriteSource, createWork } from '@tobirink/domain';
-import type { FavoriteParseArtifact, LibraryId, ProviderCandidate } from '@tobirink/domain';
+import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
@@ -24,8 +24,8 @@ export const favoriteResolutionAttemptLimit = 8;
 export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
 export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 
-export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string) {
-  const works = await storage.listWorks({ limit: 10 });
+export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string, afterId?: Work['id']) {
+  const works = await storage.listWorks(afterId === undefined ? { limit: 10 } : { afterId, limit: 10 });
   let repaired = 0;
   let skipped = 0;
   for (const work of works) {
@@ -46,7 +46,7 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
       repaired += 1;
     } catch { skipped += 1; }
   }
-  return Object.freeze({ inspected: works.length, repaired, skipped });
+  return Object.freeze({ inspected: works.length, repaired, skipped, nextAfterId: works.at(-1)?.id });
 }
 
 export interface FavoriteResolutionRunnerDependencies {
