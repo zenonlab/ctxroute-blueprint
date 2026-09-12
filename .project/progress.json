@@ -7392,6 +7392,63 @@
             "npm run verify passes 132 extension and 312 application tests plus all workspaces, security, performance, integration, audit zero and Archify showcase 9/9",
             "Installed Chromium 153 smoke passes; two builds reproduce Chrome cc1f1a0d41695f0e3326861f7b37154d68345e8aca5ad18ced1a3a283533693a and Firefox cc0e57b5b75ee6fdca7c32ed01fe5185934dd434aab24e426bbddeb08781905b"
           ]
+        },
+        {
+          "id": "step-23",
+          "title": "Make first-install reconciliation atomic resumable and guided",
+          "status": "DONE",
+          "acceptance": [
+            "The inventory checkpoint becomes complete only after every presence page is committed",
+            "Suspension after any inventory or presence checkpoint resumes idempotently without hiding an observed favorite",
+            "Every service-worker boot restores the exact durable continuation alarm and the bounded safety alarm",
+            "The Options surface explains inventory presence resolution retry and completion states with a safe resume action",
+            "A 1401-bookmark packaged flow and an upgrade-compatible flow converge with zero import-created Reviews",
+            "No provider order privacy boundary D1 schema permission or production resource changes"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/tasks/favorite-resolution-outbox-port.ts",
+            "packages/application/src/use-cases/reconcile-favorite-source-presence.ts",
+            "packages/application/src/use-cases/reconcile-favorite-source-presence.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/index.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.test.ts",
+            "apps/extension/runtime/resolution-status-messages.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.module.css",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.test.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.preview.tsx",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run validate:ui",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run package:extension -- --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.15.zip",
+            "git diff --check",
+            "git commit -m \"fix(extension): harden first-install reconciliation\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime and 101-source atomic presence tests pass; legacy active checkpoints resume and interrupted final checkpoint rolls back",
+            "Chromium 153 installed 1402-bookmark ZIP journey reaches complete with 1401 unsupported, one retryable outage, durable alarm and zero imported Reviews",
+            "npm run verify passes all workspaces, Chromium IndexedDB, security, performance, integration, audit zero and Archify showcase 9/9; isolated Chrome and Firefox hashes reproduce"
+          ]
         }
       ]
     }

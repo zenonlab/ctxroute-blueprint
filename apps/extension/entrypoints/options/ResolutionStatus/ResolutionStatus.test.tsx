@@ -4,9 +4,12 @@ import { ResolutionStatus } from './index';
 
 describe('ResolutionStatus', () => {
   it('distinguishes internal and collective waits without calling them provider failures', () => {
-    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 3, processing: 0, retryable: 3, unsupported: 0, internalErrors: 1, collectivePending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ status: 'active' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 3, processing: 0, retryable: 3, unsupported: 0, internalErrors: 1, collectivePending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ continuationAt: '2026-09-12T12:05:00.000Z', status: 'presence' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
     expect(html).toContain('Dont erreurs internes');
     expect(html).toContain('Dont attente du service collectif');
+    expect(html).toContain('Vérification des favoris encore présents');
+    expect(html).toContain('Prochaine reprise automatique');
+    expect(html).toContain('Reprendre maintenant');
     expect(html).not.toContain('panne fournisseur');
   });
   it('shows private processing states separately from actionable Review', () => {
@@ -15,9 +18,17 @@ describe('ResolutionStatus', () => {
     expect(html).toContain('Liens non pris en charge');
     expect(html).toContain('attente de reprise');
     expect(html).toContain('Favoris observés');
-    expect(html).toContain('Relancer l’analyse');
+    expect(html).toContain('Vérifier à nouveau');
     expect(html).toContain('Désactiver le diagnostic');
     expect(html).toContain('Résolution · terminé · passage run-1');
     expect(html).not.toContain('href=');
+  });
+
+  it('guides a new installation before its first scan', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 0, processing: 0, retryable: 0, unsupported: 0 }} diagnostics={{ enabled: false, events: [] }} inventory={{ status: 'not-started' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain('Lire les favoris du navigateur');
+    expect(html).toContain('Vérifier les favoris encore présents');
+    expect(html).toContain('Identifier et enrichir les œuvres');
+    expect(html).toContain('Commencer l’analyse');
   });
 });

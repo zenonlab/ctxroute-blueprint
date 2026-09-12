@@ -38,6 +38,10 @@ class MemoryOutbox implements FavoriteResolutionOutboxPort {
     const next = transition(task); await this.storage.putFavoriteResolutionTask(next); return next;
   }
   block(id: string, token: string, reason: string) { return this.change(id, (task) => blockTask(task, token, reason)); }
+  async nextAvailableAt() {
+    const task = await this.storage.getFavoriteResolutionTask(this.id);
+    return task === undefined || task.state === 'COMMITTED' || task.state === 'BLOCKED' ? undefined : task.availableAt;
+  }
   retry(id: string, token: string, retryAt: string) { return this.change(id, (task) => retryTask(task, token, retryAt)); }
 }
 

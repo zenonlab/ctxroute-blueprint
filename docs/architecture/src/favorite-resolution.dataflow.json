@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Le checkpoint complet évite les rescans; mutations et démarrage forcent l’inventaire; l’alarme suit la prochaine échéance durable."
+        "note": "Inventaire puis présence ont des checkpoints distincts; le réveil MV3 restaure l’alarme avant de reprendre la prochaine page durable."
       },
       {
         "id": "cover-rights",
@@ -134,7 +134,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "100 tâches / 20 s · échéance indexée"
+      "tag": "pages atomiques · échéance indexée"
     },
     {
       "id": "providerAdapters",
@@ -428,7 +428,8 @@
       "items": [
         "Routes Comix manga; source et artefact atomiques",
         "Curseurs, reçus et cadences survivent à MV3",
-        "Alarme nommée jusqu’au checkpoint final; aucun réveil concurrent",
+        "Inventaire puis présence: pages et checkpoints atomiques",
+        "Alarme nommée restaurée à chaque réveil MV3; aucun runner concurrent",
         "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
         "API MU sans Origin; panne, 403 ou page incomplète : RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"

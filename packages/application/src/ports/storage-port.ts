@@ -29,6 +29,8 @@ import type { FavoriteSearchCheckpoint } from '../favorites/provider-search-chec
 export interface FavoriteInventoryCheckpoint {
   cursor?: BookmarkInventoryCursor;
   id: 'favorite-inventory';
+  phase?: 'inventory' | 'presence';
+  presenceAfterId?: FavoriteSourceId;
   sessionId: string;
   startedAt: string;
   status: 'active' | 'complete';

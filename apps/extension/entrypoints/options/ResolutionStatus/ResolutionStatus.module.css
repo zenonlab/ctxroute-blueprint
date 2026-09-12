@@ -1,5 +1,7 @@
 .section { padding: var(--space-6); }
 .content { display: grid; gap: var(--space-4); }
+.steps { display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-6); }
+.current { display: grid; gap: var(--space-1); }
 .counts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); }
 .counts dd { margin: 0; font-variant-numeric: tabular-nums; }
 .diagnostics { display: grid; gap: var(--space-3); }

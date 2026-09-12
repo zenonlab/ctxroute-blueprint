@@ -40,23 +40,25 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ### Durable continuation candidate — 2026-09-12
 
-Candidate `1.0.15` resumes an incomplete inventory with one named MV3 alarm.
-After the final checkpoint, provider wakes reuse that inventory and the outbox
-selects the next READY, RETRY_AT or expired CLAIMED deadline through bounded
-compound-index reads. The alarm follows that exact deadline with the browser's
-30-second floor and is cleared after convergence. Startup, bookmark mutations
-and the trusted manual action remain the explicit inventory refresh triggers.
-The run diagnostic reports `retryable` while either inventory or provider work
-remains. This candidate remains local; publication is approved separately.
+Candidate `1.0.15` resumes separate inventory and presence phases with one
+named MV3 alarm. A presence page and its checkpoint commit in the same
+IndexedDB transaction, and only the last page can mark the inventory complete.
+Every service-worker evaluation restores the named alarm from the active
+checkpoint or the earliest READY, RETRY_AT or expired CLAIMED deadline. The
+periodic reminder only repairs that alarm; it does not run the resolver.
+Installation, update, startup and bookmark mutations refresh browser authority.
+The trusted manual action resumes an active checkpoint and rescans only after a
+completed checkpoint. This candidate remains local; publication is approved
+separately.
 
-La gate complète passe avec 132 tests extension et 312 tests application. Le
-contrat navigateur IndexedDB valide la sélection bornée de l’échéance. Le
-parcours Chromium 153 installé depuis le ZIP valide la santé, l’isolation d’une
-panne fournisseur, zéro Review créée à l’import, l’état privé et le verrou de
-diagnostic. Deux fabrications successives reproduisent exactement :
+The Chromium 153 installed journey starts with 1,402 bookmarks, converges the
+multi-wake inventory and presence phases, retains one retryable provider outage,
+commits 1,401 ordinary links as unsupported, creates zero Reviews at import and
+keeps a durable retry alarm. Options exposes the current phase, automatic wake
+and safe resume action. Two isolated builds reproduce exactly:
 
-- Chrome : 287135 octets, SHA-256 `cc1f1a0d41695f0e3326861f7b37154d68345e8aca5ad18ced1a3a283533693a`.
-- Firefox : 287180 octets, SHA-256 `cc0e57b5b75ee6fdca7c32ed01fe5185934dd434aab24e426bbddeb08781905b`.
+- Chrome: 287880 bytes, SHA-256 `780ebef687c390d15637802f67de09e5e1f7162657977c3028952fa8f3b00935`.
+- Firefox: 287925 bytes, SHA-256 `34fb16d5f66be819e33472cfbb07d59a03266ce8917457752e6df26054656841`.
 
 ### Locked diagnostics candidate — 2026-09-12
 

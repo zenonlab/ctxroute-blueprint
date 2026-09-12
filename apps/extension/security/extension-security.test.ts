@@ -104,13 +104,15 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/createExtensionLocalStorage\(\)/);
     expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
     expect(background).toMatch(/browser\.runtime\.onInstalled\.addListener/);
-    expect(favoriteResolution).toMatch(/readBookmarkBatch\(cursor, 100\)/);
+    expect(favoriteResolution).toMatch(/readBookmarkBatch\(checkpoint\.cursor, 100\)/);
     expect(favoriteResolution).toMatch(/normalizeBookmarks\(slice\.records\)/);
     expect(favoriteResolution).toMatch(/importFavoriteSources\(favorites, dependencies\.storage/);
     expect(background).toMatch(/WebExtensionBookmarkEventAdapter\(browser\.bookmarks\)/);
     expect(background).toMatch(/DexieFavoriteResolutionOutbox\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/createFavoriteResolutionRuntime/);
     expect(background).toMatch(/updateFavoriteResolutionContinuation\(browser\.alarms, availableAt\)/);
+    expect(background).toMatch(/restoreFavoriteResolutionContinuation\(browser\.alarms, privateStorage\.storage, resolutionOutbox\)/);
+    expect(background).toMatch(/Promise\.all\(\[ensureReminderAlarm\(\), restoreFavoriteWake\(\)\]\)/);
     expect(background).toMatch(/alarm\.name === favoriteResolutionContinuationAlarmName/);
     expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
     expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);

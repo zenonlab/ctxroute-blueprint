@@ -1,5 +1,5 @@
-import { importFavoriteSources, reconcileFavoriteSourcePresenceForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import { importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import type { LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
@@ -61,12 +61,16 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
           inventoryComplete = stored?.status === 'complete' && !inventoryRequested;
           if (!inventoryComplete) {
-            const checkpoint = stored?.status === 'active' && !inventoryRequested
-              ? stored
-              : { id: 'favorite-inventory' as const, sessionId: dependencies.token(), startedAt: dependencies.now(), status: 'active' as const };
-            let cursor = checkpoint.cursor;
-            for (let sliceIndex = 0; sliceIndex < 8 && !inventoryComplete; sliceIndex += 1) {
-              const slice = await dependencies.bookmarks.readBookmarkBatch(cursor, 100);
+            let checkpoint: FavoriteInventoryCheckpoint = stored?.status === 'active' && !inventoryRequested
+              ? { ...stored, phase: stored.phase ?? 'inventory' }
+              : { id: 'favorite-inventory', phase: 'inventory', sessionId: dependencies.token(), startedAt: dependencies.now(), status: 'active' };
+            for (let sliceIndex = 0; sliceIndex < 8 && checkpoint.status === 'active'; sliceIndex += 1) {
+              if (checkpoint.phase === 'presence') {
+                const result = await reconcileFavoriteSourcePresencePageForInventory(checkpoint, dependencies.storage);
+                checkpoint = result.checkpoint;
+                continue;
+              }
+              const slice = await dependencies.bookmarks.readBookmarkBatch(checkpoint.cursor, 100);
               const favorites = normalizeBookmarks(slice.records);
               inventoryBatches += 1;
               observed += favorites.length;
@@ -76,14 +80,14 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
                   await transaction.putFavoriteInventoryMark({ bookmarkId: favorite.bookmarkId, sessionId: checkpoint.sessionId });
                 }
               });
-              inventoryComplete = slice.complete;
-              cursor = slice.cursor;
-              const nextCheckpoint = cursor === undefined
-                ? { id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: inventoryComplete ? 'complete' as const : 'active' as const }
-                : { cursor, id: checkpoint.id, sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: 'active' as const };
+              if (!slice.complete && slice.cursor === undefined) throw new Error('Incomplete bookmark inventory requires a cursor.');
+              const nextCheckpoint: FavoriteInventoryCheckpoint = slice.complete
+                ? { id: checkpoint.id, phase: 'presence', sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: 'active' }
+                : { cursor: slice.cursor, id: checkpoint.id, phase: 'inventory', sessionId: checkpoint.sessionId, startedAt: checkpoint.startedAt, status: 'active' };
               await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
+              checkpoint = nextCheckpoint;
             }
-            if (inventoryComplete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
+            inventoryComplete = checkpoint.status === 'complete';
           }
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, outcome: inventoryComplete ? 'complete' : 'retryable', runId, stage: 'inventory' });
         } catch (error) {
@@ -101,7 +105,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         await dependencies.identityRecovery?.publish();
         if (inventoryFailure !== undefined) throw inventoryFailure;
         if (!inventoryComplete || result.continuationRequired) return dependencies.now();
-        return dependencies.outbox.nextAvailableAt?.({ kind: 'favorite-resolution', lane: 'routing' });
+        return dependencies.outbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' });
     });
   return function reconcileFavorites(inventoryRequested = false): Promise<void> {
     if (active !== undefined) {

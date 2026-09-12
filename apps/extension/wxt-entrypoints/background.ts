@@ -34,9 +34,15 @@ import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentityS
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
-import { favoriteResolutionContinuationAlarmName, updateFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
+import { favoriteResolutionContinuationAlarmName, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
+
+interface FavoriteStatusInventory {
+  continuationAt?: string;
+  startedAt?: string;
+  status: 'not-started' | 'inventory' | 'presence' | 'complete';
+}
 
 export default defineBackground({
   type: 'module',
@@ -72,13 +78,21 @@ export default defineBackground({
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const readFavoriteStatus = async () => {
-      const [counts, checkpoint] = await Promise.all([
+      const [counts, checkpoint, continuation] = await Promise.all([
         privateStorage.storage.readFavoriteResolutionCounts(),
         privateStorage.storage.getFavoriteInventoryCheckpoint(),
+        browser.alarms.get(favoriteResolutionContinuationAlarmName),
       ]);
-      const inventory = checkpoint === undefined
-        ? { status: 'not-started' as const }
-        : { startedAt: checkpoint.startedAt, status: checkpoint.status };
+      const status = checkpoint === undefined
+        ? 'not-started' as const
+        : checkpoint.status === 'complete'
+          ? 'complete' as const
+          : checkpoint.phase === 'presence'
+            ? 'presence' as const
+            : 'inventory' as const;
+      const inventory: FavoriteStatusInventory = { status };
+      if (continuation?.scheduledTime !== undefined) inventory.continuationAt = new Date(continuation.scheduledTime).toISOString();
+      if (checkpoint?.startedAt !== undefined) inventory.startedAt = checkpoint.startedAt;
       return { counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
     };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
@@ -103,10 +117,14 @@ export default defineBackground({
       await ensureReminderAlarm();
       await diagnostics.initializeEnabled().catch(() => undefined);
       await privateStorage.ensureReady();
-      await reconcileFavorites();
+      await reconcileFavorites(true);
       await repairLibraryProjection();
       await resumeNotifications();
     });
+    const restoreFavoriteWake = async () => {
+      await privateStorage.ensureReady();
+      await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);
+    };
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
@@ -125,7 +143,7 @@ export default defineBackground({
       void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);
+      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
@@ -156,7 +174,8 @@ export default defineBackground({
         try {
           await privateStorage.ensureReady();
           if (parsed.data.type === 'favorite.reconcile') {
-            await reconcileFavorites(true);
+            const checkpoint = await privateStorage.storage.getFavoriteInventoryCheckpoint();
+            await reconcileFavorites(checkpoint?.status !== 'active');
             await repairLibraryProjection();
           }
           if (parsed.data.type === 'favorite.diagnostics.write') await diagnostics.setEnabled(parsed.data.enabled);
@@ -356,5 +375,6 @@ export default defineBackground({
       }
       return { ok: true };
     });
+    void Promise.all([ensureReminderAlarm(), restoreFavoriteWake()]).catch(() => undefined);
   },
 });

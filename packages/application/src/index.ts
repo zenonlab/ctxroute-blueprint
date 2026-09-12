@@ -59,7 +59,7 @@ export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';
 export { favoriteImportBatchSize, importFavoriteSources } from './use-cases/import-favorite-sources';
 export type { FavoriteImportSummary } from './use-cases/import-favorite-sources';
-export { favoritePresencePageLimit, reconcileFavoriteSourcePresence, reconcileFavoriteSourcePresenceForInventory } from './use-cases/reconcile-favorite-source-presence';
+export { favoritePresencePageLimit, reconcileFavoriteSourcePresence, reconcileFavoriteSourcePresencePageForInventory } from './use-cases/reconcile-favorite-source-presence';
 export { readReviewQueue, reviewQueueLimit } from './use-cases/read-review-queue';
 export type { ReviewQueueItem, ReviewQueueSnapshot } from './use-cases/read-review-queue';
 export { readLocalReviewCandidates } from './use-cases/read-local-review-candidates';

@@ -572,11 +572,13 @@ stack, ni titre privé, ni URL privée.
 
 ### Première installation — cible après durcissement d’inventaire
 
-Le background ouvre Dexie, crée une session d’inventaire par dossiers, traite
-les tranches, importe chaque source et laisse la file reprendre la résolution. L’UI peut
-afficher séparément import en cours, bibliothèque vide réelle et Review en
-attente. Elle ne prétend pas que l’analyse est terminée avant le dernier
-checkpoint.
+Le background ouvre Dexie, crée une session d’inventaire par dossiers et traite
+huit unités de travail au maximum. Les lots `inventory` importent 100 favoris;
+les pages `presence` vérifient 100 sources. Le dernier lot navigateur ouvre la
+phase de présence et seule la transaction de la dernière page écrit `complete`.
+Options explique lecture, vérification de présence, identification et demandes
+humaines, affiche la prochaine reprise et permet de reprendre sans recommencer
+une phase active.
 
 ### Modification ou déplacement — cible après durcissement d’inventaire
 
@@ -600,6 +602,9 @@ après son lot puis lit, par index composé et sans scan, la première échéanc
 READY, RETRY_AT ou CLAIMED expirée. Il programme une alarme ponctuelle nommée à
 cette date avec un plancher de 30 secondes et libère le service worker. Le même
 nom remplace toute reprise déjà programmée; l’absence de tâche efface l’alarme.
+Chaque nouvelle évaluation du service worker répare cette alarme depuis le
+checkpoint et les index de l’outbox. Le réveil périodique des notifications ne
+résout rien : il vérifie seulement cette programmation et la recrée si besoin.
 Le diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
 actif ou qu’une tâche présente ou différée subsiste.
 
@@ -837,14 +842,16 @@ identités réellement inexploitable.
 
 ### Diagnostic verrouillé de la file
 
-La version 1.0.15 relie le checkpoint actif à une continuation MV3 durable.
-Chaque réveil d’inventaire lit au plus huit lots de 100 favoris et chaque
-passage traite au plus 100 tâches ou 20 secondes. Une fois le checkpoint
-complet, les réveils fournisseurs le réutilisent sans rescanner les favoris.
-Le démarrage, une mutation des favoris et l’action manuelle imposent un nouvel
-inventaire. L’outbox choisit sa première échéance par trois lectures indexées
-bornées; `tobirink-favorite-resolution-continuation-v1` la matérialise avec un
-plancher de 30 secondes et disparaît après convergence.
+La version 1.0.15 relie les phases `inventory` et `presence` à une continuation
+MV3 durable. Chaque réveil consomme au plus huit pages locales de 100 éléments;
+la résolution traite ensuite au plus 100 tâches ou 20 secondes. La page de
+présence et son checkpoint sont atomiques. Une fois `complete`, les réveils
+fournisseurs réutilisent l’inventaire sans rescanner les favoris. Installation,
+mise à jour, démarrage et mutation forcent un nouvel inventaire. Une action
+manuelle reprend le checkpoint actif ou vérifie à nouveau un état complet.
+L’outbox choisit sa première échéance par trois lectures indexées bornées;
+`tobirink-favorite-resolution-continuation-v1` est restaurée à chaque démarrage
+du service worker et contrôlée par le réveil périodique sans appel fournisseur.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils

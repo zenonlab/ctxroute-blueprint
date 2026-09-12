@@ -5,7 +5,7 @@ import type { ExtensionDiagnosticEvent } from '../../../runtime/extension-diagno
 export interface ResolutionStatusProps {
   counts?: { observed: number; processing: number; retryable: number; unsupported: number; internalErrors?: number; collectivePending?: number } | undefined;
   diagnostics?: { enabled: boolean; events: readonly ExtensionDiagnosticEvent[] } | undefined;
-  inventory?: { startedAt?: string; status: 'not-started' | 'active' | 'complete' } | undefined;
+  inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
   state: 'loading' | 'running' | 'ready' | 'error';
   onReconcile: () => void;
   onDiagnosticsToggle: () => void;
@@ -32,16 +32,35 @@ function diagnosticCounts(event: ExtensionDiagnosticEvent): string | undefined {
 
 export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
   const latestDiagnostic = diagnostics?.events.at(-1);
+  const inventoryLabel = inventory?.status === 'complete'
+    ? 'Inventaire vérifié'
+    : inventory?.status === 'presence'
+      ? 'Vérification des favoris encore présents'
+      : inventory?.status === 'inventory'
+        ? 'Lecture des favoris'
+        : 'Prêt à commencer';
+  const actionLabel = inventory?.status === 'complete' ? 'Vérifier à nouveau' : inventory?.status === 'not-started' ? 'Commencer l’analyse' : 'Reprendre maintenant';
   return <section className={styles.section} aria-label="Analyse des favoris"><Surface>
     <div className={styles.content}>
       <h2>Analyse des favoris</h2>
-      <p>La cloche contient uniquement les ambiguïtés et les recherches terminées sans correspondance.</p>
+      <p>TobiRink lit vos favoris par petits lots, vérifie lesquels sont encore présents, puis identifie les œuvres et récupère leurs informations.</p>
+      <ol className={styles.steps} aria-label="Étapes de préparation">
+        <li>Lire les favoris du navigateur</li>
+        <li>Vérifier les favoris encore présents</li>
+        <li>Identifier et enrichir les œuvres</li>
+        <li>Afficher seulement les choix qui demandent votre aide</li>
+      </ol>
       {state === 'loading' ? <p role="status">Lecture de l’état local…</p> : null}
-      {state === 'running' ? <p role="status">Nouvelle analyse en cours…</p> : null}
+      {state === 'running' ? <p role="status">Analyse en cours. Cette page peut rester ouverte ou être fermée.</p> : null}
       {state === 'error' ? <p role="alert">L’état local est indisponible. Réessayez.</p> : null}
+      {inventory ? <div className={styles.current} role="status">
+        <strong>{inventoryLabel}</strong>
+        {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
+        {inventory.continuationAt ? <span>Prochaine reprise automatique : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
+      </div> : null}
       {counts ? <dl className={styles.counts}>
         <dt>Favoris observés</dt><dd>{counts.observed}</dd>
-        <dt>Inventaire</dt><dd>{inventory?.status === 'complete' ? 'Complet' : inventory?.status === 'active' ? 'À poursuivre' : 'Pas démarré'}</dd>
+        <dt>Préparation</dt><dd>{inventoryLabel}</dd>
         <dt>Traitement en cours</dt><dd>{counts.processing}</dd>
         <dt>Résolutions en attente de reprise</dt><dd>{counts.retryable}</dd>
         {counts.internalErrors ? <><dt>Dont erreurs internes</dt><dd>{counts.internalErrors}</dd></> : null}
@@ -55,7 +74,7 @@ export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnostics
         <Button disabled={state === 'loading' || state === 'running'} onClick={onDiagnosticsToggle}>{diagnostics.enabled ? 'Désactiver le diagnostic' : 'Activer le diagnostic'}</Button>
       </div> : null}
       <div className={styles.actions}>
-        <Button disabled={state === 'loading' || state === 'running'} onClick={onReconcile} variant="primary">Relancer l’analyse</Button>
+        <Button disabled={state === 'loading' || state === 'running'} onClick={onReconcile} variant="primary">{actionLabel}</Button>
         <Button disabled={state === 'loading' || state === 'running'} onClick={onRefresh}>Actualiser l’état</Button>
       </div>
     </div>

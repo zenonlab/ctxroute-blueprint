@@ -8,7 +8,7 @@ export const resolutionStatusMessageSchema = z.discriminatedUnion('type', [
 ]);
 const countsSchema = z.strictObject({ observed: z.number().int().nonnegative(), processing: z.number().int().nonnegative(), retryable: z.number().int().nonnegative(), unsupported: z.number().int().nonnegative(), internalErrors: z.number().int().nonnegative().optional(), collectivePending: z.number().int().nonnegative().optional() });
 export const resolutionStatusResponseSchema = z.discriminatedUnion('ok', [
-  z.strictObject({ ok: z.literal(true), counts: countsSchema, diagnostics: z.strictObject({ enabled: z.boolean(), events: z.array(extensionDiagnosticEventSchema).max(100) }), inventory: z.strictObject({ startedAt: z.string().optional(), status: z.enum(['not-started', 'active', 'complete']) }) }),
+  z.strictObject({ ok: z.literal(true), counts: countsSchema, diagnostics: z.strictObject({ enabled: z.boolean(), events: z.array(extensionDiagnosticEventSchema).max(100) }), inventory: z.strictObject({ continuationAt: z.iso.datetime().optional(), startedAt: z.iso.datetime().optional(), status: z.enum(['not-started', 'inventory', 'presence', 'complete']) }) }),
   z.strictObject({ ok: z.literal(false), error: z.string() }),
 ]);
 
