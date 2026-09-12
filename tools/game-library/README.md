@@ -56,3 +56,13 @@ La seconde commande émet seulement un catalogue JSON de noms, tailles, empreint
 paramètres d'émission bornés et références de textures. Elle vérifie la fermeture
 BREFF→BREFT, ne copie aucun payload et ne prétend pas encore exécuter les émetteurs
 NW4R.
+
+L'adaptateur `gcn-j3d` classe les familles de formats GameCube/JSystem sans connaître
+de jeu. La commande suivante lit un placement de scène big-endian de façon bornée et
+émet son inventaire typé en espace source ; elle ne convertit pas encore les repères
+vers un renderer et ne prétend donc pas avoir qualifié la géométrie.
+
+```bash
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-gcn-stage --input private/source/room.dzr
+```

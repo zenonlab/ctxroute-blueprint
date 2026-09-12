@@ -2,15 +2,17 @@
 
 ## Statut
 
-- Proposition de direction artistique, non acceptée et non générable.
+- Direction artistique Grande Mer acceptée ; génération privée autorisée.
 - Source retenue : édition GameCube PAL uniquement (`GZLP01`, révision 0).
-- Passe d'audit locale du 12 septembre 2026 effectuée en lecture seule ; aucune
-  extraction d'asset et aucune activation n'ont été réalisées.
+- Passe d'audit locale du 12 septembre 2026 achevée ; l'inventaire privé est ouvert,
+  mais aucune activation n'a été réalisée.
 - Aucun asset commercial n'est inclus dans ce dépôt.
 - Les noms de ressources, coordonnées, musiques, acteurs et relations définitifs
   doivent venir de l'inventaire privé de la copie locale du jeu.
 - ZeldaRET est une preuve d'implémentation publique. Noclip peut servir d'oracle
   visuel, jamais de source d'assets ni de runtime.
+- Le concept machine privé vérifie 49 secteurs, 13 sous-systèmes et 38 ressources ou
+  activités ; son gate retourne `generation_allowed: true` après le `go` utilisateur.
 
 ## Reçu d'entrée GameCube
 

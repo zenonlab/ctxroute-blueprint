@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
+pub mod gcn;
 pub mod mkw;
 
 const SCHEMA_VERSION: u32 = 1;
@@ -243,7 +244,10 @@ fn validate_options(options: &IndexOptions) -> Result<()> {
         options.source.display()
     );
     ensure!(
-        matches!(options.adapter.as_str(), "generic" | "zelda64" | "mkw"),
+        matches!(
+            options.adapter.as_str(),
+            "generic" | "zelda64" | "mkw" | "gcn-j3d"
+        ),
         "unsupported adapter"
     );
     ensure!(
@@ -301,6 +305,29 @@ fn classify(path: &str, adapter: &str) -> (String, String, String) {
         "ui"
     } else if adapter == "mkw" && matches!(extension.as_str(), "brstm" | "brsar") {
         "audio_sample"
+    } else if adapter == "gcn-j3d" && matches!(extension.as_str(), "dzr" | "dzs") {
+        "scene"
+    } else if adapter == "gcn-j3d" && extension == "dzb" {
+        "collision"
+    } else if adapter == "gcn-j3d" && matches!(extension.as_str(), "bmd" | "bdl") {
+        "geometry"
+    } else if adapter == "gcn-j3d"
+        && matches!(
+            extension.as_str(),
+            "bck" | "btk" | "brk" | "btp" | "bpk" | "bva" | "bca" | "bta"
+        )
+    {
+        "animation"
+    } else if adapter == "gcn-j3d" && extension == "bti" {
+        "texture"
+    } else if adapter == "gcn-j3d" && matches!(extension.as_str(), "jpc" | "jpa") {
+        "effect"
+    } else if adapter == "gcn-j3d"
+        && matches!(extension.as_str(), "aaf" | "aw" | "afc" | "baa" | "bms")
+    {
+        "audio_metadata"
+    } else if adapter == "gcn-j3d" && matches!(extension.as_str(), "arc" | "szs") {
+        "container"
     } else if lower.contains("/audio/") {
         if extension == "wav" {
             "audio_sample"
@@ -342,11 +369,11 @@ fn classify(path: &str, adapter: &str) -> (String, String, String) {
         "other"
     };
     let (status, reason) = match category {
-        "texture" | "audio_sample" | "geometry" | "descriptor" | "metadata" => {
+        "texture" | "audio_sample" | "descriptor" | "metadata" => {
             ("understood", "recognized open or structured representation")
         }
-        "scene" | "room" | "object" | "animation" | "collision" | "source_definition"
-        | "source_fragment" => (
+        "scene" | "room" | "object" | "geometry" | "animation" | "collision" | "effect"
+        | "container" | "source_definition" | "source_fragment" => (
             "partial",
             "structured source retained; semantic conversion is not complete",
         ),
@@ -364,7 +391,7 @@ fn classify(path: &str, adapter: &str) -> (String, String, String) {
         ),
         _ => ("unknown", "file type is not classified by the common index"),
     };
-    let reason = if matches!(adapter, "zelda64" | "mkw") {
+    let reason = if matches!(adapter, "zelda64" | "mkw" | "gcn-j3d") {
         format!("{adapter}: {reason}")
     } else {
         reason.into()
@@ -578,6 +605,15 @@ mod tests {
         let (category, status, _) = classify("assets/scenes/demo/demo_room_00.c", "generic");
         assert_eq!(category, "room");
         assert_eq!(status, "partial");
+    }
+
+    #[test]
+    fn gcn_j3d_adapter_classifies_format_families_without_game_names() {
+        assert_eq!(classify("scene/room.dzr", "gcn-j3d").0, "scene");
+        assert_eq!(classify("model/mesh.bdl", "gcn-j3d").0, "geometry");
+        assert_eq!(classify("animation/motion.bck", "gcn-j3d").0, "animation");
+        assert_eq!(classify("effect/common.jpc", "gcn-j3d").0, "effect");
+        assert_eq!(classify("audio/sample.aw", "gcn-j3d").0, "audio_metadata");
     }
 
     #[test]

@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
-    IndexOptions, index_library,
+    IndexOptions,
+    gcn::inspect_stage,
+    index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
     verify_library,
 };
@@ -61,11 +63,16 @@ enum Command {
         #[arg(long = "effect", required = true)]
         effects: Vec<String>,
     },
+    InspectGcnStage {
+        #[arg(long)]
+        input: PathBuf,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
 enum Adapter {
     Generic,
+    GcnJ3d,
     Zelda64,
     Mkw,
 }
@@ -88,6 +95,7 @@ fn main() -> Result<()> {
                 output,
                 adapter: match adapter {
                     Adapter::Generic => "generic".into(),
+                    Adapter::GcnJ3d => "gcn-j3d".into(),
                     Adapter::Zelda64 => "zelda64".into(),
                     Adapter::Mkw => "mkw".into(),
                 },
@@ -118,6 +126,10 @@ fn main() -> Result<()> {
             effects,
         } => {
             let result = compile_effect_pack(&breff, &breft, &output, &effects)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectGcnStage { input } => {
+            let result = inspect_stage(&input)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

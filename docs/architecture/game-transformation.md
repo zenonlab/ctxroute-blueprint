@@ -59,6 +59,14 @@ déterministes avant et après raccord ainsi que des limites d’écart mesurée
 renderer ne déduit jamais une boucle d’un nom ou d’une durée. Voir
 [ADR-0085](../decisions/ADR-0085-typed-animation-semantics.md).
 
+Les familles GameCube/J3D entrent par un adaptateur hors ligne borné qui produit le
+même profil moteur, les mêmes relations et les mêmes reçus que les autres sources.
+La détection, les repères, GX/TEV et les familles d'animation restent dans cet
+adaptateur ; le viewer ne reconnaît aucun jeu ni format. Les dérivés commerciaux
+restent sous `private/` et une scène témoin différente doit passer sans modification
+du runtime. Voir
+[ADR-0086](../decisions/ADR-0086-bounded-gcn-j3d-offline-adapter.md).
+
 Le format de scène n'efface pas le pipeline graphique d'origine. Chaque asset porte
 un `semantic_profile`, un `render_profile` et une `visual_qualification`. Bevy garde
 l'orchestration universelle, tandis qu'un adaptateur de rendu isolé implémente les
