@@ -396,3 +396,7 @@
 ## Certifier la release locale du parser favori 1.0.22 — DONE
 
 - [x] **Construire et certifier les archives 1.0.22** — DONE _(evidence: Chrome and Firefox 1.0.22 archives reproduce byte for byte with SHA-256 3f951b9c...615c and 326289df...0fcb., Installed Chromium 153 completes 1406-bookmark convergence, sync reconstruction, encrypted backup restore and zero imported Review; installed Firefox 151 passes., npm run verify and favorite-resolution Archify showcase 9/9 pass with zero dependency vulnerabilities and no Cloudflare or D1 mutation.)_
+
+## Publier et verifier le parser favori 1.0.22 — DONE
+
+- [x] **Appliquer la gate Cloudflare 1.0.22 et verifier la production** — DONE _(evidence: Cloudflare gate b9dc6a63 applied only both immutable 1.0.22 R2 archives and Worker bec0dbe6 at 100 percent; no D1 migration, deletion, cover or secret action ran., Production download advertises 1.0.22; both ZIPs return 200 with immutable caching and exact certified SHA-256 hashes., Six HTTP production Playwright journeys, docs validation and production-publication Archify showcase pass; the installed Chrome and Firefox archives were certified before publication.)_

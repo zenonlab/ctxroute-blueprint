@@ -8401,6 +8401,50 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-favorite-parser-1-0-22",
+      "title": "Publier et verifier le parser favori 1.0.22",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Appliquer la gate Cloudflare 1.0.22 et verifier la production",
+          "status": "DONE",
+          "acceptance": [
+            "Seuls les deux nouveaux objets R2 1.0.22 et le Worker public sont modifies",
+            "Aucune migration D1 suppression cover ou modification de secret n est executee",
+            "Le Worker sert le site et la page download en version 1.0.22",
+            "Les archives distantes correspondent exactement aux hashes certifies",
+            "Les parcours de production passent et main est pousse sans force"
+          ],
+          "files": [
+            "build/operations/publish-favorite-parser-1.0.22.json",
+            "docs/release.md",
+            "docs/plans/publish-favorite-parser-1-0-22.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Charger les deux variables Cloudflare depuis le fichier env local sans les afficher",
+            "npm run infra:inspect avec le compte autorise",
+            "npm run infra:plan pour les deux archives 1.0.22 et worker-deploy",
+            "npm run infra:apply avec digest et allowlist exacts",
+            "Verifier Worker migrations pages publiques et hashes distants",
+            "Executer les parcours Playwright de production",
+            "git commit -m chore(release): publish favorite parser 1.0.22",
+            "git push origin main"
+          ],
+          "evidence": [
+            "Cloudflare gate b9dc6a63 applied only both immutable 1.0.22 R2 archives and Worker bec0dbe6 at 100 percent; no D1 migration, deletion, cover or secret action ran.",
+            "Production download advertises 1.0.22; both ZIPs return 200 with immutable caching and exact certified SHA-256 hashes.",
+            "Six HTTP production Playwright journeys, docs validation and production-publication Archify showcase pass; the installed Chrome and Firefox archives were certified before publication."
+          ]
+        }
+      ]
     }
   ]
 }

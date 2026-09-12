@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.21`; its published archives match the
+The current production release is `1.0.22`; its published archives match the
 verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
@@ -38,7 +38,7 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
-### Favorite title/slug alignment candidate — 2026-09-13
+### Favorite title/slug alignment release — 2026-09-13
 
 Candidate `1.0.22` ships `favorite-parser-v4`. For a decorated bookmark name,
 the unique human segment whose normalized form equals the stable URL slug
@@ -60,9 +60,15 @@ Two isolated builds reproduce the 21-file archives byte for byte:
 - Chrome: 298194 bytes, SHA-256 `3f951b9c0b7a80ef869f85ef189846859a88a81730b63c7825725a0f70cb615c`.
 - Firefox: 298231 bytes, SHA-256 `326289df74b7f9d3b97c6be72024fee6020c807c831f1a8d89b41d6be6800fcb`.
 
-Production remains on `1.0.21` until the separately reviewed Cloudflare gate
-uploads both immutable archives and deploys the static download page. This
-candidate requires no D1 or IndexedDB migration.
+Cloudflare gate plan
+`b9dc6a6378a824b7a7c534b8a039fafffdb9921697df49cd62f8b38ae550f069`
+uploaded only those two immutable R2 objects and deployed Worker
+`bec0dbe6-7952-4fb1-8aca-4c50f49c4d06` at 100 percent. The production page
+advertises both 1.0.22 links; each response returns HTTP 200 with immutable
+one-year caching and the exact certified hash above. The final inspection
+reports no pending D1 migration and the six HTTP production Playwright
+journeys pass. Worker `c1eef241-0eed-4f2c-b389-598f0106763d` remains the
+rollback reference. No D1, cover bucket or secret was modified.
 
 ### Persistent recovery release — 2026-09-12
 
