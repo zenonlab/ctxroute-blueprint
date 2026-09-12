@@ -8,7 +8,7 @@
   },
   "components": [
     { "id": "game", "type": "external", "label": "Entrée locale vérifiée", "sublabel": "ROM ou archive privée", "pos": [40, 70], "size": [220, 80] },
-    { "id": "readers", "type": "backend", "label": "Lecteurs source interchangeables", "sublabel": "Scènes/palettes · J3D · JPC · extraction", "pos": [340, 70], "size": [230, 80] },
+    { "id": "readers", "type": "backend", "label": "Lecteurs source interchangeables", "sublabel": "Scènes · palettes atmosphériques · J3D · JPC", "pos": [340, 70], "size": [230, 80] },
     { "id": "observer", "type": "backend", "label": "Oracle source hors ligne", "sublabel": "Vues et frames déterministes", "pos": [660, 70], "size": [230, 80] },
     { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "Ressources liées · blobs privés", "pos": [990, 70], "size": [260, 80] },
     { "id": "engine-profile", "type": "database", "label": "Profil moteur résolu", "sublabel": "Repères · états GPU · provenance", "pos": [40, 270], "size": [220, 80] },
@@ -24,7 +24,7 @@
     { "id": "read", "from": "game", "to": "readers", "label": "inventorier sans exécuter", "labelAt": [300, 164] },
     { "id": "observe", "from": "readers", "to": "observer", "label": "lacunes qualifiées", "labelAt": [615, 164] },
     { "id": "preserve-observed", "from": "observer", "to": "library", "label": "preuves reproductibles", "labelAt": [940, 164] },
-    { "id": "profile", "from": "readers", "to": "engine-profile", "label": "conventions prouvées", "fromSide": "bottom", "toSide": "top" },
+    { "id": "profile", "from": "readers", "to": "engine-profile", "label": "repères et registres prouvés", "fromSide": "bottom", "toSide": "top" },
     { "id": "qualify", "from": "engine-profile", "to": "qualification", "label": "tables ou code → relations", "labelAt": [283, 364] },
     { "id": "resolve-animation", "from": "observer", "to": "animation-semantics", "label": "clips · contrôleurs · raccords", "fromSide": "bottom", "toSide": "top", "labelAt": [775, 210] },
     { "id": "report-relations", "from": "qualification", "to": "animation-semantics", "label": "relations qualifiées", "labelAt": [608, 364] },

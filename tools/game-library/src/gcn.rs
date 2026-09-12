@@ -33,6 +33,7 @@ pub struct StageIndexReport {
     pub environments: Vec<StageEnvironmentSelection>,
     pub palette_selections: Vec<StagePaletteSelection>,
     pub palettes: Vec<StagePalette>,
+    pub atmosphere_palettes: Vec<StageAtmospherePalette>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -87,6 +88,17 @@ pub struct StagePalette {
 pub struct StageColorPair {
     pub color: [u8; 3],
     pub konst: [u8; 3],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StageAtmospherePalette {
+    pub unknown_words: [u32; 4],
+    pub cloud_color: [u8; 4],
+    pub cloud_center_color: [u8; 4],
+    pub sky_color: [u8; 3],
+    pub distant_sea_color: [u8; 3],
+    pub front_haze_color: [u8; 3],
+    pub trailing_bytes: [u8; 3],
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -4536,6 +4548,7 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
     let mut environments = Vec::new();
     let mut palette_selections = Vec::new();
     let mut palettes = Vec::new();
+    let mut atmosphere_palettes = Vec::new();
     for index in 0..chunk_count {
         let header = 4 + index * 12;
         let tag = read_tag(bytes, header)?;
@@ -4594,6 +4607,14 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
                     palettes.push(parse_stage_palette(bytes, offset + record * stride)?);
                 }
             }
+            RecordKind::AtmospherePalette => {
+                let stride = 0x24;
+                ensure_span(bytes, offset, records, stride, &tag)?;
+                for record in 0..records {
+                    atmosphere_palettes
+                        .push(parse_atmosphere_palette(bytes, offset + record * stride)?);
+                }
+            }
             RecordKind::Other => {}
         }
         chunks.push(StageChunk {
@@ -4605,7 +4626,7 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
     }
 
     Ok(StageIndexReport {
-        format: "orbite.gcn-stage-index/2",
+        format: "orbite.gcn-stage-index/3",
         adapter: "gcn.stage",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -4617,6 +4638,7 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
         environments,
         palette_selections,
         palettes,
+        atmosphere_palettes,
     })
 }
 
@@ -4627,6 +4649,7 @@ enum RecordKind {
     EnvironmentSelection,
     PaletteSelection,
     Palette,
+    AtmospherePalette,
     Other,
 }
 
@@ -4639,6 +4662,7 @@ impl RecordKind {
             Self::EnvironmentSelection => "environment_selection",
             Self::PaletteSelection => "palette_selection",
             Self::Palette => "palette",
+            Self::AtmospherePalette => "atmosphere_palette",
             Self::Other => "opaque",
         }
     }
@@ -4681,6 +4705,9 @@ fn record_kind(tag: &str) -> RecordKind {
     if tag == "Pale" {
         return RecordKind::Palette;
     }
+    if tag == "Virt" {
+        return RecordKind::AtmospherePalette;
+    }
     RecordKind::Other
 }
 
@@ -4716,6 +4743,23 @@ fn parse_stage_palette(bytes: &[u8], offset: usize) -> Result<StagePalette> {
         virtual_index: *bytes.get(offset + 33).context("truncated stage palette")?,
         fog_start: read_f32(bytes, offset + 36)?,
         fog_end: read_f32(bytes, offset + 40)?,
+    })
+}
+
+fn parse_atmosphere_palette(bytes: &[u8], offset: usize) -> Result<StageAtmospherePalette> {
+    Ok(StageAtmospherePalette {
+        unknown_words: [
+            read_u32(bytes, offset)?,
+            read_u32(bytes, offset + 4)?,
+            read_u32(bytes, offset + 8)?,
+            read_u32(bytes, offset + 12)?,
+        ],
+        cloud_color: read_u8_array(bytes, offset + 16)?,
+        cloud_center_color: read_u8_array(bytes, offset + 20)?,
+        sky_color: read_rgb(bytes, offset + 24)?,
+        distant_sea_color: read_rgb(bytes, offset + 27)?,
+        front_haze_color: read_rgb(bytes, offset + 30)?,
+        trailing_bytes: read_u8_array(bytes, offset + 33)?,
     })
 }
 
@@ -4884,12 +4928,13 @@ pub(crate) mod tests {
     }
 
     fn fixture_stage_environment() -> Vec<u8> {
-        let mut bytes = vec![0_u8; 0x70];
-        bytes[0..4].copy_from_slice(&3_u32.to_be_bytes());
+        let mut bytes = vec![0_u8; 0xa0];
+        bytes[0..4].copy_from_slice(&4_u32.to_be_bytes());
         for (index, (tag, offset)) in [
-            (*b"EnvR", 0x28_u32),
-            (*b"Colo", 0x30_u32),
-            (*b"Pale", 0x3c_u32),
+            (*b"EnvR", 0x34_u32),
+            (*b"Colo", 0x3c_u32),
+            (*b"Pale", 0x48_u32),
+            (*b"Virt", 0x74_u32),
         ]
         .into_iter()
         .enumerate()
@@ -4899,14 +4944,22 @@ pub(crate) mod tests {
             bytes[header + 4..header + 8].copy_from_slice(&1_u32.to_be_bytes());
             bytes[header + 8..header + 12].copy_from_slice(&offset.to_be_bytes());
         }
-        bytes[0x28..0x30].copy_from_slice(&[7, 6, 5, 4, 3, 2, 1, 0]);
-        bytes[0x30..0x38].copy_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
-        bytes[0x38..0x3c].copy_from_slice(&0.2_f32.to_be_bytes());
+        bytes[0x34..0x3c].copy_from_slice(&[7, 6, 5, 4, 3, 2, 1, 0]);
+        bytes[0x3c..0x44].copy_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        bytes[0x44..0x48].copy_from_slice(&0.2_f32.to_be_bytes());
         for (index, value) in (1_u8..=33).enumerate() {
-            bytes[0x3c + index] = value;
+            bytes[0x48 + index] = value;
         }
-        bytes[0x60..0x64].copy_from_slice(&10.0_f32.to_be_bytes());
-        bytes[0x64..0x68].copy_from_slice(&20_000.0_f32.to_be_bytes());
+        bytes[0x6c..0x70].copy_from_slice(&10.0_f32.to_be_bytes());
+        bytes[0x70..0x74].copy_from_slice(&20_000.0_f32.to_be_bytes());
+        for (index, value) in [0x0102_0304_u32, 5, 6, 7].into_iter().enumerate() {
+            let start = 0x74 + index * 4;
+            bytes[start..start + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        bytes[0x84..0x98].copy_from_slice(&[
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190,
+            200,
+        ]);
         bytes
     }
 
@@ -5433,7 +5486,7 @@ pub(crate) mod tests {
     #[test]
     fn inventories_stage_environment_palette_relations() {
         let report = parse_stage(&fixture_stage_environment()).unwrap();
-        assert_eq!(report.format, "orbite.gcn-stage-index/2");
+        assert_eq!(report.format, "orbite.gcn-stage-index/3");
         assert_eq!(
             report.environments[0].palette_selection_ids,
             [7, 6, 5, 4, 3, 2, 1, 0]
@@ -5449,19 +5502,42 @@ pub(crate) mod tests {
         assert_eq!(report.palettes[0].fog_color, [31, 32, 33]);
         assert_eq!(report.palettes[0].fog_start, 10.0);
         assert_eq!(report.palettes[0].fog_end, 20_000.0);
+        assert_eq!(
+            report.atmosphere_palettes[0].unknown_words,
+            [0x0102_0304, 5, 6, 7]
+        );
+        assert_eq!(report.atmosphere_palettes[0].cloud_color, [10, 20, 30, 40]);
+        assert_eq!(
+            report.atmosphere_palettes[0].cloud_center_color,
+            [50, 60, 70, 80]
+        );
+        assert_eq!(report.atmosphere_palettes[0].sky_color, [90, 100, 110]);
+        assert_eq!(
+            report.atmosphere_palettes[0].distant_sea_color,
+            [120, 130, 140]
+        );
+        assert_eq!(
+            report.atmosphere_palettes[0].front_haze_color,
+            [150, 160, 170]
+        );
+        assert_eq!(
+            report.atmosphere_palettes[0].trailing_bytes,
+            [180, 190, 200]
+        );
         assert_eq!(report.chunks[0].record_kind, "environment_selection");
         assert_eq!(report.chunks[1].record_kind, "palette_selection");
         assert_eq!(report.chunks[2].record_kind, "palette");
+        assert_eq!(report.chunks[3].record_kind, "atmosphere_palette");
     }
 
     #[test]
     fn rejects_truncated_and_non_finite_stage_palettes() {
         let mut truncated = fixture_stage_environment();
-        truncated.truncate(0x65);
+        truncated.truncate(0x97);
         assert!(parse_stage(&truncated).is_err());
 
         let mut non_finite = fixture_stage_environment();
-        non_finite[0x38..0x3c].copy_from_slice(&f32::INFINITY.to_be_bytes());
+        non_finite[0x44..0x48].copy_from_slice(&f32::INFINITY.to_be_bytes());
         assert!(parse_stage(&non_finite).is_err());
     }
 

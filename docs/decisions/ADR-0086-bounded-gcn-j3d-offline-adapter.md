@@ -157,13 +157,15 @@ contrôleur source.
 Le lecteur de scène traite les tables d'environnement DZS comme des relations
 typées : `EnvR` conserve ses huit sélecteurs, `Colo` ses huit palettes et sa vitesse
 de transition, et `Pale` les paires couleur/konst acteur et fond, le brouillard,
-l'index virtuel et ses distances. Les octets réservés restent ignorés uniquement
-quand la structure source les déclare ainsi. Les flottants non finis et les plages
-tronquées ferment l'inspection. La sélection effective demeure une étape de
+l'index virtuel et ses distances. `Virt` conserve séparément les deux registres RGBA
+des nuages et les registres RGB du ciel, de la mer lointaine et de la brume avant.
+Les quatre mots encore sans sémantique prouvée restent exposés comme inconnus ; ils
+ne sont ni supprimés ni présentés comme du padding. Les flottants non finis et les
+plages tronquées ferment l'inspection. La sélection effective demeure une étape de
 résolution séparée liée au contrôleur d'environnement ; le lecteur n'invente pas une
 heure du jour ni une couleur à partir d'une image.
-L'ajout est publié par `orbite.gcn-stage-index/2` afin qu'un consommateur de la
-première enveloppe ne confonde pas absence de tables et absence de capacité.
+Cette fermeture est publiée par `orbite.gcn-stage-index/3` afin qu'un consommateur ne
+confonde pas une ancienne enveloppe sans `Virt` avec une palette atmosphérique vide.
 
 ## Conséquences
 
