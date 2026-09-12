@@ -1,0 +1,66 @@
+{
+  "format": "orbite.wallpaper-concept/1",
+  "id": "fixture-island-concept",
+  "status": "accepted",
+  "source": {
+    "game_id": "fixture.adventure",
+    "input_reference": "private/source/fixture.img",
+    "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "content_policy": "private-local-only"
+  },
+  "research": {
+    "engine_summary": "The fixture engine stores scenes, actors and render resources in independently indexed archives with explicit placement records.",
+    "sources": [
+      { "id": "format-doc", "classification": "official_documentation", "reference": "https://example.invalid/fixture-format", "revision": "1.0", "usage": "format_research", "commercial_assets_imported": false },
+      { "id": "local-index", "classification": "local_observation", "reference": "private/research/index.json", "revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "usage": "local_inventory", "commercial_assets_imported": false }
+    ],
+    "subsystems": [
+      { "id": "engine_core", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Record engine identity and coordinate conventions.", "fidelity_target": "exact" },
+      { "id": "archives", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Extract bounded archives without rewriting sources.", "fidelity_target": "exact" },
+      { "id": "scene_graph", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Preserve node hierarchy and transforms.", "fidelity_target": "source_equivalent" },
+      { "id": "geometry", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Convert indexed primitives with winding tests.", "fidelity_target": "source_equivalent" },
+      { "id": "materials", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Compile source material stages into a portable profile.", "fidelity_target": "source_equivalent" },
+      { "id": "textures", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Decode every declared texture and mip level.", "fidelity_target": "exact" },
+      { "id": "animation", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Preserve clips, events and authored loop metadata.", "fidelity_target": "source_equivalent" },
+      { "id": "collision", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Keep collision separate from visible geometry.", "fidelity_target": "exact" },
+      { "id": "placement", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Derive complete placement matrices from source records.", "fidelity_target": "exact" },
+      { "id": "effects", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Resolve emitters, textures and timing as a bounded pack.", "fidelity_target": "source_equivalent" },
+      { "id": "audio", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Resolve streams, sequences, banks and loop points.", "fidelity_target": "source_equivalent" },
+      { "id": "ui", "status": "studied", "evidence_ids": ["local-index"], "conversion_strategy": "Inventory source UI and map it to semantic components.", "fidelity_target": "source_equivalent" },
+      { "id": "behavior", "status": "studied", "evidence_ids": ["format-doc"], "conversion_strategy": "Separate observed source behavior from wallpaper adaptations.", "fidelity_target": "source_equivalent" }
+    ],
+    "tool_candidates": [
+      { "id": "fixture-reader", "version": "1.0.0", "purpose": "Read the fixture archive and scene formats.", "adoption": "selected" }
+    ]
+  },
+  "inventory": [
+    { "id": "object.carrier", "label": "Travelling carrier", "resource_kind": "model", "evidence_ids": ["local-index"], "proposed_roles": ["scene.ambient", "pin.primary"], "supports_session": true, "supports_pin": true, "rationale": "Its motion remains readable in the scene and as a persistent foreground object." },
+    { "id": "object.indicator", "label": "Session indicator", "resource_kind": "actor", "evidence_ids": ["local-index"], "proposed_roles": ["session.presence"], "supports_session": true, "supports_pin": false, "rationale": "Its compact silhouette can communicate one independent session state." }
+  ],
+  "proposals": [
+    {
+      "id": "proposal.archipelago",
+      "title": "Living archipelago",
+      "scene": "A carrier follows a qualified route around several islands while compact actors expose browser-session state without changing their identity.",
+      "interactive_object_ids": ["object.carrier", "object.indicator"],
+      "session_bindings": [
+        { "object_id": "object.carrier", "provider_role": "browser.primary", "intents": ["focus", "open"], "identity_preserved_on_appearance_change": true },
+        { "object_id": "object.indicator", "provider_role": "browser.session", "intents": ["focus"], "identity_preserved_on_appearance_change": true }
+      ],
+      "pinning": {
+        "candidate_ids": ["object.carrier"],
+        "visibility_scope": "workspace-windows",
+        "same_instance_and_session": true,
+        "right_click_mode": "transform-frame",
+        "controls": ["position", "size", "brightness", "opacity"],
+        "actions": ["accept", "cancel", "disable"],
+        "persistent_per_object_settings": true,
+        "atomic_preview": true
+      },
+      "menus": { "generated_from_catalog": true, "generated_from_capabilities": true, "hardcoded_game_categories": false },
+      "performance": { "static_zero_submission_target": true, "pause_stops_simulation": true, "occlusion_stops_simulation": true, "pin_has_independent_dirty_state": true }
+    }
+  ],
+  "decision": { "status": "accepted", "proposal_id": "proposal.archipelago", "decided_by": "user", "rationale": "The user selected this composition before conversion." },
+  "generation_policy": { "requires_user_accepted_plan": true, "requires_complete_engine_research": true, "on_unresolved": "block-generation", "commercial_content_output": "private-only" }
+}

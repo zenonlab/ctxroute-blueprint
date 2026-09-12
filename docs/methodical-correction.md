@@ -8,6 +8,8 @@ capture issue d'un ancien processus ne constituent pas une correction.
 
 Le protocole s'applique aux thèmes, adaptateurs, runtimes, connecteurs et outils de
 préparation. Il reste indépendant du jeu, du renderer et du système d'exploitation.
+La création initiale d'un thème suit d'abord le contrat de recherche et de proposition
+`orbite.wallpaper-concept/1` ; ce document traite ensuite les défauts observés.
 
 ## Parcours obligatoire
 
@@ -126,4 +128,7 @@ Les structures attendues sont dans
 [visual-qualification.schema.json](templates/visual-qualification.schema.json) et
 leurs exemples synthétiques voisins. Le menu déclaratif est documenté par
 [theme-interface-v5.schema.json](templates/theme-interface-v5.schema.json) et son
-[exemple sans catégorie de jeu](templates/theme-interface-v5.example.json).
+[exemple sans catégorie de jeu](templates/theme-interface-v5.example.json). Le gate
+de recherche et de conception utilise
+[wallpaper-concept.schema.json](templates/wallpaper-concept.schema.json) et son
+[exemple libre](templates/wallpaper-concept.example.json).

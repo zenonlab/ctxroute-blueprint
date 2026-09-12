@@ -47,5 +47,20 @@
     "compatibility": [
       { "source_stage": "look", "target_stage": "ally", "attribute": "family" }
     ]
+  },
+  "pinning": {
+    "target_ids": ["object.primary"],
+    "visibility_scope": "workspace-windows",
+    "same_instance_and_session": true,
+    "edit_mode": "transform-frame",
+    "controls": ["position", "size", "brightness", "opacity"],
+    "actions": ["accept", "cancel", "disable"],
+    "limits": {
+      "size": [0.25, 4],
+      "brightness": [0, 1],
+      "opacity": [0, 1]
+    },
+    "persistent_per_object_settings": true,
+    "atomic_preview": true
   }
 }

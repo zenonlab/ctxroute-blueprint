@@ -70,6 +70,14 @@ anciens overrides et l'absence de branche AppKit par catégorie. Le build natif 
 warnings bloquants reste nécessaire, car SwiftPM ne compile pas les sources de
 l'application AppKit.
 
+Le gate de création d'un thème utilise `orbite.wallpaper-concept/1` avant toute
+conversion. `node scripts/verify-wallpaper-concept.mjs` exige les treize domaines de
+recherche moteur, vérifie la provenance des candidats, impose une session à chaque
+objet interactif ou pinné et maintient `generation_allowed: false` avant acceptation
+explicite ou lorsqu'un domaine reste `missing/unsupported`. La fixture libre vérifie
+aussi le cadre de pin, ses quatre réglages, ses trois décisions atomiques et la
+persistance des objets désactivés.
+
 La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
 exigent un parcours déterministe, le rejet des traversées et formats incohérents,
 la déduplication des identités et des racines issues uniquement de configuration.

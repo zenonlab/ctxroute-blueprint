@@ -2,41 +2,69 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Personnalisation — des imports locaux au thème rendu",
+    "title": "Du jeu local au wallpaper qualifié et personnalisable",
     "quality_profile": "showcase",
-    "viewBox": [1080, 560]
+    "viewBox": [1080, 800]
   },
   "stages": [
-    { "label": "Sources" },
-    { "label": "Préparer" },
-    { "label": "Résoudre" },
+    { "label": "Observer" },
+    { "label": "Concevoir" },
+    { "label": "Convertir" },
     { "label": "Composer" },
     { "label": "Présenter" }
   ],
   "nodes": [
-    { "id": "creator", "type": "frontend", "label": "Création ouverte", "sublabel": "code · studio · modèles", "stage": 0, "row": 0, "width": 150 },
-    { "id": "game", "type": "external", "label": "Import local du jeu", "sublabel": "2D/3D · rigs · caméras source", "stage": 0, "row": 2, "width": 150 },
-    { "id": "recipe", "type": "database", "label": "Recette partageable", "sublabel": "étapes · choix · attributs", "stage": 1, "row": 0, "width": 160 },
-    { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "convertit vers l'IR canonique", "stage": 1, "row": 2, "width": 150 },
-    { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "ordre · modèles · compatibilité", "stage": 2, "row": 0, "width": 160 },
-    { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · clips · icônes UI source", "stage": 2, "row": 2, "width": 160 },
-    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "sélections typées · brouillon atomique", "stage": 3, "row": 0, "width": 180 },
-    { "id": "capabilities", "type": "security", "label": "Courtiers typés", "sublabel": "snapshots processus · restauration", "stage": 3, "row": 2, "width": 170 },
-    { "id": "renderer", "type": "frontend", "label": "Hôte 2D / 3D", "sublabel": "instances · modèles · clips", "stage": 4, "row": 0, "width": 160 },
-    { "id": "ui", "type": "frontend", "label": "Menu automatique", "sublabel": "étapes déclarées · contrôles accessibles", "stage": 4, "row": 1, "width": 180 },
-    { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "surface · entrée · permissions", "stage": 4, "row": 2, "width": 160 }
+    { "id": "game", "type": "external", "label": "Corpus local du jeu", "sublabel": "disque · données · code", "stage": 0, "row": 0, "width": 150 },
+    { "id": "research", "type": "security", "label": "Recherche du moteur", "sublabel": "formats · rendu · logique · limites", "stage": 1, "row": 0, "width": 170 },
+    { "id": "concept", "type": "frontend", "label": "Proposition de wallpaper", "sublabel": "scène · objets · sessions · contrôles", "stage": 1, "row": 2, "width": 180 },
+    { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "conversion après validation du plan", "stage": 2, "row": 2, "width": 170 },
+    { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · relations · preuves", "stage": 2, "row": 4, "width": 160 },
+    { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "capacités · compatibilité · digests", "stage": 3, "row": 4, "width": 170 },
+    { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "instances stables · sessions typées", "stage": 3, "row": 2, "width": 180 },
+    { "id": "renderer", "type": "frontend", "label": "Wallpaper 2D / 3D", "sublabel": "scène · animation · occlusion", "stage": 4, "row": 0, "width": 160 },
+    { "id": "ui", "type": "frontend", "label": "Menus automatiques", "sublabel": "catalogue · contrôles accessibles", "stage": 4, "row": 1, "width": 175 },
+    { "id": "pin", "type": "frontend", "label": "Objet 3D épinglé", "sublabel": "déplacer · taille · lumière · alpha", "stage": 4, "row": 2, "width": 175 },
+    { "id": "connector", "type": "external", "label": "Connecteur OS", "sublabel": "fenêtres · entrée · visibilité", "stage": 4, "row": 4, "width": 160 }
   ],
   "flows": [
-    { "from": "creator", "to": "recipe", "label": "design" },
-    { "from": "game", "to": "importer", "label": "assets locaux", "variant": "security", "labelAt": [208, 428] },
-    { "from": "recipe", "to": "resolver", "label": "étapes, choix, attributs et liaisons", "labelAt": [420, 200] },
-    { "from": "importer", "to": "library", "label": "assets validés", "variant": "security", "labelAt": [420, 428] },
-    { "from": "library", "to": "resolver", "label": "références locales", "variant": "dashed" },
-    { "from": "resolver", "to": "runtime", "label": "composition validée", "variant": "emphasis", "labelAt": [635, 200] },
-    { "from": "runtime", "to": "renderer", "label": "modèle digesté → · reset restaure", "variant": "emphasis", "labelAt": [855, 108] },
-    { "from": "runtime", "to": "ui", "label": "ordre, choix compatibles et visuels privés", "labelAt": [925, 220] },
-    { "from": "runtime", "to": "capabilities", "label": "focus/open corrélés", "variant": "security", "labelAt": [680, 270] },
-    { "from": "capabilities", "to": "connector", "label": "actions autorisées", "variant": "security", "route": "straight", "labelAt": [855, 428] },
-    { "from": "capabilities", "to": "ui", "label": "snapshot monotone confirmé", "variant": "dashed" }
+    { "from": "game", "to": "research", "label": "inventaire sourcé", "variant": "security", "labelAt": [203, 110] },
+    { "from": "research", "to": "concept", "label": "capacités prouvées", "variant": "emphasis", "labelAt": [315, 270] },
+    { "from": "concept", "to": "importer", "label": "plan accepté", "variant": "security", "labelAt": [425, 440] },
+    { "from": "importer", "to": "library", "label": "dérivés digestés", "variant": "security", "labelAt": [530, 500] },
+    { "from": "library", "to": "resolver", "label": "références privées", "variant": "dashed", "labelAt": [635, 560] },
+    { "from": "resolver", "to": "runtime", "label": "composition complète", "variant": "emphasis", "labelAt": [745, 500] },
+    { "from": "runtime", "to": "renderer", "label": "scène", "labelAt": [850, 215] },
+    { "from": "runtime", "to": "ui", "label": "menus", "labelAt": [900, 330] },
+    { "from": "runtime", "to": "pin", "label": "identité et session", "variant": "emphasis", "route": "straight", "labelAt": [850, 440] },
+    { "from": "pin", "to": "connector", "label": "fenêtre OS bornée", "variant": "security", "labelAt": [960, 500] }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Gate avant génération",
+      "items": [
+        "Le moteur et le corpus sont étudiés avant de choisir une conversion",
+        "Le plan du wallpaper est présenté à l'utilisateur avant tout asset dérivé",
+        "Une absence reste missing ou unsupported"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Objet épinglé",
+      "items": [
+        "Le pin réutilise l'identité et la session de l'objet de scène",
+        "Le clic droit ouvre position, taille, luminosité et transparence",
+        "Valider applique atomiquement ; annuler restaure le snapshot"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Aucun métier dans le runtime",
+      "items": [
+        "Objets, sessions et menus viennent du catalogue qualifié",
+        "Le connecteur ne connaît aucun jeu, personnage ou véhicule",
+        "Les contenus commerciaux restent privés"
+      ]
+    }
   ]
 }

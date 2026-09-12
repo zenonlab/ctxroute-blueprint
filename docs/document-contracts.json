@@ -3,6 +3,12 @@
   "policy": "schema-first",
   "documents": [
     {
+      "id": "wallpaper-concept",
+      "kind": "product-contract",
+      "format": "json-schema",
+      "source": "docs/templates/wallpaper-concept.schema.json"
+    },
+    {
       "id": "theme-customization",
       "kind": "dataflow-ir",
       "audience": "product",

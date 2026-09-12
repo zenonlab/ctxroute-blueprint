@@ -129,6 +129,21 @@ conservent une table `selections` par catégorie ; les anciens champs `character
 catégorie de choix doit apparaître exactement une fois dans les étapes, ce qui évite
 les choix chargés mais inaccessibles dans le menu.
 
+La capacité optionnelle `pinning` expose les cibles 3D que le package autorise à
+maintenir visibles devant les fenêtres ordinaires de l'espace de travail. Un pin est
+une présentation supplémentaire de la même instance : il conserve `instance_id`,
+`session_binding`, état et action. Le connecteur ne clone donc ni objet ni session.
+Il exclut les écrans verrouillés, surfaces de sécurité et fenêtres système que la
+plateforme interdit de recouvrir.
+
+Le bouton pin bascule la visibilité persistante de la cible. Un clic droit sur le pin
+ouvre un cadre de transformation distinct du menu d'apparence : déplacement et taille
+dans le cadre, puis barres de luminosité et d'opacité. `accept` applique le brouillon
+en une transaction ; `cancel` restaure le snapshot complet ; `disable` masque le pin
+sans effacer ses réglages. Les réglages listent aussi les pins désactivés afin de les
+réactiver. Les bornes viennent du manifeste et le connecteur refuse une cible absente,
+une identité différente ou une capacité de fenêtre non disponible.
+
 Une substitution riggée exige une `compatibility_signature` qui couvre le type de
 ressource, le squelette, les clips requis et les points d'ancrage. Le runtime refuse
 une substitution incompatible. Un retargeting n'est accepté que comme dérivé produit
@@ -166,6 +181,29 @@ une animation continue. Occlusion, pause du mouvement et préférence de mouveme
 réduits arrêtent proprement sa progression selon la politique du thème.
 
 ## Frontière commune des convertisseurs
+
+### Recherche et concept obligatoires avant conversion
+
+La création d'un thème commence en lecture seule. Le préparateur identifie l'entrée
+locale, étudie le moteur et couvre archives, graphe de scène, géométrie, matériaux,
+textures, animations, collisions, placements, effets, audio, UI et comportements.
+Chaque conclusion distingue documentation officielle, implémentation publique,
+observation locale et hypothèse. Un viewer public peut documenter un lecteur ou servir
+d'oracle ; il ne fournit ni assets, ni runtime de substitution.
+
+Avant de produire le premier dérivé, le préparateur remet un
+`orbite.wallpaper-concept/1`. Il propose la scène, son mouvement ambiant, les objets
+réellement inventoriés, les rôles de sessions, les intentions `focus/open`, les cibles
+pinnables, les menus automatiques, les contrôles système et le comportement énergétique.
+La proposition explique pourquoi chaque objet convient au rôle. Une silhouette,
+créature, embarcation ou interface n'est jamais sélectionnée à partir du seul nom du
+jeu.
+
+La génération reste fermée jusqu'à l'acceptation explicite d'une proposition par
+l'utilisateur et jusqu'à ce que tous les sous-systèmes soient `studied` ou
+`not_applicable`. `missing` et `unsupported` peuvent apparaître dans le plan, mais
+maintiennent `generation_allowed: false`. Ce gate empêche une première map longuement
+ajustée à la main de masquer l'absence d'un convertisseur réutilisable.
 
 « Tous les émulateurs » désigne ici toutes les sources pour lesquelles un adaptateur
 peut produire le contrat canonique, et non l'embarquement d'un émulateur dans le
@@ -311,6 +349,7 @@ Le manifeste canonique est organisé par domaines stables :
 | `ui` | tokens, composants, panneaux, navigation et accessibilité |
 | `bindings` | événements, conditions, actions, cibles et résultats |
 | `system_controls` | placement, style, ordre et présentation des capacités standard |
+| `pinning` | cibles, visibilité inter-fenêtres, cadre d'édition, bornes et persistance |
 | `capabilities` | fonctions requises, optionnelles et fallbacks |
 | `profiles` | budgets de rendu, animation, audio et qualité |
 | `provenance` | auteur, licences, versions, outils et contenu exportable |

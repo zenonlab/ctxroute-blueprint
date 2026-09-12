@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "skillId": "game-theme-author",
+  "version": "1.0.0",
+  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "mutationAuthority": "orchestrator",
+  "validations": [
+    {
+      "id": "game-theme-author-tests",
+      "executable": "node",
+      "args": ["--test", "tests/theme-authoring.test.mjs"],
+      "cwd": ".",
+      "timeout_ms": 30000
+    }
+  ]
+}
