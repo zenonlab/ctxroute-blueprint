@@ -393,6 +393,10 @@ pub struct J3dMaterialEntry {
     pub z_compare_before_texture: bool,
     pub dither: bool,
     pub texture_bindings: Vec<J3dTextureBinding>,
+    pub tev_colors: Vec<J3dTevColor>,
+    pub tev_konst_colors: Vec<J3dTevKonstColor>,
+    pub tev_swap_tables: Vec<J3dTevSwapTable>,
+    pub tev_stages: Vec<J3dTevStage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -419,6 +423,57 @@ pub struct J3dDepth {
     pub compare_enabled: bool,
     pub function: &'static str,
     pub update_enabled: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTevColor {
+    pub register: u8,
+    pub source_index: Option<u16>,
+    pub rgba_s10: [i16; 4],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTevKonstColor {
+    pub register: u8,
+    pub source_index: Option<u16>,
+    pub rgba: [u8; 4],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTevSwapTable {
+    pub table: u8,
+    pub source_index: Option<u16>,
+    pub rgba_sources: [u8; 4],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTevStage {
+    pub stage: u8,
+    pub order_index: Option<u16>,
+    pub stage_index: Option<u16>,
+    pub swap_mode_index: Option<u16>,
+    pub texture_coordinate: Option<u8>,
+    pub texture_map: Option<u8>,
+    pub raster_channel: Option<&'static str>,
+    pub color_inputs: [&'static str; 4],
+    pub color_operation: J3dTevOperation,
+    pub alpha_inputs: [&'static str; 4],
+    pub alpha_operation: J3dTevOperation,
+    pub konst_color_selection_source: u8,
+    pub konst_alpha_selection_source: u8,
+    pub konst_color_selection: String,
+    pub konst_alpha_selection: String,
+    pub texture_swap_table: u8,
+    pub raster_swap_table: u8,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTevOperation {
+    pub operation: &'static str,
+    pub bias: Option<&'static str>,
+    pub scale: Option<&'static str>,
+    pub clamp: bool,
+    pub output_register: &'static str,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -891,7 +946,7 @@ pub fn parse_j3d_material_table(bytes: &[u8]) -> Result<J3dMaterialTableReport> 
         }
     }
     Ok(J3dMaterialTableReport {
-        format: "orbite.j3d-material-table-index/2",
+        format: "orbite.j3d-material-table-index/3",
         adapter: "gcn.j3d-material-table",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -940,6 +995,12 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
     let cull_mode_offset = read_u32(section, 0x1c)? as usize;
     let texgen_count_offset = read_u32(section, 0x34)? as usize;
     let tev_stage_count_offset = read_u32(section, 0x58)? as usize;
+    let tev_order_offset = read_u32(section, 0x4c)? as usize;
+    let tev_color_offset = read_u32(section, 0x50)? as usize;
+    let tev_konst_color_offset = read_u32(section, 0x54)? as usize;
+    let tev_stage_offset = read_u32(section, 0x5c)? as usize;
+    let tev_swap_mode_offset = read_u32(section, 0x60)? as usize;
+    let tev_swap_table_offset = read_u32(section, 0x64)? as usize;
     let alpha_compare_offset = read_u32(section, 0x6c)? as usize;
     let blend_offset = read_u32(section, 0x70)? as usize;
     let z_mode_offset = read_u32(section, 0x74)? as usize;
@@ -1011,6 +1072,42 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
             "Z compare location",
         )?;
         let dither = mat3_indexed_bool(section, dither_offset, dither_index, true, "dither")?;
+        let tev_colors = (0..4)
+            .map(|register| {
+                let source_index = read_u16(section, init + 0xdc + register * 2)?;
+                mat3_tev_color(section, tev_color_offset, register, source_index)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let tev_konst_colors = (0..4)
+            .map(|register| {
+                let source_index = read_u16(section, init + 0x94 + register * 2)?;
+                mat3_tev_konst_color(section, tev_konst_color_offset, register, source_index)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let tev_swap_tables = (0..4)
+            .map(|table| {
+                let source_index = read_u16(section, init + 0x124 + table * 2)?;
+                mat3_tev_swap_table(section, tev_swap_table_offset, table, source_index)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let tev_stages = (0..usize::from(allocated_tev_stages))
+            .map(|stage| {
+                let order_index = read_u16(section, init + 0xbc + stage * 2)?;
+                let stage_index = read_u16(section, init + 0xe4 + stage * 2)?;
+                let swap_mode_index = read_u16(section, init + 0x104 + stage * 2)?;
+                mat3_tev_stage(
+                    section,
+                    init,
+                    tev_order_offset,
+                    tev_stage_offset,
+                    tev_swap_mode_offset,
+                    stage,
+                    order_index,
+                    stage_index,
+                    swap_mode_index,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
         materials.push(J3dMaterialEntry {
             name,
             source_material_id,
@@ -1034,9 +1131,349 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
             z_compare_before_texture,
             dither,
             texture_bindings,
+            tev_colors,
+            tev_konst_colors,
+            tev_swap_tables,
+            tev_stages,
         });
     }
     Ok(materials)
+}
+
+fn mat3_tev_color(
+    section: &[u8],
+    table_offset: usize,
+    register: usize,
+    index: u16,
+) -> Result<J3dTevColor> {
+    let source_index = (index != u16::MAX).then_some(index);
+    let rgba_s10 = if let Some(index) = source_index {
+        let count = mat3_table_count(section, table_offset, 8)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV color index exceeds table"
+        );
+        let offset = table_offset + usize::from(index) * 8;
+        [
+            read_i16(section, offset)?,
+            read_i16(section, offset + 2)?,
+            read_i16(section, offset + 4)?,
+            read_i16(section, offset + 6)?,
+        ]
+    } else {
+        [0; 4]
+    };
+    ensure!(
+        rgba_s10.iter().all(|value| (-1024..=1023).contains(value)),
+        "MAT3 TEV color exceeds GX signed 10-bit range"
+    );
+    Ok(J3dTevColor {
+        register: u8::try_from(register)?,
+        source_index,
+        rgba_s10,
+    })
+}
+
+fn mat3_tev_konst_color(
+    section: &[u8],
+    table_offset: usize,
+    register: usize,
+    index: u16,
+) -> Result<J3dTevKonstColor> {
+    let source_index = (index != u16::MAX).then_some(index);
+    let rgba = if let Some(index) = source_index {
+        let count = mat3_table_count(section, table_offset, 4)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV konst color index exceeds table"
+        );
+        let offset = table_offset + usize::from(index) * 4;
+        section[offset..offset + 4].try_into()?
+    } else {
+        [u8::MAX; 4]
+    };
+    Ok(J3dTevKonstColor {
+        register: u8::try_from(register)?,
+        source_index,
+        rgba,
+    })
+}
+
+fn mat3_tev_swap_table(
+    section: &[u8],
+    table_offset: usize,
+    table: usize,
+    index: u16,
+) -> Result<J3dTevSwapTable> {
+    let source_index = (index != u16::MAX).then_some(index);
+    let rgba_sources = if let Some(index) = source_index {
+        let count = mat3_table_count(section, table_offset, 4)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV swap table index exceeds table"
+        );
+        let offset = table_offset + usize::from(index) * 4;
+        section[offset..offset + 4].try_into()?
+    } else {
+        [0, 1, 2, 3]
+    };
+    ensure!(
+        rgba_sources.iter().all(|channel| *channel <= 3),
+        "MAT3 TEV swap table channel exceeds GXTevColorChan"
+    );
+    Ok(J3dTevSwapTable {
+        table: u8::try_from(table)?,
+        source_index,
+        rgba_sources,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mat3_tev_stage(
+    section: &[u8],
+    init: usize,
+    order_table_offset: usize,
+    stage_table_offset: usize,
+    swap_mode_table_offset: usize,
+    stage: usize,
+    order_index: u16,
+    stage_index: u16,
+    swap_mode_index: u16,
+) -> Result<J3dTevStage> {
+    const DEFAULT_STAGE: [u8; 20] = [
+        4, 10, 15, 15, 0, 0, 0, 0, 1, 0, 5, 7, 7, 0, 0, 0, 0, 1, 0, 0,
+    ];
+    let order_source = (order_index != u16::MAX).then_some(order_index);
+    let order = if let Some(index) = order_source {
+        let count = mat3_table_count(section, order_table_offset, 4)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV order index exceeds table"
+        );
+        let offset = order_table_offset + usize::from(index) * 4;
+        section[offset..offset + 3].try_into()?
+    } else {
+        [u8::MAX; 3]
+    };
+    let stage_source = (stage_index != u16::MAX).then_some(stage_index);
+    let stage_info: [u8; 20] = if let Some(index) = stage_source {
+        let count = mat3_table_count(section, stage_table_offset, 20)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV stage index exceeds table"
+        );
+        let offset = stage_table_offset + usize::from(index) * 20;
+        section[offset..offset + 20].try_into()?
+    } else {
+        DEFAULT_STAGE
+    };
+    let swap_source = (swap_mode_index != u16::MAX).then_some(swap_mode_index);
+    let swap = if let Some(index) = swap_source {
+        let count = mat3_table_count(section, swap_mode_table_offset, 4)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 TEV swap mode index exceeds table"
+        );
+        let offset = swap_mode_table_offset + usize::from(index) * 4;
+        [section[offset], section[offset + 1]]
+    } else {
+        [0, 0]
+    };
+    ensure!(
+        swap[0] <= 3 && swap[1] <= 3,
+        "MAT3 TEV swap selection exceeds GX capacity"
+    );
+
+    let texture_coordinate = gx_optional_index(order[0], 8, "TEV texture coordinate")?;
+    let texture_map = gx_optional_index(order[1], 8, "TEV texture map")?;
+    let raster_channel = gx_raster_channel(order[2])?;
+    let color_inputs = [
+        gx_tev_color_input(stage_info[1])?,
+        gx_tev_color_input(stage_info[2])?,
+        gx_tev_color_input(stage_info[3])?,
+        gx_tev_color_input(stage_info[4])?,
+    ];
+    let alpha_inputs = [
+        gx_tev_alpha_input(stage_info[10])?,
+        gx_tev_alpha_input(stage_info[11])?,
+        gx_tev_alpha_input(stage_info[12])?,
+        gx_tev_alpha_input(stage_info[13])?,
+    ];
+    let konst_color_selection_source = section[init + 0x9c + stage];
+    let konst_alpha_selection_source = section[init + 0xac + stage];
+    let konst_color_code = effective_tev_selector(konst_color_selection_source, 0x0c);
+    let konst_alpha_code = effective_tev_selector(konst_alpha_selection_source, 0x1c);
+    Ok(J3dTevStage {
+        stage: u8::try_from(stage)?,
+        order_index: order_source,
+        stage_index: stage_source,
+        swap_mode_index: swap_source,
+        texture_coordinate,
+        texture_map,
+        raster_channel,
+        color_inputs,
+        color_operation: gx_tev_operation(&stage_info[5..10], false)?,
+        alpha_inputs,
+        alpha_operation: gx_tev_operation(&stage_info[14..19], true)?,
+        konst_color_selection_source,
+        konst_alpha_selection_source,
+        konst_color_selection: gx_tev_konst_color_selection(konst_color_code)?,
+        konst_alpha_selection: gx_tev_konst_alpha_selection(konst_alpha_code)?,
+        texture_swap_table: swap[1],
+        raster_swap_table: swap[0],
+    })
+}
+
+fn effective_tev_selector(source: u8, default: u8) -> u8 {
+    if source == u8::MAX { default } else { source }
+}
+
+fn gx_optional_index(value: u8, capacity: u8, label: &str) -> Result<Option<u8>> {
+    if value == u8::MAX {
+        Ok(None)
+    } else {
+        ensure!(value < capacity, "MAT3 {label} exceeds GX capacity");
+        Ok(Some(value))
+    }
+}
+
+fn gx_raster_channel(value: u8) -> Result<Option<&'static str>> {
+    Ok(match value {
+        0 => Some("color-0"),
+        1 => Some("color-1"),
+        2 => Some("alpha-0"),
+        3 => Some("alpha-1"),
+        4 => Some("color-0-alpha-0"),
+        5 => Some("color-1-alpha-1"),
+        6 => Some("zero"),
+        7 => Some("alpha-bump"),
+        8 => Some("normalized-alpha-bump"),
+        u8::MAX => None,
+        _ => bail!("MAT3 TEV raster channel is outside GXChannelID"),
+    })
+}
+
+fn gx_tev_color_input(value: u8) -> Result<&'static str> {
+    const NAMES: [&str; 16] = [
+        "previous-color",
+        "previous-alpha",
+        "register-0-color",
+        "register-0-alpha",
+        "register-1-color",
+        "register-1-alpha",
+        "register-2-color",
+        "register-2-alpha",
+        "texture-color",
+        "texture-alpha",
+        "raster-color",
+        "raster-alpha",
+        "one",
+        "half",
+        "konst",
+        "zero",
+    ];
+    NAMES
+        .get(usize::from(value))
+        .copied()
+        .context("MAT3 TEV color input is outside GXTevColorArg")
+}
+
+fn gx_tev_alpha_input(value: u8) -> Result<&'static str> {
+    const NAMES: [&str; 8] = [
+        "previous-alpha",
+        "register-0-alpha",
+        "register-1-alpha",
+        "register-2-alpha",
+        "texture-alpha",
+        "raster-alpha",
+        "konst",
+        "zero",
+    ];
+    NAMES
+        .get(usize::from(value))
+        .copied()
+        .context("MAT3 TEV alpha input is outside GXTevAlphaArg")
+}
+
+fn gx_tev_operation(values: &[u8], alpha: bool) -> Result<J3dTevOperation> {
+    ensure!(values.len() == 5, "internal TEV operation width is invalid");
+    let operation = match values[0] {
+        0 => "add",
+        1 => "subtract",
+        8 => "compare-r8-greater",
+        9 => "compare-r8-equal",
+        10 => "compare-gr16-greater",
+        11 => "compare-gr16-equal",
+        12 => "compare-bgr24-greater",
+        13 => "compare-bgr24-equal",
+        14 if alpha => "compare-a8-greater",
+        14 => "compare-rgb8-greater",
+        15 if alpha => "compare-a8-equal",
+        15 => "compare-rgb8-equal",
+        _ => bail!("MAT3 TEV operation is outside GXTevOp"),
+    };
+    ensure!(values[3] <= 1, "MAT3 TEV clamp is not a GX boolean");
+    let (bias, scale) = if values[0] <= 1 {
+        let bias = match values[1] {
+            0 => "zero",
+            1 => "add-half",
+            2 => "subtract-half",
+            _ => bail!("MAT3 TEV bias is outside GXTevBias"),
+        };
+        let scale = match values[2] {
+            0 => "one",
+            1 => "two",
+            2 => "four",
+            3 => "half",
+            _ => bail!("MAT3 TEV scale is outside GXTevScale"),
+        };
+        (Some(bias), Some(scale))
+    } else {
+        (None, None)
+    };
+    let output_register = match values[4] {
+        0 => "previous",
+        1 => "register-0",
+        2 => "register-1",
+        3 => "register-2",
+        _ => bail!("MAT3 TEV output is outside GXTevRegID"),
+    };
+    Ok(J3dTevOperation {
+        operation,
+        bias,
+        scale,
+        clamp: values[3] != 0,
+        output_register,
+    })
+}
+
+fn gx_tev_konst_color_selection(value: u8) -> Result<String> {
+    const FRACTIONS: [&str; 8] = ["1", "7/8", "3/4", "5/8", "1/2", "3/8", "1/4", "1/8"];
+    if let Some(value) = FRACTIONS.get(usize::from(value)) {
+        return Ok((*value).into());
+    }
+    if (0x0c..=0x0f).contains(&value) {
+        return Ok(format!("k{}-rgba", value - 0x0c));
+    }
+    gx_tev_konst_register_channel(value)
+        .context("MAT3 konst color selection is outside GXTevKColorSel")
+}
+
+fn gx_tev_konst_alpha_selection(value: u8) -> Result<String> {
+    const FRACTIONS: [&str; 8] = ["1", "7/8", "3/4", "5/8", "1/2", "3/8", "1/4", "1/8"];
+    if let Some(value) = FRACTIONS.get(usize::from(value)) {
+        return Ok((*value).into());
+    }
+    gx_tev_konst_register_channel(value)
+        .context("MAT3 konst alpha selection is outside GXTevKAlphaSel")
+}
+
+fn gx_tev_konst_register_channel(value: u8) -> Option<String> {
+    if !(0x10..=0x1f).contains(&value) {
+        return None;
+    }
+    let channel = ["red", "green", "blue", "alpha"][usize::from((value - 0x10) / 4)];
+    Some(format!("k{}-{channel}", (value - 0x10) % 4))
 }
 
 fn mat3_indexed_u8(
@@ -3495,7 +3932,7 @@ mod tests {
     }
 
     fn fixture_bmt(include_texture: bool) -> Vec<u8> {
-        let mat_size = 0x220_usize;
+        let mat_size = 0x260_usize;
         let tex_size = if include_texture { 0x90 } else { 0 };
         let size = 0x20 + mat_size + tex_size;
         let mut bytes = vec![0_u8; size];
@@ -3513,7 +3950,13 @@ mod tests {
             (0x1c, 0x1e8),
             (0x34, 0x1ec),
             (0x48, 0x1e4),
+            (0x4c, 0x210),
+            (0x50, 0x214),
+            (0x54, 0x21c),
             (0x58, 0x1f0),
+            (0x5c, 0x220),
+            (0x60, 0x234),
+            (0x64, 0x238),
             (0x6c, 0x1f8),
             (0x70, 0x200),
             (0x74, 0x204),
@@ -3536,6 +3979,16 @@ mod tests {
         bytes[mat + 0x204..mat + 0x208].copy_from_slice(&[1, 6, 0, 0]);
         bytes[mat + 0x208] = 1;
         bytes[mat + 0x20c] = 0;
+        bytes[mat + 0x210..mat + 0x214].copy_from_slice(&[2, 1, 4, 0]);
+        for (offset, value) in [(0x214, 1_i16), (0x216, -2), (0x218, 3), (0x21a, -4)] {
+            bytes[mat + offset..mat + offset + 2].copy_from_slice(&value.to_be_bytes());
+        }
+        bytes[mat + 0x21c..mat + 0x220].copy_from_slice(&[11, 22, 33, 44]);
+        bytes[mat + 0x220..mat + 0x234].copy_from_slice(&[
+            4, 8, 10, 14, 15, 0, 1, 2, 1, 2, 4, 5, 6, 7, 1, 2, 3, 0, 3, 0,
+        ]);
+        bytes[mat + 0x234..mat + 0x238].copy_from_slice(&[3, 2, 0, 0]);
+        bytes[mat + 0x238..mat + 0x23c].copy_from_slice(&[3, 2, 1, 0]);
 
         if include_texture {
             let tex = mat + mat_size;
@@ -3912,6 +4365,38 @@ mod tests {
         assert!(!report.materials[0].depth.update_enabled);
         assert!(report.materials[0].z_compare_before_texture);
         assert!(!report.materials[0].dither);
+        assert_eq!(report.materials[0].tev_colors[0].rgba_s10, [1, -2, 3, -4]);
+        assert_eq!(
+            report.materials[0].tev_konst_colors[0].rgba,
+            [11, 22, 33, 44]
+        );
+        assert_eq!(
+            report.materials[0].tev_swap_tables[0].rgba_sources,
+            [3, 2, 1, 0]
+        );
+        assert_eq!(report.materials[0].tev_stages.len(), 3);
+        assert_eq!(
+            report.materials[0].tev_stages[0].texture_coordinate,
+            Some(2)
+        );
+        assert_eq!(
+            report.materials[0].tev_stages[0].raster_channel,
+            Some("color-0-alpha-0")
+        );
+        assert_eq!(
+            report.materials[0].tev_stages[0].color_inputs[0],
+            "texture-color"
+        );
+        assert_eq!(
+            report.materials[0].tev_stages[0].color_operation.scale,
+            Some("four")
+        );
+        assert_eq!(
+            report.materials[0].tev_stages[0].alpha_operation.operation,
+            "subtract"
+        );
+        assert_eq!(report.materials[0].tev_stages[0].texture_swap_table, 2);
+        assert_eq!(report.materials[0].tev_stages[0].raster_swap_table, 3);
         assert_eq!(report.textures[0].name, "diffuse");
         assert_eq!(report.textures[0].texture.gx_format, "i4");
     }
@@ -3940,6 +4425,22 @@ mod tests {
         let mut bad_boolean = fixture_bmt(true);
         bad_boolean[0x20 + 0x208] = 2;
         assert!(parse_j3d_material_table(&bad_boolean).is_err());
+
+        let mut bad_tev_input = fixture_bmt(true);
+        bad_tev_input[0x20 + 0x221] = 16;
+        assert!(parse_j3d_material_table(&bad_tev_input).is_err());
+
+        let mut bad_tev_selector = fixture_bmt(true);
+        bad_tev_selector[0x20 + 0x84 + 0x9c] = 8;
+        assert!(parse_j3d_material_table(&bad_tev_selector).is_err());
+
+        let mut bad_swap_channel = fixture_bmt(true);
+        bad_swap_channel[0x20 + 0x238] = 4;
+        assert!(parse_j3d_material_table(&bad_swap_channel).is_err());
+
+        let mut bad_s10_color = fixture_bmt(true);
+        bad_s10_color[0x20 + 0x214..0x20 + 0x216].copy_from_slice(&1024_i16.to_be_bytes());
+        assert!(parse_j3d_material_table(&bad_s10_color).is_err());
     }
 
     #[test]
@@ -3954,6 +4455,17 @@ mod tests {
             bytes[mat + offset..mat + offset + 4].fill(0);
         }
         bytes[init + 0x146..init + 0x14a].fill(0xff);
+        for range in [
+            0x94..0x9c,
+            0xbc..0xdc,
+            0xdc..0xe4,
+            0xe4..0x104,
+            0x104..0x124,
+            0x124..0x12c,
+        ] {
+            bytes[init + range.start..init + range.end].fill(0xff);
+        }
+        bytes[init + 0x9c..init + 0xbc].fill(0xff);
 
         let material = parse_j3d_material_table(&bytes)
             .unwrap()
@@ -3971,6 +4483,13 @@ mod tests {
         assert_eq!(material.depth.function, "less-or-equal");
         assert!(!material.z_compare_before_texture);
         assert!(material.dither);
+        assert_eq!(material.tev_colors[0].rgba_s10, [0; 4]);
+        assert_eq!(material.tev_konst_colors[0].rgba, [u8::MAX; 4]);
+        assert_eq!(material.tev_swap_tables[0].rgba_sources, [0, 1, 2, 3]);
+        assert_eq!(material.tev_stages[0].order_index, None);
+        assert_eq!(material.tev_stages[0].color_inputs[0], "raster-color");
+        assert_eq!(material.tev_stages[0].konst_color_selection, "k0-rgba");
+        assert_eq!(material.tev_stages[0].konst_alpha_selection, "k0-alpha");
     }
 
     #[test]

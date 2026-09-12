@@ -95,7 +95,11 @@ depth, emplacement du Z compare et dither sont conservés puis résolus selon le
 factory J3D épinglé. Les sentinelles appliquent uniquement les valeurs par défaut
 attestées ; une alpha compare absente reste absente. Chaque index, enum, booléen et
 capacité GX est borné. Cette fermeture de l'état pixel fixe ne vaut pas fermeture du
-combinateur TEV, du fog ou de l'indirect texturing.
+fog ou de l'indirect texturing. Le combinateur TEV suit le même principe : il expose
+par stage les ordres texture/raster, entrées couleur et alpha, opérations, bias,
+scales, clamps, registres de sortie, sélections et couleurs konst, couleurs signées
+et swaps. Les indices absents reproduisent strictement les constructeurs par défaut
+J3D. Les domaines GX et la plage signée 10 bits sont vérifiés avant publication.
 
 La collision DZB reste une famille indépendante du mesh rendu. Son lecteur préserve
 les six tables sources — sommets, triangles, blocs, arbre, groupes et propriétés —,

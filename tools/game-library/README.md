@@ -161,8 +161,10 @@ distingue les bindings externes et une déclaration de sections incomplète. Les
 source et états effectifs de culling, nombre de texgens et stages TEV, alpha compare,
 blend, depth, position du Z compare et dither sont résolus avec les valeurs par défaut
 du factory J3D. Les enums et booléens GX invalides sont refusés. Les opérations des
-stages TEV, couleurs konst, swaps, fog et indirect texturing ne sont pas encore
-qualifiées.
+stages TEV sont également résolues : ordre texture/raster, entrées couleur et alpha,
+opération, bias, scale, clamp, registre de sortie, sélections konst, couleurs signées
+et tables de swap. Les valeurs source et les fallbacks J3D restent distincts. Le fog
+et l'indirect texturing ne sont pas encore qualifiés.
 
 Le lecteur DZB conserve sommets, triangles, propriétés, blocs, arbre spatial et
 hiérarchie de groupes en repère source. Il vérifie chaque référence croisée, les noms,

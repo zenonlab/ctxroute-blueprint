@@ -297,9 +297,11 @@ le reçu les marque `declaration_complete: false`. Les 19 matériaux résolvent 
 leurs états fixes MAT3 : tous utilisent le culling arrière ; 18 sont opaques et un
 utilise l'alpha blend ; 18 écrivent le depth et un le teste sans l'écrire. Les nombres
 de texgens et de stages, alpha compare, position du Z compare et dither sont aussi
-contrôlés. Les opérations des stages TEV, couleurs konst, swaps, fog et indirect
-texturing restent ouvertes : cette fermeture partielle ne passe pas le gate de
-dépendances.
+contrôlés. Leurs 45 stages TEV sont désormais intégralement inventoriés : 38 lisent
+une texture, 15 utilisent le canal raster et 6 tables de swap ne sont pas identitaires.
+Les deux combinateurs utilisent `add` sur ce sous-corpus. Le fog, l'indirect texturing
+et surtout les MAT3 embarqués dans les modèles restent ouverts : cette fermeture
+partielle ne passe pas le gate de dépendances.
 
 Les 25 DZB de cette fermeture acteur passent ensuite le lecteur de collision : 2 808
 sommets, 4 204 triangles et 129 groupes, avec références de propriétés et arbres
@@ -318,8 +320,8 @@ tables et appelants source des cinq indices dynamiques, prouve toutefois qu'aucu
 deux n'est référencée par les racines sélectionnées. Elles restent non converties et
 sont classées `not_applicable` : les 575 payloads sont ainsi classifiés, 573 par
 inspection et 2 par exclusion sourcée. La dépendance transitive reste fermée tant que
-le combinateur MAT3/TEV, le fog et l'indirect texturing nécessaires au rendu ne sont
-pas qualifiés.
+les MAT3 embarqués, le fog et l'indirect texturing nécessaires au rendu ne sont pas
+qualifiés.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
