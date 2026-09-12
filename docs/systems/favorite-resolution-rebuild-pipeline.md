@@ -580,10 +580,11 @@ checkpoint.
 
 ### Modification ou déplacement — cible après durcissement d’inventaire
 
-L’événement relit seulement le favori concerné. Un titre, une URL, un chemin ou
-un ordre modifié met à jour la source. Seule une modification qui change
-l’empreinte de parsing invalide la résolution automatique; un déplacement de
-dossier ne relance pas un fournisseur.
+L’événement est d’abord journalisé dans IndexedDB, puis force un nouvel
+inventaire borné et reprenable de l’autorité navigateur. Un titre, une URL, un
+chemin ou un ordre modifié met à jour la source. Seule une modification qui
+change l’empreinte de parsing invalide la résolution automatique; un déplacement
+de dossier ne relance pas un fournisseur.
 
 ### Suppression navigateur
 
@@ -595,10 +596,12 @@ réactive la source sans perdre l’historique.
 
 Chaque étape reprend depuis IndexedDB. Hors ligne, aucune donnée autoritaire
 n’est effacée et les tâches réseau reçoivent une échéance. Le runner s’arrête
-après son lot, programme une alarme ponctuelle nommée à 30 secondes et libère
-le service worker. Le même nom remplace toute reprise déjà programmée. Le
-diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
-actif ou que les 100 créneaux de résolution ont été consommés.
+après son lot puis lit, par index composé et sans scan, la première échéance
+READY, RETRY_AT ou CLAIMED expirée. Il programme une alarme ponctuelle nommée à
+cette date avec un plancher de 30 secondes et libère le service worker. Le même
+nom remplace toute reprise déjà programmée; l’absence de tâche efface l’alarme.
+Le diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
+actif ou qu’une tâche présente ou différée subsiste.
 
 ### Retry manuel
 
@@ -835,10 +838,13 @@ identités réellement inexploitable.
 ### Diagnostic verrouillé de la file
 
 La version 1.0.15 relie le checkpoint actif à une continuation MV3 durable.
-Chaque réveil lit au plus huit lots de 100 favoris et traite au plus 100 tâches
-ou 20 secondes. Un inventaire incomplet ou une tranche saturée remplace
-`tobirink-favorite-resolution-continuation-v1`; l’alarme reprend 30 secondes
-plus tard. Le dernier lot ne recrée pas l’alarme.
+Chaque réveil d’inventaire lit au plus huit lots de 100 favoris et chaque
+passage traite au plus 100 tâches ou 20 secondes. Une fois le checkpoint
+complet, les réveils fournisseurs le réutilisent sans rescanner les favoris.
+Le démarrage, une mutation des favoris et l’action manuelle imposent un nouvel
+inventaire. L’outbox choisit sa première échéance par trois lectures indexées
+bornées; `tobirink-favorite-resolution-continuation-v1` la matérialise avec un
+plancher de 30 secondes et disparaît après convergence.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils

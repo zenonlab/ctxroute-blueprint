@@ -3,7 +3,7 @@ import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 import type { ExtensionDiagnosticInput } from './extension-diagnostics';
-import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationDelayMinutes, scheduleFavoriteResolutionContinuation } from './favorite-resolution-continuation';
+import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, updateFavoriteResolutionContinuation } from './favorite-resolution-continuation';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -17,11 +17,17 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('replaces one named alarm at the supported 30-second boundary', async () => {
+  it('tracks the exact durable deadline with the supported 30-second floor and clears an empty queue', async () => {
     const create = vi.fn(async () => undefined);
-    await scheduleFavoriteResolutionContinuation({ create });
-    expect(create).toHaveBeenCalledWith(favoriteResolutionContinuationAlarmName, { delayInMinutes: favoriteResolutionContinuationDelayMinutes });
-    expect(favoriteResolutionContinuationDelayMinutes).toBe(0.5);
+    const clear = vi.fn(async () => true);
+    const now = Date.parse('2026-09-12T12:00:00.000Z');
+    await updateFavoriteResolutionContinuation({ clear, create }, '2026-09-12T12:00:00.000Z', () => now);
+    expect(create).toHaveBeenCalledWith(favoriteResolutionContinuationAlarmName, { when: now + favoriteResolutionContinuationMinimumDelayMs });
+    await updateFavoriteResolutionContinuation({ clear, create }, '2026-09-12T12:05:00.000Z', () => now);
+    expect(create).toHaveBeenLastCalledWith(favoriteResolutionContinuationAlarmName, { when: Date.parse('2026-09-12T12:05:00.000Z') });
+    await updateFavoriteResolutionContinuation({ clear, create }, undefined, () => now);
+    expect(clear).toHaveBeenCalledWith(favoriteResolutionContinuationAlarmName);
+    expect(favoriteResolutionContinuationMinimumDelayMs).toBe(30_000);
   });
 
   it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {
@@ -40,7 +46,7 @@ describe('createFavoriteResolutionRuntime', () => {
       };
     });
     const events: ExtensionDiagnosticInput[] = [];
-    const scheduleContinuation = vi.fn(async () => undefined);
+    const updateContinuation = vi.fn(async (_availableAt: string | undefined) => undefined);
     const storage = new MemoryStoragePort();
     const reconcile = createFavoriteResolutionRuntime({
       bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
@@ -48,19 +54,23 @@ describe('createFavoriteResolutionRuntime', () => {
       ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
       outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() },
-      scheduleContinuation, sourceAdapters: [], storage, token: () => 'large-inventory-run',
+      updateContinuation, sourceAdapters: [], storage, token: () => 'large-inventory-run',
     });
 
     await reconcile();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor: { frames: [{ nextChildIndex: 800 }] }, status: 'active' });
-    expect(scheduleContinuation).toHaveBeenCalledOnce();
+    expect(updateContinuation).toHaveBeenLastCalledWith('2026-09-12T12:00:00.000Z');
     expect(events.at(-1)).toMatchObject({ outcome: 'retryable', stage: 'run' });
 
     await reconcile();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ status: 'complete' });
     expect(readBookmarkBatch).toHaveBeenCalledTimes(15);
-    expect(scheduleContinuation).toHaveBeenCalledOnce();
+    expect(updateContinuation).toHaveBeenLastCalledWith(undefined);
     expect(events.at(-1)).toMatchObject({ outcome: 'complete', stage: 'run' });
+
+    await reconcile();
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(15);
+    expect(updateContinuation).toHaveBeenLastCalledWith(undefined);
   });
 
   it.each(['PENDING', 'RETRYABLE'] as const)('continues bounded resolution while identity restoration is %s', async (status) => {

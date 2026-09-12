@@ -27,6 +27,21 @@ export class DexieFavoriteResolutionOutbox implements FavoriteResolutionOutboxPo
     });
   }
 
+  async nextAvailableAt(query: Pick<FavoriteResolutionClaim, 'kind' | 'lane'>): Promise<string | undefined> {
+    return this.database.transaction('r', this.database.favoriteResolutionTasks, async () => {
+      const candidates: DurableTask[] = [];
+      for (const state of claimableStates) {
+        const stored = await this.database.favoriteResolutionTasks
+          .where('[kind+lane+state+availableAt]')
+          .between([query.kind, query.lane, state, Dexie.minKey], [query.kind, query.lane, state, Dexie.maxKey], true, true)
+          .first();
+        if (stored !== undefined) candidates.push(restoreDurableTask(stored));
+      }
+      candidates.sort((left, right) => left.availableAt.localeCompare(right.availableAt) || left.id.localeCompare(right.id));
+      return candidates[0]?.availableAt;
+    });
+  }
+
   private async change(id: string, transition: (task: DurableTask) => DurableTask): Promise<DurableTask> {
     return this.database.transaction('rw', this.database.favoriteResolutionTasks, async () => {
       const stored = await this.database.favoriteResolutionTasks.get(id);

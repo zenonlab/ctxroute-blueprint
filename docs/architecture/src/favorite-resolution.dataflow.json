@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Inventaire par huit lots de 100; alarme ponctuelle à 30 secondes jusqu’au checkpoint final; résolution et lecture UI restent bornées."
+        "note": "Le checkpoint complet évite les rescans; mutations et démarrage forcent l’inventaire; l’alarme suit la prochaine échéance durable."
       },
       {
         "id": "cover-rights",
@@ -134,7 +134,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "100 tâches / 20 s · reprise 30 s"
+      "tag": "100 tâches / 20 s · échéance indexée"
     },
     {
       "id": "providerAdapters",

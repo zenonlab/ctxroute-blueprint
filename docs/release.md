@@ -40,21 +40,23 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ### Durable continuation candidate — 2026-09-12
 
-Candidate `1.0.15` schedules one named 30-second MV3 alarm when an inventory
-wake stops before its final checkpoint, a resolution wake consumes all 100
-slots, or provider work exhausts its 20-second budget. The next wake resumes
-the IndexedDB cursor, replaces any pending alarm with the same name and stops
-scheduling after convergence. The run diagnostic therefore reports
-`retryable` after the 800-item or time boundary and `complete` only after the
-final batch. This candidate remains local; publication is approved separately.
+Candidate `1.0.15` resumes an incomplete inventory with one named MV3 alarm.
+After the final checkpoint, provider wakes reuse that inventory and the outbox
+selects the next READY, RETRY_AT or expired CLAIMED deadline through bounded
+compound-index reads. The alarm follows that exact deadline with the browser's
+30-second floor and is cleared after convergence. Startup, bookmark mutations
+and the trusted manual action remain the explicit inventory refresh triggers.
+The run diagnostic reports `retryable` while either inventory or provider work
+remains. This candidate remains local; publication is approved separately.
 
 La gate complète passe avec 132 tests extension et 312 tests application. Le
+contrat navigateur IndexedDB valide la sélection bornée de l’échéance. Le
 parcours Chromium 153 installé depuis le ZIP valide la santé, l’isolation d’une
-panne fournisseur, zéro Review créée à l’import et le verrou de diagnostic.
-Deux fabrications successives reproduisent exactement :
+panne fournisseur, zéro Review créée à l’import, l’état privé et le verrou de
+diagnostic. Deux fabrications successives reproduisent exactement :
 
-- Chrome : 286956 octets, SHA-256 `6d433a07e6e5e5b41de8d31eaaccb193764f4394ca58391537bc27a099dc2687`.
-- Firefox : 287001 octets, SHA-256 `e715b8f4ca092603f82db7c072f9eafaf3b4c598d4ba51c12e8c3f65a5b3aab1`.
+- Chrome : 287135 octets, SHA-256 `cc1f1a0d41695f0e3326861f7b37154d68345e8aca5ad18ced1a3a283533693a`.
+- Firefox : 287180 octets, SHA-256 `cc0e57b5b75ee6fdca7c32ed01fe5185934dd434aab24e426bbddeb08781905b`.
 
 ### Locked diagnostics candidate — 2026-09-12
 

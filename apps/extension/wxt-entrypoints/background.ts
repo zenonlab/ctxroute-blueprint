@@ -34,7 +34,7 @@ import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentityS
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
-import { favoriteResolutionContinuationAlarmName, scheduleFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
+import { favoriteResolutionContinuationAlarmName, updateFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -94,7 +94,7 @@ export default defineBackground({
       identityRecovery,
       now,
       outbox: resolutionOutbox,
-      scheduleContinuation: () => scheduleFavoriteResolutionContinuation(browser.alarms),
+      updateContinuation: (availableAt) => updateFavoriteResolutionContinuation(browser.alarms, availableAt),
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
@@ -110,7 +110,7 @@ export default defineBackground({
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
-        void reconcileFavorites(true).catch(() => undefined);
+        void reconcileFavorites().catch(() => undefined);
       }
     });
     const resumeNotifications = async () => {
@@ -122,7 +122,7 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(), repairLibraryProjection()])).catch(() => undefined);
+      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);

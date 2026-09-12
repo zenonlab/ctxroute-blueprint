@@ -7346,6 +7346,52 @@
             "npm run verify passes 132 extension 312 application and all workspace governance IndexedDB performance integration dependency and Archify checks",
             "Chromium 153 installed ZIP passes; two packages reproduce Chrome 6d433a07e6e5e5b41de8d31eaaccb193764f4394ca58391537bc27a099dc2687 and Firefox e715b8f4ca092603f82db7c072f9eafaf3b4c598d4ba51c12e8c3f65a5b3aab1"
           ]
+        },
+        {
+          "id": "step-22",
+          "title": "Port FavLib durable wake and stable inventory semantics",
+          "status": "DONE",
+          "acceptance": [
+            "A complete inventory is not rescanned by provider continuation wakes",
+            "Startup bookmark mutation and manual reconciliation still force authoritative browser inventory",
+            "The outbox exposes the earliest READY retry or expired-claim deadline through bounded indexed reads",
+            "One named alarm follows the exact durable deadline with the browser minimum delay",
+            "A 1401-bookmark installed-compatible flow converges without duplicate Reviews or concurrent runners"
+          ],
+          "files": [
+            "packages/application/src/tasks/favorite-resolution-outbox-port.ts",
+            "packages/adapters-indexeddb/src/favorite-resolution/dexie-favorite-resolution-outbox.ts",
+            "packages/adapters-indexeddb/test/browser-entry.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "node apps/extension/scripts/installed-review.mjs",
+            "git diff --check",
+            "git commit -m \"fix(extension): stabilize durable favorite wakes\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime test resumes at cursor 800, completes in 15 batches and performs zero bookmark reads on the next provider wake",
+            "IndexedDB Chromium contract selects the claimed-task expiry through the compound due index and clears the deadline after convergence",
+            "npm run verify passes 132 extension and 312 application tests plus all workspaces, security, performance, integration, audit zero and Archify showcase 9/9",
+            "Installed Chromium 153 smoke passes; two builds reproduce Chrome cc1f1a0d41695f0e3326861f7b37154d68345e8aca5ad18ced1a3a283533693a and Firefox cc0e57b5b75ee6fdca7c32ed01fe5185934dd434aab24e426bbddeb08781905b"
+          ]
         }
       ]
     }
