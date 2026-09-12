@@ -68,6 +68,22 @@ export function blockTask(task: DurableTask, token: string, reason: string): Dur
   return Object.freeze({ attempt: task.attempt, availableAt: task.availableAt, blockedReason: required(reason, 'reason'), id: task.id, idempotencyKey: task.idempotencyKey, kind: task.kind, lane: task.lane, payload: task.payload, state: 'BLOCKED' });
 }
 
+export function resetBlockedTask(task: DurableTask, availableAt: string): DurableTask {
+  if (task.state !== 'BLOCKED') throw new Error('Task must be BLOCKED before retry reset.');
+  instant(availableAt, 'availableAt');
+  return Object.freeze({
+    attempt: 0,
+    availableAt,
+    id: task.id,
+    idempotencyKey: task.idempotencyKey,
+    kind: task.kind,
+    lane: task.lane,
+    payload: task.payload,
+    retryAt: availableAt,
+    state: 'RETRY_AT',
+  });
+}
+
 export function restoreDurableTask(task: DurableTask): DurableTask {
   if (!Number.isSafeInteger(task.attempt) || task.attempt < 0) throw new Error('attempt must be a non-negative safe integer.');
   if (!['READY', 'CLAIMED', 'EFFECT_RECORDED', 'COMMITTED', 'RETRY_AT', 'BLOCKED'].includes(task.state)) throw new Error('state is invalid.');

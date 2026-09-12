@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { favoriteSourceId, reviewId } from '@tobirink/domain';
 import { encodeFavoriteResolutionTaskPayload, parseFavoriteResolutionTaskPayload } from './favorite-resolution-task-payload';
-import { claimTask, commitTask, createDurableTask, createScheduledDurableTask, isTaskAvailable, recordTaskEffect, restoreDurableTask, retryTask } from './task-state';
+import { blockTask, claimTask, commitTask, createDurableTask, createScheduledDurableTask, isTaskAvailable, recordTaskEffect, resetBlockedTask, restoreDurableTask, retryTask } from './task-state';
 describe('durable tasks', () => {
   it('records effects before commit', () => {
     const ready = createDurableTask({ id: 'task-1', idempotencyKey: 'key-1', kind: 'fixture', payload: '{}' });
@@ -22,6 +22,13 @@ describe('durable tasks', () => {
     const scheduled = createScheduledDurableTask({ id: 'task-3', idempotencyKey: 'key-3', kind: 'fixture', payload: '{}' }, '2026-09-04T10:03:00.000Z');
     expect(isTaskAvailable(scheduled, '2026-09-04T10:02:59.999Z')).toBe(false);
     expect(isTaskAvailable(scheduled, '2026-09-04T10:03:00.000Z')).toBe(true);
+  });
+  it('resets a blocked task only through an explicit retry transition', () => {
+    const ready = createDurableTask({ id: 'task-blocked', idempotencyKey: 'key-blocked', kind: 'fixture', payload: '{}' });
+    const claimed = claimTask(ready, 'token', '2026-09-04T10:00:00.000Z', '2026-09-04T10:01:00.000Z');
+    const reset = resetBlockedTask(blockTask(claimed, 'token', 'AUTOMATIC_ATTEMPT_LIMIT'), '2026-09-04T10:02:00.000Z');
+    expect(reset).toMatchObject({ attempt: 0, availableAt: '2026-09-04T10:02:00.000Z', state: 'RETRY_AT' });
+    expect(() => resetBlockedTask(ready, '2026-09-04T10:02:00.000Z')).toThrow(/BLOCKED/u);
   });
   it('rejects an oversized persisted payload', () => {
     expect(() => createDurableTask({ id: 'task-large', idempotencyKey: 'key-large', kind: 'fixture', payload: 'é'.repeat(32 * 1024 + 1) })).toThrow(/65536 UTF-8 bytes/u);

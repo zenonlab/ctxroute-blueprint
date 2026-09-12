@@ -5,6 +5,7 @@ scope:
   - apps/extension/wxt-entrypoints/background.ts
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
+  - docs/architecture/src/favorite-resolution.lifecycle.json
 review: on-change
 revised: true
 ---
@@ -53,10 +54,22 @@ l’alarme nommée. L’alarme périodique des notifications sert de contrôle d
 présence : elle réarme cette échéance si le navigateur a perdu l’alarme, sans
 lancer elle-même un scan de favoris ni un appel fournisseur.
 
-Le diagnostic global reste `retryable` tant qu’une continuation immédiate ou
-une échéance fournisseur existe. Il devient `complete` seulement lorsque
-l’inventaire est complet et que la file ne contient plus de travail présent ou
-différé.
+Le contrôleur expose des états opérationnels distincts pour l’inventaire, la
+résolution immédiatement exécutable, l’attente d’une échéance fournisseur, la
+pause, le blocage après limite et la convergence. `retryable` reste un résultat
+de source et ne sert plus à nommer un lot d’inventaire incomplet.
+
+La page Options relit automatiquement cet état pendant un parcours actif et au
+retour de visibilité. Une lecture reste sans effet fournisseur. Elle peut
+réarmer une alarme absente ou dépassée à partir du checkpoint et de l’outbox,
+sans recommencer l’inventaire. Le background effectue le même contrôle à son
+évaluation et par l’alarme périodique existante.
+
+Après huit échecs automatiques d’une même tâche, le runner la place en
+`BLOCKED/AUTOMATIC_ATTEMPT_LIMIT`. Aucune nouvelle alarme n’est programmée pour
+elle. Une action explicite la remet à zéro et la réenfile. La pause persistée
+termine le claim courant, efface l’alarme puis interdit tout nouveau claim; la
+reprise conserve les sources, artefacts, décisions et œuvres.
 
 ## Consequences
 
@@ -65,5 +78,5 @@ garder le service worker vivant. Après sa validation, l’inventaire n’est pl
 rescanné pour attendre un fournisseur. Les retries et claims expirés sont repris
 à leur propre échéance par lectures indexées bornées. Le contrôle périodique ne
 fait que restaurer l’alarme ponctuelle perdue. Options présente les quatre étapes,
-la phase courante, la prochaine reprise automatique et une action sûre. Aucun
+la phase courante, la prochaine reprise automatique, la pause et le déblocage. Aucun
 nouveau stockage, réseau, accès D1 ou permission navigateur n’est ajouté.

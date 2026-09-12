@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "TobiRink — cycle de résolution locale des favoris",
+    "output": "favorite-resolution.lifecycle.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 790],
+    "views": [
+      { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Chaque lot devient visible localement puis converge sans garder le service worker actif." },
+      { "id": "automatic-recovery", "label": "Reprise automatique", "focus": ["inventory", "scheduled", "resolving"], "note": "Checkpoint, tâche et échéance persistent avant chaque suspension MV3." },
+      { "id": "user-control", "label": "Contrôle utilisateur", "focus": ["resolving", "paused", "userAction"], "note": "Pause et limite de tentatives sont visibles; une reprise explicite conserve les données." }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Parcours principal" },
+    { "id": "waiting", "label": "Attentes durables" },
+    { "id": "control", "label": "Décisions locales" },
+    { "id": "recovery", "label": "Récupération MV3" }
+  ],
+  "states": [
+    { "id": "observed", "type": "start", "label": "Favoris observés", "sublabel": "autorité navigateur", "lane": "main", "col": 0, "step": "01" },
+    { "id": "inventory", "type": "active", "label": "Inventaire", "sublabel": "pages atomiques", "lane": "main", "col": 1, "step": "02" },
+    { "id": "resolving", "type": "active", "label": "Résolution", "sublabel": "cache puis fournisseurs", "lane": "main", "col": 2, "step": "03" },
+    { "id": "projecting", "type": "active", "label": "Projection locale", "sublabel": "titre puis métadonnées", "lane": "main", "col": 3, "step": "04" },
+    { "id": "complete", "type": "success", "label": "À jour", "sublabel": "aucune tâche due", "lane": "main", "col": 4, "step": "05" },
+    { "id": "scheduled", "type": "waiting", "label": "Reprise planifiée", "sublabel": "alarme ponctuelle", "lane": "waiting", "col": 0, "tag": "checkpoint actif" },
+    { "id": "paused", "type": "neutral", "label": "En pause", "sublabel": "après le claim courant", "lane": "control", "col": 1, "tag": "aucune alarme" },
+    { "id": "userAction", "type": "decision", "label": "Intervention requise", "sublabel": "Review ou 8 échecs", "lane": "control", "col": 2, "tag": "action explicite" }
+  ],
+  "transitions": [
+    { "id": "observe-inventory", "from": "observed", "to": "inventory", "variant": "emphasis", "route": "straight" },
+    { "id": "inventory-resolve", "from": "inventory", "to": "resolving", "variant": "emphasis", "route": "straight" },
+    { "id": "resolve-project", "from": "resolving", "to": "projecting", "variant": "emphasis", "route": "straight" },
+    { "id": "project-complete", "from": "projecting", "to": "complete", "variant": "emphasis", "route": "straight" },
+    { "id": "scheduled-resolve", "from": "scheduled", "to": "resolving", "label": "alarme ou retryAt", "variant": "security", "route": "straight", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "État visible", "items": ["L’écran relit l’état pendant tout parcours actif", "Inventaire résolution et attente fournisseur ont des libellés distincts", "L’échéance affichée disparaît dès que la file converge"] },
+    { "dot": "amber", "title": "Bornes", "items": ["Huit pages d’inventaire et vingt secondes par réveil", "Une échéance persistante par file et aucune boucle de timers", "Huit échecs automatiques avant intervention explicite"] },
+    { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Une Review apparaît seulement après ambiguïté ou introuvable terminal", "La projection locale reste lisible avant hydratation"] }
+  ]
+}

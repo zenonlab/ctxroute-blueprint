@@ -13,5 +13,6 @@ export interface FavoriteResolutionOutboxPort {
   claimNext(claim: FavoriteResolutionClaim): Promise<DurableTask | undefined>;
   compactCommitted?(input: { before: string; limit: number }): Promise<number>;
   nextAvailableAt(query: Pick<FavoriteResolutionClaim, 'kind' | 'lane'>): Promise<string | undefined>;
+  retryBlocked?(input: Pick<FavoriteResolutionClaim, 'kind' | 'lane'> & { availableAt: string; limit: number }): Promise<number>;
   retry(id: string, token: string, retryAt: string): Promise<DurableTask>;
 }

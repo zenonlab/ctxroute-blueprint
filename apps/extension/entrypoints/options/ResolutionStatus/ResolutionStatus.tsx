@@ -3,11 +3,13 @@ import styles from './ResolutionStatus.module.css';
 import type { ExtensionDiagnosticEvent } from '../../../runtime/extension-diagnostics';
 
 export interface ResolutionStatusProps {
-  counts?: { observed: number; processing: number; retryable: number; unsupported: number; internalErrors?: number; collectivePending?: number } | undefined;
+  controller?: { paused: boolean; state: 'idle' | 'inventory' | 'presence' | 'resolving' | 'waiting-provider' | 'blocked' | 'paused' | 'complete' } | undefined;
+  counts?: { observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; collectivePending?: number } | undefined;
   diagnostics?: { enabled: boolean; events: readonly ExtensionDiagnosticEvent[] } | undefined;
   inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
   state: 'loading' | 'running' | 'ready' | 'error';
   onReconcile: () => void;
+  onControl: (action: 'pause' | 'resume' | 'retry-blocked') => void;
   onDiagnosticsToggle: () => void;
   onRefresh: () => void;
 }
@@ -30,7 +32,11 @@ function diagnosticCounts(event: ExtensionDiagnosticEvent): string | undefined {
   return undefined;
 }
 
-export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
+const controllerLabels = {
+  blocked: 'Des tâches ont atteint la limite automatique', complete: 'Bibliothèque à jour', idle: 'Prêt à commencer', inventory: 'Lecture des favoris', paused: 'Analyse en pause', presence: 'Vérification des favoris encore présents', resolving: 'Identification des œuvres', 'waiting-provider': 'Attente avant une nouvelle tentative fournisseur',
+} as const;
+
+export function ResolutionStatus({ controller, counts, diagnostics, inventory, onControl, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
   const latestDiagnostic = diagnostics?.events.at(-1);
   const inventoryLabel = inventory?.status === 'complete'
     ? 'Inventaire vérifié'
@@ -54,15 +60,18 @@ export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnostics
       {state === 'running' ? <p role="status">Analyse en cours. Cette page peut rester ouverte ou être fermée.</p> : null}
       {state === 'error' ? <p role="alert">L’état local est indisponible. Réessayez.</p> : null}
       {inventory ? <div className={styles.current} role="status">
-        <strong>{inventoryLabel}</strong>
-        {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
+        <strong>{controller ? controllerLabels[controller.state] : inventoryLabel}</strong>
+        {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 && counts.blocked === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
         {inventory.continuationAt ? <span>Prochaine reprise automatique : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
       </div> : null}
       {counts ? <dl className={styles.counts}>
         <dt>Favoris observés</dt><dd>{counts.observed}</dd>
         <dt>Préparation</dt><dd>{inventoryLabel}</dd>
         <dt>Traitement en cours</dt><dd>{counts.processing}</dd>
+        <dt>Œuvres identifiées</dt><dd>{counts.resolved}</dd>
+        <dt>Choix à examiner</dt><dd>{counts.review}</dd>
         <dt>Résolutions en attente de reprise</dt><dd>{counts.retryable}</dd>
+        {counts.blocked ? <><dt>Bloquées après huit tentatives</dt><dd>{counts.blocked}</dd></> : null}
         {counts.internalErrors ? <><dt>Dont erreurs internes</dt><dd>{counts.internalErrors}</dd></> : null}
         {counts.collectivePending ? <><dt>Dont attente du service collectif</dt><dd>{counts.collectivePending}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
@@ -74,7 +83,9 @@ export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnostics
         <Button disabled={state === 'loading' || state === 'running'} onClick={onDiagnosticsToggle}>{diagnostics.enabled ? 'Désactiver le diagnostic' : 'Activer le diagnostic'}</Button>
       </div> : null}
       <div className={styles.actions}>
-        <Button disabled={state === 'loading' || state === 'running'} onClick={onReconcile} variant="primary">{actionLabel}</Button>
+        <Button disabled={state === 'loading' || state === 'running' || controller?.paused} onClick={onReconcile} variant="primary">{actionLabel}</Button>
+        {controller ? <Button disabled={state === 'loading' || state === 'running'} onClick={() => onControl(controller.paused ? 'resume' : 'pause')}>{controller.paused ? 'Reprendre l’analyse' : 'Mettre en pause'}</Button> : null}
+        {counts?.blocked ? <Button disabled={state === 'loading' || state === 'running' || controller?.paused} onClick={() => onControl('retry-blocked')}>Réessayer les tâches bloquées</Button> : null}
         <Button disabled={state === 'loading' || state === 'running'} onClick={onRefresh}>Actualiser l’état</Button>
       </div>
     </div>

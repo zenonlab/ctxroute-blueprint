@@ -1,5 +1,6 @@
-import { blockTask, claimTask, restoreDurableTask, retryTask } from '@tobirink/application';
+import { blockTask, claimTask, parseFavoriteResolutionTaskPayload, resetBlockedTask, restoreDurableTask, retryTask } from '@tobirink/application';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '@tobirink/application';
+import { createFavoriteSource } from '@tobirink/domain';
 import Dexie from 'dexie';
 import type { TobirinkDatabase } from '../database';
 
@@ -54,6 +55,32 @@ export class DexieFavoriteResolutionOutbox implements FavoriteResolutionOutboxPo
 
   block(id: string, token: string, reason: string) { return this.change(id, (task) => blockTask(task, token, reason)); }
   retry(id: string, token: string, retryAt: string) { return this.change(id, (task) => retryTask(task, token, retryAt)); }
+
+  async retryBlocked(input: Pick<FavoriteResolutionClaim, 'kind' | 'lane'> & { availableAt: string; limit: number }): Promise<number> {
+    const availableAt = new Date(input.availableAt);
+    if (Number.isNaN(availableAt.valueOf()) || availableAt.toISOString() !== input.availableAt) throw new TypeError('Blocked retry deadline must be canonical.');
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) throw new RangeError('Blocked retry limit must be between 1 and 100.');
+    return this.database.transaction('rw', this.database.favoriteResolutionTasks, this.database.favoriteSources, async () => {
+      const stored = await this.database.favoriteResolutionTasks
+        .where('[kind+lane+state+availableAt]')
+        .between([input.kind, input.lane, 'BLOCKED', Dexie.minKey], [input.kind, input.lane, 'BLOCKED', Dexie.maxKey], true, true)
+        .limit(input.limit)
+        .toArray();
+      let retried = 0;
+      for (const value of stored) {
+        const task = restoreDurableTask(value);
+        const payload = parseFavoriteResolutionTaskPayload(task.payload);
+        const source = await this.database.favoriteSources.get(payload.sourceId);
+        if (source?.resolution?.kind === 'RETRYABLE' && source.resolution.reason === 'AUTOMATIC_ATTEMPT_LIMIT') {
+          const { resolution: _resolution, resolutionVersions: _versions, ...pending } = source;
+          await this.database.favoriteResolutionTasks.put(resetBlockedTask(task, input.availableAt));
+          await this.database.favoriteSources.put(createFavoriteSource(pending));
+          retried += 1;
+        }
+      }
+      return retried;
+    });
+  }
 
   async compactCommitted(input: { before: string; limit: number }): Promise<number> {
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) throw new RangeError('Compaction limit must be between 1 and 100.');

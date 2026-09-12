@@ -372,3 +372,9 @@
 ## Publier et vérifier la bibliothèque et Review 1.0.19 — DONE
 
 - [x] **Appliquer la gate Cloudflare 1.0.19 et vérifier la production** — DONE _(evidence: Cloudflare gate 436dc18f applied additive migration 0006, published both immutable 1.0.19 ZIPs and deployed the release Worker without deleting data or prior artifacts., A production-only verification exposed and corrected the facet remount; commit 918ef6c passed npm run verify, 7 local Playwright journeys and Worker-only gate ebbb8d91 deployed version 9883cbfe at 100 percent., Wrangler reports no pending migration; five pages plus v2 rules return 200, an unknown route returns 404, 7 production Playwright journeys pass and remote ZIP hashes exactly match local candidates.)_
+
+## Rendre la pipeline favoris observable, reprenable et bornee — ACTIVE
+
+- [x] **Corriger le controleur MV3 et son etat utilisateur** — DONE _(evidence: npm run verify passed governance, documentation, all typechecks, Chromium IndexedDB, parser equivalence, performance, CRG, integration, audit and Archify delivery gates, Extension 144/144 and application 337/337 pass; Chromium proves blocked task reset preserves its FavoriteSource and clears only AUTOMATIC_ATTEMPT_LIMIT, favorite-resolution dataflow and lifecycle both pass Archify showcase 9/9 with zero errors and warnings)_
+- [ ] **Corriger les faux unsupported et grouper les caches avant fournisseurs** — PENDING
+- [ ] **Certifier la premiere installation et preparer une archive reproductible** — PENDING

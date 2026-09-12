@@ -40,6 +40,11 @@ inventory slices, checkpoints, additive migration and exact-ID hydration are
 delivered with distinct browser-presence and IndexedDB-transaction authorities. Resolution uses
 an outbox in the same private schema as each source; no Review is created at import; indexed
 provider lanes claim bounded work, and incomplete candidate sets fail closed.
+
+[`src/favorite-resolution.lifecycle.json`](src/favorite-resolution.lifecycle.json)
+sépare le parcours principal des attentes durables et des actions utilisateur.
+Il rend explicites l’alarme MV3, le `retryAt`, la pause, la limite de huit
+tentatives et la reprise sans perte depuis les checkpoints IndexedDB.
 The separate durable-task database remains the notification adapter and is not
 presented as an atomic resolution outbox. The first implementation wave places
 the immutable bounded contracts in `packages/domain/src/favorites` and the

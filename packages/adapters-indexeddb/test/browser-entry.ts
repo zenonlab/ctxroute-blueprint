@@ -81,6 +81,16 @@ try {
   if (await resolutionOutbox.compactCommitted({ before: '2026-10-08T00:00:00.000Z', limit: 8 }) !== 1 || await storage.getFavoriteResolutionTask(committed.id) !== undefined) throw new Error('Committed resolution task did not compact into its receipt.');
   if (await resolutionOutbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' }) !== undefined) throw new Error('Favorite resolution outbox retained a wake deadline after convergence.');
   if (await storage.getFavoriteResolutionReceipt(`${imported.id}:favorite-resolution`) === undefined) throw new Error('Resolution receipt disappeared during compaction.');
+  await importFavoriteSources([{ bookmarkId: 'browser-blocked', folderPath: ['Mangas'], order: 1, state: 'eligible', title: 'Blocked fixture', url: 'https://reader.example/manga/blocked-fixture' }], storage, '2026-09-07T12:10:00.000Z');
+  const blockedSource = (await storage.listFavoriteSources({ limit: 10 })).find((source) => source.bookmarkId === 'browser-blocked');
+  const blockedClaim = await resolutionOutbox.claimNext({ claimedAt: '2026-09-07T12:11:00.000Z', claimExpiresAt: '2026-09-07T12:12:00.000Z', claimToken: 'blocked-claim', kind: 'favorite-resolution', lane: 'routing' });
+  if (blockedSource === undefined || blockedClaim === undefined) throw new Error('Blocked retry fixture was not imported and claimed.');
+  await resolutionOutbox.block(blockedClaim.id, 'blocked-claim', 'AUTOMATIC_ATTEMPT_LIMIT');
+  await storage.putFavoriteSource(createFavoriteSource({ ...blockedSource, resolution: { kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' } }));
+  if (await resolutionOutbox.retryBlocked({ availableAt: '2026-09-07T12:13:00.000Z', kind: 'favorite-resolution', lane: 'routing', limit: 1 }) !== 1) throw new Error('Explicit blocked retry did not reset one task.');
+  const resetTask = await storage.getFavoriteResolutionTask(blockedClaim.id);
+  const resetSource = await storage.getFavoriteSource(blockedSource.id);
+  if (resetTask?.state !== 'RETRY_AT' || resetTask.attempt !== 0 || resetSource === undefined || resetSource.resolution !== undefined || resetSource.url !== blockedSource.url) throw new Error('Explicit blocked retry did not preserve the source and clear only its automatic failure.');
   await storage.database.table('organizer').put({
     folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],
     id: 'organizer',

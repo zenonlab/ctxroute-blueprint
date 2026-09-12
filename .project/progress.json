@@ -8017,6 +8017,127 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-runtime-reliability",
+      "title": "Rendre la pipeline favoris observable, reprenable et bornee",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger le controleur MV3 et son etat utilisateur",
+          "status": "DONE",
+          "acceptance": [
+            "Options se rafraichit automatiquement pendant un parcours actif et au retour de visibilite",
+            "Toute echeance absente ou depassee est rearmee depuis le checkpoint et l outbox sans nouveau scan implicite",
+            "Les etats inventaire resolution attente fournisseur blocage pause et termine sont distincts",
+            "Huit echecs automatiques produisent un blocage explicite reessayable par l utilisateur au lieu d une boucle infinie",
+            "La pause et la reprise conservent chaque source artefact tache decision et oeuvre"
+          ],
+          "files": [
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json",
+            "docs/architecture/README.md",
+            ".project/project-config.json",
+            "packages/domain/src/favorite-source.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/tasks/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/resolution-status-messages.ts",
+            "apps/extension/runtime/use-resolution-status.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus/**"
+          ],
+          "commands": [
+            "Tests domaine application IndexedDB et extension cibles",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m fix(favorites): make resolution lifecycle self-healing"
+          ],
+          "evidence": [
+            "npm run verify passed governance, documentation, all typechecks, Chromium IndexedDB, parser equivalence, performance, CRG, integration, audit and Archify delivery gates",
+            "Extension 144/144 and application 337/337 pass; Chromium proves blocked task reset preserves its FavoriteSource and clears only AUTOMATIC_ATTEMPT_LIMIT",
+            "favorite-resolution dataflow and lifecycle both pass Archify showcase 9/9 with zero errors and warnings"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Corriger les faux unsupported et grouper les caches avant fournisseurs",
+          "status": "TODO",
+          "acceptance": [
+            "Une route media prouvee avec titre exploitable entre dans les lanes UNKNOWN meme sans slug probant",
+            "Seules les routes utilitaires racines ressources ordinaires et taxonomies bloquees restent unsupported",
+            "Les cles sync D1 et owner sont consultees par lots bornes avant les recherches fournisseur",
+            "Une panne cache collectif reste independante et une panne fournisseur conserve son backoff propre",
+            "Aucune URL titre dossier progression ou secret ne quitte l extension"
+          ],
+          "files": [
+            "packages/application/src/favorites/**",
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-browser/src/catalogue/**",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/worker/src/catalogue/**",
+            "apps/worker/src/reviews/**",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "Tests parser resolver cache Worker et confidentialite cibles",
+            "npm run test:d1",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m fix(favorites): resolve media routes cache first"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Certifier la premiere installation et preparer une archive reproductible",
+          "status": "TODO",
+          "acceptance": [
+            "Le scenario Chromium installe de plus de 1400 favoris affiche une progression vivante sans clic manuel et converge apres suspensions MV3",
+            "Les pannes timeout 429 corruption checkpoint redemarrage pause reprise deblocage et tentatives epuisees sont couvertes",
+            "Les compteurs distinguent les liens ignores des oeuvres en attente et expliquent toute difference avec le corpus FavLib synthetique",
+            "Chrome et Firefox produisent des archives reproductibles sans deploiement",
+            "La documentation et les deux vues Archify passent showcase 9 sur 9"
+          ],
+          "files": [
+            "apps/extension/scripts/**",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/release.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "Parcours installes Chromium et Firefox",
+            "Differentiel synthetique FavLib",
+            "npm run package:extension",
+            "Verification de reproductibilite isolee",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "git diff --check",
+            "git commit -m test(favorites): certify resilient first install"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

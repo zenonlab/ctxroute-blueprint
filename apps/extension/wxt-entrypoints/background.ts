@@ -35,7 +35,7 @@ import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentityS
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
-import { favoriteResolutionContinuationAlarmName, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
+import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -64,6 +64,7 @@ export default defineBackground({
     const token = () => crypto.randomUUID();
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
+    const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
     const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(browser.storage.local, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
@@ -79,27 +80,9 @@ export default defineBackground({
     });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
-    const readFavoriteStatus = async () => {
-      const [counts, checkpoint, continuation] = await Promise.all([
-        privateStorage.storage.readFavoriteResolutionCounts(),
-        privateStorage.storage.getFavoriteInventoryCheckpoint(),
-        browser.alarms.get(favoriteResolutionContinuationAlarmName),
-      ]);
-      const status = checkpoint === undefined
-        ? 'not-started' as const
-        : checkpoint.status === 'complete'
-          ? 'complete' as const
-          : checkpoint.phase === 'presence'
-            ? 'presence' as const
-            : 'inventory' as const;
-      const inventory: FavoriteStatusInventory = { status };
-      if (continuation?.scheduledTime !== undefined) inventory.continuationAt = new Date(continuation.scheduledTime).toISOString();
-      if (checkpoint?.startedAt !== undefined) inventory.startedAt = checkpoint.startedAt;
-      return { counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
-    };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
-    const reconcileFavorites = createFavoriteResolutionRuntime({
+    const runFavoriteResolution = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
         await ownerRuntime?.refreshRules().catch(() => undefined);
         await ownerRuntime?.maintain().catch(() => undefined);
@@ -116,11 +99,21 @@ export default defineBackground({
       synchronized: identityRecovery,
       now,
       outbox: resolutionOutbox,
-      updateContinuation: (availableAt) => updateFavoriteResolutionContinuation(browser.alarms, availableAt),
+      updateContinuation: async (availableAt) => {
+        if (await resolutionPaused()) await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
+        else await updateFavoriteResolutionContinuation(browser.alarms, availableAt);
+      },
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
     });
+    const reconcileFavorites = async (inventoryRequested = false) => {
+      if (await resolutionPaused()) {
+        await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
+        return;
+      }
+      await runFavoriteResolution(inventoryRequested);
+    };
     browser.runtime.onInstalled.addListener(async () => {
       await ensureReminderAlarm();
       await ensureFavoriteInventoryAuditAlarm();
@@ -131,8 +124,46 @@ export default defineBackground({
       await resumeNotifications();
     });
     const restoreFavoriteWake = async () => {
+      if (await resolutionPaused()) {
+        await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
+        return;
+      }
       await privateStorage.ensureReady();
+      const [checkpoint, existing] = await Promise.all([
+        privateStorage.storage.getFavoriteInventoryCheckpoint(),
+        browser.alarms.get(favoriteResolutionContinuationAlarmName),
+      ]);
+      const immediateDeadline = Date.now() + favoriteResolutionContinuationMinimumDelayMs;
+      if (existing?.scheduledTime !== undefined && existing.scheduledTime > Date.now()
+        && (checkpoint?.status !== 'active' || existing.scheduledTime <= immediateDeadline)) return;
       await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);
+    };
+    const readFavoriteStatus = async () => {
+      await restoreFavoriteWake();
+      const [counts, checkpoint, continuation, paused] = await Promise.all([
+        privateStorage.storage.readFavoriteResolutionCounts(),
+        privateStorage.storage.getFavoriteInventoryCheckpoint(),
+        browser.alarms.get(favoriteResolutionContinuationAlarmName),
+        resolutionPaused(),
+      ]);
+      const status = checkpoint === undefined
+        ? 'not-started' as const
+        : checkpoint.status === 'complete'
+          ? 'complete' as const
+          : checkpoint.phase === 'presence'
+            ? 'presence' as const
+            : 'inventory' as const;
+      const inventory: FavoriteStatusInventory = { status };
+      if (continuation?.scheduledTime !== undefined) inventory.continuationAt = new Date(continuation.scheduledTime).toISOString();
+      if (checkpoint?.startedAt !== undefined) inventory.startedAt = checkpoint.startedAt;
+      const controllerState = paused ? 'paused' as const
+        : status === 'inventory' ? 'inventory' as const
+          : status === 'presence' ? 'presence' as const
+            : counts.processing > 0 ? 'resolving' as const
+              : counts.retryable > 0 ? 'waiting-provider' as const
+                : counts.blocked > 0 ? 'blocked' as const
+                  : status === 'not-started' ? 'idle' as const : 'complete' as const;
+      return { controller: { paused, state: controllerState }, counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
     };
     subscribeFavoriteBookmarkMutations(bookmarkEvents, {
       bookmarks, ensureReady: privateStorage.ensureReady, now,
@@ -183,7 +214,7 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
-      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile' || parsed.data.type === 'favorite.diagnostics.write') {
+      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile' || parsed.data.type === 'favorite.control.write' || parsed.data.type === 'favorite.diagnostics.write') {
         if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         try {
           await privateStorage.ensureReady();
@@ -191,6 +222,21 @@ export default defineBackground({
             const checkpoint = await privateStorage.storage.getFavoriteInventoryCheckpoint();
             await reconcileFavorites(checkpoint?.status !== 'active');
             await repairLibraryProjection();
+          }
+          if (parsed.data.type === 'favorite.control.write') {
+            if (parsed.data.action === 'pause') {
+              await writeFavoriteResolutionPaused(browser.storage.local, true);
+              await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
+            } else if (parsed.data.action === 'resume') {
+              await writeFavoriteResolutionPaused(browser.storage.local, false);
+              await reconcileFavorites();
+              await repairLibraryProjection();
+            } else {
+              if (await resolutionPaused()) throw new Error('FAVORITE_RESOLUTION_PAUSED');
+              await resolutionOutbox.retryBlocked({ availableAt: now(), kind: 'favorite-resolution', lane: 'routing', limit: 100 });
+              await reconcileFavorites();
+              await repairLibraryProjection();
+            }
           }
           if (parsed.data.type === 'favorite.diagnostics.write') await diagnostics.setEnabled(parsed.data.enabled);
           return await readFavoriteStatus();

@@ -40,8 +40,9 @@ La préférence MangaUpdates réutilise le matcher : enveloppe complète,
 identité unique compatible et aucun choix par ordre API ou disponibilité d’image.
 Une réparation ne remplace pas une jaquette existante par un candidat sans image.
 Les anciens blocages sont repris une fois avec un reçu conservant les données
-précédentes; les décisions humaines restent protégées. Une panne répétée garde
-une échéance de reprise avec délai plafonné au lieu d’arrêter définitivement la file.
+précédentes; les décisions humaines restent protégées. Une tâche atteint
+`BLOCKED/AUTOMATIC_ATTEMPT_LIMIT` après huit échecs et attend alors une reprise
+explicite au lieu de programmer indéfiniment de nouvelles alarmes.
 Une restauration sync indisponible ne bloque plus les favoris locaux déjà importés.
 Le repli HTTP 405 MangaUpdates conserve l’ID exact aussi après une recherche par
 titre ou un alias local; une page incomplète ne peut pas prouver un introuvable.
@@ -310,11 +311,13 @@ prioritaires; Kitsu suit seulement NO_MATCH complet. MangaDex reste exact/sortie
 Type inconnu : deux lanes indépendantes, ambiguïté inter-types explicite.
 Panne, 429, timeout ou ensemble incomplet ne déclenche aucun arbitre suivant.
 
-La surface Options lit aussi le nombre de sources observées et le checkpoint
-d’inventaire (`not-started`, `active` ou `complete`). « Actualiser l’état » ne
-fait qu’une lecture. « Relancer l’analyse » est une commande séparée, acceptée
-uniquement depuis la page Options de l’extension; elle exécute un passage borné,
-répare la projection puis renvoie les compteurs actualisés.
+La surface Options lit les compteurs terminaux et le checkpoint d’inventaire,
+puis distingue `inventory`, `presence`, `resolving`, `waiting-provider`,
+`blocked`, `paused` et `complete`. Elle actualise l’affichage pendant les états
+actifs et au retour de visibilité; cette lecture ne réclame aucune tâche et ne
+contacte aucun fournisseur. Elle réarme seulement une alarme absente ou échue.
+Les commandes de reprise, pause et remise en file des tâches bloquées sont
+acceptées uniquement depuis la page Options de l’extension.
 
 Les ports candidats/hydratation restent séparés et DTO Zod stricts. La décision
 pure applique ID, URL, exact, saison, tokens, distance sans score de popularité.
@@ -611,14 +614,17 @@ nom remplace toute reprise déjà programmée; l’absence de tâche efface l’
 Chaque nouvelle évaluation du service worker répare cette alarme depuis le
 checkpoint et les index de l’outbox. Le réveil périodique des notifications ne
 résout rien : il vérifie seulement cette programmation et la recrée si besoin.
-Le diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
-actif ou qu’une tâche présente ou différée subsiste.
+Le contrôleur expose la phase d’inventaire tant que son checkpoint est actif,
+puis la résolution, l’attente fournisseur, le blocage ou la convergence selon
+l’état durable de la file. Une pause locale efface l’alarme et interdit un
+nouveau claim après la tâche déjà en cours.
 
 ### Retry manuel
 
-L’action cible une tâche `BLOCKED` ou une Review précise, incrémente sa révision
-et recrée une tentative avec la même entrée. Elle ne déclenche pas un scan
-global et ne contourne pas le consentement.
+L’action bornée remet au plus 100 tâches `BLOCKED/AUTOMATIC_ATTEMPT_LIMIT` à
+la tentative zéro, efface uniquement ce résultat automatique et conserve la
+source, l’artefact, l’œuvre et les décisions humaines. Elle ne déclenche pas un
+scan global et ne contourne pas le consentement.
 
 ## Migration depuis Dexie v5
 
@@ -858,6 +864,9 @@ manuelle reprend le checkpoint actif ou vérifie à nouveau un état complet.
 L’outbox choisit sa première échéance par trois lectures indexées bornées;
 `tobirink-favorite-resolution-continuation-v1` est restaurée à chaque démarrage
 du service worker et contrôlée par le réveil périodique sans appel fournisseur.
+Une alarme future déjà présente n’est pas repoussée par les lectures d’état.
+Options relit automatiquement les phases actives, permet la pause persistante
+et rend actionnable la limite de huit tentatives.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils

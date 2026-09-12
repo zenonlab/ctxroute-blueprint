@@ -1,6 +1,6 @@
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation } from './favorite-resolution-continuation';
+import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, favoriteResolutionControlKey, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from './favorite-resolution-continuation';
 
 describe('favorite resolution continuation', () => {
   it('tracks the exact durable deadline with the supported 30-second floor and clears an empty queue', async () => {
@@ -30,5 +30,18 @@ describe('favorite resolution continuation', () => {
     await storage.putFavoriteInventoryCheckpoint({ id: 'favorite-inventory', sessionId: 'resume-session', startedAt: '2026-09-12T12:00:00.000Z', status: 'complete' });
     await expect(restoreFavoriteResolutionContinuation({ clear: vi.fn(), create }, storage, { nextAvailableAt }, () => now)).resolves.toBe('2026-09-12T13:00:00.000Z');
     expect(nextAvailableAt).toHaveBeenCalledOnce();
+  });
+
+  it('persists pause as a strict extension-local controller value', async () => {
+    let value: { paused: boolean; version: 1 } | undefined;
+    const storage = {
+      get: async () => ({ [favoriteResolutionControlKey]: value }),
+      set: async (next: { [favoriteResolutionControlKey]: { paused: boolean; version: 1 } }) => { value = next[favoriteResolutionControlKey]; },
+    };
+    await expect(readFavoriteResolutionPaused(storage)).resolves.toBe(false);
+    await writeFavoriteResolutionPaused(storage, true);
+    await expect(readFavoriteResolutionPaused(storage)).resolves.toBe(true);
+    await writeFavoriteResolutionPaused(storage, false);
+    await expect(readFavoriteResolutionPaused(storage)).resolves.toBe(false);
   });
 });

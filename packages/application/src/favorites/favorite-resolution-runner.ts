@@ -5,7 +5,7 @@ import { favoriteCollectiveKey, favoritePublicReferenceSchema, resolveFavoriteCo
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
 import type { FavoritePublicCacheReadPort } from '../ports/cloud-data-ports';
 import type { FavoritePublicCacheEntry } from '../collective-index/favorite-collective-protocol';
-import { parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
+import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
@@ -145,14 +145,15 @@ async function retryClaim(
     if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
       || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
       || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
-    const scheduledAt = exhausted ? new Date(Math.max(timestamp(retryAt), timestamp(dependencies.now()) + favoriteResolutionMaximumBackoffMs)).toISOString() : retryAt;
-    await session.putFavoriteResolutionTask(retryTask(current, token, scheduledAt));
+    await session.putFavoriteResolutionTask(exhausted
+      ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT')
+      : retryTask(current, token, retryAt));
     await session.putFavoriteSource(createFavoriteSource({
-      ...source, resolution: { kind: 'RETRYABLE', reason },
+      ...source, resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : reason },
       resolutionVersions: favoriteResolutionVersions(record.artifact),
     }));
   });
-  return 'retried';
+  return exhausted ? 'blocked' : 'retried';
 }
 
 async function preferMangaUpdatesHydration(
@@ -446,16 +447,20 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
         const source = await session.getFavoriteSource(payload.sourceId);
         const record = await session.getFavoriteParseArtifact(payload.sourceId);
         if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) return false;
+        const exhausted = current.attempt >= favoriteResolutionAttemptLimit;
         const retryAt = new Date(timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** Math.min(10, Math.max(0, current.attempt - 1))))).toISOString();
-        await session.putFavoriteResolutionTask({ ...retryTask(current, token, retryAt), blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
+        await session.putFavoriteResolutionTask(exhausted
+          ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT')
+          : { ...retryTask(current, token, retryAt), blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
         await session.putFavoriteSource(createFavoriteSource({
           ...source,
-          resolution: { kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' },
+          resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : 'INTERNAL_FAILURE' },
           resolutionVersions: favoriteResolutionVersions(record.artifact),
         }));
-        return true;
+        return exhausted ? 'blocked' as const : 'retried' as const;
       });
-      if (changed) retried += 1;
+      if (changed === 'blocked') blocked += 1;
+      else if (changed === 'retried') retried += 1;
       else { continuationRequired = true; break; }
     }
     if (index === favoriteResolutionSliceLimit - 1) continuationRequired = true;
