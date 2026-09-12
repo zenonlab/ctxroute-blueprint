@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
-import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createWork, favoriteSourceId, libraryId, progressId, workId } from '@tobirink/domain';
+import { importFavoriteSources } from '@tobirink/application';
+import type { FavoriteSourceAdapter } from '@tobirink/application';
+import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createSourceEvidence, createWork, favoriteSourceId, libraryId, progressId, workId } from '@tobirink/domain';
 import { createWebBridgeRequestHandler } from './web-bridge-adapter';
 
 const primaryLibraryId = libraryId('library_primary');
@@ -79,6 +81,20 @@ describe('WebBridge private projections', () => {
     expect(result.items).toHaveLength(8);
     const search = await handler({ type: 'library.read', requestId: 'request_search_last', query: { search: 'scan1399', facet: 'all', limit: 24, sort: 'TITLE_ASC' } });
     expect(search).toMatchObject({ total: 1, items: [{ workId: ids[1399] }] });
+  });
+
+  it('publishes a pending manga and counts it before any provider hydration', async () => {
+    const storage = new MemoryStoragePort();
+    const adapter: FavoriteSourceAdapter = { id: 'fixture-manga', origins: ['https://reader.example'], analyze: (input, url) => createSourceEvidence({ aliases: [], canonicalUrl: url.url, diagnostics: [], key: input.sourceKey, mediaKind: 'MANGA', proofs: ['CATEGORY_PATH'], sourceAdapter: 'fixture-manga', strategy: 'exact-origin', title: 'Pending Manga' }) };
+    await importFavoriteSources([{ bookmarkId: 'pending-web-manga', folderPath: ['Manga'], order: 4, state: 'eligible', title: 'Pending Manga chapitre 5', url: 'https://reader.example/series/pending-manga' }], storage, '2026-09-12T00:00:00.000Z', [adapter]);
+    const handler = createWebBridgeRequestHandler(storage);
+
+    await expect(handler({ type: 'bootstrap.read', requestId: 'request_pending_bootstrap' })).resolves.toMatchObject({ libraryCount: 1, protocolVersion: 4 });
+    await expect(handler({ type: 'library.read', requestId: 'request_pending_library', query: { facet: 'all', limit: 24, sort: 'ADDED_DESC' } })).resolves.toMatchObject({
+      items: [{ mediaKind: 'manga', resolutionState: 'preparation', sourceUrl: 'https://reader.example/series/pending-manga', title: 'Pending Manga' }],
+      statistics: { total: 1 },
+      total: 1,
+    });
   });
 
   it('truncates a large Agenda projection below the transport ceiling', async () => {

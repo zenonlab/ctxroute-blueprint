@@ -31,7 +31,7 @@ function WorkDetailSurface() {
           coverAlt={item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined}
           coverSrc={item.coverUrl}
           coverFallbackSrc={item.coverFallbackUrl}
-          context={item.mediaKind === 'anime' ? 'Anime' : 'Manga'}
+          context={item.mediaKind === 'anime' ? 'Anime' : item.mediaKind === 'manga' ? 'Manga' : 'Type à déterminer'}
           detail={details || 'Fiche locale'}
           href={item.sourceUrl ?? item.canonicalUrl}
           indicator={item.progressLabel}

@@ -3,7 +3,7 @@
 ## Build a release candidate
 
 The current production release is `1.0.14`. The locally verified candidate is
-`1.0.15`.
+`1.0.16`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -37,6 +37,29 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Local-first library candidate — 2026-09-12
+
+Candidate `1.0.16` restores the FavLib property that a parsed browser favorite
+is visible before provider hydration. The catalogue merges resolved `Work`
+records with read-only provisional projections from observed `FavoriteSource`
+and parse artifacts. Pending, retryable and Review entries retain a deterministic
+local identity and source URL; `UNKNOWN` is explicit. Unsupported ordinary links
+remain absent. Resolution replaces the provisional entry without a duplicate or
+an IndexedDB migration.
+
+WebBridge v4 carries the explicit media and resolution states to the matching
+site client. The Chromium 153 installed journey scans 1,403 bookmarks while
+AniList, MangaUpdates and the collective return synthetic 503 responses. It
+projects both the exact AniList title and the pending MangaUpdates manga,
+commits 1,401 YouTube links as unsupported, schedules both retries and creates
+zero Reviews at import. The current deterministic artifacts are:
+
+- Chrome: 288483 bytes, SHA-256 `b565e7d517a612cb1180365d8ce6be61b1de1ec40bb9049da5790e6d83408dc1`.
+- Firefox: 288528 bytes, SHA-256 `cdcf41bff28fa22a3c5b00a3e73fe617a583c0e7a3debceb2a8b6a0c1ca22a1c`.
+
+This candidate is local. WebBridge v4 requires the extension and site update to
+be published together through a separately approved release operation.
 
 ### Durable continuation candidate — 2026-09-12
 

@@ -93,7 +93,7 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
-- le WebBridge v3 parcourt toute la Bibliothèque par lectures locales de 100,
+- le WebBridge v4 parcourt toute la Bibliothèque par lectures locales de 100,
   limite les pages à 24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
@@ -391,17 +391,22 @@ change ni l’identité ni la progression calculées par le parser favori.
 
 Les cas d’usage locaux construisent ensuite :
 
-- Bibliothèque à partir de la bibliothèque, des `Work`, de leurs métadonnées
-  d'affichage et progressions locales;
+- Bibliothèque à partir des `FavoriteSource` observées et artefacts titrés dès
+  l’import, puis des `Work`, métadonnées d'affichage et progressions locales;
 - Review à partir des seules pending AMBIGUOUS/NOT_FOUND et de leurs preuves;
 - Agenda à partir des entrées locales dans la semaine demandée;
-- WebBridge v3 à partir de ces projections sérialisées et validées. Sa page
+- WebBridge v4 à partir de ces projections sérialisées et validées. Sa page
   Bibliothèque transporte les facettes, tris, statistiques, jaquettes
   attribuées, progression structurée et source nécessaires à l'affichage.
   Elle ne transporte ni dossier de favoris, ni décision, ni secret.
 
-Une `Work` absente produit un état partiel. Une lecture UI ne déclenche aucun
-réseau et ne remplace aucune donnée manquante par une fixture.
+Une `Work` absente ne masque plus une identité locale parsée. Le catalogue
+projette une entrée déterministe `preparation`, `retryable` ou `review`, sans
+la persister comme œuvre ni lui inventer un fournisseur. Le type inconnu reste
+`unknown`. Une source détachée, `UNSUPPORTED` ou sans identité exploitable reste
+hors bibliothèque. Quand le `Work` résolu existe, la même lecture retire
+l’entrée provisoire et conserve une seule œuvre. Une lecture UI ne déclenche
+aucun réseau et ne remplace aucune donnée manquante par une fixture.
 
 Le commit `RESOLVED` écrit atomiquement la `Work`, son association à la
 `FavoriteSource` et la progression chapitre, épisode ou volume extraite du
@@ -822,9 +827,9 @@ consumer ni de Cron pour les tâches privées; ses routes `/v2/favorites/*`
 concernent le collectif owner-scoped et la distribution des règles. Un réveil
 du background effectue l'inventaire puis une seule tranche de huit tâches, ce
 qui explique un compteur élevé de sources « en cours » après un import massif.
-La correction doit séparer les curseurs d'inventaire et de résolution, drainer
-des tranches successives dans le budget du réveil et persister une continuation
-jusqu'à épuisement des tâches dues.
+Les curseurs d’inventaire et de présence, la tranche de résolution et l’alarme
+ponctuelle sont désormais séparés et persistés. Depuis la 1.0.16, ces tâches
+restantes n’empêchent plus les titres parsés d’apparaître dans la bibliothèque.
 
 L'inspection D1 en lecture seule du 2026-09-11 indique zéro règle publiée,
 zéro propriétaire et zéro installation. Tant qu'un document de règles validé

@@ -161,7 +161,7 @@ function PopupSurface() {
       const toWork = (work: (typeof snapshot.continuations)[number]): PopupWork => {
         const item: PopupWork = {
           href: work.url,
-          mediaType: work.mediaType,
+          mediaType: work.mediaType === 'unknown' ? 'Type à déterminer' : work.mediaType,
           source: work.source,
           title: work.title,
         };

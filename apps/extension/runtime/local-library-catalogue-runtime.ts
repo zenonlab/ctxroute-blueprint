@@ -1,6 +1,6 @@
 import { providerCoverFallbackPath, readLibraryCatalogue } from '@tobirink/application';
 import type { LibraryCatalogueQuery, StoragePort } from '@tobirink/application';
-import type { LibraryId, ProviderEditorialStatus } from '@tobirink/domain';
+import type { LibraryId, ProviderCandidate, ProviderEditorialStatus } from '@tobirink/domain';
 import type { LibraryCatalogueRequest } from './library-catalogue-messages';
 
 const statusLabels: Readonly<Record<ProviderEditorialStatus, string>> = Object.freeze({
@@ -19,9 +19,10 @@ interface ProjectedLibraryItem {
   detail?: string;
   href?: string;
   id: string;
-  mediaType: 'anime' | 'manga';
+  mediaType: 'anime' | 'manga' | 'unknown';
   progress?: string;
   source: string;
+  state: 'preparation' | 'ready' | 'retryable' | 'review';
   title: string;
 }
 
@@ -38,11 +39,10 @@ function displayUrl(value: string | undefined, limit: number): string | undefine
   return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined;
 }
 
-function itemDetail(work: Awaited<ReturnType<StoragePort['getWork']>>): string | undefined {
-  const candidate = work?.hydration?.candidate;
-  if (candidate === undefined) return undefined;
-  const facts = [candidate.format, candidate.startYear?.toString(), candidate.editorialStatus ? statusLabels[candidate.editorialStatus] : undefined].filter((value): value is string => value !== undefined);
-  return facts.length > 0 ? displayText(facts.join(' · '), 300) : undefined;
+function itemDetail(candidate: ProviderCandidate | undefined, state: ProjectedLibraryItem['state']): string | undefined {
+  const facts = [candidate?.format, candidate?.startYear?.toString(), candidate?.editorialStatus ? statusLabels[candidate.editorialStatus] : undefined].filter((value): value is string => value !== undefined);
+  if (facts.length > 0) return displayText(facts.join(' · '), 300);
+  return state === 'ready' ? undefined : state === 'review' ? 'À vérifier' : state === 'retryable' ? 'Reprise automatique' : 'Préparation';
 }
 
 export async function readLocalLibraryCatalogueSnapshot(
@@ -55,23 +55,23 @@ export async function readLocalLibraryCatalogueSnapshot(
   if (input.offset !== undefined) Object.assign(query, { offset: input.offset });
   if (input.query !== undefined) Object.assign(query, { query: input.query });
   const snapshot = await readLibraryCatalogue(storage, query);
-  const items = snapshot.items.map(({ progress, work }) => {
-    const candidate = work.hydration?.candidate;
+  const items = snapshot.items.map(({ candidate, id, mediaKind, progress, source, state, title }) => {
     const base = {
-      id: work.id,
-      mediaType: work.mediaKind,
-      source: displayText(candidate?.provider ?? work.externalReferences[0]?.provider ?? work.mediaKind, 64),
-      title: displayText(work.preferredTitle, 300),
+      id,
+      mediaType: mediaKind,
+      source: displayText(candidate?.provider ?? 'local', 64),
+      state,
+      title: displayText(title, 300),
     };
-    const detail = itemDetail(work);
+    const detail = itemDetail(candidate, state);
     const progressLabel = progress === undefined ? undefined : `${progress.value} / ${progress.maximum ?? '?'}`;
     const coverSrc = displayUrl(candidate?.cover?.url, 4096);
-    const href = displayUrl(candidate?.canonicalUrl, 8192);
+    const href = displayUrl(source?.url ?? candidate?.canonicalUrl, 8192);
     const item: ProjectedLibraryItem = base;
     const fallback = candidate === undefined ? undefined : providerCoverFallbackPath(candidate);
     if (fallback !== undefined) item.coverFallbackSrc = new URL(fallback, 'https://tobirink.com').href;
     if (coverSrc !== undefined) {
-      item.coverAlt = displayText(`Couverture de ${work.preferredTitle} — ${candidate?.cover?.attribution ?? candidate?.provider ?? 'source'}`, 500);
+      item.coverAlt = displayText(`Couverture de ${title} — ${candidate?.cover?.attribution ?? candidate?.provider ?? 'source'}`, 500);
       item.coverSrc = coverSrc;
     }
     if (href !== undefined) item.href = href;

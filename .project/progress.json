@@ -7449,6 +7449,66 @@
             "Chromium 153 installed 1402-bookmark ZIP journey reaches complete with 1401 unsupported, one retryable outage, durable alarm and zero imported Reviews",
             "npm run verify passes all workspaces, Chromium IndexedDB, security, performance, integration, audit zero and Archify showcase 9/9; isolated Chrome and Firefox hashes reproduce"
           ]
+        },
+        {
+          "id": "step-24",
+          "title": "Project parsed favorites before provider hydration",
+          "status": "DONE",
+          "acceptance": [
+            "Every observed parsed media favorite is visible immediately with its local title and preparation retry or review state",
+            "Resolved sources converge to one hydrated Work without leaving a provisional duplicate",
+            "Anime manga and unknown media remain distinct without defaulting unknown entries to AniList or Manga",
+            "Rejected unsupported links remain absent and importing creates zero Reviews",
+            "The installed 1400-plus bookmark journey shows a MangaUpdates favorite while providers are unavailable",
+            "No IndexedDB migration D1 provider order permission secret production resource or deployment change"
+          ],
+          "files": [
+            "packages/application/src/library/library-catalogue-contract.ts",
+            "packages/application/src/library/project-pending-favorites.ts",
+            "packages/application/src/library/read-library-catalogue.ts",
+            "packages/application/src/library/read-library-catalogue.test.ts",
+            "packages/application/src/ports/web-bridge-port.ts",
+            "packages/contracts/src/web-bridge.ts",
+            "packages/contracts/src/web-bridge.test.ts",
+            "apps/extension/package.json",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/library-catalogue-messages.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/extension/runtime/web-bridge-runtime.test.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/ui-workbench/src/SiteReview.test.tsx",
+            "apps/web/app/page.tsx",
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/library/[workId]/WorkDetail.tsx",
+            "apps/web/e2e/workbench.spec.ts",
+            "apps/web/tests/WebBridgeProvider.test.tsx",
+            "docs/decisions/ADR-0042-local-first-library-projection.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            "package-lock.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.16.zip",
+            "npm run build --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web -- --grep 'desktop Workbench|Library keeps filters|connected empty Library'",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m \"fix(library): project favorites before hydration\""
+          ],
+          "evidence": [
+            "npm run verify passed: all workspace typechecks and tests, Chromium IndexedDB contract, performance, security, docs, UI, CRG and dependency audit with zero vulnerabilities.",
+            "Installed Chromium 153 archive observed 1403 bookmarks, exposed the pending MangaUpdates manga during synthetic provider outages, scheduled durable retries and created zero Reviews at import.",
+            "Two isolated builds reproduced Chrome b565e7d5...08dc1 and Firefox cdcf41bf...22a1c; Archify showcase passed 9/9 and the rebuilt WebBridge v4 site passed all three targeted Playwright journeys."
+          ]
         }
       ]
     }

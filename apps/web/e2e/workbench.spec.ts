@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 
 interface BridgeFixture {
   agenda: Array<{ availability: 'confirmed' | 'estimated' | 'official'; kind: 'anime' | 'manga'; releaseLabel: string; title: string; workId: string }>;
-  library: Array<{ mediaKind: 'anime' | 'manga'; progressLabel?: string; title: string; workId: string }>;
+  library: Array<{ mediaKind: 'anime' | 'manga'; progressLabel?: string; resolutionState: 'ready'; title: string; workId: string }>;
 }
 
 declare global {
@@ -16,10 +16,10 @@ const fixture: BridgeFixture = {
     { availability: 'estimated', kind: 'manga', releaseLabel: 'Chapitre 12', title: 'Œuvre Bêta', workId: 'work_beta' },
   ],
   library: [
-    { mediaKind: 'anime', progressLabel: 'Épisode 7/12', title: 'Œuvre Alpha', workId: 'work_alpha' },
-    { mediaKind: 'manga', progressLabel: 'Chapitre 11', title: 'Œuvre Bêta', workId: 'work_beta' },
-    { mediaKind: 'anime', title: 'Œuvre Gamma', workId: 'work_gamma' },
-    { mediaKind: 'manga', title: 'Œuvre Delta', workId: 'work_delta' },
+    { mediaKind: 'anime', progressLabel: 'Épisode 7/12', resolutionState: 'ready', title: 'Œuvre Alpha', workId: 'work_alpha' },
+    { mediaKind: 'manga', progressLabel: 'Chapitre 11', resolutionState: 'ready', title: 'Œuvre Bêta', workId: 'work_beta' },
+    { mediaKind: 'anime', resolutionState: 'ready', title: 'Œuvre Gamma', workId: 'work_gamma' },
+    { mediaKind: 'manga', resolutionState: 'ready', title: 'Œuvre Delta', workId: 'work_delta' },
   ],
 };
 
@@ -30,14 +30,14 @@ async function installBridge(page: Page, selectedFixture: BridgeFixture = fixtur
     window.addEventListener('message', (event) => {
       const message = event.data;
       if (message?.type === 'webbridge.handshake') {
-        const response = { expiresAt: Date.now() + 60_000, nonce: 'test_session_nonce', ok: true, protocolVersion: 3, requestId: message.requestId, type: 'tobirink.webbridge.response' };
+        const response = { expiresAt: Date.now() + 60_000, nonce: 'test_session_nonce', ok: true, protocolVersion: 4, requestId: message.requestId, type: 'tobirink.webbridge.response' };
         window.postMessage({ requestId: message.requestId, response, type: 'tobirink.webbridge.response' }, window.location.origin);
         return;
       }
       const request = message?.request;
       if (!request?.requestId) return;
       let value;
-      if (request.type === 'bootstrap.read') value = { availability: 'connected', generation: 1, libraryCount: bridgeFixture.library.length, pendingReviewCount: 0, protocolVersion: 3 };
+      if (request.type === 'bootstrap.read') value = { availability: 'connected', generation: 1, libraryCount: bridgeFixture.library.length, pendingReviewCount: 0, protocolVersion: 4 };
       if (request.type === 'review.read') value = { candidates: [], context: 'local' };
       if (request.type === 'library.read') {
         window.__libraryReads = (window.__libraryReads ?? 0) + 1;

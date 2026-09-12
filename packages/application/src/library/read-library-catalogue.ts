@@ -1,14 +1,15 @@
-import type { Progress, ProviderCandidate, Work } from '@tobirink/domain';
+import type { Progress, ProviderCandidate } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { libraryCataloguePageLimit, libraryCatalogueReadBatchSize, libraryFacetLimit } from './library-catalogue-contract';
 import type { LibraryCatalogueItem, LibraryCatalogueQuery, LibraryCatalogueSnapshot, LibraryFacetName, LibraryFacetOption, LibraryFacetState, LibrarySort } from './library-catalogue-contract';
+import { projectFavoriteSources } from './project-pending-favorites';
 
 function key(value: string): string {
   return value.normalize('NFKD').replace(/\p{Diacritic}/gu, '').trim().toLocaleLowerCase('fr');
 }
 
-function detailedType(work: Work): string {
-  return work.hydration?.candidate.mediaKind ?? work.mediaKind.toUpperCase();
+function detailedType(item: LibraryCatalogueItem): string {
+  return item.candidate?.mediaKind ?? item.mediaKind.toUpperCase();
 }
 
 function progressState(progress: Progress | undefined): string {
@@ -17,13 +18,13 @@ function progressState(progress: Progress | undefined): string {
 }
 
 function values(item: LibraryCatalogueItem, facet: LibraryFacetName): readonly string[] {
-  const candidate = item.work.hydration?.candidate;
+  const candidate = item.candidate;
   if (facet === 'genre') return candidate?.genres?.map(key) ?? [];
   if (facet === 'format') return candidate?.format ? [key(candidate.format)] : [];
   if (facet === 'status') return candidate?.editorialStatus ? [candidate.editorialStatus] : [];
-  if (facet === 'type') return [detailedType(item.work)];
+  if (facet === 'type') return [detailedType(item)];
   if (facet === 'year') return candidate?.startYear ? [String(candidate.startYear)] : [];
-  if (facet === 'source') return [candidate?.provider ?? item.work.externalReferences[0]?.provider ?? 'local'];
+  if (facet === 'source') return [candidate?.provider ?? item.work?.externalReferences[0]?.provider ?? 'local'];
   return [progressState(item.progress)];
 }
 
@@ -54,23 +55,23 @@ function progressValue(progress: Progress | undefined): number | undefined {
 }
 
 function compare(left: LibraryCatalogueItem, right: LibraryCatalogueItem, sort: LibrarySort, popularityCohort?: string): number {
-  const titles = left.work.preferredTitle.localeCompare(right.work.preferredTitle, 'fr', { sensitivity: 'base' });
+  const titles = left.title.localeCompare(right.title, 'fr', { sensitivity: 'base' });
   let result = 0;
   if (sort === 'TITLE_ASC') result = titles;
   else if (sort === 'TITLE_DESC') result = -titles;
   else if (sort === 'ADDED_DESC') result = right.addedOrder - left.addedOrder;
-  else if (sort === 'YEAR_DESC') result = compareOptional(left.work.hydration?.candidate.startYear, right.work.hydration?.candidate.startYear, 'desc');
+  else if (sort === 'YEAR_DESC') result = compareOptional(left.candidate?.startYear, right.candidate?.startYear, 'desc');
   else if (sort === 'PROGRESS_DESC') result = compareOptional(progressValue(left.progress), progressValue(right.progress), 'desc');
   else {
-    result = compareOptional(popularity(left.work.hydration?.candidate, popularityCohort), popularity(right.work.hydration?.candidate, popularityCohort), 'desc');
+    result = compareOptional(popularity(left.candidate, popularityCohort), popularity(right.candidate, popularityCohort), 'desc');
   }
-  return result || titles || left.work.id.localeCompare(right.work.id);
+  return result || titles || left.id.localeCompare(right.id);
 }
 
 function selectPopularityCohort(items: readonly LibraryCatalogueItem[]): string | undefined {
   const counts = new Map<string, number>();
   for (const item of items) {
-    const candidate = item.work.hydration?.candidate;
+    const candidate = item.candidate;
     if (candidate?.popularity === undefined) continue;
     const cohort = [candidate.provider, candidate.popularity.kind].join(':');
     counts.set(cohort, (counts.get(cohort) ?? 0) + 1);
@@ -84,7 +85,7 @@ const labels: Readonly<Record<string, string>> = Object.freeze({
 });
 
 function facetLabel(item: LibraryCatalogueItem, facet: LibraryFacetName, value: string): string {
-  const candidate = item.work.hydration?.candidate;
+  const candidate = item.candidate;
   if (facet === 'genre') return candidate?.genres?.find((genre) => key(genre) === value) ?? value;
   if (facet === 'format') return candidate?.format ?? value;
   return labels[value] ?? value;
@@ -105,13 +106,14 @@ function buildFacets(items: readonly LibraryCatalogueItem[]): LibraryCatalogueSn
 
 async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalogueQuery): Promise<LibraryCatalogueSnapshot> {
   const library = await storage.getLibrary(input.libraryId);
-  if (library === undefined) return { facets: buildFacets([]), items: [], statistics: { completed: 0, inProgress: 0, knownMetadata: 0, notStarted: 0, total: 0 }, total: 0, truncated: false };
   const limit = input.limit ?? libraryCataloguePageLimit;
   const offset = input.offset ?? 0;
   if (!Number.isInteger(limit) || limit < 1 || limit > libraryCataloguePageLimit || !Number.isInteger(offset) || offset < 0) throw new RangeError('Library catalogue pagination is invalid.');
   const corpus: LibraryCatalogueItem[] = [];
-  for (let start = 0; start < library.workIds.length; start += libraryCatalogueReadBatchSize) {
-    const batch = library.workIds.slice(start, start + libraryCatalogueReadBatchSize);
+  const resolvedWorkIds = new Set<string>();
+  const workIds = library?.workIds ?? [];
+  for (let start = 0; start < workIds.length; start += libraryCatalogueReadBatchSize) {
+    const batch = workIds.slice(start, start + libraryCatalogueReadBatchSize);
     const records = await storage.transaction(['progress', 'works'], async (session) => {
       const items: LibraryCatalogueItem[] = [];
       for (const [index, id] of batch.entries()) {
@@ -119,14 +121,24 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
         if (work === undefined) continue;
         const progress = await session.findProgressByWorkId(id);
         const addedOrder = start + index;
-        items.push(progress === undefined ? { addedOrder, work } : { addedOrder, progress, work });
+        resolvedWorkIds.add(work.id);
+        const item: LibraryCatalogueItem = work.hydration === undefined
+          ? { addedOrder, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work }
+          : { addedOrder, candidate: work.hydration.candidate, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work };
+        items.push(progress === undefined ? item : { ...item, progress });
       }
       return items;
     });
     corpus.push(...records);
   }
+  const sourceProjection = await projectFavoriteSources(storage, resolvedWorkIds);
+  for (const [index, item] of corpus.entries()) {
+    const source = sourceProjection.sourceByWorkId.get(item.id);
+    if (source !== undefined) corpus[index] = { ...item, addedOrder: source.order, source };
+  }
+  corpus.push(...sourceProjection.pending);
   const normalizedQuery = key(input.query ?? '');
-  const filtered = corpus.filter((item) => (normalizedQuery.length === 0 || key(item.work.preferredTitle).includes(normalizedQuery))
+  const filtered = corpus.filter((item) => (normalizedQuery.length === 0 || key(item.title).includes(normalizedQuery))
     && facetNames.every((facet) => matchesFacet(item, facet, input.facets?.[facet])));
   const sort = input.sort ?? 'ADDED_DESC';
   const popularityCohort = sort === 'POPULARITY_DESC' ? selectPopularityCohort(filtered) : undefined;
@@ -138,7 +150,7 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
     statistics: Object.freeze({
       completed: corpus.filter((item) => progressState(item.progress) === 'COMPLETED').length,
       inProgress: corpus.filter((item) => progressState(item.progress) === 'IN_PROGRESS').length,
-      knownMetadata: corpus.filter((item) => item.work.hydration?.candidate.metadataVersion !== undefined).length,
+      knownMetadata: corpus.filter((item) => item.candidate?.metadataVersion !== undefined).length,
       notStarted: corpus.filter((item) => progressState(item.progress) === 'NOT_STARTED').length,
       total: corpus.length,
     }),

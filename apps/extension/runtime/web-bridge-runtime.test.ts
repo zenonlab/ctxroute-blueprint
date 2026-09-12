@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { webProtocolVersion } from '@tobirink/contracts/web-bridge';
 import { createWebBridgeRuntime } from './web-bridge-runtime';
 
 const origin = 'https://tobirink.example';
 const sender = { url: `${origin}/library` };
-const handshake = { handshake: { origin, protocolVersion: 3 as const, requestId: 'request_1', type: 'webbridge.handshake' as const }, type: 'webbridge.handshake' as const };
+const handshake = { handshake: { origin, protocolVersion: webProtocolVersion, requestId: 'request_1', type: 'webbridge.handshake' as const }, type: 'webbridge.handshake' as const };
 
 describe('web bridge runtime boundary', () => {
   it('accepts the exact origin and delegates a bounded request', async () => {
-    const runtime = createWebBridgeRuntime(async () => ({ availability: 'connected', generation: 0, libraryCount: 0, pendingReviewCount: 0, protocolVersion: 3 }), { createNonce: () => 'issued_nonce', now: () => 1_000 });
+    const runtime = createWebBridgeRuntime(async () => ({ availability: 'connected', generation: 0, libraryCount: 0, pendingReviewCount: 0, protocolVersion: webProtocolVersion }), { createNonce: () => 'issued_nonce', now: () => 1_000 });
     const response = await runtime(handshake, sender, origin);
     expect(response).toMatchObject({ expiresAt: 61_000, nonce: 'issued_nonce', ok: true, requestId: 'request_1' });
   });
@@ -20,9 +21,9 @@ describe('web bridge runtime boundary', () => {
 
   it('rejects unknown, expired and replayed sessions', async () => {
     let clock = 1_000;
-    const runtime = createWebBridgeRuntime(async () => ({ availability: 'connected', generation: 0, libraryCount: 0, pendingReviewCount: 0, protocolVersion: 3 }), { createNonce: () => 'issued_nonce', now: () => clock });
+    const runtime = createWebBridgeRuntime(async () => ({ availability: 'connected', generation: 0, libraryCount: 0, pendingReviewCount: 0, protocolVersion: webProtocolVersion }), { createNonce: () => 'issued_nonce', now: () => clock });
     await runtime(handshake, sender, origin);
-    const request = (nonce: string, requestId: string) => ({ envelope: { expiresAt: 61_000, nonce, origin, protocolVersion: 3 as const, request: { requestId, type: 'bootstrap.read' as const } }, type: 'webbridge.request' as const });
+    const request = (nonce: string, requestId: string) => ({ envelope: { expiresAt: 61_000, nonce, origin, protocolVersion: webProtocolVersion, request: { requestId, type: 'bootstrap.read' as const } }, type: 'webbridge.request' as const });
     expect(await runtime(request('unknown_nonce', 'request_2'), sender, origin)).toMatchObject({ error: 'unknown-web-session' });
     expect(await runtime(request('issued_nonce', 'request_2'), sender, origin)).toMatchObject({ ok: true, requestId: 'request_2' });
     expect(await runtime(request('issued_nonce', 'request_2'), sender, origin)).toMatchObject({ error: 'replayed-web-request' });
@@ -35,7 +36,7 @@ describe('web bridge runtime boundary', () => {
     await runtime(handshake, sender, origin);
     const oversized = { ...handshake, padding: 'é'.repeat(40_000) };
     expect(await runtime(oversized, sender, origin)).toMatchObject({ error: 'webbridge-message-too-large' });
-    const request = { envelope: { expiresAt: 61_000, nonce: 'issued_nonce', origin, protocolVersion: 3 as const, request: { requestId: 'request_2', type: 'bootstrap.read' as const } }, type: 'webbridge.request' as const };
+    const request = { envelope: { expiresAt: 61_000, nonce: 'issued_nonce', origin, protocolVersion: webProtocolVersion, request: { requestId: 'request_2', type: 'bootstrap.read' as const } }, type: 'webbridge.request' as const };
     expect(await runtime(request, sender, origin)).toMatchObject({ error: 'webbridge-message-too-large', requestId: 'request_2' });
   });
 });

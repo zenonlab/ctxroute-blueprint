@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction 1.0.15",
+    "title": "TobiRink — résolution et reconstruction 1.0.16",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Inventaire puis présence ont des checkpoints distincts; le réveil MV3 restaure l’alarme avant de reprendre la prochaine page durable."
+        "note": "Checkpoints distincts; titres locaux visibles avant hydratation; le réveil MV3 reprend la prochaine page durable."
       },
       {
         "id": "cover-rights",
@@ -170,7 +170,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "catalogue complet · WebBridge borné"
+      "tag": "titres locaux puis Work hydraté"
     },
     {
       "id": "localDiagnostics",

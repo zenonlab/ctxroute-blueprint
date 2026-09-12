@@ -1,7 +1,8 @@
 import { providerCoverFallbackPath, readAgendaPeriod, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
 import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
-import type { FavoriteSource, Work, WorkId } from '@tobirink/domain';
+import type { FavoriteSource, WorkId } from '@tobirink/domain';
+import type { LibraryCatalogueItem } from '@tobirink/application';
 import type { WebAgendaPeriod, WebBootstrapSnapshot, WebLibraryItem, WebLibraryPage, WebRequest, WebReviewSnapshot } from '@tobirink/contracts/web-bridge';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from './local-review-runtime';
 import type { WebBridgeRequestHandler, WebBridgeValue } from './web-bridge-runtime';
@@ -38,11 +39,10 @@ function projectedText(value: string, limit: number): string {
   return value.slice(0, limit);
 }
 
-async function mapLibraryItem(storage: StoragePort, item: { readonly progress?: Awaited<ReturnType<StoragePort['findProgressByWorkId']>>; readonly work: Work }): Promise<WebLibraryItem> {
-  const { progress, work } = item;
-  const source = await preferredSource(storage, work.id);
-  const candidate = work.hydration?.candidate;
-  const base: WebLibraryItem = { mediaKind: work.mediaKind, title: projectedText(work.preferredTitle, 240), workId: work.id };
+async function mapLibraryItem(storage: StoragePort, item: LibraryCatalogueItem): Promise<WebLibraryItem> {
+  const { candidate, progress } = item;
+  const source = item.source ?? (item.work === undefined ? undefined : await preferredSource(storage, item.work.id));
+  const base: WebLibraryItem = { mediaKind: item.mediaKind, resolutionState: item.state, title: projectedText(item.title, 240), workId: workId(item.id) };
   const label = progressLabel(progress);
   if (label !== undefined) base.progressLabel = label;
   if (progress !== undefined) base.progress = progress.maximum === undefined
@@ -101,9 +101,11 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
 export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
-      const library = await storage.getLibrary(primaryLibraryId);
-      const review = await readReviewQueue(storage);
-      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: library?.workIds.length ?? 0, pendingReviewCount: review.items.length, protocolVersion: 3 };
+      const [catalogue, review] = await Promise.all([
+        readLibraryCatalogue(storage, { libraryId: primaryLibraryId, limit: 1 }),
+        readReviewQueue(storage),
+      ]);
+      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: catalogue.statistics.total, pendingReviewCount: review.items.length, protocolVersion: 4 };
       return snapshot;
     }
     if (request.type === 'library.read') {
@@ -120,7 +122,10 @@ export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: 
         if (requestedWork === undefined) selected = [];
         else {
           const progress = await storage.findProgressByWorkId(requestedWork.id);
-          selected = progress === undefined ? [{ addedOrder: 0, work: requestedWork }] : [{ addedOrder: 0, progress, work: requestedWork }];
+          const base: LibraryCatalogueItem = requestedWork.hydration === undefined
+            ? { addedOrder: 0, id: requestedWork.id, mediaKind: requestedWork.mediaKind, state: 'ready', title: requestedWork.preferredTitle, work: requestedWork }
+            : { addedOrder: 0, candidate: requestedWork.hydration.candidate, id: requestedWork.id, mediaKind: requestedWork.mediaKind, state: 'ready', title: requestedWork.preferredTitle, work: requestedWork };
+          selected = progress === undefined ? [base] : [{ ...base, progress }];
         }
       }
       const mapped = await Promise.all(selected.map((item) => mapLibraryItem(storage, item)));

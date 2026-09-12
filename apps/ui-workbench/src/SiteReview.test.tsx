@@ -23,10 +23,10 @@ describe('Site Review bridge', () => {
       const requestId = handshake ? message.requestId : request.requestId;
       if (request?.type === 'review.decision.write') commands(request.command);
       const value = request?.type === 'bootstrap.read'
-        ? { availability: 'connected', generation: 1, libraryCount: 0, pendingReviewCount: 1, protocolVersion: 3 }
+        ? { availability: 'connected', generation: 1, libraryCount: 0, pendingReviewCount: 1, protocolVersion: 4 }
         : { candidates: [], context: 'local', matchLevel: 'exact-title', provenance: 'provider-search', reason: 'NOT_FOUND', reviewId: 'review_synthetic', revision: 'revision-synthetic', title: 'Synthetic missing work', totalCandidates: 0 };
       const response = handshake
-        ? { expiresAt: Date.now() + 60_000, nonce: 'extension_session_nonce', ok: true, protocolVersion: 3, requestId, type: 'tobirink.webbridge.response' }
+        ? { expiresAt: Date.now() + 60_000, nonce: 'extension_session_nonce', ok: true, protocolVersion: 4, requestId, type: 'tobirink.webbridge.response' }
         : { ok: true, requestId, type: 'tobirink.webbridge.response', value };
       queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId, response, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
     };
