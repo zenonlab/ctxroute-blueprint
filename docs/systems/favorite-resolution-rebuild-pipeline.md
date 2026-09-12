@@ -883,7 +883,7 @@ diagnostic est absorbée et ne modifie jamais le résultat de résolution.
 
 ### Corrections de robustesse du 12 septembre 2026
 
-La candidate locale 1.0.20 valide ce flux sur 1 406 favoris installés dans
+La candidate locale 1.0.21 valide ce flux sur 1 406 favoris installés dans
 Chromium : l'inventaire et la présence convergent par alarmes MV3 sans commande
 manuelle, le cache public est consulté avant les deux aliases de recherche du
 cas `UNKNOWN`, et l'arrêt du service worker conserve cinq projections et son

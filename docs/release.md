@@ -3,7 +3,7 @@
 ## Build a release candidate
 
 The current production release remains `1.0.19`. The verified local candidate
-is `1.0.20`; it is not published.
+is `1.0.21`; it is not published.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -37,6 +37,27 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Persistent recovery candidate — 2026-09-12
+
+Candidate `1.0.21` publishes a validated `storage.sync` v2 snapshot for a
+1,406-source inventory during one bounded MV3 wake, then reconstructs an empty
+IndexedDB from exact provider IDs without a title search. Options also exports
+and restores a local AES-GCM private archive containing Library, progression,
+Review, organization and the opaque collective identity. A wrong phrase or
+altered archive does not mutate IndexedDB. A local journal plus the IndexedDB
+v14 receipt converges a service-worker interruption before or after commit.
+
+Store-installed builds follow their store’s signed update channel. Chrome or
+Firefox builds loaded manually from an unpacked directory or temporary archive
+do not consume TobiRink’s versioned ZIP automatically; load the new candidate
+into the same browser profile, or export the encrypted private backup before
+removing the old installation. The backup phrase is never stored or sent.
+
+The deterministic 21-file candidates are:
+
+- Chrome: 298029 bytes, SHA-256 `c0c93e66d560660e1d8f6383813f800e4249cf4844c45784badfdec134a441b1`.
+- Firefox: 298066 bytes, SHA-256 `c22b612d6f2186fd41a1c0deead265a17dfb94a3b9e26996c2344f31d603a447`.
 
 ### Cache-batched automatic convergence candidate — 2026-09-12
 

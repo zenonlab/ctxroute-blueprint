@@ -44,6 +44,9 @@ persists bounded owner-only ambiguity references in D1).
 `1.0.20` accepts a cleaned bookmark title only when a generic route proves a
 media release, groups public cache lookups before provider searches, and
 certifies automatic first-install convergence with the corrected batch route.
+`1.0.21` accélère la publication checkpointée du snapshot synchronisé, certifie
+sa reconstruction après perte d’IndexedDB et ajoute l’export/import privé v5
+chiffré avec journal de reprise pour l’identité collective.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
@@ -54,3 +57,8 @@ infrastructure gate.
 
 An update gets a cache-distinct Chrome and Firefox ZIP. A release can be built
 and verified locally before the separately approved R2 publication operation.
+Une extension installée depuis un store reçoit les mises à jour signées selon
+la politique de ce store. Une extension chargée manuellement depuis un dossier
+ou une archive ne s’actualise pas depuis les ZIP TobiRink : l’utilisateur doit
+charger le nouveau dossier ou la nouvelle archive en conservant son profil, ou
+exporter auparavant la sauvegarde privée chiffrée.

@@ -8151,7 +8151,7 @@
       "schemaVersion": 1,
       "id": "goal-user-persistence-recovery",
       "title": "Certifier et restaurer la persistance utilisateur",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -8228,7 +8228,7 @@
         {
           "id": "step-3",
           "title": "Certifier et empaqueter la release de persistance",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le parcours navigateur prouve la reconstruction apres perte locale",
             "Les ZIP Chrome et Firefox sont reproductibles",
@@ -8255,7 +8255,11 @@
             "git diff --check",
             "git commit -m test(recovery): certify persistent user release"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed all repository gates after updating the UI workbench inventory expectation from 26 to 27 components",
+            "Installed Chrome 153 archive reconstructed 1406 bookmarks after IndexedDB loss and passed encrypted backup restore; installed Firefox 151 archive passed",
+            "Independent builds reproduced 1.0.21 ZIPs: Chrome c0c93e66d560660e1d8f6383813f800e4249cf4844c45784badfdec134a441b1 and Firefox c22b612d6f2186fd41a1c0deead265a17dfb94a3b9e26996c2344f31d603a447; favorite-resolution Archify showcase passed 9/9"
+          ]
         }
       ]
     }
