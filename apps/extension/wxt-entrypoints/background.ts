@@ -17,6 +17,7 @@ import {
   HttpFavoriteCollectiveAdapter,
   HttpFavoritePublicCacheAdapter,
 } from '@tobirink/adapters-browser';
+import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
@@ -67,14 +68,19 @@ export default defineBackground({
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
-    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(browser.storage.local, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
+    // SAFETY: the optional shape is checked below before either native storage area is passed to an adapter.
+    const nativeStorage = (globalThis as typeof globalThis & { chrome?: { storage?: { local?: TrustedProviderIdentityStorageArea; sync?: TrustedProviderIdentityStorageArea } } }).chrome?.storage;
+    const trustedLocalStorage = import.meta.env.FIREFOX ? browser.storage.local : nativeStorage?.local;
+    const trustedSyncStorage = import.meta.env.FIREFOX ? browser.storage.sync : nativeStorage?.sync;
+    if (trustedLocalStorage === undefined || trustedSyncStorage === undefined) throw new Error('Trusted extension storage is unavailable.');
+    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(trustedLocalStorage, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
     const publicCache = configuredSiteOrigin ? new HttpFavoritePublicCacheAdapter(configuredSiteOrigin) : undefined;
-    const identitySync = new WebExtensionProviderIdentitySyncAdapter(browser.storage.sync, identityAccessPolicy);
+    const identitySync = new WebExtensionProviderIdentitySyncAdapter(trustedSyncStorage, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
       checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
       hydration: providerPorts,
       now,
-      publisher: new ProviderIdentitySyncPublisher(identitySync, new WebExtensionProviderIdentitySyncStateAdapter(browser.storage.local, identityAccessPolicy), Date.now),
+      publisher: new ProviderIdentitySyncPublisher(identitySync, new WebExtensionProviderIdentitySyncStateAdapter(trustedLocalStorage, identityAccessPolicy), Date.now),
       storage: privateStorage.storage,
       sync: identitySync,
     });
@@ -134,6 +140,11 @@ export default defineBackground({
         browser.alarms.get(favoriteResolutionContinuationAlarmName),
       ]);
       const immediateDeadline = Date.now() + favoriteResolutionContinuationMinimumDelayMs;
+      if (checkpoint === undefined) {
+        await reconcileFavorites(true);
+        await repairLibraryProjection();
+        return;
+      }
       if (existing?.scheduledTime !== undefined && existing.scheduledTime > Date.now()
         && (checkpoint?.status !== 'active' || existing.scheduledTime <= immediateDeadline)) return;
       await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);

@@ -70,7 +70,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync v2 puis lookup D1 groupé par 50 : empreinte→IDs sans titres. Une panne cache laisse les fournisseurs continuer."
+        "note": "Sync v2 checkpointé puis lookup D1 par 50 : empreinte→IDs sans titres. Une panne cache laisse les fournisseurs continuer."
       }
     ]
   },
@@ -190,7 +190,7 @@
       "stage": 0,
       "row": 4,
       "width": 150,
-      "tag": "IDs · courant + rollback"
+      "tag": "IDs · scan borné · rollback"
     },
     {
       "id": "collectiveWorker",
@@ -354,7 +354,7 @@
     {
       "from": "syncedIds",
       "to": "sourceEvidence",
-      "label": "empreinte → références",
+      "label": "snapshot validé → références",
       "classification": "reconstruction prioritaire",
       "variant": "dashed",
       "labelAt": [

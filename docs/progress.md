@@ -378,3 +378,9 @@
 - [x] **Corriger le controleur MV3 et son etat utilisateur** — DONE _(evidence: npm run verify passed governance, documentation, all typechecks, Chromium IndexedDB, parser equivalence, performance, CRG, integration, audit and Archify delivery gates, Extension 144/144 and application 337/337 pass; Chromium proves blocked task reset preserves its FavoriteSource and clears only AUTOMATIC_ATTEMPT_LIMIT, favorite-resolution dataflow and lifecycle both pass Archify showcase 9/9 with zero errors and warnings)_
 - [x] **Corriger les faux unsupported et grouper les caches avant fournisseurs** — DONE _(evidence: npm run verify passed all repository gates, Targeted parser cache extension and D1 tests passed, Both favorite Archify views passed showcase 9/9)_
 - [x] **Certifier la premiere installation et preparer une archive reproductible** — DONE _(evidence: Installed Chromium 153 converged automatically on 1406 bookmarks and Firefox 151 installed successfully, Chrome and Firefox 1.0.20 archives reproduced the documented SHA-256 hashes, npm run verify and both Archify showcase validations passed)_
+
+## Certifier et restaurer la persistance utilisateur — ACTIVE
+
+- [x] **Prouver la reconstruction depuis un snapshot synchronise** — DONE _(evidence: Installed Chromium 153 reconstructed 1406 sources after service-worker stop and complete IndexedDB deletion from a validated storage.sync v2 manifest while the D1 cache was offline, Exact AniList ID 154587 hydration occurred without a provider title search during recovery, 45 targeted recovery and cross-browser storage adapter tests, extension typecheck/build, docs validation, git diff check and both Archify showcase validations passed)_
+- [ ] **Brancher le backup chiffre de l historique prive** — PENDING
+- [ ] **Certifier et empaqueter la release de persistance** — PENDING

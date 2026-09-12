@@ -905,6 +905,22 @@ effectue une seule requête préparée fondée sur `json_each(?1)`, sans N+1. Un
 échec de ce cache public est mémorisé pour la tranche courante et laisse les
 lanes fournisseur avancer sans requête cache par œuvre.
 
+Le producteur de snapshot lit cent œuvres ou sources par page, persiste chaque
+curseur et consomme au plus seize pages dans un réveil. Il publie ainsi les
+identités d’un inventaire de 1 406 favoris sans attendre quinze alarmes de
+trente secondes. Une bibliothèque plus grande garde le même checkpoint et
+continue au réveil suivant. Sous Chromium, les zones sensibles utilisent
+directement `chrome.storage.local` et `chrome.storage.sync` afin que la
+restriction `setAccessLevel` soit réellement appliquée; Firefox utilise les
+zones WebExtension natives avec le même contrat.
+
+Le scénario installé prouve la frontière de reconstruction : il attend un
+manifeste v2 validé, arrête le service worker, supprime `tobirink-private`, coupe
+le cache HTTP collectif et relance le runtime. Les 1 406 sources réapparaissent,
+l’identité AniList synchronisée est hydratée par ID exact et aucune recherche
+par titre de cette œuvre n’est émise. Le blob synchronisé ne contient que les
+références publiques, empreintes et versions autorisées.
+
 Après une première résolution, une contribution publique bornée rejoint une
 outbox locale indépendante du commit de l’œuvre. Le Worker réserve un job
 idempotent et écrit avec SQL préparé la fiche fournisseur publique, ses aliases,

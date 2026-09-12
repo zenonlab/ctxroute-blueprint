@@ -11,6 +11,8 @@ export interface ProviderIdentityRecoveryRuntime {
   saveCoverRepairAfterId?(afterId: WorkId | undefined): Promise<void>;
 }
 
+export const providerIdentityScanPagesPerWake = 16;
+
 export function createProviderIdentityRecoveryRuntime(dependencies: ProviderIdentityRecoveryDependencies & { readonly sync: ProviderIdentitySyncPort; readonly publisher: Pick<ProviderIdentitySyncPublisher, 'publish'> }): ProviderIdentityRecoveryRuntime {
   let synchronizedAssociations: readonly SyncedProviderAssociation[] = [];
   return {
@@ -36,7 +38,10 @@ export function createProviderIdentityRecoveryRuntime(dependencies: ProviderIden
       } catch { return { kind: 'RETRYABLE', hydrated: 0, retryAt: Date.now() + 60_000 }; }
     },
     async publish() {
-      const scan = await scanHydratedProviderIds(dependencies.storage, dependencies.checkpoints);
+      let scan = await scanHydratedProviderIds(dependencies.storage, dependencies.checkpoints);
+      for (let page = 1; page < providerIdentityScanPagesPerWake && !scan.complete; page += 1) {
+        scan = await scanHydratedProviderIds(dependencies.storage, dependencies.checkpoints);
+      }
       if (!scan.complete) return { kind: 'SCANNING' };
       const result = await dependencies.publisher.publish(scan.ids);
       if (result.kind === 'PUBLISHED' || result.kind === 'UNCHANGED') await finishProviderIdentityScan(dependencies.checkpoints);

@@ -57,6 +57,13 @@ lisibles. Les fragments sont triés, dédupliqués, vérifiés par digest et res
 sous les quotas navigateur. Aucun titre, URL de favori, dossier, progression,
 décision ou secret n’entre dans `storage.sync`.
 
+Le scan conserve un checkpoint après chaque page de cent œuvres ou sources et
+traite au plus seize pages par réveil MV3. Cette tranche publie une bibliothèque
+de 1 406 sources dans le réveil qui suit la convergence, sans transformer la
+pagination en scan illimité; un catalogue plus grand reprend au checkpoint
+suivant. Chromium accède à `storage.local` et `storage.sync` par l’API native
+requise par `setAccessLevel`; Firefox conserve son API WebExtension native.
+
 La lecture restaure la génération valide la plus récente et sa génération de
 rollback validée. Plusieurs manifests concurrents de la même génération sont
 fusionnés sans choisir arbitrairement une identité. Après publication et
@@ -105,3 +112,9 @@ et utilisateurs suivants réutilisent ensuite les associations synchronisées ou
 le cache D1. Un snapshot corrompu, un cache indisponible ou une écriture
 interrompue reste reprenable sans perte locale. La migration D1 est additive et
 ne supprime aucune table ni donnée existante.
+
+Le parcours Chromium installé supprime entièrement IndexedDB après publication
+du manifeste v2, arrête le service worker et coupe le cache collectif. Le
+redémarrage reconstruit 1 406 sources et réhydrate l’ID AniList exact sans
+recherche textuelle. Les tests communs des adaptateurs couvrent les mêmes
+fragments, digests, rollbacks et restrictions d’accès Chrome/Firefox.

@@ -8146,6 +8146,114 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-user-persistence-recovery",
+      "title": "Certifier et restaurer la persistance utilisateur",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Prouver la reconstruction depuis un snapshot synchronise",
+          "status": "DONE",
+          "acceptance": [
+            "Un profil avec IndexedDB vierge reconstruit ses associations depuis un snapshot sync v2 valide",
+            "La reconstruction ne relance pas une recherche fournisseur quand une association exacte est disponible",
+            "Une generation incomplete ou corrompue conserve le rollback valide",
+            "Aucun titre URL dossier progression decision ou secret ne se trouve dans storage.sync"
+          ],
+          "files": [
+            "apps/extension/scripts/**",
+            "apps/extension/runtime/provider-identity-recovery-runtime.ts",
+            "apps/extension/runtime/provider-identity-recovery-runtime.test.ts",
+            "packages/application/src/recovery/**",
+            "docs/decisions/ADR-0043-cache-first-reinstall-recovery.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "Tests recovery cibles",
+            "Parcours Chromium et Firefox avec IndexedDB vierge et snapshot sync v2",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "git diff --check",
+            "git commit -m test(recovery): certify synchronized reconstruction"
+          ],
+          "evidence": [
+            "Installed Chromium 153 reconstructed 1406 sources after service-worker stop and complete IndexedDB deletion from a validated storage.sync v2 manifest while the D1 cache was offline",
+            "Exact AniList ID 154587 hydration occurred without a provider title search during recovery",
+            "45 targeted recovery and cross-browser storage adapter tests, extension typecheck/build, docs validation, git diff check and both Archify showcase validations passed"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Brancher le backup chiffre de l historique prive",
+          "status": "TODO",
+          "acceptance": [
+            "Le backup chiffre contient bibliotheque progression Review organisation et identite collective",
+            "Aucun secret titre ou URL ne parait en clair dans le blob",
+            "Un mot de passe faux ou un blob altere ne modifie aucun store",
+            "La restauration valide tout le snapshot avant un remplacement atomique confirme",
+            "Les reglages permettent export et restauration sans transmettre le mot de passe"
+          ],
+          "files": [
+            "packages/application/src/recovery/**",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/runtime/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/**",
+            "docs/decisions/**",
+            "docs/systems/**",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "Tests contrats application IndexedDB extension UI et securite cibles",
+            "npm run validate:ui",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "git diff --check",
+            "git commit -m feat(recovery): expose encrypted private backup"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Certifier et empaqueter la release de persistance",
+          "status": "TODO",
+          "acceptance": [
+            "Le parcours navigateur prouve la reconstruction apres perte locale",
+            "Les ZIP Chrome et Firefox sont reproductibles",
+            "La documentation distingue mise a jour officielle et extension chargee manuellement",
+            "Toutes les validations du depot passent sans deploiement"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "apps/extension/scripts/**",
+            "package-lock.json",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "Parcours installes Chromium et Firefox",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "git diff --check",
+            "git commit -m test(recovery): certify persistent user release"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

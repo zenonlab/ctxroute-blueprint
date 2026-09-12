@@ -28,12 +28,30 @@ const context = await chromium.launchPersistentContext(profile, {
 try {
   process.stdout.write(`Installed-test browser: ${context.browser()?.version()}\n`);
   let providerTitleSearches = 0;
+  const providerSearchTerms = [];
+  const recoveredProviderIds = [];
+  let recoveryPhase = false;
   let publicCacheReads = 0;
   const resolutionOrder = [];
   let tobirinkRequests = 0;
   const tobirinkPaths = new Set();
   await context.route('https://graphql.anilist.co/**', async (route) => {
-    if ((route.request().postData() ?? '').includes('Page(')) { providerTitleSearches += 1; resolutionOrder.push('provider-search'); }
+    const body = JSON.parse(route.request().postData() ?? '{}');
+    if ((body.query ?? '').includes('Page(')) {
+      providerTitleSearches += 1;
+      providerSearchTerms.push(String(body.variables?.search ?? ''));
+      resolutionOrder.push('provider-search');
+    }
+    if (recoveryPhase && (body.query ?? '').includes('Media(id:')) {
+      const id = Number(body.variables?.id);
+      recoveredProviderIds.push(id);
+      return route.fulfill({ contentType: 'application/json', status: 200, body: JSON.stringify({ data: { Media: {
+        chapters: null, coverImage: { extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/synthetic.jpg', large: null, medium: null },
+        endDate: { year: null }, episodes: 12, format: 'TV', genres: ['Adventure'], id, popularity: 100,
+        siteUrl: `https://anilist.co/anime/${id}`, startDate: { year: 2026 }, status: 'FINISHED', synonyms: [],
+        title: { english: 'Synthetic cache anime', native: null, romaji: 'Synthetic cache anime' }, type: 'ANIME', volumes: null,
+      } } }) });
+    }
     await route.fulfill({ status: 503, body: 'Synthetic provider outage' });
   });
   await context.route('https://api.mangaupdates.com/**', (route) => route.fulfill({ status: 503, body: 'Synthetic provider outage' }));
@@ -41,12 +59,14 @@ try {
   await context.route(/^https:\/\/tobirink\.com\/v1\/catalogue\/favorites\/resolve\?/u, (route) => {
     publicCacheReads += 1;
     resolutionOrder.push('public-cache');
+    if (recoveryPhase) return route.fulfill({ status: 503, body: 'Synthetic cache outage during recovery' });
     if (new URL(route.request().url()).searchParams.get('mediaKind') !== 'ANIME') return route.fulfill({ status: 404, body: 'not found' });
     return route.fulfill({ contentType: 'application/json', status: 200, body: JSON.stringify({ identity: { mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ externalId: '154587', provider: 'anilist' }] } }) });
   });
   await context.route('https://tobirink.com/v1/catalogue/favorites/resolve-batch', async (route) => {
     publicCacheReads += 1;
     resolutionOrder.push('public-cache');
+    if (recoveryPhase) return route.fulfill({ status: 503, body: 'Synthetic cache outage during recovery' });
     const keys = JSON.parse(route.request().postData() ?? '{}').keys ?? [];
     const results = keys.map((key) => key.mediaKind === 'ANIME'
       ? { fingerprint: key.fingerprint, identity: { mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ externalId: '154587', provider: 'anilist' }] } }
@@ -103,11 +123,42 @@ try {
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic rescued manga' && item.mediaType === 'unknown' && item.state === 'retryable'));
   assert.equal(providerTitleSearches, 2);
   assert.ok(resolutionOrder.indexOf('public-cache') < resolutionOrder.indexOf('provider-search'));
+  let synchronizedSnapshot;
+  for (let pass = 0; pass < 180; pass += 1) {
+    synchronizedSnapshot = await page.evaluate(() => globalThis.chrome.storage.sync.get(null));
+    if (Object.keys(synchronizedSnapshot).some((key) => key.startsWith('tobirink.provider-ids.v2.') && key.endsWith('.manifest'))) break;
+    await new Promise((resolve) => { setTimeout(resolve, 500); });
+  }
+  const synchronizedKeys = Object.keys(synchronizedSnapshot ?? {});
+  const synchronizedState = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink-provider-identity-sync-state-v1'));
+  assert.ok(synchronizedKeys.some((key) => key.startsWith('tobirink.provider-ids.v2.') && key.endsWith('.manifest')), `A validated v2 provider snapshot must exist before local loss: ${JSON.stringify({ synchronizedKeys, synchronizedState })}`);
+  const searchesBeforeRecovery = providerSearchTerms.length;
   const targets = await debugging.send('Target.getTargets');
   const serviceWorker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith(`chrome-extension://${extensionId}/`));
   assert.ok(serviceWorker);
   await debugging.send('Target.closeTarget', { targetId: serviceWorker.targetId });
   await new Promise((resolve) => { setTimeout(resolve, 500); });
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.deleteDatabase('tobirink-private');
+    request.onsuccess = () => resolve(undefined);
+    request.onerror = () => reject(request.error ?? new Error('Private database reset failed.'));
+    request.onblocked = () => reject(new Error('Private database reset was blocked.'));
+  }));
+  recoveryPhase = true;
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+  let recoveredStatus;
+  for (let pass = 0; pass < 750; pass += 1) {
+    recoveredStatus = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+    if (recoveredStatus.ok && recoveredStatus.inventory.status === 'complete' && recoveredStatus.counts.processing === 0) break;
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+  }
+  assert.equal(recoveredStatus?.inventory.status, 'complete');
+  assert.equal(recoveredStatus.counts.observed, 1406);
+  const recoveredCatalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
+  assert.equal(recoveredCatalogue.ok, true);
+  assert.ok(recoveredCatalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'ready'));
+  assert.ok(recoveredProviderIds.includes(154587), JSON.stringify(recoveredProviderIds));
+  assert.ok(!providerSearchTerms.slice(searchesBeforeRecovery).some((term) => term.toLocaleLowerCase() === 'synthetic cache anime'), JSON.stringify(providerSearchTerms.slice(searchesBeforeRecovery)));
   const restarted = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(restarted.ok, true);
   assert.equal(restarted.snapshot.statistics.total, 5);
@@ -142,7 +193,7 @@ try {
   await page.getByRole('button', { name: 'Activer le diagnostic' }).waitFor();
   const diagnosticLock = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink.extensionDiagnostics'));
   assert.equal(diagnosticLock['tobirink.extensionDiagnostics'], 'off');
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1406-bookmark convergence across anime/manga/manhwa/unknown, batched D1 cache before bounded provider title searches, durable retries, pause/resume, MV3 restart, zero imported Review, guided private status UI and diagnostic lock passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1406-bookmark convergence across anime/manga/manhwa/unknown, validated storage.sync v2 reconstruction after IndexedDB loss, batched D1 cache before bounded provider title searches, durable retries, pause/resume, MV3 restart, zero imported Review, guided private status UI and diagnostic lock passed.\n`);
 } finally {
   await context.close();
 }

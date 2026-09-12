@@ -1,7 +1,7 @@
 import { emptySyncedProviderIds, prepareProviderIdentitySnapshot } from '@tobirink/application';
-import type { ProviderIdentityRecoveryState } from '@tobirink/application';
+import type { ProviderIdentityRecoveryState, SyncedProviderIds } from '@tobirink/application';
 import { MemoryStoragePort } from '@tobirink/contracts';
-import { workId } from '@tobirink/domain';
+import { createWork, workId } from '@tobirink/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { createProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
 
@@ -36,6 +36,31 @@ describe('provider identity recovery orchestration', () => {
       sync: { readAll: async () => { throw new Error('Access level rejected'); }, remove: vi.fn(), write: vi.fn() },
     });
     expect(await runtime.prepare()).toMatchObject({ kind: 'RETRYABLE', hydrated: 0 }); expect(unused.hydrate).not.toHaveBeenCalled();
+  });
+
+  it('finishes a library-sized paginated scan during one bounded MV3 wake', async () => {
+    const storage = new MemoryStoragePort();
+    for (let index = 0; index < 1406; index += 1) {
+      await storage.putWork(createWork({
+        externalReferences: [{ provider: 'anilist', externalId: String(index + 1) }],
+        id: workId(`work_scan_${String(index).padStart(4, '0')}`), mediaKind: 'anime', preferredTitle: `Synthetic ${index}`,
+      }));
+    }
+    let state: ProviderIdentityRecoveryState | undefined;
+    let published: SyncedProviderIds | undefined;
+    const publish = vi.fn(async (input: SyncedProviderIds) => { published = input; return { kind: 'PUBLISHED' as const, generation: 1 }; });
+    const unused = { hydrate: vi.fn() };
+    const runtime = createProviderIdentityRecoveryRuntime({
+      checkpoints: { read: async () => state, save: async (value) => { state = value; } },
+      hydration: { anilist: unused, mangadex: unused, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused },
+      now: () => '2026-09-08T00:00:00.000Z', publisher: { publish }, storage,
+      sync: { readAll: async () => ({}), remove: vi.fn(), write: vi.fn() },
+    });
+
+    await expect(runtime.publish()).resolves.toMatchObject({ kind: 'PUBLISHED' });
+    expect(publish).toHaveBeenCalledOnce();
+    expect(published?.anilist).toHaveLength(1406);
+    expect(state?.scan).toBeUndefined();
   });
 
   it('persists the cover repair cursor across MV3 runtime instances', async () => {
