@@ -419,6 +419,7 @@ pub struct BtiCompileReport {
     pub pixels_sha256: String,
     pub width: u16,
     pub height: u16,
+    pub mip_level_count: u8,
 }
 
 #[derive(Serialize)]
@@ -437,6 +438,24 @@ struct ResolvedBtiPixels<'a> {
     width: u16,
     height: u16,
     format: &'static str,
+    mip_levels: Vec<ResolvedBtiMipLevel>,
+}
+
+#[derive(Serialize)]
+struct ResolvedBtiMipLevel {
+    level: u8,
+    width: u16,
+    height: u16,
+    byte_offset: usize,
+    byte_length: usize,
+    sha256: String,
+}
+
+struct DecodedBtiLevel {
+    level: u8,
+    width: u16,
+    height: u16,
+    pixels: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -2469,11 +2488,26 @@ pub fn compile_bti_texture(input: &Path, output: &Path) -> Result<BtiCompileRepo
     }
     let bytes = fs::read(input).with_context(|| format!("cannot read {}", input.display()))?;
     let report = parse_bti_texture(&bytes)?;
-    let pixels = decode_bti_base_level(&bytes, &report.texture)?;
+    let levels = decode_bti_levels(&bytes, &report.texture)?;
+    let mut pixels = Vec::new();
+    let mut mip_levels = Vec::with_capacity(levels.len());
+    for level in levels {
+        let byte_offset = pixels.len();
+        let byte_length = level.pixels.len();
+        mip_levels.push(ResolvedBtiMipLevel {
+            level: level.level,
+            width: level.width,
+            height: level.height,
+            byte_offset,
+            byte_length,
+            sha256: hex::encode(Sha256::digest(&level.pixels)),
+        });
+        pixels.extend_from_slice(&level.pixels);
+    }
     let pixels_sha256 = hex::encode(Sha256::digest(&pixels));
     let resolved = ResolvedBtiTexture {
-        format: "orbite.resolved-texture/1",
-        adapter: "gcn.bti-v1",
+        format: "orbite.resolved-texture/2",
+        adapter: "gcn.bti-v2",
         source_sha256: report.input_sha256,
         pixels: ResolvedBtiPixels {
             path: "pixels.rgba8",
@@ -2481,6 +2515,7 @@ pub fn compile_bti_texture(input: &Path, output: &Path) -> Result<BtiCompileRepo
             width: report.texture.width,
             height: report.texture.height,
             format: "rgba8-linear",
+            mip_levels,
         },
         sampler: ResolvedBtiSampler {
             wrap_s: report.texture.wrap_s,
@@ -2498,16 +2533,55 @@ pub fn compile_bti_texture(input: &Path, output: &Path) -> Result<BtiCompileRepo
     fs::write(output.join("texture.json"), manifest)?;
     Ok(BtiCompileReport {
         schema_version: 1,
-        adapter: "gcn.bti-v1",
+        adapter: "gcn.bti-v2",
         output: output.display().to_string(),
         manifest_sha256,
         pixels_sha256,
         width: report.texture.width,
         height: report.texture.height,
+        mip_level_count: report.texture.mipmap_count,
     })
 }
 
+fn decode_bti_levels(bytes: &[u8], texture: &BtiTexture) -> Result<Vec<DecodedBtiLevel>> {
+    let (block_width, block_height, block_bytes, _) = gx_texture_layout(texture.gx_format)?;
+    let mut width = texture.width;
+    let mut height = texture.height;
+    let mut cursor = texture.image_offset;
+    let mut levels = Vec::with_capacity(usize::from(texture.mipmap_count));
+    for level in 0..texture.mipmap_count {
+        levels.push(DecodedBtiLevel {
+            level,
+            width,
+            height,
+            pixels: decode_bti_level(bytes, texture, cursor, width, height)?,
+        });
+        cursor += usize::from(width).div_ceil(block_width)
+            * usize::from(height).div_ceil(block_height)
+            * block_bytes;
+        width = (width / 2).max(1);
+        height = (height / 2).max(1);
+    }
+    Ok(levels)
+}
+
 pub(crate) fn decode_bti_base_level(bytes: &[u8], texture: &BtiTexture) -> Result<Vec<u8>> {
+    decode_bti_level(
+        bytes,
+        texture,
+        texture.image_offset,
+        texture.width,
+        texture.height,
+    )
+}
+
+fn decode_bti_level(
+    bytes: &[u8],
+    texture: &BtiTexture,
+    image_offset: usize,
+    level_width: u16,
+    level_height: u16,
+) -> Result<Vec<u8>> {
     ensure!(
         texture.palette_offset.is_none(),
         "paletted BTI decoding is not qualified"
@@ -2518,10 +2592,10 @@ pub(crate) fn decode_bti_base_level(bytes: &[u8], texture: &BtiTexture) -> Resul
         "ia8" => (4, 4),
         other => bail!("unsupported resolved BTI GX texture format {other}"),
     };
-    let width = usize::from(texture.width);
-    let height = usize::from(texture.height);
+    let width = usize::from(level_width);
+    let height = usize::from(level_height);
     let mut rgba8 = vec![0_u8; width * height * 4];
-    let mut cursor = texture.image_offset;
+    let mut cursor = image_offset;
     for block_y in (0..height).step_by(block_height) {
         for block_x in (0..width).step_by(block_width) {
             for pixel in 0..block_width * block_height {
@@ -5660,15 +5734,38 @@ pub(crate) mod tests {
         let report = compile_bti_texture(&input, &output).unwrap();
         assert_eq!(report.width, 8);
         assert_eq!(report.height, 4);
+        assert_eq!(report.mip_level_count, 1);
         assert_eq!(
             fs::read(output.join("pixels.rgba8")).unwrap().len(),
             8 * 4 * 4
         );
         let manifest: serde_json::Value =
             serde_json::from_slice(&fs::read(output.join("texture.json")).unwrap()).unwrap();
-        assert_eq!(manifest["format"], "orbite.resolved-texture/1");
+        assert_eq!(manifest["format"], "orbite.resolved-texture/2");
         assert_eq!(manifest["pixels"]["format"], "rgba8-linear");
+        assert_eq!(
+            manifest["pixels"]["mip_levels"].as_array().unwrap().len(),
+            1
+        );
         assert!(compile_bti_texture(&input, &temporary.path().join("resolved")).is_err());
+    }
+
+    #[test]
+    fn compiles_every_stored_bti_mip_level_in_gpu_order() {
+        let mut source = fixture_intensity_bti(1, 8, 4, &[0x11; 64]);
+        source[16] = 1;
+        source[24] = 2;
+        source[0x20 + 32..].fill(0x77);
+        let temporary = tempfile::tempdir().unwrap();
+        let input = temporary.path().join("source.bti");
+        fs::write(&input, source).unwrap();
+        let output = temporary.path().join("private/resolved");
+        let report = compile_bti_texture(&input, &output).unwrap();
+        assert_eq!(report.mip_level_count, 2);
+        let pixels = fs::read(output.join("pixels.rgba8")).unwrap();
+        assert_eq!(pixels.len(), 8 * 4 * 4 + 4 * 2 * 4);
+        assert_eq!(&pixels[0..4], &[0x11, 0x11, 0x11, 0xff]);
+        assert_eq!(&pixels[8 * 4 * 4..8 * 4 * 4 + 4], &[0x77, 0x77, 0x77, 0xff]);
     }
 
     #[test]
