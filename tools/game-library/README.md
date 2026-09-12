@@ -83,6 +83,11 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-jpc --input private/source/particle-bank.jpc
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  compile-jpc-effects --input private/source/particle-bank.jpc \
+  --output private/resolved/particle-pack \
+  --effect wake=55 --effect splash=53
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-animation --input private/source/animation.bck
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
@@ -131,6 +136,15 @@ L'inspection JPC 1-00 suit les en-têtes et blocs chargés par JParticle. Elle c
 les IDs d'émetteurs, paramètres dynamiques et de forme, références de textures et
 textures GX embarquées. Les doublons, blocs inconnus, comptes divergents, références
 hors table et octets non expliqués ferment l'inspection.
+
+La compilation JPC sélectionne explicitement des IDs opaques et produit le contrat
+portable `orbite.resolved-effects/1`. Elle décode les textures IA4/IA8 embarquées,
+résout le mélange TEV primaire/environnement dans la texture portable, préserve
+cardinalité, temps, volume, vélocité, direction et champs de gravité constants, puis projette les formes JParticle
+sur les sprites bornés du renderer commun. Les volumes point, ligne, cercle et sphère
+suivent les types effectifs du loader JParticle. Une texture indexée, un volume sans
+projection portable, un champ dynamique non représentable ou une dépendance absente
+échoue explicitement.
 
 L'inspection d'animation lit actuellement les pistes squelettiques BCK/ANK1. Elle
 conserve l'attribut de lecture source, la durée — y compris une pose statique de

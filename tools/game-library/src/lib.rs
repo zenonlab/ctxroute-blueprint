@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 pub mod gcn;
+pub mod jpc_effects;
 pub mod mkw;
 pub mod ppc;
 

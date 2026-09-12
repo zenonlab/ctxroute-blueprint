@@ -50,6 +50,22 @@ Les banques JPC `1-00` sont parcourues selon le loader JParticle : chaque ressou
 textures et chaque `TEX1` GX sont bornés et reliés. Un bloc inconnu, un doublon, un
 compte divergent ou une référence hors table ferme l'inspection.
 
+Un compilateur JPC séparé matérialise une sélection explicite d'émetteurs dans
+`orbite.resolved-effects/1`. Il conserve les IDs comme valeurs opaques, décode les
+textures GX IA4/IA8, résout le mélange TEV primaire/environnement attesté et
+normalise les paramètres dynamiques dans le contrat de sprites du renderer commun.
+Les types de volume suivent l'enum et les fonctions d'échantillonnage du loader
+JParticle ; point, ligne, cercle et sphère ont une projection portable distincte.
+Les formes de ruban deviennent une projection portable `surface-stripe` distincte
+des billboards simples et directionnels. Les formes ou volumes sans équivalent natif
+sont une projection déclarée par l'adaptateur, jamais une branche propre au jeu dans
+Bevy.
+Les champs `FLD1` de gravité locale constante deviennent un vecteur d'accélération
+portable. Tout autre type de champ, mode de vélocité, portée ou temporisation non
+représentable ferme la compilation au lieu d'inventer une approximation silencieuse.
+Les formats GX non qualifiés et les dépendances multiples non représentables sont
+refusés au lieu de recevoir une texture ou un réglage inventé.
+
 Quand le source exporté ne matérialise pas une relation de ressource, l'adaptateur
 peut analyser un ELF32 PowerPC big-endian lié. La plage de code est explicite ou
 réduite à l'unique section liée ; les adresses des API, le registre d'argument et les

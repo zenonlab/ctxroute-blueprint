@@ -12,6 +12,7 @@ use wallpaper_game_library::{
         inspect_rarc, inspect_stage,
     },
     index_library,
+    jpc_effects::compile_jpc_effect_pack,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
     ppc::{PpcResourceCallOptions, inspect_ppc_resource_calls, parse_api, parse_hex_u32},
     verify_library,
@@ -85,6 +86,14 @@ enum Command {
     InspectJpc {
         #[arg(long)]
         input: PathBuf,
+    },
+    CompileJpcEffects {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long = "effect", required = true)]
+        effects: Vec<String>,
     },
     ExtractRarc {
         #[arg(long)]
@@ -250,6 +259,14 @@ fn main() -> Result<()> {
         }
         Command::InspectJpc { input } => {
             let result = inspect_jpc(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::CompileJpcEffects {
+            input,
+            output,
+            effects,
+        } => {
+            let result = compile_jpc_effect_pack(&input, &output, &effects)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::ExtractRarc { input, output } => {

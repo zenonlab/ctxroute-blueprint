@@ -169,12 +169,24 @@ pub struct JpcReport {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct JpcEmitter {
     pub resource_id: u16,
+    pub source_sha256: String,
     pub key_blocks: u8,
     pub field_blocks: u8,
     pub texture_indices: Vec<u16>,
     pub blocks: Vec<JpcBlock>,
     pub dynamics: JpcDynamics,
     pub base_shape: JpcBaseShape,
+    pub fields: Vec<JpcField>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcField {
+    pub field_type: u8,
+    pub velocity_type: u8,
+    pub status_flags: u16,
+    pub magnitude: f32,
+    pub magnitude_randomness: f32,
+    pub direction: [f32; 3],
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -191,11 +203,19 @@ pub struct JpcDynamics {
     pub division_count: u16,
     pub emission_rate: f32,
     pub emission_rate_randomness: f32,
+    pub volume_sweep: f32,
+    pub volume_min_radius: f32,
     pub rate_step: u8,
     pub max_frame: i16,
     pub start_frame: i16,
     pub lifetime: i16,
     pub lifetime_randomness: f32,
+    pub initial_velocity_omni: f32,
+    pub initial_velocity_axis: f32,
+    pub initial_velocity_random: f32,
+    pub initial_velocity_directional: f32,
+    pub initial_velocity_ratio: f32,
+    pub directional_spread: f32,
     pub emitter_scale: [f32; 3],
     pub emitter_translation: [f32; 3],
     pub emitter_direction: [f32; 3],
@@ -3336,6 +3356,7 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
     let mut emitters = Vec::with_capacity(emitter_count);
     let mut resource_ids = std::collections::BTreeSet::new();
     for _ in 0..emitter_count {
+        let emitter_start = offset;
         ensure_counted_span(bytes, offset, 1, 0x20, "JPC emitter header")?;
         ensure!(
             bytes.get(offset..offset + 8) == Some(b"JEFFjpa1"),
@@ -3361,6 +3382,7 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
         let mut texture_indices = None;
         let mut actual_key_blocks = 0_usize;
         let mut actual_field_blocks = 0_usize;
+        let mut fields = Vec::new();
         let mut optional_blocks = std::collections::BTreeSet::new();
         for _ in 0..block_count {
             ensure_counted_span(bytes, offset, 1, 0x0c, "JPC block header")?;
@@ -3396,7 +3418,10 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
                     );
                 }
                 "KFA1" => actual_key_blocks += 1,
-                "FLD1" => actual_field_blocks += 1,
+                "FLD1" => {
+                    actual_field_blocks += 1;
+                    fields.push(parse_jpc_field(bytes, offset, size)?);
+                }
                 "ESP1" | "SSP1" | "ETX1" => {
                     ensure!(
                         optional_blocks.insert(tag.clone()),
@@ -3431,12 +3456,14 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
         );
         emitters.push(JpcEmitter {
             resource_id,
+            source_sha256: hex::encode(Sha256::digest(&bytes[emitter_start..offset])),
             key_blocks,
             field_blocks,
             texture_indices,
             blocks,
             dynamics: dynamics.context("JPC emitter lacks BEM1 dynamics")?,
             base_shape: base_shape.context("JPC emitter lacks BSP1 base shape")?,
+            fields,
         });
     }
     let mut textures = Vec::with_capacity(texture_count);
@@ -3512,6 +3539,8 @@ fn parse_jpc_dynamics(bytes: &[u8], block: usize, size: usize) -> Result<JpcDyna
     Ok(JpcDynamics {
         flags,
         volume_type,
+        volume_sweep: float_at(0x04)?,
+        volume_min_radius: float_at(0x08)?,
         volume_size: read_u16(bytes, data + 0x0c)?,
         division_count: read_u16(bytes, data + 0x0e)?,
         emission_rate: float_at(0x10)?,
@@ -3521,6 +3550,12 @@ fn parse_jpc_dynamics(bytes: &[u8], block: usize, size: usize) -> Result<JpcDyna
         start_frame: read_i16(bytes, data + 0x1c)?,
         lifetime: read_i16(bytes, data + 0x1e)?,
         lifetime_randomness: float_at(0x20)?,
+        initial_velocity_omni: float_at(0x24)?,
+        initial_velocity_axis: float_at(0x28)?,
+        initial_velocity_random: float_at(0x2c)?,
+        initial_velocity_directional: float_at(0x30)?,
+        initial_velocity_ratio: float_at(0x34)?,
+        directional_spread: float_at(0x38)?,
         emitter_scale,
         emitter_translation,
         emitter_direction,
@@ -3530,6 +3565,36 @@ fn parse_jpc_dynamics(bytes: &[u8], block: usize, size: usize) -> Result<JpcDyna
             read_i16(bytes, data + 0x7c)?,
         ],
     })
+}
+
+fn parse_jpc_field(bytes: &[u8], block: usize, size: usize) -> Result<JpcField> {
+    ensure!(size >= 0x60, "JPC FLD1 block is truncated");
+    let data = block + 0x0c;
+    let flags = read_u32(bytes, data)?;
+    let field = JpcField {
+        field_type: (flags & 0x0f) as u8,
+        velocity_type: ((flags >> 8) & 0x03) as u8,
+        status_flags: (flags >> 16) as u16,
+        magnitude: read_f32(bytes, data + 0x04)?,
+        magnitude_randomness: read_f32(bytes, data + 0x08)?,
+        direction: [
+            read_f32(bytes, data + 0x1c)?,
+            read_f32(bytes, data + 0x20)?,
+            read_f32(bytes, data + 0x24)?,
+        ],
+    };
+    ensure!(field.field_type <= 8, "JPC field type exceeds source enum");
+    ensure!(
+        field.velocity_type <= 2,
+        "JPC field velocity mode exceeds source enum"
+    );
+    ensure!(
+        field.magnitude.is_finite()
+            && field.magnitude_randomness.is_finite()
+            && field.direction.iter().all(|value| value.is_finite()),
+        "JPC field contains non-finite values"
+    );
+    Ok(field)
 }
 
 fn parse_jpc_base_shape(bytes: &[u8], block: usize, size: usize) -> Result<JpcBaseShape> {
@@ -4375,7 +4440,7 @@ fn read_f32(bytes: &[u8], offset: usize) -> Result<f32> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn fixture_stage() -> Vec<u8> {
@@ -4671,7 +4736,7 @@ mod tests {
         bytes
     }
 
-    fn fixture_jpc() -> Vec<u8> {
+    pub(crate) fn fixture_jpc() -> Vec<u8> {
         let texture = fixture_bti();
         let texture_block_size = 0x20 + texture.len();
         let total = 0x20 + 0x20 + 0xa0 + 0x60 + 0x20 + texture_block_size;
