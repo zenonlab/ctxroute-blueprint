@@ -7250,6 +7250,58 @@
             "Two isolated builds reproduce Chrome b9e9cbb9b4ae29ccb79f1f877fd0f3566abd6cc11b55fe4a00fffb221e6961a1 and Firefox 0efaaa3cb01bb2423233d1b279a9946ae99b81eedb39c3108ed48eca8fbf9f59",
             "1.0.13 remains local; installed private profile was still not exposed through Chrome Options and production remains 1.0.12"
           ]
+        },
+        {
+          "id": "step-20",
+          "title": "Add locked Worker and extension diagnostics and publish 1.0.14",
+          "status": "DONE",
+          "acceptance": [
+            "Worker diagnostics require the exact worker-v1 value and contain only bounded technical fields",
+            "Extension diagnostics require the exact extension-v1 local value and can be disabled from Options",
+            "Correlation and queue lifecycle are visible without titles URLs folders progress or secrets",
+            "Version 1.0.14 passes tests reproducibility and public deployment verification"
+          ],
+          "files": [
+            "apps/worker/src",
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/worker-configuration.d.ts",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus",
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run cf-typegen --workspace @tobirink/worker",
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run validate:ui",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs",
+            "npm run build --workspace @tobirink/web",
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "npm exec -- playwright test",
+            "npm exec -- wrangler tail",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Exact Worker and extension locks pass strict schema bounded ring privacy concurrency and trusted Options tests; 130 extension and 41 Worker tests pass",
+            "Complete npm run verify passes 697 product tests 273 governance tests Chromium IndexedDB performance dependency audit and every Archify showcase",
+            "Two isolated builds reproduce Chrome 98811bff45e3670c7eda5f62aee211dd64abe0460c4832ed2ded9d4419e8cf1d and Firefox 3587e5c305fd69ae503b28b664d27e6ee5ffff6438ed79a2f2f9ee540c8ca04a; installed Chromium diagnostic toggle passes",
+            "Cloudflare plan f3c49715496e45632b8d2889b434e6257b7afe49113801a2ab83cbe3041454fe published exact ZIPs and Worker 1ac73214-008b-4d56-a3d3-be7c1162ba9d with no D1 migration; public 7 of 7 and correlated tail pass"
+          ]
         }
       ]
     }

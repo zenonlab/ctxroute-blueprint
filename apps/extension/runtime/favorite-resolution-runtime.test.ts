@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
+import type { ExtensionDiagnosticInput } from './extension-diagnostics';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -130,6 +131,31 @@ describe('createFavoriteResolutionRuntime', () => {
     await expect(reconcile()).resolves.toBeUndefined();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ sessionId: 'empty-session', status: 'complete' });
     await expect(storage.listFavoriteSources({ limit: 1 })).resolves.toEqual([]);
+  });
+
+  it('records only bounded lifecycle counters for a completed run', async () => {
+    const events: ExtensionDiagnosticInput[] = [];
+    const record = async (event: ExtensionDiagnosticInput) => { events.push(event); };
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) },
+      candidates: unavailableCandidates,
+      diagnostics: { record },
+      ensureReady: async () => ({ schemaVersion: 12 }),
+      hydration: emptyHydration,
+      libraryId: libraryId('library_primary'),
+      now: () => '2026-09-12T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() },
+      sourceAdapters: [],
+      storage: new MemoryStoragePort(),
+      token: () => 'diagnostic-run',
+    });
+    await reconcile();
+    expect(events).toEqual([
+      { outcome: 'started', runId: 'diagnostic-run', stage: 'run' },
+      { counts: { batches: 1, observed: 0 }, outcome: 'complete', runId: 'diagnostic-run', stage: 'inventory' },
+      { counts: { blocked: 0, completed: 0, retried: 0 }, outcome: 'complete', runId: 'diagnostic-run', stage: 'resolution' },
+      { outcome: 'complete', runId: 'diagnostic-run', stage: 'run' },
+    ]);
   });
 
   it('closes ordinary links during import so a later media slug remains ready in a noisy inventory', async () => {

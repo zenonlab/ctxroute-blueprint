@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current local candidate is `1.0.13`; production remains on `1.0.12`.
+The current production release is `1.0.14`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -36,6 +36,31 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Locked diagnostics candidate — 2026-09-12
+
+Candidate `1.0.14` keeps a 100-event local ring for inventory and resolution
+lifecycle states. The exact local value `extension-v1` enables it and Options
+can write `off` without deleting prior evidence. The Worker emits only bounded
+technical JSON when its exact non-secret value is `worker-v1`; raw paths,
+queries, headers, bodies, errors and favorite content are excluded. Diagnostic
+failures are isolated from resolution. Publication does not run a D1 migration.
+
+La gate complète, le paquet Chromium isolé et le parcours multi-fournisseur
+passent. Deux constructions indépendantes reproduisent exactement :
+
+- Chrome : 286771 octets, SHA-256 `98811bff45e3670c7eda5f62aee211dd64abe0460c4832ed2ded9d4419e8cf1d`.
+- Firefox : 286816 octets, SHA-256 `3587e5c305fd69ae503b28b664d27e6ee5ffff6438ed79a2f2f9ee540c8ca04a`.
+
+Le plan Cloudflare
+`f3c49715496e45632b8d2889b434e6257b7afe49113801a2ab83cbe3041454fe`
+a publié les deux objets et le Worker
+`1ac73214-008b-4d56-a3d3-be7c1162ba9d` à 100 %, sans migration D1. Les deux
+téléchargements publics reproduisent les hashes ci-dessus, `/download` annonce
+1.0.14 et les sept parcours de production passent. Un tail réel a corrélé le
+header `X-Tobirink-Request-Id` avec un événement `worker.request` de famille
+`release`, statut 200 et durée bornée, sans contenu applicatif. Conserver le
+Worker `a7fa4736-3915-4608-b97e-ddb7a99da750` et les ZIP 1.0.12 comme rollback.
 
 ### Live queue diagnostics candidate — 2026-09-12
 

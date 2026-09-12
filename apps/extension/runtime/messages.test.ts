@@ -17,8 +17,10 @@ describe('favorite resolution status messages', () => {
   it('accepts bounded status reads and explicit trusted reconciliation commands', () => {
     expect(extensionMessageSchema.safeParse({ type: 'favorite.status.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ type: 'favorite.reconcile', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ enabled: false, type: 'favorite.diagnostics.write', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ force: true, type: 'favorite.reconcile', version: 1 }).success).toBe(false);
   });
+
 });
 
 describe('extension Review messages', () => {

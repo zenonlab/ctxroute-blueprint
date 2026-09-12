@@ -33,6 +33,7 @@ import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtim
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
+import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -53,6 +54,7 @@ export default defineBackground({
     const repairLibraryProjection = () => repairFavoriteLibraryProjection(privateStorage.storage, primaryLibraryId);
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
+    const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
@@ -76,7 +78,7 @@ export default defineBackground({
       const inventory = checkpoint === undefined
         ? { status: 'not-started' as const }
         : { startedAt: checkpoint.startedAt, status: checkpoint.status };
-      return { counts, inventory, ok: true as const };
+      return { counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
     };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
@@ -85,6 +87,7 @@ export default defineBackground({
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
+      diagnostics,
       hydration: providerPorts,
       libraryId: primaryLibraryId,
       identityRecovery,
@@ -96,6 +99,7 @@ export default defineBackground({
     });
     browser.runtime.onInstalled.addListener(async () => {
       await ensureReminderAlarm();
+      await diagnostics.initializeEnabled().catch(() => undefined);
       await privateStorage.ensureReady();
       await reconcileFavorites();
       await repairLibraryProjection();
@@ -144,7 +148,7 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
-      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile') {
+      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile' || parsed.data.type === 'favorite.diagnostics.write') {
         if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         try {
           await privateStorage.ensureReady();
@@ -152,6 +156,7 @@ export default defineBackground({
             await reconcileFavorites(true);
             await repairLibraryProjection();
           }
+          if (parsed.data.type === 'favorite.diagnostics.write') await diagnostics.setEnabled(parsed.data.enabled);
           return await readFavoriteStatus();
         } catch { return { ok: false, error: 'favorite-status-unavailable' }; }
       }

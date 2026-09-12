@@ -4,6 +4,7 @@ import type { LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
 import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
+import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
 
 export interface FavoriteResolutionRuntimeDependencies {
   readonly beforeInventory?: () => Promise<void>;
@@ -11,6 +12,7 @@ export interface FavoriteResolutionRuntimeDependencies {
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
+  readonly diagnostics?: ExtensionDiagnosticsPort;
   readonly hydration: FavoriteProviderHydrationPorts;
   readonly identityRecovery?: ProviderIdentityRecoveryRuntime;
   readonly libraryId: LibraryId;
@@ -43,9 +45,15 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let active: Promise<void> | undefined;
   let mutationQueued = false;
   let coverRepairAfterId: Work['id'] | undefined;
-  const runOnce = () => dependencies.ensureReady()
+  let diagnosticFailureCode: 'INVENTORY_UNAVAILABLE' | 'RESOLUTION_UNAVAILABLE' = 'RESOLUTION_UNAVAILABLE';
+  const recordDiagnostic = async (event: Parameters<NonNullable<FavoriteResolutionRuntimeDependencies['diagnostics']>['record']>[0]) => {
+    await dependencies.diagnostics?.record(event).catch(() => undefined);
+  };
+  const runOnce = (runId: string) => dependencies.ensureReady()
     .then(async () => {
         let inventoryFailure: Error | undefined;
+        let inventoryBatches = 0;
+        let observed = 0;
         try {
           await dependencies.beforeInventory?.();
           const stored = await dependencies.storage.getFavoriteInventoryCheckpoint();
@@ -57,6 +65,8 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           for (let sliceIndex = 0; sliceIndex < 8 && !complete; sliceIndex += 1) {
             const slice = await dependencies.bookmarks.readBookmarkBatch(cursor, 100);
             const favorites = normalizeBookmarks(slice.records);
+            inventoryBatches += 1;
+            observed += favorites.length;
             await importFavoriteSources(favorites, dependencies.storage, dependencies.now(), dependencies.sourceAdapters);
             await dependencies.storage.transaction(['favoriteInventoryMarks'], async (transaction) => {
               for (const favorite of favorites.filter((item) => item.state === 'eligible')) {
@@ -71,11 +81,15 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
             await dependencies.storage.putFavoriteInventoryCheckpoint(nextCheckpoint);
           }
           if (complete) await reconcileFavoriteSourcePresenceForInventory(checkpoint.sessionId, dependencies.storage);
+          await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, outcome: complete ? 'complete' : 'retryable', runId, stage: 'inventory' });
         } catch (error) {
           inventoryFailure = error instanceof Error ? error : new Error('INVENTORY_UNAVAILABLE');
+          diagnosticFailureCode = 'INVENTORY_UNAVAILABLE';
+          await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
         await dependencies.identityRecovery?.prepare();
-        await runFavoriteResolutionSlice(dependencies);
+        const result = await runFavoriteResolutionSlice(dependencies);
+        await recordDiagnostic({ counts: result, outcome: result.retried > 0 || result.blocked > 0 ? 'retryable' : 'complete', runId, stage: 'resolution' });
         const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
         coverRepairAfterId = repairedCovers.nextAfterId;
         if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
@@ -88,12 +102,21 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
       return active;
     }
     active = (async () => {
+      const runId = dependencies.diagnostics === undefined ? 'diagnostics-disabled' : dependencies.token();
       let pass = 0;
-      do {
-        mutationQueued = false;
-        await runOnce();
-        pass += 1;
-      } while (mutationQueued && pass < 2);
+      try {
+        do {
+          mutationQueued = false;
+          if (pass === 0) await recordDiagnostic({ outcome: 'started', runId, stage: 'run' });
+          diagnosticFailureCode = 'RESOLUTION_UNAVAILABLE';
+          await runOnce(runId);
+          pass += 1;
+        } while (mutationQueued && pass < 2);
+        await recordDiagnostic({ outcome: 'complete', runId, stage: 'run' });
+      } catch (error) {
+        await recordDiagnostic({ errorCode: diagnosticFailureCode, outcome: 'failed', runId, stage: 'run' });
+        throw error;
+      }
     })().finally(() => {
       active = undefined;
       if (mutationQueued) queueMicrotask(() => { void reconcileFavorites(true).catch(() => undefined); });

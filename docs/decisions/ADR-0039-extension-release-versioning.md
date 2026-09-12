@@ -33,7 +33,8 @@ and prevents HTTP 403 from selecting a fallback; `1.0.11` recognizes Comix
 title/chapter routes as manga and prevents cached site-rule downgrade;
 `1.0.12` restores durable recovery, honest provider pagination, primary linked
 identities, complete library projection and bounded Worker cover recovery;
-`1.0.13` exposes inventory state and a trusted bounded reconciliation action).
+`1.0.13` exposes inventory state and a trusted bounded reconciliation action;
+`1.0.14` adds bounded, disableable local diagnostics).
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

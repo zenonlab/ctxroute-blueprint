@@ -829,6 +829,20 @@ identités réellement inexploitable.
 
 ## Définition de terminé
 
+### Diagnostic verrouillé de la file
+
+La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
+événements structurés uniquement avec la valeur exacte `worker-v1`; ils
+contiennent famille de route, méthode réduite, statut, durée bornée et ID de
+corrélation. L'extension conserve localement au plus 100 phases de traitement
+uniquement avec la valeur exacte `extension-v1`. Options affiche son état, son
+dernier événement et permet de l'activer ou de le désactiver. Le buffer local
+n'est jamais envoyé au Worker, à D1, à `storage.sync` ou à WebBridge.
+
+Les titres, URL, dossiers, progressions, identifiants fournisseurs, corps de
+requête, erreurs brutes et secrets sont absents des deux contrats. Une panne du
+diagnostic est absorbée et ne modifie jamais le résultat de résolution.
+
 ### Corrections de robustesse du 12 septembre 2026
 
 Les références provenant du collectif suivent le même chemin d'hydratation

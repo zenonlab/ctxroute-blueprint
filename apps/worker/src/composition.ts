@@ -30,7 +30,7 @@ export interface WorkerServices {
 
 export type WorkerRuntime = {
   Bindings: Env;
-  Variables: { services: WorkerServices };
+  Variables: { requestId: string; services: WorkerServices };
 };
 
 function dailyQuota(value: string): number {

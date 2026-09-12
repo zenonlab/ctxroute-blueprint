@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction 1.0.13",
+    "title": "TobiRink — résolution et reconstruction 1.0.14",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -42,7 +42,8 @@
           "sourceEvidence",
           "durableQueue",
           "providerAdapters",
-          "privateStore"
+          "privateStore",
+          "localDiagnostics"
         ],
         "note": "Projection depuis les favoris observés; bibliothèque entière par lots de 100; lecture UI de 24 entrées actualisée sans chevauchement."
       },
@@ -172,6 +173,16 @@
       "tag": "catalogue complet · WebBridge borné"
     },
     {
+      "id": "localDiagnostics",
+      "type": "database",
+      "label": "Diagnostic local",
+      "stage": 4,
+      "row": 4,
+      "yOffset": 270,
+      "width": 150,
+      "tag": "100 événements · verrou exact"
+    },
+    {
       "id": "syncedIds",
       "type": "database",
       "label": "IDs storage.sync",
@@ -188,7 +199,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "clé hachée / owner"
+      "tag": "clé hachée / owner · diagnostic borné"
     },
     {
       "id": "collectiveD1",
@@ -356,6 +367,17 @@
       "label": "lookup avant recherche",
       "classification": "lot authentifié",
       "variant": "security"
+    },
+    {
+      "from": "durableQueue",
+      "to": "localDiagnostics",
+      "label": "phases + compteurs",
+      "classification": "local borné sans contenu",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [[530, 820], [840, 820], [840, 883]],
+      "labelAt": [700, 805]
     },
     {
       "from": "collectiveWorker",

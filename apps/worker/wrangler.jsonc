@@ -32,7 +32,8 @@
     "binding": "COVER_IMAGES"
   },
   "vars": {
-    "COLLECTIVE_DAILY_QUOTA": "100"
+    "COLLECTIVE_DAILY_QUOTA": "100",
+    "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },
   "observability": {
     "enabled": true,

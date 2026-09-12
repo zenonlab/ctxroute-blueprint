@@ -17,5 +17,6 @@ describe('public site fallback', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     expect(response.headers.get('content-disposition')).toContain(artifact);
+    expect(response.headers.get('x-tobirink-request-id')).toMatch(/^[0-9a-f-]{36}$/u);
   });
 });

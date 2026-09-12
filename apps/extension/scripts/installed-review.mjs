@@ -63,7 +63,11 @@ try {
   await page.getByRole('button', { name: 'Actualiser l’état' }).click();
   await page.getByRole('heading', { name: 'Analyse des favoris' }).waitFor();
   assert.match(await page.locator('dl').innerText(), /Liens non pris en charge/u);
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, unsupported bookmark, retryable provider outage, zero imported Review, private status UI passed.\n`);
+  await page.getByRole('button', { name: 'Désactiver le diagnostic' }).click();
+  await page.getByRole('button', { name: 'Activer le diagnostic' }).waitFor();
+  const diagnosticLock = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink.extensionDiagnostics'));
+  assert.equal(diagnosticLock['tobirink.extensionDiagnostics'], 'off');
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, unsupported bookmark, retryable provider outage, zero imported Review, private status UI and diagnostic lock passed.\n`);
 } finally {
   await context.close();
 }
