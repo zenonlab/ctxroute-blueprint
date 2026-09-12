@@ -3,11 +3,49 @@
 ## Statut
 
 - Proposition de direction artistique, non acceptée et non générable.
+- Source retenue : édition GameCube PAL uniquement (`GZLP01`, révision 0).
+- Passe d'audit locale du 12 septembre 2026 effectuée en lecture seule ; aucune
+  extraction d'asset et aucune activation n'ont été réalisées.
 - Aucun asset commercial n'est inclus dans ce dépôt.
 - Les noms de ressources, coordonnées, musiques, acteurs et relations définitifs
   doivent venir de l'inventaire privé de la copie locale du jeu.
 - ZeldaRET est une preuve d'implémentation publique. Noclip peut servir d'oracle
   visuel, jamais de source d'assets ni de runtime.
+
+## Reçu d'entrée GameCube
+
+Le RVZ local privé est identifié comme `THE LEGEND OF ZELDA The Wind Waker for
+PAL`, disque 1, révision 0. Son SHA-256 de conteneur est
+`5e305cfa4a554c94ea7cd012c86d40e808293a287f025a4486a452478f2a6f53`.
+`nodtool 2.0.0-alpha.10` confirme un RVZ lossless, Zstandard niveau 19, blocs de
+128 KiB et données de vérification présentes. La vérification Redump passe avec
+CRC32 `61fc5423`, SHA-1 `98f0a19d9a3b2ca3352621c77f47a547c97a27f1` et XXH64
+`bd3a241a857eda1b`.
+
+La passe a utilisé uniquement des lectures virtuelles en mémoire :
+
+- `nodtool 2.0.0-alpha.10`, binaire macOS arm64 vérifié par SHA-256
+  `e23ca466999b720c55e6d29c9683fce8cc74451ba64ead2e543d50129f24528a` ;
+- `decomp-toolkit 1.8.4`, binaire macOS arm64 vérifié par SHA-256
+  `5ba1fd76adf937847277a1ebe2238b698df0020c3dbbde23ecb126f00fb10353` ;
+- ZeldaRET à `e3c6c8143b92e948d17b0151b2311c54d1e64d25`, qui déclare et prend en
+  charge explicitement la version PAL `GZLP01`.
+
+Le système de fichiers contient 2 320 fichiers et 187 répertoires, pour
+1 093 932 617 octets logiques. La première classification trouve notamment
+1 339 archives RARC, 95 textures BTI, 58 banques de particules JPC, 67 banques
+audio AW, 76 flux AFC, 235 modules REL, le manifeste audio AAF et l'archive de
+séquences `JaiSeqs.arc`. Ces comptes qualifient la surface à fermer ; ils ne
+constituent pas encore une conversion ni une fermeture de dépendances.
+
+La Grande Mer est bien structurée en 49 rooms, plus `Room0` pour le fond marin.
+`Room1.arc` à `Room49.arc` contiennent tous un placement `room.dzr` et une
+collision `room.dzb`. Quarante-huit rooms portent directement au moins un BDL ;
+la room 26, Tower of the Gods, ne contient que placement et collision et exige
+donc de résoudre ses objets placés au lieu d'inventer un modèle manquant. Le
+stage commun fournit séparément ciel, nuages, brume, faux horizon marin,
+textures de nuages et liste d'événements. Les `LOD01.arc` à `LOD49.arc` et
+`LODALL.arc` confirment une représentation distante distincte des rooms proches.
 
 ## Intention
 
@@ -214,13 +252,13 @@ vide n'apparaît pas. Une combinaison dépourvue d'attachement, de rig, de clips
 textures, de preview ou d'action est exclue avec un diagnostic ; elle n'est jamais
 remplacée silencieusement par le premier choix.
 
-## Pré-audit animation avant la ROM
+## Audit animation GameCube — passe lecture seule
 
 Le dépôt sait aujourd’hui inventorier et convertir le corpus Mario Kart Wii
 (`Yaz0/U8/BRRES`), mais ne contient pas encore d’adaptateur GameCube/J3D qualifié.
-Le viewer Bevy générique ne comble pas cette absence. Avant la copie locale du jeu,
-seuls le contrat, la méthode et les sources publiques peuvent être fermés ; les noms,
-hashes, durées et clips réellement présents restent bloqués.
+Le viewer Bevy générique ne comble pas cette absence. La copie locale permet
+maintenant de confirmer les familles et les relations, mais les durées, pistes,
+bounds et raccords restent à mesurer avant toute génération.
 
 Deux révisions publiques sont figées pour guider l’audit, sans fournir d’asset :
 
@@ -243,19 +281,52 @@ grue. Ces opérations deviendront des lignes de relations et de transitions port
 symbole, révision et preuve ; elles ne seront pas recodées sous un nom Wind Waker dans
 le runtime.
 
-À réception de la ROM, l’audit animation suit cet ordre en lecture seule :
+L'inventaire virtuel confirme les ressources nécessaires au premier assemblage :
 
-1. calculer le hash, identifier région/révision et figer le reçu d’entrée ;
-2. inventorier archives, modèles, squelettes et toutes les familles d’animation sans
+- `Ship.arc` contient quatre modèles BDL et dix clips BCK pour le corps, la tête,
+  le canon et la grue ;
+- `LkAnm.arc` contient notamment `voyage1.bck`, `ship_jump1.bck` et
+  `ship_jump2.bck`, avec leurs pistes matériau BTK/BTP associées ;
+- `Kamome.arc` contient deux modèles, neuf clips BCK et cinq pistes sonores BAS ;
+- `sea/Stage.arc` sépare ciel, nuages, brume, horizon, événements et textures ;
+- les rooms de la mer séparent modèles BDL, animation texture BTK, placement DZR,
+  collision DZB et textures/masques BTI lorsqu'ils existent.
+
+Le placement de Link n'est plus une inconnue : `setShipRidePos` transforme
+`l_ship_offset = {0, 15, -35}` par la matrice animée du corps du bateau. Deux offsets
+source distincts existent pour l'usage d'objet (`{0, 15, -66.8}`) et le warp
+(`{0, 15, -96}`). La navigation emploie `voyage1`; le saut et l'atterrissage
+emploient respectivement `ship_jump1` et `ship_jump2`. Le mode de lecture vient de
+l'attribut BCK transmis au contrôleur de frames : aucun nom de clip ne suffit pour
+décider qu'il boucle.
+
+Les effets du bateau sont eux aussi conditionnels et asymétriques. Le code source
+arrête sillage, vagues et éclaboussures lorsque le bateau vole au-dessus de l'eau ou
+n'avance plus. Les deux vagues apparaissent seulement au-delà des seuils de vitesse,
+avec directions gauche/droite distinctes ; la trace de coque est un émetteur séparé
+et l'impact d'atterrissage est borné par la vitesse verticale. Les ancres source de
+chaque vague vont de `(-80, -50, -150)` à `(-40, -100, -350)`, puis le côté opposé
+miroite uniquement la composante X. Ces données devront alimenter une relation
+générique véhicule → socket → effet, pas des constantes Wind Waker dans le runtime.
+
+La mouette n'est pas une simple orbite décorative : le contrôleur source combine
+chemins de scène, cible 3D, vitesse progressive, tangage, roulis de virage, pose au
+sol et transitions entre vol, déplacement, attente, chant, repas et atterrissage.
+Le futur comportement wallpaper devra sélectionner un sous-ensemble attesté et
+déterministe, sans remplacer cette structure par un cercle générique.
+
+La suite de l’audit animation conserve cet ordre en lecture seule :
+
+1. inventorier archives, modèles, squelettes et toutes les familles d’animation sans
    exporter de pixels ni de maillages ;
-3. fermer modèle → squelette → animation → matériau et recenser les callbacks ;
-4. rechercher pour chaque acteur sélectionné les tables puis les appels du contrôleur
+2. fermer modèle → squelette → animation → matériau et recenser les callbacks ;
+3. rechercher pour chaque acteur sélectionné les tables puis les appels du contrôleur
    qui fixent mode, vitesse, bornes, mélanges, interruptions et marqueurs ;
-5. écrire `orbite.animation-semantics/1` avec une ligne par clip et aucune boucle
+4. écrire `orbite.animation-semantics/1` avec une ligne par clip et aucune boucle
    supposée ;
-6. échantillonner les poses et états matériau aux bornes, mesurer chaque raccord et
+5. échantillonner les poses et états matériau aux bornes, mesurer chaque raccord et
    rejeter tout dépassement ;
-7. comparer frame par frame l’oracle hors ligne et le candidat isolé, y compris après
+6. comparer frame par frame l’oracle hors ligne et le candidat isolé, y compris après
    pause, reprise, transition et changement de secteur.
 
 Pour Link sur le bateau, la route et le parent bateau possèdent le déplacement global.
@@ -298,6 +369,8 @@ La première activation est interdite tant que les preuves suivantes ne passent 
 
 ## Références publiques de recherche
 
+- [Lecteur de disque `nod` v2.0.0-alpha.10](https://github.com/encounter/nod/tree/v2.0.0-alpha.10)
+- [VFS en mémoire de `decomp-toolkit` v1.8.4](https://github.com/encounter/decomp-toolkit/tree/v1.8.4)
 - [Décompilation Wind Waker de ZeldaRET](https://github.com/zeldaret/tww/tree/e3c6c8143b92e948d17b0151b2311c54d1e64d25)
 - [Contrôleur J3DFrameCtrl public](https://github.com/zeldaret/tww/blob/e3c6c8143b92e948d17b0151b2311c54d1e64d25/include/JSystem/J3DGraphAnimator/J3DAnimation.h)
 - [Implémentation publique du Lion Rouge](https://github.com/zeldaret/tww/blob/e3c6c8143b92e948d17b0151b2311c54d1e64d25/src/d/actor/d_a_ship.cpp)
