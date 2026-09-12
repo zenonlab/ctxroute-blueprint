@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebBridgeProvider, useWebBridge } from '../app/components/WebBridgeProvider';
+import { webProtocolVersion } from '@tobirink/contracts/web-bridge';
 
 function Probe() {
   const { bootstrap, status } = useWebBridge();
@@ -17,7 +18,7 @@ function respondAs(reply: BridgeReply) {
         expiresAt: Date.now() + 60_000,
         nonce: 'extension_session_nonce',
         ok: true,
-        protocolVersion: reply === 'incompatible' ? 1 : 3,
+        protocolVersion: reply === 'incompatible' ? 1 : webProtocolVersion,
         requestId: message.requestId,
         type: 'tobirink.webbridge.response',
       };
@@ -29,7 +30,7 @@ function respondAs(reply: BridgeReply) {
     const value = request.type === 'bootstrap.read'
       ? reply === 'invalid-bootstrap'
         ? { libraryCount: 'invalid' }
-        : { availability: 'connected', generation: 1, libraryCount: 7, pendingReviewCount: 0, protocolVersion: 3 }
+        : { availability: 'connected', generation: 1, libraryCount: 7, pendingReviewCount: 0, protocolVersion: webProtocolVersion }
       : { candidates: [], context: 'local' };
     queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
   };
@@ -47,7 +48,7 @@ function respondWithExpiringSessions() {
         expiresAt: Date.now() + 100,
         nonce: `extension_session_nonce_${handshakes}`,
         ok: true,
-        protocolVersion: 3,
+        protocolVersion: webProtocolVersion,
         requestId: message.requestId,
         type: 'tobirink.webbridge.response',
       };
@@ -57,7 +58,7 @@ function respondWithExpiringSessions() {
     const request = message?.request;
     if (!request?.requestId) return;
     const value = request.type === 'bootstrap.read'
-      ? { availability: 'connected', generation: handshakes, libraryCount: 7, pendingReviewCount: 0, protocolVersion: 3 }
+      ? { availability: 'connected', generation: handshakes, libraryCount: 7, pendingReviewCount: 0, protocolVersion: webProtocolVersion }
       : { candidates: [], context: 'local' };
     queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
   };
@@ -78,7 +79,7 @@ function respondWithFailedRenewal() {
         expiresAt: Date.now() + 100,
         nonce: `extension_session_nonce_${handshakes}`,
         ok: true,
-        protocolVersion: 3,
+        protocolVersion: webProtocolVersion,
         requestId: message.requestId,
         type: 'tobirink.webbridge.response',
       };
@@ -90,7 +91,7 @@ function respondWithFailedRenewal() {
     const value = request.type === 'bootstrap.read' && handshakes > 1
       ? { libraryCount: 'invalid' }
       : request.type === 'bootstrap.read'
-        ? { availability: 'connected', generation: 1, libraryCount: 7, pendingReviewCount: 0, protocolVersion: 3 }
+        ? { availability: 'connected', generation: 1, libraryCount: 7, pendingReviewCount: 0, protocolVersion: webProtocolVersion }
         : { candidates: [], context: 'local' };
     queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, origin: window.location.origin, source: window })));
   };

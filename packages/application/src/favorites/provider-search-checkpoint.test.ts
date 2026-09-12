@@ -17,6 +17,13 @@ function checkpointPort(): FavoriteSearchCheckpointPort {
 }
 
 describe('durable relevant candidate pagination', () => {
+  it('does not reuse a completed result for a different identity query', async () => {
+    const checkpoint = checkpointPort();
+    const port: FavoriteProviderCandidatePort = { search: vi.fn(async () => createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'empty', provider: 'anilist', truncated: false })) };
+    await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint);
+    await searchFavoriteProviderPage(port, { sourceTitles: ['A Different Journey'] }, 'anilist', 20, checkpoint);
+    expect(port.search).toHaveBeenCalledTimes(2);
+  });
   it('does not select an early exact result before a later identity has been compared', async () => {
     const checkpoint = checkpointPort();
     const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => createProviderCandidateEnvelope(input.cursor === undefined

@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "DONE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6754,6 +6754,760 @@
             "Chrome and Firefox 1.0.0 ZIPs are independently reproducible: SHA-256 16aa888d74ddae5d385af73ea100eaccbcef42edb15e64920616b3963cf95ec6 and 89b2be2fc60c88245bbea6197cbe229f116e97309e43d4128f87fccf1d5fb3db; native Firefox was unavailable",
             "MangaUpdates 25-result minimum page and metadata-v2 MV3 checkpoints are regression tested; focused suite passes 27 tests",
             "favorite-resolution dataflow passes Archify showcase 9/9 with zero errors or warnings; git diff --check passes"
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Correct proven cover delivery and queue regressions",
+          "status": "DONE",
+          "acceptance": [
+            "Cover rendering omits private referrer and handles load errors",
+            "MangaUpdates preference requires complete unique identity proof",
+            "Old blocked resolution tasks recover with additive receipt"
+          ],
+          "files": [
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/favorites/correct-imported-review.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "packages/ui/src/features/library/work-card/WorkCard.tsx",
+            "packages/ui/src/features/library/work-card/WorkCard.test.tsx",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md"
+          ],
+          "commands": [
+            "npm exec -- vitest run packages/application/src/favorites/favorite-resolution-runner.test.ts packages/application/src/use-cases/import-favorite-sources.test.ts apps/extension/runtime/favorite-resolution-runtime.test.ts packages/ui/src/features/library/work-card/WorkCard.test.tsx",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m fix(favorites): verify cover identity and recover blocked tasks"
+          ],
+          "evidence": [
+            "57 targeted tests passed including ambiguous incomplete unrelated covers and blocked-task recovery",
+            "All workspace typechecks ESLint Oxlint docs and git diff checks passed",
+            "favorite-resolution Archify showcase 9/9; live Chrome confirmed replacement images and Referer-dependent GET response"
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Verify and package release 1.0.9",
+          "status": "DONE",
+          "acceptance": [
+            "Full verify passes",
+            "Chrome and Firefox archives are reproducible and hashed",
+            "Installed browser smoke passes"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "apps/extension/.output/packages",
+            "apps/web/out"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.9.zip",
+            "git commit -m chore(extension): prepare verified 1.0.9 release"
+          ],
+          "evidence": [
+            "npm run verify passed on final product changes; current 1.0.9 packaged multi-provider E2E and installed Chromium Review smoke passed",
+            "Two isolated builds matched both Chrome and Firefox 1.0.9 archive hashes; live Chrome no-referrer diagnostic decoded actual 512x728 cover",
+            "Native Firefox installation and complete private library parity remain unverified; release documentation records boundaries"
+          ]
+        },
+        {
+          "id": "step-8",
+          "title": "Publish approved artifacts and verify installed rendering",
+          "status": "BLOCKED",
+          "acceptance": [
+            "Gate publishes only versioned ZIPs and matching Worker assets",
+            "Public hashes equal tested artifacts",
+            "Live cover rendering verified and reload outcome recorded"
+          ],
+          "files": [
+            ".ctxroute/state/pipeline-release-cloudflare.json",
+            "docs/release.md",
+            "apps/extension/.output"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "Browser reload and image inspection",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Gate 45d191ea218c83a1832adbbd8338da5a09ad4a07627fdd76fa16e73e0a7d6070 published 1.0.11 ZIPs and Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0; no D1 migration; previous Worker retained as rollback reference",
+            "Public Chrome SHA256 66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea and Firefox SHA256 69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb equal reproducible artifacts; download advertises 1.0.11; library HTTP 200",
+            "external: User library DOM is empty; browser control cannot access internal extension manager. Installed version, queue diagnostics and actual private-library recovery remain unverified; user asked to open Options"
+          ]
+        },
+        {
+          "id": "step-9",
+          "title": "Restore MangaUpdates transport and reject error-driven fallback",
+          "status": "DONE",
+          "acceptance": [
+            "Installed Chromium sends MangaUpdates requests without Origin",
+            "403 never selects a fallback provider",
+            "Tests and Archify validate; existing private records preserved"
+          ],
+          "files": [
+            "apps/extension/wxt.config.ts",
+            "apps/extension/public/rules/mangaupdates-transport.json",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/scripts/installed-mangaupdates.mjs",
+            "packages/application/src/favorites/resolve-provider-lanes.ts",
+            "packages/application/src/favorites/resolve-provider-lanes.test.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "scripts/performance/extension-performance.test.tsx"
+          ],
+          "commands": [
+            "npm run build --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run test --workspace @tobirink/extension",
+            "npm exec -- vitest run packages/application/src/favorites/resolve-provider-lanes.test.ts",
+            "node apps/extension/scripts/installed-mangaupdates.mjs",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs",
+            "git diff --check",
+            "git commit -m fix(favorites): restore MangaUpdates primary transport",
+            "npm run verify"
+          ],
+          "evidence": [
+            "Installed Chromium rule disabled=403, enabled=200 and 25 results; real MangaUpdates pagination and matching passed",
+            "20 targeted tests including nullable images passed; full validation and workspace tests passed; performance gate corrected for added rule file and passed",
+            "CRG integration dependency audit and Archify showcase 9/9 passed; zero vulnerabilities; git diff check clean"
+          ]
+        },
+        {
+          "id": "step-10",
+          "title": "Package verified MangaUpdates transport release 1.0.10",
+          "status": "DONE",
+          "acceptance": [
+            "Versioned archives preserve 1.0.9",
+            "Installed transport test and package E2E pass",
+            "Hashes and release boundaries documented"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "apps/extension/.output",
+            "apps/web/out"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "node apps/extension/scripts/installed-mangaupdates.mjs",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m chore(extension): prepare MangaUpdates transport release 1.0.10"
+          ],
+          "evidence": [
+            "npm run verify passed; installed Chromium live transport 403 before rule and 200 with 25 results after rule",
+            "Current 1.0.10 packaged multi-provider E2E passed; two isolated builds reproduce both SHA256 hashes; static site build passed",
+            "Existing 1.0.9 ZIPs preserved; no private library migration claimed"
+          ]
+        },
+        {
+          "id": "step-11",
+          "title": "Recognize Comix manga routes and retain newest validated rules",
+          "status": "DONE",
+          "acceptance": [
+            "Comix title and chapter routes parse manga identity without opaque IDs",
+            "Decimal chapters and intrinsic title numbers survive",
+            "Reimport of previously unsupported routes requeues without deleting sources",
+            "Older owner cache cannot downgrade bundled rules",
+            "Installed synthetic Comix import resolves on MangaUpdates while AniList is unavailable"
+          ],
+          "files": [
+            "packages/application/src/favorites/site-rules.ts",
+            "packages/application/src/favorites/site-rules.test.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "apps/extension/runtime/favorite-owner-runtime.ts",
+            "apps/extension/runtime/favorite-owner-runtime.test.ts",
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "apps/extension/.output",
+            "apps/web/out"
+          ],
+          "commands": [
+            "npm exec -- vitest run packages/application/src/favorites/site-rules.test.ts packages/application/src/use-cases/import-favorite-sources.test.ts apps/extension/runtime/favorite-owner-runtime.test.ts",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m fix(favorites): recognize Comix manga routes",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web",
+            "npm exec -- playwright test e2e/packaged-extension.spec.ts"
+          ],
+          "evidence": [
+            "40 targeted tests pass including previously unsupported source requeue, chapter zero/decimal and cached-rule downgrade prevention",
+            "npm run verify passed; 1.0.11 packaged Chromium E2E resolves synthetic Comix through MangaUpdates with zero anime searches for that title",
+            "Two isolated builds reproduce both archive hashes; Archify showcase 9/9; user installed-profile recovery remains unverified"
+          ]
+        },
+        {
+          "id": "step-12",
+          "title": "Unify collective hydration and isolate collective outages",
+          "status": "DONE",
+          "acceptance": [
+            "D1 MangaUpdates identity uses exact-ID transport recovery",
+            "Unavailable collective does not prevent local provider investigation or overwrite inaccessible owner choices",
+            "Incomplete hydration search resumes safely"
+          ],
+          "files": [
+            "packages/application/src/collective-index/favorite-collective-lookup.ts",
+            "packages/application/src/collective-index/favorite-collective-lookup.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "36 resolver and collective tests pass including 405 two-page recovery and owner outage checkpoint reuse",
+            "All workspace typechecks pass; docs validation and Archify showcase 9/9 pass",
+            "Collective failure now permits investigation but deliberately defers final decision until owner lookup recovers; no installed-profile recovery claimed"
+          ]
+        },
+        {
+          "id": "step-13",
+          "title": "Make inventory recovery and task diagnostics resumable",
+          "status": "DONE",
+          "acceptance": [
+            "Resolution continues despite independent inventory failure",
+            "Task diagnostics distinguish internal failures from provider delays",
+            "Restoration advances past deferred provider identities without losing them"
+          ],
+          "files": [
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "packages/application/src/recovery",
+            "packages/application/src/favorites",
+            "packages/adapters-indexeddb/src",
+            "packages/contracts/src",
+            "packages/domain/src",
+            "packages/ui/src/features",
+            "apps/extension/entrypoints/options",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "45 queue recovery and status tests pass; 43 recovery import domain tests pass; 16 storage/import tests pass",
+            "All workspace typechecks, Oxlint, docs and Archify showcase pass",
+            "Old recovery receipts preserved; internal failures retain dated retries; failed provider does not block another provider restoration"
+          ]
+        },
+        {
+          "id": "step-14",
+          "title": "Restore media route coverage and honest provider pagination",
+          "status": "DONE",
+          "acceptance": [
+            "Synthetic historical release routes resolve without admitting ordinary links",
+            "MangaDex completeness follows actual pagination",
+            "Cross-provider identity references remain validated",
+            "Primary ambiguity or outage never becomes fallback evidence"
+          ],
+          "files": [
+            "packages/application/src/favorites",
+            "packages/adapters-browser/src/favorites",
+            "packages/domain/src",
+            "packages/application/src/ports",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Provider/parser/checkpoint tests pass; snapshot changes only adapter version and semantic fingerprints",
+            "Exact MangaDex to MangaUpdates references retained; legacy IDs rejected; five provider lanes and metadata checkpoints supported",
+            "All workspace typechecks, Oxlint, documentation and Archify showcase 9/9 pass; git diff --check clean"
+          ]
+        },
+        {
+          "id": "step-15",
+          "title": "Project the complete library with bounded reads",
+          "status": "DONE",
+          "acceptance": [
+            "At least 1400 works remain searchable sortable and pageable",
+            "Projection recovery does not stop at 500",
+            "UI refresh and diagnostics reflect ongoing resolution"
+          ],
+          "files": [
+            "packages/application/src/library",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/web/app/library",
+            "apps/web/app/components",
+            "packages/ui/src/features/library",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "apps/web/tests/LibraryPage.test.tsx"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "10 library and bridge tests pass including 1400 works and interrupted repair at 600; live UI refresh test passes",
+            "All workspace typechecks, Oxlint, documentation and Archify showcase pass",
+            "No deletion; membership-only sync cache excluded from repair; query changes discard stale responses"
+          ]
+        },
+        {
+          "id": "step-16",
+          "title": "Connect cover recovery to the existing media boundary",
+          "status": "DONE",
+          "acceptance": [
+            "Provider cover failures have a verified bounded recovery path",
+            "No unvalidated asset or arbitrary URL ingestion",
+            "Media operations remain behind the existing Worker gate"
+          ],
+          "files": [
+            "packages/ui/src/features/library",
+            "packages/application/src",
+            "packages/adapters-browser/src",
+            "apps/worker/src/media",
+            "apps/extension/runtime",
+            "docs/decisions",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "packages/adapters-cloudflare/src/media",
+            "packages/contracts/src/web-bridge.ts",
+            "apps/web/app/library",
+            "apps/extension/entrypoints/options"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "36 media/collective/projection tests and actual DOM cover fallback test pass; all workspace typechecks and Oxlint pass",
+            "Archify dataflow and architecture showcase, docs and diff checks pass",
+            "Recovery uses validated public ID and bounded R2 association; operational ingestion preserved; no production media populated"
+          ]
+        },
+        {
+          "id": "step-17",
+          "title": "Certify the robust pipeline and prepare immutable artifacts",
+          "status": "DONE",
+          "acceptance": [
+            "Synthetic large-library and interrupted multi-provider journeys pass",
+            "Complete verification and reproducible archives",
+            "Installed private profile and publication status reported separately"
+          ],
+          "files": [
+            "apps/web/e2e",
+            "apps/extension/scripts",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.test.ts"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run build --workspace @tobirink/web"
+          ],
+          "evidence": [
+            "Complete verify passes: workspace tests, typechecks, performance, CRG, integration, dependency audit zero vulnerabilities and Archify showcase 9/9",
+            "Final 1.0.12 Chromium packaged journey and Firefox 151 isolated installed smoke pass; six website journeys, website build and Chromium IndexedDB migrations pass",
+            "1400 synthetic works pass runtime message pagination; MangaDex to MangaUpdates upgrades preserve identity; zero Reviews at import",
+            "Two isolated builds reproduce Chrome 4b6642dfe4008ccb1d2ca1a57bfbdf48ebdc41d79e537d2bdbe3a37456cb961b and Firefox 014de4344a0e7781eef8b74e3ee2a09b1073a9d6e3d6ff39dfc37a6d6d29aaf7",
+            "Local candidate only: actual private profile, production publication and populated R2 associations remain unverified; external step-8 unchanged"
+          ]
+        },
+        {
+          "id": "step-18",
+          "title": "Publish verified 1.0.12 Worker and extension archives",
+          "status": "DONE",
+          "acceptance": [
+            "Exact approved archive hashes served publicly",
+            "Worker version and site journeys verified; prior Worker retained for rollback",
+            "No D1 migration or private-profile recovery claimed"
+          ],
+          "files": [
+            "docs/release.md",
+            "docs/progress.md",
+            ".project/progress.json",
+            "apps/web/out",
+            "apps/extension/.output/packages"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "npm exec -- playwright test",
+            "npm run validate:docs",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Explicit user deployment request; gate 808bb95417403e2a782da2c72af17453634ecc5b0e647b5f1d7fc30b0fcacdda published both 1.0.12 ZIPs and Worker a7fa4736-3915-4608-b97e-ddb7a99da750",
+            "Public ZIP downloads HTTP 200 and exact certified SHA-256; download page advertises 1.0.12; library and agenda HTTP 200",
+            "Playwright against production base URL passes 7/7 with synthetic provider and bridge fixtures; previous Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0 retained for rollback",
+            "No D1 migration, cover ingestion, user-profile mutation or Git push; actual installed private library remains unverified in step-8"
+          ]
+        },
+        {
+          "id": "step-19",
+          "title": "Make live favorite reconciliation observable and restartable",
+          "status": "DONE",
+          "acceptance": [
+            "Status reads work on the actual IndexedDB schema",
+            "Options reports observed inventory and checkpoint state",
+            "A trusted Options action runs bounded reconciliation and refreshes the projection",
+            "Installed interaction test proves the action and counters"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Packaged Chromium interaction creates six bookmarks, runs the trusted Options reconciliation, reports complete inventory and resolves five media works while excluding YouTube",
+            "Complete npm run verify, all workspace typechecks, Chromium IndexedDB migrations, docs and Archify showcase pass",
+            "Two isolated builds reproduce Chrome b9e9cbb9b4ae29ccb79f1f877fd0f3566abd6cc11b55fe4a00fffb221e6961a1 and Firefox 0efaaa3cb01bb2423233d1b279a9946ae99b81eedb39c3108ed48eca8fbf9f59",
+            "1.0.13 remains local; installed private profile was still not exposed through Chrome Options and production remains 1.0.12"
+          ]
+        },
+        {
+          "id": "step-20",
+          "title": "Add locked Worker and extension diagnostics and publish 1.0.14",
+          "status": "DONE",
+          "acceptance": [
+            "Worker diagnostics require the exact worker-v1 value and contain only bounded technical fields",
+            "Extension diagnostics require the exact extension-v1 local value and can be disabled from Options",
+            "Correlation and queue lifecycle are visible without titles URLs folders progress or secrets",
+            "Version 1.0.14 passes tests reproducibility and public deployment verification"
+          ],
+          "files": [
+            "apps/worker/src",
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/worker-configuration.d.ts",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus",
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run cf-typegen --workspace @tobirink/worker",
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run validate:ui",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs",
+            "npm run build --workspace @tobirink/web",
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "npm exec -- playwright test",
+            "npm exec -- wrangler tail",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Exact Worker and extension locks pass strict schema bounded ring privacy concurrency and trusted Options tests; 130 extension and 41 Worker tests pass",
+            "Complete npm run verify passes 697 product tests 273 governance tests Chromium IndexedDB performance dependency audit and every Archify showcase",
+            "Two isolated builds reproduce Chrome 98811bff45e3670c7eda5f62aee211dd64abe0460c4832ed2ded9d4419e8cf1d and Firefox 3587e5c305fd69ae503b28b664d27e6ee5ffff6438ed79a2f2f9ee540c8ca04a; installed Chromium diagnostic toggle passes",
+            "Cloudflare plan f3c49715496e45632b8d2889b434e6257b7afe49113801a2ab83cbe3041454fe published exact ZIPs and Worker 1ac73214-008b-4d56-a3d3-be7c1162ba9d with no D1 migration; public 7 of 7 and correlated tail pass"
+          ]
+        },
+        {
+          "id": "step-21",
+          "title": "Resume bounded favorite reconciliation until convergence",
+          "status": "DONE",
+          "acceptance": [
+            "More than 800 bookmarks converge over durable MV3 continuations without resetting the checkpoint",
+            "A named one-shot alarm is replaced rather than multiplied and stops after the final empty slice",
+            "Run diagnostics remain retryable until inventory and queued resolution work converge",
+            "Extension tests typechecks full verification Archify and reproducible packages pass"
+          ],
+          "files": [
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run test:extension:installed",
+            "git diff --check",
+            "git commit -m \"fix(extension): resume favorite reconciliation\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime test resumes at cursor 800 and completes 15 batches with one continuation; wake-budget exhaustion also requests continuation",
+            "npm run verify passes 132 extension 312 application and all workspace governance IndexedDB performance integration dependency and Archify checks",
+            "Chromium 153 installed ZIP passes; two packages reproduce Chrome 6d433a07e6e5e5b41de8d31eaaccb193764f4394ca58391537bc27a099dc2687 and Firefox e715b8f4ca092603f82db7c072f9eafaf3b4c598d4ba51c12e8c3f65a5b3aab1"
+          ]
+        },
+        {
+          "id": "step-22",
+          "title": "Port FavLib durable wake and stable inventory semantics",
+          "status": "DONE",
+          "acceptance": [
+            "A complete inventory is not rescanned by provider continuation wakes",
+            "Startup bookmark mutation and manual reconciliation still force authoritative browser inventory",
+            "The outbox exposes the earliest READY retry or expired-claim deadline through bounded indexed reads",
+            "One named alarm follows the exact durable deadline with the browser minimum delay",
+            "A 1401-bookmark installed-compatible flow converges without duplicate Reviews or concurrent runners"
+          ],
+          "files": [
+            "packages/application/src/tasks/favorite-resolution-outbox-port.ts",
+            "packages/adapters-indexeddb/src/favorite-resolution/dexie-favorite-resolution-outbox.ts",
+            "packages/adapters-indexeddb/test/browser-entry.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "node apps/extension/scripts/installed-review.mjs",
+            "git diff --check",
+            "git commit -m \"fix(extension): stabilize durable favorite wakes\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime test resumes at cursor 800, completes in 15 batches and performs zero bookmark reads on the next provider wake",
+            "IndexedDB Chromium contract selects the claimed-task expiry through the compound due index and clears the deadline after convergence",
+            "npm run verify passes 132 extension and 312 application tests plus all workspaces, security, performance, integration, audit zero and Archify showcase 9/9",
+            "Installed Chromium 153 smoke passes; two builds reproduce Chrome cc1f1a0d41695f0e3326861f7b37154d68345e8aca5ad18ced1a3a283533693a and Firefox cc0e57b5b75ee6fdca7c32ed01fe5185934dd434aab24e426bbddeb08781905b"
+          ]
+        },
+        {
+          "id": "step-23",
+          "title": "Make first-install reconciliation atomic resumable and guided",
+          "status": "DONE",
+          "acceptance": [
+            "The inventory checkpoint becomes complete only after every presence page is committed",
+            "Suspension after any inventory or presence checkpoint resumes idempotently without hiding an observed favorite",
+            "Every service-worker boot restores the exact durable continuation alarm and the bounded safety alarm",
+            "The Options surface explains inventory presence resolution retry and completion states with a safe resume action",
+            "A 1401-bookmark packaged flow and an upgrade-compatible flow converge with zero import-created Reviews",
+            "No provider order privacy boundary D1 schema permission or production resource changes"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/tasks/favorite-resolution-outbox-port.ts",
+            "packages/application/src/use-cases/reconcile-favorite-source-presence.ts",
+            "packages/application/src/use-cases/reconcile-favorite-source-presence.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/index.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.test.ts",
+            "apps/extension/runtime/resolution-status-messages.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.module.css",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.test.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.preview.tsx",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-indexeddb",
+            "npm test --workspace @tobirink/extension",
+            "npm run validate:ui",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run package:extension -- --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.15.zip",
+            "git diff --check",
+            "git commit -m \"fix(extension): harden first-install reconciliation\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime and 101-source atomic presence tests pass; legacy active checkpoints resume and interrupted final checkpoint rolls back",
+            "Chromium 153 installed 1402-bookmark ZIP journey reaches complete with 1401 unsupported, one retryable outage, durable alarm and zero imported Reviews",
+            "npm run verify passes all workspaces, Chromium IndexedDB, security, performance, integration, audit zero and Archify showcase 9/9; isolated Chrome and Firefox hashes reproduce"
+          ]
+        },
+        {
+          "id": "step-24",
+          "title": "Project parsed favorites before provider hydration",
+          "status": "DONE",
+          "acceptance": [
+            "Every observed parsed media favorite is visible immediately with its local title and preparation retry or review state",
+            "Resolved sources converge to one hydrated Work without leaving a provisional duplicate",
+            "Anime manga and unknown media remain distinct without defaulting unknown entries to AniList or Manga",
+            "Rejected unsupported links remain absent and importing creates zero Reviews",
+            "The installed 1400-plus bookmark journey shows a MangaUpdates favorite while providers are unavailable",
+            "No IndexedDB migration D1 provider order permission secret production resource or deployment change"
+          ],
+          "files": [
+            "packages/application/src/library/library-catalogue-contract.ts",
+            "packages/application/src/library/project-pending-favorites.ts",
+            "packages/application/src/library/read-library-catalogue.ts",
+            "packages/application/src/library/read-library-catalogue.test.ts",
+            "packages/application/src/ports/web-bridge-port.ts",
+            "packages/contracts/src/web-bridge.ts",
+            "packages/contracts/src/web-bridge.test.ts",
+            "apps/extension/package.json",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/extension/runtime/library-catalogue-messages.ts",
+            "apps/extension/runtime/library-catalogue-messages.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/extension/runtime/web-bridge-runtime.test.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/ui-workbench/src/SiteReview.test.tsx",
+            "apps/web/app/page.tsx",
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/library/[workId]/WorkDetail.tsx",
+            "apps/web/e2e/workbench.spec.ts",
+            "apps/web/tests/WebBridgeProvider.test.tsx",
+            "docs/decisions/ADR-0042-local-first-library-projection.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            "package-lock.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.16.zip",
+            "npm run build --workspace @tobirink/web",
+            "npm run test:e2e --workspace @tobirink/web -- --grep 'desktop Workbench|Library keeps filters|connected empty Library'",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m \"fix(library): project favorites before hydration\""
+          ],
+          "evidence": [
+            "npm run verify passed: all workspace typechecks and tests, Chromium IndexedDB contract, performance, security, docs, UI, CRG and dependency audit with zero vulnerabilities.",
+            "Installed Chromium 153 archive observed 1403 bookmarks, exposed the pending MangaUpdates manga during synthetic provider outages, scheduled durable retries and created zero Reviews at import.",
+            "Two isolated builds reproduced Chrome b565e7d5...08dc1 and Firefox cdcf41bf...22a1c; Archify showcase passed 9/9 and the rebuilt WebBridge v4 site passed all three targeted Playwright journeys."
           ]
         }
       ]

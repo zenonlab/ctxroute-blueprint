@@ -44,6 +44,26 @@ function mediaBindings(found = true) {
 }
 
 describe('cover media routes', () => {
+  it('resolves a public provider ID to an approved immutable master without accepting source URLs', async () => {
+    const fixture = mediaBindings();
+    const reads: string[] = [];
+    const coverMasters = new R2CoverMasterReadAdapter({ get: async key => { reads.push(key); return { body: new Blob([JSON.stringify({ schemaVersion: 1, digest, extension: 'webp' })]).stream() }; } });
+    const app = createCoverMediaApp({ ...fixture.services, coverMasters });
+    const response = await app.request('https://api.example/v1/media/provider-covers/mangaupdates/12345/cover-md');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`/v1/media/covers/${digest}/webp/cover-md`);
+    expect(reads).toEqual(['covers/references/mangaupdates/12345.json']);
+    expect((await app.request('https://api.example/v1/media/provider-covers/mangaupdates/invalid/cover-md')).status).toBe(404);
+    expect((await app.request('https://api.example/v1/media/provider-covers/mangaupdates/12345/cover-md?url=https://untrusted.example')).status).toBe(400);
+    expect(reads).toHaveLength(1);
+  });
+  it.each(['corrupt', JSON.stringify({ schemaVersion: 1, digest: '../invalid', extension: 'jpg' }), 'x'.repeat(5000)])('rejects invalid reference objects without rendering an asset', async (body) => {
+    const fixture = mediaBindings();
+    const coverMasters = new R2CoverMasterReadAdapter({ get: async () => ({ body: new Blob([body]).stream() }) });
+    const response = await createCoverMediaApp({ ...fixture.services, coverMasters }).request('https://api.example/v1/media/provider-covers/mangaupdates/12345/cover-md');
+    expect(response.status).toBe(404);
+    expect(fixture.transforms).toHaveLength(0);
+  });
   it('exposes exactly the three fixed scale-down variants', async () => {
     expect(Object.keys(COVER_VARIANTS)).toEqual(['cover-lg', 'cover-md', 'cover-sm']);
     for (const [variant, dimensions] of Object.entries(COVER_VARIANTS)) {

@@ -29,6 +29,8 @@ import type { FavoriteSearchCheckpoint } from '../favorites/provider-search-chec
 export interface FavoriteInventoryCheckpoint {
   cursor?: BookmarkInventoryCursor;
   id: 'favorite-inventory';
+  phase?: 'inventory' | 'presence';
+  presenceAfterId?: FavoriteSourceId;
   sessionId: string;
   startedAt: string;
   status: 'active' | 'complete';
@@ -104,7 +106,7 @@ export function createFavoriteParseArtifactRecord(input: FavoriteParseArtifactRe
   if (Number.isNaN(recordedAt.valueOf()) || recordedAt.toISOString() !== input.recordedAt) throw new TypeError('recordedAt must be canonical.');
   const record = { ...input, artifact: createFavoriteParseArtifact(input.artifact), sourceId: favoriteSourceId(input.sourceId) };
   if (input.searchCheckpoints !== undefined) {
-    if (input.searchCheckpoints.length > 4 || new Set(input.searchCheckpoints.map((item) => item.provider)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
+    if (input.searchCheckpoints.length > 10 || new Set(input.searchCheckpoints.map((item) => `${item.provider}:${item.purpose ?? 'resolution'}`)).size !== input.searchCheckpoints.length) throw new Error('Search checkpoints require unique bounded provider lanes.');
     record.searchCheckpoints = Object.freeze(input.searchCheckpoints.map((item) => favoriteSearchCheckpointSchema.parse(item)));
   }
   return Object.freeze(input.reviewId === undefined ? record : { ...record, reviewId: reviewId(input.reviewId) });
@@ -159,7 +161,7 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 }
 
 export interface StorageReadPort {
-  readFavoriteResolutionCounts(): Promise<{ processing: number; retryable: number; unsupported: number }>;
+  readFavoriteResolutionCounts(): Promise<{ observed: number; processing: number; retryable: number; unsupported: number; internalErrors?: number; collectivePending?: number }>;
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;

@@ -1,25 +1,82 @@
 import { Button, Surface } from '@tobirink/ui';
 import styles from './ResolutionStatus.module.css';
+import type { ExtensionDiagnosticEvent } from '../../../runtime/extension-diagnostics';
 
 export interface ResolutionStatusProps {
-  counts?: { processing: number; retryable: number; unsupported: number } | undefined;
-  state: 'loading' | 'ready' | 'error';
+  counts?: { observed: number; processing: number; retryable: number; unsupported: number; internalErrors?: number; collectivePending?: number } | undefined;
+  diagnostics?: { enabled: boolean; events: readonly ExtensionDiagnosticEvent[] } | undefined;
+  inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
+  state: 'loading' | 'running' | 'ready' | 'error';
+  onReconcile: () => void;
+  onDiagnosticsToggle: () => void;
   onRefresh: () => void;
 }
 
-export function ResolutionStatus({ counts, onRefresh, state }: ResolutionStatusProps) {
+const diagnosticLabels = {
+  inventory: 'Inventaire',
+  resolution: 'Résolution',
+  run: 'Exécution',
+} as const;
+const diagnosticOutcomeLabels = {
+  complete: 'terminé',
+  failed: 'interrompu',
+  retryable: 'à reprendre',
+  started: 'démarré',
+} as const;
+
+function diagnosticCounts(event: ExtensionDiagnosticEvent): string | undefined {
+  if (event.stage === 'inventory' && event.counts) return `${event.counts.observed ?? 0} lus · ${event.counts.batches ?? 0} lots`;
+  if (event.stage === 'resolution' && event.counts) return `${event.counts.completed ?? 0} terminées · ${event.counts.retried ?? 0} reprises · ${event.counts.blocked ?? 0} bloquées`;
+  return undefined;
+}
+
+export function ResolutionStatus({ counts, diagnostics, inventory, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
+  const latestDiagnostic = diagnostics?.events.at(-1);
+  const inventoryLabel = inventory?.status === 'complete'
+    ? 'Inventaire vérifié'
+    : inventory?.status === 'presence'
+      ? 'Vérification des favoris encore présents'
+      : inventory?.status === 'inventory'
+        ? 'Lecture des favoris'
+        : 'Prêt à commencer';
+  const actionLabel = inventory?.status === 'complete' ? 'Vérifier à nouveau' : inventory?.status === 'not-started' ? 'Commencer l’analyse' : 'Reprendre maintenant';
   return <section className={styles.section} aria-label="Analyse des favoris"><Surface>
     <div className={styles.content}>
       <h2>Analyse des favoris</h2>
-      <p>La cloche contient uniquement les ambiguïtés et les recherches terminées sans correspondance.</p>
+      <p>TobiRink lit vos favoris par petits lots, vérifie lesquels sont encore présents, puis identifie les œuvres et récupère leurs informations.</p>
+      <ol className={styles.steps} aria-label="Étapes de préparation">
+        <li>Lire les favoris du navigateur</li>
+        <li>Vérifier les favoris encore présents</li>
+        <li>Identifier et enrichir les œuvres</li>
+        <li>Afficher seulement les choix qui demandent votre aide</li>
+      </ol>
       {state === 'loading' ? <p role="status">Lecture de l’état local…</p> : null}
+      {state === 'running' ? <p role="status">Analyse en cours. Cette page peut rester ouverte ou être fermée.</p> : null}
       {state === 'error' ? <p role="alert">L’état local est indisponible. Réessayez.</p> : null}
+      {inventory ? <div className={styles.current} role="status">
+        <strong>{inventoryLabel}</strong>
+        {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
+        {inventory.continuationAt ? <span>Prochaine reprise automatique : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
+      </div> : null}
       {counts ? <dl className={styles.counts}>
+        <dt>Favoris observés</dt><dd>{counts.observed}</dd>
+        <dt>Préparation</dt><dd>{inventoryLabel}</dd>
         <dt>Traitement en cours</dt><dd>{counts.processing}</dd>
-        <dt>Résolution à reprendre après une panne fournisseur</dt><dd>{counts.retryable}</dd>
+        <dt>Résolutions en attente de reprise</dt><dd>{counts.retryable}</dd>
+        {counts.internalErrors ? <><dt>Dont erreurs internes</dt><dd>{counts.internalErrors}</dd></> : null}
+        {counts.collectivePending ? <><dt>Dont attente du service collectif</dt><dd>{counts.collectivePending}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
       </dl> : null}
-      <Button disabled={state === 'loading'} onClick={onRefresh}>Actualiser l’état</Button>
+      {diagnostics ? <div className={styles.diagnostics}>
+        <h3>Diagnostic local</h3>
+        <p role="status">{diagnostics.enabled ? 'Activé' : 'Désactivé'} · {diagnostics.events.length} événements conservés sur 100 maximum.</p>
+        {latestDiagnostic ? <p>Dernier état : {diagnosticLabels[latestDiagnostic.stage]} · {diagnosticOutcomeLabels[latestDiagnostic.outcome]} · passage {latestDiagnostic.runId} · {latestDiagnostic.occurredAt}{diagnosticCounts(latestDiagnostic) ? ` · ${diagnosticCounts(latestDiagnostic)}` : ''}</p> : <p>Aucun événement enregistré.</p>}
+        <Button disabled={state === 'loading' || state === 'running'} onClick={onDiagnosticsToggle}>{diagnostics.enabled ? 'Désactiver le diagnostic' : 'Activer le diagnostic'}</Button>
+      </div> : null}
+      <div className={styles.actions}>
+        <Button disabled={state === 'loading' || state === 'running'} onClick={onReconcile} variant="primary">{actionLabel}</Button>
+        <Button disabled={state === 'loading' || state === 'running'} onClick={onRefresh}>Actualiser l’état</Button>
+      </div>
     </div>
   </Surface></section>;
 }

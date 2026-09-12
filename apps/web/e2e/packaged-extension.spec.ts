@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
@@ -24,7 +24,7 @@ const kitsuResource = (type: 'anime' | 'manga') => ({
 });
 const mangaDexPayload = {
   data: {
-    attributes: { altTitles: [], contentRating: 'safe', originalLanguage: 'ja', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }], title: { en: 'Fixture Garden' }, year: 2021 },
+    attributes: { altTitles: [], contentRating: 'safe', links: { mu: '1gdu' }, originalLanguage: 'ja', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }], title: { en: 'Fixture Garden' }, year: 2021 },
     id: mangaDexId, relationships: [{ attributes: { fileName: 'fixture.jpg' }, id: '12345678-1234-4234-8234-123456789abd', type: 'cover_art' }], type: 'manga',
   },
   result: 'ok',
@@ -33,7 +33,8 @@ const mangaDexPayload = {
 test('the packaged Chrome extension imports, resolves, bridges and survives offline', async () => {
   test.setTimeout(90_000);
   const repository = resolve(import.meta.dirname, '../../..');
-  const archive = resolve(repository, 'apps/extension/.output/packages/tobirink-chrome-mv3-1.0.0.zip');
+  const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
+  const archive = resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
   const extensionPath = mkdtempSync(resolve(tmpdir(), 'tobirink-packaged-extension-'));
   const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-chromium-profile-'));
   execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
@@ -43,7 +44,18 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     headless: true,
   });
   try {
+    let comixAnimeSearches = 0;
+    const coverRequests: string[] = [];
+    await context.route(/^https:\/\/(s4\.anilist\.co|cdn\.mangaupdates\.com|uploads\.mangadex\.org|media\.kitsu\.app)\//u, async (route) => {
+      coverRequests.push(route.request().headers().referer ?? '');
+      await route.fulfill({ body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1cAAAAASUVORK5CYII=', 'base64'), contentType: 'image/png', status: 200 });
+    });
     await context.route('https://graphql.anilist.co/**', async (route) => {
+      if (route.request().postData()?.toLowerCase().includes('fixture river')) {
+        comixAnimeSearches += 1;
+        await route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Synthetic anime provider outage', status: 403 }] }) });
+        return;
+      }
       const exactHydration = route.request().postData()?.includes('"id":154587') === true;
       await route.fulfill({
         body: JSON.stringify(exactHydration
@@ -55,10 +67,12 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     });
     await context.route('https://api.mangaupdates.com/**', async (route) => {
       const search = route.request().method() === 'POST';
-      await route.fulfill({ body: JSON.stringify(search ? { results: [{ record: mangaUpdatesSeries }], total_hits: 1 } : mangaUpdatesSeries), contentType: 'application/json', status: 200 });
+      const exact = new URL(route.request().url()).pathname.endsWith('/67890') ? { ...mangaUpdatesSeries, image: { url: { original: 'https://cdn.mangaupdates.com/image/fixture-garden.jpg' } }, series_id: 67890, title: 'Fixture Garden', url: 'https://www.mangaupdates.com/series/1gdu/fixture-garden' } : mangaUpdatesSeries;
+      await route.fulfill({ body: JSON.stringify(search ? { results: [{ record: mangaUpdatesSeries }], total_hits: 1 } : exact), contentType: 'application/json', status: 200 });
     });
     await context.route('https://api.mangadex.org/**', async (route) => {
-      await route.fulfill({ body: JSON.stringify(mangaDexPayload), contentType: 'application/json', status: 200 });
+      const search = new URL(route.request().url()).pathname === '/manga';
+      await route.fulfill({ body: JSON.stringify(search ? { result: 'ok', data: [], limit: 20, offset: 0, total: 0 } : mangaDexPayload), contentType: 'application/json', status: 200 });
     });
     await context.route('https://kitsu.io/api/edge/**', async (route) => {
       const type = route.request().url().includes('/manga') ? 'manga' : 'anime';
@@ -71,11 +85,20 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await worker.evaluate(async () => {
       await chrome.bookmarks.create({ title: '(3) CES STREAMERS QUI GHOSTENT M. LE MAIRE ft. Dach', url: 'https://www.youtube.com/watch?v=fixture' });
       await chrome.bookmarks.create({ title: 'Frieren: Beyond Journey’s End', url: 'https://anilist.co/anime/154587/frieren-beyond-journeys-end' });
-      await chrome.bookmarks.create({ title: 'Fixture River Chapter 12', url: 'https://fixtures.tobirink.invalid/manga/fixture-river/chapter-12' });
+      await chrome.bookmarks.create({ title: 'Fixture River Chapter 12', url: 'https://comix.to/title/ab123-fixture-river/1234567-chapter-12' });
       await chrome.bookmarks.create({ title: 'Fixture Garden Chapter 8', url: 'https://mangadex.org/title/12345678-1234-4234-8234-123456789abc/fixture-garden' });
       await chrome.bookmarks.create({ title: 'Fixture Sky Episode 4', url: 'https://fixtures.tobirink.invalid/anime/fixture-sky/episode-4' });
       await chrome.bookmarks.create({ title: 'Fixture Paper Chapter 9', url: 'https://fixtures.tobirink.invalid/manga/fixture-paper/chapter-9' });
     });
+
+    const optionsPage = await context.newPage();
+    await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+    await expect(optionsPage.getByText('Favoris observés')).toBeVisible();
+    await optionsPage.getByRole('button', { name: 'Relancer l’analyse' }).click();
+    await expect(optionsPage.getByRole('button', { name: 'Relancer l’analyse' })).toBeEnabled({ timeout: 60_000 });
+    await expect(optionsPage.getByText('Complet')).toBeVisible();
+    await expect(optionsPage.locator('dl').getByText('6', { exact: true })).toBeVisible();
+    await optionsPage.close();
 
     const privateLibrary = await context.newPage();
     await privateLibrary.goto(`chrome-extension://${extensionId}/library.html`);
@@ -105,10 +128,17 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible({ timeout: 30_000 });
     for (const title of ['Fixture River', 'Fixture Garden', 'Fixture Sky', 'Fixture Paper']) await expect(privateLibrary.getByText(title).first()).toBeVisible();
+    expect(comixAnimeSearches).toBe(0);
     await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
-    for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'uploads.mangadex.org', 'media.kitsu.app']) {
+    for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'media.kitsu.app']) {
       await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('alt', /Couverture/u);
+      await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('referrerpolicy', 'no-referrer');
     }
+    await expect.poll(() => privateLibrary.locator('img').evaluateAll((images) => images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
+    expect(coverRequests.length).toBeGreaterThanOrEqual(5);
+    expect(coverRequests.every((referer) => referer === '')).toBe(true);
+    await expect(privateLibrary.locator('img[src^="https://uploads.mangadex.org/"]')).toHaveCount(0);
+    await expect(privateLibrary.locator('img[src^="https://cdn.mangaupdates.com/"]')).toHaveCount(2);
     expect(await privateLibrary.evaluate(async () => {
       const database = await new Promise<IDBDatabase>((resolveDatabase, reject) => {
         const request = indexedDB.open('tobirink-private');
@@ -127,6 +157,29 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await context.setOffline(true);
     await privateLibrary.reload();
     await expect(privateLibrary.getByText('Frieren').first()).toBeVisible();
+
+    const largeProjection = await privateLibrary.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((ready, reject) => {
+        const request = indexedDB.open('tobirink-private');
+        request.onsuccess = () => ready(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const ids = Array.from({ length: 1400 }, (_, index) => `work_bulk${String(index).padStart(4, '0')}`);
+      await new Promise<void>((ready, reject) => {
+        const transaction = database.transaction(['works', 'libraries'], 'readwrite');
+        for (const id of ids) transaction.objectStore('works').put({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: id });
+        const existing = transaction.objectStore('libraries').get('library_primary');
+        existing.onsuccess = () => transaction.objectStore('libraries').put({ id: 'library_primary', workIds: [...(existing.result?.workIds ?? []), ...ids] });
+        transaction.oncomplete = () => ready();
+        transaction.onerror = () => reject(transaction.error);
+      });
+      database.close();
+      return chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, query: 'work_bulk', sort: 'TITLE_ASC', offset: 1392 });
+    });
+    expect(largeProjection.ok).toBe(true);
+    expect(largeProjection.snapshot.total).toBe(1400);
+    expect(largeProjection.snapshot.items).toHaveLength(8);
+    expect(largeProjection.snapshot.items.at(-1).id).toBe('work_bulk1399');
   } finally {
     await context.close();
   }

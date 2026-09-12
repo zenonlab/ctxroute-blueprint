@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
-import { claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
+import { blockTask, claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from '../favorites/site-rules';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
 const favorite: ImportableFavorite = {
@@ -16,6 +17,38 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
+  it('requeues a previously unsupported Comix source after the site rule update', async () => {
+    const storage = new MemoryStoragePort();
+    const input = { ...favorite, title: 'Synthetic Journey Chapter 101', url: 'https://comix.to/title/ab123-synthetic-journey/1234567-chapter-101' };
+    await importFavoriteSources([input], storage, importedAt);
+    const [before] = await storage.listFavoriteSources({ limit: 1 });
+    expect(before?.resolution?.kind).toBe('UNSUPPORTED');
+    await importFavoriteSources([input], storage, importedAt, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
+    const [after] = await storage.listFavoriteSources({ limit: 1 });
+    expect(after?.id).toBe(before?.id);
+    expect(after?.resolution).toBeUndefined();
+    expect((await storage.getFavoriteResolutionTask('favorite-resolution_4_3432'))?.state).toBe('READY');
+    expect((await storage.listReviews({ status: 'pending', limit: 20 })).length).toBe(0);
+  });
+
+  it('recovers an old blocked task once and preserves its previous state in a receipt', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const taskId = 'favorite-resolution_4_3432';
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!task || !source) throw new Error('Missing fixture');
+    await storage.putFavoriteResolutionTask(blockTask(claimTask(task, 'old', importedAt, '2026-09-06T00:01:00.000Z'), 'old', 'AUTOMATIC_ATTEMPT_LIMIT'));
+    const oldReceipt = { completedAt: importedAt, effectDigest: 'correction:blocked-task', id: `${source.id}:queue-recovery-109`, idempotencyKey: `${source.id}:queue-recovery-109`, sourceId: source.id };
+    await storage.putFavoriteResolutionReceipt(oldReceipt);
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY', attempt: 0 });
+    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`);
+    expect(receipt).toMatchObject({ correction: { task: { state: 'BLOCKED', blockedReason: 'AUTOMATIC_ATTEMPT_LIMIT' } } });
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`)).toEqual(receipt);
+    expect(await storage.getFavoriteResolutionReceipt(oldReceipt.id)).toEqual(oldReceipt);
+  });
   it('archives an artificial import Review with a before-image and resumes resolution once', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([favorite], storage, importedAt);

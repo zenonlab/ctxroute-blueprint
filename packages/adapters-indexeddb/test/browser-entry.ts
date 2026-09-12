@@ -71,6 +71,7 @@ try {
   const resolutionOutbox = new DexieFavoriteResolutionOutbox(storage.database);
   const claimed = await resolutionOutbox.claimNext({ claimedAt: '2026-09-07T12:01:00.000Z', claimExpiresAt: '2026-09-07T12:02:00.000Z', claimToken: 'browser-claim', kind: 'favorite-resolution', lane: 'routing' });
   if (claimed?.state !== 'CLAIMED' || claimed.availableAt !== '2026-09-07T12:02:00.000Z') throw new Error('Favorite resolution outbox did not claim through its compound due index.');
+  if (await resolutionOutbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' }) !== '2026-09-07T12:02:00.000Z') throw new Error('Favorite resolution outbox did not expose the claimed-task recovery deadline.');
   const committed = commitTask(recordTaskEffect(claimed, 'browser-claim', 'browser:resolved'), 'browser-claim');
   if (imported === undefined) throw new Error('Imported source disappeared before receipt test.');
   await storage.transaction(['favoriteResolutionReceipts', 'favoriteResolutionTasks'], async (session) => {
@@ -78,6 +79,7 @@ try {
     await session.putFavoriteResolutionReceipt({ completedAt: '2026-09-07T12:03:00.000Z', effectDigest: 'browser:resolved', id: `${imported.id}:favorite-resolution`, idempotencyKey: committed.idempotencyKey, sourceId: imported.id });
   });
   if (await resolutionOutbox.compactCommitted({ before: '2026-10-08T00:00:00.000Z', limit: 8 }) !== 1 || await storage.getFavoriteResolutionTask(committed.id) !== undefined) throw new Error('Committed resolution task did not compact into its receipt.');
+  if (await resolutionOutbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' }) !== undefined) throw new Error('Favorite resolution outbox retained a wake deadline after convergence.');
   if (await storage.getFavoriteResolutionReceipt(`${imported.id}:favorite-resolution`) === undefined) throw new Error('Resolution receipt disappeared during compaction.');
   await storage.database.table('organizer').put({
     folders: [{ children: [], enabled: true, id: 'invalid id', name: 'Invalid' }],

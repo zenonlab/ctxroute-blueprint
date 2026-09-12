@@ -9,7 +9,7 @@ const observation = createFavoriteObservation({ bookmarkId: input.sourceKey, fol
 const artifact = parseFavoriteObservation(observation, extractFavoriteSourceEvidence(input));
 const candidate = { provider: 'anilist' as const, externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, titles: ['Synthetic Series'] };
 const unused = { hydrate: async () => { throw new Error('unrouted provider'); } };
-const hydration = { anilist: { hydrate: async () => candidate }, mangaupdates: unused, 'kitsu-anime': unused, 'kitsu-manga': unused };
+const hydration = { anilist: { hydrate: async () => candidate }, mangaupdates: unused, mangadex: unused, 'kitsu-anime': unused, 'kitsu-manga': unused };
 
 describe('minimal collective lookup boundary', () => {
   it('allows only an owner preference to settle a local ambiguity', async () => {
@@ -37,8 +37,8 @@ describe('minimal collective lookup boundary', () => {
   });
 
   it('rejects unrelated keys and incomplete batch responses', async () => {
-    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE' });
-    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [{ fingerprint: 'a'.repeat(64), kind: 'MISS' }] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE' });
+    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE', stage: 'LOOKUP' });
+    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [{ fingerprint: 'a'.repeat(64), kind: 'MISS' }] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE', stage: 'LOOKUP' });
   });
 
   it('rejects two different IDs from one provider presented as one identity', () => {
@@ -46,7 +46,7 @@ describe('minimal collective lookup boundary', () => {
   });
 
   it('keeps a failed lookup retryable while a disabled collective remains optional', async () => {
-    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => { throw new Error('offline'); } }, artifact, hydration)).toEqual({ kind: 'RETRYABLE' });
+    expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => { throw new Error('offline'); } }, artifact, hydration)).toEqual({ kind: 'RETRYABLE', stage: 'LOOKUP' });
     expect(await resolveFavoriteCollectiveIdentity(undefined, artifact, hydration)).toEqual({ kind: 'MISS' });
   });
 });

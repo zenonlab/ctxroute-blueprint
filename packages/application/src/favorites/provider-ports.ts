@@ -10,6 +10,7 @@ export class FavoriteProviderRetryError extends Error {
 }
 
 export interface FavoriteProviderSearchQuery {
+  readonly explicitProviderReference?: FavoriteProviderReference;
   readonly cursor?: string;
   readonly limit: number;
   readonly provider: ResolutionProvider;
@@ -53,6 +54,7 @@ export function routeFavoriteProviderTiers(mediaKind: FavoriteMediaKind): readon
 }
 
 export function assertFavoriteProviderSearchQuery(query: FavoriteProviderSearchQuery): FavoriteProviderSearchQuery {
+  if (query.explicitProviderReference !== undefined && (query.explicitProviderReference.provider !== query.provider || !/^[A-Za-z0-9-]{1,128}$/u.test(query.explicitProviderReference.externalId))) throw new TypeError('Invalid exact provider search reference.');
   if (!['anilist', 'kitsu-anime', 'kitsu-manga', 'mangadex', 'mangaupdates'].includes(query.provider)) throw new TypeError('provider search accepts only a resolution provider.');
   if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > providerCandidateLimit) throw new RangeError(`provider search limit must be between 1 and ${providerCandidateLimit}.`);
   if (query.titles.length < 1 || query.titles.length > favoriteAliasLimit) throw new RangeError(`provider search requires between 1 and ${favoriteAliasLimit} titles.`);

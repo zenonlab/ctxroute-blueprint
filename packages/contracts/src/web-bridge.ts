@@ -3,7 +3,7 @@ import { z } from 'zod';
 const workIdSchema = z.string().regex(/^work_[a-z0-9_]+$/u);
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
 
-export const webProtocolVersion = 3 as const;
+export const webProtocolVersion = 4 as const;
 export const webBridgeMessageLimit = 64 * 1024;
 export const webBridgeSessionDurationMs = 60_000;
 
@@ -39,17 +39,19 @@ export const webLibraryItemSchema = z.object({
   canonicalUrl: z.string().url().max(2048).optional(),
   chapterCount: z.number().int().nonnegative().optional(),
   coverAttribution: boundedText(120).optional(),
+  coverFallbackUrl: z.string().url().max(4096).optional(),
   coverUrl: z.string().url().max(4096).optional(),
   editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
   endYear: z.number().int().min(1800).max(3000).optional(),
   episodeCount: z.number().int().nonnegative().optional(),
   format: boundedText(120).optional(),
   genres: z.array(boundedText(120)).max(16).optional(),
-  mediaKind: z.enum(['anime', 'manga']),
+  mediaKind: z.enum(['anime', 'manga', 'unknown']),
   popularity: z.object({ kind: z.enum(['MEMBERS', 'RANK']), value: z.number().int().nonnegative() }).strict().optional(),
   progress: z.object({ kind: z.enum(['episode', 'chapter', 'volume']), maximum: z.number().nonnegative().optional(), value: z.number().nonnegative() }).strict().optional(),
   progressLabel: boundedText(80).optional(),
   provider: boundedText(120).optional(),
+  resolutionState: z.enum(['preparation', 'ready', 'retryable', 'review']),
   sourceUrl: z.string().url().max(2048).optional(),
   startYear: z.number().int().min(1800).max(3000).optional(),
   title: boundedText(240),

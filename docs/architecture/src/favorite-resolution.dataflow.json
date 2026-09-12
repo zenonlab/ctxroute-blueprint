@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction v3",
+    "title": "TobiRink — résolution et reconstruction 1.0.16",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -20,7 +20,7 @@
           "parseArtifact",
           "titleMatcher"
         ],
-        "note": "Règles versionnées : origine exacte et segments bornés, sans code distant. URL, titre, saison et progression restent séparés."
+        "note": "Routes bornées, pagination complète et références croisées publiques validées avant hydratation exacte."
       },
       {
         "id": "durable-resolution",
@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "MangaDex tente MU avant commit et conserve les références; MU 405 utilise sa recherche bornée sur l’ID exact."
+        "note": "D1 et résolution partagent l’hydratation; MU 405 reprend sa recherche paginée sur ID exact."
       },
       {
         "id": "bounded-convergence",
@@ -42,9 +42,10 @@
           "sourceEvidence",
           "durableQueue",
           "providerAdapters",
-          "privateStore"
+          "privateStore",
+          "localDiagnostics"
         ],
-        "note": "IndexedDB privé : titres, facettes et jaquettes attribuées; covers et projection avancent par curseur borné."
+        "note": "Checkpoints distincts; titres locaux visibles avant hydratation; le réveil MV3 reprend la prochaine page durable."
       },
       {
         "id": "cover-rights",
@@ -56,7 +57,7 @@
           "rightsGate",
           "coverR2"
         ],
-        "note": "Deux chemins séparés : référence fournisseur locale allowlistée, ou master R2 uniquement après preuve de droits au gate opérationnel."
+        "note": "Cover fournisseur puis un essai R2 par ID public; association ID→master à l’ingestion opérationnelle uniquement."
       },
       {
         "id": "recovery-collective",
@@ -133,7 +134,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "identités prouvées · 8 tâches"
+      "tag": "pages atomiques · échéance indexée"
     },
     {
       "id": "providerAdapters",
@@ -169,7 +170,17 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "catalogue complet · WebBridge borné"
+      "tag": "titres locaux puis Work hydraté"
+    },
+    {
+      "id": "localDiagnostics",
+      "type": "database",
+      "label": "Diagnostic local",
+      "stage": 4,
+      "row": 4,
+      "yOffset": 270,
+      "width": 150,
+      "tag": "100 événements · verrou exact"
     },
     {
       "id": "syncedIds",
@@ -188,7 +199,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "clé hachée / owner"
+      "tag": "clé hachée / owner · diagnostic borné"
     },
     {
       "id": "collectiveD1",
@@ -358,6 +369,17 @@
       "variant": "security"
     },
     {
+      "from": "durableQueue",
+      "to": "localDiagnostics",
+      "label": "phases + compteurs",
+      "classification": "local borné sans contenu",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [[530, 820], [840, 820], [840, 883]],
+      "labelAt": [700, 805]
+    },
+    {
       "from": "collectiveWorker",
       "to": "collectiveD1",
       "label": "SQL préparé",
@@ -404,10 +426,12 @@
       "dot": "cyan",
       "title": "Convergence MV3 bornée",
       "items": [
-        "Source et artefact atomiques; lien ordinaire terminal sans réseau",
+        "Routes Comix manga; source et artefact atomiques",
         "Curseurs, reçus et cadences survivent à MV3",
+        "Inventaire puis présence: pages et checkpoints atomiques",
+        "Alarme nommée restaurée à chaque réveil MV3; aucun runner concurrent",
         "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
-        "Panne ou réponse incomplète reste RETRYABLE",
+        "API MU sans Origin; panne, 403 ou page incomplète : RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"
       ]
     },

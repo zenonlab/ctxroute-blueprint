@@ -6,8 +6,8 @@ import type { FavoriteSourceAdapter } from './source-evidence';
 const segmentText = z.string().min(1).max(80).regex(/^[\p{L}\p{N}._-]+$/u);
 const segmentSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('literal'), values: z.array(segmentText).min(1).max(16) }),
-  z.strictObject({ kind: z.literal('identity') }),
-  z.strictObject({ kind: z.literal('number'), prefix: segmentText.optional(), maximum: z.number().int().min(1).max(100_000) }),
+  z.strictObject({ kind: z.literal('identity'), prefix: z.literal('opaque-5').optional() }),
+  z.strictObject({ kind: z.literal('number'), prefix: segmentText.optional(), format: z.literal('id-chapter').optional(), maximum: z.number().int().min(1).max(100_000) }),
 ]);
 const ruleSchema = z.strictObject({
   id: z.string().min(1).max(100), identitySegment: z.number().int().min(0).max(7),
@@ -33,6 +33,11 @@ type Segment = z.infer<typeof segmentSchema>;
 type MutableSourceEvidence = { -readonly [Key in keyof SourceEvidence]: SourceEvidence[Key] };
 
 function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: string): number | undefined {
+  if (segment.format === 'id-chapter') {
+    const match = /^\d{1,12}-chapter-(\d{1,6}(?:\.\d{1,3})?)$/u.exec(value);
+    const number = match === null ? NaN : Number(match[1]);
+    return number >= 0 && number <= segment.maximum ? number : undefined;
+  }
   const prefix = segment.prefix ?? '';
   if (!value.startsWith(prefix)) return undefined;
   const raw = value.slice(prefix.length);
@@ -44,6 +49,7 @@ function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: strin
 function matches(segment: Segment, value: string): boolean {
   if (segment.kind === 'literal') return segment.values.includes(value);
   if (segment.kind === 'number') return numberValue(segment, value) !== undefined;
+  if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{5}-.{2,250}$/u.test(value)) return false;
   return value.length >= 2 && value.length <= 256 && /\p{L}/u.test(value) && !/[\s/?#\\]/u.test(value);
 }
 
@@ -56,13 +62,15 @@ export function createFavoriteSiteAdapters(input: FavoriteSiteRules): readonly F
         && rule.segments.every((segment, index) => matches(segment, url.decodedSegments[index] ?? '')));
       const rule = applicable[0];
       if (applicable.length !== 1 || rule === undefined) return undefined;
-      const slug = url.decodedSegments[rule.identitySegment];
-      if (slug === undefined) return undefined;
+      const rawSlug = url.decodedSegments[rule.identitySegment];
+      if (rawSlug === undefined) return undefined;
+      const identitySegment = rule.segments[rule.identitySegment];
+      const slug = identitySegment?.kind === 'identity' && identitySegment.prefix === 'opaque-5' ? rawSlug.slice(6) : rawSlug;
       const title = slug.replace(/[-_.]+/gu, ' ').trim();
       const evidence: MutableSourceEvidence = {
         aliases: [{ provenance: 'stable-url-slug', value: title }], canonicalUrl: `${origin}/${url.rawSegments.slice(0, rule.identitySegment + 1).join('/')}`,
         diagnostics: [], key: source.sourceKey, mediaKind: rule.mediaKind, origin, path: url.pathname,
-        proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug: slug, sourceAdapter: `site-rules-v${snapshot.version}:${rule.id}`,
+        proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: `site-rules-v${snapshot.version}:${rule.id}`,
         stableSlug: slug, strategy: 'exact-origin', title,
       };
       if (rule.seasonSegment !== undefined) {
@@ -89,12 +97,19 @@ const catalogue = { kind: 'literal', values: ['catalogue'] } as const;
 const identity = { kind: 'identity' } as const;
 const language = { kind: 'literal', values: ['vf', 'vostfr', 'vo'] } as const;
 export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSchema.parse({
-  schemaVersion: 1, version: 1,
-  rules: ['https://anime-sama.fr', 'https://anime-sama.si'].flatMap((origin, index) => [
+  schemaVersion: 1, version: 2,
+  rules: [...['https://anime-sama.fr', 'https://anime-sama.si'].flatMap((origin, index) => [
     { id: `anime-sama-${index}-identity`, identitySegment: 1, mediaKind: 'UNKNOWN', origin, segments: [catalogue, identity] },
     ...[false, true].flatMap((withLanguage) => [
       { id: `anime-sama-${index}-anime-${withLanguage}`, identitySegment: 1, mediaKind: 'ANIME', origin, seasonSegment: 2, segments: [catalogue, identity, { kind: 'number', maximum: 99, prefix: 'saison' }, ...(withLanguage ? [language] : [])] },
       { id: `anime-sama-${index}-scan-${withLanguage}`, identitySegment: 1, mediaKind: 'MANGA', origin, segments: [catalogue, identity, { kind: 'literal', values: ['scan', 'scans'] }, ...(withLanguage ? [language] : [])] },
     ]),
   ]),
+  ...[false, true].map((withChapter) => {
+    const rule = {
+      id: `comix-title-${withChapter}`, origin: 'https://comix.to', identitySegment: 1, mediaKind: 'MANGA',
+      segments: [{ kind: 'literal', values: ['title'] }, { kind: 'identity', prefix: 'opaque-5' }, ...(withChapter ? [{ kind: 'number', format: 'id-chapter', maximum: 100_000 }] : [])],
+    };
+    return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
+  })],
 });

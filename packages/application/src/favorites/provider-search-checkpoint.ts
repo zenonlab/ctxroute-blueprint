@@ -7,13 +7,15 @@ import type { DurableTask } from '../tasks/task-state';
 import { inspectFavoriteTitleCandidates } from './provider-matcher';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPage, favoriteProviderPolicy } from './provider-ports';
-import type { FavoriteProviderCandidatePort, ResolutionProvider } from './provider-ports';
+import type { FavoriteProviderCandidatePort, FavoriteProviderSearchQuery, ResolutionProvider } from './provider-ports';
 
 const levels = ['source-id', 'source-url', 'ordered-exact', 'explicit-season', 'reordered-significant-words', 'bounded-edit-distance'] as const;
 const text = z.string().min(1).max(1024);
 const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
+type MutableProviderSearchQuery = { -readonly [Key in keyof FavoriteProviderSearchQuery]: FavoriteProviderSearchQuery[Key] };
 export const providerCandidateSchema = z.strictObject({
+  linkedReferences: z.array(z.strictObject({ provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']), externalId: text })).max(5).optional(),
   canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(16).optional(), externalId: text,
   cover: z.strictObject({ attribution: z.string().trim().min(1).max(120), url: z.url().max(32 * 1024) }).optional(),
   displayTitle: text.optional(),
@@ -26,8 +28,9 @@ export const providerCandidateSchema = z.strictObject({
   season: z.number().int().positive().optional(),
   titleVariants: z.array(z.strictObject({ language: z.string().trim().min(1).max(120).optional(), title: text })).max(16).optional(),
   titles: z.array(text).min(1).max(16),
-}).transform(({ canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
+}).transform(({ linkedReferences, canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
   const value: MutableProviderCandidate = candidate;
+  if (linkedReferences !== undefined) value.linkedReferences = linkedReferences;
   if (canonicalUrl !== undefined) value.canonicalUrl = canonicalUrl;
   if (categories !== undefined) value.categories = categories;
   if (cover !== undefined) value.cover = cover;
@@ -49,6 +52,7 @@ export const providerCandidateSchema = z.strictObject({
   return createProviderCandidate(value, value.provider);
 });
 export const favoriteSearchCheckpointSchema = z.strictObject({
+  purpose: z.enum(['resolution', 'metadata']).optional(), queryDigest: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
   candidates: z.array(providerCandidateSchema).max(20), complete: z.boolean(), cursor: z.string().min(1).max(20).optional(),
   digest: z.string().min(1).max(128), level: z.enum(levels), pages: z.number().int().min(0).max(1000),
   provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']),
@@ -68,16 +72,20 @@ export async function searchFavoriteProviderPage(
   port: FavoriteProviderCandidatePort, query: FavoriteTitleMatchQuery, provider: ResolutionProvider, limit: number,
   checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<FavoriteProviderSearchStep> {
-  if (checkpoints === undefined) return { kind: 'ENVELOPE', envelope: await port.search({ limit, provider, titles: query.sourceTitles }) };
+  const base: MutableProviderSearchQuery = { limit, provider, titles: query.sourceTitles };
+  if (query.explicitProviderReference?.provider === provider) base.explicitProviderReference = query.explicitProviderReference;
+  if (checkpoints === undefined) return { kind: 'ENVELOPE', envelope: await port.search(base) };
   const stored = await checkpoints.read(provider);
+  const queryBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(query)));
+  const queryDigest = [...new Uint8Array(queryBytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
   const age = stored === undefined ? -1 : checkpoints.now() - stored.startedAt;
-  const previous = stored !== undefined && age >= 0 && age <= favoriteProviderPolicy.positiveTtlMs ? stored : undefined;
+  const previous = stored !== undefined && stored.queryDigest === queryDigest && age >= 0 && age <= favoriteProviderPolicy.positiveTtlMs ? stored : undefined;
   if (previous?.complete) return { kind: 'ENVELOPE', envelope: createProviderCandidateEnvelope({ candidates: previous.candidates, complete: true, digest: previous.digest, provider, truncated: false }) };
   if ((previous?.pages ?? 0) >= 1000) throw new Error('PROVIDER_PAGINATION_BUDGET_EXHAUSTED');
   const titleIndex = previous?.titleIndex ?? 0;
   const title = query.sourceTitles[titleIndex];
   if (title === undefined) throw new Error('STALE_SEARCH_CHECKPOINT');
-  const search = { limit, provider, titles: [title] };
+  const search = { ...base, titles: [title] };
   const page = await port.search(previous?.cursor === undefined ? search : { ...search, cursor: previous.cursor });
   if (page.provider !== provider || page.candidates.length > limit || (page.complete && (page.truncated || page.nextCursor !== undefined))) throw new Error('INVALID_PROVIDER_PAGE');
   if (!page.complete && page.nextCursor === undefined) return { kind: 'ENVELOPE', envelope: page };
@@ -97,7 +105,7 @@ export async function searchFavoriteProviderPage(
   const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([previous?.digest ?? '', page.digest, candidates])));
   const digest = [...new Uint8Array(digestBytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const next = {
-    candidates, complete, digest, level: levels[Math.min(nextLevel, previousLevel)], pages: (previous?.pages ?? 0) + 1,
+    candidates, complete, digest, queryDigest, level: levels[Math.min(nextLevel, previousLevel)], pages: (previous?.pages ?? 0) + 1,
     provider, startedAt: previous?.startedAt ?? checkpoints.now(), titleIndex: completedTitle && !complete ? titleIndex + 1 : titleIndex, version: 1,
   };
   const checkpoint = favoriteSearchCheckpointSchema.parse(page.nextCursor === undefined ? next : { ...next, cursor: page.nextCursor });
@@ -105,7 +113,7 @@ export async function searchFavoriteProviderPage(
   return complete ? { kind: 'ENVELOPE', envelope: createProviderCandidateEnvelope({ candidates, complete: true, digest, provider, truncated: false }) } : { kind: 'PAGE_PENDING' };
 }
 
-export function createFavoriteSearchCheckpointPort(storage: StoragePort, task: DurableTask, token: string, now: () => string): FavoriteSearchCheckpointPort {
+export function createFavoriteSearchCheckpointPort(storage: StoragePort, task: DurableTask, token: string, now: () => string, purpose: 'resolution' | 'metadata' = 'resolution'): FavoriteSearchCheckpointPort {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
   let writes: Promise<void> = Promise.resolve();
   return {
@@ -113,7 +121,7 @@ export function createFavoriteSearchCheckpointPort(storage: StoragePort, task: D
     async read(provider) {
       const record = await storage.getFavoriteParseArtifact(payload.sourceId);
       if (record?.artifact.semanticFingerprint !== payload.semanticFingerprint) throw new Error('STALE_PRIVATE_REFERENCE');
-      const checkpoint = record.searchCheckpoints?.find((item) => item.provider === provider);
+      const checkpoint = record.searchCheckpoints?.find((item) => item.provider === provider && (item.purpose ?? 'resolution') === purpose);
       return checkpoint === undefined ? undefined : favoriteSearchCheckpointSchema.parse(checkpoint);
     },
     save(checkpoint) {
@@ -122,7 +130,7 @@ export function createFavoriteSearchCheckpointPort(storage: StoragePort, task: D
         const current = await session.getFavoriteResolutionTask(task.id);
         if (record?.artifact.semanticFingerprint !== payload.semanticFingerprint || current?.claimToken !== token || current.state !== 'CLAIMED'
           || current.idempotencyKey !== task.idempotencyKey || current.claimExpiresAt === undefined || current.claimExpiresAt <= now()) throw new Error('STALE_PRIVATE_REFERENCE');
-        const searchCheckpoints = [...(record.searchCheckpoints ?? []).filter((item) => item.provider !== checkpoint.provider), checkpoint];
+        const searchCheckpoints = [...(record.searchCheckpoints ?? []).filter((item) => item.provider !== checkpoint.provider || (item.purpose ?? 'resolution') !== purpose), { ...checkpoint, purpose }];
         await session.putFavoriteParseArtifact({ ...record, searchCheckpoints });
       }));
       return writes;

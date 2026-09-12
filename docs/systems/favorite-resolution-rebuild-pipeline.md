@@ -27,6 +27,61 @@ sont historiques et ne décrivent plus le manifest installé.
 
 ## État implémenté vérifié
 
+### Correctif de livraison 1.0.9
+
+Le contrôle dans Chrome a montré que MangaDex renvoie une image promotionnelle
+avec HTTP 200 lorsque le référent est le site. Les cartes demandent les images
+avec `referrerPolicy="no-referrer"` pour ne pas transmettre la navigation privée.
+Un échec de chargement affiche le placeholder accessible. Une URL présente ou
+un HTTP 200 ne suffisent pas à certifier visuellement une couverture.
+
+La préférence MangaUpdates réutilise le matcher : enveloppe complète,
+identité unique compatible et aucun choix par ordre API ou disponibilité d’image.
+Une réparation ne remplace pas une jaquette existante par un candidat sans image.
+Les anciens blocages sont repris une fois avec un reçu conservant les données
+précédentes; les décisions humaines restent protégées. Une panne répétée garde
+une échéance de reprise avec délai plafonné au lieu d’arrêter définitivement la file.
+Une restauration sync indisponible ne bloque plus les favoris locaux déjà importés.
+Le repli HTTP 405 MangaUpdates conserve l’ID exact aussi après une recherche par
+titre ou un alias local; une page incomplète ne peut pas prouver un introuvable.
+Le test navigateur multi-fournisseurs lit la version courante du paquet et
+vérifie les images décodées ainsi que l’absence de référent.
+
+### Diagnostic du fallback MangaDex systématique
+
+Le 11 septembre 2026, une recherche publique MangaUpdates répond 403 avec
+un Origin d'extension et 200 sans Origin. Le manifeste FavLib embarquait une
+règle déclarative supprimant cet en-tête pour l'API MangaUpdates; TobiRink
+l'avait omise. Le résolveur aggravait ce défaut en passant au fournisseur
+suivant sur tout HTTP 403. La règle locale est restaurée, sans relais Worker,
+et les refus restent RETRYABLE. Le test installé active et désactive la règle
+dans un profil Chromium isolé et reproduit 403 puis 200 avec 25 résultats.
+
+Le décodage réel a aussi révélé des URL de couverture `null` dans une page
+de résultats. Ces absences sont acceptées sans perdre les identités de la page;
+le contrat de candidat continue à omettre la couverture indisponible.
+Les œuvres MangaDex déjà stockées ne sont pas supprimées par ce correctif.
+Le rapprochement existant reste conservateur, et ne remplace pas une migration
+complète des choix automatiques antérieurs. La vérification de la bibliothèque
+privée installée reste distincte de ces tests de transport et de résolution.
+
+### Routes Comix et panne de la lane anime
+
+La forme Comix `/title/identifiant-titre/identifiant-chapter-numéro` était
+rejetée par l'analyse générique; la fiche sans chapitre gardait UNKNOWN et
+son préfixe opaque dans le titre. Les règles embarquées v2 déclarent ces deux
+routes comme MANGA, retirent seulement le préfixe opaque de cinq caractères
+du slug recherché et conservent l'URL canonique exacte. Les chapitres zéro
+et décimaux restent des progressions, les nombres du titre restent intacts.
+Les pages de collection ne deviennent pas des œuvres.
+
+Un rescan des anciennes sources UNSUPPORTED change leur fingerprint et les
+réenfile sans suppression ni Review artificielle. Un cache propriétaire de
+règles plus ancien ne peut pas remplacer la version embarquée. Le parcours
+installé utilise une URL Comix synthétique et refuse une recherche anime de
+ce titre afin de détecter une régression de classification.
+
+
 Le runtime actuel possède déjà des fondations réutilisables :
 
 - `WebExtensionBookmarkImportAdapter` parcourt l’arbre avec
@@ -38,8 +93,8 @@ Le runtime actuel possède déjà des fondations réutilisables :
 - les lectures `FavoriteSource` et `Review` sont paginées et limitées à 100;
 - Review limite une réponse à six candidats et son client HTTP refuse les
   réponses supérieures à 64 Kio;
-- le WebBridge v3 limite les parcours Bibliothèque à 500 œuvres, les pages à
-  24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
+- le WebBridge v4 parcourt toute la Bibliothèque par lectures locales de 100,
+  limite les pages à 24, Agenda à 100 entrées et ses enveloppes à 64 Kio;
 - les modules purs `title-segmentation`, `season-extraction`,
   `progression-extraction` et `favorite-parser` produisent désormais l’artefact
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
@@ -245,7 +300,7 @@ Review. Une purge future demanderait une action produit séparée et explicite.
 
 ### 6. Réserver et router la résolution
 
-Le runner réclame au plus huit tâches dues et s’arrête après 20 secondes par
+Le runner réclame au plus 100 tâches dues et s’arrête après 20 secondes par
 réveil. Le claim de 60 secondes, son expiration et l’`idempotencyKey` sont
 persistés avant l’effet. Le routeur applique l'ordre du plan v3 : ID URL, règle exacte origine/route,
 artefact/aliases, fiche hydratée, D1 owner-scoped via Worker, recherche locale,
@@ -253,6 +308,12 @@ puis Review terminale seulement. AniList anime et MangaUpdates manga sont
 prioritaires; Kitsu suit seulement NO_MATCH complet. MangaDex reste exact/sorties.
 Type inconnu : deux lanes indépendantes, ambiguïté inter-types explicite.
 Panne, 429, timeout ou ensemble incomplet ne déclenche aucun arbitre suivant.
+
+La surface Options lit aussi le nombre de sources observées et le checkpoint
+d’inventaire (`not-started`, `active` ou `complete`). « Actualiser l’état » ne
+fait qu’une lecture. « Relancer l’analyse » est une commande séparée, acceptée
+uniquement depuis la page Options de l’extension; elle exécute un passage borné,
+répare la projection puis renvoie les compteurs actualisés.
 
 Les ports candidats/hydratation restent séparés et DTO Zod stricts. La décision
 pure applique ID, URL, exact, saison, tokens, distance sans score de popularité.
@@ -330,17 +391,22 @@ change ni l’identité ni la progression calculées par le parser favori.
 
 Les cas d’usage locaux construisent ensuite :
 
-- Bibliothèque à partir de la bibliothèque, des `Work`, de leurs métadonnées
-  d'affichage et progressions locales;
+- Bibliothèque à partir des `FavoriteSource` observées et artefacts titrés dès
+  l’import, puis des `Work`, métadonnées d'affichage et progressions locales;
 - Review à partir des seules pending AMBIGUOUS/NOT_FOUND et de leurs preuves;
 - Agenda à partir des entrées locales dans la semaine demandée;
-- WebBridge v3 à partir de ces projections sérialisées et validées. Sa page
+- WebBridge v4 à partir de ces projections sérialisées et validées. Sa page
   Bibliothèque transporte les facettes, tris, statistiques, jaquettes
   attribuées, progression structurée et source nécessaires à l'affichage.
   Elle ne transporte ni dossier de favoris, ni décision, ni secret.
 
-Une `Work` absente produit un état partiel. Une lecture UI ne déclenche aucun
-réseau et ne remplace aucune donnée manquante par une fixture.
+Une `Work` absente ne masque plus une identité locale parsée. Le catalogue
+projette une entrée déterministe `preparation`, `retryable` ou `review`, sans
+la persister comme œuvre ni lui inventer un fournisseur. Le type inconnu reste
+`unknown`. Une source détachée, `UNSUPPORTED` ou sans identité exploitable reste
+hors bibliothèque. Quand le `Work` résolu existe, la même lecture retire
+l’entrée provisoire et conserve une seule œuvre. Une lecture UI ne déclenche
+aucun réseau et ne remplace aucune donnée manquante par une fixture.
 
 Le commit `RESOLVED` écrit atomiquement la `Work`, son association à la
 `FavoriteSource` et la progression chapitre, épisode ou volume extraite du
@@ -439,19 +505,19 @@ central ne décide silencieusement entre deux analyses.
 | Parser | brut + preuves → artefact | 64 Kio, 64 transformations, 32 diagnostics | motif stable, aucune exception opaque | empreinte sémantique | matrice P à R + oracle profond |
 | Import | artefact → source et tâche sans Review | 100/transaction | rollback transactionnel | ID source + empreinte | relecture et décision existante |
 | Claim | tâches dues → tâches réservées | 8/20 s, claim 60 s | expiration durable | clé unique d’effet | deux workers, lanes isolées, claim expiré |
-| Transport | requête publique → enveloppe complète | 20 candidats, 64 Kio, 8 s | tronqué fail-closed, erreur typée | clé tâche + requête | timeout, 403, 429, JSON invalide, page manquante |
+| Transport | requête publique → enveloppe complète | 20 candidats, 512 Kio, 8 s | tronqué fail-closed, erreur typée | clé tâche + requête | timeout, 403, 429, JSON invalide, page manquante |
 | Matcher | artefact + candidats → décision | 20 | ambiguïté explicite | fonction pure | permutations et égalités |
 | Review | décision → choix confirmé | 6 candidats, 100 pending | conflit de révision | review + révision + choix | stale, skip, no-match, resolve |
-| Hydratation | ID exact → `Work` | 1 fiche, 64 Kio, 8 s | retry sans rematch | fournisseur + ID + version | replay après commit réseau |
+| Hydratation | ID exact → `Work` | 1 fiche, 512 Kio, 8 s | retry sans rematch | fournisseur + ID + version | replay après commit réseau |
 | Langue locale | document déjà observé → preuve | 24 déclarations, 160 caractères, texte ≥ 80 | `undetected` ou `ambiguous` | entrée + version analyseur | L-01 à L-05 |
 | Taxonomie | fiche hydratée → admissible/bloquée | listes fermées versionnées | blocage éditorial explicite | fiche + version politique | C-01/C-02 |
-| Projection | stores → snapshot UI | 24/500/100, 64 Kio | état partiel | lecture pure | limites, données manquantes, vide |
+| Projection | stores → snapshot UI | 100/transaction, 24/page, 64 Kio | reprise au prochain rafraîchissement | lecture pure | 1 400 œuvres, données manquantes, vide |
 | Réconciliation | pages locales → tâches manquantes | 100/page, 8 créées/réveil | curseur durable | index uniques | interruption à chaque checkpoint |
 
 Les limites nouvelles sont normatives : 8 secondes par requête, 20 candidats,
 8 tâches et 20 secondes par réveil, claim de 60 secondes, huit tentatives,
 backoff de 30 secondes à 6 heures, AniList 2 200 ms, MangaUpdates 3 000 ms et
-batch AniList de 50. Les limites déjà actives de 100, 6, 24, 500 et 64 Kio ne
+batch AniList de 50. Les limites déjà actives de 100, 6, 24 et 64 Kio ne
 doivent pas être dupliquées sous forme de constantes concurrentes.
 
 L’outbox conserve l’artefact courant et au plus son prédécesseur par source;
@@ -511,18 +577,21 @@ stack, ni titre privé, ni URL privée.
 
 ### Première installation — cible après durcissement d’inventaire
 
-Le background ouvre Dexie, crée une session d’inventaire par dossiers, traite
-les tranches, importe chaque source et laisse la file reprendre la résolution. L’UI peut
-afficher séparément import en cours, bibliothèque vide réelle et Review en
-attente. Elle ne prétend pas que l’analyse est terminée avant le dernier
-checkpoint.
+Le background ouvre Dexie, crée une session d’inventaire par dossiers et traite
+huit unités de travail au maximum. Les lots `inventory` importent 100 favoris;
+les pages `presence` vérifient 100 sources. Le dernier lot navigateur ouvre la
+phase de présence et seule la transaction de la dernière page écrit `complete`.
+Options explique lecture, vérification de présence, identification et demandes
+humaines, affiche la prochaine reprise et permet de reprendre sans recommencer
+une phase active.
 
 ### Modification ou déplacement — cible après durcissement d’inventaire
 
-L’événement relit seulement le favori concerné. Un titre, une URL, un chemin ou
-un ordre modifié met à jour la source. Seule une modification qui change
-l’empreinte de parsing invalide la résolution automatique; un déplacement de
-dossier ne relance pas un fournisseur.
+L’événement est d’abord journalisé dans IndexedDB, puis force un nouvel
+inventaire borné et reprenable de l’autorité navigateur. Un titre, une URL, un
+chemin ou un ordre modifié met à jour la source. Seule une modification qui
+change l’empreinte de parsing invalide la résolution automatique; un déplacement
+de dossier ne relance pas un fournisseur.
 
 ### Suppression navigateur
 
@@ -534,7 +603,15 @@ réactive la source sans perdre l’historique.
 
 Chaque étape reprend depuis IndexedDB. Hors ligne, aucune donnée autoritaire
 n’est effacée et les tâches réseau reçoivent une échéance. Le runner s’arrête
-après son lot, programme une alarme et libère le service worker.
+après son lot puis lit, par index composé et sans scan, la première échéance
+READY, RETRY_AT ou CLAIMED expirée. Il programme une alarme ponctuelle nommée à
+cette date avec un plancher de 30 secondes et libère le service worker. Le même
+nom remplace toute reprise déjà programmée; l’absence de tâche efface l’alarme.
+Chaque nouvelle évaluation du service worker répare cette alarme depuis le
+checkpoint et les index de l’outbox. Le réveil périodique des notifications ne
+résout rien : il vérifie seulement cette programmation et la recrée si besoin.
+Le diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
+actif ou qu’une tâche présente ou différée subsiste.
 
 ### Retry manuel
 
@@ -750,9 +827,9 @@ consumer ni de Cron pour les tâches privées; ses routes `/v2/favorites/*`
 concernent le collectif owner-scoped et la distribution des règles. Un réveil
 du background effectue l'inventaire puis une seule tranche de huit tâches, ce
 qui explique un compteur élevé de sources « en cours » après un import massif.
-La correction doit séparer les curseurs d'inventaire et de résolution, drainer
-des tranches successives dans le budget du réveil et persister une continuation
-jusqu'à épuisement des tâches dues.
+Les curseurs d’inventaire et de présence, la tranche de résolution et l’alarme
+ponctuelle sont désormais séparés et persistés. Depuis la 1.0.16, ces tâches
+restantes n’empêchent plus les titres parsés d’apparaître dans la bibliothèque.
 
 L'inspection D1 en lecture seule du 2026-09-11 indique zéro règle publiée,
 zéro propriétaire et zéro installation. Tant qu'un document de règles validé
@@ -767,6 +844,98 @@ réserve `UNSUPPORTED` aux routes utilitaires, ressources ordinaires ou
 identités réellement inexploitable.
 
 ## Définition de terminé
+
+### Diagnostic verrouillé de la file
+
+La version 1.0.15 relie les phases `inventory` et `presence` à une continuation
+MV3 durable. Chaque réveil consomme au plus huit pages locales de 100 éléments;
+la résolution traite ensuite au plus 100 tâches ou 20 secondes. La page de
+présence et son checkpoint sont atomiques. Une fois `complete`, les réveils
+fournisseurs réutilisent l’inventaire sans rescanner les favoris. Installation,
+mise à jour, démarrage et mutation forcent un nouvel inventaire. Une action
+manuelle reprend le checkpoint actif ou vérifie à nouveau un état complet.
+L’outbox choisit sa première échéance par trois lectures indexées bornées;
+`tobirink-favorite-resolution-continuation-v1` est restaurée à chaque démarrage
+du service worker et contrôlée par le réveil périodique sans appel fournisseur.
+
+La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
+événements structurés uniquement avec la valeur exacte `worker-v1`; ils
+contiennent famille de route, méthode réduite, statut, durée bornée et ID de
+corrélation. L'extension conserve localement au plus 100 phases de traitement
+uniquement avec la valeur exacte `extension-v1`. Options affiche son état, son
+dernier événement et permet de l'activer ou de le désactiver. Le buffer local
+n'est jamais envoyé au Worker, à D1, à `storage.sync` ou à WebBridge.
+
+Les titres, URL, dossiers, progressions, identifiants fournisseurs, corps de
+requête, erreurs brutes et secrets sont absents des deux contrats. Une panne du
+diagnostic est absorbée et ne modifie jamais le résultat de résolution.
+
+### Corrections de robustesse du 12 septembre 2026
+
+Les références provenant du collectif suivent le même chemin d'hydratation
+que les références explicites et les résultats locaux. Le secours HTTP 405
+MangaUpdates conserve l'ID exact, avance par pages avec checkpoint et ne
+transforme jamais une page incomplète en introuvable.
+Si le lookup collectif échoue, la recherche fournisseur peut avancer et
+conserver ses pages localement. Sa décision finale attend toutefois le retour
+du collectif : un choix personnel inaccessible ne doit pas être remplacé
+silencieusement. Une panne d'hydratation après un lookup réussi ne déclenche
+pas de nouvelle décision d'identité.
+
+Les erreurs internes et l'indisponibilité collective ont des motifs distincts
+des pannes fournisseurs. Une tâche valide conserve une reprise datée même
+après une erreur interne. L'échec d'inventaire reste signalé au réveil, mais
+la résolution des sources déjà importées est exécutée avant ce signalement.
+La restauration sync conserve les indices différés et poursuit les identités
+des autres fournisseurs, avec au plus deux appels d'hydratation par tranche.
+
+Les formes racine `/titre/chapter-12` et `/titre-chapter-12` apportent une
+preuve de sortie même sans catégorie. Elles restent de type inconnu en
+l'absence de règle exacte. Les liens racine ordinaires restent exclus.
+La pagination MangaDex utilise les champs officiels `limit`, `offset` et
+`total`; toute page incohérente reste réessayable. Une limite locale de
+candidats ne constitue jamais une preuve de fin de recherche.
+
+Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
+références publiques validées et utilisés pour hydrater exactement la source
+principale. Les anciens IDs décimaux ne sont pas convertis en IDs API.
+Cette préférence s'applique aux sources explicites, aliases locaux, réponses
+collectives et recherches. Chaque checkpoint est lié au digest de sa requête;
+résolution et enrichissement disposent de tranches distinctes pour les cinq
+fournisseurs. Une panne primaire conserve la reprise datée.
+
+Les réponses fournisseur sont limitées à 512 KiB, vérifiés sur les octets lus
+et l'en-tête déclaré. La limite de transport WebBridge reste 64 KiB. Une
+requête publique MangaDex de 20 résultats mesurée pendant l'audit produisait
+119 663 octets : la précédente limite de 64 KiB rejetait des pages valides.
+
+La Bibliothèque lit toutes ses identités par transactions de 100 œuvres,
+puis filtre et trie globalement avant de projeter 24 entrées. Un curseur après
+500 reste valide. Sa réparation ajoute uniquement des œuvres liées à une
+source observée résolue; une fiche issue seulement de sync reste un cache.
+Chaque lot réparé est conservé après interruption et la reprise est idempotente.
+Le site relit sa page toutes les 15 secondes lorsqu'il est visible, sans
+requête concurrente et sans appliquer une ancienne réponse après un changement
+de filtres. Les lectures portent sur l'appartenance locale au début du parcours;
+les ajouts concurrents apparaissent au rafraîchissement suivant.
+
+Le secours cover utilise `/v1/media/provider-covers/:provider/:id/cover-md`.
+L'ID public est validé avant une lecture R2 précise; aucun titre, URL de
+favori ou paramètre de téléchargement n'est accepté. L'ingestion opérationnelle
+d'un master autorisé peut associer cet ID au digest et au format du master.
+L'association JSON est limitée à 4 KiB; sa mise à jour conditionnelle sur ETag
+détecte les écritures concurrentes. Une interruption après le master se reprend
+sans réécrire celui-ci. Le Worker redirige vers ses variantes fixes existantes.
+La carte tente sa cover fournisseur puis ce secours une seule fois, conserve
+son échec lors d'un rafraîchissement et réessaie si les références changent.
+Sans association ingérée, R2 répond 404; cette correction n'affirme pas que le
+catalogue de covers est déjà peuplé ou publié.
+
+La migration de métadonnées MangaDex→MangaUpdates conserve l'identité locale
+d'une œuvre existante et ses références. La lecture suivante reconnaît la
+référence MangaDex liée dans le cache primaire, sans créer de doublon. Les
+schémas de messages Bibliothèque acceptent les compteurs et curseurs au-delà
+de 500; la limite de 24 éléments par réponse reste inchangée.
 
 La reconstruction est terminée seulement quand :
 

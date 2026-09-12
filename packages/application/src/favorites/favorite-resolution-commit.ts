@@ -67,10 +67,11 @@ export async function persistFavoriteResolutionCompletion(
         if (!candidate || source.presence !== 'observed') throw new Error('RESOLVED_REQUIRES_CURRENT_CANDIDATE');
         const id = identity?.workId ?? favoriteCandidateWorkId(candidate);
         const previous = await session.getWork(id);
-        if (identity?.workId !== undefined && !previous?.externalReferences.some((reference) => reference.provider === candidate.provider && reference.externalId === candidate.externalId)) throw new Error('STALE_WORK_IDENTITY');
+        const identities = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])];
+        if (identity?.workId !== undefined && !previous?.externalReferences.some(reference => identities.some(value => value.provider === reference.provider && value.externalId === reference.externalId))) throw new Error('STALE_WORK_IDENTITY');
         const favoriteAliasKeys = [...new Set([...(previous?.hydration?.matcherVersion === versions.matcher ? previous.hydration.favoriteAliasKeys : []), ...favoriteArtifactAliasKeys(record.artifact, candidate)])].slice(0, 64);
         const work = createWork({
-          externalReferences: [...new Map([...(previous?.externalReferences ?? []), ...(identity?.references ?? []), { externalId: candidate.externalId, provider: candidate.provider }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()],
+          externalReferences: [...new Map([...(previous?.externalReferences ?? []), ...(identity?.references ?? []), ...(candidate.linkedReferences ?? []), { externalId: candidate.externalId, provider: candidate.provider }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()],
           hydration: { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))] },
           id,
           mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',

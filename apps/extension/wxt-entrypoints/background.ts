@@ -17,8 +17,8 @@ import {
   HttpFavoriteCollectiveAdapter,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
-import { addWork, createLibrary, libraryId, workId } from '@tobirink/domain';
-import type { Work } from '@tobirink/domain';
+import { libraryId, workId } from '@tobirink/domain';
+import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-catalogue-runtime';
@@ -33,8 +33,16 @@ import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtim
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
+import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
+import { favoriteResolutionContinuationAlarmName, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
+
+interface FavoriteStatusInventory {
+  continuationAt?: string;
+  startedAt?: string;
+  status: 'not-started' | 'inventory' | 'presence' | 'complete';
+}
 
 export default defineBackground({
   type: 'module',
@@ -50,24 +58,10 @@ export default defineBackground({
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
-    const repairLibraryProjection = async () => {
-      const works: Work[] = [];
-      let afterId: Parameters<typeof privateStorage.storage.listWorks>[0]['afterId'];
-      for (let page = 0; page < 5; page += 1) {
-        const batch = await privateStorage.storage.listWorks(afterId === undefined ? { limit: 100 } : { afterId, limit: 100 });
-        works.push(...batch);
-        afterId = batch.at(-1)?.id;
-        if (batch.length < 100) break;
-      }
-      if (works.length === 0) return;
-      await privateStorage.storage.transaction(['libraries'], async (session) => {
-        let library = await session.getLibrary(primaryLibraryId) ?? createLibrary(primaryLibraryId);
-        for (const work of works) if (!library.workIds.includes(work.id)) library = addWork(library, work.id);
-        await session.putLibrary(library);
-      });
-    };
+    const repairLibraryProjection = () => repairFavoriteLibraryProjection(privateStorage.storage, primaryLibraryId);
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
+    const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
@@ -83,6 +77,24 @@ export default defineBackground({
     });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
+    const readFavoriteStatus = async () => {
+      const [counts, checkpoint, continuation] = await Promise.all([
+        privateStorage.storage.readFavoriteResolutionCounts(),
+        privateStorage.storage.getFavoriteInventoryCheckpoint(),
+        browser.alarms.get(favoriteResolutionContinuationAlarmName),
+      ]);
+      const status = checkpoint === undefined
+        ? 'not-started' as const
+        : checkpoint.status === 'complete'
+          ? 'complete' as const
+          : checkpoint.phase === 'presence'
+            ? 'presence' as const
+            : 'inventory' as const;
+      const inventory: FavoriteStatusInventory = { status };
+      if (continuation?.scheduledTime !== undefined) inventory.continuationAt = new Date(continuation.scheduledTime).toISOString();
+      if (checkpoint?.startedAt !== undefined) inventory.startedAt = checkpoint.startedAt;
+      return { counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
+    };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
       beforeInventory: async () => { await ownerRuntime?.maintain().catch(() => undefined); },
@@ -90,26 +102,33 @@ export default defineBackground({
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
+      diagnostics,
       hydration: providerPorts,
       libraryId: primaryLibraryId,
       identityRecovery,
       now,
       outbox: resolutionOutbox,
+      updateContinuation: (availableAt) => updateFavoriteResolutionContinuation(browser.alarms, availableAt),
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
     });
     browser.runtime.onInstalled.addListener(async () => {
       await ensureReminderAlarm();
+      await diagnostics.initializeEnabled().catch(() => undefined);
       await privateStorage.ensureReady();
-      await reconcileFavorites();
+      await reconcileFavorites(true);
       await repairLibraryProjection();
       await resumeNotifications();
     });
+    const restoreFavoriteWake = async () => {
+      await privateStorage.ensureReady();
+      await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);
+    };
     subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
-        void reconcileFavorites(true).catch(() => undefined);
+        void reconcileFavorites().catch(() => undefined);
       }
     });
     const resumeNotifications = async () => {
@@ -121,10 +140,11 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(), repairLibraryProjection()])).catch(() => undefined);
+      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);
+      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
+      if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
@@ -149,10 +169,17 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
-      if (parsed.data.type === 'favorite.status.read') {
+      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile' || parsed.data.type === 'favorite.diagnostics.write') {
+        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         try {
           await privateStorage.ensureReady();
-          return { ok: true, counts: await privateStorage.storage.readFavoriteResolutionCounts() };
+          if (parsed.data.type === 'favorite.reconcile') {
+            const checkpoint = await privateStorage.storage.getFavoriteInventoryCheckpoint();
+            await reconcileFavorites(checkpoint?.status !== 'active');
+            await repairLibraryProjection();
+          }
+          if (parsed.data.type === 'favorite.diagnostics.write') await diagnostics.setEnabled(parsed.data.enabled);
+          return await readFavoriteStatus();
         } catch { return { ok: false, error: 'favorite-status-unavailable' }; }
       }
       if (parsed.data.type === 'review.queue.read') {
@@ -348,5 +375,6 @@ export default defineBackground({
       }
       return { ok: true };
     });
+    void Promise.all([ensureReminderAlarm(), restoreFavoriteWake()]).catch(() => undefined);
   },
 });

@@ -6,6 +6,16 @@ const adapters = createFavoriteSiteAdapters(bundledFavoriteSiteRules);
 function evidence(url: string) { return extractFavoriteSourceEvidence({ sourceKey: 'synthetic-source', title: 'Synthetic Journey', url }, adapters); }
 
 describe('declarative site routes', () => {
+  it.each(['', '/1234567-chapter-101', '/1234567-chapter-12.5', '/1234567-chapter-0'])('extracts a Comix manga identity with route %s', (tail) => {
+    const result = evidence(`https://comix.to/title/ab123-synthetic-86-journey${tail}`);
+    expect(result).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'synthetic-86-journey', title: 'synthetic 86 journey', canonicalUrl: 'https://comix.to/title/ab123-synthetic-86-journey' });
+    expect(result.release?.value).toBe(tail === '' ? undefined : Number(tail.split('chapter-')[1]));
+  });
+
+  it.each(['https://comix.to/collections/123', 'https://comix.to/title/ab123-synthetic/123-chapter-no', 'https://comix.to/title/ab123-synthetic/123-chapter-100001', 'https://comix.to/title/ab123-synthetic/123-chapter-1/extra'])('rejects a non-work or malformed Comix route %s', (url) => {
+    expect(evidence(url).disposition).toBe('URL_IDENTITY_UNRESOLVED');
+  });
+
   it.each([
     ['saison2/vostfr', 'ANIME', 2],
     ['saison1', 'ANIME', 1],
@@ -17,7 +27,7 @@ describe('declarative site routes', () => {
     expect(result.mediaKind).toBe(mediaKind);
     expect(result.season).toBe(season);
     expect(result.stableSlug).toBe('synthetic-journey');
-    expect(result.sourceAdapter).toContain('site-rules-v1:');
+    expect(result.sourceAdapter).toContain(`site-rules-v${bundledFavoriteSiteRules.version}:`);
   });
 
   it.each(['https://www.youtube.com/watch?v=synthetic', 'https://youtube.com/shorts/synthetic', 'https://example.org/news/synthetic', 'https://anime-sama.fr/catalogue/synthetic/watch', 'https://anime-sama.fr.evil.invalid/catalogue/synthetic/saison1'])('keeps unsupported route %s out of identity resolution', (url) => {

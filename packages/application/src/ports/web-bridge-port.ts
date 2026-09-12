@@ -7,7 +7,7 @@ export interface WebBootstrapSnapshot {
   generation: number;
   libraryCount: number;
   pendingReviewCount: number;
-  protocolVersion: 3;
+  protocolVersion: 4;
 }
 
 export interface WebLibraryQuery {
@@ -40,17 +40,19 @@ export interface WebLibraryItem {
   canonicalUrl?: string;
   chapterCount?: number;
   coverAttribution?: string;
+  coverFallbackUrl?: string;
   coverUrl?: string;
   editorialStatus?: 'UPCOMING' | 'ONGOING' | 'HIATUS' | 'COMPLETED' | 'CANCELLED' | 'UNKNOWN';
   endYear?: number;
   episodeCount?: number;
   format?: string;
   genres?: readonly string[];
-  mediaKind: 'anime' | 'manga';
+  mediaKind: 'anime' | 'manga' | 'unknown';
   popularity?: Readonly<{ kind: 'MEMBERS' | 'RANK'; value: number }>;
   progress?: Readonly<{ kind: 'episode' | 'chapter' | 'volume'; maximum?: number; value: number }>;
   progressLabel?: string;
   provider?: string;
+  resolutionState: 'preparation' | 'ready' | 'retryable' | 'review';
   sourceUrl?: string;
   startYear?: number;
   title: string;

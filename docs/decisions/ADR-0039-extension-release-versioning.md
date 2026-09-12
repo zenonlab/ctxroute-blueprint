@@ -26,7 +26,16 @@ Every corrective extension build increments the extension package version
 repair, `1.0.4` for resolution during sync restoration, then `1.0.5` for
 library projection reconstruction, `1.0.6` for rejecting non-media generic
 links, `1.0.7` for explicit MangaUpdates hydration fallback, and `1.0.8` for
-excluding pre-serialization matches). The
+excluding pre-serialization matches; `1.0.9` fixes cover referrer handling,
+unique complete MangaUpdates matching and blocked-queue recovery; `1.0.10`
+restores the MangaUpdates Origin transport rule, accepts absent cover URLs
+and prevents HTTP 403 from selecting a fallback; `1.0.11` recognizes Comix
+title/chapter routes as manga and prevents cached site-rule downgrade;
+`1.0.12` restores durable recovery, honest provider pagination, primary linked
+identities, complete library projection and bounded Worker cover recovery;
+`1.0.13` exposes inventory state and a trusted bounded reconciliation action;
+`1.0.14` adds bounded, disableable local diagnostics).
+The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are
 retained unchanged. Publishing a new archive remains behind the Cloudflare

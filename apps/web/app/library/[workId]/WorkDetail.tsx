@@ -30,7 +30,8 @@ function WorkDetailSurface() {
         <WorkCard
           coverAlt={item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined}
           coverSrc={item.coverUrl}
-          context={item.mediaKind === 'anime' ? 'Anime' : 'Manga'}
+          coverFallbackSrc={item.coverFallbackUrl}
+          context={item.mediaKind === 'anime' ? 'Anime' : item.mediaKind === 'manga' ? 'Manga' : 'Type à déterminer'}
           detail={details || 'Fiche locale'}
           href={item.sourceUrl ?? item.canonicalUrl}
           indicator={item.progressLabel}

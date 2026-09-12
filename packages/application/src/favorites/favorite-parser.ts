@@ -52,7 +52,7 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
   return reconciled;
 }
 
-export function parseFavoriteObservation(observation: FavoriteObservation, evidence: SourceEvidence, sourceAdapterVersion = `source-adapter-v2:${evidence.sourceAdapter}`): FavoriteParseArtifact {
+export function parseFavoriteObservation(observation: FavoriteObservation, evidence: SourceEvidence, sourceAdapterVersion = `source-adapter-v3:${evidence.sourceAdapter}`): FavoriteParseArtifact {
   const titleAnalysis = segmentFavoriteTitle(observation.title, hostname(evidence));
   const seasonEvidence = extractFavoriteSeason(observation.title, evidence);
   const transformations = [...titleAnalysis.transformations];

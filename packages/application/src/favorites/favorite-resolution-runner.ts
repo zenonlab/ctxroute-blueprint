@@ -1,18 +1,20 @@
-import { createFavoriteSource, createWork } from '@tobirink/domain';
+import { createFavoriteSource, createProviderCandidate, createWork } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
-import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
+import { parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
-import { hasExactBlockedProviderTaxonomy } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, matchFavoriteTitles } from './provider-matcher';
+import { normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
-import { createFavoriteSearchCheckpointPort } from './provider-search-checkpoint';
+import { createFavoriteSearchCheckpointPort, searchFavoriteProviderPage } from './provider-search-checkpoint';
+import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
@@ -24,12 +26,24 @@ export const favoriteResolutionAttemptLimit = 8;
 export const favoriteResolutionMaximumBackoffMs = 6 * 60 * 60 * 1_000;
 export const favoriteResolutionTaskRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 
-export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string, afterId?: Work['id']) {
+export async function repairMissingFavoriteCovers(storage: StoragePort, hydration: FavoriteProviderHydrationPorts, now: () => string, afterId?: Work['id'], candidates?: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>) {
   const works = await storage.listWorks(afterId === undefined ? { limit: 10 } : { afterId, limit: 10 });
   let repaired = 0;
   let skipped = 0;
   for (const work of works) {
-    if (work.hydration?.candidate.cover !== undefined) { skipped += 1; continue; }
+    const currentCandidate = work.hydration?.candidate;
+    if (currentCandidate?.provider === 'mangadex' && candidates?.mangaupdates !== undefined && currentCandidate.titles.length > 0) {
+      try {
+        const preferred = await preferMangaUpdatesHydration({ candidates, hydration }, currentCandidate);
+        if (preferred.provider === 'mangaupdates' && preferred.cover !== undefined && work.hydration !== undefined) {
+          const references = [...new Map([...work.externalReferences, { provider: preferred.provider, externalId: preferred.externalId }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+          await storage.putWork(createWork({ ...work, externalReferences: references, hydration: { ...work.hydration, candidate: preferred, hydratedAt: now(), providerTitleKeys: [...new Set(preferred.titles.map((title) => normalizeFavoriteTitle(title).normalized))] } }));
+          repaired += 1;
+          continue;
+        }
+      } catch { /* keep the current provider cover when the preference lookup is unavailable */ }
+    }
+    if (currentCandidate?.cover !== undefined) { skipped += 1; continue; }
     const reference = work.externalReferences.find((item) => item.provider in hydration);
     const provider = reference === undefined ? undefined : (['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga'] as const).find((value) => value === reference.provider);
     const adapter = provider === undefined ? undefined : hydration[provider];
@@ -63,6 +77,7 @@ export interface FavoriteResolutionRunnerDependencies {
 export interface FavoriteResolutionSliceResult {
   readonly blocked: number;
   readonly completed: number;
+  readonly continuationRequired: boolean;
   readonly retried: number;
 }
 
@@ -86,12 +101,18 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   return Object.freeze([...new Set(titles)]);
 }
 
+function hydrationRetryAt(retryAt: number | undefined, now: string): number {
+  return retryAt !== undefined
+    ? Math.max(timestamp(now) + 1_000, retryAt)
+    : timestamp(now) + favoriteProviderPolicy.negativeTtlMs;
+}
+
 async function retryClaim(
   dependencies: FavoriteResolutionRunnerDependencies,
   task: DurableTask,
   token: string,
   retryAt: string,
-  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' = 'PROVIDER_UNAVAILABLE',
+  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'COLLECTIVE_UNAVAILABLE' = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
   const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
   await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
@@ -102,36 +123,49 @@ async function retryClaim(
     if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
       || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
       || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
-    await session.putFavoriteResolutionTask(exhausted ? blockTask(current, token, 'AUTOMATIC_ATTEMPT_LIMIT') : retryTask(current, token, retryAt));
+    const scheduledAt = exhausted ? new Date(Math.max(timestamp(retryAt), timestamp(dependencies.now()) + favoriteResolutionMaximumBackoffMs)).toISOString() : retryAt;
+    await session.putFavoriteResolutionTask(retryTask(current, token, scheduledAt));
     await session.putFavoriteSource(createFavoriteSource({
-      ...source, resolution: { kind: 'RETRYABLE', reason: exhausted ? 'AUTOMATIC_ATTEMPT_LIMIT' : reason },
+      ...source, resolution: { kind: 'RETRYABLE', reason },
       resolutionVersions: favoriteResolutionVersions(record.artifact),
     }));
   });
-  return exhausted ? 'blocked' : 'retried';
+  return 'retried';
 }
 
 async function preferMangaUpdatesHydration(
-  dependencies: FavoriteResolutionRunnerDependencies,
+  dependencies: Pick<FavoriteResolutionRunnerDependencies, 'candidates' | 'hydration'>,
   candidate: ProviderCandidate,
+  checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<ProviderCandidate> {
   if (candidate.provider !== 'mangadex') return candidate;
   const mangaUpdates = dependencies.candidates.mangaupdates;
   if (!mangaUpdates) return candidate;
-  try {
-    const envelope = await mangaUpdates.search({ provider: 'mangaupdates', titles: candidate.titles, limit: 6 });
-    const exact = envelope.candidates.filter((value) => value.provider === 'mangaupdates' && value.mediaKind !== 'ANIME' && !value.preSerialization);
-    if (exact.length !== 1) return candidate;
-    return exact[0]!;
-  } catch {
-    return candidate;
+  const reference = candidate.linkedReferences?.find(value => value.provider === 'mangaupdates');
+  let preferred: ProviderCandidate | undefined;
+  if (reference !== undefined) {
+    try { preferred = await dependencies.hydration.mangaupdates.hydrate(reference); }
+    catch (error) { if (!(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error; }
   }
+  if (preferred === undefined) {
+    const query: MutableFavoriteTitleMatchQuery = { sourceTitles: candidate.titles, mediaKind: candidate.mediaKind, preSerialization: false };
+    if (reference !== undefined) query.explicitProviderReference = reference;
+    const result = await searchFavoriteProviderPage(mangaUpdates, query, 'mangaupdates', 20, checkpoints);
+    if (result.kind === 'PAGE_PENDING') throw new FavoriteProviderRetryError('Primary metadata search has another page.', (checkpoints?.now() ?? Date.now()) + 1_000);
+    const decision = matchFavoriteTitles(query, [result.envelope]);
+    if (decision.kind !== 'MATCH') return candidate;
+    preferred = result.envelope.candidates.find(value => value.externalId === decision.matchedReference.externalId);
+  }
+  if (preferred === undefined) return candidate;
+  if (preferred.provider !== 'mangaupdates' || (reference !== undefined && preferred.externalId !== reference.externalId)) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+  return createProviderCandidate({ ...preferred, linkedReferences: [{ provider: 'mangadex', externalId: candidate.externalId }] }, 'mangaupdates');
 }
 
 async function hydrateExplicitReference(
   dependencies: FavoriteResolutionRunnerDependencies,
   reference: { readonly provider: ResolutionProvider; readonly externalId: string },
   artifact: FavoriteParseArtifact,
+  checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<ProviderCandidate | undefined> {
   const hydration = dependencies.hydration[reference.provider];
   if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
@@ -144,13 +178,19 @@ async function hydrateExplicitReference(
     if (reference.provider !== 'mangaupdates' || !(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error;
     const search = dependencies.candidates.mangaupdates;
     if (search === undefined) throw error;
-    const envelope = await search.search({ provider: 'mangaupdates', titles: providerTitles(artifact), limit: 20 });
-    return envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+    const result = await searchFavoriteProviderPage(search, { sourceTitles: providerTitles(artifact), explicitProviderReference: reference }, 'mangaupdates', 20, checkpoints);
+    if (result.kind === 'PAGE_PENDING') throw new FavoriteProviderRetryError('Exact identity hydration has another page.', timestamp(dependencies.now()) + 1_000);
+    const envelope = result.envelope;
+    const exact = envelope.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+    if (exact === undefined && (!envelope.complete || envelope.truncated)) throw new Error('INCOMPLETE_HYDRATION_SEARCH');
+    return exact;
   }
 }
 
 async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependencies, task: DurableTask, token: string): Promise<'blocked' | 'completed' | 'retried'> {
   const payload = parseFavoriteResolutionTaskPayload(task.payload);
+  const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
+  const metadataCheckpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now, 'metadata');
   const [source, record] = await Promise.all([
     dependencies.storage.getFavoriteSource(payload.sourceId),
     dependencies.storage.getFavoriteParseArtifact(payload.sourceId),
@@ -178,22 +218,23 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const cached = await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
     const fresh = freshHydration(cached?.hydration?.hydratedAt, dependencies.now());
     let candidate: ProviderCandidate | undefined;
-    try { candidate = fresh ? cached?.hydration?.candidate : await hydrateExplicitReference(dependencies, reference, artifact); } catch (error) {
-      const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+    try { candidate = fresh ? cached?.hydration?.candidate : await hydrateExplicitReference(dependencies, reference, artifact, checkpoints); } catch (error) {
+      const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
       return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
     }
     if (candidate !== undefined) {
-      if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-      candidate = await preferMangaUpdatesHydration(dependencies, candidate);
+      const cachedCrossReference = fresh && candidate.linkedReferences?.some(value => value.provider === reference.provider && value.externalId === reference.externalId);
+      if ((candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) && !cachedCrossReference) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+        return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
         return 'completed';
       }
-      const identity = candidate.provider === reference.provider && cached?.id !== undefined
+      const identity = cached?.id !== undefined
         ? { workId: cached.id, references: [reference] }
-        : fresh && cached?.hydration?.hydratedAt !== undefined
-          ? { hydratedAt: cached.hydration.hydratedAt, references: [reference] }
-          : { references: [reference] };
+        : { references: [reference] };
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${reference.provider}:${reference.externalId}`, candidate, undefined, identity);
       return 'completed';
     }
@@ -218,8 +259,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     let candidate = fresh ? local.candidate : undefined;
     if (!fresh) {
       if (hydration === undefined) throw new Error('UNROUTABLE_PROVIDER_REFERENCE');
-      try { candidate = await hydration.hydrate(local.candidate); } catch (error) {
-        const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+      try { candidate = await hydrateExplicitReference(dependencies, local.candidate, artifact, checkpoints); } catch (error) {
+        const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
         return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
       }
     }
@@ -227,6 +268,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:cached-id-not-found');
     } else {
       if (candidate.provider !== local.candidate.provider || candidate.externalId !== local.candidate.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+      try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+        return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+      }
       if (hasExactBlockedProviderTaxonomy(candidate)) {
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
       } else {
@@ -235,24 +279,31 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     return 'completed';
   }
-  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS');
-  if (collective.kind === 'RETRYABLE') return retryClaim(dependencies, task, token, new Date(Math.max(collective.retryAt ?? 0, timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs)).toISOString());
+  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS', (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
+  const collectiveRetryAt = collective.kind === 'RETRYABLE'
+    ? new Date(collective.retryAt === undefined ? timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs : Math.max(timestamp(dependencies.now()) + 1_000, collective.retryAt)).toISOString()
+    : undefined;
+  if (collective.kind === 'RETRYABLE' && collective.stage === 'HYDRATION' && collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
   if (collective.kind === 'REVIEW_REQUIRED') {
     await persistFavoriteResolutionCompletion(dependencies, task, token, collective, `review:collective-${collective.reason.toLowerCase()}`);
     return 'completed';
   }
   if (collective.kind === 'RESOLVED') {
-    if (hasExactBlockedProviderTaxonomy(collective.candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
-    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, collective.candidate, undefined, { references: collective.references });
+    let candidate = collective.candidate;
+    try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+      return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+    }
+    if (hasExactBlockedProviderTaxonomy(candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, candidate, undefined, { references: collective.references });
     return 'completed';
   }
   if (local.kind === 'AMBIGUOUS') {
+    if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt, 'COLLECTIVE_UNAVAILABLE');
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
       candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
     });
     return 'completed';
   }
-  const checkpoints = createFavoriteSearchCheckpointPort(dependencies.storage, task, token, dependencies.now);
   const lanes = await resolveFavoriteProviderLanes(dependencies.candidates, matchQuery, artifact.mediaKind, checkpoints);
   if (lanes.kind === 'PAGE_PENDING') {
     await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
@@ -268,6 +319,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt, lanes.reason);
   }
   const { decision: outcome, envelopes } = lanes;
+  // Save provider evidence while the collective is unavailable, but do not
+  // replace a personal decision that could not be consulted.
+  if (collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt, 'COLLECTIVE_UNAVAILABLE');
   if (outcome.kind === 'AMBIGUOUS') {
     const references = new Set(outcome.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
     const candidates = envelopes.flatMap((envelope) => envelope.candidates).filter((candidate) => references.has(`${candidate.provider}:${candidate.externalId}`)).slice(0, 6);
@@ -281,8 +335,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   const provider = outcome.matchedReference.provider;
   let candidate: ProviderCandidate | undefined;
-  try { candidate = await dependencies.hydration[provider].hydrate({ externalId: outcome.matchedReference.externalId, provider }); } catch (error) {
-    const retryAt = Math.max(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+  try { candidate = await hydrateExplicitReference(dependencies, { externalId: outcome.matchedReference.externalId, provider }, artifact, checkpoints); } catch (error) {
+    const retryAt = hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now());
     return retryClaim(dependencies, task, token, new Date(retryAt).toISOString());
   }
   if (candidate === undefined) {
@@ -290,7 +344,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (candidate.provider !== provider || candidate.externalId !== outcome.matchedReference.externalId) throw new Error('HYDRATION_REFERENCE_MISMATCH');
-  candidate = await preferMangaUpdatesHydration(dependencies, candidate);
+  try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+    return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+  }
   if (hasExactBlockedProviderTaxonomy(candidate)) {
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
     return 'completed';
@@ -302,9 +358,10 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
 export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutionRunnerDependencies): Promise<FavoriteResolutionSliceResult> {
   const startedAt = timestamp(dependencies.now());
   let blocked = 0; let completed = 0; let retried = 0;
+  let continuationRequired = false;
   for (let index = 0; index < favoriteResolutionSliceLimit; index += 1) {
     const claimedAt = dependencies.now();
-    if (timestamp(claimedAt) - startedAt >= favoriteResolutionWakeBudgetMs) break;
+    if (timestamp(claimedAt) - startedAt >= favoriteResolutionWakeBudgetMs) { continuationRequired = true; break; }
     const token = dependencies.token();
     const task = await dependencies.outbox.claimNext({
       claimedAt,
@@ -319,18 +376,29 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
       if (result === 'completed') completed += 1;
       else if (result === 'retried') retried += 1;
       else blocked += 1;
-    } catch (error) {
-      const changed = await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
+    } catch {
+      const changed = await dependencies.storage.transaction(['favoriteArtifacts', 'favoriteResolutionTasks', 'favoriteSources'], async (session) => {
         const current = await session.getFavoriteResolutionTask(task.id);
         if (current?.state !== 'CLAIMED' || current.claimToken !== token || current.idempotencyKey !== task.idempotencyKey
           || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) return false;
-        await session.putFavoriteResolutionTask(blockTask(current, token, error instanceof Error ? error.message : 'UNKNOWN_RESOLUTION_FAILURE'));
+        const payload = parseFavoriteResolutionTaskPayload(task.payload);
+        const source = await session.getFavoriteSource(payload.sourceId);
+        const record = await session.getFavoriteParseArtifact(payload.sourceId);
+        if (source === undefined || record === undefined || record.artifact.semanticFingerprint !== payload.semanticFingerprint) return false;
+        const retryAt = new Date(timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** Math.min(10, Math.max(0, current.attempt - 1))))).toISOString();
+        await session.putFavoriteResolutionTask({ ...retryTask(current, token, retryAt), blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
+        await session.putFavoriteSource(createFavoriteSource({
+          ...source,
+          resolution: { kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' },
+          resolutionVersions: favoriteResolutionVersions(record.artifact),
+        }));
         return true;
       });
-      if (changed) blocked += 1;
-      else break;
+      if (changed) retried += 1;
+      else { continuationRequired = true; break; }
     }
+    if (index === favoriteResolutionSliceLimit - 1) continuationRequired = true;
   }
   await dependencies.outbox.compactCommitted?.({ before: new Date(startedAt - favoriteResolutionTaskRetentionMs).toISOString(), limit: favoriteResolutionSliceLimit });
-  return Object.freeze({ blocked, completed, retried });
+  return Object.freeze({ blocked, completed, continuationRequired, retried });
 }

@@ -13,7 +13,7 @@ import type { SyncedProviderIds } from './provider-identity-snapshot';
 export const providerIdentityRecoveryStateSchema = z.strictObject({
   schemaVersion: z.literal(1),
   scan: z.strictObject({ afterId: z.string().min(1).max(256).optional(), complete: z.boolean(), ids: syncedProviderIdsSchema }).optional(),
-  restoration: z.strictObject({ digest: z.string().regex(/^[a-f0-9]{64}$/u), index: z.number().int().min(0).max(100000), complete: z.boolean(), missingCount: z.number().int().nonnegative(), retryAt: z.number().int().nonnegative().optional() }).optional(),
+  restoration: z.strictObject({ digest: z.string().regex(/^[a-f0-9]{64}$/u), index: z.number().int().min(0).max(100000), complete: z.boolean(), missingCount: z.number().int().nonnegative(), retryAt: z.number().int().nonnegative().optional(), deferred: z.array(z.strictObject({ index: z.number().int().min(0).max(100000), retryAt: z.number().int().nonnegative() })).max(100000).refine(items => new Set(items.map(item => item.index)).size === items.length).optional() }).optional(),
 });
 export type ProviderIdentityRecoveryState = z.infer<typeof providerIdentityRecoveryStateSchema>;
 export interface ProviderIdentityRecoveryStatePort {
@@ -65,21 +65,50 @@ export async function restoreProviderIdentities(input: SyncedProviderIds, depend
   const ids = mergeSyncedProviderIds(input);
   const digest = await providerIdentitySnapshotDigest(ids);
   const state = providerIdentityRecoveryStateSchema.parse(await dependencies.checkpoints.read() ?? { schemaVersion: 1 });
-  let restoration = state.restoration?.digest === digest ? state.restoration : { digest, index: 0, complete: false, missingCount: 0 };
+  let restoration: NonNullable<ProviderIdentityRecoveryState['restoration']> = state.restoration?.digest === digest ? state.restoration : { digest, index: 0, complete: false, missingCount: 0 };
   if (restoration.complete) return { kind: 'COMPLETE', hydrated: 0 };
   const now = new Date(dependencies.now()).valueOf();
-  if (restoration.retryAt !== undefined && restoration.retryAt > now) return { kind: 'RETRYABLE', hydrated: 0, retryAt: restoration.retryAt };
+  const deferred = new Map((restoration.deferred ?? []).map(item => [item.index, item.retryAt]));
+  if (restoration.retryAt !== undefined) {
+    deferred.set(restoration.index, restoration.retryAt);
+    restoration = { digest, index: restoration.index + 1, complete: false, missingCount: restoration.missingCount };
+  }
+  const providerDelays = new Map<string, number>();
+  for (const [index, retryAt] of deferred) {
+    const reference = referenceAt(ids, index);
+    if (reference !== undefined && retryAt > now) providerDelays.set(reference.provider, Math.max(providerDelays.get(reference.provider) ?? 0, retryAt));
+  }
+  const save = () => dependencies.checkpoints.save({ ...state, restoration: { ...restoration, deferred: [...deferred].map(([index, retryAt]) => ({ index, retryAt })) } });
   let hydrated = 0;
+  let attempted = 0;
   for (let inspected = 0; inspected < 100; inspected += 1) {
-    const reference = referenceAt(ids, restoration.index);
+    const scanning = referenceAt(ids, restoration.index) !== undefined;
+    const index = scanning ? restoration.index : [...deferred].find(([, retryAt]) => retryAt <= now)?.[0];
+    const reference = index === undefined ? undefined : referenceAt(ids, index);
     if (reference === undefined) {
-      await dependencies.checkpoints.save({ ...state, restoration: { digest, index: restoration.index, complete: true, missingCount: restoration.missingCount } });
+      if (deferred.size > 0) {
+        await save();
+        let retryAt = Number.POSITIVE_INFINITY;
+        for (const value of deferred.values()) retryAt = Math.min(retryAt, value);
+        return { kind: 'RETRYABLE', hydrated, retryAt };
+      }
+      restoration = { ...restoration, complete: true };
+      await save();
       return { kind: 'COMPLETE', hydrated };
     }
+    if (index === undefined) throw new Error('Recovery index is missing.');
     const id = favoriteCandidateWorkId(reference);
     const existing = await dependencies.storage.getWork(id);
     if (existing?.hydration === undefined) {
-      if (hydrated >= 2) return { kind: 'PENDING', hydrated };
+      const delayed = providerDelays.get(reference.provider);
+      if (delayed !== undefined && delayed > now) {
+        deferred.set(index, delayed);
+        if (scanning) restoration = { ...restoration, index: index + 1 };
+        await save();
+        continue;
+      }
+      if (attempted >= 2) { await save(); return { kind: 'PENDING', hydrated }; }
+      attempted += 1;
       try {
         const adapter = dependencies.hydration[reference.provider];
         if (adapter === undefined) throw new Error('Recovery hydration provider is unavailable.');
@@ -95,12 +124,16 @@ export async function restoreProviderIdentities(input: SyncedProviderIds, depend
         }
       } catch (error) {
         const retryAt = Math.max(new Date(dependencies.now()).valueOf() + favoriteProviderPolicy.negativeTtlMs, error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
-        await dependencies.checkpoints.save({ ...state, restoration: { ...restoration, retryAt } });
-        return { kind: 'RETRYABLE', hydrated, retryAt };
+        deferred.set(index, retryAt);
+        providerDelays.set(reference.provider, retryAt);
+        if (scanning) restoration = { ...restoration, index: index + 1 };
+        await save();
+        continue;
       }
     }
-    restoration = { digest, index: restoration.index + 1, complete: false, missingCount: restoration.missingCount };
-    await dependencies.checkpoints.save({ ...state, restoration });
+    deferred.delete(index);
+    if (scanning) restoration = { ...restoration, index: index + 1 };
+    await save();
   }
   return { kind: 'PENDING', hydrated };
 }

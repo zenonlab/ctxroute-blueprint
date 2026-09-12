@@ -1,3 +1,5 @@
+import type { FavoritePublicReference } from '../collective-index/favorite-collective-lookup';
+
 export interface PublicCatalogueWork {
   id: string;
   mediaKind: 'anime' | 'manga';
@@ -25,6 +27,7 @@ export interface PublicCatalogueReadPort {
 }
 
 export interface CoverMasterReadPort {
+  findMaster?(reference: FavoritePublicReference): Promise<{ digest: string; extension: 'avif' | 'jpg' | 'png' | 'webp' } | undefined>;
   readMaster(key: string): Promise<ReadableStream<Uint8Array> | undefined>;
 }
 
@@ -33,6 +36,7 @@ export type CoverOutputFormat = 'image/avif' | 'image/jpeg' | 'image/png' | 'ima
 export type CoverRightsBasis = 'licensed' | 'public-domain';
 
 export interface NormalizedCoverMaster {
+  publicReference?: FavoritePublicReference;
   attribution?: string;
   bytes: Uint8Array;
   colorSpace: 'srgb';

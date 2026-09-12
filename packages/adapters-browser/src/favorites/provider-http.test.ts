@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
+import { favoriteProviderResponseByteLimit, FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
 
 describe('FavoriteProviderRateGate', () => {
+  it('accepts a realistic provider page larger than the WebBridge budget', async () => {
+    const payload = { description: 'x'.repeat(120_000) };
+    await expect(readFavoriteProviderJson(async () => Response.json(payload), 'https://fixtures.tobirink.invalid/provider', {}, z.object({ description: z.string() }))).resolves.toMatchObject({ value: payload });
+  });
   it('cancels an oversized chunked body before buffering the entire response', async () => {
     const cancel = vi.fn(); let pulls = 0;
     const body = new ReadableStream<Uint8Array>({ pull(controller) { pulls += 1; controller.enqueue(new Uint8Array(40000)); }, cancel });
     await expect(readFavoriteProviderJson(async () => new Response(body), 'https://fixtures.tobirink.invalid/provider', {}, z.strictObject({}))).rejects.toThrow('too large');
-    expect(cancel).toHaveBeenCalledOnce(); expect(pulls).toBeLessThanOrEqual(3);
+    expect(cancel).toHaveBeenCalledOnce(); expect(pulls).toBeLessThanOrEqual(Math.ceil(favoriteProviderResponseByteLimit / 40000) + 1);
   });
   it('Q-06 persists the exact next reservation before the provider effect', async () => {
     let stored = 12_000;

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
+import type { ExtensionDiagnosticInput } from './extension-diagnostics';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -15,14 +16,64 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('continues bounded resolution while identity restoration is still pending', async () => {
-    const prepare = vi.fn(async (): Promise<'READY' | 'PENDING'> => 'READY').mockResolvedValueOnce('PENDING');
+  it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {
+    const records = Array.from({ length: 1401 }, (_, index) => ({
+      bookmarkId: `ordinary-${index}`, folderPath: [], order: index, title: `Ordinary video ${index}`,
+      url: `https://www.youtube.com/watch?v=fixture-${index}`,
+    }));
+    const readBookmarkBatch = vi.fn(async (cursor: { frames: readonly { nextChildIndex: number }[] } | undefined, limit: number) => {
+      const start = cursor?.frames[0]?.nextChildIndex ?? 0;
+      const end = Math.min(records.length, start + limit);
+      const complete = end === records.length;
+      return {
+        complete,
+        cursor: complete ? undefined : { frames: [{ folderId: '0', folderPath: [], nextChildIndex: end }], rootId: '0' },
+        records: records.slice(start, end),
+      };
+    });
+    const events: ExtensionDiagnosticInput[] = [];
+    const updateContinuation = vi.fn(async (_availableAt: string | undefined) => undefined);
+    const storage = new MemoryStoragePort();
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
+      diagnostics: { record: async (event) => { events.push(event); } },
+      ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
+      libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() },
+      updateContinuation, sourceAdapters: [], storage, token: () => 'large-inventory-run',
+    });
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor: { frames: [{ nextChildIndex: 800 }] }, status: 'active' });
+    expect(updateContinuation).toHaveBeenLastCalledWith('2026-09-12T12:00:00.000Z');
+    expect(events.at(-1)).toMatchObject({ outcome: 'retryable', stage: 'run' });
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ phase: 'presence', presenceAfterId: expect.any(String), status: 'active' });
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(15);
+    expect(updateContinuation).toHaveBeenLastCalledWith('2026-09-12T12:00:00.000Z');
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ phase: 'presence', presenceAfterId: expect.any(String), status: 'active' });
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ status: 'complete' });
+    expect(updateContinuation).toHaveBeenLastCalledWith(undefined);
+    expect(events.at(-1)).toMatchObject({ outcome: 'complete', stage: 'run' });
+
+    await reconcile();
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(15);
+    expect(updateContinuation).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it.each(['PENDING', 'RETRYABLE'] as const)('continues bounded resolution while identity restoration is %s', async (status) => {
+    const prepare = vi.fn(async (): Promise<'READY' | 'PENDING' | 'RETRYABLE'> => 'READY').mockResolvedValueOnce(status);
     const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
     const claimNext = vi.fn(async () => undefined);
     const reconcile = createFavoriteResolutionRuntime({
       bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) }, candidates: unavailableCandidates,
       ensureReady: async () => ({ schemaVersion: 11 }), hydration: emptyHydration, identityRecovery: { prepare, publish },
-      libraryId: libraryId('library_primary'), now: () => '2026-09-08T00:00:00.000Z', outbox: { block: vi.fn(), claimNext, retry: vi.fn() },
+      libraryId: libraryId('library_primary'), now: () => '2026-09-08T00:00:00.000Z', outbox: { block: vi.fn(), claimNext, nextAvailableAt: async () => undefined, retry: vi.fn() },
       sourceAdapters: [], storage: new MemoryStoragePort(), token: () => 'recovery-token',
     });
     await reconcile();
@@ -63,7 +114,7 @@ describe('createFavoriteResolutionRuntime', () => {
       hydration: emptyHydration,
       libraryId: libraryId('library_primary'),
       now: () => '2026-09-07T12:00:00.000Z',
-      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() },
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() },
       sourceAdapters: [],
       storage,
       token: () => 'token',
@@ -85,7 +136,7 @@ describe('createFavoriteResolutionRuntime', () => {
       bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
       ensureReady: async () => ({ schemaVersion: 6 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
-      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [],
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() }, sourceAdapters: [],
       storage: new MemoryStoragePort(), token: () => 'token',
     });
     const active = reconcile();
@@ -106,9 +157,10 @@ describe('createFavoriteResolutionRuntime', () => {
       ensureReady: async () => ({ schemaVersion: 7 }),
       hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
-      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'inventory-session',
+      outbox: { block: vi.fn(), claimNext: vi.fn(async () => undefined), nextAvailableAt: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'inventory-session',
     } as const;
     await expect(createFavoriteResolutionRuntime({ ...dependencies, bookmarks: { readBookmarkBatch: firstReader } })()).rejects.toThrow('suspended');
+    expect(dependencies.outbox.claimNext).toHaveBeenCalledOnce();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor, sessionId: 'inventory-session', status: 'active' });
 
     const resumedReader = vi.fn(async () => ({ complete: true, records: [] as const }));
@@ -118,17 +170,60 @@ describe('createFavoriteResolutionRuntime', () => {
     expect((await storage.listFavoriteSources({ limit: 10 }))[0]?.presence).toBe('observed');
   });
 
+  it('upgrades a legacy active checkpoint by resuming its bookmark cursor', async () => {
+    const storage = new MemoryStoragePort();
+    const cursor = { frames: [{ folderId: '0', folderPath: [], nextChildIndex: 100 }], rootId: '0' } as const;
+    await storage.putFavoriteInventoryCheckpoint({ cursor, id: 'favorite-inventory', sessionId: 'legacy-session', startedAt: '2026-09-07T12:00:00.000Z', status: 'active' });
+    const readBookmarkBatch = vi.fn(async () => ({ complete: true, records: [] as const }));
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
+      ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
+      libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() },
+      sourceAdapters: [], storage, token: () => 'unused-token',
+    });
+
+    await reconcile();
+    expect(readBookmarkBatch).toHaveBeenCalledWith(cursor, 100);
+    await expect(storage.getFavoriteInventoryCheckpoint()).resolves.toMatchObject({ sessionId: 'legacy-session', status: 'complete' });
+  });
+
   it('B-04 completes an empty inventory without creating private data', async () => {
     const storage = new MemoryStoragePort();
     const reconcile = createFavoriteResolutionRuntime({
       bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) },
       candidates: unavailableCandidates,
       ensureReady: async () => ({ schemaVersion: 8 }), hydration: emptyHydration,
-      libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z', outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'empty-session',
+      libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z', outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'empty-session',
     });
     await expect(reconcile()).resolves.toBeUndefined();
     expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ sessionId: 'empty-session', status: 'complete' });
     await expect(storage.listFavoriteSources({ limit: 1 })).resolves.toEqual([]);
+  });
+
+  it('records only bounded lifecycle counters for a completed run', async () => {
+    const events: ExtensionDiagnosticInput[] = [];
+    const record = async (event: ExtensionDiagnosticInput) => { events.push(event); };
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) },
+      candidates: unavailableCandidates,
+      diagnostics: { record },
+      ensureReady: async () => ({ schemaVersion: 12 }),
+      hydration: emptyHydration,
+      libraryId: libraryId('library_primary'),
+      now: () => '2026-09-12T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() },
+      sourceAdapters: [],
+      storage: new MemoryStoragePort(),
+      token: () => 'diagnostic-run',
+    });
+    await reconcile();
+    expect(events).toEqual([
+      { outcome: 'started', runId: 'diagnostic-run', stage: 'run' },
+      { counts: { batches: 1, observed: 0 }, outcome: 'complete', runId: 'diagnostic-run', stage: 'inventory' },
+      { counts: { blocked: 0, completed: 0, retried: 0 }, outcome: 'complete', runId: 'diagnostic-run', stage: 'resolution' },
+      { outcome: 'complete', runId: 'diagnostic-run', stage: 'run' },
+    ]);
   });
 
   it('closes ordinary links during import so a later media slug remains ready in a noisy inventory', async () => {
@@ -148,7 +243,7 @@ describe('createFavoriteResolutionRuntime', () => {
       bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
       ensureReady: async () => ({ schemaVersion: 8 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-07T12:00:00.000Z',
-      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'noisy-session',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() }, sourceAdapters: [], storage, token: () => 'noisy-session',
     });
 
     await reconcile();

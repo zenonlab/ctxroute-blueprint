@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
+import { createLibrary, createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '../tasks';
 import { blockTask, claimTask, isTaskAvailable, retryTask } from '../tasks';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite-source-presence';
 import { repairMissingFavoriteCovers, runFavoriteResolutionSlice } from './favorite-resolution-runner';
-import { persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
+import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { FavoriteProviderRetryError } from './provider-ports';
+import type { FavoriteProviderSearchQuery } from './provider-ports';
+import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
 
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
@@ -15,10 +17,10 @@ const candidate = { externalId: '154587', mediaKind: 'ANIME' as const, preSerial
 const unusedSearch = { search: async () => { throw new Error('not routed'); } };
 const unusedHydration = { hydrate: async () => undefined };
 function candidatePorts(anilist: { search: () => Promise<ReturnType<typeof createProviderCandidateEnvelope>> }, kitsuAnime = unusedSearch) {
-  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedSearch, mangaupdates: unusedSearch } as const;
+  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedSearch, mangadex: unusedSearch, mangaupdates: unusedSearch } as const;
 }
 function hydrationPorts(anilist: { hydrate: () => Promise<typeof candidate | undefined> }, kitsuAnime = unusedHydration) {
-  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedHydration, mangaupdates: unusedHydration } as const;
+  return { anilist, 'kitsu-anime': kitsuAnime, 'kitsu-manga': unusedHydration, mangadex: unusedHydration, mangaupdates: unusedHydration } as const;
 }
 
 class MemoryOutbox implements FavoriteResolutionOutboxPort {
@@ -36,6 +38,10 @@ class MemoryOutbox implements FavoriteResolutionOutboxPort {
     const next = transition(task); await this.storage.putFavoriteResolutionTask(next); return next;
   }
   block(id: string, token: string, reason: string) { return this.change(id, (task) => blockTask(task, token, reason)); }
+  async nextAvailableAt() {
+    const task = await this.storage.getFavoriteResolutionTask(this.id);
+    return task === undefined || task.state === 'COMMITTED' || task.state === 'BLOCKED' ? undefined : task.availableAt;
+  }
   retry(id: string, token: string, retryAt: string) { return this.change(id, (task) => retryTask(task, token, retryAt)); }
 }
 
@@ -48,6 +54,86 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it.each(['none', 'mangadex', 'mangaupdates'])('hydrates the linked primary ID and preserves existing work identity: %s', async (cachedProvider) => {
+    const cached = cachedProvider !== 'none';
+    const { storage, outbox } = await fixture();
+    const mdId = '12345678-1234-4234-8234-123456789abc';
+    const primary = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, externalId: '12345' };
+    const md = { ...primary, provider: 'mangadex' as const, externalId: mdId, linkedReferences: [{ provider: 'mangaupdates' as const, externalId: '12345' }] };
+    if (cached) {
+      const id = favoriteCandidateWorkId(md);
+      const cachedCandidate = cachedProvider === 'mangaupdates' ? { ...primary, linkedReferences: [{ provider: md.provider, externalId: md.externalId }] } : md;
+      await storage.putWork(createWork({ id, externalReferences: [{ provider: md.provider, externalId: md.externalId }, { provider: primary.provider, externalId: primary.externalId }], mediaKind: 'manga', preferredTitle: 'Synthetic', hydration: { candidate: cachedCandidate, hydratedAt: now, matcherVersion: 'favorite-matcher-v3', favoriteAliasKeys: [], providerTitleKeys: [] } }));
+      await storage.putLibrary(createLibrary(libraryId('library_primary'), [id]));
+    }
+    const sourceAdapter = { id: 'fixture-md', origins: ['https://mangadex.org'], analyze: () => createSourceEvidence({ aliases: [], canonicalUrl: `https://mangadex.org/title/${mdId}`, diagnostics: [], explicitProviderReference: { provider: 'mangadex', externalId: mdId }, key: 'fixture', mediaKind: 'MANGA', origin: 'https://mangadex.org', path: `/title/${mdId}`, proofs: ['CATEGORY_PATH'], sourceAdapter: 'fixture-md', strategy: 'exact-origin' }) };
+    await importFavoriteSources([{ ...favorite, url: `https://mangadex.org/title/${mdId}` }], storage, now, [sourceAdapter]);
+    const hydratedIds: string[] = [];
+    const result = await runFavoriteResolutionSlice({ candidates: candidatePorts(unusedSearch), hydration: { ...hydrationPorts(unusedHydration), mangadex: { hydrate: async () => md }, mangaupdates: { hydrate: async (reference) => { hydratedIds.push(reference.externalId); return primary; } } }, libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'cross-reference' });
+    expect(result.completed).toBe(1);
+    expect(hydratedIds).toEqual(cachedProvider === 'mangaupdates' ? [] : ['12345']);
+    const works = await storage.listWorks({ limit: 10 });
+    expect(works).toHaveLength(1);
+    if (cached) expect(works[0]?.id).toBe(favoriteCandidateWorkId(md));
+    expect(works[0]).toMatchObject({ hydration: { candidate: { provider: 'mangaupdates' } }, externalReferences: expect.arrayContaining([{ provider: 'mangadex', externalId: mdId }, { provider: 'mangaupdates', externalId: '12345' }]) });
+  });
+  it('resumes the exact MangaUpdates identity from D1 after a paginated 405 recovery', async () => {
+    const { storage, task, outbox } = await fixture();
+    await importFavoriteSources([{ ...favorite, url: 'https://reader.example/manga/frieren' }], storage, now);
+    const manga = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const };
+    const pages: (string | undefined)[] = [];
+    let clock = now;
+    const dependencies = {
+      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => keys.map(key => ({ fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: 'MANGA' as const, references: [{ provider: manga.provider, externalId: manga.externalId }], scope: 'owner' as const })) },
+      candidates: { ...candidatePorts(unusedSearch), mangaupdates: { search: async (query: FavoriteProviderSearchQuery) => {
+        pages.push(query.cursor);
+        return createProviderCandidateEnvelope(query.cursor === undefined
+          ? { candidates: [], complete: false, digest: 'page-1', nextCursor: '2', provider: 'mangaupdates', truncated: true }
+          : { candidates: [manga], complete: true, digest: 'page-2', provider: 'mangaupdates', truncated: false });
+      } } },
+      hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => { throw new Error('HTTP 405'); } } },
+      libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-manga',
+    };
+    await runFavoriteResolutionSlice(dependencies);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:01.000Z' });
+    clock = '2026-09-07T12:00:02.000Z';
+    await runFavoriteResolutionSlice(dependencies);
+    expect(pages).toEqual([undefined, '2']);
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+
+  it('checkpoints provider evidence during a D1 outage and consults the owner before committing', async () => {
+    const { outbox, storage } = await fixture();
+    let clock = now;
+    let offline = true;
+    let searches = 0;
+    const dependencies = {
+      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => {
+        if (offline) throw new Error('D1 unavailable');
+        return keys.map(key => ({ fingerprint: key.fingerprint, kind: 'MISS' as const }));
+      } },
+      candidates: candidatePorts({ search: async () => { searches += 1; return createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'saved-evidence', provider: 'anilist', truncated: false }); } }),
+      hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-outage',
+    };
+    await runFavoriteResolutionSlice(dependencies);
+    expect(searches).toBe(1);
+    expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
+    offline = false;
+    clock = '2026-09-07T12:16:00.000Z';
+    await runFavoriteResolutionSlice(dependencies);
+    expect(searches).toBe(1);
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
+  });
+
+  it('keeps a provider outage scheduled after eight attempts', async () => {
+    const { storage, task, outbox } = await fixture();
+    await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
+    await runFavoriteResolutionSlice({ candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'eighth' });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T18:00:00.000Z' });
+    expect(await storage.readFavoriteResolutionCounts()).toEqual({ observed: 1, processing: 0, retryable: 1, unsupported: 0 });
+  });
   it('uses the owner-scoped lookup before title search and preserves its public references', async () => {
     const { outbox, storage } = await fixture();
     let searches = 0;
@@ -94,7 +180,7 @@ describe('runFavoriteResolutionSlice', () => {
     const pending = copy === undefined ? undefined : await storage.getFavoriteResolutionTask(copy.id.replace(/^source_/u, 'favorite-resolution_'));
     if (pending === undefined) throw new Error('Expected copied favorite task.');
     const result = await runFavoriteResolutionSlice({ ...dependencies, outbox: new MemoryOutbox(storage, pending.id) });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(searches).toBe(1);
     expect(hydrations).toBe(expired ? 2 : 1);
     const sources = await storage.listFavoriteSources({ limit: 100 });
@@ -115,7 +201,7 @@ describe('runFavoriteResolutionSlice', () => {
       storage,
       token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:anilist:154587', state: 'COMMITTED' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source && await storage.getFavoriteResolutionReceipt(`${source.id}:favorite-resolution`)).toMatchObject({ effectDigest: 'resolved:anilist:154587', idempotencyKey: task.idempotencyKey });
@@ -123,6 +209,21 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
     expect(source?.matchedWorkId && await storage.getWork(source.matchedWorkId)).toMatchObject({ preferredTitle: 'Frieren' });
     await expect(storage.getLibrary(libraryId('library_primary'))).resolves.toMatchObject({ workIds: [source?.matchedWorkId] });
+  });
+
+  it('schedules an internal failure separately from a provider outage', async () => {
+    const { outbox, storage, task } = await fixture();
+    const envelope = createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'invariant-search', provider: 'anilist', truncated: false });
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => envelope }),
+      hydration: hydrationPorts({ hydrate: async () => ({ ...candidate, externalId: 'wrong-id' }) }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'invariant-token',
+    });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:30.000Z', blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+    expect(await storage.readFavoriteResolutionCounts()).toMatchObject({ internalErrors: 1 });
   });
 
   it('persists bookmark progression with the hydrated provider maximum', async () => {
@@ -161,7 +262,7 @@ describe('runFavoriteResolutionSlice', () => {
       storage,
       token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
@@ -187,7 +288,7 @@ describe('runFavoriteResolutionSlice', () => {
       },
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:kitsu-anime:46474', state: 'COMMITTED' });
   });
 
@@ -206,7 +307,7 @@ describe('runFavoriteResolutionSlice', () => {
     });
 
     expect(providerCalls).toBe(0);
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'source:detached', state: 'COMMITTED' });
   });
 
@@ -233,17 +334,17 @@ describe('runFavoriteResolutionSlice', () => {
     });
 
     expect(searches).toBe(0);
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
     expect(source?.reviewId).toBeUndefined();
   });
 
-  it('hydrates an explicit MangaUpdates ID through bounded search after a 405 response', async () => {
+  it.each([true, false])('hydrates a MangaUpdates ID through bounded search after a 405 response (explicit %s)', async (explicit) => {
     const storage = new MemoryStoragePort();
     const manga = { externalId: '12345', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Synthetic Manga'], displayTitle: 'Synthetic Manga' };
     const novel = { ...manga, externalId: '54321', preSerialization: true, titles: ['Synthetic Manga (Novel)'], displayTitle: 'Synthetic Manga (Novel)' };
-    const explicitFavorite = { ...favorite, bookmarkId: 'explicit-mu', title: 'Synthetic Manga', url: 'https://www.mangaupdates.com/series/abc123/synthetic-manga' };
+    const explicitFavorite = { ...favorite, bookmarkId: 'explicit-mu', title: 'Synthetic Manga', url: explicit ? 'https://www.mangaupdates.com/series/abc123/synthetic-manga' : 'https://reader.example/manga/synthetic-manga' };
     await importFavoriteSources([explicitFavorite], storage, now, [{
       analyze: (input, url) => createSourceEvidence({ aliases: [{ provenance: 'stable-url-slug', value: 'Synthetic Manga' }], diagnostics: [], explicitProviderReference: { externalId: '12345', provider: 'mangaupdates' }, key: input.sourceKey, mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], sourceAdapter: 'test-mu', strategy: 'exact-origin', title: 'Synthetic Manga' }),
       id: 'test-mu', origins: ['https://www.mangaupdates.com'],
@@ -256,7 +357,7 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => { throw new Error('Favorite provider request failed with HTTP 405.'); } } },
       libraryId: libraryId('library_primary'), now: () => now, outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'mu-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
     expect(source?.reviewId).toBeUndefined();
@@ -293,7 +394,7 @@ describe('runFavoriteResolutionSlice', () => {
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
 
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
   });
 
@@ -348,7 +449,7 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toEqual(claimed);
   });
 
-  it('leaves an expired request reclaimable instead of blocking a newer task', async () => {
+  it('requests a continuation when a provider call exhausts the wake budget', async () => {
     const { outbox, storage, task } = await fixture();
     let clock = now;
     const result = await runFavoriteResolutionSlice({
@@ -359,7 +460,7 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: hydrationPorts({ hydrate: async () => candidate }),
       libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'expired-request',
     });
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: true, retried: 0 });
     const current = await storage.getFavoriteResolutionTask(task.id);
     expect(current?.state).toBe('CLAIMED');
     expect(current && isTaskAvailable(current, clock)).toBe(true);
@@ -396,6 +497,31 @@ describe('runFavoriteResolutionSlice', () => {
 });
 
 describe('repairMissingFavoriteCovers', () => {
+  it.each(['ambiguous', 'incomplete', 'unrelated', 'no-cover'] as const)('preserves the existing work for a %s MangaUpdates result', async (scenario) => {
+    const storage = new MemoryStoragePort();
+    const mangadex = { ...candidate, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', mediaKind: 'MANGA' as const, cover: { attribution: 'MangaDex', url: 'https://uploads.mangadex.org/covers/fixture.jpg' } };
+    const work = createWork({ id: workId('work_cover_guard'), preferredTitle: 'Frieren', mediaKind: 'manga', externalReferences: [{ provider: 'mangadex', externalId: mangadex.externalId }], hydration: { candidate: mangadex, favoriteAliasKeys: [], hydratedAt: now, matcherVersion: 'matcher-v1', providerTitleKeys: [] } });
+    await storage.putWork(work);
+    const base = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, titles: scenario === 'unrelated' ? ['Unrelated Title'] : ['Frieren'] };
+    const preferred = scenario === 'no-cover' ? base : { ...base, cover: { attribution: 'MangaUpdates', url: 'https://cdn.mangaupdates.com/image/fixture.jpg' } };
+    const candidates = scenario === 'ambiguous' ? [preferred, { ...preferred, externalId: '87654' }] : [preferred];
+    const input = { candidates, complete: scenario !== 'incomplete', truncated: scenario === 'incomplete', digest: 'guard', provider: 'mangaupdates' as const };
+    const envelope = createProviderCandidateEnvelope(scenario === 'incomplete' ? { ...input, nextCursor: '2' } : input);
+    await repairMissingFavoriteCovers(storage, hydrationPorts(unusedHydration), () => now, undefined, { ...candidatePorts(unusedSearch), mangaupdates: { search: async () => envelope } });
+    expect(await storage.getWork(work.id)).toEqual(work);
+  });
+  it('prefers a bounded MangaUpdates cover for an existing MangaDex work', async () => {
+    const storage = new MemoryStoragePort();
+    const mangadex = { ...candidate, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', mediaKind: 'MANGA' as const, cover: { attribution: 'MangaDex', url: 'https://uploads.mangadex.org/covers/12345678-1234-4234-8234-123456789abc/old.512.jpg' } };
+    await storage.putWork(createWork({ externalReferences: [{ provider: 'mangadex', externalId: mangadex.externalId }], id: workId('work_mangadex-cover'), mediaKind: 'manga', preferredTitle: 'Synthetic Series', hydration: { candidate: mangadex, favoriteAliasKeys: [], hydratedAt: now, matcherVersion: 'matcher-v1', providerTitleKeys: [] } }));
+    const preferred = { ...mangadex, provider: 'mangaupdates' as const, externalId: '12345', cover: { attribution: 'MangaUpdates', url: 'https://cdn.mangaupdates.com/image/series.jpg' } };
+    const hydration = hydrationPorts(unusedHydration);
+    const candidates = candidatePorts(unusedSearch);
+    const result = await repairMissingFavoriteCovers(storage, { ...hydration, mangadex: { hydrate: async () => mangadex }, mangaupdates: { hydrate: async () => preferred } }, () => now, undefined, { ...candidates, mangadex: { search: async () => createProviderCandidateEnvelope({ candidates: [mangadex], complete: true, digest: 'md', provider: 'mangadex', truncated: false }) }, mangaupdates: { search: async () => createProviderCandidateEnvelope({ candidates: [preferred], complete: true, digest: 'mu', provider: 'mangaupdates', truncated: false }) } });
+    expect(result.repaired).toBe(1);
+    await expect(storage.getWork(workId('work_mangadex-cover'))).resolves.toMatchObject({ hydration: { candidate: { provider: 'mangaupdates', externalId: '12345', cover: { attribution: 'MangaUpdates' } } }, externalReferences: expect.arrayContaining([{ provider: 'mangadex', externalId: mangadex.externalId }, { provider: 'mangaupdates', externalId: '12345' }]) });
+  });
+
   it('advances by work id so later pages are eventually repaired', async () => {
     const storage = new MemoryStoragePort();
     for (let index = 0; index < 11; index += 1) {

@@ -10,6 +10,10 @@ const css = readFileSync(new URL('./WorkCard.module.css', import.meta.url), 'utf
 const preview = readFileSync(new URL('./WorkCard.preview.tsx', import.meta.url), 'utf8');
 
 describe('WorkCard', () => {
+  it('does not disclose the library referrer when loading a provider cover', () => {
+    const markup = renderToStaticMarkup(createElement(WorkCard, { context: 'Manga', title: 'Synthetic', coverSrc: 'https://uploads.mangadex.org/covers/synthetic.jpg' }));
+    expect(markup).toContain('referrerPolicy="no-referrer"');
+  });
   it('bounds every product context and interaction state', () => {
     expect(workCardVariants).toEqual(['library', 'review', 'agenda', 'active-work']);
     expect(workCardStates).toEqual(['default', 'selected', 'unavailable']);

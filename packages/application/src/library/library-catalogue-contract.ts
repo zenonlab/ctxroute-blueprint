@@ -1,6 +1,7 @@
-import type { LibraryId, Progress, Work } from '@tobirink/domain';
+import type { FavoriteSource, LibraryId, Progress, ProviderCandidate, Work } from '@tobirink/domain';
 
 export const libraryCatalogueScanLimit = 500;
+export const libraryCatalogueReadBatchSize = 100;
 export const libraryCataloguePageLimit = 24;
 export const libraryFacetLimit = 64;
 
@@ -20,8 +21,14 @@ export interface LibraryCatalogueQuery {
 
 export interface LibraryCatalogueItem {
   readonly addedOrder: number;
+  readonly candidate?: ProviderCandidate;
+  readonly id: string;
+  readonly mediaKind: 'anime' | 'manga' | 'unknown';
   readonly progress?: Progress;
-  readonly work: Work;
+  readonly source?: FavoriteSource;
+  readonly state: 'preparation' | 'ready' | 'retryable' | 'review';
+  readonly title: string;
+  readonly work?: Work;
 }
 
 export interface LibraryFacetOption { readonly count: number; readonly label: string; readonly value: string }

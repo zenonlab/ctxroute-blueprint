@@ -45,7 +45,7 @@ function HomePrivateOverview() {
   const loading = status === 'loading' || status === 'reconnecting' || status === 'connected' && (!library || !agenda);
   const empty = status === 'extension-missing';
   const days = agendaDays(period, agenda);
-  const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl ?? item.canonicalUrl ?? `/library/_?work=${encodeURIComponent(item.workId)}`, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : 'Manga', progress: item.progressLabel, source: (item.sourceUrl ? new URL(item.sourceUrl).hostname : undefined) ?? item.provider ?? 'Fiche locale', title: item.title })) ?? [];
+  const libraryItems = library?.items.map((item) => ({ coverSrc: item.coverUrl, href: item.sourceUrl ?? item.canonicalUrl ?? `/library/_?work=${encodeURIComponent(item.workId)}`, id: item.workId, mediaType: item.mediaKind === 'anime' ? 'Anime' : item.mediaKind === 'manga' ? 'Manga' : 'Type à déterminer', progress: item.progressLabel, source: (item.sourceUrl ? new URL(item.sourceUrl).hostname : undefined) ?? item.provider ?? 'Fiche locale', title: item.title })) ?? [];
   if (empty || status === 'incompatible' || status === 'error') return <main className="member-state-page"><BridgeState /></main>;
   return <MemberOverview agendaDays={days} agendaHref="/agenda" agendaState={failed ? 'error' : loading ? 'loading' : agenda?.entries.length === 0 ? 'empty' : 'ready'} libraryCount={bootstrap?.libraryCount ?? libraryItems.length} libraryHref="/library" libraryItems={libraryItems} libraryState={failed ? 'error' : loading ? 'loading' : libraryItems.length === 0 ? 'empty' : 'ready'} onRetry={() => setRetryCount((count) => count + 1)} periodLabel={period.label} />;
 }

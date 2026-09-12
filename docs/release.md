@@ -2,7 +2,9 @@
 
 ## Build a release candidate
 
-The current candidate is `1.0.8`. `apps/extension/package.json` is the only
+The current production release is `1.0.14`. The locally verified candidate is
+`1.0.16`.
+`apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +37,220 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Local-first library candidate — 2026-09-12
+
+Candidate `1.0.16` restores the FavLib property that a parsed browser favorite
+is visible before provider hydration. The catalogue merges resolved `Work`
+records with read-only provisional projections from observed `FavoriteSource`
+and parse artifacts. Pending, retryable and Review entries retain a deterministic
+local identity and source URL; `UNKNOWN` is explicit. Unsupported ordinary links
+remain absent. Resolution replaces the provisional entry without a duplicate or
+an IndexedDB migration.
+
+WebBridge v4 carries the explicit media and resolution states to the matching
+site client. The Chromium 153 installed journey scans 1,403 bookmarks while
+AniList, MangaUpdates and the collective return synthetic 503 responses. It
+projects both the exact AniList title and the pending MangaUpdates manga,
+commits 1,401 YouTube links as unsupported, schedules both retries and creates
+zero Reviews at import. The current deterministic artifacts are:
+
+- Chrome: 288483 bytes, SHA-256 `b565e7d517a612cb1180365d8ce6be61b1de1ec40bb9049da5790e6d83408dc1`.
+- Firefox: 288528 bytes, SHA-256 `cdcf41bff28fa22a3c5b00a3e73fe617a583c0e7a3debceb2a8b6a0c1ca22a1c`.
+
+This candidate is local. WebBridge v4 requires the extension and site update to
+be published together through a separately approved release operation.
+
+### Durable continuation candidate — 2026-09-12
+
+Candidate `1.0.15` resumes separate inventory and presence phases with one
+named MV3 alarm. A presence page and its checkpoint commit in the same
+IndexedDB transaction, and only the last page can mark the inventory complete.
+Every service-worker evaluation restores the named alarm from the active
+checkpoint or the earliest READY, RETRY_AT or expired CLAIMED deadline. The
+periodic reminder only repairs that alarm; it does not run the resolver.
+Installation, update, startup and bookmark mutations refresh browser authority.
+The trusted manual action resumes an active checkpoint and rescans only after a
+completed checkpoint. This candidate remains local; publication is approved
+separately.
+
+The Chromium 153 installed journey starts with 1,402 bookmarks, converges the
+multi-wake inventory and presence phases, retains one retryable provider outage,
+commits 1,401 ordinary links as unsupported, creates zero Reviews at import and
+keeps a durable retry alarm. Options exposes the current phase, automatic wake
+and safe resume action. Two isolated builds reproduce exactly:
+
+- Chrome: 287880 bytes, SHA-256 `780ebef687c390d15637802f67de09e5e1f7162657977c3028952fa8f3b00935`.
+- Firefox: 287925 bytes, SHA-256 `34fb16d5f66be819e33472cfbb07d59a03266ce8917457752e6df26054656841`.
+
+### Locked diagnostics candidate — 2026-09-12
+
+Candidate `1.0.14` keeps a 100-event local ring for inventory and resolution
+lifecycle states. The exact local value `extension-v1` enables it and Options
+can write `off` without deleting prior evidence. The Worker emits only bounded
+technical JSON when its exact non-secret value is `worker-v1`; raw paths,
+queries, headers, bodies, errors and favorite content are excluded. Diagnostic
+failures are isolated from resolution. Publication does not run a D1 migration.
+
+La gate complète, le paquet Chromium isolé et le parcours multi-fournisseur
+passent. Deux constructions indépendantes reproduisent exactement :
+
+- Chrome : 286771 octets, SHA-256 `98811bff45e3670c7eda5f62aee211dd64abe0460c4832ed2ded9d4419e8cf1d`.
+- Firefox : 286816 octets, SHA-256 `3587e5c305fd69ae503b28b664d27e6ee5ffff6438ed79a2f2f9ee540c8ca04a`.
+
+Le plan Cloudflare
+`f3c49715496e45632b8d2889b434e6257b7afe49113801a2ab83cbe3041454fe`
+a publié les deux objets et le Worker
+`1ac73214-008b-4d56-a3d3-be7c1162ba9d` à 100 %, sans migration D1. Les deux
+téléchargements publics reproduisent les hashes ci-dessus, `/download` annonce
+1.0.14 et les sept parcours de production passent. Un tail réel a corrélé le
+header `X-Tobirink-Request-Id` avec un événement `worker.request` de famille
+`release`, statut 200 et durée bornée, sans contenu applicatif. Conserver le
+Worker `a7fa4736-3915-4608-b97e-ddb7a99da750` et les ZIP 1.0.12 comme rollback.
+
+### Live queue diagnostics candidate — 2026-09-12
+
+Candidate `1.0.13` exposes the observed favorite count and inventory checkpoint
+in Options. Its primary action performs an actual bounded reconciliation and
+library projection repair; the secondary action only refreshes the counters.
+Both commands are restricted to the trusted Options page. This makes an empty
+inventory distinguishable from an active scan or queued provider work. It does
+not yet prove recovery of the user's private profile and is not published.
+
+The packaged Chromium journey creates six browser bookmarks, opens Options,
+activates « Relancer l’analyse », observes a complete six-item inventory, then
+verifies five resolved media works and one excluded ordinary YouTube link.
+`npm run verify`, the Chromium migration suite and Archify showcase pass. Two
+isolated builds reproduce these local archives:
+
+- Chrome: 285618 bytes, SHA-256 `b9e9cbb9b4ae29ccb79f1f877fd0f3566abd6cc11b55fe4a00fffb221e6961a1`.
+- Firefox: 285663 bytes, SHA-256 `0efaaa3cb01bb2423233d1b279a9946ae99b81eedb39c3108ed48eca8fbf9f59`.
+
+### Robust pipeline release — 2026-09-12
+
+Release `1.0.12` restores D1 exact-ID hydration recovery,
+independent provider restoration, dated internal retries, root release routes,
+honest MangaDex pagination and linked MangaUpdates hydration. Provider response
+limits are 512 KiB, separate from the 64 KiB bridge. Library reads, message
+schemas and repair no longer stop at 500 works. Primary metadata upgrades
+preserve existing work identity. Cover failures attempt one ID-based Worker
+lookup for an already ingested R2 master; no production covers were populated.
+
+The packaged Chromium journey passes with five resolved synthetic works,
+MangaUpdates metadata for the explicit MangaDex cross-reference, provider
+covers without referrers, zero imported Reviews, excluded ordinary YouTube
+and offline reload. A separate synthetic 1 400-work IndexedDB projection in
+that installed extension validates its late cursor through the runtime message
+boundary. This projection test does not claim 1 400 live provider resolutions.
+Six website journeys pass, including connection states and persistent facets.
+The Firefox 151 isolated installation smoke passes health, ordinary bookmark
+exclusion, empty Review queue and zero imported Review.
+
+The complete `npm run verify` chain passes, including workspace tests,
+typechecks, performance checks, CRG smoke, integration and dependency audit
+(zero vulnerabilities). Archify showcase passes 9/9. The separate Chromium
+IndexedDB migration suite and the production website build pass. Native
+Firefox evidence is the installed smoke above, not the complete migration suite.
+
+Two isolated builds reproduce the final local archives:
+
+- Chrome: 285247 bytes, SHA-256 `4b6642dfe4008ccb1d2ca1a57bfbdf48ebdc41d79e537d2bdbe3a37456cb961b`.
+- Firefox: 285292 bytes, SHA-256 `014de4344a0e7781eef8b74e3ee2a09b1073a9d6e3d6ff39dfc37a6d6d29aaf7`.
+
+The source comparison used FavLib read-only, including historical `3267de2`,
+to identify omitted release routes and retry isolation. No FavLib private
+database was imported or committed. The synthetic equivalence snapshot changes
+only adapter versions and their fingerprints; it is not evidence of parity
+with the user's private corpus.
+
+After the user's explicit deployment request, gate plan
+`808bb95417403e2a782da2c72af17453634ecc5b0e647b5f1d7fc30b0fcacdda`
+published both ZIPs and Worker `a7fa4736-3915-4608-b97e-ddb7a99da750`.
+Public downloads return HTTP 200 and match both hashes above; `/download`
+advertises 1.0.12 and `/library` and `/agenda` return HTTP 200.
+The Playwright run against the production base URL passes 7/7; provider data
+and bridge fixtures remain synthetic. Previous Worker
+`6d02c19a-9760-44ae-ab89-26e82bbc77e0` and the 1.0.11 archives remain the
+rollback references; its deployment snapshot is retained locally.
+
+No D1 migration was applied and no user data was deleted. Populating R2 cover
+associations and verifying the user's actual installed profile remain separate
+operations. Publishing a ZIP does not update an unpacked browser installation.
+The user's `.codex/config.toml` change remains outside these commits.
+
+### Comix route correction candidate — 2026-09-11
+
+Candidate `1.0.11` recognizes exact Comix title/chapter routes as manga and
+keeps newer bundled rules when an older owner cache is present. Forty targeted
+tests pass, including reimport of an unsupported source without data deletion.
+The packaged Chromium journey resolves its synthetic Comix bookmark through
+MangaUpdates and verifies that no anime query is issued for that title.
+Two isolated builds reproduce both archives:
+
+- Chrome: 283267 bytes, SHA-256 `66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea`.
+- Firefox: 283311 bytes, SHA-256 `69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb`.
+
+`npm run verify` passes. Gate plan
+`45d191ea218c83a1832adbbd8338da5a09ad4a07627fdd76fa16e73e0a7d6070`
+published both ZIPs and Worker `6d02c19a-9760-44ae-ab89-26e82bbc77e0`.
+Public downloads match the hashes above, `/download` advertises 1.0.11,
+and `/library` returns HTTP 200. No D1 migration was applied. Previous Worker
+`63799f79-d60f-448f-8291-2ca46f091dad` remains the rollback reference.
+
+The user's site tab was observed empty. Its installed extension version and
+queue diagnostics remain unavailable through the browser control adapter;
+these local tests do not certify recovery of the complete private library.
+
+### MangaUpdates transport candidate — 2026-09-11
+
+Candidate `1.0.10` restores the API-specific Origin header rule, keeps HTTP
+403 retryable instead of selecting MangaDex, and accepts absent provider image
+URLs. Installed Chromium 153 reproduces 403 with the rule disabled and 200
+with 25 results when enabled. A separate live public query passes through the
+real adapter, paginated checkpoints and matcher and resolves to MangaUpdates.
+The packaged multi-provider import, WebBridge and offline journey passes.
+Two isolated builds reproduce both archives:
+
+- Chrome: 283003 bytes, SHA-256 `82401ff3a8dfb1e122d0a63dcfd451f1eb42f6d01e2d6b8fc5e9a56f7da17612`.
+- Firefox: 283048 bytes, SHA-256 `58bd2bb00d3a9e7b82e9ebeae63d5469cf5984b9ba5a7b297d45084b355d9f3e`.
+
+`npm run verify` passes. Gate plan
+`2b25ce4cd70d15a02ed4715fee463696912978b2ee0131406bedc06842d96672`
+published both ZIPs and Worker `63799f79-d60f-448f-8291-2ca46f091dad`.
+Public downloads match the hashes above and `/download` advertises 1.0.10.
+No D1 migration was applied. Previous Worker
+`0721e450-0098-43fd-ae64-923640b332f1` remains the rollback reference.
+The user's installed-profile reload remains unverified.
+Previously stored MangaDex identities remain preserved; this
+candidate does not certify complete migration of that private library.
+
+### Cover and queue correction candidate — 2026-09-11
+
+Candidate `1.0.9` passes `npm run verify`, the current-archive multi-provider
+Playwright journey and the installed Chromium Review smoke test. Two isolated
+builds produce identical archives:
+
+- Chrome: 282615 bytes, SHA-256 `e4c7412a62ac49239d2e8a12204570d82c0c54ee2f82e32eb60deed844b1b2fe`.
+- Firefox: 282663 bytes, SHA-256 `372956d453f152a1f44e420fb75594ddb8dc995863423fdfc38c5ce6738b102b`.
+
+Live Chrome inspection reproduced a MangaDex replacement image served with
+HTTP 200; the same public diagnostic URL without a Referer decoded as the real
+512-by-728 cover. The packaged journey checks decoded images and absent Referer
+headers for the provider fixtures. Native Firefox installation was not verified
+for this candidate. This evidence does not certify the complete private library.
+
+Publication completed through gate plan
+`8b4518333f37265a97114c96d62c93fee2b449b0dd857a53ca635c0f6a4cc64b`:
+Worker `0721e450-0098-43fd-ae64-923640b332f1` serves the updated site and both
+versioned ZIPs are uploaded. Public downloads return HTTP 200 and match the
+hashes above; `/download` advertises 1.0.9 and `/library` returns HTTP 200.
+Cloudflare credentials were loaded in memory from the user-designated legacy
+environment file; no secret was copied into this repository. No D1 migration
+was applied. Retain previous Worker version
+`037cb356-d934-4814-b283-ae09e43e6582` as the rollback reference.
+The browser control adapter cannot claim Chrome's internal extension manager,
+so the user's installed extension has not been reloaded. Installed private
+library certification remains pending that reload.
 
 ### Favorites queue correction — 2026-09-11
 

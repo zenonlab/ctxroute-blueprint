@@ -16,7 +16,7 @@ describe('AniListFavoriteProviderAdapter', () => {
   it('fails closed on a malformed or oversized response', async () => {
     const malformed = new AniListFavoriteProviderAdapter(async () => new Response(JSON.stringify({ data: {} }), { headers: { 'content-type': 'application/json' } }));
     await expect(malformed.search({ limit: 1, provider: 'anilist', titles: ['Titre'] })).rejects.toThrow();
-    const oversized = new AniListFavoriteProviderAdapter(async () => new Response('x', { headers: { 'content-length': '65537', 'content-type': 'application/json' } }));
+    const oversized = new AniListFavoriteProviderAdapter(async () => new Response('x', { headers: { 'content-length': '524289', 'content-type': 'application/json' } }));
     await expect(oversized.search({ limit: 1, provider: 'anilist', titles: ['Titre'] })).rejects.toThrow(/too large/u);
   });
 

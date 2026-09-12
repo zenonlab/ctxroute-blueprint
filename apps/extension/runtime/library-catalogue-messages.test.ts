@@ -14,7 +14,7 @@ describe('library catalogue messages', () => {
   it('validates stable facet and statistic snapshots', () => {
     expect(libraryCatalogueResponseSchema.safeParse({ ok: true, snapshot: {
       facets: { format: [], genre: [{ count: 2, label: 'Fantasy', value: 'fantasy' }], progress: [], source: [], status: [], type: [], year: [] },
-      items: [{ detail: 'TV · 2024 · En cours', id: 'work_library-one', mediaType: 'anime', progress: '3 / 12', source: 'anilist', title: 'Frieren' }],
+      items: [{ detail: 'TV · 2024 · En cours', id: 'work_library-one', mediaType: 'anime', progress: '3 / 12', source: 'anilist', state: 'ready', title: 'Frieren' }],
       statistics: { completed: 0, inProgress: 1, knownMetadata: 1, notStarted: 0, total: 1 }, total: 1, truncated: false,
     } }).success).toBe(true);
   });

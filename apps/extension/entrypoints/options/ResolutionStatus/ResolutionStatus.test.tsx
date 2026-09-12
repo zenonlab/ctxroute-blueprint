@@ -3,11 +3,32 @@ import { describe, expect, it } from 'vitest';
 import { ResolutionStatus } from './index';
 
 describe('ResolutionStatus', () => {
+  it('distinguishes internal and collective waits without calling them provider failures', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 3, processing: 0, retryable: 3, unsupported: 0, internalErrors: 1, collectivePending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ continuationAt: '2026-09-12T12:05:00.000Z', status: 'presence' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain('Dont erreurs internes');
+    expect(html).toContain('Dont attente du service collectif');
+    expect(html).toContain('Vérification des favoris encore présents');
+    expect(html).toContain('Prochaine reprise automatique');
+    expect(html).toContain('Reprendre maintenant');
+    expect(html).not.toContain('panne fournisseur');
+  });
   it('shows private processing states separately from actionable Review', () => {
-    const html = renderToStaticMarkup(<ResolutionStatus counts={{ processing: 12, retryable: 2, unsupported: 8 }} onRefresh={() => undefined} state="ready" />);
+    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 22, processing: 12, retryable: 2, unsupported: 8 }} diagnostics={{ enabled: true, events: [{ occurredAt: '2026-09-12T12:00:00.000Z', outcome: 'complete', runId: 'run-1', sequence: 'event-1', stage: 'resolution', version: 1 }] }} inventory={{ status: 'complete' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
     expect(html).toContain('Traitement en cours');
     expect(html).toContain('Liens non pris en charge');
-    expect(html).toContain('panne fournisseur');
+    expect(html).toContain('attente de reprise');
+    expect(html).toContain('Favoris observés');
+    expect(html).toContain('Vérifier à nouveau');
+    expect(html).toContain('Désactiver le diagnostic');
+    expect(html).toContain('Résolution · terminé · passage run-1');
     expect(html).not.toContain('href=');
+  });
+
+  it('guides a new installation before its first scan', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus counts={{ observed: 0, processing: 0, retryable: 0, unsupported: 0 }} diagnostics={{ enabled: false, events: [] }} inventory={{ status: 'not-started' }} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain('Lire les favoris du navigateur');
+    expect(html).toContain('Vérifier les favoris encore présents');
+    expect(html).toContain('Identifier et enrichir les œuvres');
+    expect(html).toContain('Commencer l’analyse');
   });
 });

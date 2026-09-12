@@ -5,8 +5,27 @@ const id = '12345678-1234-4234-8234-123456789abc';
 const payload = { result: 'ok', data: { id, type: 'manga', attributes: { title: { en: 'Synthetic Series' }, altTitles: [{ ja: 'Synthetic Alias' }], contentRating: 'safe', lastChapter: '42', lastVolume: '6', originalLanguage: 'ko', status: 'ongoing', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }, { attributes: { group: 'theme', name: { en: 'School Life' } } }, { attributes: { group: 'format', name: { en: 'Long Strip' } } }], year: 2021 }, relationships: [{ attributes: { fileName: 'cover-file.jpg' }, id: '12345678-1234-4234-8234-123456789abd', type: 'cover_art' }] } };
 
 describe('MangaDex exact hydration', () => {
+  it.each(['abc123', 'https://www.mangaupdates.com/series/abc123/synthetic'])('retains a modern MangaUpdates reference: %s', async (mu) => {
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ ...payload, data: { ...payload.data, attributes: { ...payload.data.attributes, links: { mu } } } }));
+    expect((await adapter.hydrate({ provider: 'mangadex', externalId: id }))?.linkedReferences).toEqual([{ provider: 'mangaupdates', externalId: String(parseInt('abc123', 36)) }]);
+  });
+  it.each(['12345', 'https://www.mangaupdates.com/series.html?id=12345', 'https://untrusted.example/series/abc123'])('does not invent a canonical identity from %s', async (mu) => {
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ ...payload, data: { ...payload.data, attributes: { ...payload.data.attributes, links: { mu } } } }));
+    expect((await adapter.hydrate({ provider: 'mangadex', externalId: id }))?.linkedReferences).toBeUndefined();
+  });
+  it('retains a next page and forwards its offset instead of claiming completeness', async () => {
+    const unrelated = { ...payload.data, id: '12345678-1234-4234-8234-123456789abd', attributes: { ...payload.data.attributes, title: { en: 'Unrelated Constellation' }, altTitles: [] } };
+    const fetcher = vi.fn(async () => Response.json({ result: 'ok', data: [payload.data, ...Array.from({ length: 19 }, () => unrelated)], limit: 20, offset: 20, total: 41 }));
+    const result = await new MangaDexFavoriteProviderAdapter(fetcher).search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 10, cursor: '2' });
+    expect(result).toMatchObject({ complete: false, truncated: true, nextCursor: '3' });
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('offset=20'), expect.anything());
+  });
+  it('rejects inconsistent pagination instead of declaring no-match', async () => {
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ result: 'ok', data: [], limit: 20, offset: 0, total: 42 }));
+    await expect(adapter.search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 })).rejects.toThrow('pagination');
+  });
   it('searches by a bounded title and returns normalized candidates', async () => {
-    const fetcher = vi.fn(async () => Response.json({ result: 'ok', data: [payload.data] }));
+    const fetcher = vi.fn(async () => Response.json({ result: 'ok', data: [payload.data], limit: 20, offset: 0, total: 1 }));
     const adapter = new MangaDexFavoriteProviderAdapter(fetcher);
     const result = await adapter.search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 });
     expect(result).toMatchObject({ provider: 'mangadex', complete: true, candidates: [{ provider: 'mangadex', externalId: id, mediaKind: 'MANHWA' }] });

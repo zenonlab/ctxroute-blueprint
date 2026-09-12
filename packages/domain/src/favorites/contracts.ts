@@ -62,6 +62,7 @@ export interface FavoriteObservation {
 }
 
 export interface ProviderCandidate {
+  readonly linkedReferences?: readonly ProviderCandidateReference[];
   readonly canonicalUrl?: string;
   readonly categories?: readonly string[];
   readonly externalId: string;
@@ -251,6 +252,15 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
   if (titleVariants !== undefined) Object.assign(candidate, { titleVariants });
   if (input.metadataVersion !== undefined) Object.assign(candidate, { metadataVersion: input.metadataVersion });
   if (canonicalUrl !== undefined) Object.assign(candidate, { canonicalUrl });
+  if (input.linkedReferences !== undefined) {
+    contract(input.linkedReferences.length <= 5, 'linkedReferences exceeds five providers.');
+    contract(new Set(input.linkedReferences.map(reference => reference.provider)).size === input.linkedReferences.length, 'linkedReferences requires distinct providers.');
+    for (const reference of input.linkedReferences) {
+      contract(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga'].includes(reference.provider), 'linked reference provider is invalid.');
+      boundedText(reference.externalId, 'linkedReferences.externalId', favoriteTitleByteLimit);
+    }
+    Object.assign(candidate, { linkedReferences: Object.freeze(input.linkedReferences.map(freezeReference)) });
+  }
   return Object.freeze(candidate);
 }
 
