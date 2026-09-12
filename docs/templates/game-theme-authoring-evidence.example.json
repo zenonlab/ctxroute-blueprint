@@ -1,0 +1,22 @@
+{
+  "format": "orbite.game-theme-authoring-evidence.fixture/1",
+  "notice": "Free synthetic fixture used only to test linked evidence integrity.",
+  "gates": [
+    "input_integrity",
+    "engine_research",
+    "inventory_closure",
+    "coordinate_probe",
+    "dependency_closure",
+    "source_relations",
+    "conversion_determinism",
+    "witness_scene",
+    "animation_semantics",
+    "effect_semantics",
+    "ui_generation",
+    "session_identity",
+    "isolated_runtime",
+    "visual_matrix",
+    "interaction_matrix",
+    "pause_occlusion"
+  ]
+}

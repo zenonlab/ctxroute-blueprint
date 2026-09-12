@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orbite.local/schemas/game-theme-authoring-run-v1.json",
+  "title": "Orbite game theme authoring run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "status", "concept", "workspace", "engine_profile", "relations", "scenes", "gates", "activation"],
+  "properties": {
+    "format": { "const": "orbite.game-theme-authoring-run/1" },
+    "id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["researching", "proposed", "accepted", "converting", "candidate", "qualified", "activated", "failed", "blocked"] },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativeJsonPath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_root", "active_artifact_reference", "candidate_built_outside_active_install", "active_install_untouched_until_qualified", "commercial_content"],
+      "properties": {
+        "candidate_root": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "active_artifact_reference": { "type": ["string", "null"], "maxLength": 1024 },
+        "candidate_built_outside_active_install": { "const": true },
+        "active_install_untouched_until_qualified": { "const": true },
+        "commercial_content": { "const": "private-only" }
+      }
+    },
+    "engine_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine_id", "revision", "evidence_ids", "coordinates", "semantics", "dependency_closure"],
+      "properties": {
+        "engine_id": { "$ref": "#/$defs/id" },
+        "revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["handedness", "up_axis", "forward_axis", "unit", "meters_per_unit", "transform_order", "matrix_convention"],
+          "properties": {
+            "handedness": { "enum": ["left", "right"] },
+            "up_axis": { "$ref": "#/$defs/axis" },
+            "forward_axis": { "$ref": "#/$defs/axis" },
+            "unit": { "$ref": "#/$defs/id" },
+            "meters_per_unit": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+            "transform_order": { "type": "string", "minLength": 1, "maxLength": 96 },
+            "matrix_convention": { "type": "string", "minLength": 1, "maxLength": 96 }
+          }
+        },
+        "semantics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["animation_timing", "loop_metadata", "root_motion", "attachments", "effect_emitters", "material_pipeline", "scene_dependencies"],
+          "properties": {
+            "animation_timing": { "$ref": "#/$defs/sourceKind" },
+            "loop_metadata": { "$ref": "#/$defs/sourceKind" },
+            "root_motion": { "$ref": "#/$defs/sourceKind" },
+            "attachments": { "$ref": "#/$defs/sourceKind" },
+            "effect_emitters": { "$ref": "#/$defs/sourceKind" },
+            "material_pipeline": { "$ref": "#/$defs/sourceKind" },
+            "scene_dependencies": { "$ref": "#/$defs/sourceKind" }
+          }
+        },
+        "dependency_closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["roots", "discovered", "resolved", "unresolved", "cycles", "status"],
+          "properties": {
+            "roots": { "type": "integer", "minimum": 1 },
+            "discovered": { "type": "integer", "minimum": 1 },
+            "resolved": { "type": "integer", "minimum": 0 },
+            "unresolved": { "type": "integer", "minimum": 0 },
+            "cycles": { "type": "integer", "minimum": 0 },
+            "status": { "enum": ["partial", "complete"] }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "source_kind", "evidence_ids", "axes", "on_unresolved"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "status": { "enum": ["planned", "qualified", "not_applicable", "missing", "unsupported"] },
+          "source_kind": { "$ref": "#/$defs/sourceKind" },
+          "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+          "axes": { "type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+          "on_unresolved": { "const": "reject" }
+        }
+      }
+    },
+    "scenes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "witness", "same_adapter", "runtime_changes_for_witness"],
+      "properties": {
+        "primary": { "$ref": "#/$defs/id" },
+        "witness": { "$ref": "#/$defs/id" },
+        "same_adapter": { "const": true },
+        "runtime_changes_for_witness": { "const": false }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "status": { "enum": ["pending", "pass", "fail", "blocked"] },
+          "evidence": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/evidence" }] }
+        }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "active_receipt"],
+      "properties": {
+        "attempted": { "type": "boolean" },
+        "active_receipt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/evidence" }] }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relativeJsonPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}\\.json$" },
+    "relativePath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}$" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "axis": { "enum": ["x", "-x", "y", "-y", "z", "-z"] },
+    "sourceKind": { "enum": ["source_table", "source_metadata", "source_code", "not_applicable"] }
+  }
+}

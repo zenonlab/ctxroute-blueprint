@@ -78,6 +78,19 @@ explicite ou lorsqu'un domaine reste `missing/unsupported`. La fixture libre vé
 aussi le cadre de pin, ses quatre réglages, ses trois décisions atomiques et la
 persistance des objets désactivés.
 
+Après acceptation, `orbite.game-theme-authoring-run/1` devient le ledger de preuve du
+premier rendu. `node scripts/verify-game-theme-authoring-run.mjs <run.json>` exige
+les dix-sept gates dans l'ordre, une fermeture exacte des dépendances, quatre familles
+minimales de relations source, des axes haut/avant distincts et une seconde scène
+convertie par le même adaptateur sans modification du runtime. Les gates échoués ou
+bloqués conservent un chemin de preuve ; seul `pending` n'en porte pas.
+
+L'activation native reste interdite jusqu'à ce que les seize gates précédents soient
+`pass`, que le concept accepté permette la génération et que le candidat ait été
+construit hors de l'installation active. Le test de la fixture vérifie aussi le refus
+d'une activation prématurée, d'une fausse scène témoin, d'un graphe de dépendances
+incomplet, d'un ordre de gates modifié et d'une famille de relations absente.
+
 La découverte de thèmes ajoute des fixtures temporaires sans nom de jeu. Les tests
 exigent un parcours déterministe, le rejet des traversées et formats incohérents,
 la déduplication des identités et des racines issues uniquement de configuration.

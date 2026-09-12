@@ -205,6 +205,43 @@ l'utilisateur et jusqu'à ce que tous les sous-systèmes soient `studied` ou
 maintiennent `generation_allowed: false`. Ce gate empêche une première map longuement
 ajustée à la main de masquer l'absence d'un convertisseur réutilisable.
 
+### Ledger exécutable du premier rendu
+
+Après acceptation du concept, chaque adaptation conserve un
+`orbite.game-theme-authoring-run/1`. Ce ledger sépare le candidat privé de
+l'installation active et impose dix-sept gates ordonnés : intégrité de l'entrée,
+recherche moteur, fermeture de l'inventaire, repères, dépendances, relations source,
+déterminisme, seconde scène témoin, animations, effets, UI, sessions, runtime isolé,
+matrices visuelle et interactive, pause/occlusion, puis seulement activation native.
+
+Le profil moteur enregistre explicitement latéralité, axes haut/avant, unité,
+conversion métrique, ordre des transformations et convention matricielle. Il nomme
+aussi la provenance de la durée d'animation, du bouclage, du root motion, des points
+d'attache, des émetteurs, des matériaux et des dépendances. Une sonde asymétrique
+valide ces conventions avant le premier export visible.
+
+Les relations minimales `placement`, `attachment`, `effect_origin` et
+`interactive_hit_region` sont planifiées comme matrices ouvertes. Une relation peut
+être prouvée `not_applicable`, mais jamais remplacée par une constante de secours.
+Le graphe de dépendances est fermé lorsque `resolved == discovered` et
+`unresolved == 0`; les cycles sont comptés sans duplication.
+
+La scène témoin diffère de la scène principale et passe par le même adaptateur sans
+modification du runtime. Le candidat est ensuite exécuté dans un viewer isolé. Le
+wallpaper installé, son processus et ses permissions restent intacts tant que les
+seize premiers gates n'ont pas tous une preuve `pass`. La commande suivante calcule
+séparément les droits de génération et d'activation :
+
+```bash
+node scripts/verify-game-theme-authoring-run.mjs private/candidate/run.json
+```
+
+Le playbook complet destiné aux agents est fourni par
+`.agents/skills/game-theme-author/references/first-pass-playbook.md`. Il décrit les
+livrables attendus, la recherche du moteur, les animations sans téléportation de
+boucle, la cardinalité des émetteurs, les menus automatiques et le test universel à
+deux scènes.
+
 « Tous les émulateurs » désigne ici toutes les sources pour lesquelles un adaptateur
 peut produire le contrat canonique, et non l'embarquement d'un émulateur dans le
 runtime. Décompilations, parseurs statiques, outils communautaires et émulateurs

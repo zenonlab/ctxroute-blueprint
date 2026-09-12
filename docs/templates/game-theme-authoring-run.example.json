@@ -1,0 +1,82 @@
+{
+  "format": "orbite.game-theme-authoring-run/1",
+  "id": "fixture-island-first-pass",
+  "status": "qualified",
+  "concept": {
+    "path": "wallpaper-concept.example.json",
+    "sha256": "8f3075199bf658e8127247170eb630148f18988e85cc8f42187545ae9562d6b4"
+  },
+  "workspace": {
+    "candidate_root": "private/candidates/fixture-island-first-pass",
+    "active_artifact_reference": null,
+    "candidate_built_outside_active_install": true,
+    "active_install_untouched_until_qualified": true,
+    "commercial_content": "private-only"
+  },
+  "engine_profile": {
+    "engine_id": "fixture.engine",
+    "revision": "fixture-reader@1.0.0",
+    "evidence_ids": ["format-doc", "local-index"],
+    "coordinates": {
+      "handedness": "right",
+      "up_axis": "y",
+      "forward_axis": "-z",
+      "unit": "centimeter",
+      "meters_per_unit": 0.01,
+      "transform_order": "scale-rotate-translate",
+      "matrix_convention": "column-vector"
+    },
+    "semantics": {
+      "animation_timing": "source_metadata",
+      "loop_metadata": "source_metadata",
+      "root_motion": "source_code",
+      "attachments": "source_table",
+      "effect_emitters": "source_table",
+      "material_pipeline": "source_code",
+      "scene_dependencies": "source_metadata"
+    },
+    "dependency_closure": {
+      "roots": 2,
+      "discovered": 24,
+      "resolved": 24,
+      "unresolved": 0,
+      "cycles": 1,
+      "status": "complete"
+    }
+  },
+  "relations": [
+    { "id": "placement", "status": "qualified", "source_kind": "source_table", "evidence_ids": ["local-index"], "axes": ["scene", "variant"], "on_unresolved": "reject" },
+    { "id": "attachment", "status": "qualified", "source_kind": "source_table", "evidence_ids": ["local-index"], "axes": ["subject", "carrier"], "on_unresolved": "reject" },
+    { "id": "effect_origin", "status": "qualified", "source_kind": "source_table", "evidence_ids": ["local-index"], "axes": ["carrier", "effect"], "on_unresolved": "reject" },
+    { "id": "interactive_hit_region", "status": "qualified", "source_kind": "source_metadata", "evidence_ids": ["format-doc"], "axes": ["object", "state"], "on_unresolved": "reject" }
+  ],
+  "scenes": {
+    "primary": "scene.archipelago",
+    "witness": "scene.harbor",
+    "same_adapter": true,
+    "runtime_changes_for_witness": false
+  },
+  "gates": [
+    { "id": "input_integrity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "engine_research", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "inventory_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "coordinate_probe", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "dependency_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "source_relations", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "conversion_determinism", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "witness_scene", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "animation_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "effect_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "ui_generation", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "session_identity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "isolated_runtime", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "visual_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "interaction_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "pause_occlusion", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "dd0b8eebc73dcbeec1843fce015b206afda10bef5fea84eff286ea810ab456e8" } },
+    { "id": "native_activation", "status": "pending", "evidence": null }
+  ],
+  "activation": {
+    "attempted": false,
+    "active_receipt": null
+  }
+}
