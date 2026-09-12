@@ -1,6 +1,6 @@
 # Pipeline de reconstruction des favoris
 
-- Version de pipeline : 3
+- Version de pipeline : 4
 - Contrat comportemental : `favorite-parsing-resolution-spec` v3 et [plan correctif v3](favorite-resolution-correction-plan.md)
 
 ## Statut et portée
@@ -15,8 +15,9 @@ qu’un indice signifie; ce document décide où il est produit, persisté, repr
 testé et projeté.
 
 Le navigateur possède présence et progression observée; IndexedDB possède
-les transactions privées. Sync restaure seulement les IDs. Le Worker seul
-possède D1, pour lookup owner-scoped puis confirmations distinctes. La pipeline
+les transactions privées. Sync restaure les IDs et leurs associations à une
+empreinte normalisée, jamais les titres ni la navigation. Le Worker seul
+possède D1, pour cache public, lookup owner-scoped puis confirmations distinctes. La pipeline
 et ses budgets suivent le plan v3; la section suivante décrit l'ancien runtime,
 qui ne constitue pas le résultat cible.
 
@@ -871,6 +872,23 @@ requête, erreurs brutes et secrets sont absents des deux contrats. Une panne du
 diagnostic est absorbée et ne modifie jamais le résultat de résolution.
 
 ### Corrections de robustesse du 12 septembre 2026
+
+La version 4 rend la réinstallation cache-first. Chaque favori média parsé est
+projeté dès son lot d’inventaire. Le snapshot sync v2 relie son empreinte
+normalisée aux références fournisseur publiques et reste compatible avec les
+listes v1. Sa restauration, son scan de publication et l’inventaire possèdent
+chacun une continuation durable jusqu’à `COMPLETE`; leurs résultats incomplets
+ne sont plus ignorés. Le resolver consulte ensuite l’association sync, le cache
+public D1 par empreinte ou référence, puis seulement les fournisseurs.
+
+Après une première résolution, une contribution publique bornée rejoint une
+outbox locale indépendante du commit de l’œuvre. Le Worker réserve un job
+idempotent et écrit avec SQL préparé la fiche fournisseur publique, ses aliases,
+références et faits de tri. Un conflit de références pour une même empreinte
+reste explicite. D1 ne stocke jamais l’URL du favori, son dossier, sa progression,
+une décision humaine, un diagnostic ou un secret. La base publique ne représente
+pas la bibliothèque d’un propriétaire; elle évite de redemander une fiche déjà
+connue.
 
 Les références provenant du collectif suivent le même chemin d'hydratation
 que les références explicites et les résultats locaux. Le secours HTTP 405

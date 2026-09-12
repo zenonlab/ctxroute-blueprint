@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -7521,6 +7521,112 @@
             "Installed Chromium 153 archive observed 1403 bookmarks, exposed the pending MangaUpdates manga during synthetic provider outages, scheduled durable retries and created zero Reviews at import.",
             "Two isolated builds reproduced Chrome b565e7d5...08dc1 and Firefox cdcf41bf...22a1c; Archify showcase passed 9/9 and the rebuilt WebBridge v4 site passed all three targeted Playwright journeys."
           ]
+        },
+        {
+          "id": "step-25",
+          "title": "Define the cache-first recovery contract",
+          "status": "DONE",
+          "acceptance": [
+            "The documented order is browser inventory then synchronized associations then D1 cache then provider search",
+            "The privacy boundary distinguishes public provider metadata from private bookmark URL folder and progress",
+            "The continuation contract covers incomplete inventory synchronized restoration publication and cache ingestion",
+            "The favorite-resolution Archify dataflow passes showcase validation"
+          ],
+          "files": [
+            "docs/decisions/ADR-0043-cache-first-reinstall-recovery.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m \"docs(recovery): define cache-first reinstall flow\""
+          ],
+          "evidence": [
+            "ADR-0043 records sync fingerprint associations D1 public cache boundaries and durable continuation without deleting existing data",
+            "favorite-resolution dataflow cache-first 1.0.17 passes Archify showcase 9 of 9 with zero errors and warnings",
+            "Decision and complete documentation validation pass; git diff check is clean"
+          ]
+        },
+        {
+          "id": "step-26",
+          "title": "Connect synchronized associations and D1 cache ingestion",
+          "status": "TODO",
+          "acceptance": [
+            "A versioned storage.sync snapshot maps normalized fingerprints to public provider IDs while remaining compatible with version 1",
+            "Incomplete identity restoration and publication always schedule another durable wake and finish without unrelated work",
+            "Favorite resolution reads synchronized associations and D1 before direct provider search",
+            "The Worker accepts bounded idempotent cache jobs and writes only validated public work metadata and normalized lookup keys through prepared D1 statements",
+            "Private bookmark URLs folders progress decisions and secrets never enter storage.sync or D1",
+            "No existing row is deleted and the migration is additive"
+          ],
+          "files": [
+            "packages/application/src/recovery/provider-identity-snapshot.ts",
+            "packages/application/src/recovery/provider-identity-recovery.ts",
+            "packages/application/src/recovery/provider-identity-recovery.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/ports/cloud-data-ports.ts",
+            "packages/adapters-browser/src/catalogue",
+            "packages/adapters-browser/src/recovery",
+            "packages/adapters-cloudflare/src/catalogue",
+            "apps/extension/runtime/provider-identity-recovery-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-provider-runtime.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/worker/migrations/0005_public_favorite_cache.sql",
+            "apps/worker/src/catalogue/catalogue-routes.ts",
+            "apps/worker/src/catalogue/catalogue-routes.test.ts",
+            "apps/worker/src/composition.ts",
+            "apps/worker/wrangler.jsonc",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/worker",
+            "npm run typecheck",
+            "npm run test:d1",
+            "git diff --check",
+            "git commit -m \"fix(recovery): connect sync and shared cache\""
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-27",
+          "title": "Certify cache-first reinstall convergence",
+          "status": "TODO",
+          "acceptance": [
+            "A fresh installed profile with 1400 favorites projects the complete parsed inventory before hydration finishes",
+            "A second installation restores known associations without provider title searches",
+            "Interrupted inventory sync restore publication and Worker cache jobs resume to completion",
+            "Chrome and Firefox packages are reproducible and the complete repository verification passes",
+            "Production publication remains unapplied pending its separate Cloudflare gate"
+          ],
+          "files": [
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension -- --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.17.zip",
+            "npm run test:e2e --workspace @tobirink/web -- --grep \"packaged Chrome extension\"",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m \"test(recovery): certify cache-first reinstall\""
+          ],
+          "evidence": []
         }
       ]
     }
