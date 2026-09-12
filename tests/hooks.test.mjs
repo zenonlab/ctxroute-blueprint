@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
+import { routingContext } from '../.codex/hooks/mission-context.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
@@ -85,7 +86,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     PreToolUse: ['pre-tool-architecture.mjs'],
     PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['problem-memory.mjs'],
-    PreCompact: ['ctxroute-reset.js'],
+    PreCompact: ['ctxroute-reset.js', 'mission-context.mjs'],
     Stop: ['worker-restitution.mjs', 'ctxroute-reset.js', 'stop-review.mjs'],
   };
   for (const event of lifecycleEvents) {
@@ -118,6 +119,21 @@ test('the lifecycle dispatcher executes sequentially and merges non-blocking con
   });
   assert.deepEqual(called, ['pre-tool-architecture.mjs']);
   assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-architecture.mjs');
+});
+
+test('SessionStart retains the canonical file routing and hook timing', () => {
+  const output = routingContext(root);
+  const context = output.hookSpecificOutput?.additionalContext ?? '';
+  assert.match(context, /source: packages\/, scripts\//u);
+  assert.match(context, /architecture: docs\/architecture\/src\/blueprint\.architecture\.json/u);
+  assert.match(context, /Declare intended files before mutation/u);
+  assert.match(context, /PreToolUse handles prerequisites, PostToolUse audits/u);
+});
+
+test('PreCompact refreshes canonical routing with the correct event envelope', () => {
+  const output = routingContext(root, 'PreCompact');
+  assert.equal(output.hookSpecificOutput?.hookEventName, 'PreCompact');
+  assert.match(output.hookSpecificOutput?.additionalContext ?? '', /Canonical change routing/u);
 });
 
 test('the lifecycle dispatcher skips architecture policy for read-only tools', () => {
@@ -299,7 +315,12 @@ test('both host dispatchers report an unsafe file through the real PostToolUse c
 });
 
 function run(script, input, options = {}) {
-  return spawnSync('node', [join(root, script)], { cwd: options.cwd ?? root, input: JSON.stringify(input), encoding: 'utf8' });
+  return spawnSync('node', [join(root, script)], {
+    cwd: options.cwd ?? root,
+    env: { ...process.env, ...options.env },
+    input: JSON.stringify(input),
+    encoding: 'utf8',
+  });
 }
 
 function stopProcessTree(pid) {
@@ -347,6 +368,32 @@ test('PostToolUse reminds about documentation after a code change', () => {
 test('PostToolUse audits documents and Archify sources', () => {
   const result = run('.codex/hooks/post-tool-audit.mjs', { tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/runtime-loop.mmd' } });
   assert.equal(result.stdout, '');
+});
+
+test('PostToolUse audits the cumulative diff without retroactive prerequisite advice', () => {
+  const cwd = initializedWorkspace();
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :initial\n');
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :changed\n');
+  const result = run('.codex/hooks/post-tool-audit.mjs', {
+    tool_name: 'Edit',
+    tool_input: { file_path: 'docs/architecture/src/blueprint.architecture.json' },
+  }, { cwd, env: { CODEX_POST_TOOL_AUDIT: '1' } });
+  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /Cumulative code scope: src\/existing\.rb/u);
+  assert.doesNotMatch(context, /Read relevant documentation and diagrams before changing code/u);
+});
+
+test('AGENTS defines file declaration and lifecycle timing from canonical policy', () => {
+  const source = readFileSync(join(root, 'AGENTS.md'), 'utf8');
+  assert.match(source, /state the intended repository-relative files/u);
+  assert.match(source, /PreToolUse owns prerequisite routing/u);
+  assert.match(source, /PostToolUse audits the completed write/u);
+  assert.match(source, /PreCompact refreshes it after context compaction/u);
 });
 
 test('Archify preview health checks accept only unauthenticated loopback HTTP URLs', async () => {

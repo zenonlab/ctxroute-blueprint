@@ -113,22 +113,37 @@ if (codeOutsideDeclaredRoots.length) {
 const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(path) && !isTestPath(path, config));
 const structuralChange = paths.some(path => isSourcePath(path, config)) && hasStructuralSignal(addedContent(toolInput));
 if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
-  context(`Potential structural change in ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}. Update an ADR and Archify source only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
+  context([
+    `Before mutating ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}: classify whether the structural signal changes a boundary, contract, dependency, or cross-component flow.`,
+    formatPrerequisites(decisionStatus, config, true),
+    'If material, update the applicable ADR and Archify source before product code; otherwise continue without architecture ceremony.',
+  ].filter(Boolean).join('\n'));
   process.exit(0);
 }
 
 if (paths.some(path => isSourcePath(path, config))) {
-  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
+  context([
+    `Before mutating product code: ${paths.filter(path => isSourcePath(path, config)).join(', ')}.`,
+    formatPrerequisites(decisionStatus, config, false),
+    'Confirm placement, side effects, relevant documentation, and test strategy before applying the write.',
+  ].filter(Boolean).join('\n'));
 } else if (decisionStatus.applicable.length) {
-  context(formatDecisionStatus(decisionStatus));
+  context(`Before mutation:\n${formatPrerequisites(decisionStatus, config, false)}`);
 }
 
-function formatDecisionStatus(status) {
-  if (!status.applicable.length) return '';
+function formatPrerequisites(status, config, includeArchitecture) {
+  const lines = [];
+  if (status.applicable.length) {
   const files = status.applicable.slice(0, 8).map(path => path.split('/').pop()).join(', ');
   const remainder = status.applicable.length > 8 ? ` (+${status.applicable.length - 8})` : '';
   const qualifier = status.status === 'partial' ? ` ${status.message}` : '';
-  return `\n\nApplicable ADRs: ${files}${remainder}. Read only those material to a boundary, contract, dependency, or cross-component flow.${qualifier}`;
+    lines.push(`Read applicable ADRs now: ${files}${remainder}.${qualifier}`);
+  }
+  if (includeArchitecture) {
+    const sources = [...(config.architecture?.documents ?? []), ...(config.architecture?.internalDocuments ?? [])];
+    if (sources.length) lines.push(`Relevant architecture candidates: ${sources.slice(0, 8).join(', ')}${sources.length > 8 ? ` (+${sources.length - 8})` : ''}.`);
+  }
+  return lines.join('\n');
 }
 
 function extractPaths(value) {

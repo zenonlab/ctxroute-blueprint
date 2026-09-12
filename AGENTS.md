@@ -26,6 +26,14 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Give one next action.
 - Briefly state the current status.
 
+## Change routing and hook timing
+
+- At the start of a change, state the intended repository-relative files or the narrowest known path patterns. Treat that list as the working scope and announce additions before touching them.
+- Use `.project/project-config.json` to classify source, test, generated, documentation, architecture, and contract paths. Use active `docs/decisions/ADR-*.md` front-matter scopes to find applicable decisions. Do not maintain a duplicate path list in this file.
+- Before the first mutation, read the applicable ADRs and, only for a material boundary, contract, dependency, or cross-component flow, the relevant Archify source. Update required decision and architecture evidence before product code.
+- PreToolUse owns prerequisite routing and policy for the exact target plus the accumulated Git diff. PostToolUse audits the completed write and cumulative scope. Stop and Git gates validate the complete change.
+- SessionStart keeps a bounded canonical routing map in context and PreCompact refreshes it after context compaction. It is guidance derived from checked project files, never hidden authority or a substitute for reading a relevant decision.
+
 ## Milestones and delegation
 
 - Skip milestone bookkeeping for small, reversible, or single-agent changes. For substantial work, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.

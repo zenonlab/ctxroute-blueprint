@@ -15,14 +15,15 @@ not inject that corpus for each tool call.
 
 ```text
 flowchart TD
-    Session[SessionStart] --> Mission[Targeted worker mission when present]
+    Session[SessionStart] --> Routing[Canonical file routing from project config]
+    Routing --> Mission[Targeted worker mission when present]
     Request[Requested action] --> PreTool[PreToolUse dispatcher]
-    PreTool --> Governance[Governance policy]
+    PreTool --> Governance[Prerequisite ADR and architecture routing]
     Governance -->|allow| Edit[Authorized action]
     Governance -->|block| Refusal[Immediate refusal with reason]
     Edit --> PostTool[PostToolUse dispatcher]
     PostTool --> Sensor[Blocking Sensor]
-    Sensor --> Audit[Local change audit]
+    Sensor --> Audit[Cumulative completed-change audit]
     Audit --> Index[Git index]
     Index --> PreCommit[Authoritative pre-commit]
     PreCommit --> Architecture[Architecture and ADR checks]
@@ -35,11 +36,19 @@ flowchart TD
     Commands --> Stop[Fail-open Stop review]
     Prompt[UserPromptSubmit] --> Observe[Passive problem observation]
     Compact[PreCompact] --> Reset[CTXRoute reset]
+    Reset --> Routing
     Query[Explicit context request] --> Route[Bounded CTXRoute lookup]
 ```
 
-PreToolUse provides immediate feedback. Git hooks remain authoritative because
-they inspect the index and capture files produced by commands or external tools.
+At the start of a change, the agent declares its intended repository-relative
+files. SessionStart retains a bounded canonical routing map derived from
+`.project/project-config.json` and refreshes it after context compaction;
+active ADR front-matter scopes remain the decision-to-file map. PreToolUse names prerequisite reads before mutation and
+evaluates both the exact target and accumulated Git diff. PostToolUse audits
+the completed write and cumulative scope without issuing retroactive advice.
+
+Git hooks remain authoritative because they inspect the index and capture files
+produced by commands or external tools.
 The registered lifecycle handlers intentionally omit custom status messages.
 Read-only tools skip the architecture subprocess, and PostToolUse is limited to
 mutation-capable tools to reduce lifecycle noise and process startup overhead.

@@ -57,6 +57,15 @@ mission injection, bounded worker restitution, cleanup, security checks, and
 passive observability. Stop always fails open, honors `stop_hook_active`, and
 never schedules or blocks in order to continue work.
 
+Session initialization supplies one bounded file-routing map derived from the
+project configuration and active ADR scopes, and PreCompact refreshes the same
+map after context compaction. The map is guidance retained
+in the agent context, not a second policy store. Before a mutation, the hook
+resolves the exact tool targets together with the accumulated Git diff and
+names the ADR or architecture prerequisites that must be read then. After the
+mutation, hooks audit the resulting cumulative scope; they never issue a
+retroactive instruction to perform a prerequisite read.
+
 ## Resource boundaries
 
 No arbitrary maximum number of goals, missions, steps, or workers is part of

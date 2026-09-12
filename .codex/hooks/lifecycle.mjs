@@ -29,7 +29,7 @@ export function handlerPlan(harness, event, root = projectRoot) {
     PreToolUse: [local('pre-tool-architecture.mjs')],
     PostToolUse: [local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
     UserPromptSubmit: [problemMemory('UserPromptSubmit')],
-    PreCompact: [direct('ctxroute-reset.js')],
+    PreCompact: [direct('ctxroute-reset.js'), { ...local('mission-context.mjs'), args: ['PreCompact'] }],
     Stop: [local('worker-restitution.mjs'), direct('ctxroute-reset.js'), local('stop-review.mjs')],
   }[event] ?? [];
 }
