@@ -102,11 +102,11 @@ describe('UI workbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Correspondances à vérifier' }));
     expect(screen.getByText('1 / 2')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Review précédente' }).hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Passer cette Review pour le moment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review suivante' }));
     expect(screen.getByText('2 / 2')).toBeTruthy();
     expect(screen.getByText('Frieren chapitre')).toBeTruthy();
     expect(screen.queryByText(/Décision prête/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Passer cette Review pour le moment' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Review suivante' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Review précédente' }));
     expect(screen.getByText('1 / 2')).toBeTruthy();
     const candidates = screen.getAllByRole('group', { name: /Actions pour le candidat/ });
@@ -173,7 +173,7 @@ describe('UI workbench', () => {
     expect(screen.getByText('Carnets apothicaire')).toBeTruthy();
 
     expect(screen.getByRole('button', { name: 'Review précédente' }).hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Passer cette Review pour le moment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review suivante' }));
     expect(screen.getByText('2 / 3')).toBeTruthy();
     expect(screen.getByText('Review passée pour le moment')).toBeTruthy();
     expect(screen.queryByText(/Décision enregistrée/)).toBeNull();

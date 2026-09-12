@@ -2,7 +2,7 @@ import { bundledFavoriteSiteRules, collectiveDigest, favoriteCollectiveCommandSc
 import type { FavoriteCollectiveCommand, FavoriteOwnerLocalState } from '@tobirink/application';
 import { HttpFavoriteCollectiveAdapter } from '@tobirink/adapters-browser';
 import { MemoryStoragePort } from '@tobirink/contracts';
-import { createFavoriteSource, createWork, workId } from '@tobirink/domain';
+import { createFavoriteSource, createReview, createWork, reviewId, workId } from '@tobirink/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { FavoriteOwnerRuntime } from './favorite-owner-runtime';
 
@@ -89,6 +89,24 @@ describe('owner background recovery', () => {
     expect(payload).not.toMatch(/Synthetic Series|Private synthetic folder|reader\.example/u);
     expect(payload).toContain('"metadata":{"preSerialization":false}');
     expect(payload).toContain('"confirmed":false');
+  });
+
+  it('publishes an owner ambiguity as public provider references only', async () => {
+    const test = fixture(); await test.runtime().enable();
+    await importFavoriteSources([{ bookmarkId: 'ambiguous-fixture', folderPath: ['Private'], order: 0, state: 'eligible', title: 'Synthetic Series', url: 'https://reader.example/anime/synthetic-series' }], test.storage, '2026-09-08T00:00:00.000Z');
+    const source = (await test.storage.listFavoriteSources({ limit: 1 }))[0];
+    if (source === undefined) throw new Error('Missing fixture source');
+    const review = createReview({ id: reviewId('review_owner_ambiguity'), reason: 'AMBIGUOUS', sourceLabel: source.url, status: 'pending', title: source.title });
+    await test.storage.putReview(review);
+    await test.storage.putFavoriteSource(createFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id }));
+    await test.storage.putFavoriteReviewCandidateSet({ reviewId: review.id, candidates: [
+      { canonicalUrl: 'https://anilist.co/anime/1', externalId: '1', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Private title one'] },
+      { canonicalUrl: 'https://kitsu.app/anime/2', externalId: '2', mediaKind: 'ANIME', preSerialization: false, provider: 'kitsu-anime', titles: ['Private title two'] },
+    ], digest: 'ambiguity-fixture', recordedAt: '2026-09-08T00:00:00.000Z' });
+    await test.runtime().maintain();
+    const command = test.commands.find((value) => value.operation === 'contribute');
+    expect(command).toMatchObject({ operation: 'contribute', choices: [], ambiguities: [{ identities: [{ references: [{ externalId: '1' }] }, { references: [{ externalId: '2' }] }] }] });
+    expect(JSON.stringify(command)).not.toMatch(/Private|reader\.example|canonicalUrl|titles/u);
   });
 
   it('stops lookups immediately on revocation and resumes its persisted nonce', async () => {

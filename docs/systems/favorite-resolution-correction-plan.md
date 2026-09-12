@@ -393,14 +393,13 @@ expliquer son exclusion; les compteurs restent privés et se rafraîchissent à
 la demande, sans requête fournisseur.
 Afficher raison, provenance, niveau de matching et six candidats comparables
 au plus, avec indication si d'autres candidats existent. Choix, ID/source
-manuel exact, report et confirmation no-match relisent la révision avant commit.
+manuel exact et confirmation no-match relisent la révision avant commit.
 Un ID public manuel peut être hydraté sans exiger sa présence préalable en
-bibliothèque. Un report garde la décision ouverte sans fabriquer de no-match.
+bibliothèque.
 Toute décision finale met à jour source, Work éventuelle, Review et reçu dans
 la même transaction. Les liens ordinaires restent hors cloche.
-Le site transmet les motifs, la provenance et le niveau de preuve reçus du
-WebBridge au composant partagé. Le report conserve la commande `defer`; il
-n'est jamais traduit en confirmation `none`. Un test avec le vrai provider
+Le site transmet les motifs, la provenance, le niveau de preuve et les covers
+reçus du WebBridge au composant partagé. Un test avec le vrai provider
 WebBridge et des réponses de transport synthétiques vérifie ce raccord.
 
 La sélection utilise le jeu de candidats effectivement comparé, conservé dans
@@ -415,9 +414,9 @@ IndexedDB v12 ajoute l'index composé statut/échéance/ID. La cloche parcourt c
 index par pages de 100, avec un curseur échéance/ID et une échéance de lecture
 fixe, jusqu'à obtenir 100 cas actionnables ou atteindre la fin. Les anciennes
 lignes liées à une source retirée ou en traitement ne masquent pas les suivantes.
-La mémoire reste bornée à une page et au résultat. Les Reviews terminales
-en attente deviennent disponibles; le report humain écrit une échéance à
-24 heures, préservée dans l'export. Une saisie `fournisseur:identifiant` ou une
+La mémoire reste bornée à une page et au résultat. Les Reviews terminales en
+attente restent disponibles et les flèches changent seulement le curseur de
+navigation. Une saisie `fournisseur:identifiant` ou une
 URL fournisseur exacte utilise les ports d'hydratation et leur cadence; un ID
 nu reste limité à une identité locale unique pour ne pas deviner son fournisseur.
 La validation installée utilise un profil Chromium isolé et les commandes CDP

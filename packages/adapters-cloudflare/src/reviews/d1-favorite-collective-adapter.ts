@@ -30,6 +30,10 @@ const choicesSql = `INSERT INTO favorite_choices(owner_id, key_id, identity_hash
   ON CONFLICT(owner_id, key_id) DO UPDATE SET identity_hash = excluded.identity_hash, media_kind = excluded.media_kind,
     references_json = excluded.references_json, confirmed = excluded.confirmed
   WHERE favorite_choices.confirmed = 0 OR excluded.confirmed = 1`;
+const ambiguitiesSql = `INSERT INTO favorite_ambiguity_sets(owner_id, key_id, identities_json, updated_at)
+  SELECT ?2, json_extract(value, '$.keyId'), json_extract(value, '$.identities'), ?5 FROM json_each(?1)
+  WHERE EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?2 AND nonce = ?3 AND execution_id = ?4)
+  ON CONFLICT(owner_id, key_id) DO UPDATE SET identities_json = excluded.identities_json, updated_at = excluded.updated_at`;
 const decisionsSql = `INSERT OR IGNORE INTO favorite_decisions(owner_id, nonce, choices_json)
   SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?1 AND nonce = ?2 AND execution_id = ?4)`;
 const publicCacheSql = `INSERT OR IGNORE INTO favorite_public_cache(
@@ -48,6 +52,8 @@ export const favoriteLookupReceiptSql = `UPDATE favorite_receipts SET response_j
   SELECT json_group_array(json(COALESCE(
     (SELECT json_object('kind', 'FOUND', 'fingerprint', json_extract(k.value, '$.fingerprint'), 'scope', 'owner', 'mediaKind', c.media_kind, 'references', json(c.references_json))
       FROM favorite_choices c WHERE c.owner_id = ?1 AND c.key_id = json_extract(k.value, '$.keyId')),
+    (SELECT json_object('kind', 'AMBIGUOUS', 'fingerprint', json_extract(k.value, '$.fingerprint'), 'scope', 'owner', 'identities', json(a.identities_json))
+      FROM favorite_ambiguity_sets a WHERE a.owner_id = ?1 AND a.key_id = json_extract(k.value, '$.keyId')),
     (SELECT CASE WHEN COUNT(*) = 1 AND MIN(owner_count) >= 2 THEN json_object('kind', 'FOUND', 'fingerprint', json_extract(k.value, '$.fingerprint'), 'scope', 'shared', 'mediaKind', MIN(media_kind), 'references', json(MIN(references_json))) END
       FROM (SELECT owner_count, media_kind, references_json FROM favorite_confirmations
         WHERE key_id = json_extract(k.value, '$.keyId') AND owner_count > 0 ORDER BY identity_hash LIMIT 2)),
@@ -130,8 +136,18 @@ export class D1FavoriteCollectiveAdapter implements FavoriteCollectiveServicePor
         const references = [...choice.references].sort((a, b) => a.provider < b.provider ? -1 : 1);
         return { ...choice, references, keyId: await collectiveDigest(JSON.stringify([2, choice.key.mediaKind, choice.key.fingerprint, choice.key.parserVersion, choice.key.siteRulesVersion])), identityHash: await collectiveDigest(JSON.stringify([choice.mediaKind, references])) };
       }));
+      const ambiguities = await Promise.all((command.ambiguities ?? []).map(async (ambiguity) => {
+        const identities = ambiguity.identities.map((identity) => ({ ...identity, references: [...identity.references].sort((a, b) => a.provider.localeCompare(b.provider)) }))
+          .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+        return { ...ambiguity, identities, keyId: await collectiveDigest(JSON.stringify([2, ambiguity.key.mediaKind, ambiguity.key.fingerprint, ambiguity.key.parserVersion, ambiguity.key.siteRulesVersion])) };
+      }));
       const payload = JSON.stringify(choices);
-      statements.push(this.database.prepare(keysSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(choicesSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(decisionsSql).bind(ownerId, command.nonce, payload, executionId), this.database.prepare(publicCacheSql).bind(payload, ownerId, command.nonce, executionId, now));
+      const ambiguityPayload = JSON.stringify(ambiguities);
+      const keysPayload = JSON.stringify([...choices, ...ambiguities]);
+      statements.push(this.database.prepare(keysSql).bind(keysPayload, ownerId, command.nonce, executionId));
+      if (choices.length > 0) statements.push(this.database.prepare(choicesSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(publicCacheSql).bind(payload, ownerId, command.nonce, executionId, now));
+      if (ambiguities.length > 0) statements.push(this.database.prepare(ambiguitiesSql).bind(ambiguityPayload, ownerId, command.nonce, executionId, now));
+      statements.push(this.database.prepare(decisionsSql).bind(ownerId, command.nonce, JSON.stringify({ choices, ambiguities }), executionId));
     } else if (command.operation === 'lookup') {
       const keys = await Promise.all(command.keys.map(async (key) => ({ ...key, keyId: await collectiveDigest(JSON.stringify([2, key.mediaKind, key.fingerprint, key.parserVersion, key.siteRulesVersion])) })));
       statements.push(this.database.prepare(favoriteLookupReceiptSql).bind(ownerId, command.nonce, executionId, JSON.stringify(keys)));

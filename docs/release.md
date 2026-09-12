@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.18`.
+The current production release is `1.0.18`; the local candidate is `1.0.19`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -36,6 +36,30 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Internal pagination and owner ambiguity candidate — 2026-09-12
+
+Candidate `1.0.19` keeps the Library continuation cursor inside React state,
+appends unique cards to the same grid and leaves the public URL limited to
+user-selected search, sort and facets. Review carries provider covers through
+the local runtime and WebBridge, derives the controlled R2 fallback from the
+public provider ID, removes the 24-hour defer action and retains previous/next
+navigation.
+
+Migration `0006_owner_ambiguity_sets.sql` stores two to six competing public
+provider identities for one opaque owner and normalized key. It stores no raw
+title, favorite URL, folder, progress or cover URL. Lookup returns the set only
+to that owner; the extension hydrates it into the private candidate set and
+still requires a human choice. Production remains on `1.0.18` until the
+separate Cloudflare operation is approved.
+
+Two isolated builds reproduce 21-file archives byte for byte. Chromium 153
+loads the final Chrome archive and completes the 1,405-bookmark cache-first
+journey; Firefox 151 loads the final Firefox archive and passes its installed
+smoke:
+
+- Chrome: 292064 bytes, SHA-256 `14fb88450dbffbda2531472c77fb28511685bb763537cedfc9b51852b0bdb202`.
+- Firefox: 292109 bytes, SHA-256 `93dcb8d431ba4bbc58f7174e8af98eceb34344a05dcdc686bf780f2e3d3f485d`.
 
 ### Complete favorite-pipeline release — 2026-09-12
 

@@ -150,14 +150,14 @@ export function ReviewResolver({
   return (
     <section aria-busy={busy || undefined} className={styles.resolver}>
       {state === 'partial' && item.reason === undefined ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
-      {item.reason ? <Status tone="accent">{item.reason === 'NOT_FOUND' ? 'Aucune identité trouvée après recherche complète' : 'Plusieurs identités ou preuves contradictoires'}</Status> : null}
+      {item.reason === 'NOT_FOUND' ? <Status tone="accent">Aucune identité trouvée après recherche complète</Status> : null}
       {state === 'offline' ? <Status tone="warning">Hors ligne · les détails seront complétés à la reconnexion</Status> : null}
 
       <section aria-label="Contexte du favori" className={styles.sourceContext}>
         <div>
           <strong>{item.title}</strong>
           <span>{[item.sourceLabel, item.progress].filter(Boolean).join(' · ')}</span>
-          {item.provenance || item.matchLevel ? <span>{[item.provenance ? provenanceLabels.get(item.provenance) ?? 'Résolution locale' : undefined, item.matchLevel ? matchLabels.get(item.matchLevel) ?? 'Preuves contradictoires' : undefined].filter(Boolean).join(' · ')}</span> : null}
+          {item.provenance || item.matchLevel ? <span>{[item.provenance ? provenanceLabels.get(item.provenance) ?? 'Résolution locale' : undefined, item.matchLevel ? matchLabels.get(item.matchLevel) : undefined].filter(Boolean).join(' · ')}</span> : null}
         </div>
         {item.sourceUrl ? (
           <div className={styles.sourceActions}>
@@ -175,6 +175,7 @@ export function ReviewResolver({
             {item.candidates.map((candidate) => (
               <WorkCard
                 coverAlt={candidate.coverAlt}
+                coverFallbackSrc={candidate.coverFallbackSrc}
                 coverSrc={candidate.coverSrc}
                 context={candidate.mediaType}
                 detail={candidate.provider}
@@ -248,7 +249,6 @@ export function ReviewResolver({
         </div>
       ) : null}
 
-      {item.reason ? <Button disabled={busy} onClick={() => onSubmitDecision({ kind: 'defer', revision: item.revision })} variant="quiet">Reporter de 24 heures</Button> : null}
       <nav aria-label="Navigation dans les Reviews" className={styles.reviewNavigation}>
         <Button
           aria-label="Review précédente"
@@ -262,7 +262,7 @@ export function ReviewResolver({
           {item.position && item.total ? `${item.position} / ${item.total}` : 'Review en cours'}
         </span>
         <Button
-          aria-label="Passer cette Review pour le moment"
+          aria-label="Review suivante"
           disabled={busy || !canNext}
           icon="chevron-right"
           iconOnly

@@ -12,7 +12,6 @@ import { normalizeFavoriteTitle } from '../favorites/title-normalization';
 export type LocalReviewDecision =
   | { kind: 'candidate'; workId: WorkId }
   | { kind: 'manual'; source: 'id' | 'url'; value: string }
-  | { kind: 'defer' }
   | { kind: 'none' };
 
 async function resolveManualWork(
@@ -80,9 +79,7 @@ export async function recordReviewDecision(
     if (currentRevision !== input.revision) throw new Error('Review decision revision conflict.');
 
     let resolved: Review;
-    if (input.decision.kind === 'defer') {
-      resolved = createReview({ ...review, availableAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() });
-    } else if (input.decision.kind !== 'none') {
+    if (input.decision.kind !== 'none') {
       const selectedWorkId = input.decision.kind === 'manual' && preparedCandidate !== undefined ? favoriteCandidateWorkId(preparedCandidate) : input.decision.kind === 'candidate'
         ? input.decision.workId
         : await resolveManualWork(session, input.libraryId, input.decision);

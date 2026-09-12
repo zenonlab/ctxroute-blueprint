@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { favoriteCollectiveKeySchema, favoriteCollectiveLookupQuerySchema, favoriteCollectiveLookupResultSchema, favoritePublicReferenceSchema } from './favorite-collective-lookup';
+import { favoriteCollectiveIdentitySchema, favoriteCollectiveKeySchema, favoriteCollectiveLookupQuerySchema, favoriteCollectiveLookupResultSchema, favoritePublicReferenceSchema } from './favorite-collective-lookup';
 import { favoriteSiteRulesSchema } from '../favorites/site-rules';
 import type { FavoriteSiteRules } from '../favorites/site-rules';
 import type { ProviderCandidate } from '@tobirink/domain';
@@ -38,9 +38,19 @@ export const favoriteCollectiveChoiceSchema = z.strictObject({
   metadata: favoritePublicMetadataSchema.optional(),
 }).refine((choice) => choice.key.mediaKind === 'UNKNOWN' || choice.key.mediaKind === choice.mediaKind)
   .refine((choice) => choice.references.every((ref) => choice.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'].includes(ref.provider) : ref.provider !== 'kitsu-anime'));
+export const favoriteCollectiveAmbiguitySchema = z.strictObject({
+  key: favoriteCollectiveKeySchema,
+  identities: z.array(favoriteCollectiveIdentitySchema).min(2).max(6),
+}).refine(({ identities }) => new Set(identities.map((identity) => JSON.stringify([...identity.references].sort((a, b) => a.provider.localeCompare(b.provider))))).size === identities.length)
+  .refine(({ key, identities }) => identities.every((identity) => key.mediaKind === 'UNKNOWN' || key.mediaKind === identity.mediaKind))
+  .refine(({ identities }) => identities.every((identity) => identity.references.every((reference) => identity.mediaKind === 'ANIME'
+    ? ['anilist', 'kitsu-anime'].includes(reference.provider)
+    : reference.provider !== 'kitsu-anime')));
 export const favoriteCollectiveCommandSchema = z.discriminatedUnion('operation', [
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('lookup'), nonce: collectiveOpaqueIdSchema, keys: favoriteCollectiveLookupQuerySchema }),
-  z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('contribute'), nonce: collectiveOpaqueIdSchema, choices: z.array(favoriteCollectiveChoiceSchema).min(1).max(50).refine((choices) => new Set(choices.map(({ key }) => key.fingerprint)).size === choices.length) }),
+  z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('contribute'), nonce: collectiveOpaqueIdSchema, choices: z.array(favoriteCollectiveChoiceSchema).max(50), ambiguities: z.array(favoriteCollectiveAmbiguitySchema).max(50).optional() })
+    .refine(({ choices, ambiguities }) => choices.length + (ambiguities?.length ?? 0) >= 1 && choices.length + (ambiguities?.length ?? 0) <= 50)
+    .refine(({ choices, ambiguities }) => new Set([...choices, ...(ambiguities ?? [])].map(({ key }) => key.fingerprint)).size === choices.length + (ambiguities?.length ?? 0)),
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('pair'), nonce: collectiveOpaqueIdSchema, pairingToken: collectiveTokenSchema }),
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('revoke'), nonce: collectiveOpaqueIdSchema }),
 ]);

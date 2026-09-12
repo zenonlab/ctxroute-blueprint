@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createFavoriteSource, createLibrary, createReview, createWork, favoriteSourceId, libraryId, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { localReviewRevisionPort } from './read-review-candidates';
@@ -27,27 +27,6 @@ async function fixture() {
 }
 
 describe('recordReviewDecision', () => {
-  it('defers a terminal Review without creating no-match and rejects a replay of its old revision', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-09-08T10:00:00.000Z'));
-    try {
-      const { library, review, storage } = await fixture();
-      const terminal = createReview({ ...review, reason: 'NOT_FOUND' });
-      await storage.putReview(terminal);
-      const source = await storage.findFavoriteSourceByReviewId(review.id);
-      if (!source) throw new Error('Expected source.');
-      const terminalSource = createFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' } });
-      await storage.putFavoriteSource(terminalSource);
-      const revision = await localReviewRevisionPort.createRevision({ review: terminal, source: terminalSource });
-      const input = { decision: { kind: 'defer' as const }, libraryId: library.id, reviewId: review.id, revision };
-      expect(await recordReviewDecision(storage, input)).toMatchObject({ availableAt: '2026-09-09T10:00:00.000Z', status: 'pending' });
-      expect(await storage.listReviews({ actionableOnly: true, limit: 100, status: 'pending' })).toEqual([]);
-      await expect(recordReviewDecision(storage, input)).rejects.toThrow(/conflict/u);
-      vi.setSystemTime(new Date('2026-09-09T10:00:00.000Z'));
-      expect(await storage.listReviews({ actionableOnly: true, limit: 100, status: 'pending' })).toHaveLength(1);
-    } finally { vi.useRealTimers(); }
-  });
-
   it('selects an actually compared provider candidate absent from the library and rejects an obsolete set', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([{ bookmarkId: '42', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic voyager', url: 'https://reader.example/voyager' }], storage, '2026-09-08T00:00:00.000Z');

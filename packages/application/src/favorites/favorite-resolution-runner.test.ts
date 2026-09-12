@@ -187,6 +187,25 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source?.matchedWorkId && await storage.getWork(source.matchedWorkId)).toMatchObject({ externalReferences: references });
     expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
+  it('reconstructs an owner ambiguity into the private Review set before title search', async () => {
+    const { outbox, storage } = await fixture();
+    const first = { ...candidate, canonicalUrl: 'https://anilist.co/anime/154587', cover: { attribution: 'AniList', url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/154587.jpg' } };
+    const second = { ...candidate, canonicalUrl: 'https://kitsu.app/anime/46474', externalId: '46474', provider: 'kitsu-anime' as const };
+    const search = vi.fn(async () => { throw new Error('unexpected search'); });
+    await runFavoriteResolutionSlice({
+      collective: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, identities: [
+        { mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: first.externalId }] },
+        { mediaKind: 'ANIME' as const, references: [{ provider: 'kitsu-anime' as const, externalId: second.externalId }] },
+      ], kind: 'AMBIGUOUS' as const, scope: 'owner' as const })) },
+      candidates: candidatePorts({ search }),
+      hydration: hydrationPorts({ hydrate: async () => first }, { hydrate: async () => second }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'owner-ambiguity',
+    });
+    expect(search).not.toHaveBeenCalled();
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source).toMatchObject({ resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' } });
+    expect(source?.reviewId && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: first.externalId }, { externalId: second.externalId }], provenance: 'owner-collective' });
+  });
   it('schedules provider Retry-After without asking the fallback provider', async () => {
     const { outbox, storage, task } = await fixture();
     const retryAt = '2026-09-07T14:00:00.000Z';

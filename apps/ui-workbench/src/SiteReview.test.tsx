@@ -13,7 +13,7 @@ function Wrapper({ children }: { children: ReactNode }) {
 }
 
 describe('Site Review bridge', () => {
-  it('preserves the terminal reason and sends a defer command unchanged through the real bridge', async () => {
+  it('preserves the terminal reason and sends an explicit no-match through the real bridge', async () => {
     const commands = vi.fn();
     const listener = (event: MessageEvent) => {
       const message = event.data;
@@ -34,8 +34,6 @@ describe('Site Review bridge', () => {
     const { result, unmount } = renderHook(useWebMemberNavigation, { wrapper: Wrapper });
     try {
       await waitFor(() => expect(result.current.review.resolver.item).toMatchObject({ matchLevel: 'exact-title', provenance: 'provider-search', reason: 'NOT_FOUND', totalCandidates: 0 }));
-      act(() => result.current.review.resolver.onSubmitDecision({ kind: 'defer', revision: 'revision-synthetic' }));
-      await waitFor(() => expect(commands).toHaveBeenLastCalledWith({ decision: { kind: 'defer' }, reviewId: 'review_synthetic', revision: 'revision-synthetic' }));
       act(() => result.current.review.resolver.onSubmitDecision({ kind: 'none', revision: 'revision-synthetic' }));
       await waitFor(() => expect(commands).toHaveBeenLastCalledWith({ decision: { kind: 'none' }, reviewId: 'review_synthetic', revision: 'revision-synthetic' }));
     } finally {

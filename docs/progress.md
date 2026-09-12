@@ -364,3 +364,7 @@
 ## Publier et vérifier la pipeline favoris 1.0.18 — DONE
 
 - [x] **Appliquer la gate Cloudflare et vérifier la production** — DONE _(evidence: Cloudflare gate digest a82d7ab5102a492d4568ab8fee013f21e089ec1f74f9cc40533cd4c2310f18af applied D1 migration 0005 uploaded both immutable archives and deployed Worker version 5b6b4734-fb5b-429f-bced-7552dea0d418, Wrangler reports no pending D1 migrations; public Chrome and Firefox archives return 200 and exactly match certified SHA-256 values, Production pages and rules return 200 bounded cache cover and unknown misses return 404 and all seven Playwright production journeys pass)_
+
+## Nettoyer bibliothèque Review et ambiguïtés collectives — DONE
+
+- [x] **Corriger pagination covers Review et cache ambigu D1** — DONE _(evidence: npm run verify passes 811 product tests, 273 governance tests, all typechecks, Chromium IndexedDB, parser differential, performance, CRG, integration, audit zero and Archify showcase 9/9, D1 migration 0006 and 11 Worker SQL tests prove owner isolation, bounded public-ID ambiguity sets, prepared indexed lookup and no private titles URLs progress or cover URLs, Installed Chromium 153 completes the 1405-bookmark journey; Firefox 151 smoke passes; isolated 1.0.19 packages reproduce Chrome 14fb8845...b202 and Firefox 93dcb8d4...485d)_

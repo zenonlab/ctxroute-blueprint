@@ -33,14 +33,12 @@ function LibrarySurface() {
   const { readLibrary, status } = useWebBridge();
   const navigation = useWebMemberNavigation();
   const [retryCount, setRetryCount] = useState(0);
-  const cursor = searchParams.get('cursor')?.slice(0, 128) || undefined;
   const [filters, setFilters] = useState<LibraryFiltersValue>(() => filtersFrom(searchParams));
   const query = useMemo<WebLibraryQuery>(() => {
     const nextQuery: WebLibraryQuery = { facet: 'all', facets: { format: filters.format, genre: filters.genre, progress: filters.progress, source: filters.source, status: filters.status, type: filters.type, year: filters.year }, limit: 24, sort: filters.sort };
-    if (cursor) nextQuery.cursor = cursor;
     if (filters.query) nextQuery.search = filters.query;
     return nextQuery;
-  }, [cursor, filters]);
+  }, [filters]);
 
   const setQuery = (value: LibraryFiltersValue) => {
     const params = new URLSearchParams();
@@ -52,7 +50,7 @@ function LibrarySurface() {
     window.history.replaceState(null, '', params.size > 0 ? `/library?${params.toString()}` : '/library');
   };
 
-  const { page, loading, failed } = useLibraryRefresh(readLibrary, status === 'connected', query, retryCount);
+  const { page, loading, failed, loadMore } = useLibraryRefresh(readLibrary, status === 'connected', query, retryCount);
   const nextCursor = page?.cursor;
   const items: readonly LibraryWork[] = page?.items.map((item) => ({
     coverAlt: item.coverAttribution ? `Couverture de ${item.title} — ${item.coverAttribution}` : undefined,
@@ -81,7 +79,7 @@ function LibrarySurface() {
     navigation={navigation}
     onChangeFilters={setQuery}
     onDownloadExtension={() => router.push('/download')}
-    onLoadMore={() => { if (!nextCursor) return; const params = new URLSearchParams(searchParams.toString()); params.set('cursor', nextCursor); router.push(`/library?${params.toString()}`); }}
+    onLoadMore={() => { void loadMore(); }}
     onOpenRecovery={() => setRetryCount((count) => count + 1)}
     onRetry={() => setRetryCount((count) => count + 1)}
     state={state}

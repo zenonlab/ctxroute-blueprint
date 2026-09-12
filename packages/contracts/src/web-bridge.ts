@@ -110,6 +110,9 @@ export const webReviewSnapshotSchema = z.object({
   totalCandidates: z.number().int().min(0).max(1000).optional(),
   candidates: z.array(z.object({
     candidateId: boundedText(128),
+    coverAlt: boundedText(500).optional(),
+    coverFallbackSrc: z.string().url().max(4096).optional(),
+    coverSrc: z.string().url().max(4096).optional(),
     mediaKind: z.enum(['anime', 'manga']),
     sourceUrl: z.string().url().max(2048),
     title: boundedText(240),
@@ -126,7 +129,6 @@ export const webReviewDecisionCommandSchema = z.object({
     z.object({ kind: z.literal('candidate'), workId: workIdSchema }).strict(),
     z.object({ kind: z.literal('manual'), source: z.enum(['id', 'url']), value: boundedText(2048) }).strict(),
     z.object({ kind: z.literal('none') }).strict(),
-    z.object({ kind: z.literal('defer') }).strict(),
   ]),
   reviewId: z.string().regex(/^review_[a-z0-9][a-z0-9_-]{5,}$/u),
   revision: boundedText(256),

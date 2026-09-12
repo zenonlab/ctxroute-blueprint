@@ -22,6 +22,9 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
   const reviewItem = review?.reviewId && review.revision ? {
     candidates: review.candidates.map((candidate) => ({
       candidateId: candidate.workId ?? candidate.candidateId,
+      coverAlt: candidate.coverAlt,
+      coverFallbackSrc: candidate.coverFallbackSrc,
+      coverSrc: candidate.coverSrc,
       href: candidate.sourceUrl,
       mediaType: candidate.mediaKind,
       provider: new URL(candidate.sourceUrl).hostname,

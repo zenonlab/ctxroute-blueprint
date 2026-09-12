@@ -23,6 +23,20 @@ async function results(adapter: D1FavoriteCollectiveAdapter, credentials: Favori
 }
 
 describe('favorite owner SQL index', () => {
+  it('retains bounded owner ambiguity references without private favorite data', async () => {
+    const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB);
+    const credentials = await owner(adapter);
+    const command: FavoriteCollectiveCommand = { schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [], ambiguities: [{ key, identities: [
+      { mediaKind: 'ANIME', references: [{ provider: 'anilist', externalId: '1' }] },
+      { mediaKind: 'ANIME', references: [{ provider: 'kitsu-anime', externalId: '2' }] },
+    ] }] };
+    expect((await adapter.execute(credentials, command, 100)).kind).toBe('ACCEPTED');
+    expect(await results(adapter, credentials)).toMatchObject([{ kind: 'AMBIGUOUS', scope: 'owner', identities: [{ references: [{ externalId: '1' }] }, { references: [{ externalId: '2' }] }] }]);
+    const stored = await env.COLLECTIVE_DB.prepare('SELECT identities_json AS identities FROM favorite_ambiguity_sets WHERE owner_id = ?1').bind(credentials.ownerId).first<{ identities: string }>();
+    expect(stored?.identities).not.toMatch(/title|url|progress/u);
+    expect(await results(adapter, await owner(adapter))).toMatchObject([{ kind: 'MISS' }]);
+  });
+
   it('publishes title-free facet metadata only after two distinct human confirmations', async () => {
     const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB);
     const first = await owner(adapter); const second = await owner(adapter);
@@ -140,6 +154,8 @@ describe('favorite owner SQL index', () => {
     expect(details).toContain('favorite_confirmations_active');
     const own = await env.COLLECTIVE_DB.prepare('EXPLAIN QUERY PLAN SELECT media_kind, references_json FROM favorite_choices WHERE owner_id = ?1 AND key_id = ?2').bind('x', 'y').all<{ detail: string }>();
     expect(own.results.map(({ detail }) => detail).join(' ')).toContain('sqlite_autoindex_favorite_choices');
+    const ambiguity = await env.COLLECTIVE_DB.prepare('EXPLAIN QUERY PLAN SELECT identities_json FROM favorite_ambiguity_sets WHERE owner_id = ?1 AND key_id = ?2').bind('x', 'y').all<{ detail: string }>();
+    expect(ambiguity.results.map(({ detail }) => detail).join(' ')).toContain('sqlite_autoindex_favorite_ambiguity_sets');
     expect(details).not.toMatch(/SCAN (?:favorite_choices|favorite_confirmations|c)\b/u);
     const columns = await env.COLLECTIVE_DB.prepare('PRAGMA table_info(favorite_choices)').all<{ name: string }>();
     expect(columns.results.map(({ name }) => name)).toEqual(['owner_id', 'key_id', 'identity_hash', 'media_kind', 'references_json', 'confirmed']);

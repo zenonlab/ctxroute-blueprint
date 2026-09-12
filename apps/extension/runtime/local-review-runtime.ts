@@ -1,4 +1,4 @@
-import { extractFavoriteSourceEvidence, readLocalReviewCandidates, recordReviewDecision } from '@tobirink/application';
+import { extractFavoriteSourceEvidence, providerCoverFallbackPath, readLocalReviewCandidates, recordReviewDecision } from '@tobirink/application';
 import type { FavoriteProviderHydrationPorts, LocalReviewDecision, StoragePort } from '@tobirink/application';
 import { anilistSourceAdapter, mangaDexSourceAdapter, mangaUpdatesSourceAdapter } from '@tobirink/adapters-browser';
 import { z } from 'zod';
@@ -11,10 +11,16 @@ export async function readLocalReviewCandidateSnapshot(storage: StoragePort, lib
   const snapshot = await readLocalReviewCandidates(storage, { libraryId, reviewId: reviewId(rawReviewId) });
   return {
     ...snapshot,
-    candidates: snapshot.candidates.map(({ sourceUrl, work }) => {
+    candidates: snapshot.candidates.map(({ candidate, sourceUrl, work }) => {
       const reference = work.externalReferences[0];
+      const coverSrc = candidate?.cover?.url;
+      const fallbackPath = candidate === undefined ? undefined : providerCoverFallbackPath(candidate);
+      const coverFallbackSrc = fallbackPath === undefined ? undefined : new URL(fallbackPath, 'https://tobirink.com').href;
       return {
         candidateId: work.id,
+        coverAlt: coverSrc === undefined ? undefined : `Couverture de ${work.preferredTitle} — ${candidate?.cover?.attribution ?? candidate?.provider ?? 'source'}`,
+        coverFallbackSrc,
+        coverSrc,
         href: sourceUrl,
         mediaType: work.mediaKind,
         provider: reference?.provider ?? work.mediaKind,
@@ -28,7 +34,7 @@ export async function readLocalReviewCandidateSnapshot(storage: StoragePort, lib
 export async function writeLocalReviewDecision(
   storage: StoragePort,
   libraryId: LibraryId,
-  input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' } | { kind: 'defer' }; reviewId: string; revision: string },
+  input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' }; reviewId: string; revision: string },
   hydration?: FavoriteProviderHydrationPorts,
 ) {
   const decision: LocalReviewDecision = input.decision.kind === 'candidate'

@@ -7922,6 +7922,60 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-review-cleanup-1-0-19",
+      "title": "Nettoyer bibliothèque Review et ambiguïtés collectives",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger pagination covers Review et cache ambigu D1",
+          "status": "DONE",
+          "acceptance": [
+            "Loading more appends unique works without adding cursor to the public library URL and resets safely on filter changes",
+            "Review candidates display provider covers with R2 fallback while defer and contradictory-proof copy are absent and arrow navigation remains",
+            "Owner-scoped D1 stores only bounded public provider-reference ambiguity sets and reconstructs Review without automatic selection",
+            "Versioned Chrome and Firefox candidates pass complete local and installed validation"
+          ],
+          "files": [
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/library/use-library-refresh.ts",
+            "apps/web/e2e/workbench.spec.ts",
+            "packages/ui/src/features/review/review-resolver/**",
+            "packages/application/src/use-cases/read-local-review-candidates.ts",
+            "packages/application/src/use-cases/record-review-decision.ts",
+            "packages/application/src/collective-index/**",
+            "apps/extension/runtime/local-review-runtime.ts",
+            "apps/extension/runtime/review-messages.ts",
+            "apps/extension/runtime/favorite-owner-runtime.ts",
+            "packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts",
+            "apps/worker/migrations/0006_favorite_ambiguity_sets.sql",
+            "apps/worker/src/catalogue/**",
+            "docs/decisions/**",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "apps/extension/package.json",
+            "package-lock.json"
+          ],
+          "commands": [
+            "targeted web UI application extension adapter and Worker tests",
+            "npm run test:d1",
+            "npm run verify",
+            "installed Chromium and Firefox candidate tests",
+            "npm run package:extension and isolated reproducibility",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run verify passes 811 product tests, 273 governance tests, all typechecks, Chromium IndexedDB, parser differential, performance, CRG, integration, audit zero and Archify showcase 9/9",
+            "D1 migration 0006 and 11 Worker SQL tests prove owner isolation, bounded public-ID ambiguity sets, prepared indexed lookup and no private titles URLs progress or cover URLs",
+            "Installed Chromium 153 completes the 1405-bookmark journey; Firefox 151 smoke passes; isolated 1.0.19 packages reproduce Chrome 14fb8845...b202 and Firefox 93dcb8d4...485d"
+          ]
+        }
+      ]
     }
   ]
 }

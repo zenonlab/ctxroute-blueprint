@@ -1,10 +1,11 @@
-import { bundledFavoriteSiteRules, collectiveDigest, favoriteCollectiveChoiceSchema, favoriteCollectiveKey, favoriteOwnerCredentialsSchema, favoriteOwnerLocalStateSchema, favoritePairRedemptionSchema, favoritePublicMetadata } from '@tobirink/application';
+import { bundledFavoriteSiteRules, collectiveDigest, favoriteCollectiveAmbiguitySchema, favoriteCollectiveChoiceSchema, favoriteCollectiveKey, favoriteOwnerCredentialsSchema, favoriteOwnerLocalStateSchema, favoritePairRedemptionSchema, favoritePublicMetadata, favoritePublicReferenceSchema } from '@tobirink/application';
 import type { FavoriteCollectiveCommand, FavoriteCollectiveKey, FavoriteCollectiveLookupPort, FavoriteOwnerLocalState, FavoriteOwnerLocalStatePort, StoragePort } from '@tobirink/application';
 import type { HttpFavoriteCollectiveAdapter } from '@tobirink/adapters-browser';
 import { favoriteSourceId } from '@tobirink/domain';
 import type { z } from 'zod';
 
 type Choice = z.infer<typeof favoriteCollectiveChoiceSchema>;
+type Ambiguity = z.infer<typeof favoriteCollectiveAmbiguitySchema>;
 function secretToken() { return [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
   private active: Promise<void> = Promise.resolve();
@@ -45,9 +46,9 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
     const { pending, ...remaining } = state;
     const sent = { ...remaining.sent };
     const lookups = { ...remaining.lookups };
-    if (pending.operation === 'contribute') for (const choice of pending.choices) {
-      const keyId = await collectiveDigest(JSON.stringify(choice.key));
-      sent[keyId] = await collectiveDigest(JSON.stringify(choice));
+    if (pending.operation === 'contribute') for (const contribution of [...pending.choices, ...(pending.ambiguities ?? [])]) {
+      const keyId = await collectiveDigest(JSON.stringify(contribution.key));
+      sent[keyId] = await collectiveDigest(JSON.stringify(contribution));
       const cached = lookups[keyId];
       if (cached !== undefined) lookups[keyId] = { ...cached, expiresAt: 0 };
     }
@@ -135,6 +136,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
       state = await this.updateRules(state) ?? state;
       const page = await this.storage.listFavoriteSources(state.scanAfter === undefined ? { limit: 50 } : { afterId: favoriteSourceId(state.scanAfter), limit: 50 });
       const choices = new Map<string, Choice>();
+      const ambiguities = new Map<string, Ambiguity>();
       const pendingKeys = new Map<string, FavoriteCollectiveKey>();
       for (const source of page) {
         if (source.presence !== 'observed') continue;
@@ -145,6 +147,24 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
         }
         const review = source.reviewId === undefined ? undefined : await this.storage.getReview(source.reviewId);
         if (review?.status === 'no-match') continue;
+        if (review?.status === 'pending' && review.reason === 'AMBIGUOUS' && record?.artifact.identityKey !== undefined) {
+          const candidateSet = await this.storage.getFavoriteReviewCandidateSet(review.id);
+          const key = await favoriteCollectiveKey(record.artifact);
+          const identities = candidateSet?.candidates.flatMap((candidate) => {
+            const references = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])]
+              .flatMap((reference) => {
+                const parsed = favoritePublicReferenceSchema.safeParse(reference);
+                return parsed.success ? [parsed.data] : [];
+              });
+            return references.length > 0 ? [{ mediaKind: candidate.mediaKind, references }] : [];
+          }) ?? [];
+          const ambiguity = favoriteCollectiveAmbiguitySchema.safeParse({ key, identities });
+          if (ambiguity.success) {
+            const keyId = await collectiveDigest(JSON.stringify(key));
+            if (state.sent[keyId] !== await collectiveDigest(JSON.stringify(ambiguity.data))) ambiguities.set(keyId, ambiguity.data);
+          }
+          continue;
+        }
         const id = source.matchedWorkId ?? review?.matchedWorkId;
         if (id === undefined) continue;
         const work = await this.storage.getWork(id);
@@ -155,7 +175,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
         const keyId = await collectiveDigest(JSON.stringify(key));
         if (state.sent[keyId] !== await collectiveDigest(JSON.stringify(choice.data))) choices.set(keyId, choice.data);
       }
-      if (choices.size > 0) state = await this.command(state, { schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [...choices.values()] });
+      if (choices.size + ambiguities.size > 0) state = await this.command(state, { schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [...choices.values()], ambiguities: [...ambiguities.values()] });
       if (pendingKeys.size > 0) { await this.lookupCached([...pendingKeys.values()]); state = await this.local.read() ?? state; }
       const { scanAfter: _previousCursor, ...next } = state;
       const after = page.length === 50 ? page.at(-1)?.id : undefined;

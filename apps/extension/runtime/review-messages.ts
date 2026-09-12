@@ -11,7 +11,6 @@ export const reviewDecisionMessageSchema = z.strictObject({
     z.strictObject({ kind: z.literal('candidate'), workId: workIdSchema }),
     z.strictObject({ kind: z.literal('manual'), source: z.enum(['id', 'url']), value: z.string().trim().min(1).max(500) }),
     z.strictObject({ kind: z.literal('none') }),
-    z.strictObject({ kind: z.literal('defer') }),
   ]),
   reviewId: reviewIdSchema,
   revision: z.string().min(1).max(100),
@@ -34,6 +33,9 @@ export const reviewCandidatesResponseSchema = z.discriminatedUnion('ok', [
     totalCandidates: z.number().int().min(0).max(1000).optional(),
     candidates: z.array(z.strictObject({
       candidateId: workIdSchema,
+      coverAlt: z.string().min(1).max(500).optional(),
+      coverFallbackSrc: z.url().optional(),
+      coverSrc: z.url().optional(),
       href: z.string().regex(/^https?:\/\/[^\s]+$/u),
       mediaType: z.enum(['anime', 'manga']),
       provider: z.string().min(1).max(32),
@@ -67,6 +69,6 @@ export async function readReviewCandidatesMessage(reviewId: string): Promise<Ext
   return response.snapshot;
 }
 
-export async function writeReviewDecisionMessage(input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' | 'defer' }; reviewId: string; revision: string }): Promise<z.infer<typeof reviewDecisionResponseSchema>> {
+export async function writeReviewDecisionMessage(input: { decision: { kind: 'candidate'; workId: string } | { kind: 'manual'; source: 'id' | 'url'; value: string } | { kind: 'none' }; reviewId: string; revision: string }): Promise<z.infer<typeof reviewDecisionResponseSchema>> {
   return reviewDecisionResponseSchema.parse(await browser.runtime.sendMessage({ ...input, type: 'review.decision.write', version }));
 }

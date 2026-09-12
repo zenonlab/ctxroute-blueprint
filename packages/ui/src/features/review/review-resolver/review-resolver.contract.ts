@@ -15,6 +15,7 @@ export interface ReviewCandidate {
   aliases?: readonly string[];
   candidateId: string;
   coverAlt?: string;
+  coverFallbackSrc?: string;
   coverSrc?: string;
   href: string;
   mediaType: string;
@@ -40,7 +41,6 @@ export interface ReviewItem {
 }
 
 export type ReviewDecision =
-  | { kind: 'defer'; revision: string }
   | { candidateId: string; kind: 'candidate'; revision: string }
   | { kind: 'manual'; revision: string; source: 'id' | 'url'; value: string }
   | { kind: 'none'; revision: string };

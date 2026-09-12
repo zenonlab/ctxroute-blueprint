@@ -16,7 +16,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-05
-- Revised: 2026-09-08
+- Revised: 2026-09-12
 
 ## Context
 
@@ -82,14 +82,16 @@ does not activate the dormant candidate adapter.
 
 Global search and the installed Review panel reuse a bounded local title query:
 at most 500 primary-library identifiers are inspected and at most 24 results or
-six Review candidates cross the message boundary. A Review candidate is shown from the persisted comparable provider set and its
-provenance. It does not require an artificial resolved Review or a pre-existing
-library Work.
+six Review candidates cross the message boundary. A Review candidate is shown
+from the persisted comparable provider set with its provenance, provider cover
+and controlled R2 fallback derived from the public provider ID. It does not
+require an artificial resolved Review or a pre-existing library Work.
 Candidate, manual local identifier/source, and no-match decisions re-read the
 pending Review, its source, revision and exact selected identity inside one
 IndexedDB transaction. A manual public ID/source is hydrated exactly before
 commit; it need not already belong to the library. A stale revision, invalid
-identity or ambiguous manual match fails closed. Previous and next only move the in-memory cursor.
+identity or ambiguous manual match fails closed. Previous and next only move
+the in-memory cursor. A timed defer is not a Review decision.
 The dormant HTTP candidate adapter remains uncomposed; no D1 call or host
 permission is introduced by local search.
 

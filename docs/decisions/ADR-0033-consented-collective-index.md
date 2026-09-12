@@ -19,7 +19,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-04
-- Revised: 2026-09-08
+- Revised: 2026-09-12
 
 ## Contexte
 
@@ -51,6 +51,12 @@ comptent une seule fois. Un conflit conserve chaque choix personnel et interdit
 le vote comme départage automatique. Le protocole limite l'abus mais ne prouve
 pas l'indépendance réelle de propriétaires malveillants coordonnés.
 
+Une ambiguïté terminale peut également conserver, pour ce seul propriétaire,
+de deux à six identités concurrentes. D1 reçoit uniquement leur type média et
+leurs identifiants fournisseurs publics. L'extension réhydrate ces références
+et recrée le jeu de candidats local avec ses covers; cet état n'est jamais
+partagé, ne compte pas comme confirmation et ne sélectionne aucune identité.
+
 Consentement explicite et révocable. L'extension détient l'identité opaque,
 les secrets d'installation et de révocation dans storage.local de confiance.
 D1 conserve leurs empreintes seulement; le site et sync ne reçoivent jamais
@@ -59,7 +65,7 @@ Les tests utilisent des credentials synthétiques.
 
 Chaque requête contient uniquement clé hachée, média, IDs publics, versions,
 nonce et authentification. Corps ≤64 Kio, batch ≤50 clés/associations,
-≤5 références par association. Le Worker dérive owner et temps serveur,
+≤5 références par identité et ≤6 identités par ambiguïté. Le Worker dérive owner et temps serveur,
 valide schéma strict, installation, consentement et quota. Requêtes préparées
 et `D1.batch` rendent atomiques nonce, association, confirmation et reçu.
 Même batch/digest authentifié : reçu idempotent; même nonce/contenu différent :
@@ -68,13 +74,15 @@ rejet. Lookup groupé indexé, owner prioritaire, aucun N+1 ou scan non borné.
 ## Conséquences
 
 Le protocole de résolution v2 reste distinct des anciennes associations v1.
-La migration 0004 ajoute des tables préfixées `favorite_`; le retour au Worker
+Les migrations 0004 et 0006 ajoutent des tables préfixées `favorite_`; le retour au Worker
 précédent laisse ces tables intactes. Chaque owner conserve un choix courant
 par empreinte et média, et un journal versionné de décisions lié aux reçus.
 Des compteurs d'identités confirmées sont entretenus dans le même batch que
 les choix personnels, pour borner les lookups indépendamment du nombre de
 propriétaires. Un conflit entre identités confirmées produit un MISS partagé,
 sans écraser un choix personnel. Aucun calcul de popularité ne résout ce conflit.
+La table 0006 `favorite_ambiguity_sets` est indexée par propriétaire et clé;
+son JSON est validé, limité à 4 Kio et lu par la même requête groupée.
 
 Le [plan canonique v3](../systems/favorite-resolution-correction-plan.md)
 définit les tables logiques, requêtes, index et migrations. Les tests locaux

@@ -38,4 +38,15 @@ describe('readLocalReviewCandidates', () => {
       state: 'ready',
     });
   });
+
+  it('preserves a persisted provider cover for the Review projection', async () => {
+    const storage = new MemoryStoragePort();
+    const review = createReview({ id: reviewId('review_cover_candidate'), reason: 'AMBIGUOUS', sourceLabel: 'Source', status: 'pending', title: 'Synthetic cover' });
+    await storage.putReview(review);
+    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'cover', folderPath: [], id: favoriteSourceId('source_cover_candidate'), importedAt: '2026-09-08T00:00:00.000Z', order: 0, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id, title: review.title, url: 'https://reader.example/cover' }));
+    const candidate = { canonicalUrl: 'https://anilist.co/anime/1', cover: { attribution: 'AniList', height: 600, url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/test.jpg', width: 400 }, externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic cover'] };
+    await storage.putFavoriteReviewCandidateSet({ candidates: [candidate, { ...candidate, canonicalUrl: 'https://kitsu.app/anime/2', externalId: '2', provider: 'kitsu-anime' }], digest: 'cover-set', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const snapshot = await readLocalReviewCandidates(storage, { libraryId: libraryId('library_cover_candidate'), reviewId: review.id });
+    expect(snapshot.candidates[0]).toMatchObject({ candidate: { cover: { url: candidate.cover.url } } });
+  });
 });

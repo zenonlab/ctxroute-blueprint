@@ -6,6 +6,7 @@ import { searchLocalLibrary } from './search-local-library';
 import { favoriteCandidateWorkId } from '../favorites/favorite-resolution-commit';
 
 export interface LocalReviewCandidate {
+  candidate?: ProviderCandidate;
   sourceUrl: string;
   work: Work;
 }
@@ -34,6 +35,7 @@ function isHttpUrl(value: string): boolean {
 function providerCandidate(candidate: ProviderCandidate): LocalReviewCandidate | undefined {
   if (candidate.canonicalUrl === undefined || !isHttpUrl(candidate.canonicalUrl)) return undefined;
   return Object.freeze({
+    candidate,
     sourceUrl: candidate.canonicalUrl,
     work: createWork({ externalReferences: [{ externalId: candidate.externalId, provider: candidate.provider }], id: favoriteCandidateWorkId(candidate), mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', preferredTitle: candidate.titles[0] ?? candidate.externalId }),
   });
@@ -44,11 +46,11 @@ async function readLegacyCandidates(storage: StoragePort, libraryId: LibraryId, 
   return (await Promise.all(found.items.map(async (work) => {
     const sources = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: work.id });
     const direct = sources.find((source) => source.presence === 'observed' && isHttpUrl(source.url));
-    if (direct) return Object.freeze({ sourceUrl: direct.url, work });
+    if (direct) return Object.freeze(work.hydration === undefined ? { sourceUrl: direct.url, work } : { candidate: work.hydration.candidate, sourceUrl: direct.url, work });
     const matches = await storage.listReviewsByWorkId({ limit: 100, workId: work.id });
     for (const match of matches) {
       const source = await storage.findFavoriteSourceByReviewId(match.id);
-      if (source?.presence === 'observed' && isHttpUrl(source.url)) return Object.freeze({ sourceUrl: source.url, work });
+      if (source?.presence === 'observed' && isHttpUrl(source.url)) return Object.freeze(work.hydration === undefined ? { sourceUrl: source.url, work } : { candidate: work.hydration.candidate, sourceUrl: source.url, work });
     }
     return undefined;
   }))).flatMap((candidate) => candidate ? [candidate] : []);

@@ -24,4 +24,17 @@ describe('live local library', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(read).toHaveBeenCalledTimes(2);
   });
+
+  it('appends a cursor page without exposing the cursor in the browser URL', async () => {
+    const item = (id: string) => ({ mediaKind: 'anime' as const, resolutionState: 'ready' as const, title: id, workId: `work_${id}` });
+    const first = { ...page, cursor: 'offset:24', hasMore: true, items: [item('one')], total: 3 };
+    const second = { ...page, cursor: 'offset:48', hasMore: false, items: [item('one'), item('two')], query: { ...query, cursor: 'offset:24' }, total: 3 };
+    const read = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    const view = renderHook(() => useLibraryRefresh(read, true, query, 0));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await view.result.current.loadMore(); });
+    expect(view.result.current.page?.items.map(({ workId }) => workId)).toEqual(['work_one', 'work_two']);
+    expect(read).toHaveBeenLastCalledWith({ ...query, cursor: 'offset:24' });
+    expect(window.location.search).toBe('');
+  });
 });

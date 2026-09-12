@@ -326,7 +326,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return retryClaim(dependencies, task, token, retryAt);
   }
   if (synchronized.kind === 'REVIEW_REQUIRED') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, synchronized, `review:sync-${synchronized.reason.toLowerCase()}`);
+    const candidateSet = synchronized.candidates === undefined ? undefined : {
+      candidates: synchronized.candidates,
+      digest: `sync:${artifact.semanticFingerprint}:${synchronized.candidates.map(({ externalId, provider }) => `${provider}:${externalId}`).join('|')}`,
+      provenance: 'owner-collective', totalCandidates: synchronized.candidates.length, recordedAt: dependencies.now(),
+    };
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: synchronized.reason }, `review:sync-${synchronized.reason.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
   }
   if (synchronized.kind === 'RESOLVED') {
@@ -344,7 +349,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     : undefined;
   if (collective.kind === 'RETRYABLE' && collective.stage === 'HYDRATION' && collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
   if (collective.kind === 'REVIEW_REQUIRED') {
-    await persistFavoriteResolutionCompletion(dependencies, task, token, collective, `review:collective-${collective.reason.toLowerCase()}`);
+    const candidateSet = collective.candidates === undefined ? undefined : {
+      candidates: collective.candidates,
+      digest: `collective:${artifact.semanticFingerprint}:${collective.candidates.map(({ externalId, provider }) => `${provider}:${externalId}`).join('|')}`,
+      provenance: 'owner-collective', totalCandidates: collective.candidates.length, recordedAt: dependencies.now(),
+    };
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: collective.reason }, `review:collective-${collective.reason.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
   }
   if (collective.kind === 'RESOLVED') {

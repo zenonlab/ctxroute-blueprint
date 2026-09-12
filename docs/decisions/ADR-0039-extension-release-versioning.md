@@ -38,7 +38,9 @@ identities, complete library projection and bounded Worker cover recovery;
 first-install continuation, `1.0.16` projects parsed favorites before
 hydration, `1.0.17` restores cache-first sync and D1 reconstruction, and
 `1.0.18` ships the bounded multi-provider, owner-scoped collective, durable
-sync and pinned FavLib differential corrections).
+sync and pinned FavLib differential corrections; `1.0.19` keeps Library
+pagination inside the surface, carries Review covers through WebBridge and
+persists bounded owner-only ambiguity references in D1).
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { importFavoriteSources } from '@tobirink/application';
 import type { FavoriteSourceAdapter } from '@tobirink/application';
-import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createSourceEvidence, createWork, favoriteSourceId, libraryId, progressId, workId } from '@tobirink/domain';
+import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createReview, createSourceEvidence, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
 import { createWebBridgeRequestHandler } from './web-bridge-adapter';
 
 const primaryLibraryId = libraryId('library_primary');
@@ -15,6 +15,21 @@ async function addResolvedWork(storage: MemoryStoragePort, input: { id: string; 
 }
 
 describe('WebBridge private projections', () => {
+  it('projects Review covers and the controlled provider fallback through WebBridge', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ bookmarkId: 'review-cover', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic cover', url: 'https://reader.example/anime/synthetic-cover' }], storage, '2026-09-08T00:00:00.000Z');
+    const source = (await storage.listFavoriteSources({ limit: 1 }))[0];
+    if (source === undefined) throw new Error('Missing source');
+    const review = createReview({ id: reviewId('review_web_cover'), reason: 'AMBIGUOUS', sourceLabel: source.url, status: 'pending', title: source.title });
+    await storage.putReview(review);
+    await storage.putFavoriteSource(createFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id }));
+    const candidate = { canonicalUrl: 'https://anilist.co/anime/1', cover: { attribution: 'AniList', url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/example.jpg' }, externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic cover'] };
+    await storage.putFavoriteReviewCandidateSet({ candidates: [candidate, { ...candidate, canonicalUrl: 'https://kitsu.app/anime/2', externalId: '2', provider: 'kitsu-anime' }], digest: 'review-web-cover', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const snapshot = await createWebBridgeRequestHandler(storage)({ type: 'review.read', requestId: 'request_review_cover' });
+    if (!('candidates' in snapshot)) throw new Error('Missing Review candidates');
+    expect(snapshot.candidates[0]).toMatchObject({ coverFallbackSrc: 'https://tobirink.com/v1/media/provider-covers/anilist/1/cover-md', coverSrc: candidate.cover.url });
+  });
+
   it('applies normalized search, facet, cursor, progress and the 24-item limit', async () => {
     const storage = new MemoryStoragePort();
     const ids = [];

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction cache-first 1.0.18",
+    "title": "TobiRink — résolution et reconstruction cache-first 1.0.19",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -70,7 +70,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync v2 : empreinte→IDs sans titres. D1 : IDs et facettes sans titres ni URL, publiés après deux confirmations humaines distinctes."
+        "note": "Sync v2 : empreinte→IDs sans titres. D1 garde IDs/facettes et ambiguïtés owner-scoped; la Review réhydrate les candidats."
       }
     ]
   },
@@ -210,7 +210,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "IDs / facettes / choix confirmés"
+      "tag": "IDs / facettes / ambiguïtés owner"
     },
     {
       "id": "operationalMedia",
@@ -440,7 +440,7 @@
       "dot": "emerald",
       "title": "Bibliothèque locale",
       "items": [
-        "Sept facettes stables, menus persistants et sélection multiple avant pagination",
+        "Sept facettes stables, menus persistants et pages ajoutées sans exposer le curseur",
         "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Genres typés et totaux éditoriaux explicites uniquement",

@@ -36,6 +36,17 @@ describe('minimal collective lookup boundary', () => {
     expect(result).toEqual({ kind: 'RESOLVED', candidate, references, scope: 'owner' });
   });
 
+  it('reconstructs an owner ambiguity as comparable hydrated candidates', async () => {
+    const key = await favoriteCollectiveKey(artifact);
+    const second = { canonicalUrl: 'https://kitsu.app/anime/2', provider: 'kitsu-anime' as const, externalId: '2', mediaKind: 'ANIME' as const, preSerialization: false, titles: ['Synthetic Series'] };
+    const first = { ...candidate, canonicalUrl: 'https://anilist.co/anime/1' };
+    const result = await resolveFavoriteCollectiveIdentity({ lookup: async () => [{ fingerprint: key.fingerprint, identities: [
+      { mediaKind: 'ANIME', references: [{ provider: 'anilist', externalId: '1' }] },
+      { mediaKind: 'ANIME', references: [{ provider: 'kitsu-anime', externalId: '2' }] },
+    ], kind: 'AMBIGUOUS', scope: 'owner' }] }, artifact, hydration, false, async (reference) => reference.provider === 'anilist' ? first : second);
+    expect(result).toEqual({ candidates: [first, second], kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' });
+  });
+
   it('rejects unrelated keys and incomplete batch responses', async () => {
     expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE', stage: 'LOOKUP' });
     expect(await resolveFavoriteCollectiveIdentity({ lookup: async () => [{ fingerprint: 'a'.repeat(64), kind: 'MISS' }] }, artifact, hydration)).toEqual({ kind: 'RETRYABLE', stage: 'LOOKUP' });

@@ -22,10 +22,16 @@ describe('Actionable Review decisions', () => {
     expect(submit).toHaveBeenCalledWith({ kind: 'none', revision: 'revision-1' });
   });
 
-  it('can defer the last Review without resolving it', () => {
+  it('keeps arrow navigation and omits technical ambiguity and defer copy', () => {
     const submit = vi.fn();
-    render(<ReviewResolver canNext={false} canPrevious={false} item={{ candidates: [], id: 'review_synthetic', reason: 'AMBIGUOUS', revision: 'revision-2', sourceLabel: 'Favori', title: 'Synthetic voyager' }} onNext={vi.fn()} onPrevious={vi.fn()} onRefresh={vi.fn()} onRetry={vi.fn()} onSubmitDecision={submit} state="ready" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Reporter de 24 heures' }));
-    expect(submit).toHaveBeenCalledWith({ kind: 'defer', revision: 'revision-2' });
+    const previous = vi.fn();
+    const next = vi.fn();
+    render(<ReviewResolver canNext canPrevious item={{ candidates: [], id: 'review_synthetic', reason: 'AMBIGUOUS', revision: 'revision-2', sourceLabel: 'Favori', title: 'Synthetic voyager' }} onNext={next} onPrevious={previous} onRefresh={vi.fn()} onRetry={vi.fn()} onSubmitDecision={submit} state="ready" />);
+    expect(screen.queryByText('Plusieurs identités ou preuves contradictoires')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reporter de 24 heures' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Review précédente' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review suivante' }));
+    expect(previous).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledOnce();
   });
 });
