@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction cache-first 1.0.19",
+    "title": "TobiRink — résolution et reconstruction cache-first 1.0.20",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -70,7 +70,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync v2 : empreinte→IDs sans titres. D1 garde IDs/facettes et ambiguïtés owner-scoped; la Review réhydrate les candidats."
+        "note": "Sync v2 puis lookup D1 groupé par 50 : empreinte→IDs sans titres. Une panne cache laisse les fournisseurs continuer."
       }
     ]
   },
@@ -117,7 +117,7 @@
       "stage": 1,
       "row": 4,
       "width": 150,
-      "tag": "route + brut · preuve versionnée"
+      "tag": "route média + titre · versionné"
     },
     {
       "id": "parseArtifact",
@@ -200,7 +200,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "règles publiques · collectif opt-in"
+      "tag": "lots de 50 · collectif opt-in"
     },
     {
       "id": "collectiveD1",
@@ -365,8 +365,8 @@
     {
       "from": "durableQueue",
       "to": "collectiveWorker",
-      "label": "cache avant fournisseur",
-      "classification": "lot authentifié",
+      "label": "clés seules avant fournisseur",
+      "classification": "lot public ≤ 50",
       "variant": "security"
     },
     {
@@ -383,7 +383,7 @@
     {
       "from": "collectiveWorker",
       "to": "collectiveD1",
-      "label": "SQL préparé",
+      "label": "SQL préparé groupé",
       "route": "straight",
       "labelAt": [423, 946],
       "classification": "batch indexé",

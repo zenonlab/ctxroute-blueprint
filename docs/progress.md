@@ -376,5 +376,5 @@
 ## Rendre la pipeline favoris observable, reprenable et bornee — ACTIVE
 
 - [x] **Corriger le controleur MV3 et son etat utilisateur** — DONE _(evidence: npm run verify passed governance, documentation, all typechecks, Chromium IndexedDB, parser equivalence, performance, CRG, integration, audit and Archify delivery gates, Extension 144/144 and application 337/337 pass; Chromium proves blocked task reset preserves its FavoriteSource and clears only AUTOMATIC_ATTEMPT_LIMIT, favorite-resolution dataflow and lifecycle both pass Archify showcase 9/9 with zero errors and warnings)_
-- [ ] **Corriger les faux unsupported et grouper les caches avant fournisseurs** — PENDING
+- [x] **Corriger les faux unsupported et grouper les caches avant fournisseurs** — DONE _(evidence: npm run verify passed all repository gates, Targeted parser cache extension and D1 tests passed, Both favorite Archify views passed showcase 9/9)_
 - [ ] **Certifier la premiere installation et preparer une archive reproductible** — PENDING

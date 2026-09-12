@@ -73,6 +73,29 @@ describe('public D1 catalogue', () => {
     expect((await SELF.fetch(url)).status).toBe(404);
   });
 
+  it('resolves a strict batch of public fingerprints and returns an explicit miss in input order', async () => {
+    const fingerprint = 'd'.repeat(64);
+    const identity = { mediaKind: 'MANGA', metadata: { preSerialization: false, startYear: 2020 }, references: [{ provider: 'mangaupdates', externalId: '42' }] };
+    await env.COLLECTIVE_DB.prepare('INSERT INTO favorite_keys(key_id, fingerprint, media_kind, parser_version, rules_version) VALUES (?1, ?2, ?3, ?4, ?5)').bind('batch-key', fingerprint, 'MANGA', 'parser-v4', 'rules-v3').run();
+    await env.COLLECTIVE_DB.prepare('INSERT INTO favorite_confirmations(key_id, identity_hash, media_kind, references_json, owner_count) VALUES (?1, ?2, ?3, ?4, 2)').bind('batch-key', 'e'.repeat(64), 'MANGA', JSON.stringify(identity.references)).run();
+    await env.COLLECTIVE_DB.prepare(`INSERT INTO favorite_public_cache
+      (fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, metadata_json, created_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`).bind(fingerprint, 'MANGA', 'e'.repeat(64), 'parser-v4', 'rules-v3', JSON.stringify(identity.references), JSON.stringify(identity.metadata), 1).run();
+    const keys = [
+      { fingerprint, mediaKind: 'MANGA', parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3' },
+      { fingerprint: 'f'.repeat(64), mediaKind: 'ANIME', parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3' },
+    ];
+    const response = await SELF.fetch('https://tobirink.test/v1/catalogue/favorites/resolve-batch', {
+      body: JSON.stringify({ keys }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ results: [{ fingerprint, identity }, { fingerprint: 'f'.repeat(64) }] });
+    const privatePayload = await SELF.fetch('https://tobirink.test/v1/catalogue/favorites/resolve-batch', {
+      body: JSON.stringify({ keys, title: 'private' }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(privatePayload.status).toBe(400);
+  });
+
   it('searches exact titles case-insensitively with a stable bound', async () => {
     await env.COLLECTIVE_DB.batch([
       env.COLLECTIVE_DB.prepare('INSERT INTO catalogue_works (work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)').bind('work_frieren_anime', 'anime', 'Frieren anime', 2),

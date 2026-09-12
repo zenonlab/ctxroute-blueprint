@@ -41,6 +41,11 @@ describe('favorite source evidence U-01…U-10', () => {
   it.each(['ordinary-link', 'watch?v=synthetic', 'blog/ordinary-link'])('still rejects ordinary links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });
+  it('uses a cleaned bookmark title only when a generic route proves a media release', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-release-title', title: 'Genius of the Unique Lineage Chapter 31', url: 'https://reader.example/view/9384/chapter/31' })).toMatchObject({
+      mediaKind: 'UNKNOWN', proofs: ['RELEASE_PATH'], release: { kind: 'chapter', value: 31 }, sourceAdapter: 'generic-bookmark-release-v1', title: 'Genius of the Unique Lineage',
+    });
+  });
   it.each([
     ['not a URL', 'INVALID_URL'],
     ['ftp://fixtures.tobirink.invalid/anime/frieren', 'NON_WEB_URL'],

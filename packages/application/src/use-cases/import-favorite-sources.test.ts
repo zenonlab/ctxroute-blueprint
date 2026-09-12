@@ -32,12 +32,14 @@ describe('importFavoriteSources', () => {
     expect(after && await storage.getFavoriteResolutionTask(after.id.replace(/^source_/u, 'favorite-resolution_'))).toMatchObject({ state: 'READY' });
   });
 
-  it('requeues a previously unsupported Comix source after the site rule update', async () => {
+  it('requeues generic Comix title evidence with its more precise site rule', async () => {
     const storage = new MemoryStoragePort();
     const input = { ...favorite, title: 'Synthetic Journey Chapter 101', url: 'https://comix.to/title/ab123-synthetic-journey/1234567-chapter-101' };
     await importFavoriteSources([input], storage, importedAt);
     const [before] = await storage.listFavoriteSources({ limit: 1 });
-    expect(before?.resolution?.kind).toBe('UNSUPPORTED');
+    const genericArtifact = before === undefined ? undefined : await storage.getFavoriteParseArtifact(before.id);
+    expect(before?.resolution).toBeUndefined();
+    expect(genericArtifact?.artifact).toMatchObject({ displayTitle: 'Synthetic Journey', mediaKind: 'UNKNOWN', sourceAdapterVersion: 'source-adapter-v3:generic-bookmark-release-v1' });
     await importFavoriteSources([input], storage, importedAt, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
     const [after] = await storage.listFavoriteSources({ limit: 1 });
     expect(after?.id).toBe(before?.id);

@@ -26,6 +26,10 @@ export const favoritePublicCacheEntrySchema = z.strictObject({
   references: z.array(favoritePublicReferenceSchema).min(1).max(5).refine((refs) => new Set(refs.map((ref) => ref.provider)).size === refs.length),
 });
 export type FavoritePublicCacheEntry = z.infer<typeof favoritePublicCacheEntrySchema>;
+export const favoritePublicCacheBatchRequestSchema = z.strictObject({ keys: favoriteCollectiveLookupQuerySchema });
+export const favoritePublicCacheBatchResultSchema = z.strictObject({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/u), identity: favoritePublicCacheEntrySchema.optional() });
+export const favoritePublicCacheBatchResponseSchema = z.strictObject({ results: z.array(favoritePublicCacheBatchResultSchema).min(1).max(50) });
+export type FavoritePublicCacheBatchResult = z.infer<typeof favoritePublicCacheBatchResultSchema>;
 export function favoritePublicMetadata(candidate: ProviderCandidate): FavoritePublicMetadata {
   const { categories, chapterCount, editorialStatus, endYear, episodeCount, format, genres, popularity, preSerialization, startYear, volumeCount } = candidate;
   return favoritePublicMetadataSchema.parse({ categories, chapterCount, editorialStatus, endYear, episodeCount, format, genres, popularity, preSerialization, startYear, volumeCount });

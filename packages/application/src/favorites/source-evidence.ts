@@ -2,6 +2,7 @@ import { createSourceEvidence } from '@tobirink/domain';
 import type { FavoriteMediaKind, FavoriteUrlDisposition, SourceEvidence } from '@tobirink/domain';
 import { qualifyFavoriteUrl } from './eligibility';
 import type { EligibleFavoriteUrl } from './eligibility';
+import { segmentFavoriteTitle } from './title-segmentation';
 
 export interface FavoriteSourceEvidenceInput {
   readonly sourceKey: string;
@@ -56,6 +57,20 @@ function rejectedEvidence(input: FavoriteSourceEvidenceInput, disposition: Favor
   return createSourceEvidence({ aliases: [], diagnostics: [], disposition, key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter, strategy });
 }
 
+function bookmarkTitleReleaseEvidence(
+  input: FavoriteSourceEvidenceInput,
+  url: EligibleFavoriteUrl,
+  release: NonNullable<SourceEvidence['release']>,
+): SourceEvidence | undefined {
+  const title = segmentFavoriteTitle(input.title, new URL(url.origin).hostname).cleanedTitle;
+  if (!/\p{L}{2}/u.test(title) || /^(?:chapter|chapitre|episode|épisode|volume|watch|read)$/iu.test(title)) return undefined;
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [],
+    mediaKind: 'UNKNOWN', proofs: [release.provenance === 'URL_PATH' ? 'RELEASE_PATH' : 'RELEASE_SUFFIX'], release,
+    sourceAdapter: 'generic-bookmark-release-v1', strategy: 'generic', title,
+  });
+}
+
 function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence {
   const decoded = [...url.decodedSegments];
   const raw = [...url.rawSegments];
@@ -108,13 +123,15 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   stableSlug = structuralIdentity.slug || stableSlug;
   const normalizedSlug = stableSlug?.toLowerCase();
   if (stableSlug === undefined || observedSlug === undefined || normalizedSlug === undefined || /^\d+$/u.test(normalizedSlug) || structuralSegments.has(normalizedSlug)) {
-    return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
+    return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')
+      : (bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED'));
   }
   const category = decoded[identityIndex - 1]?.toLowerCase();
   const categoryRoute = category !== undefined && routeCategorySegments.has(category);
   const rootReleaseRoute = identityIndex === 0 && release !== undefined;
   if (!categoryRoute && !rootReleaseRoute) {
-    return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
+    return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')
+      : (bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED'));
   }
   const mediaKind = category === undefined ? 'UNKNOWN' : (categoryKinds[category] ?? 'UNKNOWN');
   const title = displayTitle(stableSlug);

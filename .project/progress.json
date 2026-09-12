@@ -8073,7 +8073,7 @@
         {
           "id": "step-2",
           "title": "Corriger les faux unsupported et grouper les caches avant fournisseurs",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une route media prouvee avec titre exploitable entre dans les lanes UNKNOWN meme sans slug probant",
             "Seules les routes utilitaires racines ressources ordinaires et taxonomies bloquees restent unsupported",
@@ -8102,7 +8102,11 @@
             "git diff --check",
             "git commit -m fix(favorites): resolve media routes cache first"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed all repository gates",
+            "Targeted parser cache extension and D1 tests passed",
+            "Both favorite Archify views passed showcase 9/9"
+          ]
         },
         {
           "id": "step-3",

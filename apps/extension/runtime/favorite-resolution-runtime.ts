@@ -1,7 +1,7 @@
-import { favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
+import { favoriteCollectiveKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoritePublicCacheReadPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import { createFavoriteSource } from '@tobirink/domain';
-import type { LibraryId, Work } from '@tobirink/domain';
+import type { FavoriteSourceId, LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
 import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
@@ -77,9 +77,33 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let active: Promise<void> | undefined;
   let inventoryQueued = false;
   let coverRepairAfterId: Work['id'] | undefined;
+  let cacheScanAfterId: FavoriteSourceId | undefined;
   let diagnosticFailureCode: 'INVENTORY_UNAVAILABLE' | 'RESOLUTION_UNAVAILABLE' = 'RESOLUTION_UNAVAILABLE';
   const recordDiagnostic = async (event: Parameters<NonNullable<FavoriteResolutionRuntimeDependencies['diagnostics']>['record']>[0]) => {
     await dependencies.diagnostics?.record(event).catch(() => undefined);
+  };
+  const prepareResolutionCaches = async () => {
+    const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 100 });
+    cacheScanAfterId = page.length === 100 ? page.at(-1)?.id : undefined;
+    const keys = new Map<string, Awaited<ReturnType<typeof favoriteCollectiveKey>>>();
+    for (const source of page) {
+      if (source.presence !== 'observed' || (source.resolution !== undefined && source.resolution.kind !== 'RETRYABLE')) continue;
+      const artifact = (await dependencies.storage.getFavoriteParseArtifact(source.id))?.artifact;
+      if (artifact?.identityKey !== undefined) {
+        const key = await favoriteCollectiveKey(artifact);
+        keys.set(key.fingerprint, key);
+      }
+    }
+    if (keys.size === 0) return;
+    const prepared = [...keys.values()];
+    for (let offset = 0; offset < prepared.length; offset += 50) {
+      const batch = prepared.slice(offset, offset + 50);
+      await Promise.allSettled([
+        dependencies.synchronized?.lookup(batch),
+        dependencies.collective?.lookup(batch),
+        dependencies.publicCache?.prepareFavoriteIdentities?.(batch),
+      ]);
+    }
   };
   const runOnce = (runId: string, inventoryRequested: boolean) => dependencies.ensureReady()
     .then(async () => {
@@ -127,6 +151,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
         const identityPreparation = await dependencies.identityRecovery?.prepare();
+        await prepareResolutionCaches();
         const result = await runFavoriteResolutionSlice(dependencies);
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });

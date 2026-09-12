@@ -23,4 +23,26 @@ describe('HTTP favorite public cache', () => {
     const oversized = new HttpFavoritePublicCacheAdapter('https://tobirink.test', async () => new Response(JSON.stringify({ identity, padding: 'x'.repeat(70_000) }), { headers: { 'Content-Type': 'application/json' } }));
     await expect(oversized.findFavoriteIdentity(key)).rejects.toThrow(/byte limit/u);
   });
+
+  it('prepares several public fingerprints in one credential-free request', async () => {
+    const secondKey = { ...key, fingerprint: 'b'.repeat(64), mediaKind: 'MANGA' as const };
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      expect(JSON.parse(String(init.body))).toEqual({ keys: [key, secondKey] });
+      return Response.json({ results: [{ fingerprint: key.fingerprint, identity }, { fingerprint: secondKey.fingerprint }] });
+    });
+    const adapter = new HttpFavoritePublicCacheAdapter('https://tobirink.test', fetcher);
+    await adapter.prepareFavoriteIdentities?.([key, secondKey]);
+    await expect(adapter.findFavoriteIdentity(key)).resolves.toEqual(identity);
+    await expect(adapter.findFavoriteIdentity(secondKey)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledWith('https://tobirink.test/v1/catalogue/favorites/resolve-batch', expect.objectContaining({ credentials: 'omit', method: 'POST' }));
+  });
+
+  it('contains a failed batch so provider resolution can continue without per-key cache requests', async () => {
+    const fetcher = vi.fn(async () => new Response(null, { status: 503 }));
+    const adapter = new HttpFavoritePublicCacheAdapter('https://tobirink.test', fetcher);
+    await expect(adapter.prepareFavoriteIdentities?.([key])).rejects.toThrow(/503/u);
+    await expect(adapter.findFavoriteIdentity(key)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
 });

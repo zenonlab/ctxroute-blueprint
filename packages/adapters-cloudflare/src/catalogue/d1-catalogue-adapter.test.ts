@@ -41,4 +41,33 @@ describe('D1PublicCatalogueAdapter', () => {
     ]);
     expect(calls.every(({ query }) => query.includes('?1'))).toBe(true);
   });
+
+  it('binds a bounded favorite-key batch as one JSON value and correlates misses', async () => {
+    const calls: Array<{ query: string; values: Array<number | string | null> }> = [];
+    const database = {
+      prepare(query: string) {
+        // SAFETY: this fake records only values accepted by the D1 port's SqlValue boundary.
+        const call = { query, values: [] as Array<number | string | null> }; calls.push(call);
+        return {
+          bind(...values: Array<number | string | null>) { call.values = values; return this; },
+          // SAFETY: this row contains every projected field consumed by the batch adapter.
+          all: async <TResult>() => ({ results: [{ requestedFingerprint: 'a'.repeat(64), identityHash: 'identity', mediaKind: 'ANIME', metadataJson: '{"preSerialization":false}', referencesJson: '[{"provider":"anilist","externalId":"1"}]' }] as TResult[] }),
+          // SAFETY: the batch path never calls first; the fake still satisfies the complete statement port.
+          first: async <TResult>() => null as TResult | null,
+        };
+      },
+    };
+    const keys = [
+      { fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: 'parser-v3', siteRulesVersion: 'rules-v3' },
+      { fingerprint: 'b'.repeat(64), mediaKind: 'MANGA' as const, parserVersion: 'parser-v3', siteRulesVersion: 'rules-v3' },
+    ];
+    const adapter = new D1PublicCatalogueAdapter(database);
+    await expect(adapter.findFavoriteIdentities(keys)).resolves.toEqual([
+      { fingerprint: keys[0]?.fingerprint, identity: { mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ provider: 'anilist', externalId: '1' }] } },
+      { fingerprint: keys[1]?.fingerprint },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.query).toContain('FROM json_each(?1)');
+    expect(calls[0]?.values).toEqual([JSON.stringify(keys)]);
+  });
 });

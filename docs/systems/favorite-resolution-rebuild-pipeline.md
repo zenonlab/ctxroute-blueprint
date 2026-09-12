@@ -121,9 +121,10 @@ Le runtime actuel possède déjà des fondations réutilisables :
   et `hreflang` faible sans introduire de réseau ni de décision implicite;
 - une source absente est marquée `detached`; elle reste sauvegardable mais ne
   fournit plus de lien à Review, Agenda, Organisateur ou popup.
-- une route HTTP sans identité média probante est conservée comme source et
-  artefact `UNSUPPORTED/IDENTITY_MISSING`, avec tâche et reçu déjà terminaux;
-  elle n'occupe jamais les huit créneaux fournisseur d'un réveil MV3;
+- une route HTTP ordinaire sans preuve média reste
+  `UNSUPPORTED/IDENTITY_MISSING`; une route générique qui prouve un chapitre,
+  un épisode ou un volume peut employer son titre de favori nettoyé et entrer
+  dans les lanes `UNKNOWN`;
 - une route imbriquée de type `anime/{identité}/{sortie}-02-vostfr` conserve le
   segment d'identité précédent et sépare la progression de la clé recherchée.
 
@@ -284,9 +285,10 @@ persistance et des entrées-sorties.
 ### 5. Importer atomiquement
 
 Une transaction dans `tobirink-private` écrit ou met à jour `FavoriteSource`,
-ne crée aucune `Review` et enregistre l’artefact. Avec une identité média ou un
-ID fournisseur explicite, elle ajoute une entrée `READY` dans l’outbox
-`ResolutionTask`. Sans identité, elle écrit le résultat
+ne crée aucune `Review` et enregistre l’artefact. Avec une identité média, une
+sortie média corroborée par un titre exploitable, ou un ID fournisseur
+explicite, elle ajoute une entrée `READY` dans l’outbox `ResolutionTask`. Sans
+aucune de ces preuves, elle écrit le résultat
 `UNSUPPORTED/IDENTITY_MISSING`, la tâche `COMMITTED` et son reçu dans la même
 transaction. Aucun appel réseau n’a lieu avant le commit.
 L’identité locale reste dérivée de l’identifiant du favori selon le contrat
@@ -842,13 +844,12 @@ L'inspection D1 en lecture seule du 2026-09-11 indique zéro règle publiée,
 zéro propriétaire et zéro installation. Tant qu'un document de règles validé
 n'est pas publié par la gate, seule la règle intégrée Anime-Sama est active.
 
-Le parseur générique refuse une URL sans segment de catégorie ou marqueur de
-sortie avant d'examiner suffisamment le titre du favori. Un lien de lecture
-valide peut donc devenir `UNSUPPORTED/IDENTITY_MISSING` alors qu'une recherche
-`UNKNOWN` bornée serait possible. La prochaine version conserve le slug et le
-titre dans l'artefact privé, lance les lanes anime et manga indépendantes, et
-réserve `UNSUPPORTED` aux routes utilitaires, ressources ordinaires ou
-identités réellement inexploitable.
+Le parseur générique exige toujours une preuve de route média. Quand une route
+prouve une sortie mais que son segment d'identité est opaque ou structurel, il
+emploie désormais le titre du favori après retrait de la progression et du nom
+de domaine. L'artefact reste `UNKNOWN` et lance les lanes anime et manga. Les
+routes utilitaires, ressources ordinaires, adaptateurs exacts ayant rejeté leur
+route et identités réellement inexploitables restent `UNSUPPORTED`.
 
 ## Définition de terminé
 
@@ -887,8 +888,13 @@ projeté dès son lot d’inventaire. Le snapshot sync v2 relie son empreinte
 normalisée aux références fournisseur publiques et reste compatible avec les
 listes v1. Sa restauration, son scan de publication et l’inventaire possèdent
 chacun une continuation durable jusqu’à `COMPLETE`; leurs résultats incomplets
-ne sont plus ignorés. Le resolver consulte ensuite l’association sync, le cache
-public D1 par empreinte ou référence, puis seulement les fournisseurs.
+ne sont plus ignorés. Le resolver prépare ensuite, par lots dédupliqués de 50
+clés, l’association sync, le cache owner-scoped et le cache public D1, puis
+seulement les fournisseurs. Le Worker reçoit uniquement empreinte, type et
+versions. Son endpoint strict corrèle chaque résultat à la clé d'entrée et D1
+effectue une seule requête préparée fondée sur `json_each(?1)`, sans N+1. Un
+échec de ce cache public est mémorisé pour la tranche courante et laisse les
+lanes fournisseur avancer sans requête cache par œuvre.
 
 Après une première résolution, une contribution publique bornée rejoint une
 outbox locale indépendante du commit de l’œuvre. Le Worker réserve un job
