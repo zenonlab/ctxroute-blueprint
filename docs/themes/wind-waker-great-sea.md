@@ -283,10 +283,12 @@ déclarer la fermeture transitive.
 L'expansion de ces dépendances donne 43 archives uniques et 575 payloads. Les 157
 BDL, 5 BMD et 175 BCK passent le lecteur structurel commun. Vingt-deux BCK portent
 un bloc sonore JAI annexé, totalisant 24 événements ; les 50 BAS autonomes totalisent
-28 événements supplémentaires. Les 387 inspections modèles, squelettes et sons sont
-désormais toutes valides. Les familles matériau, texture, collision et animation de
-matériau restent explicitement en attente de lecteurs qualifiés ; cette passe ne
-change donc pas encore le statut du gate global de dépendances.
+28 événements supplémentaires. Les 46 BTK, 12 BTP, 32 BRK et 5 BPK passent maintenant
+un lecteur d'animation matériau séparant SRT de texture, motif de texture, couleur
+matériau et registres TEV. Les 482 inspections modèles et animations sont toutes
+valides. Les définitions matériau, textures, collisions et leurs relations restent
+explicitement en attente de lecteurs qualifiés ; cette passe ne change donc pas encore
+le statut du gate global de dépendances.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur

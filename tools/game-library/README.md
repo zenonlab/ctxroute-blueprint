@@ -81,6 +81,9 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-jai-animation-sound --input private/source/animation.bas
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-j3d-material-animation --input private/source/animation.btk
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-ppc-resource-calls \
   --input private/source/linked.elf \
   --module actor-controller \
@@ -106,6 +109,14 @@ après `ANK1`. Il conserve les identifiants, fenêtres de frames, pitch, flags, 
 boucles et panoramique ; les tailles, pointeurs sérialisés, valeurs flottantes et
 octets de bourrage sont validés. Le bloc sonore ne peut donc plus être confondu avec
 une section d'animation corrompue ou ignoré lors de la conversion.
+
+Les animations de matériau J3D restent des familles séparées : transformation SRT
+de texture BTK/TTK1, motif de texture BTP/TPT1, couleur matériau BPK/PAK1 et registres
+TEV BRK/TRK1. Le rapport conserve mode de lecture, durée, noms et identifiants des
+matériaux, slots, centres SRT et cardinalités des pistes. Chaque offset, table de noms,
+index et mode de tangente est borné. Pour BTK, la valeur brute du calcul matriciel et
+la valeur effective sont toutes deux exposées lorsque le loader source applique son
+fallback documenté.
 
 L'inspection PPC complète cette preuve quand le source exporté est incomplet. Elle
 lit un ELF32 big-endian borné, limite l'analyse à une plage exécutable explicite ou

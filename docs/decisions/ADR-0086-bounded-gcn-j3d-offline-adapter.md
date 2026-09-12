@@ -57,6 +57,15 @@ identifiant, sa fenêtre temporelle et ses paramètres de lecture. Un suffixe in
 une taille incohérente, un pointeur sérialisé non nul, un flottant invalide ou un
 bourrage non nul ferme la conversion au lieu d'être assimilé à du padding libre.
 
+Les pistes matériau utilisent un lecteur commun mais quatre sorties typées, conformes
+aux blocs chargés par J3D : `TTK1`, `TPT1`, `PAK1` et `TRK1`. Noms de matériaux,
+identifiants résolus, slots texture ou TEV, centres SRT, cardinalités et valeurs de
+lecture restent dans le reçu. Les tailles de section BTK historiques peuvent différer
+du stockage aligné de moins de 32 octets ; l'adaptateur conserve les deux tailles,
+borne cet écart et valide toutes les plages réellement référencées. Il reproduit aussi
+le fallback du loader J3D qui transforme un type matriciel BTK inconnu en type `0`,
+tout en conservant la valeur source pour l'audit.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans

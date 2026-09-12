@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
     gcn::{
-        inspect_j3d_animation, inspect_j3d_model, inspect_jai_animation_sound, inspect_rarc,
-        inspect_stage,
+        inspect_j3d_animation, inspect_j3d_material_animation, inspect_j3d_model,
+        inspect_jai_animation_sound, inspect_rarc, inspect_stage,
     },
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
@@ -84,6 +84,10 @@ enum Command {
         input: PathBuf,
     },
     InspectJaiAnimationSound {
+        #[arg(long)]
+        input: PathBuf,
+    },
+    InspectJ3dMaterialAnimation {
         #[arg(long)]
         input: PathBuf,
     },
@@ -182,6 +186,10 @@ fn main() -> Result<()> {
         }
         Command::InspectJaiAnimationSound { input } => {
             let result = inspect_jai_animation_sound(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectJ3dMaterialAnimation { input } => {
+            let result = inspect_j3d_material_animation(&input)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::InspectPpcResourceCalls {

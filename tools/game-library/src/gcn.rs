@@ -181,6 +181,62 @@ pub struct JaiSoundReport {
     pub events: Vec<JaiSoundEvent>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dMaterialAnimationReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub magic: String,
+    pub declared_section_bytes: usize,
+    pub stored_section_bytes: usize,
+    pub source_playback: &'static str,
+    pub duration_frames: u16,
+    #[serde(flatten)]
+    pub data: J3dMaterialAnimationData,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "track_family", rename_all = "kebab-case")]
+pub enum J3dMaterialAnimationData {
+    TextureSrtKey {
+        angle_multiplier: u8,
+        source_matrix_calculation_type: u32,
+        effective_matrix_calculation_type: u32,
+        scale_values: usize,
+        rotation_values: usize,
+        translation_values: usize,
+        targets: Vec<J3dMaterialTarget>,
+        post_targets: Vec<J3dMaterialTarget>,
+    },
+    TexturePattern {
+        texture_indices: usize,
+        targets: Vec<J3dMaterialTarget>,
+    },
+    MaterialColorKey {
+        red_values: usize,
+        green_values: usize,
+        blue_values: usize,
+        alpha_values: usize,
+        targets: Vec<J3dMaterialTarget>,
+    },
+    TevRegisterKey {
+        color_value_counts: [usize; 4],
+        konst_value_counts: [usize; 4],
+        color_targets: Vec<J3dMaterialTarget>,
+        konst_targets: Vec<J3dMaterialTarget>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dMaterialTarget {
+    pub material_name: String,
+    pub source_material_id: u16,
+    pub slot: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub center: Option<[f32; 3]>,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -254,6 +310,545 @@ pub fn inspect_jai_animation_sound(path: &Path) -> Result<JaiSoundReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_jai_animation_sound(&bytes)
+}
+
+pub fn inspect_j3d_material_animation(path: &Path) -> Result<J3dMaterialAnimationReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "J3D material animation input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "J3D material animation input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_j3d_material_animation(&bytes)
+}
+
+pub fn parse_j3d_material_animation(bytes: &[u8]) -> Result<J3dMaterialAnimationReport> {
+    ensure!(
+        bytes.len() >= 0x40 && bytes.len() <= MAX_J3D_BYTES,
+        "J3D material animation input exceeds the bounded size"
+    );
+    let magic = bytes.get(0..8).context("truncated J3D animation magic")?;
+    let (expected_magic, expected_section) = match magic {
+        b"J3D1btk1" => ("J3D1btk1", b"TTK1".as_slice()),
+        b"J3D1btp1" => ("J3D1btp1", b"TPT1".as_slice()),
+        b"J3D1bpk1" => ("J3D1bpk1", b"PAK1".as_slice()),
+        b"J3D1brk1" => ("J3D1brk1", b"TRK1".as_slice()),
+        _ => bail!("unsupported J3D material animation magic"),
+    };
+    ensure!(
+        read_u32(bytes, 8)? as usize == bytes.len(),
+        "J3D material animation declared size mismatch"
+    );
+    ensure!(
+        read_u32(bytes, 12)? == 1,
+        "J3D material animation must contain exactly one section"
+    );
+    ensure!(
+        bytes.get(0x20..0x24) == Some(expected_section),
+        "J3D material animation section does not match its magic"
+    );
+    let section_size = read_u32(bytes, 0x24)? as usize;
+    ensure!(
+        section_size >= 8,
+        "invalid J3D material animation section size"
+    );
+    let stored_section_bytes = bytes.len() - 0x20;
+    ensure!(
+        section_size.abs_diff(stored_section_bytes) <= 0x1f,
+        "J3D material animation section size mismatch exceeds alignment"
+    );
+    let source_playback = parse_j3d_playback(bytes[0x28])?;
+    let duration_frames = read_u16(
+        bytes,
+        if expected_section == b"PAK1" {
+            0x2c
+        } else {
+            0x2a
+        },
+    )?;
+    let data = match expected_section {
+        b"TTK1" => parse_ttk1(bytes)?,
+        b"TPT1" => parse_tpt1(bytes)?,
+        b"PAK1" => parse_pak1(bytes)?,
+        b"TRK1" => parse_trk1(bytes)?,
+        _ => unreachable!(),
+    };
+    Ok(J3dMaterialAnimationReport {
+        format: "orbite.j3d-material-animation-index/1",
+        adapter: "gcn.j3d-material-animation",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        magic: expected_magic.into(),
+        declared_section_bytes: section_size,
+        stored_section_bytes,
+        source_playback,
+        duration_frames,
+        data,
+    })
+}
+
+fn parse_j3d_playback(value: u8) -> Result<&'static str> {
+    match value {
+        0 => Ok("oneshot"),
+        1 => Ok("oneshot-reset"),
+        2 => Ok("loop"),
+        3 => Ok("ping-pong-once"),
+        4 => Ok("ping-pong-loop"),
+        _ => bail!("unsupported J3D playback attribute {value}"),
+    }
+}
+
+fn parse_ttk1(bytes: &[u8]) -> Result<J3dMaterialAnimationData> {
+    let track_count = bounded_u16(bytes, 0x2c, "TTK1 track")?;
+    ensure!(
+        track_count % 3 == 0,
+        "TTK1 track count must be divisible by three"
+    );
+    let counts = [
+        bounded_u16(bytes, 0x2e, "TTK1 scale value")?,
+        bounded_u16(bytes, 0x30, "TTK1 rotation value")?,
+        bounded_u16(bytes, 0x32, "TTK1 translation value")?,
+    ];
+    let targets = parse_ttk_targets(bytes, track_count, counts, 0x34, "TTK1")?;
+
+    let post_track_count = bounded_u16(bytes, 0x54, "TTK1 post track")?;
+    ensure!(
+        post_track_count % 3 == 0,
+        "TTK1 post track count must be divisible by three"
+    );
+    let post_counts = [
+        bounded_u16(bytes, 0x56, "TTK1 post scale value")?,
+        bounded_u16(bytes, 0x58, "TTK1 post rotation value")?,
+        bounded_u16(bytes, 0x5a, "TTK1 post translation value")?,
+    ];
+    let post_targets = parse_ttk_targets(bytes, post_track_count, post_counts, 0x5c, "TTK1 post")?;
+    let source_matrix_calculation_type = read_u32(bytes, 0x7c)?;
+    let effective_matrix_calculation_type = match source_matrix_calculation_type {
+        0 | 1 => source_matrix_calculation_type,
+        _ => 0,
+    };
+    Ok(J3dMaterialAnimationData::TextureSrtKey {
+        angle_multiplier: bytes[0x29],
+        source_matrix_calculation_type,
+        effective_matrix_calculation_type,
+        scale_values: counts[0],
+        rotation_values: counts[1],
+        translation_values: counts[2],
+        targets,
+        post_targets,
+    })
+}
+
+fn parse_ttk_targets(
+    bytes: &[u8],
+    track_count: usize,
+    counts: [usize; 3],
+    offsets_at: usize,
+    tag: &str,
+) -> Result<Vec<J3dMaterialTarget>> {
+    let target_count = track_count / 3;
+    let table = section_offset(bytes, offsets_at, tag)?;
+    let material_ids = section_offset(bytes, offsets_at + 4, tag)?;
+    let names = section_offset(bytes, offsets_at + 8, tag)?;
+    let slots = section_offset(bytes, offsets_at + 12, tag)?;
+    let centers = section_offset(bytes, offsets_at + 16, tag)?;
+    let values = [
+        section_offset(bytes, offsets_at + 20, tag)?,
+        section_offset(bytes, offsets_at + 24, tag)?,
+        section_offset(bytes, offsets_at + 28, tag)?,
+    ];
+    ensure_counted_span(bytes, table, track_count, 0x12, &format!("{tag} tables"))?;
+    for (offset, count, stride, label) in [
+        (values[0], counts[0], 4, "scale"),
+        (values[1], counts[1], 2, "rotation"),
+        (values[2], counts[2], 4, "translation"),
+    ] {
+        ensure_counted_span(
+            bytes,
+            offset,
+            count,
+            stride,
+            &format!("{tag} {label} values"),
+        )?;
+    }
+    validate_transform_key_tables(bytes, table, track_count, counts, tag)?;
+    ensure_counted_span(
+        bytes,
+        material_ids,
+        target_count,
+        2,
+        &format!("{tag} material IDs"),
+    )?;
+    ensure_counted_span(
+        bytes,
+        slots,
+        target_count,
+        1,
+        &format!("{tag} texture matrix slots"),
+    )?;
+    ensure_counted_span(bytes, centers, target_count, 12, &format!("{tag} centers"))?;
+    let names = parse_name_table(bytes, names, target_count, tag)?;
+    let mut targets = Vec::with_capacity(target_count);
+    for (index, material_name) in names.into_iter().enumerate() {
+        let center_offset = centers + index * 12;
+        let center = [
+            read_f32(bytes, center_offset)?,
+            read_f32(bytes, center_offset + 4)?,
+            read_f32(bytes, center_offset + 8)?,
+        ];
+        targets.push(J3dMaterialTarget {
+            material_name,
+            source_material_id: read_u16(bytes, material_ids + index * 2)?,
+            slot: bytes[slots + index],
+            center: Some(center),
+        });
+    }
+    Ok(targets)
+}
+
+fn parse_tpt1(bytes: &[u8]) -> Result<J3dMaterialAnimationData> {
+    let target_count = bounded_u16(bytes, 0x2c, "TPT1 target")?;
+    let texture_indices = bounded_u16(bytes, 0x2e, "TPT1 texture index")?;
+    let table = section_offset(bytes, 0x30, "TPT1 table")?;
+    let values = section_offset(bytes, 0x34, "TPT1 values")?;
+    let material_ids = section_offset(bytes, 0x38, "TPT1 material IDs")?;
+    let names = section_offset(bytes, 0x3c, "TPT1 names")?;
+    ensure_counted_span(bytes, table, target_count, 8, "TPT1 tables")?;
+    ensure_counted_span(bytes, values, texture_indices, 2, "TPT1 texture indices")?;
+    ensure_counted_span(bytes, material_ids, target_count, 2, "TPT1 material IDs")?;
+    let names = parse_name_table(bytes, names, target_count, "TPT1")?;
+    let mut targets = Vec::with_capacity(target_count);
+    for (index, material_name) in names.into_iter().enumerate() {
+        let entry = table + index * 8;
+        let count = read_u16(bytes, entry)? as usize;
+        let first = read_u16(bytes, entry + 2)? as usize;
+        ensure!(
+            first
+                .checked_add(count)
+                .context("TPT1 index span overflow")?
+                <= texture_indices,
+            "TPT1 track exceeds texture index table"
+        );
+        targets.push(J3dMaterialTarget {
+            material_name,
+            source_material_id: read_u16(bytes, material_ids + index * 2)?,
+            slot: bytes[entry + 4],
+            center: None,
+        });
+    }
+    Ok(J3dMaterialAnimationData::TexturePattern {
+        texture_indices,
+        targets,
+    })
+}
+
+fn parse_pak1(bytes: &[u8]) -> Result<J3dMaterialAnimationData> {
+    let target_count = bounded_u16(bytes, 0x2e, "PAK1 target")?;
+    let counts = [
+        bounded_u16(bytes, 0x30, "PAK1 red value")?,
+        bounded_u16(bytes, 0x32, "PAK1 green value")?,
+        bounded_u16(bytes, 0x34, "PAK1 blue value")?,
+        bounded_u16(bytes, 0x36, "PAK1 alpha value")?,
+    ];
+    let table = section_offset(bytes, 0x38, "PAK1 table")?;
+    let material_ids = section_offset(bytes, 0x3c, "PAK1 material IDs")?;
+    let names = section_offset(bytes, 0x40, "PAK1 names")?;
+    let value_offsets =
+        [0x44, 0x48, 0x4c, 0x50].map(|offset| section_offset(bytes, offset, "PAK1 values"));
+    let value_offsets = value_offsets.into_iter().collect::<Result<Vec<_>>>()?;
+    ensure_counted_span(bytes, table, target_count, 0x18, "PAK1 tables")?;
+    ensure_counted_span(bytes, material_ids, target_count, 2, "PAK1 material IDs")?;
+    for (index, (&offset, &count)) in value_offsets.iter().zip(counts.iter()).enumerate() {
+        ensure_counted_span(
+            bytes,
+            offset,
+            count,
+            2,
+            &format!("PAK1 channel {index} values"),
+        )?;
+    }
+    validate_color_key_tables(bytes, table, target_count, counts, 0x18, "PAK1")?;
+    let targets = simple_material_targets(bytes, material_ids, names, target_count, None, "PAK1")?;
+    Ok(J3dMaterialAnimationData::MaterialColorKey {
+        red_values: counts[0],
+        green_values: counts[1],
+        blue_values: counts[2],
+        alpha_values: counts[3],
+        targets,
+    })
+}
+
+fn parse_trk1(bytes: &[u8]) -> Result<J3dMaterialAnimationData> {
+    let color_count = bounded_u16(bytes, 0x2c, "TRK1 color target")?;
+    let konst_count = bounded_u16(bytes, 0x2e, "TRK1 konst target")?;
+    let color_values =
+        [0x30, 0x32, 0x34, 0x36].map(|offset| bounded_u16(bytes, offset, "TRK1 color value"));
+    let color_values: [usize; 4] = color_values
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?
+        .try_into()
+        .unwrap();
+    let konst_values =
+        [0x38, 0x3a, 0x3c, 0x3e].map(|offset| bounded_u16(bytes, offset, "TRK1 konst value"));
+    let konst_values: [usize; 4] = konst_values
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?
+        .try_into()
+        .unwrap();
+    let color_table = section_offset(bytes, 0x40, "TRK1 color table")?;
+    let konst_table = section_offset(bytes, 0x44, "TRK1 konst table")?;
+    let color_ids = section_offset(bytes, 0x48, "TRK1 color material IDs")?;
+    let konst_ids = section_offset(bytes, 0x4c, "TRK1 konst material IDs")?;
+    let color_names = section_offset(bytes, 0x50, "TRK1 color names")?;
+    let konst_names = section_offset(bytes, 0x54, "TRK1 konst names")?;
+    let color_offsets =
+        [0x58, 0x5c, 0x60, 0x64].map(|offset| section_offset(bytes, offset, "TRK1 color values"));
+    let color_offsets = color_offsets.into_iter().collect::<Result<Vec<_>>>()?;
+    let konst_offsets =
+        [0x68, 0x6c, 0x70, 0x74].map(|offset| section_offset(bytes, offset, "TRK1 konst values"));
+    let konst_offsets = konst_offsets.into_iter().collect::<Result<Vec<_>>>()?;
+    ensure_counted_span(bytes, color_table, color_count, 0x1c, "TRK1 color tables")?;
+    ensure_counted_span(bytes, konst_table, konst_count, 0x1c, "TRK1 konst tables")?;
+    ensure_counted_span(bytes, color_ids, color_count, 2, "TRK1 color material IDs")?;
+    ensure_counted_span(bytes, konst_ids, konst_count, 2, "TRK1 konst material IDs")?;
+    for (offsets, counts, label) in [
+        (&color_offsets, color_values, "color"),
+        (&konst_offsets, konst_values, "konst"),
+    ] {
+        for (index, (&offset, count)) in offsets.iter().zip(counts).enumerate() {
+            ensure_counted_span(
+                bytes,
+                offset,
+                count,
+                2,
+                &format!("TRK1 {label} channel {index} values"),
+            )?;
+        }
+    }
+    validate_color_key_tables(
+        bytes,
+        color_table,
+        color_count,
+        color_values,
+        0x1c,
+        "TRK1 color",
+    )?;
+    validate_color_key_tables(
+        bytes,
+        konst_table,
+        konst_count,
+        konst_values,
+        0x1c,
+        "TRK1 konst",
+    )?;
+    let color_targets = simple_material_targets(
+        bytes,
+        color_ids,
+        color_names,
+        color_count,
+        Some(color_table),
+        "TRK1 color",
+    )?;
+    let konst_targets = simple_material_targets(
+        bytes,
+        konst_ids,
+        konst_names,
+        konst_count,
+        Some(konst_table),
+        "TRK1 konst",
+    )?;
+    Ok(J3dMaterialAnimationData::TevRegisterKey {
+        color_value_counts: color_values,
+        konst_value_counts: konst_values,
+        color_targets,
+        konst_targets,
+    })
+}
+
+fn simple_material_targets(
+    bytes: &[u8],
+    material_ids: usize,
+    names_offset: usize,
+    count: usize,
+    slot_table: Option<usize>,
+    tag: &str,
+) -> Result<Vec<J3dMaterialTarget>> {
+    let names = parse_name_table(bytes, names_offset, count, tag)?;
+    names
+        .into_iter()
+        .enumerate()
+        .map(|(index, material_name)| {
+            let slot = slot_table.map_or(0, |table| bytes[table + index * 0x1c + 0x18]);
+            ensure!(slot <= 3, "{tag} register slot exceeds GX limit");
+            Ok(J3dMaterialTarget {
+                material_name,
+                source_material_id: read_u16(bytes, material_ids + index * 2)?,
+                slot,
+                center: None,
+            })
+        })
+        .collect()
+}
+
+fn validate_transform_key_tables(
+    bytes: &[u8],
+    table: usize,
+    count: usize,
+    available: [usize; 3],
+    tag: &str,
+) -> Result<()> {
+    for entry in 0..count {
+        for (component, available) in available.into_iter().enumerate() {
+            let offset = table + entry * 0x12 + component * 6;
+            validate_j3d_key_track(
+                read_u16(bytes, offset)? as usize,
+                read_u16(bytes, offset + 2)? as usize,
+                read_u16(bytes, offset + 4)?,
+                available,
+                tag,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_color_key_tables(
+    bytes: &[u8],
+    table: usize,
+    count: usize,
+    available: [usize; 4],
+    stride: usize,
+    tag: &str,
+) -> Result<()> {
+    for entry in 0..count {
+        for (channel, available) in available.into_iter().enumerate() {
+            let offset = table + entry * stride + channel * 6;
+            validate_j3d_key_track(
+                read_u16(bytes, offset)? as usize,
+                read_u16(bytes, offset + 2)? as usize,
+                read_u16(bytes, offset + 4)?,
+                available,
+                tag,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_j3d_key_track(
+    count: usize,
+    first: usize,
+    tangent: u16,
+    available: usize,
+    tag: &str,
+) -> Result<()> {
+    if count == 0 {
+        return Ok(());
+    }
+    ensure!(matches!(tangent, 0 | 1), "unsupported {tag} tangent mode");
+    let stride = if count == 1 {
+        1
+    } else if tangent == 0 {
+        3
+    } else {
+        4
+    };
+    let required = first
+        .checked_add(
+            count
+                .checked_mul(stride)
+                .context("J3D key track span overflow")?,
+        )
+        .context("J3D key track span overflow")?;
+    ensure!(required <= available, "{tag} track exceeds value table");
+    Ok(())
+}
+
+fn parse_name_table(
+    bytes: &[u8],
+    offset: usize,
+    expected: usize,
+    tag: &str,
+) -> Result<Vec<String>> {
+    if expected == 0 {
+        if offset != 0 {
+            ensure_span(bytes, offset, 1, 4, &format!("{tag} empty name table"))?;
+            ensure!(
+                read_u16(bytes, offset)? == 0,
+                "{tag} empty name table is not empty"
+            );
+        }
+        return Ok(Vec::new());
+    }
+    ensure!(offset != 0, "{tag} name table offset is missing");
+    ensure_span(bytes, offset, 1, 4, &format!("{tag} name table header"))?;
+    let count = read_u16(bytes, offset)? as usize;
+    ensure!(count == expected, "{tag} name table cardinality mismatch");
+    ensure_span(
+        bytes,
+        offset + 4,
+        count,
+        4,
+        &format!("{tag} name table entries"),
+    )?;
+    let mut names = Vec::with_capacity(count);
+    for index in 0..count {
+        let relative = read_u16(bytes, offset + 4 + index * 4 + 2)? as usize;
+        let start = offset
+            .checked_add(relative)
+            .context("J3D name offset overflow")?;
+        ensure!(start < bytes.len(), "{tag} name exceeds input");
+        let tail = &bytes[start..];
+        let end = tail
+            .iter()
+            .position(|byte| *byte == 0)
+            .context("unterminated J3D name")?;
+        ensure!(end > 0, "empty J3D name");
+        let mut name = String::new();
+        for byte in &tail[..end] {
+            if matches!(*byte, 0x20..=0x7e) {
+                name.push(char::from(*byte));
+            } else {
+                name.push_str(&format!("\\x{byte:02x}"));
+            }
+        }
+        names.push(name);
+    }
+    Ok(names)
+}
+
+fn section_offset(bytes: &[u8], field: usize, tag: &str) -> Result<usize> {
+    let relative = read_u32(bytes, field)? as usize;
+    if relative == 0 {
+        return Ok(0);
+    }
+    let offset = 0x20_usize
+        .checked_add(relative)
+        .context("J3D section offset overflow")?;
+    ensure!(offset < bytes.len(), "{tag} offset exceeds section");
+    Ok(offset)
+}
+
+fn bounded_u16(bytes: &[u8], offset: usize, tag: &str) -> Result<usize> {
+    let value = read_u16(bytes, offset)? as usize;
+    ensure!(value <= MAX_J3D_VALUES, "{tag} count exceeds the limit");
+    Ok(value)
+}
+
+fn ensure_counted_span(
+    bytes: &[u8],
+    offset: usize,
+    count: usize,
+    stride: usize,
+    tag: &str,
+) -> Result<()> {
+    ensure!(count == 0 || offset != 0, "{tag} offset is missing");
+    ensure_span(bytes, offset, count, stride, tag)
 }
 
 pub fn parse_jai_animation_sound(bytes: &[u8]) -> Result<JaiSoundReport> {
@@ -1359,6 +1954,126 @@ mod tests {
         bytes
     }
 
+    fn fixture_material_animation(magic: &[u8; 8], section: &[u8; 4], size: usize) -> Vec<u8> {
+        let mut bytes = vec![0_u8; size];
+        bytes[0..8].copy_from_slice(magic);
+        bytes[8..12].copy_from_slice(&(size as u32).to_be_bytes());
+        bytes[12..16].copy_from_slice(&1_u32.to_be_bytes());
+        bytes[0x20..0x24].copy_from_slice(section);
+        bytes[0x24..0x28].copy_from_slice(&((size - 0x20) as u32).to_be_bytes());
+        bytes[0x28] = 2;
+        bytes
+    }
+
+    fn write_name_table(bytes: &mut [u8], offset: usize, name: &[u8]) {
+        bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[offset + 6..offset + 8].copy_from_slice(&8_u16.to_be_bytes());
+        bytes[offset + 8..offset + 8 + name.len()].copy_from_slice(name);
+        bytes[offset + 8 + name.len()] = 0;
+    }
+
+    fn fixture_btk() -> Vec<u8> {
+        let mut bytes = fixture_material_animation(b"J3D1btk1", b"TTK1", 0x100);
+        bytes[0x29] = 1;
+        bytes[0x2a..0x2c].copy_from_slice(&20_u16.to_be_bytes());
+        for offset in [0x2c, 0x2e, 0x30, 0x32] {
+            bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        bytes[0x2c..0x2e].copy_from_slice(&3_u16.to_be_bytes());
+        for (offset, value) in [
+            (0x34, 0x60_u32),
+            (0x38, 0x98),
+            (0x3c, 0x9c),
+            (0x40, 0xa8),
+            (0x44, 0xac),
+            (0x48, 0xb8),
+            (0x4c, 0xbc),
+            (0x50, 0xbe),
+        ] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        bytes[0x7c..0x80].copy_from_slice(&1_u32.to_be_bytes());
+        for component in 0..9 {
+            let offset = 0x80 + component * 6;
+            bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        bytes[0xb8..0xba].copy_from_slice(&7_u16.to_be_bytes());
+        write_name_table(&mut bytes, 0xbc, b"mat");
+        bytes[0xc8] = 2;
+        for (offset, value) in [(0xcc, 1.0_f32), (0xd0, 2.0), (0xd4, 3.0), (0xd8, 1.0)] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+        bytes
+    }
+
+    fn fixture_btp() -> Vec<u8> {
+        let mut bytes = fixture_material_animation(b"J3D1btp1", b"TPT1", 0x80);
+        bytes[0x2a..0x2c].copy_from_slice(&10_u16.to_be_bytes());
+        bytes[0x2c..0x2e].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x2e..0x30].copy_from_slice(&2_u16.to_be_bytes());
+        for (offset, value) in [(0x30, 0x20_u32), (0x34, 0x28), (0x38, 0x2c), (0x3c, 0x30)] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        bytes[0x40..0x42].copy_from_slice(&2_u16.to_be_bytes());
+        bytes[0x44] = 3;
+        bytes[0x48..0x4c].copy_from_slice(&[0, 4, 0, 9]);
+        bytes[0x4c..0x4e].copy_from_slice(&5_u16.to_be_bytes());
+        write_name_table(&mut bytes, 0x50, b"eye");
+        bytes
+    }
+
+    fn fixture_bpk() -> Vec<u8> {
+        let mut bytes = fixture_material_animation(b"J3D1bpk1", b"PAK1", 0xc0);
+        bytes[0x2c..0x2e].copy_from_slice(&35_u16.to_be_bytes());
+        for offset in [0x2e, 0x30, 0x32, 0x34, 0x36] {
+            bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        for (offset, value) in [
+            (0x38, 0x40_u32),
+            (0x3c, 0x58),
+            (0x40, 0x5c),
+            (0x44, 0x70),
+            (0x48, 0x72),
+            (0x4c, 0x74),
+            (0x50, 0x76),
+        ] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        for channel in 0..4 {
+            bytes[0x60 + channel * 6..0x62 + channel * 6].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        bytes[0x78..0x7a].copy_from_slice(&6_u16.to_be_bytes());
+        write_name_table(&mut bytes, 0x7c, b"body");
+        bytes
+    }
+
+    fn fixture_brk() -> Vec<u8> {
+        let mut bytes = fixture_material_animation(b"J3D1brk1", b"TRK1", 0xd0);
+        bytes[0x2a..0x2c].copy_from_slice(&12_u16.to_be_bytes());
+        bytes[0x2c..0x2e].copy_from_slice(&1_u16.to_be_bytes());
+        for offset in [0x30, 0x32, 0x34, 0x36] {
+            bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        for (offset, value) in [
+            (0x40, 0x60_u32),
+            (0x48, 0x7c),
+            (0x50, 0x80),
+            (0x58, 0x90),
+            (0x5c, 0x92),
+            (0x60, 0x94),
+            (0x64, 0x96),
+        ] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        for channel in 0..4 {
+            bytes[0x80 + channel * 6..0x82 + channel * 6].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        bytes[0x98] = 3;
+        bytes[0x9c..0x9e].copy_from_slice(&8_u16.to_be_bytes());
+        write_name_table(&mut bytes, 0xa0, b"glow");
+        bytes
+    }
+
     fn fixture_bck_with_embedded_sound() -> Vec<u8> {
         let mut bytes = fixture_bck();
         bytes.resize(0x120, 0);
@@ -1488,6 +2203,60 @@ mod tests {
         assert_eq!(report.joints, 1);
         assert_eq!(report.root_translation_animated, [true, false, false]);
         assert_eq!(report.embedded_sound, None);
+    }
+
+    #[test]
+    fn inventories_all_four_j3d_material_animation_families() {
+        let btk = parse_j3d_material_animation(&fixture_btk()).unwrap();
+        assert_eq!(btk.source_playback, "loop");
+        match btk.data {
+            J3dMaterialAnimationData::TextureSrtKey { targets, .. } => {
+                assert_eq!(targets[0].material_name, "mat");
+                assert_eq!(targets[0].slot, 2);
+                assert_eq!(targets[0].center, Some([1.0, 2.0, 3.0]));
+            }
+            _ => panic!("unexpected BTK family"),
+        }
+
+        let btp = parse_j3d_material_animation(&fixture_btp()).unwrap();
+        match btp.data {
+            J3dMaterialAnimationData::TexturePattern {
+                texture_indices,
+                targets,
+            } => {
+                assert_eq!(texture_indices, 2);
+                assert_eq!(targets[0].material_name, "eye");
+                assert_eq!(targets[0].slot, 3);
+            }
+            _ => panic!("unexpected BTP family"),
+        }
+
+        let bpk = parse_j3d_material_animation(&fixture_bpk()).unwrap();
+        assert_eq!(bpk.duration_frames, 35);
+        assert!(matches!(
+            bpk.data,
+            J3dMaterialAnimationData::MaterialColorKey { .. }
+        ));
+
+        let brk = parse_j3d_material_animation(&fixture_brk()).unwrap();
+        match brk.data {
+            J3dMaterialAnimationData::TevRegisterKey { color_targets, .. } => {
+                assert_eq!(color_targets[0].material_name, "glow");
+                assert_eq!(color_targets[0].slot, 3);
+            }
+            _ => panic!("unexpected BRK family"),
+        }
+    }
+
+    #[test]
+    fn rejects_material_animation_crossed_sections_and_out_of_range_tracks() {
+        let mut crossed = fixture_btp();
+        crossed[0x20..0x24].copy_from_slice(b"PAK1");
+        assert!(parse_j3d_material_animation(&crossed).is_err());
+
+        let mut invalid = fixture_bpk();
+        invalid[0x62..0x64].copy_from_slice(&99_u16.to_be_bytes());
+        assert!(parse_j3d_material_animation(&invalid).is_err());
     }
 
     #[test]
