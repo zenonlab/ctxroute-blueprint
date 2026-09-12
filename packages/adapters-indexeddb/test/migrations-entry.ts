@@ -187,7 +187,7 @@ async function verifyReviewCorrection(name: string): Promise<void> {
   if ((await storage.database.favoriteSources.get('source_4_3432'))?.reviewId !== undefined) throw new Error('Artificial Review remained linked.');
   if (!await storage.database.reviews.get('review_4_3432')) throw new Error('Correction removed the historical Review.');
   const counts = await storage.readFavoriteResolutionCounts();
-  if (counts.processing !== 1 || counts.retryable !== 0 || counts.unsupported !== 0) throw new Error('Indexed processing counts included unobserved legacy records.');
+  if (counts.observed !== 1 || counts.processing !== 1 || counts.retryable !== 0 || counts.unsupported !== 0) throw new Error('Indexed processing counts included unobserved legacy records.');
   document.body.dataset.phase = 'review-queue-pagination';
   for (let index = 0; index < 100; index += 1) {
     await storage.putReview(createReview({ availableAt: '1970-01-01T00:00:00.000Z', id: reviewId(`review_orphan_${index.toString().padStart(6, '0')}`), reason: 'NOT_FOUND', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic orphan' }));

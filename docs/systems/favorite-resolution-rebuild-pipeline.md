@@ -300,7 +300,7 @@ Review. Une purge future demanderait une action produit séparée et explicite.
 
 ### 6. Réserver et router la résolution
 
-Le runner réclame au plus huit tâches dues et s’arrête après 20 secondes par
+Le runner réclame au plus 100 tâches dues et s’arrête après 20 secondes par
 réveil. Le claim de 60 secondes, son expiration et l’`idempotencyKey` sont
 persistés avant l’effet. Le routeur applique l'ordre du plan v3 : ID URL, règle exacte origine/route,
 artefact/aliases, fiche hydratée, D1 owner-scoped via Worker, recherche locale,
@@ -308,6 +308,12 @@ puis Review terminale seulement. AniList anime et MangaUpdates manga sont
 prioritaires; Kitsu suit seulement NO_MATCH complet. MangaDex reste exact/sorties.
 Type inconnu : deux lanes indépendantes, ambiguïté inter-types explicite.
 Panne, 429, timeout ou ensemble incomplet ne déclenche aucun arbitre suivant.
+
+La surface Options lit aussi le nombre de sources observées et le checkpoint
+d’inventaire (`not-started`, `active` ou `complete`). « Actualiser l’état » ne
+fait qu’une lecture. « Relancer l’analyse » est une commande séparée, acceptée
+uniquement depuis la page Options de l’extension; elle exécute un passage borné,
+répare la projection puis renvoie les compteurs actualisés.
 
 Les ports candidats/hydratation restent séparés et DTO Zod stricts. La décision
 pure applique ID, URL, exact, saison, tokens, distance sans score de popularité.

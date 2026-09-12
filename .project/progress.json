@@ -7211,6 +7211,45 @@
             "Playwright against production base URL passes 7/7 with synthetic provider and bridge fixtures; previous Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0 retained for rollback",
             "No D1 migration, cover ingestion, user-profile mutation or Git push; actual installed private library remains unverified in step-8"
           ]
+        },
+        {
+          "id": "step-19",
+          "title": "Make live favorite reconciliation observable and restartable",
+          "status": "DONE",
+          "acceptance": [
+            "Status reads work on the actual IndexedDB schema",
+            "Options reports observed inventory and checkpoint state",
+            "A trusted Options action runs bounded reconciliation and refreshes the projection",
+            "Installed interaction test proves the action and counters"
+          ],
+          "files": [
+            "packages/application/src/ports/storage-port.ts",
+            "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+            "packages/contracts/src/memory-storage-port.ts",
+            "apps/extension/runtime",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm exec -- vitest run",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "git diff --check",
+            "git commit"
+          ],
+          "evidence": [
+            "Packaged Chromium interaction creates six bookmarks, runs the trusted Options reconciliation, reports complete inventory and resolves five media works while excluding YouTube",
+            "Complete npm run verify, all workspace typechecks, Chromium IndexedDB migrations, docs and Archify showcase pass",
+            "Two isolated builds reproduce Chrome b9e9cbb9b4ae29ccb79f1f877fd0f3566abd6cc11b55fe4a00fffb221e6961a1 and Firefox 0efaaa3cb01bb2423233d1b279a9946ae99b81eedb39c3108ed48eca8fbf9f59",
+            "1.0.13 remains local; installed private profile was still not exposed through Chrome Options and production remains 1.0.12"
+          ]
         }
       ]
     }

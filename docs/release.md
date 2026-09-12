@@ -2,7 +2,8 @@
 
 ## Build a release candidate
 
-The current published release is `1.0.12`. `apps/extension/package.json` is the only
+The current local candidate is `1.0.13`; production remains on `1.0.12`.
+`apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
 
@@ -35,6 +36,24 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Live queue diagnostics candidate — 2026-09-12
+
+Candidate `1.0.13` exposes the observed favorite count and inventory checkpoint
+in Options. Its primary action performs an actual bounded reconciliation and
+library projection repair; the secondary action only refreshes the counters.
+Both commands are restricted to the trusted Options page. This makes an empty
+inventory distinguishable from an active scan or queued provider work. It does
+not yet prove recovery of the user's private profile and is not published.
+
+The packaged Chromium journey creates six browser bookmarks, opens Options,
+activates « Relancer l’analyse », observes a complete six-item inventory, then
+verifies five resolved media works and one excluded ordinary YouTube link.
+`npm run verify`, the Chromium migration suite and Archify showcase pass. Two
+isolated builds reproduce these local archives:
+
+- Chrome: 285618 bytes, SHA-256 `b9e9cbb9b4ae29ccb79f1f877fd0f3566abd6cc11b55fe4a00fffb221e6961a1`.
+- Firefox: 285663 bytes, SHA-256 `0efaaa3cb01bb2423233d1b279a9946ae99b81eedb39c3108ed48eca8fbf9f59`.
 
 ### Robust pipeline release — 2026-09-12
 

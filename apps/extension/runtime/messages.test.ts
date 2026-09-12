@@ -13,6 +13,14 @@ const organizerConfiguration = {
   updatedAt: '2026-09-06T00:00:00.000Z',
 };
 
+describe('favorite resolution status messages', () => {
+  it('accepts bounded status reads and explicit trusted reconciliation commands', () => {
+    expect(extensionMessageSchema.safeParse({ type: 'favorite.status.read', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ type: 'favorite.reconcile', version: 1 }).success).toBe(true);
+    expect(extensionMessageSchema.safeParse({ force: true, type: 'favorite.reconcile', version: 1 }).success).toBe(false);
+  });
+});
+
 describe('extension Review messages', () => {
   it('accepts only the exact versioned queue read command', () => {
     expect(extensionMessageSchema.safeParse({ type: 'review.queue.read', version: 1 }).success).toBe(true);

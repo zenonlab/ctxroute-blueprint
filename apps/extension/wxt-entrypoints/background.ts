@@ -68,6 +68,16 @@ export default defineBackground({
     });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
+    const readFavoriteStatus = async () => {
+      const [counts, checkpoint] = await Promise.all([
+        privateStorage.storage.readFavoriteResolutionCounts(),
+        privateStorage.storage.getFavoriteInventoryCheckpoint(),
+      ]);
+      const inventory = checkpoint === undefined
+        ? { status: 'not-started' as const }
+        : { startedAt: checkpoint.startedAt, status: checkpoint.status };
+      return { counts, inventory, ok: true as const };
+    };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
       beforeInventory: async () => { await ownerRuntime?.maintain().catch(() => undefined); },
@@ -134,10 +144,15 @@ export default defineBackground({
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);
       }
       if (parsed.data.type === 'health.check') return { ok: true, version: 1 };
-      if (parsed.data.type === 'favorite.status.read') {
+      if (parsed.data.type === 'favorite.status.read' || parsed.data.type === 'favorite.reconcile') {
+        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         try {
           await privateStorage.ensureReady();
-          return { ok: true, counts: await privateStorage.storage.readFavoriteResolutionCounts() };
+          if (parsed.data.type === 'favorite.reconcile') {
+            await reconcileFavorites(true);
+            await repairLibraryProjection();
+          }
+          return await readFavoriteStatus();
         } catch { return { ok: false, error: 'favorite-status-unavailable' }; }
       }
       if (parsed.data.type === 'review.queue.read') {

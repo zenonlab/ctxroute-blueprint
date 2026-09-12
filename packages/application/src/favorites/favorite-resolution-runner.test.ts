@@ -128,7 +128,7 @@ describe('runFavoriteResolutionSlice', () => {
     await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
     await runFavoriteResolutionSlice({ candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'eighth' });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T18:00:00.000Z' });
-    expect(await storage.readFavoriteResolutionCounts()).toEqual({ processing: 0, retryable: 1, unsupported: 0 });
+    expect(await storage.readFavoriteResolutionCounts()).toEqual({ observed: 1, processing: 0, retryable: 1, unsupported: 0 });
   });
   it('uses the owner-scoped lookup before title search and preserves its public references', async () => {
     const { outbox, storage } = await fixture();

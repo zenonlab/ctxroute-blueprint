@@ -8,5 +8,5 @@ export default definePreview({
   dependencies: ['Button', 'Surface'], accessibility: ['Liste descriptive native', 'Chargement annoncé', 'Erreur annoncée et reprise explicite'],
   sources: [{ label: 'API publique', path: 'entrypoints/options/ResolutionStatus/index.ts' }, { label: 'Surface', path: 'entrypoints/options/ResolutionStatus/ResolutionStatus.tsx' }, { label: 'Styles', path: 'entrypoints/options/ResolutionStatus/ResolutionStatus.module.css' }],
   usage: "import { ResolutionStatus } from './ResolutionStatus';",
-  render: ({ state }) => <ResolutionStatus counts={state === 'ready' ? { processing: 12, retryable: 2, unsupported: 8 } : undefined} onRefresh={() => undefined} state={state === 'loading' || state === 'error' ? state : 'ready'} />,
+  render: ({ state }) => <ResolutionStatus counts={state === 'ready' ? { observed: 22, processing: 12, retryable: 2, unsupported: 8 } : undefined} inventory={state === 'ready' ? { status: 'complete' } : undefined} onReconcile={() => undefined} onRefresh={() => undefined} state={state === 'loading' || state === 'error' ? state : 'ready'} />,
 });

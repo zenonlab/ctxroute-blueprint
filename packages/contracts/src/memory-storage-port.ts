@@ -33,7 +33,7 @@ function readReviews(reviews: RecordMap<Review>, query: Parameters<StoragePort['
 
 function resolutionCounts(sources: RecordMap<FavoriteSource>) {
   const observed = [...sources.values()].filter((source) => source.presence === 'observed');
-  const result: Awaited<ReturnType<StoragePort['readFavoriteResolutionCounts']>> = { processing: observed.filter((source) => source.resolution === undefined).length, retryable: observed.filter((source) => source.resolution?.kind === 'RETRYABLE').length, unsupported: observed.filter((source) => source.resolution?.kind === 'UNSUPPORTED').length };
+  const result: Awaited<ReturnType<StoragePort['readFavoriteResolutionCounts']>> = { observed: observed.length, processing: observed.filter((source) => source.resolution === undefined).length, retryable: observed.filter((source) => source.resolution?.kind === 'RETRYABLE').length, unsupported: observed.filter((source) => source.resolution?.kind === 'UNSUPPORTED').length };
   const internalErrors = observed.filter(source => source.resolution?.kind === 'RETRYABLE' && source.resolution.reason === 'INTERNAL_FAILURE').length;
   const collectivePending = observed.filter(source => source.resolution?.kind === 'RETRYABLE' && source.resolution.reason === 'COLLECTIVE_UNAVAILABLE').length;
   if (internalErrors) result.internalErrors = internalErrors;
