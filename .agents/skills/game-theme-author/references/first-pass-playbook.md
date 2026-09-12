@@ -14,6 +14,7 @@ only generic schemas, adapters, tests and free fixtures.
 | input receipt | hashes, size, revision, container identity | input integrity |
 | engine dossier | public sources, pinned implementations, selected/rejected tools | engine research |
 | corpus index | every resource kind, owner archive and stable ID | inventory closure |
+| region scorecard | audio, activities, signatures, staging and route coverage per logical region | concept acceptance |
 | coordinate receipt | handedness, axes, units, matrices and asymmetric probe | coordinate probe |
 | dependency graph | roots, edges, cycles, resolved and unresolved counts | dependency closure |
 | source-relation manifests | complete variant matrices with provenance | source relations |
@@ -45,6 +46,16 @@ only generic schemas, adapters, tests and free fixtures.
 7. Locate variant relations in source tables or metadata. If absent, inspect locally
    exported source code read-only and materialize every branch with symbol and hash.
 8. Only then propose the wallpaper composition and its session objects to the user.
+
+The proposal enumerates every logical region, even when the source represents the
+world as rooms, cells, screens, biomes or a single static scene. Each region records a
+sourced audio identity, one inventoried primary activity, up to three secondary
+activities, environmental motion, a camera cue and at least three signature axes.
+Every declared axis has a concrete signature value, and non-silent audio names an
+inventoried resource rather than only a descriptive label.
+The declared route covers every region exactly once and states whether its boundary is
+closed, open or static. An unresolved scorecard is shown to the user and closes
+generation; it is never filled with repeated generic ambience.
 
 ## Conversion rules
 
@@ -78,6 +89,8 @@ Before native activation, render deterministic views for both scenes across decl
 camera, time, variant and behavior-state axes. For visible effects, check visibility,
 origin, scale, density, orientation, appearance and timing. For assemblies, check
 ground contact, relative scale, attachment, culling, alpha and animation continuity.
+The visual matrix also includes every region scorecard and every route transition;
+adjacent regions must not reproduce the same audio/activity/staging fingerprint.
 
 Run interactions in the isolated candidate surface: left action, right customization,
 empty-space add, reset, atomic cancel/accept, pause/resume, pin edit/disable/enable,

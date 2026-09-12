@@ -35,6 +35,12 @@ export async function verifyWallpaperConcept(path) {
 
   const sources = new Map(document.research.sources.map(source => [source.id, source]));
   unique([...sources.keys()], 'research source ids');
+  const verifiedEvidence = (ids, label) => {
+    for (const id of ids) {
+      if (!sources.has(id)) throw new Error(`${label} references unknown evidence ${id}`);
+    }
+    return ids.some(id => sources.get(id).classification !== 'hypothesis');
+  };
   if (![...sources.values()].some(source => ['official_documentation', 'public_implementation'].includes(source.classification))) {
     throw new Error('engine research requires primary documentation or implementation evidence');
   }
@@ -69,7 +75,73 @@ export async function verifyWallpaperConcept(path) {
   }
 
   unique(document.proposals.map(proposal => proposal.id), 'proposal ids');
+  const unresolvedRegions = [];
   for (const proposal of document.proposals) {
+    const regions = new Map(proposal.regions.map(region => [region.id, region]));
+    unique([...regions.keys()], `${proposal.id} region ids`);
+    for (const region of regions.values()) {
+      const signatureKeys = Object.keys(region.signature_values).sort();
+      if (JSON.stringify(signatureKeys) !== JSON.stringify([...region.signature_axes].sort())) {
+        throw new Error(`${proposal.id}/${region.id} signature axes and values must match`);
+      }
+      const activityIds = [region.primary_activity_id, ...region.secondary_activity_ids];
+      unique(activityIds, `${proposal.id}/${region.id} activity ids`);
+      const activities = activityIds.map(id => {
+        const item = inventory.get(id);
+        if (!item) throw new Error(`${proposal.id}/${region.id} uses unknown activity ${id}`);
+        return item;
+      });
+      let audioItem = null;
+      if (region.audio.mode === 'intentional_silence') {
+        if (region.audio.resource_id !== null) {
+          throw new Error(`${proposal.id}/${region.id} intentional silence cannot reference audio`);
+        }
+      } else {
+        audioItem = inventory.get(region.audio.resource_id);
+        if (!audioItem) {
+          throw new Error(`${proposal.id}/${region.id} uses unknown audio ${region.audio.resource_id}`);
+        }
+      }
+      const regionEvidenceVerified = verifiedEvidence(region.evidence_ids, `${proposal.id}/${region.id}`);
+      const audioEvidenceVerified = verifiedEvidence(region.audio.evidence_ids, `${proposal.id}/${region.id} audio`);
+      const activityEvidenceVerified = activities.every(item =>
+        verifiedEvidence(item.evidence_ids, `${proposal.id}/${region.id} activity ${item.id}`));
+      const audioResourceVerified = audioItem === null ||
+        verifiedEvidence(audioItem.evidence_ids, `${proposal.id}/${region.id} audio ${audioItem.id}`);
+      if (region.qualification === 'verified' &&
+          !(regionEvidenceVerified && audioEvidenceVerified && activityEvidenceVerified && audioResourceVerified)) {
+        throw new Error(`${proposal.id}/${region.id} cannot be verified from hypotheses alone`);
+      }
+      if (region.qualification !== 'verified') unresolvedRegions.push(`${proposal.id}/${region.id}`);
+    }
+    const ordered = proposal.route.ordered_region_ids;
+    if (ordered.length !== regions.size || ordered.some(id => !regions.has(id))) {
+      throw new Error(`${proposal.id} route must cover every region exactly once`);
+    }
+    if (proposal.route.mode === 'static_scene' && ordered.length !== 1) {
+      throw new Error(`${proposal.id} static scene requires exactly one region`);
+    }
+    if (proposal.route.mode !== 'static_scene' && ordered.length < 2) {
+      throw new Error(`${proposal.id} travelling route requires at least two regions`);
+    }
+    if (proposal.route.mode === 'closed_loop') {
+      const requiredContinuity = ['position', 'orientation', 'motion', 'environment', 'audio', 'simulation'];
+      const continuity = new Set(proposal.route.continuity_axes);
+      const missing = requiredContinuity.filter(axis => !continuity.has(axis));
+      if (missing.length) throw new Error(`${proposal.id} closed loop misses continuity axes: ${missing.join(', ')}`);
+    }
+    const fingerprint = region => JSON.stringify([
+      Object.entries(region.signature_values).sort(), region.audio.mode, region.audio.resource_id,
+      region.primary_activity_id, region.environment_motion, region.camera_cue
+    ]);
+    const pairCount = proposal.route.mode === 'closed_loop' ? ordered.length : ordered.length - 1;
+    for (let index = 0; index < pairCount; index += 1) {
+      const left = regions.get(ordered[index]);
+      const right = regions.get(ordered[(index + 1) % ordered.length]);
+      if (fingerprint(left) === fingerprint(right)) {
+        throw new Error(`${proposal.id} adjacent regions ${left.id} and ${right.id} repeat the same presentation`);
+      }
+    }
     const bindings = new Map();
     for (const binding of proposal.session_bindings) {
       if (bindings.has(binding.object_id)) throw new Error(`${proposal.id} duplicates session binding for ${binding.object_id}`);
@@ -104,7 +176,7 @@ export async function verifyWallpaperConcept(path) {
   const unresolved = document.research.subsystems
     .filter(subsystem => ['missing', 'unsupported'].includes(subsystem.status))
     .map(subsystem => subsystem.id);
-  const generationAllowed = accepted && unresolved.length === 0;
+  const generationAllowed = accepted && unresolved.length === 0 && unresolvedRegions.length === 0;
 
   return {
     ok: true,
@@ -114,6 +186,7 @@ export async function verifyWallpaperConcept(path) {
     researched_subsystems: subsystemIds.length,
     inventory_items: inventory.size,
     unresolved_subsystems: unresolved,
+    unresolved_regions: unresolvedRegions,
     generation_allowed: generationAllowed
   };
 }

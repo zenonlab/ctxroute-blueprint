@@ -2,7 +2,7 @@
 name: game-theme-author
 description: Research a local game's engine and corpus, propose a source-grounded wallpaper concept for user acceptance, then prepare a portable theme without game-specific runtime hardcode or untracked commercial assets.
 metadata:
-  blueprint-version: "1.1.0"
+  blueprint-version: "1.2.0"
   execution-authority: primary-or-orchestrator
 ---
 
@@ -69,12 +69,22 @@ node scripts/verify-wallpaper-concept.mjs /path/to/concept.json
 Present the user with a concise plan before generating anything. The plan must name:
 
 - the scene and its ambient motion;
+- every logical region, its sourced audio identity, primary activity, environmental
+  motion and camera cue;
+- the complete route through those regions and its transition/continuity policy;
 - the useful objects discovered in the local inventory and why each fits;
 - which interactive object represents each typed session role;
 - the `focus` and `open` intents available on each object;
 - which 3D objects may be pinned above ordinary workspace windows;
 - the automatic menus, system controls, pause/occlusion behavior and known gaps;
 - at least one alternative when the corpus supports materially different concepts.
+
+Every region must carry at least three distinct signature axes among silhouette,
+audio, actor, environment and camera, with a concrete value for every declared axis.
+Its primary and secondary activities reference inventoried objects, and its audio
+references both an inventoried resource and research evidence. Adjacent regions may
+not repeat the same complete presentation. Unresolved or hypothesis-only region data
+is visible in the proposal and keeps generation closed.
 
 For example, an exploration game may suggest a travelling carrier as ambient motion
 and compact companions as session indicators, but those roles are accepted only when

@@ -39,8 +39,9 @@ interactif à un rôle de session et décrit les cibles pinnables. Seule une pro
 explicitement acceptée par l'utilisateur, sans sous-système `missing` ou `unsupported`,
 ouvre le gate de génération. Le validateur rend cette décision mécanique.
 
-Le manifeste d'interface ajoute une capacité `pinning` optionnelle et générique. Le
-pin partage l'identité et la session de l'instance de scène. Son clic droit ouvre un
+Le manifeste d'interface ajoute une capacité `pinning` générique, rendue obligatoire
+pour la version 5 par ADR-0084. Le pin partage l'identité et la session de l'instance
+de scène. Son clic droit ouvre un
 cadre de déplacement/taille ainsi que luminosité et opacité. Acceptation et annulation
 sont atomiques ; désactivation et réactivation persistent par objet. Le connecteur OS
 possède la politique de niveau de fenêtre et refuse les surfaces protégées.

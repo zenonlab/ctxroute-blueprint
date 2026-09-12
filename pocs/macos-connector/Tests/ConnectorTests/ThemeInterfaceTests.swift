@@ -3,6 +3,15 @@ import XCTest
 @testable import ThemeModel
 
 final class ThemeInterfaceTests: XCTestCase {
+    private func pinning(targetID: String = "object.primary") -> ThemeInterfaceManifest.Pinning {
+        .init(target_ids: [targetID], visibility_scope: "workspace-windows",
+              same_instance_and_session: true, edit_mode: "transform-frame",
+              controls: ["position", "size", "brightness", "opacity"],
+              actions: ["accept", "cancel", "disable"],
+              limits: .init(size: [0.25, 4], brightness: [0, 1], opacity: [0, 1]),
+              persistent_per_object_settings: true, atomic_preview: true)
+    }
+
     func testPrivateInterfaceResolvesOnlyDigestPinnedContainedPNGs() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("theme-interface-\(UUID().uuidString)", isDirectory: true)
@@ -21,10 +30,11 @@ final class ThemeInterfaceTests: XCTestCase {
                 .init(id: "subject.fixture", label: "Sujet libre", kind: subject, preview: asset.id),
                 .init(id: "carrier.fixture", label: "Support libre", kind: carrier, preview: asset.id,
                       appearance: .init(part: "body", material: "mat_body", tint: [1, 0.5, 0.25, 1]))
-            ], selection: .init(stages: [
+            ], targets: [.init(id: "object.primary", label: "Objet", session_id: "session.primary")],
+            selection: .init(stages: [
                 .init(id: "subject", label: "Choisir un sujet", kind: subject, columns: 2),
                 .init(id: "carrier", label: "Choisir un support", kind: carrier, columns: 2)
-            ]))
+            ]), pinning: pinning())
         let manifestURL = root.appendingPathComponent("interface.json")
         try JSONEncoder().encode(manifest).write(to: manifestURL)
 
@@ -93,6 +103,30 @@ final class ThemeInterfaceTests: XCTestCase {
         XCTAssertEqual(loaded.models?.first?.effect_sockets["trail"]?[0], [-0.5, 0, 1])
         XCTAssertEqual(loaded.placements.first?.translation, [0, 1, 0])
         XCTAssertEqual(loaded.pinning?.target_ids, ["object.primary"])
+    }
+
+    func testInterfaceV5RejectsMissingPinningContract() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("theme-interface-missing-pin-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let png = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1])
+        try png.write(to: root.appendingPathComponent("preview.png"))
+        let digest = SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined()
+        let asset = ThemeInterfaceManifest.Asset(id: "preview", path: "preview.png", sha256: digest)
+        let slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
+        let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
+            slots: slots,
+            choices: [.init(id: "subject.fixture", label: "Sujet", kind: subject, preview: asset.id)],
+            targets: [.init(id: "object.primary", label: "Objet", session_id: "session.primary")],
+            selection: .init(stages: [
+                .init(id: "subject", label: "Choisir", kind: subject, columns: 2)
+            ]))
+        let url = root.appendingPathComponent("interface.json")
+        try JSONEncoder().encode(manifest).write(to: url)
+        XCTAssertThrowsError(try ThemeInterfaceLoader.load(url)) { error in
+            XCTAssertEqual(error.localizedDescription, "interface v5 requires pinning")
+        }
     }
 
     func testInterfaceV5RejectsUnknownTopLevelFields() throws {
@@ -205,9 +239,10 @@ final class ThemeInterfaceTests: XCTestCase {
         let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
             slots: slots, choices: [
                 .init(id: "outfit.blue", label: "Tenue bleue", kind: outfit, preview: asset.id)
-            ], selection: .init(stages: [
+            ], targets: [.init(id: "object.primary", label: "Objet", session_id: "session.primary")],
+            selection: .init(stages: [
                 .init(id: "look", label: "Choisir une tenue", kind: outfit, columns: 4)
-            ]))
+            ]), pinning: pinning())
         let url = root.appendingPathComponent("interface.json")
         try JSONEncoder().encode(manifest).write(to: url)
 

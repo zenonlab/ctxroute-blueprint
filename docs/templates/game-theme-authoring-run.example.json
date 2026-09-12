@@ -4,7 +4,7 @@
   "status": "qualified",
   "concept": {
     "path": "wallpaper-concept.example.json",
-    "sha256": "8f3075199bf658e8127247170eb630148f18988e85cc8f42187545ae9562d6b4"
+    "sha256": "7c66333f45ece1588c2f5f75b79eaa88e933a2eb3996464eec112688e472ae81"
   },
   "workspace": {
     "candidate_root": "private/candidates/fixture-island-first-pass",

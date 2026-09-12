@@ -382,6 +382,9 @@ public enum ThemeInterfaceLoader {
     }
 
     private static func validatePinning(_ manifest: ThemeInterfaceManifest) throws {
+        if manifest.format == "orbite.theme-interface/5", manifest.pinning == nil {
+            throw ModelError.invalid("interface v5 requires pinning")
+        }
         guard let pinning = manifest.pinning else { return }
         let targetIDs = Set(manifest.targets.map(\.id))
         let controls = Set(["position", "size", "brightness", "opacity"])

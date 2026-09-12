@@ -106,11 +106,36 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "title", "scene", "interactive_object_ids", "session_bindings", "pinning", "menus", "performance"],
+        "required": ["id", "title", "scene", "regions", "route", "interactive_object_ids", "session_bindings", "pinning", "menus", "performance"],
         "properties": {
           "id": { "$ref": "#/$defs/id" },
           "title": { "type": "string", "minLength": 1, "maxLength": 120 },
           "scene": { "type": "string", "minLength": 20, "maxLength": 2000 },
+          "regions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": { "$ref": "#/$defs/region" }
+          },
+          "route": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mode", "ordered_region_ids", "visits_each_region_once", "continuity_axes", "transition_phases", "adjacent_repetition_policy"],
+            "properties": {
+              "mode": { "enum": ["closed_loop", "open_sequence", "static_scene"] },
+              "ordered_region_ids": { "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "visits_each_region_once": { "const": true },
+              "continuity_axes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 6,
+                "uniqueItems": true,
+                "items": { "enum": ["position", "orientation", "motion", "environment", "audio", "simulation"] }
+              },
+              "transition_phases": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "adjacent_repetition_policy": { "const": "reject-identical-signatures" }
+            }
+          },
           "interactive_object_ids": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
           "session_bindings": {
             "type": "array",
@@ -192,6 +217,53 @@
   },
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
-    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "qualification", "evidence_ids", "signature_axes", "signature_values", "audio", "primary_activity_id", "secondary_activity_ids", "environment_motion", "camera_cue"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "qualification": { "enum": ["verified", "unresolved"] },
+        "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+        "signature_axes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "enum": ["silhouette", "audio", "actor", "environment", "camera"] }
+        },
+        "signature_values": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 3,
+          "maxProperties": 5,
+          "properties": {
+            "silhouette": { "type": "string", "minLength": 10, "maxLength": 240 },
+            "audio": { "type": "string", "minLength": 10, "maxLength": 240 },
+            "actor": { "type": "string", "minLength": 10, "maxLength": 240 },
+            "environment": { "type": "string", "minLength": 10, "maxLength": 240 },
+            "camera": { "type": "string", "minLength": 10, "maxLength": 240 }
+          }
+        },
+        "audio": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity", "resource_id", "mode", "evidence_ids"],
+          "properties": {
+            "identity": { "type": "string", "minLength": 1, "maxLength": 240 },
+            "resource_id": { "type": ["string", "null"], "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,95}$" },
+            "mode": { "enum": ["source_track", "source_ambience", "inherited", "intentional_silence"] },
+            "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+          }
+        },
+        "primary_activity_id": { "$ref": "#/$defs/id" },
+        "secondary_activity_ids": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "environment_motion": { "type": "string", "minLength": 10, "maxLength": 500 },
+        "camera_cue": { "type": "string", "minLength": 10, "maxLength": 500 }
+      }
+    }
   }
 }

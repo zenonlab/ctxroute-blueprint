@@ -4,7 +4,7 @@
   "title": "Orbite declarative theme interface v5",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "assets", "slots", "choices", "targets", "selection"],
+  "required": ["format", "assets", "slots", "choices", "targets", "selection", "pinning"],
   "properties": {
     "format": { "const": "orbite.theme-interface/5" },
     "assets": {

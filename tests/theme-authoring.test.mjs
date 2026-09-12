@@ -45,6 +45,82 @@ test('theme interface declares the complete source-neutral pin editor', async ()
   assert.equal(validate(document), true, JSON.stringify(validate.errors));
   document.pinning.controls.pop();
   assert.equal(validate(document), false);
+
+  const withoutPin = JSON.parse(await readFile('docs/templates/theme-interface-v5.example.json', 'utf8'));
+  delete withoutPin.pinning;
+  assert.equal(validate(withoutPin), false);
+});
+
+test('every region requires a complete distinctive scorecard and route coverage', async () => {
+  const document = await fixture();
+  document.proposals[0].regions[0].signature_axes = ['audio', 'camera'];
+  const root = await mkdtemp(join(tmpdir(), 'orbite-wallpaper-concept-'));
+  const path = join(root, 'concept.json');
+  await writeFile(path, JSON.stringify(document));
+  await assert.rejects(verifyWallpaperConcept(path), /wallpaper concept schema/);
+
+  const uncovered = await fixture();
+  uncovered.proposals[0].route.ordered_region_ids.pop();
+  await writeFile(path, JSON.stringify(uncovered));
+  await assert.rejects(verifyWallpaperConcept(path), /cover every region exactly once/);
+
+  const discontinuous = await fixture();
+  discontinuous.proposals[0].route.continuity_axes = ['position', 'motion'];
+  await writeFile(path, JSON.stringify(discontinuous));
+  await assert.rejects(verifyWallpaperConcept(path), /closed loop misses continuity axes/);
+
+  const missingAudio = await fixture();
+  missingAudio.proposals[0].regions[0].audio.resource_id = 'audio.unknown';
+  await writeFile(path, JSON.stringify(missingAudio));
+  await assert.rejects(verifyWallpaperConcept(path), /uses unknown audio/);
+});
+
+test('unresolved or repeated region direction keeps generation closed', async () => {
+  const unresolved = await fixture();
+  unresolved.proposals[0].regions[1].qualification = 'unresolved';
+  const root = await mkdtemp(join(tmpdir(), 'orbite-wallpaper-concept-'));
+  const path = join(root, 'concept.json');
+  await writeFile(path, JSON.stringify(unresolved));
+  const result = await verifyWallpaperConcept(path);
+  assert.equal(result.generation_allowed, false);
+  assert.deepEqual(result.unresolved_regions, ['proposal.archipelago/region.grove']);
+
+  const repeated = await fixture();
+  repeated.proposals[0].regions[1] = {
+    ...structuredClone(repeated.proposals[0].regions[0]), id: 'region.grove', label: 'Grove'
+  };
+  await writeFile(path, JSON.stringify(repeated));
+  await assert.rejects(verifyWallpaperConcept(path), /repeat the same presentation/);
+});
+
+test('verified region direction cannot rely on hypothesis-only evidence', async () => {
+  const document = await fixture();
+  document.research.sources.push({
+    id: 'region-guess', classification: 'hypothesis', reference: 'private/research/guess.json',
+    revision: 'unverified', usage: 'behavior_research', commercial_assets_imported: false
+  });
+  document.proposals[0].regions[0].evidence_ids = ['region-guess'];
+  document.proposals[0].regions[0].audio.evidence_ids = ['region-guess'];
+  const root = await mkdtemp(join(tmpdir(), 'orbite-wallpaper-concept-'));
+  const path = join(root, 'concept.json');
+  await writeFile(path, JSON.stringify(document));
+  await assert.rejects(verifyWallpaperConcept(path), /cannot be verified from hypotheses alone/);
+});
+
+test('native macOS architecture exposes the complete pin boundary', async () => {
+  const architecture = JSON.parse(await readFile(
+    'docs/architecture/src/macos-native-wallpaper.architecture.json', 'utf8'
+  ));
+  const components = new Set(architecture.components.map(component => component.id));
+  for (const id of ['pin-controller', 'pin-surface', 'pin-state', 'protected-surfaces', 'input']) {
+    assert.equal(components.has(id), true, `missing architecture component ${id}`);
+  }
+  const flows = new Set(architecture.connections.map(connection => `${connection.from}->${connection.to}`));
+  for (const flow of ['core->pin-controller', 'input->pin-controller',
+    'pin-controller->pin-surface', 'pin-controller->pin-state',
+    'pin-surface->protected-surfaces']) {
+    assert.equal(flows.has(flow), true, `missing architecture flow ${flow}`);
+  }
 });
 
 test('generation stays closed before explicit user acceptance', async () => {
@@ -185,6 +261,8 @@ test('the same authoring pipeline qualifies an unrelated engine and object vocab
   concept.proposals[0].session_bindings[0].object_id = 'object.mount';
   concept.proposals[0].session_bindings[1].object_id = 'object.avatar';
   concept.proposals[0].pinning.candidate_ids = ['object.mount'];
+  concept.proposals[0].regions[0].primary_activity_id = 'object.mount';
+  concept.proposals[0].regions[1].primary_activity_id = 'object.avatar';
   const conceptBytes = Buffer.from(JSON.stringify(concept));
   await writeFile(conceptPath, conceptBytes);
   second.document.id = 'second-engine-first-pass';

@@ -35,13 +35,51 @@
   },
   "inventory": [
     { "id": "object.carrier", "label": "Travelling carrier", "resource_kind": "model", "evidence_ids": ["local-index"], "proposed_roles": ["scene.ambient", "pin.primary"], "supports_session": true, "supports_pin": true, "rationale": "Its motion remains readable in the scene and as a persistent foreground object." },
-    { "id": "object.indicator", "label": "Session indicator", "resource_kind": "actor", "evidence_ids": ["local-index"], "proposed_roles": ["session.presence"], "supports_session": true, "supports_pin": false, "rationale": "Its compact silhouette can communicate one independent session state." }
+    { "id": "object.indicator", "label": "Session indicator", "resource_kind": "actor", "evidence_ids": ["local-index"], "proposed_roles": ["session.presence"], "supports_session": true, "supports_pin": false, "rationale": "Its compact silhouette can communicate one independent session state." },
+    { "id": "audio.harbor", "label": "Harbor ambience", "resource_kind": "audio", "evidence_ids": ["local-index"], "proposed_roles": ["region.audio"], "supports_session": false, "supports_pin": false, "rationale": "The indexed ambience gives the harbor a source-grounded sound identity." },
+    { "id": "audio.grove", "label": "Grove music", "resource_kind": "audio", "evidence_ids": ["local-index"], "proposed_roles": ["region.audio"], "supports_session": false, "supports_pin": false, "rationale": "The indexed music gives the grove a source-grounded transition target." }
   ],
   "proposals": [
     {
       "id": "proposal.archipelago",
       "title": "Living archipelago",
       "scene": "A carrier follows a qualified route around several islands while compact actors expose browser-session state without changing their identity.",
+      "regions": [
+        {
+          "id": "region.harbor",
+          "label": "Harbor",
+          "qualification": "verified",
+          "evidence_ids": ["local-index"],
+          "signature_axes": ["silhouette", "audio", "actor", "camera"],
+          "signature_values": { "silhouette": "Layered harbor walls", "audio": "Harbor water ambience", "actor": "Carrier foreground pass", "camera": "Low entrance reveal" },
+          "audio": { "identity": "Harbor source ambience", "resource_id": "audio.harbor", "mode": "source_ambience", "evidence_ids": ["local-index"] },
+          "primary_activity_id": "object.carrier",
+          "secondary_activity_ids": [],
+          "environment_motion": "Layered source waves move across the harbor entrance.",
+          "camera_cue": "The carrier crosses the foreground before the harbor silhouette clears."
+        },
+        {
+          "id": "region.grove",
+          "label": "Grove",
+          "qualification": "verified",
+          "evidence_ids": ["local-index"],
+          "signature_axes": ["audio", "actor", "environment", "camera"],
+          "signature_values": { "audio": "Grove melodic layer", "actor": "Indicator canopy reveal", "environment": "Vertical foliage motion", "camera": "Waterline-to-canopy lift" },
+          "audio": { "identity": "Grove source layer", "resource_id": "audio.grove", "mode": "source_track", "evidence_ids": ["local-index"] },
+          "primary_activity_id": "object.indicator",
+          "secondary_activity_ids": [],
+          "environment_motion": "Source foliage motion rises as the carrier enters the grove.",
+          "camera_cue": "The camera lifts from the waterline to reveal the compact actor."
+        }
+      ],
+      "route": {
+        "mode": "closed_loop",
+        "ordered_region_ids": ["region.harbor", "region.grove"],
+        "visits_each_region_once": true,
+        "continuity_axes": ["position", "orientation", "motion", "environment", "audio", "simulation"],
+        "transition_phases": ["distant", "approach", "feature", "departure"],
+        "adjacent_repetition_policy": "reject-identical-signatures"
+      },
       "interactive_object_ids": ["object.carrier", "object.indicator"],
       "session_bindings": [
         { "object_id": "object.carrier", "provider_role": "browser.primary", "intents": ["focus", "open"], "identity_preserved_on_appearance_change": true },

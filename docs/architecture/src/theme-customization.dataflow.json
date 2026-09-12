@@ -17,6 +17,7 @@
     { "id": "game", "type": "external", "label": "Corpus local du jeu", "sublabel": "disque · données · code", "stage": 0, "row": 0, "width": 150 },
     { "id": "research", "type": "security", "label": "Recherche du moteur", "sublabel": "formats · rendu · logique · limites", "stage": 1, "row": 0, "width": 170 },
     { "id": "concept", "type": "frontend", "label": "Proposition de wallpaper", "sublabel": "scène · objets · sessions · contrôles", "stage": 1, "row": 2, "width": 180 },
+    { "id": "regions", "type": "frontend", "label": "Registre des zones", "sublabel": "audio · activité · signatures · parcours", "stage": 1, "row": 4, "width": 180 },
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "conversion après validation du plan", "stage": 2, "row": 2, "width": 170 },
     { "id": "library", "type": "database", "label": "Candidat privé isolé", "sublabel": "relations · reçus · témoin", "stage": 2, "row": 4, "width": 180 },
     { "id": "resolver", "type": "security", "label": "Préflight typé", "sublabel": "checks par gate · artefacts digestés", "stage": 3, "row": 4, "width": 180 },
@@ -29,7 +30,8 @@
   "flows": [
     { "from": "game", "to": "research", "label": "inventaire sourcé", "variant": "security", "labelAt": [203, 110] },
     { "from": "research", "to": "concept", "label": "capacités prouvées", "variant": "emphasis", "labelAt": [315, 270] },
-    { "from": "concept", "to": "importer", "label": "plan accepté", "variant": "security", "labelAt": [425, 440] },
+    { "from": "concept", "to": "regions", "label": "dramaturgie complète", "variant": "emphasis", "route": "straight", "labelAt": [330, 430] },
+    { "from": "regions", "to": "importer", "label": "plan accepté", "variant": "security", "labelAt": [425, 500] },
     { "from": "importer", "to": "library", "label": "dérivés reproductibles", "variant": "security", "labelAt": [530, 500] },
     { "from": "library", "to": "resolver", "label": "reçus typés par gate", "variant": "dashed", "labelAt": [635, 560] },
     { "from": "resolver", "to": "runtime", "label": "candidat qualifié", "variant": "emphasis", "labelAt": [745, 500] },
@@ -45,6 +47,8 @@
       "items": [
         "Le moteur et le corpus sont étudiés avant de choisir une conversion",
         "Le plan du wallpaper est présenté à l'utilisateur avant tout asset dérivé",
+        "Chaque zone prouve audio, activité principale et trois signatures distinctives",
+        "Le parcours référence chaque zone sans doublon ni trou",
         "Le candidat reste séparé de l’installation active jusqu’au gate 17",
         "Chaque gate valide son propre type de preuve et ses checks obligatoires",
         "Une absence reste missing ou unsupported"

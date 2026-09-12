@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "Connecteur wallpaper macOS — Swift natif", "quality_profile": "showcase", "viewBox": [1280, 760] },
+  "meta": { "title": "Connecteur wallpaper macOS — Swift natif", "quality_profile": "showcase", "viewBox": [1280, 920] },
   "components": [
     { "id": "settings", "type": "external", "label": "Réglages macOS", "sublabel": "Sélection explicite du thème", "pos": [40, 100], "size": [210, 76] },
     { "id": "wallpaper-agent", "type": "external", "label": "WallpaperAgent", "sublabel": "Hôte système", "pos": [360, 100], "size": [210, 76] },
@@ -11,12 +11,16 @@
     { "id": "xpc", "type": "messagebus", "label": "Canal XPC", "sublabel": "Intentions et quittances bornées", "pos": [360, 330], "size": [210, 76] },
     { "id": "core", "type": "backend", "label": "WallpaperCore", "sublabel": "États déterministes · aucune API OS", "pos": [690, 330], "size": [220, 76] },
     { "id": "theme", "type": "database", "label": "ThemePackage", "sublabel": "JSON original · assets privés optionnels", "pos": [1010, 330], "size": [220, 76] },
-    { "id": "installer", "type": "security", "label": "Installateur local", "sublabel": "Signature puis copie canonique", "pos": [40, 550], "size": [210, 76] },
-    { "id": "input", "type": "backend", "label": "MacInputAdapter", "sublabel": "Priorité Finder · capacité explicite", "pos": [360, 550], "size": [210, 76] },
-    { "id": "finder", "type": "external", "label": "Finder", "sublabel": "Icônes et bureau prioritaires", "pos": [690, 550], "size": [220, 76] }
+    { "id": "pin-controller", "type": "backend", "label": "PinCoordinator", "sublabel": "Swift · snapshot · transaction", "pos": [690, 550], "size": [220, 76] },
+    { "id": "pin-surface", "type": "frontend", "label": "Surface 3D épinglée", "sublabel": "fenêtres ordinaires · régions sales", "pos": [1010, 550], "size": [220, 76] },
+    { "id": "installer", "type": "security", "label": "Installateur local", "sublabel": "Signature puis copie canonique", "pos": [40, 710], "size": [210, 76] },
+    { "id": "input", "type": "backend", "label": "MacInputAdapter", "sublabel": "priorité Finder · hit regions", "pos": [360, 550], "size": [210, 76] },
+    { "id": "finder", "type": "external", "label": "Finder", "sublabel": "Icônes et bureau prioritaires", "pos": [360, 710], "size": [210, 76] },
+    { "id": "pin-state", "type": "database", "label": "État des pins", "sublabel": "position · taille · lumière · alpha", "pos": [690, 710], "size": [220, 76] },
+    { "id": "protected-surfaces", "type": "external", "label": "Surfaces protégées", "sublabel": "verrouillage · système · sécurité", "pos": [1010, 710], "size": [220, 76] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Orbite Wallpaper.app", "wraps": ["app", "provider", "core", "theme", "xpc", "input"], "pad": 18 }
+    { "kind": "region", "label": "Orbite Wallpaper.app", "wraps": ["app", "provider", "core", "theme", "xpc", "input", "pin-controller", "pin-surface", "pin-state"], "pad": 18 }
   ],
   "connections": [
     { "from": "settings", "to": "wallpaper-agent", "label": "choix utilisateur" },
@@ -26,9 +30,13 @@
     { "from": "xpc", "to": "provider", "label": "échange local" },
     { "from": "core", "to": "provider", "label": "projection de scène" },
     { "from": "theme", "to": "core", "label": "recette validée" },
-    { "from": "installer", "to": "app", "label": "installe une copie" },
-    { "from": "app", "to": "input", "label": "active la capacité" },
-    { "from": "finder", "to": "input", "label": "cible native prioritaire", "variant": "security", "labelAt": [630, 640] },
-    { "from": "input", "to": "xpc", "label": "intention autorisée" }
+    { "from": "core", "to": "pin-controller", "label": "instance · session · pixels", "route": "straight", "labelAt": [800, 480] },
+    { "from": "input", "to": "pin-controller", "label": "toggle · clic droit · déplacement", "route": "straight", "labelAt": [630, 540] },
+    { "from": "pin-controller", "to": "pin-surface", "label": "niveau borné · zones sales", "variant": "emphasis", "route": "straight", "labelAt": [960, 540] },
+    { "from": "pin-controller", "to": "pin-state", "label": "accepter · annuler · désactiver", "route": "straight", "labelAt": [800, 665] },
+    { "from": "installer", "to": "app", "label": "installe une copie", "labelAt": [145, 560] },
+    { "from": "finder", "to": "input", "label": "cible native prioritaire", "variant": "security", "route": "straight", "labelAt": [465, 665] },
+    { "from": "input", "to": "xpc", "label": "intention autorisée", "route": "straight", "labelAt": [465, 480] },
+    { "from": "pin-surface", "to": "protected-surfaces", "label": "exclusion obligatoire", "variant": "security", "route": "straight", "labelAt": [1120, 665] }
   ]
 }

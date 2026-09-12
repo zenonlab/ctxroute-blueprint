@@ -129,7 +129,7 @@ conservent une table `selections` par catégorie ; les anciens champs `character
 catégorie de choix doit apparaître exactement une fois dans les étapes, ce qui évite
 les choix chargés mais inaccessibles dans le menu.
 
-La capacité optionnelle `pinning` expose les cibles 3D que le package autorise à
+La version 5 exige la capacité générique `pinning` et expose les cibles 3D que le package autorise à
 maintenir visibles devant les fenêtres ordinaires de l'espace de travail. Un pin est
 une présentation supplémentaire de la même instance : il conserve `instance_id`,
 `session_binding`, état et action. Le connecteur ne clone donc ni objet ni session.
@@ -198,6 +198,15 @@ pinnables, les menus automatiques, les contrôles système et le comportement é
 La proposition explique pourquoi chaque objet convient au rôle. Une silhouette,
 créature, embarcation ou interface n'est jamais sélectionnée à partir du seul nom du
 jeu.
+
+La description globale ne suffit pas. La proposition inventorie toutes les régions
+logiques de la composition, y compris l'unique région d'une scène statique. Pour
+chacune, elle relie une identité audio à une ressource inventoriée et à une preuve, choisit une activité principale
+dans l'inventaire, borne les activités secondaires et décrit mouvement environnemental
+et intention caméra. Au moins trois axes parmi silhouette, audio, acteur,
+environnement et caméra doivent la distinguer. Le parcours couvre chaque région
+exactement une fois et déclare la continuité de sa fermeture ; deux voisines ne peuvent
+pas partager la même présentation complète.
 
 La génération reste fermée jusqu'à l'acceptation explicite d'une proposition par
 l'utilisateur et jusqu'à ce que tous les sous-systèmes soient `studied` ou
