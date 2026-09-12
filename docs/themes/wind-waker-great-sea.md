@@ -288,9 +288,14 @@ un lecteur d'animation matériau séparant SRT de texture, motif de texture, cou
 matériau et registres TEV. Les 482 inspections modèles et animations sont toutes
 valides. Les 45 BTI autonomes passent aussi le lecteur de métadonnées et de layout GX,
 soit 527 inspections sur 527. Les textures embarquées dans TEX1, les définitions
-matériau, les collisions et leurs relations restent explicitement en attente de
-lecteurs qualifiés ; cette passe ne change donc pas encore le statut du gate global
-de dépendances.
+matériau détaillées, les collisions et leurs relations restent alors à fermer.
+
+Les 18 BMT ajoutent ensuite 19 entrées matériau et 77 textures TEX1, avec remaps et
+bindings de slots vérifiés par le même lecteur BTI. Le total atteint 545 inspections
+sur 545. Trois BMT de l'archive `Kb` déclarent deux sections mais n'en stockent qu'une ;
+le reçu les marque `declaration_complete: false`. Les tables TEV, alpha, blend, fog et
+depth ne sont pas encore traduites : ni ces trois écarts ni la seule fermeture des
+textures ne permettent de passer le gate de dépendances.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur

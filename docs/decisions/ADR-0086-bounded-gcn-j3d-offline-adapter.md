@@ -72,6 +72,13 @@ anisotropie, palette et offsets. Les tailles de payload sont recalculées avec l
 dimensions de tuiles GX puis comparées aux plages physiques ; une texture lisible ne
 vaut toutefois pas encore qualification de son matériau TEV.
 
+Une table BMT est lue comme une composition de sections optionnelles `MAT3` et
+`TEX1`. L'adaptateur matérialise les remaps de matériaux et les bindings de slots,
+réutilise exactement le lecteur BTI pour les textures embarquées et compte les
+bindings qui restent externes. Le nombre de sections déclaré et le nombre réellement
+stocké demeurent deux faits distincts : un fichier auto-borné peut être inventorié
+avec `declaration_complete: false`, mais cet écart ne peut fermer une qualification.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans

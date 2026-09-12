@@ -277,6 +277,47 @@ pub struct BtiTexture {
     pub palette_bytes: usize,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dMaterialTableReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub magic: String,
+    pub declared_sections: usize,
+    pub stored_sections: usize,
+    pub declaration_complete: bool,
+    pub has_material_section: bool,
+    pub has_texture_section: bool,
+    pub external_texture_bindings: usize,
+    pub materials: Vec<J3dMaterialEntry>,
+    pub textures: Vec<J3dNamedTexture>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dMaterialEntry {
+    pub name: String,
+    pub source_material_id: u16,
+    pub material_mode: u8,
+    pub cull_mode_index: u8,
+    pub texgen_count_index: u8,
+    pub tev_stage_count_index: u8,
+    pub texture_bindings: Vec<J3dTextureBinding>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dTextureBinding {
+    pub slot: u8,
+    pub texture_index: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dNamedTexture {
+    pub name: String,
+    #[serde(flatten)]
+    pub texture: BtiTexture,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -380,6 +421,222 @@ pub fn inspect_bti_texture(path: &Path) -> Result<BtiTextureReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_bti_texture(&bytes)
+}
+
+pub fn inspect_j3d_material_table(path: &Path) -> Result<J3dMaterialTableReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "BMT input must be a regular file"
+    );
+    ensure!(
+        metadata.len() >= 0x20 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "BMT input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_j3d_material_table(&bytes)
+}
+
+pub fn parse_j3d_material_table(bytes: &[u8]) -> Result<J3dMaterialTableReport> {
+    ensure!(
+        bytes.len() >= 0x20 && bytes.len() <= MAX_J3D_BYTES,
+        "BMT input exceeds the bounded size"
+    );
+    ensure!(
+        bytes.get(0..8) == Some(b"J3D2bmt3"),
+        "unsupported BMT magic"
+    );
+    ensure!(
+        read_u32(bytes, 8)? as usize == bytes.len(),
+        "BMT declared size mismatch"
+    );
+    let declared_sections = read_u32(bytes, 12)? as usize;
+    ensure!(
+        (1..=MAX_J3D_SECTIONS).contains(&declared_sections),
+        "BMT section count exceeds the limit"
+    );
+    let mut offset = 0x20;
+    let mut stored_sections = 0;
+    let mut materials = None;
+    let mut textures = Vec::new();
+    let mut saw_texture_section = false;
+    while offset < bytes.len() {
+        ensure_span(bytes, offset, 1, 8, "BMT section header")?;
+        let size = read_u32(bytes, offset + 4)? as usize;
+        ensure!(size >= 8, "invalid BMT section size");
+        let end = offset
+            .checked_add(size)
+            .context("BMT section span overflow")?;
+        ensure!(end <= bytes.len(), "truncated BMT section");
+        match bytes.get(offset..offset + 4) {
+            Some(b"MAT3") => {
+                ensure!(materials.is_none(), "duplicate MAT3 section");
+                materials = Some(parse_mat3(&bytes[offset..end])?);
+            }
+            Some(b"TEX1") => {
+                ensure!(!saw_texture_section, "duplicate TEX1 section");
+                saw_texture_section = true;
+                textures = parse_tex1(&bytes[offset..end])?;
+            }
+            _ => bail!("unsupported BMT section"),
+        }
+        stored_sections += 1;
+        ensure!(
+            stored_sections <= declared_sections,
+            "BMT stores excess sections"
+        );
+        offset = end;
+    }
+    ensure!(
+        materials.is_some() || saw_texture_section,
+        "BMT has no supported table"
+    );
+    let has_material_section = materials.is_some();
+    let has_texture_section = saw_texture_section;
+    let materials = materials.unwrap_or_default();
+    let external_texture_bindings = if has_texture_section {
+        0
+    } else {
+        materials
+            .iter()
+            .map(|material| material.texture_bindings.len())
+            .sum()
+    };
+    ensure!(offset == bytes.len(), "unaccounted BMT bytes");
+    for material in &materials {
+        for binding in &material.texture_bindings {
+            ensure!(
+                usize::from(binding.texture_index) < textures.len() || !has_texture_section,
+                "MAT3 texture binding exceeds TEX1"
+            );
+        }
+    }
+    Ok(J3dMaterialTableReport {
+        format: "orbite.j3d-material-table-index/1",
+        adapter: "gcn.j3d-material-table",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        magic: "J3D2bmt3".into(),
+        declared_sections,
+        stored_sections,
+        declaration_complete: declared_sections == stored_sections,
+        has_material_section,
+        has_texture_section,
+        external_texture_bindings,
+        materials,
+        textures,
+    })
+}
+
+fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
+    ensure!(section.len() >= 0x84, "truncated MAT3 header");
+    let material_count = read_u16(section, 8)? as usize;
+    ensure!(
+        material_count <= MAX_RECORDS_PER_CHUNK,
+        "MAT3 material count exceeds the limit"
+    );
+    let init_offset = read_u32(section, 0x0c)? as usize;
+    let ids_offset = read_u32(section, 0x10)? as usize;
+    let names_offset = read_u32(section, 0x14)? as usize;
+    ensure_counted_span(section, ids_offset, material_count, 2, "MAT3 material IDs")?;
+    let names = parse_name_table(section, names_offset, material_count, "MAT3")?;
+    let mut material_ids = Vec::with_capacity(material_count);
+    for index in 0..material_count {
+        material_ids.push(read_u16(section, ids_offset + index * 2)?);
+    }
+    let unique_count = material_ids
+        .iter()
+        .copied()
+        .max()
+        .map_or(0, |value| usize::from(value) + 1);
+    ensure_counted_span(
+        section,
+        init_offset,
+        unique_count,
+        0x14c,
+        "MAT3 init records",
+    )?;
+    let tex_no_offset = read_u32(section, 0x48)? as usize;
+    let tex_no_count = mat3_table_count(section, tex_no_offset, 2)?;
+    let mut materials = Vec::with_capacity(material_count);
+    for (index, name) in names.into_iter().enumerate() {
+        let source_material_id = material_ids[index];
+        let init = init_offset + usize::from(source_material_id) * 0x14c;
+        let mut texture_bindings = Vec::new();
+        for slot in 0..8 {
+            let tex_no_index = read_u16(section, init + 0x84 + slot * 2)?;
+            if tex_no_index != u16::MAX {
+                ensure!(
+                    usize::from(tex_no_index) < tex_no_count,
+                    "MAT3 texture number index exceeds table"
+                );
+                let texture_index =
+                    read_u16(section, tex_no_offset + usize::from(tex_no_index) * 2)?;
+                if texture_index != u16::MAX {
+                    texture_bindings.push(J3dTextureBinding {
+                        slot: u8::try_from(slot)?,
+                        texture_index,
+                    });
+                }
+            }
+        }
+        materials.push(J3dMaterialEntry {
+            name,
+            source_material_id,
+            material_mode: section[init],
+            cull_mode_index: section[init + 1],
+            texgen_count_index: section[init + 3],
+            tev_stage_count_index: section[init + 4],
+            texture_bindings,
+        });
+    }
+    Ok(materials)
+}
+
+fn mat3_table_count(section: &[u8], start: usize, stride: usize) -> Result<usize> {
+    ensure!(
+        start > 0 && start < section.len(),
+        "MAT3 table offset exceeds section"
+    );
+    let mut end = section.len();
+    for field in (0x0c..=0x80).step_by(4) {
+        let candidate = read_u32(section, field)? as usize;
+        if candidate > start {
+            end = end.min(candidate);
+        }
+    }
+    ensure!(end >= start, "MAT3 table order is invalid");
+    Ok((end - start) / stride)
+}
+
+fn parse_tex1(section: &[u8]) -> Result<Vec<J3dNamedTexture>> {
+    ensure!(section.len() >= 0x14, "truncated TEX1 header");
+    let texture_count = read_u16(section, 8)? as usize;
+    ensure!(
+        texture_count <= MAX_RECORDS_PER_CHUNK,
+        "TEX1 texture count exceeds the limit"
+    );
+    let headers = read_u32(section, 0x0c)? as usize;
+    let names_offset = read_u32(section, 0x10)? as usize;
+    ensure_counted_span(
+        section,
+        headers,
+        texture_count,
+        0x20,
+        "TEX1 texture headers",
+    )?;
+    let names = parse_name_table(section, names_offset, texture_count, "TEX1")?;
+    names
+        .into_iter()
+        .enumerate()
+        .map(|(index, name)| {
+            Ok(J3dNamedTexture {
+                name,
+                texture: parse_bti_resource(section, headers + index * 0x20)?,
+            })
+        })
+        .collect()
 }
 
 pub fn parse_bti_texture(bytes: &[u8]) -> Result<BtiTextureReport> {
@@ -2303,6 +2560,54 @@ mod tests {
         bytes
     }
 
+    fn fixture_bmt(include_texture: bool) -> Vec<u8> {
+        let mat_size = 0x200_usize;
+        let tex_size = if include_texture { 0x90 } else { 0 };
+        let size = 0x20 + mat_size + tex_size;
+        let mut bytes = vec![0_u8; size];
+        bytes[0..8].copy_from_slice(b"J3D2bmt3");
+        bytes[8..12].copy_from_slice(&(size as u32).to_be_bytes());
+        bytes[12..16].copy_from_slice(&2_u32.to_be_bytes());
+        let mat = 0x20;
+        bytes[mat..mat + 4].copy_from_slice(b"MAT3");
+        bytes[mat + 4..mat + 8].copy_from_slice(&(mat_size as u32).to_be_bytes());
+        bytes[mat + 8..mat + 10].copy_from_slice(&1_u16.to_be_bytes());
+        for (field, value) in [
+            (0x0c, 0x84_u32),
+            (0x10, 0x1d0),
+            (0x14, 0x1d4),
+            (0x48, 0x1e0),
+        ] {
+            bytes[mat + field..mat + field + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        let init = mat + 0x84;
+        bytes[init] = 1;
+        bytes[init + 1] = 2;
+        bytes[init + 3] = 3;
+        bytes[init + 4] = 4;
+        bytes[init + 0x84..init + 0x94].fill(0xff);
+        bytes[init + 0x84..init + 0x86].copy_from_slice(&0_u16.to_be_bytes());
+        write_name_table(&mut bytes, mat + 0x1d4, b"body");
+
+        if include_texture {
+            let tex = mat + mat_size;
+            bytes[tex..tex + 4].copy_from_slice(b"TEX1");
+            bytes[tex + 4..tex + 8].copy_from_slice(&(tex_size as u32).to_be_bytes());
+            bytes[tex + 8..tex + 10].copy_from_slice(&1_u16.to_be_bytes());
+            bytes[tex + 0x0c..tex + 0x10].copy_from_slice(&0x20_u32.to_be_bytes());
+            bytes[tex + 0x10..tex + 0x14].copy_from_slice(&0x40_u32.to_be_bytes());
+            let header = tex + 0x20;
+            bytes[header + 2..header + 4].copy_from_slice(&8_u16.to_be_bytes());
+            bytes[header + 4..header + 6].copy_from_slice(&8_u16.to_be_bytes());
+            bytes[header + 20] = 1;
+            bytes[header + 21] = 1;
+            bytes[header + 24] = 1;
+            bytes[header + 28..header + 32].copy_from_slice(&0x50_u32.to_be_bytes());
+            write_name_table(&mut bytes, tex + 0x40, b"diffuse");
+        }
+        bytes
+    }
+
     fn fixture_bck_with_embedded_sound() -> Vec<u8> {
         let mut bytes = fixture_bck();
         bytes.resize(0x120, 0);
@@ -2508,6 +2813,29 @@ mod tests {
         let mut truncated = fixture_bti();
         truncated.truncate(40);
         assert!(parse_bti_texture(&truncated).is_err());
+    }
+
+    #[test]
+    fn inventories_bmt_material_to_embedded_texture_relations() {
+        let report = parse_j3d_material_table(&fixture_bmt(true)).unwrap();
+        assert!(report.declaration_complete);
+        assert!(report.has_material_section);
+        assert!(report.has_texture_section);
+        assert_eq!(report.materials[0].name, "body");
+        assert_eq!(report.materials[0].texture_bindings[0].texture_index, 0);
+        assert_eq!(report.textures[0].name, "diffuse");
+        assert_eq!(report.textures[0].texture.gx_format, "i4");
+    }
+
+    #[test]
+    fn reports_bmt_external_texture_bindings_and_rejects_bad_embedded_indices() {
+        let report = parse_j3d_material_table(&fixture_bmt(false)).unwrap();
+        assert!(!report.declaration_complete);
+        assert_eq!(report.external_texture_bindings, 1);
+
+        let mut invalid = fixture_bmt(true);
+        invalid[0x20 + 0x1e0..0x20 + 0x1e2].copy_from_slice(&9_u16.to_be_bytes());
+        assert!(parse_j3d_material_table(&invalid).is_err());
     }
 
     #[test]
