@@ -58,7 +58,7 @@ export {
 } from './ports/review-candidate-port';
 export { addWorkToLibrary } from './use-cases/add-work-to-library';
 export type { AddWorkToLibraryDependencies } from './use-cases/add-work-to-library';
-export { favoriteImportBatchSize, importFavoriteSources } from './use-cases/import-favorite-sources';
+export { favoriteImportBatchSize, favoriteSourceIdentity, importFavoriteSources } from './use-cases/import-favorite-sources';
 export type { FavoriteImportSummary } from './use-cases/import-favorite-sources';
 export { favoritePresencePageLimit, reconcileFavoriteSourcePresence, reconcileFavoriteSourcePresencePageForInventory } from './use-cases/reconcile-favorite-source-presence';
 export { readReviewQueue, reviewQueueLimit } from './use-cases/read-review-queue';

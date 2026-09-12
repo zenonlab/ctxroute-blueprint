@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { emptySyncedProviderIds, readProviderIdentitySnapshots } from './provider-identity-snapshot';
+import { emptySyncedProviderIds, prepareProviderIdentitySnapshot, readProviderIdentitySnapshots } from './provider-identity-snapshot';
 import type { ProviderSyncItem, ProviderSyncStorageValues } from './provider-identity-snapshot';
 import { ProviderIdentitySyncPublisher } from './provider-identity-sync';
 import type { ProviderIdentitySyncState } from './provider-identity-sync';
@@ -11,6 +11,7 @@ function fixture(values: ProviderSyncStorageValues = {}) {
   let failCompletion = false;
   const sync = {
     readAll: async () => structuredClone(values),
+    remove: vi.fn(async (keys: string[]) => { for (const key of keys) delete values[key]; }),
     write: vi.fn(async (items: Readonly<Record<string, ProviderSyncItem>>) => { Object.assign(values, structuredClone(items)); }),
   };
   const state = {
@@ -66,6 +67,20 @@ describe('durable snapshot publication', () => {
     first.advance(); second.advance();
     await second.publisher().publish(other); await first.publisher().publish(ids);
     expect(await readProviderIdentitySnapshots(values)).toMatchObject({ validGenerations: 2, ids: { ...ids, mangaUpdates: ['2'] } });
+  });
+
+  it('retires generations older than the validated rollback without touching unrelated sync values', async () => {
+    const values: ProviderSyncStorageValues = { unrelated: 'kept' };
+    for (let generation = 1; generation <= 3; generation += 1) {
+      const snapshot = await prepareProviderIdentitySnapshot({ ...ids, anilist: [String(generation)] }, generation);
+      Object.assign(values, snapshot.fragments, { [snapshot.manifestKey]: snapshot.manifest });
+    }
+    const test = fixture(values);
+    expect((await readProviderIdentitySnapshots(values)).obsoleteKeys.length).toBeGreaterThan(0);
+    expect(await test.publisher().publish({ ...ids, anilist: ['3'] })).toMatchObject({ kind: 'STAGED' });
+    expect(test.sync.remove).toHaveBeenCalledOnce();
+    expect(values.unrelated).toBe('kept');
+    expect(await readProviderIdentitySnapshots(values)).toMatchObject({ validGenerations: 2, obsoleteKeys: [] });
   });
 
   it('defers quota overflow without removing existing keys or starting a partial generation', async () => {

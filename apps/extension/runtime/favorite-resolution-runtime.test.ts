@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
-import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
+import { createFavoriteResolutionRuntime, reconcileFavoriteBookmarkMutation, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 import type { ExtensionDiagnosticInput } from './extension-diagnostics';
 import type { ProviderIdentityRestoreResult } from '@tobirink/application';
 
@@ -105,6 +105,21 @@ describe('createFavoriteResolutionRuntime', () => {
     });
     expect(ensureReady).toHaveBeenCalledOnce();
     expect(reconcile).toHaveBeenCalledOnce();
+  });
+
+  it('reconciles a changed bookmark directly and detaches its source directly on removal', async () => {
+    const storage = new MemoryStoragePort();
+    const reconcile = vi.fn(async (_inventoryRequested?: boolean) => undefined);
+    const dependencies = {
+      bookmarks: { readBookmark: async () => ({ bookmarkId: 'bookmark-1', folderPath: ['Manga'], order: 4, title: 'Frieren', url: 'https://reader.example/frieren' }), readBookmarkBatch: async () => ({ complete: true, records: [] }) },
+      ensureReady: async () => ({ schemaVersion: 12 }), now: () => '2026-09-12T12:00:00.000Z', sourceAdapters: [], storage, token: () => crypto.randomUUID(),
+    };
+    await reconcileFavoriteBookmarkMutation(dependencies, { bookmarkId: 'bookmark-1', kind: 'changed' }, reconcile);
+    expect(await storage.listFavoriteSources({ limit: 10 })).toMatchObject([{ bookmarkId: 'bookmark-1', presence: 'observed', title: 'Frieren' }]);
+    expect(reconcile).toHaveBeenLastCalledWith(false);
+    await reconcileFavoriteBookmarkMutation(dependencies, { bookmarkId: 'bookmark-1', kind: 'removed' }, reconcile);
+    expect(await storage.listFavoriteSources({ limit: 10 })).toMatchObject([{ bookmarkId: 'bookmark-1', presence: 'detached' }]);
+    expect(reconcile).toHaveBeenLastCalledWith(false);
   });
 
   it('Q-03 coalesces concurrent reconciliation requests', async () => {

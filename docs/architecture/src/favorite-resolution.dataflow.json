@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Titres locaux visibles avant hydratation; quatre alias au maximum et une page par alias garantissent la convergence MV3."
+        "note": "Titres locaux avant hydratation; mutations unitaires, audit durable à 6 h, quatre alias et une page par alias bornent MV3."
       },
       {
         "id": "cover-rights",
@@ -57,7 +57,7 @@
           "rightsGate",
           "coverR2"
         ],
-        "note": "Cover fournisseur puis un essai R2 par ID public; association ID→master à l’ingestion opérationnelle uniquement."
+        "note": "Cover fournisseur puis R2 par ID public; curseur durable; association ID→master par ingestion opérationnelle autorisée."
       },
       {
         "id": "recovery-collective",
@@ -189,7 +189,7 @@
       "stage": 0,
       "row": 4,
       "width": 150,
-      "tag": "empreinte→IDs · fragments / digest"
+      "tag": "IDs · courant + rollback"
     },
     {
       "id": "collectiveWorker",

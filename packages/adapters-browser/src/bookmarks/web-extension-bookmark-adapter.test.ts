@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { WebExtensionBookmarkImportAdapter } from './web-extension-bookmark-adapter';
 
 describe('WebExtensionBookmarkImportAdapter', () => {
+  it('reads one bookmark with a bounded parent path for incremental reconciliation', async () => {
+    const nodes = new Map([
+      ['bookmark-a', { id: 'bookmark-a', index: 3, parentId: 'folder-manga', title: 'Frieren', url: 'https://reader.example/frieren' }],
+      ['folder-manga', { id: 'folder-manga', parentId: '0', title: 'Manga' }],
+    ]);
+    const adapter = new WebExtensionBookmarkImportAdapter({
+      get: async (id) => { const node = nodes.get(id); return node === undefined ? [] : [node]; },
+      getChildren: async () => [],
+    });
+    await expect(adapter.readBookmark('bookmark-a')).resolves.toEqual({ bookmarkId: 'bookmark-a', folderPath: ['Manga'], order: 3, title: 'Frieren', url: 'https://reader.example/frieren' });
+  });
+
   it('B-01 walks getChildren in bounded slices while preserving folder paths and sibling order', async () => {
     const tree = new Map<string, readonly { id: string; index?: number; title: string; url?: string }[]>([
       ['0', [{ id: 'folder-manga', title: ' Manga ' }]],

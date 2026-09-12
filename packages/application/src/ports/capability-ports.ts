@@ -26,6 +26,7 @@ export interface BookmarkInventorySlice {
 }
 
 export interface BookmarkImportPort {
+  readBookmark?(bookmarkId: string): Promise<BookmarkRecord | undefined>;
   readBookmarkBatch(cursor?: BookmarkInventoryCursor, limit?: number): Promise<BookmarkInventorySlice>;
 }
 

@@ -7783,7 +7783,7 @@
         {
           "id": "step-3",
           "title": "Rendre reconstruction sync scans et couvertures réellement durables",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "storage.sync restores only the newest valid generation plus its validated rollback generation and retires stale fragments within quota",
             "Bookmark mutations reconcile incrementally and periodic full scans remain resumable",
@@ -7812,7 +7812,11 @@
             "npm run verify",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Current plus rollback sync generations restore; stale fragment GC and interruption tests pass",
+            "Incremental bookmark changes, six-hour resumable audit and durable MV3 cover cursor pass in extension 140/140",
+            "npm run verify passes; Chromium IndexedDB, 22 R2 cover tests and Archify showcase 9/9 pass"
+          ]
         },
         {
           "id": "step-4",

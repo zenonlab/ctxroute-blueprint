@@ -4,11 +4,13 @@ export interface WebExtensionBookmarkNode {
   children?: readonly WebExtensionBookmarkNode[];
   id: string;
   index?: number;
+  parentId?: string;
   title: string;
   url?: string;
 }
 
 interface WebExtensionBookmarksApi {
+  get?(id: string): Promise<readonly WebExtensionBookmarkNode[]>;
   getChildren(id: string): Promise<readonly WebExtensionBookmarkNode[]>;
 }
 
@@ -29,6 +31,27 @@ export class WebExtensionBookmarkImportAdapter implements BookmarkImportPort {
       try { await this.bookmarks.getChildren(rootId); return rootId; } catch { /* try the next browser root */ }
     }
     throw new Error('BOOKMARK_ROOT_UNAVAILABLE');
+  }
+
+  async readBookmark(bookmarkId: string): Promise<BookmarkRecord | undefined> {
+    if (this.bookmarks.get === undefined) throw new Error('BOOKMARK_POINT_READ_UNAVAILABLE');
+    const node = (await this.bookmarks.get(bookmarkId))[0];
+    if (node?.url === undefined) return undefined;
+    const folderPath: string[] = [];
+    const visited = new Set<string>([bookmarkId]);
+    let parentId = node.parentId;
+    for (let depth = 0; parentId !== undefined && !this.rootIds.includes(parentId) && depth < 64; depth += 1) {
+      if (visited.has(parentId)) throw new Error('BOOKMARK_ANCESTRY_CYCLE');
+      visited.add(parentId);
+      const parent = (await this.bookmarks.get(parentId))[0];
+      if (parent === undefined) throw new Error('BOOKMARK_ANCESTRY_UNAVAILABLE');
+      const title = parent.title.trim();
+      if (title) folderPath.unshift(title);
+      parentId = parent.parentId;
+    }
+    if (parentId !== undefined && !this.rootIds.includes(parentId)) throw new Error('BOOKMARK_ANCESTRY_TOO_DEEP');
+    const order = node.index !== undefined && Number.isInteger(node.index) && node.index >= 0 ? node.index : 0;
+    return Object.freeze({ bookmarkId: node.id, folderPath: Object.freeze(folderPath), order, title: node.title, url: node.url });
   }
 
   async readBookmarkBatch(cursor?: BookmarkInventoryCursor, limit = 100): Promise<BookmarkInventorySlice> {

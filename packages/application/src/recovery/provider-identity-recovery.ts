@@ -12,6 +12,7 @@ import type { SyncedProviderIds } from './provider-identity-snapshot';
 
 export const providerIdentityRecoveryStateSchema = z.strictObject({
   schemaVersion: z.literal(1),
+  coverRepairAfterId: z.string().min(1).max(256).optional(),
   scan: z.strictObject({
     afterId: z.string().min(1).max(256).optional(), complete: z.boolean(), ids: syncedProviderIdsSchema,
     sourceAfterId: z.string().min(1).max(256).optional(), worksComplete: z.boolean().optional(),

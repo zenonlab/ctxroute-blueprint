@@ -9,6 +9,7 @@ export const providerIdentitySyncStateSchema = z.strictObject({
 export type ProviderIdentitySyncState = z.infer<typeof providerIdentitySyncStateSchema>;
 export interface ProviderIdentitySyncPort {
   readAll(): Promise<ProviderSyncStorageValues>;
+  remove(keys: string[]): Promise<void>;
   write(values: Readonly<Record<string, ProviderSyncItem>>): Promise<void>;
 }
 export interface ProviderIdentitySyncStatePort {
@@ -30,19 +31,26 @@ export class ProviderIdentitySyncPublisher {
     let release: () => void = () => {};
     this.active = new Promise<void>((resolve) => { release = resolve; });
     await previous;
-    try { return await this.run(ids); } catch (error) {
+    try { return await this.publishSnapshot(ids); } catch (error) {
       return error instanceof Error && error.message === 'PROVIDER_SYNC_QUOTA_EXCEEDED' ? { kind: 'QUOTA_EXCEEDED' } : { kind: 'RETRYABLE' };
     } finally { release(); }
   }
 
-  private async run(input: SyncedProviderIds): Promise<ProviderIdentitySyncResult> {
+  private async publishSnapshot(input: SyncedProviderIds): Promise<ProviderIdentitySyncResult> {
     const now = this.now();
     if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid sync clock.');
     const state = providerIdentitySyncStateSchema.parse(await this.state.read() ?? { schemaVersion: 1, lastWriteAt: 0 });
     const values = await this.sync.readAll();
     const current = await readProviderIdentitySnapshots(values);
-    const desired = mergeSyncedProviderIds(current.ids, input);
-    if (state.pending === undefined && JSON.stringify(current.ids) === JSON.stringify(desired)) return { kind: 'UNCHANGED' };
+    const desired = mergeSyncedProviderIds(current.newestIds, input);
+    const retryAt = state.lastWriteAt + providerSyncQuota.writeIntervalMs;
+    if (state.pending === undefined && JSON.stringify(current.newestIds) === JSON.stringify(desired)) {
+      if (current.obsoleteKeys.length === 0) return { kind: 'UNCHANGED' };
+      if (now < retryAt) return { kind: 'DEFERRED', retryAt };
+      await this.sync.remove([...current.obsoleteKeys]);
+      await this.state.save({ schemaVersion: 1, lastWriteAt: now });
+      return { kind: 'STAGED', retryAt: now + providerSyncQuota.writeIntervalMs };
+    }
     const pending = state.pending ?? { generation: Math.max(now, current.generation + 1), ids: desired };
     const snapshot = await prepareProviderIdentitySnapshot(pending.ids, pending.generation);
     const verified = await readProviderIdentityGeneration(values, snapshot.manifest);
@@ -51,7 +59,6 @@ export class ProviderIdentitySyncPublisher {
       await this.state.save({ schemaVersion: 1, lastWriteAt: state.lastWriteAt });
       return { kind: 'PUBLISHED' };
     }
-    const retryAt = state.lastWriteAt + providerSyncQuota.writeIntervalMs;
     if (now < retryAt) return { kind: 'DEFERRED', retryAt };
     assertProviderSyncQuota(values, { ...snapshot.fragments, [snapshot.manifestKey]: snapshot.manifest });
     await this.state.save({ schemaVersion: 1, lastWriteAt: now, pending });

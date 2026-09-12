@@ -1,15 +1,23 @@
 import { finishProviderIdentityScan, readProviderIdentitySnapshots, restoreProviderIdentities, scanHydratedProviderIds } from '@tobirink/application';
 import type { FavoriteCollectiveKey, FavoriteCollectiveLookupResult, ProviderIdentityRecoveryDependencies, ProviderIdentityRestoreResult, ProviderIdentitySyncPort, ProviderIdentitySyncPublisher, ProviderIdentitySyncResult, SyncedProviderAssociation } from '@tobirink/application';
+import { workId } from '@tobirink/domain';
+import type { WorkId } from '@tobirink/domain';
 
 export interface ProviderIdentityRecoveryRuntime {
+  coverRepairAfterId?(): Promise<WorkId | undefined>;
   lookup(keys: readonly FavoriteCollectiveKey[]): Promise<readonly FavoriteCollectiveLookupResult[]>;
   prepare(): Promise<ProviderIdentityRestoreResult>;
   publish(): Promise<ProviderIdentitySyncResult | { readonly kind: 'SCANNING' }>;
+  saveCoverRepairAfterId?(afterId: WorkId | undefined): Promise<void>;
 }
 
 export function createProviderIdentityRecoveryRuntime(dependencies: ProviderIdentityRecoveryDependencies & { readonly sync: ProviderIdentitySyncPort; readonly publisher: Pick<ProviderIdentitySyncPublisher, 'publish'> }): ProviderIdentityRecoveryRuntime {
   let synchronizedAssociations: readonly SyncedProviderAssociation[] = [];
   return {
+    async coverRepairAfterId() {
+      const state = await dependencies.checkpoints.read();
+      return state?.coverRepairAfterId === undefined ? undefined : workId(state.coverRepairAfterId);
+    },
     async lookup(keys) {
       return keys.map((key) => {
         const association = synchronizedAssociations.find((item) => item.fingerprint === key.fingerprint
@@ -33,6 +41,10 @@ export function createProviderIdentityRecoveryRuntime(dependencies: ProviderIden
       const result = await dependencies.publisher.publish(scan.ids);
       if (result.kind === 'PUBLISHED' || result.kind === 'UNCHANGED') await finishProviderIdentityScan(dependencies.checkpoints);
       return result;
+    },
+    async saveCoverRepairAfterId(afterId) {
+      const state = await dependencies.checkpoints.read() ?? { schemaVersion: 1 as const };
+      await dependencies.checkpoints.save(afterId === undefined ? (({ coverRepairAfterId: _cursor, ...rest }) => rest)(state) : { ...state, coverRepairAfterId: afterId });
     },
   };
 }

@@ -357,6 +357,6 @@
 
 - [x] **Rendre la résolution fournisseur bornée et indépendante du collectif** — DONE _(evidence: Kitsu live anime and manga probes return HTTP 200 with expected identities, Adapters-browser 70/70 and application 331/331 tests pass, npm run verify and favorite-resolution Archify showcase 9/9 pass)_
 - [x] **Corriger le consentement et le cache collectif D1** — DONE _(evidence: Worker 43/43, extension 138/138, adapters-browser 70/70 and application 331/331 pass, Five affected workspace typechecks plus docs and ADR validation pass, favorite-resolution dataflow passes Archify showcase 9/9; D1 cache requires two distinct human confirmations and excludes private text)_
-- [ ] **Rendre reconstruction sync scans et couvertures réellement durables** — PENDING
+- [x] **Rendre reconstruction sync scans et couvertures réellement durables** — DONE _(evidence: Current plus rollback sync generations restore; stale fragment GC and interruption tests pass, Incremental bookmark changes, six-hour resumable audit and durable MV3 cover cursor pass in extension 140/140, npm run verify passes; Chromium IndexedDB, 22 R2 cover tests and Archify showcase 9/9 pass)_
 - [ ] **Remplacer le faux oracle par un différentiel FavLib réel et anonymisé** — PENDING
 - [ ] **Certifier une release locale installable sans déployer** — PENDING

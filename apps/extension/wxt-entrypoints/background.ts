@@ -29,7 +29,7 @@ import { extensionMessageSchema } from '../runtime/messages';
 const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
-import { createFavoriteResolutionRuntime, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
+import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
@@ -98,6 +98,7 @@ export default defineBackground({
       return { counts, diagnostics: await diagnostics.read().catch(() => ({ enabled: false, events: [] })), inventory, ok: true as const };
     };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
+    const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
         await ownerRuntime?.refreshRules().catch(() => undefined);
@@ -122,6 +123,7 @@ export default defineBackground({
     });
     browser.runtime.onInstalled.addListener(async () => {
       await ensureReminderAlarm();
+      await ensureFavoriteInventoryAuditAlarm();
       await diagnostics.initializeEnabled().catch(() => undefined);
       await privateStorage.ensureReady();
       await reconcileFavorites(true);
@@ -132,7 +134,11 @@ export default defineBackground({
       await privateStorage.ensureReady();
       await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);
     };
-    subscribeFavoriteBookmarkMutations(bookmarkEvents, { ensureReady: privateStorage.ensureReady, now, storage: privateStorage.storage, token }, () => reconcileFavorites(true));
+    subscribeFavoriteBookmarkMutations(bookmarkEvents, {
+      bookmarks, ensureReady: privateStorage.ensureReady, now,
+      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
+      storage: privateStorage.storage, token,
+    }, reconcileFavorites);
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
         void reconcileFavorites().catch(() => undefined);
@@ -147,11 +153,12 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void ensureReminderAlarm().then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
+      void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
+      if (alarm.name === favoriteInventoryAuditAlarmName) void reconcileFavorites(true).then(repairLibraryProjection).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };

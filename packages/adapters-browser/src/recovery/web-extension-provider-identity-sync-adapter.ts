@@ -1,9 +1,11 @@
 import { favoriteOwnerLocalStateSchema, providerIdentitySyncStateSchema, providerSyncStorageValuesSchema, providerSyncWriteValuesSchema } from '@tobirink/application';
 import type { FavoriteOwnerLocalState, FavoriteOwnerLocalStatePort } from '@tobirink/application';
 import type { ProviderIdentitySyncPort, ProviderIdentitySyncState, ProviderIdentitySyncStatePort, ProviderSyncItem, ProviderSyncStorageValues } from '@tobirink/application';
+import { z } from 'zod';
 
 export interface TrustedProviderIdentityStorageArea {
   get(key: string | null): Promise<ProviderSyncStorageValues>;
+  remove?(keys: string[]): Promise<void>;
   set(values: ProviderSyncStorageValues): Promise<void>;
   setAccessLevel?(options: { accessLevel: 'TRUSTED_CONTEXTS' }): Promise<void>;
 }
@@ -25,6 +27,13 @@ export class WebExtensionProviderIdentitySyncAdapter implements ProviderIdentity
   async write(values: Readonly<Record<string, ProviderSyncItem>>): Promise<void> {
     await this.ready();
     await this.storage.set(providerSyncWriteValuesSchema.parse(values));
+  }
+  async remove(keys: string[]): Promise<void> {
+    await this.ready();
+    const bounded = z.array(z.string().startsWith('tobirink.provider-ids.')).max(512).parse(keys);
+    if (bounded.length === 0) return;
+    if (this.storage.remove === undefined) throw new Error('Native storage removal is unavailable.');
+    await this.storage.remove(bounded);
   }
 }
 

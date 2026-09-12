@@ -137,9 +137,9 @@ export async function readProviderIdentityGeneration(values: ProviderSyncStorage
   } catch { return undefined; }
 }
 
-export async function readProviderIdentitySnapshots(values: ProviderSyncStorageValues): Promise<{ ids: SyncedProviderIds; generation: number; validGenerations: number; invalidGenerations: number }> {
+export async function readProviderIdentitySnapshots(values: ProviderSyncStorageValues): Promise<{ ids: SyncedProviderIds; newestIds: SyncedProviderIds; generation: number; validGenerations: number; invalidGenerations: number; obsoleteKeys: readonly string[] }> {
   if (Object.keys(values).length > providerSyncQuota.items) throw new Error('PROVIDER_SYNC_QUOTA_EXCEEDED');
-  const snapshots: SyncedProviderIds[] = [];
+  const snapshots: { ids: SyncedProviderIds; generation: number; keys: readonly string[] }[] = [];
   let generation = 0; let invalidGenerations = 0;
   for (const [key, value] of Object.entries(values)) {
     if (!key.startsWith(providerSyncPrefix) || !key.endsWith('.manifest')) continue;
@@ -147,7 +147,21 @@ export async function readProviderIdentitySnapshots(values: ProviderSyncStorageV
     if (!parsed.success || key !== `${namespace(parsed.data.schemaVersion, parsed.data.generation, parsed.data.digest)}.manifest`) { invalidGenerations += 1; continue; }
     const ids = await readProviderIdentityGeneration(values, parsed.data);
     if (ids === undefined) { invalidGenerations += 1; continue; }
-    snapshots.push(ids); generation = Math.max(generation, parsed.data.generation);
+    const prefix = namespace(parsed.data.schemaVersion, parsed.data.generation, parsed.data.digest);
+    snapshots.push({ ids, generation: parsed.data.generation, keys: [key, ...Array.from({ length: parsed.data.fragmentCount }, (_, index) => `${prefix}.fragment.${index}`)] });
+    generation = Math.max(generation, parsed.data.generation);
   }
-  return { ids: mergeSyncedProviderIds(...snapshots), generation, validGenerations: snapshots.length, invalidGenerations };
+  const retainedGenerations = [...new Set(snapshots.map((snapshot) => snapshot.generation))].sort((left, right) => right - left).slice(0, 2);
+  const retained = snapshots.filter((snapshot) => retainedGenerations.includes(snapshot.generation));
+  const newest = retained.filter((snapshot) => snapshot.generation === generation);
+  const retainedKeys = new Set(retained.flatMap((snapshot) => snapshot.keys));
+  const obsoleteKeys = Object.keys(values).filter((key) => key.startsWith(providerSyncPrefix) && !retainedKeys.has(key)).sort();
+  return {
+    ids: mergeSyncedProviderIds(...retained.map((snapshot) => snapshot.ids)),
+    newestIds: mergeSyncedProviderIds(...newest.map((snapshot) => snapshot.ids)),
+    generation,
+    validGenerations: retained.length,
+    invalidGenerations,
+    obsoleteKeys,
+  };
 }

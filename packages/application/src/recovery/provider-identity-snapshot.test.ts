@@ -58,6 +58,18 @@ describe('synchronized provider identity snapshots', () => {
     expect(await readProviderIdentitySnapshots({ ...complete(first), ...complete(concurrent), ...complete(older) })).toMatchObject({ generation: 10, validGenerations: 3, ids: { ...emptySyncedProviderIds(), anilist: ['1'], mangaUpdates: ['2'], kitsuAnime: ['3'] } });
   });
 
+  it('restores only the newest generation and its validated rollback generation', async () => {
+    const oldest = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['1'] }, 1);
+    const rollback = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), mangaUpdates: ['2'] }, 2);
+    const newest = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), kitsuAnime: ['3'] }, 3);
+    const values = { ...complete(oldest), ...complete(rollback), ...complete(newest) };
+    const result = await readProviderIdentitySnapshots(values);
+    expect(result.ids).toEqual({ ...emptySyncedProviderIds(), mangaUpdates: ['2'], kitsuAnime: ['3'] });
+    expect(result.newestIds).toEqual({ ...emptySyncedProviderIds(), kitsuAnime: ['3'] });
+    expect(result.validGenerations).toBe(2);
+    expect(result.obsoleteKeys).toEqual(expect.arrayContaining(Object.keys(complete(oldest))));
+  });
+
   it('includes retained generations and unrelated items in the quota reservation', async () => {
     const snapshot = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['1'] }, 1);
     const existing = Object.fromEntries(Array.from({ length: 511 }, (_, index) => [`existing-${index}`, 'kept']));

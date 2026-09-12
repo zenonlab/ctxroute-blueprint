@@ -1,5 +1,6 @@
-import { importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
+import { favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoritePublicCacheReadPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import { createFavoriteSource } from '@tobirink/domain';
 import type { LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
@@ -26,6 +27,9 @@ export interface FavoriteResolutionRuntimeDependencies {
   readonly token: () => string;
 }
 
+export const favoriteInventoryAuditAlarmName = 'tobirink-favorite-inventory-audit-v1';
+export const favoriteInventoryAuditPeriodMinutes = 6 * 60;
+
 export async function recordFavoriteBookmarkMutation(
   dependencies: Pick<FavoriteResolutionRuntimeDependencies, 'ensureReady' | 'now' | 'storage' | 'token'>,
   mutation: BookmarkMutation,
@@ -38,10 +42,35 @@ export async function recordFavoriteBookmarkMutation(
 
 export function subscribeFavoriteBookmarkMutations(
   events: { subscribe(listener: (mutation: BookmarkMutation) => void): void },
-  dependencies: Pick<FavoriteResolutionRuntimeDependencies, 'ensureReady' | 'now' | 'storage' | 'token'>,
-  reconcile: () => Promise<void>,
+  dependencies: Pick<FavoriteResolutionRuntimeDependencies, 'bookmarks' | 'ensureReady' | 'now' | 'sourceAdapters' | 'storage' | 'token'>,
+  reconcile: (inventoryRequested?: boolean) => Promise<void>,
 ): void {
-  events.subscribe((mutation) => { void recordFavoriteBookmarkMutation(dependencies, mutation, reconcile).catch(() => undefined); });
+  events.subscribe((mutation) => { void reconcileFavoriteBookmarkMutation(dependencies, mutation, reconcile).catch(() => undefined); });
+}
+
+export async function reconcileFavoriteBookmarkMutation(
+  dependencies: Pick<FavoriteResolutionRuntimeDependencies, 'bookmarks' | 'ensureReady' | 'now' | 'sourceAdapters' | 'storage' | 'token'>,
+  mutation: BookmarkMutation,
+  reconcile: (inventoryRequested?: boolean) => Promise<void>,
+): Promise<void> {
+  await dependencies.ensureReady();
+  await dependencies.storage.putFavoriteBookmarkMutation({ ...mutation, recordedAt: dependencies.now(), sequence: dependencies.token() });
+  if (mutation.kind === 'removed') {
+    const source = await dependencies.storage.getFavoriteSource(favoriteSourceIdentity(mutation.bookmarkId));
+    if (source !== undefined) {
+      await dependencies.storage.putFavoriteSource(createFavoriteSource({ ...source, presence: 'detached' }));
+      await reconcile(false);
+      return;
+    }
+  } else if (dependencies.bookmarks.readBookmark !== undefined) {
+    const bookmark = await dependencies.bookmarks.readBookmark(mutation.bookmarkId);
+    if (bookmark !== undefined) {
+      await importFavoriteSources(normalizeBookmarks([bookmark]), dependencies.storage, dependencies.now(), dependencies.sourceAdapters);
+      await reconcile(false);
+      return;
+    }
+  }
+  await reconcile(true);
 }
 
 export function createFavoriteResolutionRuntime(dependencies: FavoriteResolutionRuntimeDependencies) {
@@ -101,9 +130,11 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         const result = await runFavoriteResolutionSlice(dependencies);
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
+        coverRepairAfterId = await dependencies.identityRecovery?.coverRepairAfterId?.() ?? coverRepairAfterId;
         const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
         coverRepairAfterId = repairedCovers.nextAfterId;
         if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
+        await dependencies.identityRecovery?.saveCoverRepairAfterId?.(coverRepairAfterId);
         const identityPublication = await dependencies.identityRecovery?.publish();
         if (inventoryFailure !== undefined) throw inventoryFailure;
         if (!inventoryComplete || result.continuationRequired || identityPreparation?.kind === 'PENDING' || identityPublication?.kind === 'SCANNING') return dependencies.now();

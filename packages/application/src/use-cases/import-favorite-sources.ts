@@ -30,7 +30,7 @@ function encodedBookmarkIdentity(bookmarkId: string): string {
   return `${hexadecimal.length.toString(36)}_${hexadecimal}`.padEnd(6, '0');
 }
 
-function sourceIdentity(bookmarkId: string): FavoriteSourceId {
+export function favoriteSourceIdentity(bookmarkId: string): FavoriteSourceId {
   return favoriteSourceId(`source_${encodedBookmarkIdentity(bookmarkId)}`);
 }
 
@@ -50,7 +50,7 @@ export async function importFavoriteSources(
     const batch = eligible.slice(offset, offset + favoriteImportBatchSize);
     await storage.transaction(['favoriteArtifacts', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteSources', 'reviews'], async (session) => {
       for (const favorite of batch) {
-        const id = sourceIdentity(favorite.bookmarkId);
+        const id = favoriteSourceIdentity(favorite.bookmarkId);
         const previousSource = await session.getFavoriteSource(id);
         const existingSource = previousSource === undefined ? undefined
           : await correctImportedReview(session, previousSource, resolutionTaskIdentity(favorite.bookmarkId), importedAt);

@@ -4,6 +4,9 @@ scope:
   - packages/application/src/favorites/**
   - packages/application/src/collective-index/favorite-collective-protocol.ts
   - packages/application/src/ports/cloud-data-ports.ts
+  - packages/application/src/ports/capability-ports.ts
+  - packages/application/src/use-cases/import-favorite-sources.ts
+  - packages/adapters-browser/src/bookmarks/**
   - packages/adapters-browser/src/catalogue/**
   - packages/adapters-browser/src/recovery/**
   - packages/adapters-cloudflare/src/catalogue/**
@@ -54,6 +57,13 @@ lisibles. Les fragments sont triés, dédupliqués, vérifiés par digest et res
 sous les quotas navigateur. Aucun titre, URL de favori, dossier, progression,
 décision ou secret n’entre dans `storage.sync`.
 
+La lecture restaure la génération valide la plus récente et sa génération de
+rollback validée. Plusieurs manifests concurrents de la même génération sont
+fusionnés sans choisir arbitrairement une identité. Après publication et
+validation du digest, l’adaptateur retire les fragments plus anciens ou
+orphelins avec une écriture espacée; une génération en cours n’est jamais
+collectée.
+
 Le Worker expose un cache public borné. Une lecture par empreinte ou référence
 précède les API fournisseurs. Une contribution contient seulement empreinte,
 versions, type, références et facettes de tri. Le Worker effectue des upserts
@@ -67,6 +77,17 @@ pré-sérialisation. Il ne conserve aucun titre, alias, URL, couverture, source,
 dossier, progression, décision privée ou secret. L’extension garde son titre
 local et hydrate ensuite par identifiant lorsque les détails manquent. Les
 jaquettes conservent la politique de droits de l’ADR-0026 et restent dans R2.
+Le curseur de réparation des jaquettes est persisté dans IndexedDB afin qu’un
+arrêt MV3 reprenne le prochain lot. L’ingestion R2 reste une opération bornée
+derrière la gate de droits : aucune URL fournisseur ne devient implicitement
+une autorisation de copie.
+
+Les événements de création, modification, déplacement et suppression d’un
+favori sont journalisés avant traitement. Un favori isolé est relu et réimporté
+directement; une suppression détache directement sa source connue. Les
+mutations de dossier, impossibles à réduire à une source unique, déclenchent
+l’inventaire complet reprenable. Un audit complet périodique de six heures
+réconcilie aussi les événements perdus pendant l’arrêt du navigateur.
 
 La route déclarative des règles reste publique et peut être rafraîchie sans
 créer de propriétaire. Inscription, lookup propriétaire et contribution ne
