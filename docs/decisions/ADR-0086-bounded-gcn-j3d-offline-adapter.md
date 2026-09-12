@@ -66,6 +66,12 @@ borne cet écart et valide toutes les plages réellement référencées. Il repr
 le fallback du loader J3D qui transforme un type matriciel BTK inconnu en type `0`,
 tout en conservant la valeur source pour l'audit.
 
+Les textures BTI sont inventoriées dans leur représentation GX native avant tout
+décodage. Le reçu garde format, mode alpha brut, échantillonnage, mipmaps, LOD,
+anisotropie, palette et offsets. Les tailles de payload sont recalculées avec les
+dimensions de tuiles GX puis comparées aux plages physiques ; une texture lisible ne
+vaut toutefois pas encore qualification de son matériau TEV.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans

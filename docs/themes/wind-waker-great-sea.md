@@ -286,9 +286,11 @@ un bloc sonore JAI annexé, totalisant 24 événements ; les 50 BAS autonomes to
 28 événements supplémentaires. Les 46 BTK, 12 BTP, 32 BRK et 5 BPK passent maintenant
 un lecteur d'animation matériau séparant SRT de texture, motif de texture, couleur
 matériau et registres TEV. Les 482 inspections modèles et animations sont toutes
-valides. Les définitions matériau, textures, collisions et leurs relations restent
-explicitement en attente de lecteurs qualifiés ; cette passe ne change donc pas encore
-le statut du gate global de dépendances.
+valides. Les 45 BTI autonomes passent aussi le lecteur de métadonnées et de layout GX,
+soit 527 inspections sur 527. Les textures embarquées dans TEX1, les définitions
+matériau, les collisions et leurs relations restent explicitement en attente de
+lecteurs qualifiés ; cette passe ne change donc pas encore le statut du gate global
+de dépendances.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur

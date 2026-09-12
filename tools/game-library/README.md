@@ -84,6 +84,9 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-material-animation --input private/source/animation.btk
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-bti-texture --input private/source/texture.bti
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-ppc-resource-calls \
   --input private/source/linked.elf \
   --module actor-controller \
@@ -117,6 +120,13 @@ matériaux, slots, centres SRT et cardinalités des pistes. Chaque offset, table
 index et mode de tangente est borné. Pour BTK, la valeur brute du calcul matriciel et
 la valeur effective sont toutes deux exposées lorsque le loader source applique son
 fallback documenté.
+
+Le lecteur BTI conserve le format GX, la valeur alpha source, les dimensions, wraps,
+filtres, niveaux de mipmap, LOD, anisotropie, palette et plages de données. Le calcul
+de taille suit les tuiles GX propres à chaque format, y compris RGBA8 et CMPR. Une
+incohérence format indexé/palette, un niveau impossible ou une plage tronquée ferme
+l'inspection ; le lecteur n'effectue encore ni décodage RGBA ni approximation de
+matériau.
 
 L'inspection PPC complète cette preuve quand le source exporté est incomplet. Elle
 lit un ELF32 big-endian borné, limite l'analyse à une plage exécutable explicite ou

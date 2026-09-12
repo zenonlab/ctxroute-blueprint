@@ -237,6 +237,46 @@ pub struct J3dMaterialTarget {
     pub center: Option<[f32; 3]>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BtiTextureReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub byte_order: &'static str,
+    pub texture: BtiTexture,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BtiTexture {
+    pub gx_format: &'static str,
+    pub source_format: u8,
+    pub source_alpha_mode: u8,
+    pub alpha_enabled: bool,
+    pub width: u16,
+    pub height: u16,
+    pub wrap_s: &'static str,
+    pub wrap_t: &'static str,
+    pub indexed: bool,
+    pub palette_format: Option<&'static str>,
+    pub palette_colors: u16,
+    pub mipmap_enabled: bool,
+    pub edge_lod_enabled: bool,
+    pub bias_clamp_enabled: bool,
+    pub mipmap_count: u8,
+    pub min_filter: &'static str,
+    pub mag_filter: &'static str,
+    pub min_lod_eighths: i8,
+    pub max_lod_eighths: i8,
+    pub lod_bias_hundredths: i16,
+    pub max_anisotropy: u8,
+    pub source_unknown: u8,
+    pub image_offset: usize,
+    pub image_bytes: usize,
+    pub palette_offset: Option<usize>,
+    pub palette_bytes: usize,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -325,6 +365,176 @@ pub fn inspect_j3d_material_animation(path: &Path) -> Result<J3dMaterialAnimatio
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_j3d_material_animation(&bytes)
+}
+
+pub fn inspect_bti_texture(path: &Path) -> Result<BtiTextureReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "BTI input must be a regular file"
+    );
+    ensure!(
+        metadata.len() >= 0x20 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "BTI input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_bti_texture(&bytes)
+}
+
+pub fn parse_bti_texture(bytes: &[u8]) -> Result<BtiTextureReport> {
+    ensure!(
+        bytes.len() >= 0x20 && bytes.len() <= MAX_J3D_BYTES,
+        "BTI input exceeds the bounded size"
+    );
+    Ok(BtiTextureReport {
+        format: "orbite.bti-texture-index/1",
+        adapter: "gcn.bti-texture",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        byte_order: "big-endian",
+        texture: parse_bti_resource(bytes, 0)?,
+    })
+}
+
+fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
+    ensure_span(bytes, header, 1, 0x20, "BTI header")?;
+    let source_format = bytes[header];
+    let (gx_format, tile_width, tile_height, tile_bytes, indexed) = match source_format {
+        0 => ("i4", 8, 8, 32, false),
+        1 => ("i8", 8, 4, 32, false),
+        2 => ("ia4", 8, 4, 32, false),
+        3 => ("ia8", 4, 4, 32, false),
+        4 => ("rgb565", 4, 4, 32, false),
+        5 => ("rgb5a3", 4, 4, 32, false),
+        6 => ("rgba8", 4, 4, 64, false),
+        8 => ("c4", 8, 8, 32, true),
+        9 => ("c8", 8, 4, 32, true),
+        10 => ("c14x2", 4, 4, 32, true),
+        14 => ("cmpr", 8, 8, 32, false),
+        value => bail!("unsupported BTI GX texture format {value}"),
+    };
+    let width = read_u16(bytes, header + 2)?;
+    let height = read_u16(bytes, header + 4)?;
+    ensure!(width > 0 && height > 0, "BTI dimensions must be non-zero");
+    let wrap_s = parse_bti_wrap(bytes[header + 6])?;
+    let wrap_t = parse_bti_wrap(bytes[header + 7])?;
+    ensure!(
+        (bytes[header + 8] != 0) == indexed,
+        "BTI indexed flag does not match its GX format"
+    );
+    let palette_colors = read_u16(bytes, header + 10)?;
+    let palette_format = if indexed {
+        Some(match bytes[header + 9] {
+            0 => "ia8",
+            1 => "rgb565",
+            2 => "rgb5a3",
+            value => bail!("unsupported BTI palette format {value}"),
+        })
+    } else {
+        ensure!(
+            palette_colors == 0,
+            "non-indexed BTI declares palette colors"
+        );
+        None
+    };
+    let mipmap_enabled = bytes[header + 16] != 0;
+    let mipmap_count = bytes[header + 24];
+    ensure!(mipmap_count > 0, "BTI mipmap count must be non-zero");
+    ensure!(
+        mipmap_enabled || mipmap_count == 1,
+        "BTI without mipmaps declares multiple levels"
+    );
+    let max_levels = u8::try_from(u16::BITS - width.max(height).leading_zeros())?;
+    ensure!(
+        mipmap_count <= max_levels,
+        "BTI mipmap count exceeds dimensions"
+    );
+    let mut level_width = usize::from(width);
+    let mut level_height = usize::from(height);
+    let mut image_bytes = 0_usize;
+    for _ in 0..mipmap_count {
+        let columns = level_width.div_ceil(tile_width);
+        let rows = level_height.div_ceil(tile_height);
+        image_bytes = image_bytes
+            .checked_add(
+                columns
+                    .checked_mul(rows)
+                    .and_then(|tiles| tiles.checked_mul(tile_bytes))
+                    .context("BTI image size overflow")?,
+            )
+            .context("BTI image size overflow")?;
+        level_width = (level_width / 2).max(1);
+        level_height = (level_height / 2).max(1);
+    }
+    let image_offset = header
+        .checked_add(read_u32(bytes, header + 28)? as usize)
+        .context("BTI image offset overflow")?;
+    ensure_counted_span(bytes, image_offset, image_bytes, 1, "BTI image")?;
+    let palette_bytes = usize::from(palette_colors) * 2;
+    let palette_offset = if palette_bytes > 0 {
+        let palette_offset = header
+            .checked_add(read_u32(bytes, header + 12)? as usize)
+            .context("BTI palette offset overflow")?;
+        ensure_counted_span(bytes, palette_offset, palette_bytes, 1, "BTI palette")?;
+        Some(palette_offset)
+    } else {
+        None
+    };
+    Ok(BtiTexture {
+        gx_format,
+        source_format,
+        source_alpha_mode: bytes[header + 1],
+        alpha_enabled: bytes[header + 1] != 0,
+        width,
+        height,
+        wrap_s,
+        wrap_t,
+        indexed,
+        palette_format,
+        palette_colors,
+        mipmap_enabled,
+        edge_lod_enabled: bytes[header + 17] != 0,
+        bias_clamp_enabled: bytes[header + 18] != 0,
+        mipmap_count,
+        min_filter: parse_bti_filter(bytes[header + 20])?,
+        mag_filter: parse_bti_filter(bytes[header + 21])?,
+        min_lod_eighths: bytes[header + 22] as i8,
+        max_lod_eighths: bytes[header + 23] as i8,
+        lod_bias_hundredths: read_i16(bytes, header + 26)?,
+        max_anisotropy: match bytes[header + 19] {
+            0 => 1,
+            1 => 2,
+            2 => 4,
+            value => bail!("unsupported BTI anisotropy {value}"),
+        },
+        source_unknown: bytes[header + 25],
+        image_offset,
+        image_bytes,
+        palette_offset,
+        palette_bytes,
+    })
+}
+
+fn parse_bti_wrap(value: u8) -> Result<&'static str> {
+    match value {
+        0 => Ok("clamp"),
+        1 => Ok("repeat"),
+        2 => Ok("mirror"),
+        _ => bail!("unsupported BTI wrap mode {value}"),
+    }
+}
+
+fn parse_bti_filter(value: u8) -> Result<&'static str> {
+    match value {
+        0 => Ok("nearest"),
+        1 => Ok("linear"),
+        2 => Ok("nearest-mipmap-nearest"),
+        3 => Ok("linear-mipmap-nearest"),
+        4 => Ok("nearest-mipmap-linear"),
+        5 => Ok("linear-mipmap-linear"),
+        _ => bail!("unsupported BTI filter {value}"),
+    }
 }
 
 pub fn parse_j3d_material_animation(bytes: &[u8]) -> Result<J3dMaterialAnimationReport> {
@@ -2074,6 +2284,25 @@ mod tests {
         bytes
     }
 
+    fn fixture_bti() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 104];
+        bytes[0] = 9;
+        bytes[1] = 1;
+        bytes[2..4].copy_from_slice(&8_u16.to_be_bytes());
+        bytes[4..6].copy_from_slice(&8_u16.to_be_bytes());
+        bytes[6] = 1;
+        bytes[7] = 2;
+        bytes[8] = 1;
+        bytes[9] = 2;
+        bytes[10..12].copy_from_slice(&4_u16.to_be_bytes());
+        bytes[12..16].copy_from_slice(&0x60_u32.to_be_bytes());
+        bytes[20] = 1;
+        bytes[21] = 1;
+        bytes[24] = 1;
+        bytes[28..32].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes
+    }
+
     fn fixture_bck_with_embedded_sound() -> Vec<u8> {
         let mut bytes = fixture_bck();
         bytes.resize(0x120, 0);
@@ -2257,6 +2486,28 @@ mod tests {
         let mut invalid = fixture_bpk();
         invalid[0x62..0x64].copy_from_slice(&99_u16.to_be_bytes());
         assert!(parse_j3d_material_animation(&invalid).is_err());
+    }
+
+    #[test]
+    fn inventories_bti_gpu_layout_sampler_and_palette() {
+        let report = parse_bti_texture(&fixture_bti()).unwrap();
+        assert_eq!(report.texture.gx_format, "c8");
+        assert_eq!(report.texture.width, 8);
+        assert_eq!(report.texture.wrap_t, "mirror");
+        assert_eq!(report.texture.palette_format, Some("rgb5a3"));
+        assert_eq!(report.texture.image_bytes, 64);
+        assert_eq!(report.texture.palette_bytes, 8);
+    }
+
+    #[test]
+    fn rejects_bti_format_flag_mismatch_and_truncated_image() {
+        let mut mismatch = fixture_bti();
+        mismatch[8] = 0;
+        assert!(parse_bti_texture(&mismatch).is_err());
+
+        let mut truncated = fixture_bti();
+        truncated.truncate(40);
+        assert!(parse_bti_texture(&truncated).is_err());
     }
 
     #[test]
