@@ -7821,7 +7821,7 @@
         {
           "id": "step-4",
           "title": "Remplacer le faux oracle par un différentiel FavLib réel et anonymisé",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "The harness executes both FavLib reference behavior and TobiRink behavior over representative readonly inputs",
             "Every difference is classified as intentional improvement retained behavior or regression",
@@ -7844,7 +7844,11 @@
             "npm run verify",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Pinned FavLib 3267de2 parser digest verified and executed read-only in an isolated in-memory context",
+            "Six synthetic differential families pass; routing suffix is classified improvement and two hidden TobiRink regressions were fixed",
+            "npm run verify, 334 application tests, 82-case semantic coverage and Archify showcase 9/9 pass with no FavLib private data"
+          ]
         },
         {
           "id": "step-5",

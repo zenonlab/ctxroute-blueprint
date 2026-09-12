@@ -18,9 +18,10 @@
           "eligibility",
           "sourceEvidence",
           "parseArtifact",
-          "titleMatcher"
+          "titleMatcher",
+          "privateStore"
         ],
-        "note": "Route et titre brut retirent les IDs de routage prouvés; progression et suppressions restent tracées avant hydratation."
+        "note": "Preuves locales tracées avant hydratation; oracle FavLib épinglé exécuté en mémoire sur fixtures synthétiques."
       },
       {
         "id": "durable-resolution",

@@ -9,6 +9,7 @@ scope:
   - packages/adapters-browser/**
   - packages/adapters-indexeddb/**
   - apps/extension/**
+  - scripts/parser-equivalence/**
 review: on-change
 revised: true
 ---
@@ -23,8 +24,8 @@ revised: true
 
 La pipeline précédente créait une Review à l'import et pouvait confier à
 Kitsu une recherche principale indisponible. La reconstruction clean-room doit
-fixer les comportements utiles sans reprendre le runtime, le code ou les
-données FavLib. La doctrine historique `3267de2` est une source de décisions
+fixer les comportements utiles sans reprendre le runtime ou les données FavLib.
+La doctrine historique `3267de2` est une source de décisions
 revues, précisée puis remplacée par le contrat TobiRink du 2026-09-08.
 
 ## Décision
@@ -117,6 +118,12 @@ versionnés. Brut et transformations restent locaux. Les règles distribuées
 par Worker sont des données JSON bornées origine/segments/type/progression;
 aucun code distant ni regex distante n'est exécuté. Les origines réseau
 restent explicites et les DTO Zod stricts à chaque frontière.
+Lorsqu'un titre humain corrobore exactement un slug débarrassé d'un identifiant
+de routage, sa casse et sa ponctuation deviennent le titre d'affichage tandis
+que la clé d'identité reste normalisée.
+Un slug technique alphanumérique mixte d'au moins six caractères peut aussi
+être remplacé par un titre humain unique; les petits nombres terminaux
+intrinsèques à un titre restent exclus de cette détection.
 
 L'outbox reste dans `tobirink-private`, jamais dans la base de notifications.
 Source/artefact/tâche sont atomiques avant réseau; claims indexés par lane,
@@ -144,7 +151,11 @@ aux routes utilitaires et aux identités numériques sans titre exploitable.
 
 ## Conséquences
 
-TobiRink ne lit aucune base ni aucun export FavLib pendant sa validation. Les
+TobiRink ne lit aucune base ni aucun export FavLib pendant sa validation. Un
+harness local peut exécuter le parseur du commit épinglé, chargé par `git show`
+et transpilé en mémoire dans un contexte sans module, processus, réseau ou accès
+fichier. Le digest du fichier est vérifié avant exécution; aucune source FavLib
+n'est copiée dans le dépôt. Les
 82 cas synthétiques versionnés forment un corpus clean-room indépendant couvrant
 artefact, type, progression, identité, décision et raison. Le bilan 77/4/1
 décrit les décisions prises sur ce corpus; il ne mesure pas une bibliothèque

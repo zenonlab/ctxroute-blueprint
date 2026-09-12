@@ -8,6 +8,10 @@ const evidence = (values = {}) => createSourceEvidence({ aliases: [], diagnostic
 describe('favorite identity parser I-01…I-07', () => {
   it('I-01 aligns routing, language and reader decorations', () => expect(parseFavoriteObservation(observation('Frieren [reader]'), evidence({ rawSlug: '123-vostfr-frieren-reader', stableSlug: '123-vostfr-frieren-reader' }))).toMatchObject({ identityKey: 'frieren', status: 'parsed' }));
   it('I-02 replaces an opaque slug with one human title', () => expect(parseFavoriteObservation(observation('Frieren'), evidence({ rawSlug: '9f3a8c21', stableSlug: '9f3a8c21' }))).toMatchObject({ identityKey: 'frieren', transformations: ['opaque-url-slug-replaced'] }));
+  it('I-02 replaces a prefixed mixed opaque slug while preserving intrinsic title numbers', () => {
+    expect(parseFavoriteObservation(observation('Synthetic Ember Ledger'), evidence({ rawSlug: 'route-zx731904', stableSlug: 'route-zx731904' }))).toMatchObject({ displayTitle: 'Synthetic Ember Ledger', identityKey: 'synthetic ember ledger', transformations: ['opaque-url-slug-replaced'] });
+    expect(parseFavoriteObservation(observation('Area 51'), evidence({ rawSlug: 'area-51', stableSlug: 'area-51' }))).toMatchObject({ displayTitle: 'area 51', identityKey: 'area 51' });
+  });
   it('I-03 blocks an uncorroborated opaque identity', () => expect(parseFavoriteObservation(observation('9f3a8c21'), evidence({ rawSlug: '9f3a8c21', stableSlug: '9f3a8c21' }))).toMatchObject({ diagnostics: ['OPAQUE_IDENTITY_UNCORROBORATED'], status: 'identity-missing' }));
   it('I-04 removes a contradicted numeric prefix', () => expect(parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: '123-frieren' })).identityKey).toBe('frieren'));
   it('I-05 preserves an uncontradicted numeric prefix', () => expect(parseFavoriteObservation(observation('86 Eighty Six'), evidence({ stableSlug: '86-eighty-six' })).identityKey).toBe('86 eighty six'));
@@ -18,8 +22,8 @@ describe('favorite identity parser I-01…I-07', () => {
     evidence({ identityTransformations: ['numeric-routing-suffix'], mediaKind: 'MANHWA', rawSlug: 'kage-no-jitsuryokusha-ni-naritakute-006', release: { kind: 'chapter', provenance: 'URL_PATH', raw: 'chapter-66.1', value: 66.1 }, stableSlug: 'kage-no-jitsuryokusha-ni-naritakute' }),
   )).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', identityKey: 'kage no jitsuryokusha ni naritakute', progress: { kind: 'chapter', value: 66.1 }, transformations: ['numeric-routing-suffix'] }));
   it('removes an attached routing prefix from every provider-facing alias', () => expect(parseFavoriteObservation(
-    observation('0906168628 genius of the unique lineage'),
+    observation('0906168628 Genius of the Unique Lineage'),
     evidence({ identityTransformations: ['numeric-routing-prefix'], mediaKind: 'UNKNOWN', rawSlug: '0906168628-genius-of-the-unique-lineage-chapter-31', release: { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', raw: 'chapter-31', value: 31 }, releaseSuffix: 'chapter-31', stableSlug: 'genius-of-the-unique-lineage' }),
-  )).toMatchObject({ aliases: [{ provenance: 'stable-url-slug', value: 'genius of the unique lineage' }], displayTitle: 'genius of the unique lineage', progress: { kind: 'chapter', value: 31 }, transformations: ['numeric-routing-prefix'] }));
+  )).toMatchObject({ aliases: [{ provenance: 'stable-url-slug', value: 'Genius of the Unique Lineage' }], displayTitle: 'Genius of the Unique Lineage', identityKey: 'genius of the unique lineage', progress: { kind: 'chapter', value: 31 }, transformations: ['numeric-routing-prefix'] }));
   it('is deeply deterministic and immutable', () => { const first = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); const second = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); expect(first).toEqual(second); expect(Object.isFrozen(first)).toBe(true); expect(Object.isFrozen(first.segments)).toBe(true); });
 });

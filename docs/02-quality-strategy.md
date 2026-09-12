@@ -118,8 +118,9 @@ browser or `workerd` test when platform behavior is the risk.
   des 82 identifiants, vérifie l’unicité de leurs attentes et maintient le bilan
   historique 77 conservés / 4 corrigés / `X-01` futur comme référence initiale.
   Le plan v3 active X-01 MangaDex. Le corpus clean-room couvre explicitement
-  identité, type, progression, décision et raison sans connexion, export ou
-  donnée FavLib.
+  identité, type, progression, décision et raison sans export ou donnée FavLib.
+  Lorsque le checkout voisin est disponible, un différentiel exécute en mémoire
+  le parseur FavLib `3267de2` au digest épinglé et classe chaque écart synthétique.
 
 ## Dependency integrity
 

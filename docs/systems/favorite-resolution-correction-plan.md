@@ -4,15 +4,17 @@
 
 Contrat cible v3, approuvé le 2026-09-08. Sa documentation ne constitue pas
 une preuve d'implémentation. Progress conserve la validation de chaque étape.
-La conformité est démontrée par les contrats TobiRink, le corpus clean-room et
-les validations d'intégration; elle ne dépend d'aucune base FavLib.
+La conformité est démontrée par les contrats TobiRink, le corpus clean-room,
+un différentiel local contre le parseur épinglé et les validations d'intégration;
+elle ne dépend d'aucune base FavLib.
 
 Référence historique : commit Git `3267de2`, notamment `CLAUDE.md` et
 `docs/adr/0087-architecture-locale-favoris-resolution-agenda.md`. Le dernier
 FavLib local-only n'est pas l'autorité normative. La demande utilisateur
 du 2026-09-08 précise cette doctrine : Worker seul détenteur du binding D1,
 propriétaire opaque détenu par l'extension, Kitsu en repli contrôlé, migrations
-additives. Aucun code FavLib n'est porté ou exécuté dans TobiRink.
+additives. Aucun code FavLib n'est porté dans TobiRink; le parseur épinglé peut
+être exécuté en mémoire par le harness local en lecture seule.
 
 Ce contrat remplace les prescriptions contradictoires des versions 1/2 de
 la spécification et de la pipeline. Les règles pures de parsing et les 82 cas
@@ -454,7 +456,7 @@ Les identifiants G sont conservés depuis l'audit pour ne pas perdre la traçabi
 | G-22 | actions manuelles validées, révision/type/domaine vérifiés | 6 |
 | G-23 | grand inventaire, plusieurs réveils, mutation concurrente | 8 |
 | G-24 | doctrine 3267de2, ADR/spec/pipeline/Archify cohérents | 1 |
-| G-25 | corpus synthétique indépendant, sans accès aux données FavLib | 7 |
+| G-25 | corpus synthétique et différentiel local épinglé, sans données FavLib | 7 |
 | G-26 | preuves unitaires/corpus/installation/production distinctes | 7,8 |
 | G-27 | migration additive reçue, décisions humaines préservées | 6 |
 | G-28 | favoris autorité présence/progression; sync IDs/reconstruction | 2,4 |
@@ -473,7 +475,9 @@ Les identifiants G sont conservés depuis l'audit pour ne pas perdre la traçabi
 | Raison | niveau de preuve et conflit | aucun écart inexpliqué |
 
 Aucune base, aucun export, aucun titre privé et aucune URL FavLib ne sont lus
-par la validation. Les 82 fixtures synthétiques reproduisent uniquement les
+par la validation. Le harness lit uniquement le fichier du parseur au commit
+`3267de2`, vérifie son digest et l'exécute en mémoire sans accès réseau ou disque.
+Les 82 fixtures synthétiques reproduisent uniquement les
 formes et décisions revues nécessaires au contrat TobiRink. Le bilan 77/4/1
 classe ces cas synthétiques; le repère historique « environ 40 ambiguïtés,
 4 introuvables » n'est ni une cible ni un critère d'acceptation. MangaDex X-01

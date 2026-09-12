@@ -39,7 +39,11 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
   if (slug === undefined) return undefined;
   const human = cleanedTitle.trim();
   const slugTitle = slug.replace(/[-_.]+/gu, ' ').trim();
-  const opaque = /^[a-f\d]{8,}$/iu.test(slug.replace(/[-_.]/gu, ''));
+  const slugParts = slug.split(/[-_.]+/u).filter(Boolean);
+  const opaqueToken = (value: string) => value.length >= 6 && /^[\p{L}\d]+$/u.test(value) && /\p{L}/u.test(value) && /\d/u.test(value)
+    && !/^(?=.*\p{L}{4,})(?=.*\d{1,2}$)[\p{L}\d]+$/u.test(value);
+  const opaque = /^[a-f\d]{8,}$/iu.test(slug.replace(/[-_.]/gu, '')) || opaqueToken(slug)
+    || (slugParts.length > 1 && slugParts.slice(0, -1).every((part) => /^\p{L}{2,16}$/u.test(part)) && opaqueToken(slugParts.at(-1) ?? ''));
   if (opaque) {
     if (human.length === 0 || normalizeFavoriteTitle(human).compact === normalizeFavoriteTitle(slugTitle).compact) return undefined;
     transformations.push('opaque-url-slug-replaced'); return human;
@@ -57,6 +61,11 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
   if (numericPrefix !== null && !normalizeFavoriteTitle(human).normalized.startsWith(`${numericPrefix[1]} `) && normalizeFavoriteTitle(numericPrefix[2] ?? '').compact === normalizeFavoriteTitle(human).compact) {
     reconciled = numericPrefix[2] ?? reconciled; transformations.push('numeric-routing-prefix');
   }
+  const routingTransformations = evidence.identityTransformations ?? [];
+  let corroboratingHuman = human;
+  if (routingTransformations.includes('numeric-routing-prefix')) corroboratingHuman = corroboratingHuman.replace(/^0\d{5,11}\s+/u, '');
+  if (routingTransformations.includes('numeric-routing-suffix')) corroboratingHuman = corroboratingHuman.replace(/\s+0\d{2,4}$/u, '');
+  if (routingTransformations.length > 0 && normalizeFavoriteTitle(reconciled).compact === normalizeFavoriteTitle(corroboratingHuman).compact) return corroboratingHuman;
   return reconciled;
 }
 
