@@ -990,6 +990,10 @@ humains non concordants reste sans identité plutôt que de choisir arbitraireme
 Le titre et le slug bruts restent dans l'artefact local pour expliquer la
 décision et permettre un reparsing versionné.
 
+La candidate locale 1.0.22 distribue ce parser dans les deux manifests. Elle
+conserve le modèle cache-first, la reconstruction `storage.sync` v2 et le
+stockage IndexedDB v14 de la 1.0.21; aucun schéma D1 ou IndexedDB ne change.
+
 Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
 références publiques validées et utilisés pour hydrater exactement la source
 principale. Les anciens IDs décimaux ne sont pas convertis en IDs API.

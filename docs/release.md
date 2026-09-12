@@ -38,6 +38,32 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### Favorite title/slug alignment candidate — 2026-09-13
+
+Candidate `1.0.22` ships `favorite-parser-v4`. For a decorated bookmark name,
+the unique human segment whose normalized form equals the stable URL slug
+becomes the local identity. A six-to-twelve-digit routing prefix is removed
+only when the URL proves a release and the bookmark name independently
+corroborates the remainder. Intrinsic numbers and unresolved multi-segment
+titles remain unchanged or explicitly unresolved.
+
+The pinned read-only FavLib differential passes its five synthetic tests and
+the 82-case semantic oracle changes only the parser version and its derived
+fingerprints. Chromium 153 installs the exact archive and completes automatic
+1,406-bookmark convergence, `storage.sync` v2 reconstruction after IndexedDB
+loss, encrypted backup restore, cache-first routing, durable retry,
+pause/resume and zero imported Review. Firefox 151 installs its exact archive
+and passes health, ordinary-link exclusion and zero-Review checks.
+
+Two isolated builds reproduce the 21-file archives byte for byte:
+
+- Chrome: 298194 bytes, SHA-256 `3f951b9c0b7a80ef869f85ef189846859a88a81730b63c7825725a0f70cb615c`.
+- Firefox: 298231 bytes, SHA-256 `326289df74b7f9d3b97c6be72024fee6020c807c831f1a8d89b41d6be6800fcb`.
+
+Production remains on `1.0.21` until the separately reviewed Cloudflare gate
+uploads both immutable archives and deploys the static download page. This
+candidate requires no D1 or IndexedDB migration.
+
 ### Persistent recovery release — 2026-09-12
 
 Candidate `1.0.21` publishes a validated `storage.sync` v2 snapshot for a

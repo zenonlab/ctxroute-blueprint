@@ -8353,6 +8353,54 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-certify-favorite-parser-1-0-22",
+      "title": "Certifier la release locale du parser favori 1.0.22",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Construire et certifier les archives 1.0.22",
+          "status": "DONE",
+          "acceptance": [
+            "Les manifests Chrome et Firefox portent la version 1.0.22",
+            "Les deux archives sont reproductibles et leurs hashes sont documentes",
+            "Les parcours installes Chrome et Firefox passent dans des profils isoles",
+            "Le parser v4 repare les titres sans regression de reconstruction",
+            "Aucune ressource Cloudflare ni migration D1 n est modifiee"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/plans/certify-favorite-parser-1-0-22.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs avec archive Chrome 1.0.22",
+            "node apps/extension/scripts/installed-firefox.mjs avec archive Firefox 1.0.22",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m test(parser): certify favorite parser 1.0.22"
+          ],
+          "evidence": [
+            "Chrome and Firefox 1.0.22 archives reproduce byte for byte with SHA-256 3f951b9c...615c and 326289df...0fcb.",
+            "Installed Chromium 153 completes 1406-bookmark convergence, sync reconstruction, encrypted backup restore and zero imported Review; installed Firefox 151 passes.",
+            "npm run verify and favorite-resolution Archify showcase 9/9 pass with zero dependency vulnerabilities and no Cloudflare or D1 mutation."
+          ]
+        }
+      ]
     }
   ]
 }

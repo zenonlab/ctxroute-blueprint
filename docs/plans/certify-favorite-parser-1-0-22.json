@@ -1,0 +1,44 @@
+{
+  "goalId": "goal-certify-favorite-parser-1-0-22",
+  "title": "Certifier la release locale du parser favori 1.0.22",
+  "approved": true,
+  "validationEvidence": [
+    "Le commit c0b48d6 corrige et certifie le parser v4",
+    "La production 1.0.21 et ses deux archives restent le rollback",
+    "Approbation explicite de la preparation locale 1.0.22"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Construire et certifier les archives 1.0.22",
+      "acceptance": [
+        "Les manifests Chrome et Firefox portent la version 1.0.22",
+        "Les deux archives sont reproductibles et leurs hashes sont documentes",
+        "Les parcours installes Chrome et Firefox passent dans des profils isoles",
+        "Le parser v4 repare les titres sans regression de reconstruction",
+        "Aucune ressource Cloudflare ni migration D1 n est modifiee"
+      ],
+      "files": [
+        "apps/extension/package.json",
+        "package-lock.json",
+        "docs/decisions/ADR-0039-extension-release-versioning.md",
+        "docs/release.md",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/plans/certify-favorite-parser-1-0-22.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run package:extension",
+        "node scripts/release/package-extension.mjs --verify-isolated",
+        "node apps/extension/scripts/installed-review.mjs avec archive Chrome 1.0.22",
+        "node apps/extension/scripts/installed-firefox.mjs avec archive Firefox 1.0.22",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "git diff --check",
+        "git commit -m test(parser): certify favorite parser 1.0.22"
+      ]
+    }
+  ]
+}

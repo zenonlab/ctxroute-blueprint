@@ -392,3 +392,7 @@
 ## Aligner universellement le nom favori et le slug — DONE
 
 - [x] **Corriger et certifier l alignement structurel titre slug** — DONE _(evidence: Parser v4 resolves the four reported title forms through unique normalized bookmark-segment to stable-slug alignment; long numeric prefixes require release and title corroboration while intrinsic numbers remain unchanged., Application 344/344, extension 151/151 and pinned readonly FavLib synthetic differential 5/5 pass; the 82-case oracle snapshot changed only parser version and semantic fingerprints., npm run verify passed all repository gates with zero dependency vulnerabilities; favorite-resolution dataflow and lifecycle each pass Archify showcase 9/9 with zero errors and warnings.)_
+
+## Certifier la release locale du parser favori 1.0.22 — DONE
+
+- [x] **Construire et certifier les archives 1.0.22** — DONE _(evidence: Chrome and Firefox 1.0.22 archives reproduce byte for byte with SHA-256 3f951b9c...615c and 326289df...0fcb., Installed Chromium 153 completes 1406-bookmark convergence, sync reconstruction, encrypted backup restore and zero imported Review; installed Firefox 151 passes., npm run verify and favorite-resolution Archify showcase 9/9 pass with zero dependency vulnerabilities and no Cloudflare or D1 mutation.)_
