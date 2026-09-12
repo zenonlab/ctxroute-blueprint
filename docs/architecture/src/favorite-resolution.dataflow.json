@@ -33,7 +33,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "D1 et résolution partagent l’hydratation; MU 405 reprend sa recherche paginée sur ID exact."
+        "note": "La preuve d’identité est conservée sans attendre D1 ni l’hydratation; chaque fournisseur inspecte une fenêtre de résultats bornée."
       },
       {
         "id": "bounded-convergence",
@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Titres locaux visibles avant hydratation; toute restauration, publication ou page incomplète programme le réveil MV3 suivant."
+        "note": "Titres locaux visibles avant hydratation; quatre alias au maximum et une page par alias garantissent la convergence MV3."
       },
       {
         "id": "cover-rights",
@@ -134,7 +134,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "pages atomiques · échéance indexée"
+      "tag": "fenêtres bornées · échéance indexée"
     },
     {
       "id": "providerAdapters",

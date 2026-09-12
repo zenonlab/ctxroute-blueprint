@@ -16,7 +16,7 @@ function checkpointPort(): FavoriteSearchCheckpointPort {
   };
 }
 
-describe('durable relevant candidate pagination', () => {
+describe('durable bounded provider search', () => {
   it('does not reuse a completed result for a different identity query', async () => {
     const checkpoint = checkpointPort();
     const port: FavoriteProviderCandidatePort = { search: vi.fn(async () => createProviderCandidateEnvelope({ candidates: [], complete: true, digest: 'empty', provider: 'anilist', truncated: false })) };
@@ -24,24 +24,24 @@ describe('durable relevant candidate pagination', () => {
     await searchFavoriteProviderPage(port, { sourceTitles: ['A Different Journey'] }, 'anilist', 20, checkpoint);
     expect(port.search).toHaveBeenCalledTimes(2);
   });
-  it('does not select an early exact result before a later identity has been compared', async () => {
+  it('accepts one unique exact identity from the first bounded provider window', async () => {
     const checkpoint = checkpointPort();
     const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => createProviderCandidateEnvelope(input.cursor === undefined
       ? { candidates: [candidate('1')], complete: false, digest: 'first', nextCursor: '2', provider: 'anilist', truncated: true }
       : { candidates: [candidate('2')], complete: true, digest: 'second', provider: 'anilist', truncated: false })) };
-    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toEqual({ kind: 'PAGE_PENDING' });
     const result = await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint);
-    expect(result).toMatchObject({ envelope: { candidates: [{ externalId: '1' }, { externalId: '2' }], complete: true }, kind: 'ENVELOPE' });
-    expect(port.search).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: '2' }));
+    expect(result).toMatchObject({ envelope: { candidates: [{ externalId: '1' }], complete: true }, kind: 'ENVELOPE' });
+    expect(port.search).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps only the highest proof level across pages without relying on API order', async () => {
+  it('keeps only the highest proof level across independent aliases without relying on API order', async () => {
     const checkpoint = checkpointPort();
-    const port: FavoriteProviderCandidatePort = { search: async (input) => createProviderCandidateEnvelope(input.cursor === undefined
+    const aliases = { sourceTitles: ['Synthetic Journey', 'Exact Alias'] };
+    const port: FavoriteProviderCandidatePort = { search: async (input) => createProviderCandidateEnvelope(input.titles[0] === 'Synthetic Journey'
       ? { candidates: [candidate('fuzzy', 'Synthetic Jurney')], complete: false, digest: 'fuzzy', nextCursor: '2', provider: 'anilist', truncated: true }
-      : { candidates: [candidate('exact')], complete: true, digest: 'exact', provider: 'anilist', truncated: false }) };
-    await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint);
-    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [{ externalId: 'exact' }] } });
+      : { candidates: [candidate('exact', 'Exact Alias')], complete: true, digest: 'exact', provider: 'anilist', truncated: false }) };
+    expect(await searchFavoriteProviderPage(port, aliases, 'anilist', 20, checkpoint)).toEqual({ kind: 'PAGE_PENDING' });
+    expect(await searchFavoriteProviderPage(port, aliases, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [{ externalId: 'exact' }] } });
   });
 
   it('persists version 2 display metadata and advances across an empty evidence page', async () => {
@@ -54,12 +54,13 @@ describe('durable relevant candidate pagination', () => {
       metadataVersion: 2,
       titleVariants: [{ language: 'en', title: 'Synthetic Journey' }],
     };
-    const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => input.cursor === undefined
+    const aliases = { sourceTitles: ['Synthetic Journey', 'Rich Alias'] };
+    const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => input.titles[0] === 'Synthetic Journey'
       ? first
-      : createProviderCandidateEnvelope({ candidates: [richCandidate], complete: true, digest: 'rich', provider: 'anilist', truncated: false })) };
+      : createProviderCandidateEnvelope({ candidates: [{ ...richCandidate, titles: ['Rich Alias'] }], complete: true, digest: 'rich', provider: 'anilist', truncated: false })) };
 
-    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toEqual({ kind: 'PAGE_PENDING' });
-    expect(await searchFavoriteProviderPage(port, query, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [richCandidate], complete: true } });
+    expect(await searchFavoriteProviderPage(port, aliases, 'anilist', 20, checkpoint)).toEqual({ kind: 'PAGE_PENDING' });
+    expect(await searchFavoriteProviderPage(port, aliases, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [expect.objectContaining({ externalId: 'rich', metadataVersion: 2 })], complete: true } });
   });
 
   it('searches all local aliases before declaring a provider NO_MATCH', async () => {
@@ -72,13 +73,15 @@ describe('durable relevant candidate pagination', () => {
 
   it('preserves the previous checkpoint when transport or persistence fails', async () => {
     const checkpoint = checkpointPort();
-    const page = createProviderCandidateEnvelope({ candidates: [candidate('1')], complete: false, digest: 'page', nextCursor: '2', provider: 'anilist', truncated: true });
-    await searchFavoriteProviderPage({ search: async () => page }, query, 'anilist', 20, checkpoint);
+    const aliases = { sourceTitles: ['Synthetic Journey', 'Other Alias'] };
+    const page = createProviderCandidateEnvelope({ candidates: [], complete: false, digest: 'page', nextCursor: '2', provider: 'anilist', truncated: true });
+    await searchFavoriteProviderPage({ search: async () => page }, aliases, 'anilist', 20, checkpoint);
     const previous = await checkpoint.read('anilist');
-    await expect(searchFavoriteProviderPage({ search: async () => { throw new Error('offline'); } }, query, 'anilist', 20, checkpoint)).rejects.toThrow('offline');
+    await expect(searchFavoriteProviderPage({ search: async () => { throw new Error('offline'); } }, aliases, 'anilist', 20, checkpoint)).rejects.toThrow('offline');
     expect(await checkpoint.read('anilist')).toEqual(previous);
-    const failedWrite = { ...checkpoint, save: async (_value: FavoriteSearchCheckpoint) => { throw new Error('interrupted'); } };
-    await expect(searchFavoriteProviderPage({ search: async () => ({ ...page, nextCursor: '3' }) }, query, 'anilist', 20, failedWrite)).rejects.toThrow('interrupted');
+    const fresh = checkpointPort();
+    const failedWrite = { ...fresh, save: async (_value: FavoriteSearchCheckpoint) => { throw new Error('interrupted'); } };
+    await expect(searchFavoriteProviderPage({ search: async () => page }, aliases, 'anilist', 20, failedWrite)).rejects.toThrow('interrupted');
     expect(await checkpoint.read('anilist')).toEqual(previous);
   });
 });

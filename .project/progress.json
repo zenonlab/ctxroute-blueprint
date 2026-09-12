@@ -7698,6 +7698,175 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-pipeline-hardening",
+      "title": "Corriger et certifier la pipeline FavLib vers TobiRink",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Rendre la résolution fournisseur bornée et indépendante du collectif",
+          "status": "DONE",
+          "acceptance": [
+            "Kitsu Anime and Manga use valid media-specific fields in live and mocked requests",
+            "Provider searches stop within a documented bounded candidate and page budget while preserving deterministic ambiguity and terminal no-match",
+            "A collective outage never discards a provider resolution and resolved identity remains visible before deferred metadata hydration"
+          ],
+          "files": [
+            "docs/plans/favorite-pipeline-hardening.json",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/kitsu-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/mangaupdates-provider-adapter.test.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.ts",
+            "packages/adapters-browser/src/favorites/anilist-provider-adapter.test.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.test.ts",
+            "packages/application/src/favorites/resolve-provider-lanes.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/decisions/ADR-0037-deterministic-favorite-resolution.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/application",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Kitsu live anime and manga probes return HTTP 200 with expected identities",
+            "Adapters-browser 70/70 and application 331/331 tests pass",
+            "npm run verify and favorite-resolution Archify showcase 9/9 pass"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Corriger le consentement et le cache collectif D1",
+          "status": "TODO",
+          "acceptance": [
+            "Public parsing rules are readable without owner registration or contribution consent",
+            "Public cache publication requires the documented trust threshold and versioned key semantics",
+            "D1 stores only approved public identifiers versions and sortable metadata without private source text or URLs"
+          ],
+          "files": [
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/favorite-owner-runtime.ts",
+            "apps/extension/runtime/favorite-owner-runtime.test.ts",
+            "apps/worker/migrations/0005_public_favorite_cache.sql",
+            "packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts",
+            "packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.test.ts",
+            "packages/application/src/favorites/favorite-collective.ts",
+            "packages/application/src/favorites/favorite-collective.test.ts",
+            "docs/decisions/ADR-0043-cache-first-favorite-reconstruction.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-cloudflare",
+            "npm test --workspace @tobirink/worker",
+            "npm test --workspace @tobirink/extension",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Rendre reconstruction sync scans et couvertures réellement durables",
+          "status": "TODO",
+          "acceptance": [
+            "storage.sync restores only the newest valid generation plus its validated rollback generation and retires stale fragments within quota",
+            "Bookmark mutations reconcile incrementally and periodic full scans remain resumable",
+            "Cover ingestion and repair use durable bounded tasks and R2 fallback is populated and testable without hotlink dependence"
+          ],
+          "files": [
+            "packages/application/src/recovery/provider-identity-snapshot.ts",
+            "packages/application/src/recovery/provider-identity-snapshot.test.ts",
+            "packages/application/src/recovery/provider-identity-sync.ts",
+            "packages/application/src/recovery/provider-identity-sync.test.ts",
+            "apps/extension/runtime/provider-identity-recovery-runtime.ts",
+            "apps/extension/runtime/provider-identity-recovery-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/worker/src/media/cover-routes.ts",
+            "packages/adapters-cloudflare/src/media/cover-master-adapter.ts",
+            "docs/decisions/ADR-0043-cache-first-favorite-reconstruction.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/worker",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Remplacer le faux oracle par un différentiel FavLib réel et anonymisé",
+          "status": "TODO",
+          "acceptance": [
+            "The harness executes both FavLib reference behavior and TobiRink behavior over representative readonly inputs",
+            "Every difference is classified as intentional improvement retained behavior or regression",
+            "Committed fixtures contain no private title URL folder progress secret or database content"
+          ],
+          "files": [
+            "scripts/parser-equivalence/semantic-coverage.test.ts",
+            "scripts/parser-equivalence/favlib-differential.test.ts",
+            "packages/application/src/favorites/canonical-equivalence-runner.ts",
+            "packages/application/src/favorites/equivalence-oracle.test.ts",
+            "packages/application/src/favorites/equivalence-corpus.ts",
+            "docs/favorite-resolution-correction-plan.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:parser-equivalence",
+            "npm run validate:docs",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Certifier une release locale installable sans déployer",
+          "status": "TODO",
+          "acceptance": [
+            "Fresh Chromium and Firefox installations converge across anime manga manhwa unknown retry reset and MV3 restart scenarios",
+            "Remote read-only probes confirm expected provider Worker D1 and R2 contracts without mutating production",
+            "Reproducible versioned ZIPs and hashes are produced only after all repository security quota migration and UI gates pass"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "apps/extension/tests/installed-favorite-resolution.test.ts",
+            "apps/worker/src/index.test.ts",
+            "docs/release.md",
+            "docs/browser-support.md",
+            "docs/architecture/src/production-publication.dataflow.json",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- production-publication.dataflow",
+            "npm audit",
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

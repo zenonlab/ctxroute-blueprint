@@ -352,3 +352,11 @@
 ## Normalize structural routing identifiers before favorite resolution — DONE
 
 - [x] **Extract a clean work title from structurally proven routes** — DONE _(evidence: Asura 0906168628 prefix and Manhwaz 006 suffix normalize to clean work titles while preserving chapter progression and raw route evidence; intrinsic-number regression cases pass., Provider-resolution and import regression tests confirm only the clean alias is searched and affected existing artifacts are reparsed without a global parser-version invalidation., npm run verify passed with exit 0; favorite-resolution.dataflow passed Archify showcase 9/9 with zero errors or warnings; git diff --check passed.)_
+
+## Corriger et certifier la pipeline FavLib vers TobiRink — ACTIVE
+
+- [x] **Rendre la résolution fournisseur bornée et indépendante du collectif** — DONE _(evidence: Kitsu live anime and manga probes return HTTP 200 with expected identities, Adapters-browser 70/70 and application 331/331 tests pass, npm run verify and favorite-resolution Archify showcase 9/9 pass)_
+- [ ] **Corriger le consentement et le cache collectif D1** — PENDING
+- [ ] **Rendre reconstruction sync scans et couvertures réellement durables** — PENDING
+- [ ] **Remplacer le faux oracle par un différentiel FavLib réel et anonymisé** — PENDING
+- [ ] **Certifier une release locale installable sans déployer** — PENDING

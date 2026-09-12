@@ -117,7 +117,7 @@ describe('runFavoriteResolutionSlice', () => {
     if (cached) expect(works[0]?.id).toBe(favoriteCandidateWorkId(md));
     expect(works[0]).toMatchObject({ hydration: { candidate: { provider: 'mangaupdates' } }, externalReferences: expect.arrayContaining([{ provider: 'mangadex', externalId: mdId }, { provider: 'mangaupdates', externalId: '12345' }]) });
   });
-  it('resumes the exact MangaUpdates identity from D1 after a paginated 405 recovery', async () => {
+  it('keeps an exact MangaUpdates identity retryable when bounded 405 recovery cannot return that ID', async () => {
     const { storage, task, outbox } = await fixture();
     await importFavoriteSources([{ ...favorite, url: 'https://reader.example/manga/frieren' }], storage, now);
     const manga = { ...candidate, provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const };
@@ -135,16 +135,14 @@ describe('runFavoriteResolutionSlice', () => {
       libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-manga',
     };
     await runFavoriteResolutionSlice(dependencies);
-    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:01.000Z' });
-    clock = '2026-09-07T12:00:02.000Z';
-    await runFavoriteResolutionSlice(dependencies);
-    expect(pages).toEqual([undefined, '2']);
-    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
-    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:15:00.000Z' });
+    expect(pages).toEqual([undefined]);
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
+    expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
     expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
 
-  it('checkpoints provider evidence during a D1 outage and consults the owner before committing', async () => {
+  it('commits provider evidence while the optional collective is unavailable', async () => {
     const { outbox, storage } = await fixture();
     let clock = now;
     let offline = true;
@@ -159,7 +157,7 @@ describe('runFavoriteResolutionSlice', () => {
     };
     await runFavoriteResolutionSlice(dependencies);
     expect(searches).toBe(1);
-    expect(await storage.getLibrary(libraryId('library_primary'))).toBeUndefined();
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
     offline = false;
     clock = '2026-09-07T12:16:00.000Z';
     await runFavoriteResolutionSlice(dependencies);
@@ -507,7 +505,7 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
 
-  it('resumes more than eight normal pages across rescans without exhausting the failure counter', async () => {
+  it('bounds provider pagination to the first relevance window', async () => {
     const { outbox, storage, task } = await fixture();
     let clock = new Date(now).valueOf();
     const requestedPages: string[] = [];
@@ -521,18 +519,12 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'),
       now: () => new Date(clock).toISOString(), outbox, storage, token: () => 'resume-token',
     };
-    for (let page = 1; page <= 10; page += 1) {
-      await importFavoriteSources([favorite], storage, dependencies.now());
-      const result = await runFavoriteResolutionSlice(dependencies);
-      expect(result.blocked).toBe(0);
-      if (page < 10) {
-        expect(result.completed).toBe(0);
-        expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
-      }
-      clock += 1_001;
-    }
-    expect(requestedPages).toEqual(Array.from({ length: 10 }, (_, index) => String(index + 1)));
-    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+    await importFavoriteSources([favorite], storage, dependencies.now());
+    const result = await runFavoriteResolutionSlice(dependencies);
+    expect(result.blocked).toBe(0);
+    expect(requestedPages).toEqual(['1']);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
 });
 

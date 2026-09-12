@@ -14,9 +14,9 @@ const posterImageSchema = z.object({
 }).passthrough();
 const attributesSchema = z.object({
   abbreviatedTitles: z.array(nonEmptyString).max(16),
-  ageRating: nonEmptyString.nullable(),
+  ageRating: nonEmptyString.nullable().optional(),
   canonicalTitle: nonEmptyString,
-  nsfw: z.boolean(),
+  nsfw: z.boolean().optional(),
   slug: nonEmptyString,
   subtype: nonEmptyString.nullable(),
   status: nonEmptyString.optional(), startDate: nonEmptyString.nullable().optional(), endDate: nonEmptyString.nullable().optional(),
@@ -37,6 +37,11 @@ type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCa
 
 function kind(provider: KitsuProvider): 'anime' | 'manga' {
   return provider === 'kitsu-anime' ? 'anime' : 'manga';
+}
+
+function sparseFields(provider: KitsuProvider): string {
+  const common = ['slug', 'canonicalTitle', 'titles', 'abbreviatedTitles', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'posterImage'];
+  return [...common, ...(provider === 'kitsu-anime' ? ['nsfw', 'episodeCount'] : ['chapterCount', 'volumeCount'])].join(',');
 }
 
 function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCandidate {
@@ -72,7 +77,7 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCa
 
 function endpoint(provider: KitsuProvider, id?: string): string {
   const media = kind(provider);
-  if (id !== undefined) return `${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}?fields[${media}]=slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating,status,startDate,endDate,episodeCount,chapterCount,volumeCount,userCount,posterImage`;
+  if (id !== undefined) return `${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}?fields[${media}]=${sparseFields(provider)}`;
   return `${kitsuApiOrigin}/${media}`;
 }
 
@@ -92,7 +97,7 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
     url.searchParams.set('filter[text]', query.titles[0] ?? '');
     url.searchParams.set('page[limit]', String(query.limit));
     url.searchParams.set('page[offset]', String((page - 1) * query.limit));
-    url.searchParams.set(`fields[${media}]`, 'slug,canonicalTitle,titles,abbreviatedTitles,subtype,nsfw,ageRating,status,startDate,endDate,episodeCount,chapterCount,volumeCount,userCount,posterImage');
+    url.searchParams.set(`fields[${media}]`, sparseFields(this.provider));
     const response = await this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, url.href, { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, searchSchema));
     const candidates = response.value.data.map((resource) => candidate(resource, this.provider));
     const truncated = response.value.links.next != null || response.value.meta.count > (page - 1) * query.limit + candidates.length;

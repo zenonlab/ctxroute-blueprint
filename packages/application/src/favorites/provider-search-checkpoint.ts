@@ -10,6 +10,10 @@ import { favoriteProviderPage, favoriteProviderPolicy } from './provider-ports';
 import type { FavoriteProviderCandidatePort, FavoriteProviderSearchQuery, ResolutionProvider } from './provider-ports';
 
 const levels = ['source-id', 'source-url', 'ordered-exact', 'explicit-season', 'reordered-significant-words', 'bounded-edit-distance'] as const;
+// Discovery endpoints are relevance-ranked searches, not catalogue exports.
+// Inspect one bounded result window for at most four independent local aliases;
+// exhausting thousands of remote pages cannot strengthen a title proof.
+export const favoriteProviderSearchWindow = Object.freeze({ aliases: 4, pagesPerAlias: 1, version: 2 });
 const text = z.string().min(1).max(1024);
 const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
@@ -72,18 +76,18 @@ export async function searchFavoriteProviderPage(
   port: FavoriteProviderCandidatePort, query: FavoriteTitleMatchQuery, provider: ResolutionProvider, limit: number,
   checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<FavoriteProviderSearchStep> {
-  const base: MutableProviderSearchQuery = { limit, provider, titles: query.sourceTitles };
+  const boundedTitles = query.sourceTitles.slice(0, favoriteProviderSearchWindow.aliases);
+  const base: MutableProviderSearchQuery = { limit, provider, titles: boundedTitles };
   if (query.explicitProviderReference?.provider === provider) base.explicitProviderReference = query.explicitProviderReference;
   if (checkpoints === undefined) return { kind: 'ENVELOPE', envelope: await port.search(base) };
   const stored = await checkpoints.read(provider);
-  const queryBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(query)));
+  const queryBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([favoriteProviderSearchWindow.version, { ...query, sourceTitles: boundedTitles }])));
   const queryDigest = [...new Uint8Array(queryBytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
   const age = stored === undefined ? -1 : checkpoints.now() - stored.startedAt;
   const previous = stored !== undefined && stored.queryDigest === queryDigest && age >= 0 && age <= favoriteProviderPolicy.positiveTtlMs ? stored : undefined;
   if (previous?.complete) return { kind: 'ENVELOPE', envelope: createProviderCandidateEnvelope({ candidates: previous.candidates, complete: true, digest: previous.digest, provider, truncated: false }) };
-  if ((previous?.pages ?? 0) >= 1000) throw new Error('PROVIDER_PAGINATION_BUDGET_EXHAUSTED');
   const titleIndex = previous?.titleIndex ?? 0;
-  const title = query.sourceTitles[titleIndex];
+  const title = boundedTitles[titleIndex];
   if (title === undefined) throw new Error('STALE_SEARCH_CHECKPOINT');
   const search = { ...base, titles: [title] };
   const page = await port.search(previous?.cursor === undefined ? search : { ...search, cursor: previous.cursor });
@@ -100,15 +104,16 @@ export async function searchFavoriteProviderPage(
     for (const value of page.candidates) if (references.has(candidateKey(value))) selected.set(candidateKey(value), value);
   }
   const candidates = [...selected.values()].sort((left, right) => candidateKey(left).localeCompare(candidateKey(right))).slice(0, limit);
-  const completedTitle = page.complete && !page.truncated && page.nextCursor === undefined;
-  const complete = completedTitle && titleIndex === query.sourceTitles.length - 1;
+  const completedTitle = true;
+  const strongEvidence = nextLevel >= 0 && nextLevel <= levels.indexOf('explicit-season') && evidence.candidateReferences.length > 0;
+  const complete = strongEvidence || titleIndex === boundedTitles.length - 1;
   const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([previous?.digest ?? '', page.digest, candidates])));
   const digest = [...new Uint8Array(digestBytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const next = {
     candidates, complete, digest, queryDigest, level: levels[Math.min(nextLevel, previousLevel)], pages: (previous?.pages ?? 0) + 1,
     provider, startedAt: previous?.startedAt ?? checkpoints.now(), titleIndex: completedTitle && !complete ? titleIndex + 1 : titleIndex, version: 1,
   };
-  const checkpoint = favoriteSearchCheckpointSchema.parse(page.nextCursor === undefined ? next : { ...next, cursor: page.nextCursor });
+  const checkpoint = favoriteSearchCheckpointSchema.parse(next);
   await checkpoints.save(checkpoint);
   return complete ? { kind: 'ENVELOPE', envelope: createProviderCandidateEnvelope({ candidates, complete: true, digest, provider, truncated: false }) } : { kind: 'PAGE_PENDING' };
 }

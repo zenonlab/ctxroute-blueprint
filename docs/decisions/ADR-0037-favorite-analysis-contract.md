@@ -35,8 +35,10 @@ sont séparés par fournisseur et usage (résolution ou métadonnées), liés au
 digest de la requête, et couvrent les cinq fournisseurs. Les références
 croisées modernes MangaDex→MangaUpdates sont converties depuis le slug base36;
 un ancien identifiant décimal `series.html` ne devient jamais un ID API.
-L'hydratation MangaUpdates exacte reste prioritaire; ses erreurs gardent la
-tâche réessayable. La complétude MangaDex suit `offset`, `limit` et `total`.
+L'hydratation MangaUpdates exacte reste prioritaire. Une panne de recherche
+garde la résolution réessayable; une panne d'enrichissement ne retire jamais
+une identité déjà prouvée. Kitsu utilise des champs JSON:API distincts pour
+Anime et Manga afin que le fallback reste réellement interrogeable.
 
 Le [plan de correction v3](../systems/favorite-resolution-correction-plan.md)
 possède la pipeline, les 30 écarts, migrations et critères d'équivalence.
@@ -86,20 +88,26 @@ rang, ordre, couverture et premier résultat sont interdits comme preuves.
 OVA/pré-sérialisation restent des compatibilités symétriques; taxonomie
 éditoriale s'applique après hydratation, sans fabriquer une identité.
 
-Payload valide, pagination et exhaustivité sont distincts. La limite de
-20 candidats est par page; l'absence/unicité doit porter sur l'ensemble
-pertinent prouvé, pas sur la première page. Le curseur et jusqu'à trois aliases
-sont persistés; budget atteint ou page manquante reste RETRYABLE. Une panne
-ne doit pas boucler sur une page déjà attestée ni devenir no-match humain.
+Payload valide, pagination du catalogue et fenêtre de recherche sont distincts.
+Un endpoint de découverte classé par pertinence n'est jamais parcouru comme un
+export de catalogue : la résolution inspecte au plus une page de 20 à 25
+résultats pour chacun des quatre premiers aliases distincts. Le matcher compare
+toutes les identités du meilleur niveau dans cette fenêtre; l'ordre du
+fournisseur ne constitue toujours aucune preuve. Une identité exacte ou une
+saison corroborée unique termine immédiatement la recherche. Un résultat faible
+continue sur les aliases bornés. Le fallback reçoit `NO_MATCH` seulement après
+l'épuisement de cette fenêtre; une erreur de transport reste `RETRYABLE`.
 
-L'implémentation locale v3 utilise des checkpoints de pages par fournisseur
-dans l'artefact privé, liés au fingerprint et au claim courant. Elle retient
-au plus 20 identités au meilleur niveau de preuve, attend la fin des pages et
-aliases, puis décide. La pagination normale ne consomme pas les huit tentatives
-réservées aux erreurs. `Retry-After` est persisté et peut reporter le réveil.
+L'implémentation locale v3 utilise des checkpoints par fournisseur dans
+l'artefact privé, liés au fingerprint, à la version de fenêtre et au claim
+courant. Elle retient au plus 20 identités au meilleur niveau de preuve et
+avance d'un alias par réveil lorsque la preuve reste faible ou absente.
+`Retry-After` est persisté et peut reporter le réveil.
 Les aliases mémorisés dans Work doivent eux-mêmes correspondre à la fiche
 hydratée; un libellé libre du favori ne devient pas un alias par simple voisinage.
-Le port collectif strict reçoit seulement une clé SHA-256 liée au titre
+Une indisponibilité du collectif n'annule jamais une correspondance locale ou
+fournisseur; la préférence personnelle déjà disponible reste prioritaire. Le
+port collectif strict reçoit seulement une clé SHA-256 liée au titre
 normalisé/type/saison et les versions; ses références équivalentes sont
 hydratées suivant la priorité fournisseur. L'adaptateur HTTP authentifié et
 la distribution effective des règles sont raccordés à l'étape Worker/D1.
@@ -112,8 +120,9 @@ restent explicites et les DTO Zod stricts à chaque frontière.
 
 L'outbox reste dans `tobirink-private`, jamais dans la base de notifications.
 Source/artefact/tâche sont atomiques avant réseau; claims indexés par lane,
-état/échéance, au plus huit tâches et 20 s par réveil. Résultat, hydratation,
-lien Work et reçu sont commités atomiquement. Les checkpoints et cadences
+état/échéance, au plus huit tâches et 20 s par réveil. L'identité, le lien Work
+et le reçu sont commités atomiquement dès la preuve; l'hydratation plus riche
+peut être réparée séparément. Les checkpoints et cadences
 survivent à MV3; réseau au-moins-une-fois et effets locaux idempotents.
 Les migrations des anciens v6/v7/v8 sont additives et préservent les décisions
 humaines; les pending d'import sont masquées et réenfilées avec reçus.
