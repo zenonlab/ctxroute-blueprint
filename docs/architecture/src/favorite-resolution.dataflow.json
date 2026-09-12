@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Checkpoints distincts; titres locaux visibles avant hydratation; le réveil MV3 reprend la prochaine page durable."
+        "note": "Titres locaux visibles avant hydratation; toute restauration, publication ou page incomplète programme le réveil MV3 suivant."
       },
       {
         "id": "cover-rights",

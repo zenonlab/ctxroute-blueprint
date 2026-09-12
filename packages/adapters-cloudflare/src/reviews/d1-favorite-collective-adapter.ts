@@ -32,6 +32,13 @@ const choicesSql = `INSERT INTO favorite_choices(owner_id, key_id, identity_hash
   WHERE favorite_choices.confirmed = 0 OR excluded.confirmed = 1`;
 const decisionsSql = `INSERT OR IGNORE INTO favorite_decisions(owner_id, nonce, choices_json)
   SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?1 AND nonce = ?2 AND execution_id = ?4)`;
+const publicCacheSql = `INSERT OR IGNORE INTO favorite_public_cache(
+    fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, candidate_json, created_at)
+  SELECT json_extract(value, '$.key.fingerprint'), json_extract(value, '$.mediaKind'), json_extract(value, '$.identityHash'),
+    json_extract(value, '$.key.parserVersion'), json_extract(value, '$.key.siteRulesVersion'), json_extract(value, '$.references'),
+    json_extract(value, '$.candidate'), ?5 FROM json_each(?1)
+  WHERE json_type(value, '$.candidate') = 'object'
+    AND EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?2 AND nonce = ?3 AND execution_id = ?4)`;
 
 // Each key reads one owner row or at most two indexed, active shared identities.
 export const favoriteLookupReceiptSql = `UPDATE favorite_receipts SET response_json = json_set(response_json, '$.results', json((
@@ -121,7 +128,7 @@ export class D1FavoriteCollectiveAdapter implements FavoriteCollectiveServicePor
         return { ...choice, references, keyId: await collectiveDigest(JSON.stringify([1, choice.key.mediaKind, choice.key.fingerprint])), identityHash: await collectiveDigest(JSON.stringify([choice.mediaKind, references])) };
       }));
       const payload = JSON.stringify(choices);
-      statements.push(this.database.prepare(keysSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(choicesSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(decisionsSql).bind(ownerId, command.nonce, payload, executionId));
+      statements.push(this.database.prepare(keysSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(choicesSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(decisionsSql).bind(ownerId, command.nonce, payload, executionId), this.database.prepare(publicCacheSql).bind(payload, ownerId, command.nonce, executionId, now));
     } else if (command.operation === 'lookup') {
       const keys = await Promise.all(command.keys.map(async (key) => ({ ...key, keyId: await collectiveDigest(JSON.stringify([1, key.mediaKind, key.fingerprint])) })));
       statements.push(this.database.prepare(favoriteLookupReceiptSql).bind(ownerId, command.nonce, executionId, JSON.stringify(keys)));

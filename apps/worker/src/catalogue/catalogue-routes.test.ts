@@ -52,6 +52,20 @@ describe('public D1 catalogue', () => {
     expect(boundedWork.work.titles).toHaveLength(32);
   });
 
+  it('returns one public cached candidate and refuses an ambiguous fingerprint', async () => {
+    const fingerprint = 'a'.repeat(64);
+    const candidate = { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] };
+    const insert = env.COLLECTIVE_DB.prepare(`INSERT INTO favorite_public_cache
+      (fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, candidate_json, created_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`);
+    await insert.bind(fingerprint, 'ANIME', 'b'.repeat(64), 'parser-v4', 'rules-v3', '[{"provider":"anilist","externalId":"154587"}]', JSON.stringify(candidate), 1).run();
+    const url = new URL('https://tobirink.test/v1/catalogue/favorites/resolve');
+    for (const [name, value] of Object.entries({ fingerprint, mediaKind: 'ANIME', parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3' })) url.searchParams.set(name, value);
+    expect(await (await SELF.fetch(url)).json()).toEqual({ candidate });
+    await insert.bind(fingerprint, 'ANIME', 'c'.repeat(64), 'parser-v4', 'rules-v3', '[{"provider":"kitsu-anime","externalId":"1"}]', JSON.stringify({ ...candidate, externalId: '1', provider: 'kitsu-anime' }), 1).run();
+    expect((await SELF.fetch(url)).status).toBe(404);
+  });
+
   it('searches exact titles case-insensitively with a stable bound', async () => {
     await env.COLLECTIVE_DB.batch([
       env.COLLECTIVE_DB.prepare('INSERT INTO catalogue_works (work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)').bind('work_frieren_anime', 'anime', 'Frieren anime', 2),

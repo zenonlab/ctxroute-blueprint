@@ -140,7 +140,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
         const work = await this.storage.getWork(id);
         if (work?.hydration === undefined || record?.artifact.identityKey === undefined) continue;
         const key = await favoriteCollectiveKey(record.artifact);
-        const choice = favoriteCollectiveChoiceSchema.safeParse({ key, mediaKind: work.hydration.candidate.mediaKind, references: work.externalReferences, confirmed: review?.status === 'resolved' && review.decisionOrigin === 'human' });
+        const choice = favoriteCollectiveChoiceSchema.safeParse({ key, mediaKind: work.hydration.candidate.mediaKind, references: work.externalReferences, candidate: work.hydration.candidate, confirmed: review?.status === 'resolved' && review.decisionOrigin === 'human' });
         if (!choice.success) continue;
         const keyId = await collectiveDigest(JSON.stringify(key));
         if (state.sent[keyId] !== await collectiveDigest(JSON.stringify(choice.data))) choices.set(keyId, choice.data);

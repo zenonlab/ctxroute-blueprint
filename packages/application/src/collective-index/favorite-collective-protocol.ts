@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { favoriteCollectiveKeySchema, favoriteCollectiveLookupQuerySchema, favoriteCollectiveLookupResultSchema, favoritePublicReferenceSchema } from './favorite-collective-lookup';
 import { favoriteSiteRulesSchema } from '../favorites/site-rules';
 import type { FavoriteSiteRules } from '../favorites/site-rules';
+import { providerCandidateSchema } from '../favorites/provider-search-checkpoint';
 
 export const collectiveOpaqueIdSchema = z.uuid();
 export const collectiveTokenSchema = z.string().regex(/^[a-f0-9]{64}$/u);
@@ -13,8 +14,11 @@ export const favoriteCollectiveChoiceSchema = z.strictObject({
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
   references: z.array(favoritePublicReferenceSchema).min(1).max(5).refine((refs) => new Set(refs.map((ref) => ref.provider)).size === refs.length),
   confirmed: z.boolean(),
+  candidate: providerCandidateSchema.optional(),
 }).refine((choice) => choice.key.mediaKind === 'UNKNOWN' || choice.key.mediaKind === choice.mediaKind)
-  .refine((choice) => choice.references.every((ref) => choice.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'].includes(ref.provider) : ref.provider !== 'kitsu-anime'));
+  .refine((choice) => choice.references.every((ref) => choice.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'].includes(ref.provider) : ref.provider !== 'kitsu-anime'))
+  .refine((choice) => choice.candidate === undefined || choice.candidate.mediaKind === choice.mediaKind)
+  .refine((choice) => choice.candidate === undefined || choice.references.some((reference) => reference.provider === choice.candidate?.provider && reference.externalId === choice.candidate.externalId));
 export const favoriteCollectiveCommandSchema = z.discriminatedUnion('operation', [
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('lookup'), nonce: collectiveOpaqueIdSchema, keys: favoriteCollectiveLookupQuerySchema }),
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('contribute'), nonce: collectiveOpaqueIdSchema, choices: z.array(favoriteCollectiveChoiceSchema).min(1).max(50).refine((choices) => new Set(choices.map(({ key }) => key.fingerprint)).size === choices.length) }),

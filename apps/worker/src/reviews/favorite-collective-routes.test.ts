@@ -23,6 +23,16 @@ async function results(adapter: D1FavoriteCollectiveAdapter, credentials: Favori
 }
 
 describe('favorite owner SQL index', () => {
+  it('ingests validated public candidate metadata idempotently through an authenticated contribution', async () => {
+    const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB); const credentials = await owner(adapter);
+    const candidate = { externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic public title'], genres: ['Adventure'], startYear: 2026 };
+    const command: FavoriteCollectiveCommand = { schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [{ key, mediaKind: 'ANIME', references: [{ provider: 'anilist', externalId: '1' }], candidate, confirmed: false }] };
+    expect((await adapter.execute(credentials, command, 100)).kind).toBe('ACCEPTED');
+    expect((await adapter.execute(credentials, command, 100)).kind).toBe('ACCEPTED');
+    const rows = await env.COLLECTIVE_DB.prepare('SELECT candidate_json AS candidate FROM favorite_public_cache WHERE fingerprint = ?1').bind(key.fingerprint).all<{ candidate: string }>();
+    expect(rows.results.map((row) => JSON.parse(row.candidate))).toEqual([candidate]);
+  });
+
   it('enforces the quota atomically under distinct concurrent nonces', async () => {
     const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB); const credentials = await owner(adapter);
     const outcomes = await Promise.all([adapter.execute(credentials, contribute('1'), 1), adapter.execute(credentials, contribute('2'), 1)]);

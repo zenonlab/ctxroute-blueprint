@@ -1,6 +1,6 @@
-import { createWork, workId } from '@tobirink/domain';
+import { createWork, favoriteSourceId, workId } from '@tobirink/domain';
 import { z } from 'zod';
-import { favoritePublicReferenceSchema } from '../collective-index/favorite-collective-lookup';
+import { favoriteCollectiveKey, favoritePublicReferenceSchema } from '../collective-index/favorite-collective-lookup';
 import { favoriteCandidateWorkId } from '../favorites/favorite-resolution-commit';
 import { favoriteMatcherVersion, hasExactBlockedProviderTaxonomy } from '../favorites/provider-matcher';
 import { FavoriteProviderRetryError, favoriteProviderPolicy } from '../favorites/provider-ports';
@@ -12,7 +12,10 @@ import type { SyncedProviderIds } from './provider-identity-snapshot';
 
 export const providerIdentityRecoveryStateSchema = z.strictObject({
   schemaVersion: z.literal(1),
-  scan: z.strictObject({ afterId: z.string().min(1).max(256).optional(), complete: z.boolean(), ids: syncedProviderIdsSchema }).optional(),
+  scan: z.strictObject({
+    afterId: z.string().min(1).max(256).optional(), complete: z.boolean(), ids: syncedProviderIdsSchema,
+    sourceAfterId: z.string().min(1).max(256).optional(), worksComplete: z.boolean().optional(),
+  }).optional(),
   restoration: z.strictObject({ digest: z.string().regex(/^[a-f0-9]{64}$/u), index: z.number().int().min(0).max(100000), complete: z.boolean(), missingCount: z.number().int().nonnegative(), retryAt: z.number().int().nonnegative().optional(), deferred: z.array(z.strictObject({ index: z.number().int().min(0).max(100000), retryAt: z.number().int().nonnegative() })).max(100000).refine(items => new Set(items.map(item => item.index)).size === items.length).optional() }).optional(),
 });
 export type ProviderIdentityRecoveryState = z.infer<typeof providerIdentityRecoveryStateSchema>;
@@ -24,16 +27,45 @@ export interface ProviderIdentityRecoveryStatePort {
 export async function scanHydratedProviderIds(storage: StoragePort, checkpoints: ProviderIdentityRecoveryStatePort): Promise<{ readonly complete: boolean; readonly ids: SyncedProviderIds }> {
   const state = providerIdentityRecoveryStateSchema.parse(await checkpoints.read() ?? { schemaVersion: 1 });
   if (state.scan?.complete) return { complete: true, ids: state.scan.ids };
-  const page = await storage.listWorks(state.scan?.afterId === undefined ? { limit: 100 } : { afterId: workId(state.scan.afterId), limit: 100 });
-  const additions = emptySyncedProviderIds();
-  for (const work of page) for (const reference of work.externalReferences) {
-    const parsed = favoritePublicReferenceSchema.safeParse(reference);
-    if (parsed.success) additions[providerIdFields[parsed.data.provider]].push(parsed.data.externalId);
+  let ids = state.scan?.ids ?? emptySyncedProviderIds();
+  let afterId = state.scan?.afterId;
+  let worksComplete = state.scan?.worksComplete ?? false;
+  if (!worksComplete) {
+    const page = await storage.listWorks(afterId === undefined ? { limit: 100 } : { afterId: workId(afterId), limit: 100 });
+    const additions = emptySyncedProviderIds();
+    for (const work of page) for (const reference of work.externalReferences) {
+      const parsed = favoritePublicReferenceSchema.safeParse(reference);
+      if (parsed.success) additions[providerIdFields[parsed.data.provider]].push(parsed.data.externalId);
+    }
+    ids = mergeSyncedProviderIds(ids, additions);
+    worksComplete = page.length < 100;
+    afterId = page.at(-1)?.id;
+    if (!worksComplete) {
+      const scan = afterId === undefined ? { complete: false, ids, worksComplete } : { afterId, complete: false, ids, worksComplete };
+      await checkpoints.save({ ...state, scan });
+      return { complete: false, ids };
+    }
   }
-  const ids = mergeSyncedProviderIds(state.scan?.ids ?? emptySyncedProviderIds(), additions);
-  const complete = page.length < 100;
-  const afterId = page.at(-1)?.id;
-  const scan = afterId === undefined ? { complete, ids } : { afterId, complete, ids };
+  const sourcePage = await storage.listFavoriteSources(state.scan?.sourceAfterId === undefined
+    ? { limit: 100 }
+    : { afterId: favoriteSourceId(state.scan.sourceAfterId), limit: 100 });
+  const associations = [];
+  for (const source of sourcePage) {
+    if (source.presence !== 'observed' || source.resolution?.kind !== 'RESOLVED' || source.matchedWorkId === undefined) continue;
+    const [record, work] = await Promise.all([storage.getFavoriteParseArtifact(source.id), storage.getWork(source.matchedWorkId)]);
+    if (record?.artifact.identityKey === undefined || work?.hydration === undefined) continue;
+    const key = await favoriteCollectiveKey(record.artifact);
+    const references = work.externalReferences.flatMap((reference) => {
+      const parsed = favoritePublicReferenceSchema.safeParse(reference);
+      return parsed.success ? [parsed.data] : [];
+    }).slice(0, 5);
+    if (references.length === 0) continue;
+    associations.push({ fingerprint: key.fingerprint, mediaKind: work.hydration.candidate.mediaKind, parserVersion: key.parserVersion, references, siteRulesVersion: key.siteRulesVersion });
+  }
+  ids = mergeSyncedProviderIds(ids, { ...emptySyncedProviderIds(), associations, snapshotVersion: 2 });
+  const complete = sourcePage.length < 100;
+  const sourceAfterId = sourcePage.at(-1)?.id;
+  const scan = sourceAfterId === undefined ? { afterId, complete, ids, worksComplete } : { afterId, complete, ids, sourceAfterId, worksComplete };
   await checkpoints.save({ ...state, scan });
   return { complete, ids };
 }

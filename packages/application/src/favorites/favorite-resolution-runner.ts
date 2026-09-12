@@ -1,14 +1,15 @@
 import { createFavoriteSource, createProviderCandidate, createWork } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
+import { favoriteCollectiveKey, favoritePublicReferenceSchema, resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
+import type { FavoritePublicCacheReadPort } from '../ports/cloud-data-ports';
 import { parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
-import { hasExactBlockedProviderTaxonomy, matchFavoriteTitles } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
 import { normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
@@ -65,6 +66,8 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
 
 export interface FavoriteResolutionRunnerDependencies {
   readonly collective?: FavoriteCollectiveLookupPort;
+  readonly publicCache?: FavoritePublicCacheReadPort;
+  readonly synchronized?: FavoriteCollectiveLookupPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly hydration: FavoriteProviderHydrationPorts;
   readonly libraryId: LibraryId;
@@ -277,6 +280,45 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
         await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${local.provenance}`, candidate, undefined, { workId: local.work.id, hydratedAt: fresh ? cachedAt : undefined });
       }
     }
+    return 'completed';
+  }
+  const collectiveKey = await favoriteCollectiveKey(artifact);
+  let synchronizedLookup: Awaited<ReturnType<FavoriteCollectiveLookupPort['lookup']>> | undefined;
+  if (dependencies.synchronized !== undefined) {
+    try { synchronizedLookup = await dependencies.synchronized.lookup([collectiveKey]); }
+    catch { synchronizedLookup = undefined; }
+  }
+  if (dependencies.publicCache !== undefined) {
+    try {
+      const cached = await dependencies.publicCache.findFavoriteCandidate(collectiveKey);
+      if (cached !== undefined && !hasExactBlockedProviderTaxonomy(cached) && isProviderCandidateCompatible(matchQuery, cached)) {
+        const references = [{ provider: cached.provider, externalId: cached.externalId }, ...(cached.linkedReferences ?? [])]
+          .flatMap((reference) => {
+            const parsed = favoritePublicReferenceSchema.safeParse(reference);
+            return parsed.success ? [parsed.data] : [];
+          });
+        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-public-cache', cached, undefined, { references });
+        return 'completed';
+      }
+    } catch { /* A cache outage never changes provider resolution semantics. */ }
+  }
+  const synchronizedPort = synchronizedLookup === undefined ? undefined : { lookup: async () => synchronizedLookup };
+  const synchronized = await resolveFavoriteCollectiveIdentity(synchronizedPort, artifact, dependencies.hydration, false, (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
+  if (synchronized.kind === 'RETRYABLE') {
+    const retryAt = new Date(synchronized.retryAt === undefined ? timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs : Math.max(timestamp(dependencies.now()) + 1_000, synchronized.retryAt)).toISOString();
+    return retryClaim(dependencies, task, token, retryAt);
+  }
+  if (synchronized.kind === 'REVIEW_REQUIRED') {
+    await persistFavoriteResolutionCompletion(dependencies, task, token, synchronized, `review:sync-${synchronized.reason.toLowerCase()}`);
+    return 'completed';
+  }
+  if (synchronized.kind === 'RESOLVED') {
+    let candidate = synchronized.candidate;
+    try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
+      return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+    }
+    if (hasExactBlockedProviderTaxonomy(candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:synchronized-association', candidate, undefined, { references: synchronized.references });
     return 'completed';
   }
   const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS', (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));

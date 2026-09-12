@@ -1,9 +1,11 @@
 import type {
+  FavoriteCollectiveKey,
   PublicCatalogueReadPort,
   PublicCatalogueReference,
   PublicCatalogueTitle,
   PublicCatalogueWork,
 } from '@tobirink/application';
+import { providerCandidateSchema } from '@tobirink/application';
 
 type SqlValue = null | number | string;
 
@@ -84,5 +86,16 @@ export class D1PublicCatalogueAdapter implements PublicCatalogueReadPort {
       WHERE work_id = ?1 ORDER BY provider, external_id LIMIT ?2
     `).bind(workId, limit).all<PublicCatalogueReference>();
     return result.results;
+  }
+  async findFavoriteCandidate(key: FavoriteCollectiveKey) {
+    const rows = await this.database.prepare(`
+      SELECT candidate_json AS candidate FROM favorite_public_cache
+      WHERE fingerprint = ?1 AND (?2 = 'UNKNOWN' OR media_kind = ?2)
+        AND parser_version = ?3 AND rules_version = ?4
+      ORDER BY identity_hash LIMIT 2
+    `).bind(key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion).all<{ candidate: string }>();
+    if (rows.results.length !== 1) return undefined;
+    try { return providerCandidateSchema.parse(JSON.parse(rows.results[0]?.candidate ?? 'null')); }
+    catch { return undefined; }
   }
 }

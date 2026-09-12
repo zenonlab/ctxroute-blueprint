@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createLibrary, createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '../tasks';
 import { blockTask, claimTask, isTaskAvailable, retryTask } from '../tasks';
@@ -54,6 +54,20 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('commits a D1 public cache hit before any provider search or hydration', async () => {
+    const { storage, outbox } = await fixture();
+    const search = vi.fn(async () => { throw new Error('provider search must not run'); });
+    const hydrate = vi.fn(async () => { throw new Error('provider hydration must not run'); });
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox,
+      publicCache: { findFavoriteCandidate: async () => candidate }, storage, token: () => 'public-cache',
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0 });
+    expect(search).not.toHaveBeenCalled(); expect(hydrate).not.toHaveBeenCalled();
+    expect((await storage.listFavoriteSources({ limit: 10 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' }, matchedWorkId: favoriteCandidateWorkId(candidate) });
+  });
+
   it.each(['none', 'mangadex', 'mangaupdates'])('hydrates the linked primary ID and preserves existing work identity: %s', async (cachedProvider) => {
     const cached = cachedProvider !== 'none';
     const { storage, outbox } = await fixture();

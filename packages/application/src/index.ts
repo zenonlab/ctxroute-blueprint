@@ -31,6 +31,7 @@ export type {
   CoverRightsBasis,
   NormalizedCoverMaster,
   PublicCatalogueReadPort,
+  FavoritePublicCacheReadPort,
   PublicCatalogueReference,
   PublicCatalogueTitle,
   PublicCatalogueWork,

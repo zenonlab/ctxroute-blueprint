@@ -15,6 +15,7 @@ import {
   WebExtensionProviderIdentitySyncStateAdapter,
   WebExtensionFavoriteOwnerStateAdapter,
   HttpFavoriteCollectiveAdapter,
+  HttpFavoritePublicCacheAdapter,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
@@ -66,6 +67,7 @@ export default defineBackground({
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
     const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
     const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(browser.storage.local, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
+    const publicCache = configuredSiteOrigin ? new HttpFavoritePublicCacheAdapter(configuredSiteOrigin) : undefined;
     const identitySync = new WebExtensionProviderIdentitySyncAdapter(browser.storage.sync, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
       checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
@@ -97,8 +99,12 @@ export default defineBackground({
     };
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
-      beforeInventory: async () => { await ownerRuntime?.maintain().catch(() => undefined); },
+      beforeInventory: async () => {
+        await ownerRuntime?.enable().catch(() => undefined);
+        await ownerRuntime?.maintain().catch(() => undefined);
+      },
       collective: ownerRuntime,
+      publicCache,
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
@@ -106,6 +112,7 @@ export default defineBackground({
       hydration: providerPorts,
       libraryId: primaryLibraryId,
       identityRecovery,
+      synchronized: identityRecovery,
       now,
       outbox: resolutionOutbox,
       updateContinuation: (availableAt) => updateFavoriteResolutionContinuation(browser.alarms, availableAt),

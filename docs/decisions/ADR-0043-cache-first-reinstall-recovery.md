@@ -2,10 +2,12 @@
 scope:
   - packages/application/src/recovery/**
   - packages/application/src/favorites/**
+  - packages/application/src/collective-index/favorite-collective-protocol.ts
   - packages/application/src/ports/cloud-data-ports.ts
   - packages/adapters-browser/src/catalogue/**
   - packages/adapters-browser/src/recovery/**
   - packages/adapters-cloudflare/src/catalogue/**
+  - packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts
   - apps/extension/runtime/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/worker/migrations/**
@@ -15,12 +17,14 @@ scope:
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0043 — Reconstruction cache-first après réinstallation
 
 - Status: accepted
 - Date: 2026-09-12
+- Revised: 2026-09-12
 - Supersedes: les restrictions de l’ADR-0038 qui interdisaient toute métadonnée publique dans D1 et le snapshot sans associations de l’ADR-0037
 
 ## Contexte

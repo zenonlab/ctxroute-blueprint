@@ -77,7 +77,8 @@ describe('owner background recovery', () => {
     expect(test.commands).toEqual([pending, pending]);
     await test.runtime().maintain(); expect(test.commands).toHaveLength(2);
     const payload = JSON.stringify(pending);
-    expect(payload).not.toMatch(/Synthetic Series|Private synthetic folder|reader\.example/u);
+    expect(payload).toContain('Synthetic Series');
+    expect(payload).not.toMatch(/Private synthetic folder|reader\.example/u);
     expect(payload).toContain('"confirmed":false');
   });
 

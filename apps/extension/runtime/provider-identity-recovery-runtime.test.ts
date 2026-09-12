@@ -19,10 +19,10 @@ describe('provider identity recovery orchestration', () => {
       now: () => '2026-09-08T00:00:00.000Z', publisher: { publish }, storage: new MemoryStoragePort(),
       sync: { readAll: async () => values, write: vi.fn() },
     });
-    expect(await runtime.prepare()).toBe('READY');
+    expect(await runtime.prepare()).toEqual({ kind: 'COMPLETE', hydrated: 1 });
     expect(hydrate).toHaveBeenCalledExactlyOnceWith({ provider: 'anilist', externalId: '1' });
     expect(await runtime.publish()).toEqual({ kind: 'UNCHANGED' });
-    expect(publish).toHaveBeenCalledExactlyOnceWith(ids);
+    expect(publish).toHaveBeenCalledExactlyOnceWith({ ...ids, associations: [], snapshotVersion: 2 });
     expect(state?.scan).toBeUndefined();
     expect(state?.restoration?.complete).toBe(true);
   });
@@ -34,6 +34,6 @@ describe('provider identity recovery orchestration', () => {
       now: () => '2026-09-08T00:00:00.000Z', publisher: { publish: vi.fn() }, storage: new MemoryStoragePort(),
       sync: { readAll: async () => { throw new Error('Access level rejected'); }, write: vi.fn() },
     });
-    expect(await runtime.prepare()).toBe('RETRYABLE'); expect(unused.hydrate).not.toHaveBeenCalled();
+    expect(await runtime.prepare()).toMatchObject({ kind: 'RETRYABLE', hydrated: 0 }); expect(unused.hydrate).not.toHaveBeenCalled();
   });
 });

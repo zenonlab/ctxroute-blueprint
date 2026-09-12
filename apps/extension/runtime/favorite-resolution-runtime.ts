@@ -1,5 +1,5 @@
 import { importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoritePublicCacheReadPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
 import type { LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
@@ -9,6 +9,8 @@ import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
 export interface FavoriteResolutionRuntimeDependencies {
   readonly beforeInventory?: () => Promise<void>;
   readonly collective?: FavoriteCollectiveLookupPort;
+  readonly publicCache?: FavoritePublicCacheReadPort;
+  readonly synchronized?: FavoriteCollectiveLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
@@ -95,16 +97,19 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           diagnosticFailureCode = 'INVENTORY_UNAVAILABLE';
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
-        await dependencies.identityRecovery?.prepare();
+        const identityPreparation = await dependencies.identityRecovery?.prepare();
         const result = await runFavoriteResolutionSlice(dependencies);
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
         const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
         coverRepairAfterId = repairedCovers.nextAfterId;
         if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
-        await dependencies.identityRecovery?.publish();
+        const identityPublication = await dependencies.identityRecovery?.publish();
         if (inventoryFailure !== undefined) throw inventoryFailure;
-        if (!inventoryComplete || result.continuationRequired) return dependencies.now();
+        if (!inventoryComplete || result.continuationRequired || identityPreparation?.kind === 'PENDING' || identityPublication?.kind === 'SCANNING') return dependencies.now();
+        if (identityPreparation?.kind === 'RETRYABLE') return new Date(identityPreparation.retryAt).toISOString();
+        if (identityPublication?.kind === 'DEFERRED' || identityPublication?.kind === 'STAGED') return new Date(identityPublication.retryAt).toISOString();
+        if (identityPublication?.kind === 'RETRYABLE') return dependencies.now();
         return dependencies.outbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' });
     });
   return function reconcileFavorites(inventoryRequested = false): Promise<void> {

@@ -7555,7 +7555,7 @@
         {
           "id": "step-26",
           "title": "Connect synchronized associations and D1 cache ingestion",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A versioned storage.sync snapshot maps normalized fingerprints to public provider IDs while remaining compatible with version 1",
             "Incomplete identity restoration and publication always schedule another durable wake and finish without unrelated work",
@@ -7597,7 +7597,12 @@
             "git diff --check",
             "git commit -m \"fix(recovery): connect sync and shared cache\""
           ],
-          "evidence": []
+          "evidence": [
+            "storage.sync v2 manifests round-trip fingerprint-to-public IDs and preserve v1 reads; conflicts are dropped instead of auto-selected.",
+            "MV3 recovery schedules durable continuation for pending restore, scanning, staged/deferred publication and retry states.",
+            "Resolution consults synchronized associations and the strict D1 public candidate cache before provider search; authenticated idempotent owner batches populate additive favorite_public_cache rows.",
+            "Application 320, browser adapter 69, Cloudflare adapter 22, extension 137 and Worker 43 tests passed; full typecheck, local D1 tests, docs/decisions and Archify showcase 9/9 passed."
+          ]
         },
         {
           "id": "step-27",

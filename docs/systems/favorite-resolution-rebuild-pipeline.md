@@ -890,6 +890,12 @@ une décision humaine, un diagnostic ou un secret. La base publique ne représen
 pas la bibliothèque d’un propriétaire; elle évite de redemander une fiche déjà
 connue.
 
+Quand ce service est joignable, l’extension crée automatiquement une identité
+opaque d’installation dans `storage.local`. Elle authentifie les contributions
+publiques et les nonces sans placer le secret dans `storage.sync`. La fiche
+jointe peut contenir ses titres et facettes fournisseur publics; le titre brut,
+l’URL et le dossier du favori ne font jamais partie du batch.
+
 Les références provenant du collectif suivent le même chemin d'hydratation
 que les références explicites et les résultats locaux. Le secours HTTP 405
 MangaUpdates conserve l'ID exact, avance par pages avec checkpoint et ne

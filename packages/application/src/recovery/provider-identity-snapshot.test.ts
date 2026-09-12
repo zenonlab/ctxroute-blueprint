@@ -21,6 +21,25 @@ describe('synchronized provider identity snapshots', () => {
     expect(await readProviderIdentitySnapshots(complete(snapshot))).toMatchObject({ ids: mergeSyncedProviderIds(ids), generation: 1, validGenerations: 1, invalidGenerations: 0 });
   });
 
+  it('round-trips version 2 fingerprint associations while keeping version 1 generations readable', async () => {
+    const association = { fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3', references: [{ provider: 'anilist' as const, externalId: '154587' }] };
+    const legacy = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['1'] }, 1);
+    const current = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['154587'], associations: [association], snapshotVersion: 2 }, 2);
+    expect(legacy.manifest.schemaVersion).toBe(1); expect(current.manifest.schemaVersion).toBe(2);
+    const restored = await readProviderIdentitySnapshots({ ...complete(legacy), ...complete(current) });
+    expect(restored.ids).toMatchObject({ anilist: ['1', '154587'], associations: [association], snapshotVersion: 2 });
+    expect(() => syncedProviderIdsSchema.parse({ ...emptySyncedProviderIds(), associations: [{ ...association, title: 'private' }], snapshotVersion: 2 })).toThrow();
+  });
+
+  it('drops a conflicting synchronized identity instead of selecting a first reference', () => {
+    const base = { fingerprint: 'b'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3' };
+    const merged = mergeSyncedProviderIds(
+      { ...emptySyncedProviderIds(), associations: [{ ...base, references: [{ provider: 'anilist', externalId: '1' }] }], snapshotVersion: 2 },
+      { ...emptySyncedProviderIds(), associations: [{ ...base, references: [{ provider: 'anilist', externalId: '2' }] }], snapshotVersion: 2 },
+    );
+    expect(merged.associations).toEqual([]);
+  });
+
   it('keeps the preceding snapshot when a newer generation is corrupt or incomplete', async () => {
     const old = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['1'] }, 1);
     const next = await prepareProviderIdentitySnapshot({ ...emptySyncedProviderIds(), anilist: ['1', '2'] }, 2);

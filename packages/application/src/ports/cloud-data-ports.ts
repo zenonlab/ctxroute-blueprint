@@ -1,4 +1,6 @@
 import type { FavoritePublicReference } from '../collective-index/favorite-collective-lookup';
+import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
+import type { ProviderCandidate } from '@tobirink/domain';
 
 export interface PublicCatalogueWork {
   id: string;
@@ -18,12 +20,17 @@ export interface PublicCatalogueReference {
 }
 
 export interface PublicCatalogueReadPort {
+  findFavoriteCandidate(key: FavoriteCollectiveKey): Promise<ProviderCandidate | undefined>;
   findWork(workId: string): Promise<PublicCatalogueWork | undefined>;
   listReferences(workId: string, limit: number): Promise<readonly PublicCatalogueReference[]>;
   listTitles(workId: string, limit: number): Promise<readonly PublicCatalogueTitle[]>;
   listWorksAfter(cursor: { id: string; revision: number }, limit: number): Promise<readonly PublicCatalogueWork[]>;
   resolveReference(provider: string, externalId: string): Promise<PublicCatalogueWork | undefined>;
   searchWorksByTitle(title: string, limit: number): Promise<readonly PublicCatalogueWork[]>;
+}
+
+export interface FavoritePublicCacheReadPort {
+  findFavoriteCandidate(key: FavoriteCollectiveKey): Promise<ProviderCandidate | undefined>;
 }
 
 export interface CoverMasterReadPort {

@@ -1,9 +1,10 @@
-import { createWork, libraryId, workId } from '@tobirink/domain';
+import { createFavoriteSource, createWork, libraryId, workId } from '@tobirink/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { emptySyncedProviderIds } from './provider-identity-snapshot';
 import { finishProviderIdentityScan, restoreProviderIdentities, scanHydratedProviderIds } from './provider-identity-recovery';
 import type { ProviderIdentityRecoveryState, ProviderIdentityRecoveryStatePort } from './provider-identity-recovery';
+import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 
 function checkpoints(): ProviderIdentityRecoveryStatePort {
   let state: ProviderIdentityRecoveryState | undefined;
@@ -87,5 +88,19 @@ describe('provider identities after private database reset', () => {
     expect(listing).toHaveBeenLastCalledWith({ afterId: workId('work_scan_0099'), limit: 100 });
     await finishProviderIdentityScan(state);
     expect((await state.read())?.scan).toBeUndefined();
+  });
+
+  it('publishes only the versioned fingerprint-to-public-ID association for a resolved favorite', async () => {
+    const storage = new MemoryStoragePort(); const state = checkpoints();
+    await importFavoriteSources([{ bookmarkId: 'private-bookmark', folderPath: ['Private folder'], order: 0, state: 'eligible', title: 'Synthetic Series', url: 'https://reader.example/anime/synthetic-series' }], storage, '2026-09-08T00:00:00.000Z');
+    const source = (await storage.listFavoriteSources({ limit: 1 }))[0];
+    if (source === undefined) throw new Error('Missing source fixture.');
+    const id = workId('work_sync_association');
+    const hydrated = candidate('1');
+    await storage.putWork(createWork({ id, externalReferences: [{ provider: 'anilist', externalId: '1' }], mediaKind: 'anime', preferredTitle: 'Synthetic Series', hydration: { candidate: hydrated, favoriteAliasKeys: [], hydratedAt: '2026-09-08T00:00:00.000Z', matcherVersion: 'favorite-matcher-v3', providerTitleKeys: ['synthetic series'] } }));
+    await storage.putFavoriteSource(createFavoriteSource({ ...source, matchedWorkId: id, resolution: { kind: 'RESOLVED' } }));
+    const scan = await scanHydratedProviderIds(storage, state);
+    expect(scan).toMatchObject({ complete: true, ids: { associations: [{ mediaKind: 'ANIME', references: [{ provider: 'anilist', externalId: '1' }] }], snapshotVersion: 2 } });
+    expect(JSON.stringify(scan.ids)).not.toMatch(/Private folder|reader\.example|private-bookmark/u);
   });
 });

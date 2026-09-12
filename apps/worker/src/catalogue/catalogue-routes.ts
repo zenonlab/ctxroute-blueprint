@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { WorkerRuntime, WorkerServices } from '../composition';
+import { favoriteCollectiveKeySchema, providerCandidateSchema } from '@tobirink/application';
 
 const publicIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 const providerPattern = /^[a-z0-9-]{1,32}$/u;
@@ -81,6 +82,16 @@ export function createCatalogueApp(injected?: CatalogueServices) {
     }
     const work = await routeServices(context, injected).catalogue.resolveReference(provider, externalId);
     return work ? context.json({ work }) : context.json({ error: 'not-found' }, 404);
+  });
+
+  app.get('/v1/catalogue/favorites/resolve', async (context) => {
+    const key = favoriteCollectiveKeySchema.safeParse({
+      fingerprint: context.req.query('fingerprint'), mediaKind: context.req.query('mediaKind'),
+      parserVersion: context.req.query('parserVersion'), siteRulesVersion: context.req.query('siteRulesVersion'),
+    });
+    if (!key.success) return context.json({ error: 'invalid-query' }, 400);
+    const candidate = await routeServices(context, injected).catalogue.findFavoriteCandidate(key.data);
+    return candidate === undefined ? context.json({ error: 'not-found' }, 404) : context.json({ candidate: providerCandidateSchema.parse(candidate) });
   });
 
   app.get('/v1/catalogue/search', async (context) => {
