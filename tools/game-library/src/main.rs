@@ -5,10 +5,11 @@ use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
     gcn::{
-        FixedRecordTableOptions, GxRawTextureOptions, RecordCountEncoding, inspect_bti_texture,
-        inspect_dzb_collision, inspect_fixed_record_table, inspect_gx_raw_texture,
-        inspect_j3d_animation, inspect_j3d_material_animation, inspect_j3d_material_table,
-        inspect_j3d_model, inspect_jai_animation_sound, inspect_rarc, inspect_stage,
+        FixedRecordTableOptions, GxRawTextureOptions, RecordCountEncoding, extract_rarc,
+        inspect_bti_texture, inspect_dzb_collision, inspect_fixed_record_table,
+        inspect_gx_raw_texture, inspect_j3d_animation, inspect_j3d_material_animation,
+        inspect_j3d_material_table, inspect_j3d_model, inspect_jai_animation_sound, inspect_rarc,
+        inspect_stage,
     },
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
@@ -80,6 +81,12 @@ enum Command {
     InspectRarc {
         #[arg(long)]
         input: PathBuf,
+    },
+    ExtractRarc {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
     },
     InspectJ3dAnimation {
         #[arg(long)]
@@ -235,6 +242,10 @@ fn main() -> Result<()> {
         }
         Command::InspectRarc { input } => {
             let result = inspect_rarc(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::ExtractRarc { input, output } => {
+            let result = extract_rarc(&input, &output)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::InspectJ3dAnimation { input } => {

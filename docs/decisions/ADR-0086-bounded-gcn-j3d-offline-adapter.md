@@ -40,6 +40,11 @@ ni nom de ressource. Le candidat isolé doit convertir une scène témoin
 structurellement différente sans modification du runtime avant toute activation
 native.
 
+L'extraction RARC réutilise le parcours borné de l'inspecteur et refuse une sortie
+hors de `private/`, une destination non vide, une traversée de parent ou de lien
+symbolique. Elle refuse aussi un payload compressé tant que son décodeur n'est pas
+qualifié dans cet adaptateur, au lieu de publier ses octets stockés comme contenu.
+
 Quand le source exporté ne matérialise pas une relation de ressource, l'adaptateur
 peut analyser un ELF32 PowerPC big-endian lié. La plage de code est explicite ou
 réduite à l'unique section liée ; les adresses des API, le registre d'argument et les

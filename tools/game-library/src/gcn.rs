@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Component, Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use serde::Serialize;
@@ -131,6 +134,24 @@ pub struct RarcFile {
     pub compression: &'static str,
     pub stored_bytes: usize,
     pub stored_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RarcExtractReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub output: String,
+    pub files: usize,
+    pub bytes: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct RarcPayload {
+    path: PathBuf,
+    start: usize,
+    end: usize,
+    compression: &'static str,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -3212,7 +3233,50 @@ fn validate_bck_track(count: usize, first: usize, tangent: u16, available: usize
     Ok(())
 }
 
+pub fn extract_rarc(input: &Path, output: &Path) -> Result<RarcExtractReport> {
+    require_private_output(output)?;
+    ensure!(input.is_file(), "RARC input must be a regular file");
+    if output.exists() {
+        ensure!(
+            output.read_dir()?.next().is_none(),
+            "RARC output directory must be absent or empty"
+        );
+    }
+    let bytes = fs::read(input).with_context(|| format!("cannot read {}", input.display()))?;
+    let (report, payloads) = parse_rarc_with_payloads(&bytes)?;
+    ensure!(
+        payloads.iter().all(|payload| payload.compression == "none"),
+        "compressed RARC payload extraction is not yet supported"
+    );
+    fs::create_dir_all(output)?;
+    let mut extracted_bytes = 0_usize;
+    for payload in payloads {
+        let destination = output.join(&payload.path);
+        ensure!(
+            destination.starts_with(output),
+            "RARC payload escaped output directory"
+        );
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&destination, &bytes[payload.start..payload.end])?;
+        extracted_bytes += payload.end - payload.start;
+    }
+    Ok(RarcExtractReport {
+        format: "orbite.rarc-extraction-receipt/1",
+        adapter: "gcn.rarc",
+        input_sha256: report.input_sha256,
+        output: output.display().to_string(),
+        files: report.files.len(),
+        bytes: extracted_bytes,
+    })
+}
+
 pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
+    parse_rarc_with_payloads(bytes).map(|(report, _)| report)
+}
+
+fn parse_rarc_with_payloads(bytes: &[u8]) -> Result<(RarcReport, Vec<RarcPayload>)> {
     ensure!(
         bytes.len() >= 0x40 && bytes.len() <= MAX_RARC_BYTES,
         "RARC input exceeds the bounded size"
@@ -3256,6 +3320,7 @@ pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
     ensure!(file_data <= bytes.len(), "RARC file data exceeds input");
 
     let mut files = Vec::new();
+    let mut payloads = Vec::new();
     let mut recursion_stack = vec![false; node_count];
     let mut reached_nodes = vec![false; node_count];
     let mut reached_entries = vec![false; entry_count];
@@ -3274,6 +3339,7 @@ pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
         &mut reached_nodes,
         &mut reached_entries,
         &mut files,
+        &mut payloads,
     )?;
     ensure!(
         reached_nodes.into_iter().all(|value| value),
@@ -3284,7 +3350,7 @@ pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
         "RARC contains unreachable entries"
     );
     files.sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(RarcReport {
+    let report = RarcReport {
         format: "orbite.rarc-index/1",
         adapter: "gcn.rarc",
         input_sha256: hex::encode(Sha256::digest(bytes)),
@@ -3293,7 +3359,8 @@ pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
         nodes: node_count,
         entries: entry_count,
         files,
-    })
+    };
+    Ok((report, payloads))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3312,6 +3379,7 @@ fn walk_rarc_node(
     reached_nodes: &mut [bool],
     reached_entries: &mut [bool],
     files: &mut Vec<RarcFile>,
+    payloads: &mut Vec<RarcPayload>,
 ) -> Result<()> {
     ensure!(
         node_index < node_count,
@@ -3375,6 +3443,7 @@ fn walk_rarc_node(
                 reached_nodes,
                 reached_entries,
                 files,
+                payloads,
             )?;
             continue;
         }
@@ -3385,22 +3454,54 @@ fn walk_rarc_node(
             .checked_add(data_size)
             .context("RARC file span overflow")?;
         ensure!(end <= bytes.len(), "RARC file exceeds data region");
+        let compression = if flags & 0x04 == 0 {
+            "none"
+        } else if flags & 0x80 != 0 {
+            "yaz0"
+        } else {
+            "yay0"
+        };
+        payloads.push(RarcPayload {
+            path: PathBuf::from(&path),
+            start,
+            end,
+            compression,
+        });
         files.push(RarcFile {
             path,
             file_id,
             flags,
-            compression: if flags & 0x04 == 0 {
-                "none"
-            } else if flags & 0x80 != 0 {
-                "yaz0"
-            } else {
-                "yay0"
-            },
+            compression,
             stored_bytes: data_size,
             stored_sha256: hex::encode(Sha256::digest(&bytes[start..end])),
         });
     }
     recursion_stack[node_index] = false;
+    Ok(())
+}
+
+fn require_private_output(path: &Path) -> Result<()> {
+    ensure!(
+        path.components()
+            .any(|component| component.as_os_str() == "private"),
+        "extracted game assets may only be written below private/"
+    );
+    ensure!(
+        !path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir)),
+        "RARC output path may not contain parent traversal"
+    );
+    for ancestor in path
+        .ancestors()
+        .take_while(|ancestor| ancestor.file_name().is_none_or(|name| name != "private"))
+        .filter(|ancestor| ancestor.exists())
+    {
+        ensure!(
+            !fs::symlink_metadata(ancestor)?.file_type().is_symlink(),
+            "RARC output path must not traverse a symbolic link"
+        );
+    }
     Ok(())
 }
 
@@ -4520,6 +4621,29 @@ mod tests {
         assert_eq!(report.files[1].path, "sub/b.bin");
         assert_eq!(report.files[1].compression, "yaz0");
         assert_eq!(report.files[1].stored_bytes, 4);
+    }
+
+    #[test]
+    fn extracts_rarc_only_to_an_empty_private_destination() {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("source.arc");
+        let mut bytes = fixture_rarc();
+        bytes[0x8c] = 0x01;
+        fs::write(&input, bytes).unwrap();
+        let output = temp.path().join("private/archive");
+
+        let receipt = extract_rarc(&input, &output).unwrap();
+        assert_eq!(receipt.files, 2);
+        assert_eq!(receipt.bytes, 7);
+        assert_eq!(fs::read(output.join("a.bin")).unwrap(), b"abc");
+        assert_eq!(fs::read(output.join("sub/b.bin")).unwrap(), b"defg");
+        assert!(extract_rarc(&input, &output).is_err());
+        assert!(extract_rarc(&input, &temp.path().join("public/archive")).is_err());
+
+        let compressed_output = temp.path().join("private/compressed");
+        fs::write(&input, fixture_rarc()).unwrap();
+        assert!(extract_rarc(&input, &compressed_output).is_err());
+        assert!(!compressed_output.exists());
     }
 
     #[test]
