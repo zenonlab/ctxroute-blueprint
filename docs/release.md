@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.16`.
+The current production release is `1.0.18`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -37,9 +37,9 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
-### Complete favorite-pipeline candidate — 2026-09-12
+### Complete favorite-pipeline release — 2026-09-12
 
-Candidate `1.0.18` réunit la résolution fournisseur bornée, le cache collectif
+Release `1.0.18` réunit la résolution fournisseur bornée, le cache collectif
 owner-scoped à consentement explicite, la reprise `storage.sync` courant +
 rollback, les mutations de favoris incrémentales, le curseur durable de
 réparation des couvertures et le différentiel FavLib épinglé sur fixtures
@@ -54,11 +54,14 @@ entrées après arrêt puis réveil du service worker MV3. Firefox 151 installe
 l’archive distincte, répond au health check, exclut le lien ordinaire et garde
 la Review vide.
 
-Les probes production en lecture seule confirment `1.0.16` sur `/download`, les
-règles publiques en HTTP 200, et les misses cache D1 et cover R2 en JSON 404
-`no-store`. Wrangler liste uniquement `0005_public_favorite_cache.sql` comme
-migration distante en attente. La publication de `1.0.18`, cette migration et
-le nouveau Worker restent une opération Cloudflare séparée.
+La gate Cloudflare
+`a82d7ab5102a492d4568ab8fee013f21e089ec1f74f9cc40533cd4c2310f18af`
+a appliqué `0005_public_favorite_cache.sql`, publié les deux archives et déployé
+le Worker `5b6b4734-fb5b-429f-bced-7552dea0d418`. Wrangler ne liste plus de
+migration en attente. Les probes production confirment `1.0.18` sur `/download`,
+les cinq pages publiques en HTTP 200, les règles publiques en HTTP 200, et les
+misses cache D1 et cover R2 en JSON 404 `no-store`. Les sept parcours
+Playwright de production passent.
 
 Deux archives locales déterministes de 21 fichiers ont été produites :
 

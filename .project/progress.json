@@ -7884,6 +7884,44 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-favorite-pipeline-1-0-18",
+      "title": "Publier et vérifier la pipeline favoris 1.0.18",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Appliquer la gate Cloudflare et vérifier la production",
+          "status": "DONE",
+          "acceptance": [
+            "D1 additive migration 0005 is applied without deleting existing data",
+            "Public Chrome and Firefox 1.0.18 downloads match certified local SHA-256 values and download page advertises 1.0.18",
+            "Worker production routes cache cover pages and unknown routes return their expected bounded responses",
+            "Verified main commit is pushed without including the user-owned .codex/config.toml change"
+          ],
+          "files": [
+            "build/.output/cloudflare-favorite-1.0.18-plan.json",
+            "apps/worker/migrations/0005_public_favorite_cache.sql",
+            "apps/extension/.output/packages/tobirink-chrome-mv3-1.0.18.zip",
+            "apps/extension/.output/packages/tobirink-firefox-mv3-1.0.18.zip"
+          ],
+          "commands": [
+            "npm run infra:apply with exact reviewed plan digest and four allowlisted resources",
+            "npm exec -- wrangler d1 migrations list COLLECTIVE_DB --remote",
+            "production HTTP and SHA-256 probes",
+            "git push origin main"
+          ],
+          "evidence": [
+            "Cloudflare gate digest a82d7ab5102a492d4568ab8fee013f21e089ec1f74f9cc40533cd4c2310f18af applied D1 migration 0005 uploaded both immutable archives and deployed Worker version 5b6b4734-fb5b-429f-bced-7552dea0d418",
+            "Wrangler reports no pending D1 migrations; public Chrome and Firefox archives return 200 and exactly match certified SHA-256 values",
+            "Production pages and rules return 200 bounded cache cover and unknown misses return 404 and all seven Playwright production journeys pass"
+          ]
+        }
+      ]
     }
   ]
 }
