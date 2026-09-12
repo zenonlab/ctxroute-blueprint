@@ -90,6 +90,12 @@ réutilise exactement le lecteur BTI pour les textures embarquées et compte les
 bindings qui restent externes. Le nombre de sections déclaré et le nombre réellement
 stocké demeurent deux faits distincts : un fichier auto-borné peut être inventorié
 avec `declaration_complete: false`, mais cet écart ne peut fermer une qualification.
+Les indices MAT3 de culling, texgen, nombre de stages TEV, alpha compare, blend,
+depth, emplacement du Z compare et dither sont conservés puis résolus selon le
+factory J3D épinglé. Les sentinelles appliquent uniquement les valeurs par défaut
+attestées ; une alpha compare absente reste absente. Chaque index, enum, booléen et
+capacité GX est borné. Cette fermeture de l'état pixel fixe ne vaut pas fermeture du
+combinateur TEV, du fog ou de l'indirect texturing.
 
 La collision DZB reste une famille indépendante du mesh rendu. Son lecteur préserve
 les six tables sources — sommets, triangles, blocs, arbre, groupes et propriétés —,

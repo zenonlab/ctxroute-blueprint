@@ -377,7 +377,48 @@ pub struct J3dMaterialEntry {
     pub cull_mode_index: u8,
     pub texgen_count_index: u8,
     pub tev_stage_count_index: u8,
+    pub z_compare_location_index: u8,
+    pub z_mode_index: u8,
+    pub dither_index: u8,
+    pub fog_index: u16,
+    pub alpha_compare_index: u16,
+    pub blend_index: u16,
+    pub cull_mode: Option<&'static str>,
+    pub texgen_count: Option<u8>,
+    pub tev_stage_count: Option<u8>,
+    pub allocated_tev_stages: u8,
+    pub alpha_compare: Option<J3dAlphaCompare>,
+    pub blend: J3dBlend,
+    pub depth: J3dDepth,
+    pub z_compare_before_texture: bool,
+    pub dither: bool,
     pub texture_bindings: Vec<J3dTextureBinding>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dAlphaCompare {
+    pub compare_0: &'static str,
+    pub reference_0: u8,
+    pub operation: &'static str,
+    pub compare_1: &'static str,
+    pub reference_1: u8,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dBlend {
+    pub source_default: bool,
+    pub mode: &'static str,
+    pub source_factor: &'static str,
+    pub destination_factor: &'static str,
+    pub logic_operation: &'static str,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dDepth {
+    pub source_default: bool,
+    pub compare_enabled: bool,
+    pub function: &'static str,
+    pub update_enabled: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -850,7 +891,7 @@ pub fn parse_j3d_material_table(bytes: &[u8]) -> Result<J3dMaterialTableReport> 
         }
     }
     Ok(J3dMaterialTableReport {
-        format: "orbite.j3d-material-table-index/1",
+        format: "orbite.j3d-material-table-index/2",
         adapter: "gcn.j3d-material-table",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -896,14 +937,33 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
     )?;
     let tex_no_offset = read_u32(section, 0x48)? as usize;
     let tex_no_count = mat3_table_count(section, tex_no_offset, 2)?;
+    let cull_mode_offset = read_u32(section, 0x1c)? as usize;
+    let texgen_count_offset = read_u32(section, 0x34)? as usize;
+    let tev_stage_count_offset = read_u32(section, 0x58)? as usize;
+    let alpha_compare_offset = read_u32(section, 0x6c)? as usize;
+    let blend_offset = read_u32(section, 0x70)? as usize;
+    let z_mode_offset = read_u32(section, 0x74)? as usize;
+    let z_compare_location_offset = read_u32(section, 0x78)? as usize;
+    let dither_offset = read_u32(section, 0x7c)? as usize;
     let mut materials = Vec::with_capacity(material_count);
     for (index, name) in names.into_iter().enumerate() {
         let source_material_id = material_ids[index];
         let init = init_offset + usize::from(source_material_id) * 0x14c;
+        let cull_mode_index = section[init + 1];
+        let texgen_count_index = section[init + 3];
+        let tev_stage_count_index = section[init + 4];
+        let z_compare_location_index = section[init + 5];
+        let z_mode_index = section[init + 6];
+        let dither_index = section[init + 7];
+        let fog_index = read_u16(section, init + 0x144)?;
+        let alpha_compare_index = read_u16(section, init + 0x146)?;
+        let blend_index = read_u16(section, init + 0x148)?;
         let mut texture_bindings = Vec::new();
+        let mut source_texture_slots = 0_u8;
         for slot in 0..8 {
             let tex_no_index = read_u16(section, init + 0x84 + slot * 2)?;
             if tex_no_index != u16::MAX {
+                source_texture_slots += 1;
                 ensure!(
                     usize::from(tex_no_index) < tex_no_count,
                     "MAT3 texture number index exceeds table"
@@ -918,17 +978,264 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
                 }
             }
         }
+        let cull_mode = mat3_indexed_u32(section, cull_mode_offset, cull_mode_index, "cull mode")?
+            .map(gx_cull_mode)
+            .transpose()?;
+        let texgen_count = mat3_indexed_u8(
+            section,
+            texgen_count_offset,
+            texgen_count_index,
+            "texgen count",
+        )?;
+        if let Some(count) = texgen_count {
+            ensure!(count <= 8, "MAT3 texgen count exceeds GX capacity");
+        }
+        let tev_stage_count = mat3_indexed_u8(
+            section,
+            tev_stage_count_offset,
+            tev_stage_count_index,
+            "TEV stage count",
+        )?;
+        if let Some(count) = tev_stage_count {
+            ensure!(count <= 16, "MAT3 TEV stage count exceeds GX capacity");
+        }
+        let allocated_tev_stages = tev_stage_count.unwrap_or(0).max(source_texture_slots);
+        let alpha_compare = mat3_alpha_compare(section, alpha_compare_offset, alpha_compare_index)?;
+        let blend = mat3_blend(section, blend_offset, blend_index)?;
+        let depth = mat3_depth(section, z_mode_offset, z_mode_index)?;
+        let z_compare_before_texture = mat3_indexed_bool(
+            section,
+            z_compare_location_offset,
+            z_compare_location_index,
+            false,
+            "Z compare location",
+        )?;
+        let dither = mat3_indexed_bool(section, dither_offset, dither_index, true, "dither")?;
         materials.push(J3dMaterialEntry {
             name,
             source_material_id,
             material_mode: section[init],
-            cull_mode_index: section[init + 1],
-            texgen_count_index: section[init + 3],
-            tev_stage_count_index: section[init + 4],
+            cull_mode_index,
+            texgen_count_index,
+            tev_stage_count_index,
+            z_compare_location_index,
+            z_mode_index,
+            dither_index,
+            fog_index,
+            alpha_compare_index,
+            blend_index,
+            cull_mode,
+            texgen_count,
+            tev_stage_count,
+            allocated_tev_stages,
+            alpha_compare,
+            blend,
+            depth,
+            z_compare_before_texture,
+            dither,
             texture_bindings,
         });
     }
     Ok(materials)
+}
+
+fn mat3_indexed_u8(
+    section: &[u8],
+    table_offset: usize,
+    index: u8,
+    label: &str,
+) -> Result<Option<u8>> {
+    if index == u8::MAX {
+        return Ok(None);
+    }
+    let count = mat3_table_count(section, table_offset, 1)?;
+    ensure!(
+        usize::from(index) < count,
+        "MAT3 {label} index exceeds table"
+    );
+    Ok(Some(section[table_offset + usize::from(index)]))
+}
+
+fn mat3_indexed_u32(
+    section: &[u8],
+    table_offset: usize,
+    index: u8,
+    label: &str,
+) -> Result<Option<u32>> {
+    if index == u8::MAX {
+        return Ok(None);
+    }
+    let count = mat3_table_count(section, table_offset, 4)?;
+    ensure!(
+        usize::from(index) < count,
+        "MAT3 {label} index exceeds table"
+    );
+    Ok(Some(read_u32(
+        section,
+        table_offset + usize::from(index) * 4,
+    )?))
+}
+
+fn mat3_indexed_bool(
+    section: &[u8],
+    table_offset: usize,
+    index: u8,
+    default: bool,
+    label: &str,
+) -> Result<bool> {
+    let Some(value) = mat3_indexed_u8(section, table_offset, index, label)? else {
+        return Ok(default);
+    };
+    ensure!(value <= 1, "MAT3 {label} is not a GX boolean");
+    Ok(value != 0)
+}
+
+fn mat3_alpha_compare(
+    section: &[u8],
+    table_offset: usize,
+    index: u16,
+) -> Result<Option<J3dAlphaCompare>> {
+    if index == u16::MAX {
+        return Ok(None);
+    }
+    let count = mat3_table_count(section, table_offset, 8)?;
+    ensure!(
+        usize::from(index) < count,
+        "MAT3 alpha compare index exceeds table"
+    );
+    let offset = table_offset + usize::from(index) * 8;
+    Ok(Some(J3dAlphaCompare {
+        compare_0: gx_compare(section[offset])?,
+        reference_0: section[offset + 1],
+        operation: gx_alpha_operation(section[offset + 2])?,
+        compare_1: gx_compare(section[offset + 3])?,
+        reference_1: section[offset + 4],
+    }))
+}
+
+fn mat3_blend(section: &[u8], table_offset: usize, index: u16) -> Result<J3dBlend> {
+    let (source_default, values) = if index == u16::MAX {
+        (true, [1, 4, 5, 5])
+    } else {
+        let count = mat3_table_count(section, table_offset, 4)?;
+        ensure!(usize::from(index) < count, "MAT3 blend index exceeds table");
+        let offset = table_offset + usize::from(index) * 4;
+        (false, section[offset..offset + 4].try_into()?)
+    };
+    Ok(J3dBlend {
+        source_default,
+        mode: gx_blend_mode(values[0])?,
+        source_factor: gx_blend_factor(values[1])?,
+        destination_factor: gx_blend_factor(values[2])?,
+        logic_operation: gx_logic_operation(values[3])?,
+    })
+}
+
+fn mat3_depth(section: &[u8], table_offset: usize, index: u8) -> Result<J3dDepth> {
+    let (source_default, values) = if index == u8::MAX {
+        (true, [1, 3, 1])
+    } else {
+        let count = mat3_table_count(section, table_offset, 4)?;
+        ensure!(
+            usize::from(index) < count,
+            "MAT3 Z mode index exceeds table"
+        );
+        let offset = table_offset + usize::from(index) * 4;
+        (false, section[offset..offset + 3].try_into()?)
+    };
+    ensure!(
+        values[0] <= 1 && values[2] <= 1,
+        "MAT3 Z mode has invalid GX booleans"
+    );
+    Ok(J3dDepth {
+        source_default,
+        compare_enabled: values[0] != 0,
+        function: gx_compare(values[1])?,
+        update_enabled: values[2] != 0,
+    })
+}
+
+fn gx_cull_mode(value: u32) -> Result<&'static str> {
+    Ok(match value {
+        0 => "none",
+        1 => "front",
+        2 => "back",
+        3 => "all",
+        _ => bail!("MAT3 cull mode is outside GXCullMode"),
+    })
+}
+
+fn gx_compare(value: u8) -> Result<&'static str> {
+    Ok(match value {
+        0 => "never",
+        1 => "less",
+        2 => "equal",
+        3 => "less-or-equal",
+        4 => "greater",
+        5 => "not-equal",
+        6 => "greater-or-equal",
+        7 => "always",
+        _ => bail!("MAT3 compare function is outside GXCompare"),
+    })
+}
+
+fn gx_alpha_operation(value: u8) -> Result<&'static str> {
+    Ok(match value {
+        0 => "and",
+        1 => "or",
+        2 => "xor",
+        3 => "xnor",
+        _ => bail!("MAT3 alpha operation is outside GXAlphaOp"),
+    })
+}
+
+fn gx_blend_mode(value: u8) -> Result<&'static str> {
+    Ok(match value {
+        0 => "none",
+        1 => "blend",
+        2 => "logic",
+        3 => "subtract",
+        _ => bail!("MAT3 blend mode is outside GXBlendMode"),
+    })
+}
+
+fn gx_blend_factor(value: u8) -> Result<&'static str> {
+    Ok(match value {
+        0 => "zero",
+        1 => "one",
+        2 => "source-or-destination-color",
+        3 => "inverse-source-or-destination-color",
+        4 => "source-alpha",
+        5 => "inverse-source-alpha",
+        6 => "destination-alpha",
+        7 => "inverse-destination-alpha",
+        _ => bail!("MAT3 blend factor is outside GXBlendFactor"),
+    })
+}
+
+fn gx_logic_operation(value: u8) -> Result<&'static str> {
+    const NAMES: [&str; 16] = [
+        "clear",
+        "and",
+        "reverse-and",
+        "copy",
+        "inverse-and",
+        "noop",
+        "xor",
+        "or",
+        "nor",
+        "equivalent",
+        "inverse",
+        "reverse-or",
+        "inverse-copy",
+        "inverse-or",
+        "nand",
+        "set",
+    ];
+    NAMES
+        .get(usize::from(value))
+        .copied()
+        .context("MAT3 logic operation is outside GXLogicOp")
 }
 
 fn mat3_table_count(section: &[u8], start: usize, stride: usize) -> Result<usize> {
@@ -3188,7 +3495,7 @@ mod tests {
     }
 
     fn fixture_bmt(include_texture: bool) -> Vec<u8> {
-        let mat_size = 0x200_usize;
+        let mat_size = 0x220_usize;
         let tex_size = if include_texture { 0x90 } else { 0 };
         let size = 0x20 + mat_size + tex_size;
         let mut bytes = vec![0_u8; size];
@@ -3203,18 +3510,32 @@ mod tests {
             (0x0c, 0x84_u32),
             (0x10, 0x1d0),
             (0x14, 0x1d4),
-            (0x48, 0x1e0),
+            (0x1c, 0x1e8),
+            (0x34, 0x1ec),
+            (0x48, 0x1e4),
+            (0x58, 0x1f0),
+            (0x6c, 0x1f8),
+            (0x70, 0x200),
+            (0x74, 0x204),
+            (0x78, 0x208),
+            (0x7c, 0x20c),
         ] {
             bytes[mat + field..mat + field + 4].copy_from_slice(&value.to_be_bytes());
         }
         let init = mat + 0x84;
         bytes[init] = 1;
-        bytes[init + 1] = 2;
-        bytes[init + 3] = 3;
-        bytes[init + 4] = 4;
         bytes[init + 0x84..init + 0x94].fill(0xff);
         bytes[init + 0x84..init + 0x86].copy_from_slice(&0_u16.to_be_bytes());
+        bytes[init + 0x146..init + 0x14a].fill(0);
         write_name_table(&mut bytes, mat + 0x1d4, b"body");
+        bytes[mat + 0x1e8..mat + 0x1ec].copy_from_slice(&1_u32.to_be_bytes());
+        bytes[mat + 0x1ec] = 2;
+        bytes[mat + 0x1f0] = 3;
+        bytes[mat + 0x1f8..mat + 0x200].copy_from_slice(&[4, 37, 2, 1, 211, 0, 0, 0]);
+        bytes[mat + 0x200..mat + 0x204].copy_from_slice(&[3, 1, 6, 14]);
+        bytes[mat + 0x204..mat + 0x208].copy_from_slice(&[1, 6, 0, 0]);
+        bytes[mat + 0x208] = 1;
+        bytes[mat + 0x20c] = 0;
 
         if include_texture {
             let tex = mat + mat_size;
@@ -3570,6 +3891,27 @@ mod tests {
         assert!(report.has_texture_section);
         assert_eq!(report.materials[0].name, "body");
         assert_eq!(report.materials[0].texture_bindings[0].texture_index, 0);
+        assert_eq!(report.materials[0].cull_mode, Some("front"));
+        assert_eq!(report.materials[0].texgen_count, Some(2));
+        assert_eq!(report.materials[0].tev_stage_count, Some(3));
+        assert_eq!(report.materials[0].allocated_tev_stages, 3);
+        assert_eq!(
+            report.materials[0]
+                .alpha_compare
+                .as_ref()
+                .unwrap()
+                .reference_0,
+            37
+        );
+        assert_eq!(report.materials[0].blend.mode, "subtract");
+        assert_eq!(
+            report.materials[0].blend.destination_factor,
+            "destination-alpha"
+        );
+        assert_eq!(report.materials[0].depth.function, "greater-or-equal");
+        assert!(!report.materials[0].depth.update_enabled);
+        assert!(report.materials[0].z_compare_before_texture);
+        assert!(!report.materials[0].dither);
         assert_eq!(report.textures[0].name, "diffuse");
         assert_eq!(report.textures[0].texture.gx_format, "i4");
     }
@@ -3581,8 +3923,54 @@ mod tests {
         assert_eq!(report.external_texture_bindings, 1);
 
         let mut invalid = fixture_bmt(true);
-        invalid[0x20 + 0x1e0..0x20 + 0x1e2].copy_from_slice(&9_u16.to_be_bytes());
+        invalid[0x20 + 0x1e4..0x20 + 0x1e6].copy_from_slice(&9_u16.to_be_bytes());
         assert!(parse_j3d_material_table(&invalid).is_err());
+    }
+
+    #[test]
+    fn rejects_bmt_material_state_indices_and_gx_values_outside_their_tables() {
+        let mut bad_index = fixture_bmt(true);
+        bad_index[0x20 + 0x84 + 1] = 2;
+        assert!(parse_j3d_material_table(&bad_index).is_err());
+
+        let mut bad_alpha = fixture_bmt(true);
+        bad_alpha[0x20 + 0x1f8] = 8;
+        assert!(parse_j3d_material_table(&bad_alpha).is_err());
+
+        let mut bad_boolean = fixture_bmt(true);
+        bad_boolean[0x20 + 0x208] = 2;
+        assert!(parse_j3d_material_table(&bad_boolean).is_err());
+    }
+
+    #[test]
+    fn applies_only_source_attested_mat3_sentinel_defaults() {
+        let mut bytes = fixture_bmt(true);
+        let mat = 0x20;
+        let init = mat + 0x84;
+        for offset in [1, 3, 4, 5, 6, 7] {
+            bytes[init + offset] = u8::MAX;
+        }
+        for offset in [0x1c, 0x34, 0x58, 0x6c, 0x70, 0x74, 0x78, 0x7c] {
+            bytes[mat + offset..mat + offset + 4].fill(0);
+        }
+        bytes[init + 0x146..init + 0x14a].fill(0xff);
+
+        let material = parse_j3d_material_table(&bytes)
+            .unwrap()
+            .materials
+            .remove(0);
+        assert_eq!(material.cull_mode, None);
+        assert_eq!(material.texgen_count, None);
+        assert_eq!(material.tev_stage_count, None);
+        assert_eq!(material.allocated_tev_stages, 1);
+        assert_eq!(material.alpha_compare, None);
+        assert!(material.blend.source_default);
+        assert_eq!(material.blend.mode, "blend");
+        assert_eq!(material.blend.source_factor, "source-alpha");
+        assert!(material.depth.source_default);
+        assert_eq!(material.depth.function, "less-or-equal");
+        assert!(!material.z_compare_before_texture);
+        assert!(material.dither);
     }
 
     #[test]

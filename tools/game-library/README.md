@@ -157,9 +157,12 @@ sans inventer la sémantique de leurs champs.
 L'inspection BMT accepte les compositions `MAT3`, `TEX1` ou les deux, comme le loader
 J3D source. Elle résout les remaps de matériaux, noms, modes et huit slots vers les
 indices de textures, puis applique le même lecteur BTI aux entrées TEX1. Le rapport
-distingue les bindings externes et une déclaration de sections incomplète. Il ne
-qualifie pas encore les opérations TEV, blend, alpha, fog ou depth référencées par
-les tables MAT3.
+distingue les bindings externes et une déclaration de sections incomplète. Les indices
+source et états effectifs de culling, nombre de texgens et stages TEV, alpha compare,
+blend, depth, position du Z compare et dither sont résolus avec les valeurs par défaut
+du factory J3D. Les enums et booléens GX invalides sont refusés. Les opérations des
+stages TEV, couleurs konst, swaps, fog et indirect texturing ne sont pas encore
+qualifiées.
 
 Le lecteur DZB conserve sommets, triangles, propriétés, blocs, arbre spatial et
 hiérarchie de groupes en repère source. Il vérifie chaque référence croisée, les noms,
