@@ -59,10 +59,15 @@ NW4R.
 
 L'adaptateur `gcn-j3d` classe les familles de formats GameCube/JSystem sans connaître
 de jeu. La commande suivante lit un placement de scène big-endian de façon bornée et
-émet son inventaire typé en espace source ; elle ne convertit pas encore les repères
-vers un renderer et ne prétend donc pas avoir qualifié la géométrie.
+émet son inventaire typé en espace source. La seconde inspecte l'enveloppe J3D,
+les sections, les tableaux de sommets, les bornes et les translations de joints.
+Elle explicite le passage vers le repère canonique mais ne prétend pas encore
+convertir les matériaux GX/TEV ni produire un modèle visuellement qualifié.
 
 ```bash
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-gcn-stage --input private/source/room.dzr
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-j3d-model --input private/source/model.bdl
 ```

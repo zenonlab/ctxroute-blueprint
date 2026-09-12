@@ -5,8 +5,11 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 const MAX_STAGE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_J3D_BYTES: usize = 64 * 1024 * 1024;
 const MAX_CHUNKS: usize = 256;
 const MAX_RECORDS_PER_CHUNK: usize = 65_536;
+const MAX_J3D_SECTIONS: usize = 64;
+const MAX_J3D_VALUES: usize = 8_000_000;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct StageIndexReport {
@@ -48,6 +51,61 @@ pub struct SoundPlacement {
     pub parameters: [u8; 7],
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dModelReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub magic: String,
+    pub byte_order: &'static str,
+    pub source_coordinate_space: &'static str,
+    pub canonical_transform: CanonicalTransform,
+    pub sections: Vec<J3dSection>,
+    pub declared_vertices: Option<usize>,
+    pub vertex_arrays: Vec<J3dVertexArray>,
+    pub source_position_bounds: Option<Bounds3>,
+    pub canonical_position_bounds: Option<Bounds3>,
+    pub joints: Option<J3dJointSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct CanonicalTransform {
+    pub target_coordinate_space: &'static str,
+    pub source_to_target_columns: [[f32; 4]; 4],
+    pub winding: &'static str,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dSection {
+    pub tag: String,
+    pub offset: usize,
+    pub bytes: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dVertexArray {
+    pub attribute: String,
+    pub component_count: u32,
+    pub data_type: u32,
+    pub fractional_bits: u8,
+    pub storage_bytes: usize,
+    pub complete_values: usize,
+    pub trailing_bytes: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Bounds3 {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dJointSummary {
+    pub count: usize,
+    pub source_translation_bounds: Option<Bounds3>,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -61,6 +119,276 @@ pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_stage(&bytes)
+}
+
+pub fn inspect_j3d_model(path: &Path) -> Result<J3dModelReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "J3D input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "J3D input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_j3d_model(&bytes)
+}
+
+pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
+    ensure!(
+        bytes.len() >= 0x20 && bytes.len() <= MAX_J3D_BYTES,
+        "J3D input exceeds the bounded size"
+    );
+    let magic_bytes = bytes.get(0..8).context("truncated J3D magic")?;
+    ensure!(
+        magic_bytes.starts_with(b"J3D") && magic_bytes.iter().all(u8::is_ascii_graphic),
+        "invalid J3D model magic"
+    );
+    let declared_size = read_u32(bytes, 8)? as usize;
+    ensure!(declared_size == bytes.len(), "J3D declared size mismatch");
+    let section_count = read_u32(bytes, 12)? as usize;
+    ensure!(
+        section_count > 0 && section_count <= MAX_J3D_SECTIONS,
+        "J3D section count exceeds the limit"
+    );
+
+    let mut offset = 0x20;
+    let mut sections = Vec::with_capacity(section_count);
+    let mut vertex_arrays = Vec::new();
+    let mut source_position_bounds = None;
+    let mut joints = None;
+    let mut declared_vertices = None;
+    for _ in 0..section_count {
+        let tag = read_tag(bytes, offset)?;
+        let section_size = read_u32(bytes, offset + 4)? as usize;
+        ensure!(section_size >= 8, "invalid {tag} section size");
+        let end = offset
+            .checked_add(section_size)
+            .context("J3D section span overflow")?;
+        ensure!(end <= bytes.len(), "truncated {tag} section");
+        match tag.as_str() {
+            "INF1" => {
+                ensure!(section_size >= 0x18, "truncated INF1 header");
+                let count = read_u32(bytes, offset + 16)? as usize;
+                ensure!(
+                    count <= MAX_J3D_VALUES,
+                    "INF1 vertex count exceeds the limit"
+                );
+                declared_vertices = Some(count);
+            }
+            "VTX1" => {
+                let result = parse_vtx1(&bytes[offset..end], declared_vertices)?;
+                vertex_arrays = result.0;
+                source_position_bounds = result.1;
+            }
+            "JNT1" => joints = Some(parse_jnt1(&bytes[offset..end])?),
+            _ => {}
+        }
+        sections.push(J3dSection {
+            tag,
+            offset,
+            bytes: section_size,
+        });
+        offset = end;
+    }
+    ensure!(
+        offset == bytes.len(),
+        "unaccounted bytes after J3D sections"
+    );
+
+    // J3D and the canonical renderer are both right-handed and Y-up. Keeping the
+    // basis is intentional; a later camera policy decides which local direction is forward.
+    let canonical_transform = CanonicalTransform {
+        target_coordinate_space: "right-handed Y-up, source units",
+        source_to_target_columns: [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        winding: "preserve",
+    };
+    Ok(J3dModelReport {
+        format: "orbite.j3d-model-index/1",
+        adapter: "gcn.j3d",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        magic: String::from_utf8(magic_bytes.to_vec()).expect("ASCII J3D magic"),
+        byte_order: "big-endian",
+        source_coordinate_space: "right-handed Y-up, source units",
+        canonical_transform,
+        sections,
+        declared_vertices,
+        vertex_arrays,
+        canonical_position_bounds: source_position_bounds.clone(),
+        source_position_bounds,
+        joints,
+    })
+}
+
+fn parse_vtx1(
+    bytes: &[u8],
+    declared_vertices: Option<usize>,
+) -> Result<(Vec<J3dVertexArray>, Option<Bounds3>)> {
+    ensure!(bytes.len() >= 0x40, "truncated VTX1 header");
+    let formats_offset = read_u32(bytes, 8)? as usize;
+    ensure!(
+        formats_offset >= 0x40 && formats_offset <= bytes.len(),
+        "invalid VTX1 format offset"
+    );
+    let mut offsets = [0_usize; 13];
+    for (index, value) in offsets.iter_mut().enumerate() {
+        *value = read_u32(bytes, 12 + index * 4)? as usize;
+        ensure!(
+            *value == 0 || *value < bytes.len(),
+            "invalid VTX1 array offset"
+        );
+    }
+    let present: Vec<_> = offsets
+        .iter()
+        .enumerate()
+        .filter(|(_, value)| **value != 0)
+        .collect();
+    ensure!(present.len() <= 13, "too many VTX1 arrays");
+
+    let mut arrays = Vec::with_capacity(present.len());
+    let mut position_bounds = None;
+    for (format_index, (array_index, start)) in present.iter().enumerate() {
+        let format = formats_offset
+            .checked_add(format_index * 16)
+            .context("VTX1 format overflow")?;
+        ensure!(format + 16 <= bytes.len(), "truncated VTX1 array format");
+        let attribute = read_u32(bytes, format)?;
+        let component_count = read_u32(bytes, format + 4)?;
+        let data_type = read_u32(bytes, format + 8)?;
+        let fractional_bits = bytes[format + 12];
+        let end = offsets
+            .iter()
+            .skip(*array_index + 1)
+            .copied()
+            .find(|value| *value != 0)
+            .unwrap_or(bytes.len());
+        ensure!(end >= **start, "unordered VTX1 array offsets");
+        let storage_bytes = end - **start;
+        let value_bytes = match data_type {
+            2 => 1,
+            3 => 2,
+            4 => 4,
+            5 => 1,
+            _ => bail!("unsupported VTX1 data type {data_type}"),
+        };
+        let complete_values = storage_bytes / value_bytes;
+        ensure!(
+            complete_values <= MAX_J3D_VALUES,
+            "VTX1 value count exceeds the limit"
+        );
+        arrays.push(J3dVertexArray {
+            attribute: j3d_attribute_name(attribute),
+            component_count,
+            data_type,
+            fractional_bits,
+            storage_bytes,
+            complete_values,
+            trailing_bytes: storage_bytes % value_bytes,
+        });
+        if attribute == 9 {
+            ensure!(component_count == 1, "only XYZ J3D positions are supported");
+            let stored_point_count = complete_values / 3;
+            let point_count = declared_vertices.unwrap_or(stored_point_count);
+            ensure!(
+                point_count <= stored_point_count,
+                "INF1 vertex count exceeds VTX1 position storage"
+            );
+            ensure!(point_count > 0, "empty J3D position array");
+            let mut bounds = Bounds3 {
+                min: [f32::INFINITY; 3],
+                max: [f32::NEG_INFINITY; 3],
+            };
+            for point in 0..point_count {
+                for axis in 0..3 {
+                    let value = read_vertex_value(
+                        bytes,
+                        **start + (point * 3 + axis) * value_bytes,
+                        data_type,
+                        fractional_bits,
+                    )?;
+                    bounds.min[axis] = bounds.min[axis].min(value);
+                    bounds.max[axis] = bounds.max[axis].max(value);
+                }
+            }
+            position_bounds = Some(bounds);
+        }
+    }
+    Ok((arrays, position_bounds))
+}
+
+fn parse_jnt1(bytes: &[u8]) -> Result<J3dJointSummary> {
+    ensure!(bytes.len() >= 0x18, "truncated JNT1 header");
+    let count = read_u16(bytes, 8)? as usize;
+    ensure!(
+        count <= MAX_RECORDS_PER_CHUNK,
+        "JNT1 joint count exceeds the limit"
+    );
+    let entries = read_u32(bytes, 12)? as usize;
+    ensure_span(bytes, entries, count, 0x40, "JNT1")?;
+    let mut bounds = None;
+    for index in 0..count {
+        let entry = entries + index * 0x40;
+        let position = [
+            read_f32(bytes, entry + 0x18)?,
+            read_f32(bytes, entry + 0x1c)?,
+            read_f32(bytes, entry + 0x20)?,
+        ];
+        extend_bounds(&mut bounds, position);
+    }
+    Ok(J3dJointSummary {
+        count,
+        source_translation_bounds: bounds,
+    })
+}
+
+fn read_vertex_value(
+    bytes: &[u8],
+    offset: usize,
+    data_type: u32,
+    fractional_bits: u8,
+) -> Result<f32> {
+    let scale = 2_f32.powi(-(fractional_bits as i32));
+    let value = match data_type {
+        2 => {
+            i8::from_be_bytes([*bytes.get(offset).context("truncated s8 vertex value")?]) as f32
+                * scale
+        }
+        3 => read_i16(bytes, offset)? as f32 * scale,
+        4 => read_f32(bytes, offset)?,
+        _ => bail!("unsupported numeric VTX1 data type {data_type}"),
+    };
+    ensure!(value.is_finite(), "non-finite VTX1 value");
+    Ok(value)
+}
+
+fn extend_bounds(bounds: &mut Option<Bounds3>, point: [f32; 3]) {
+    let current = bounds.get_or_insert(Bounds3 {
+        min: point,
+        max: point,
+    });
+    for (axis, value) in point.into_iter().enumerate() {
+        current.min[axis] = current.min[axis].min(value);
+        current.max[axis] = current.max[axis].max(value);
+    }
+}
+
+fn j3d_attribute_name(attribute: u32) -> String {
+    match attribute {
+        9 => "position".into(),
+        10 => "normal".into(),
+        11 => "color0".into(),
+        12 => "color1".into(),
+        13..=20 => format!("texcoord{}", attribute - 13),
+        _ => format!("attribute-{attribute}"),
+    }
 }
 
 pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
@@ -356,6 +684,45 @@ mod tests {
         bytes[offset + 30..offset + 32].copy_from_slice(&9_u16.to_be_bytes());
     }
 
+    fn fixture_j3d() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0x120];
+        bytes[0..8].copy_from_slice(b"J3D2bmd3");
+        bytes[8..12].copy_from_slice(&0x120_u32.to_be_bytes());
+        bytes[12..16].copy_from_slice(&3_u32.to_be_bytes());
+
+        let inf = 0x20;
+        bytes[inf..inf + 4].copy_from_slice(b"INF1");
+        bytes[inf + 4..inf + 8].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[inf + 16..inf + 20].copy_from_slice(&2_u32.to_be_bytes());
+
+        let vtx = 0x40;
+        bytes[vtx..vtx + 4].copy_from_slice(b"VTX1");
+        bytes[vtx + 4..vtx + 8].copy_from_slice(&0x80_u32.to_be_bytes());
+        bytes[vtx + 8..vtx + 12].copy_from_slice(&0x40_u32.to_be_bytes());
+        bytes[vtx + 12..vtx + 16].copy_from_slice(&0x50_u32.to_be_bytes());
+        bytes[vtx + 0x40..vtx + 0x44].copy_from_slice(&9_u32.to_be_bytes());
+        bytes[vtx + 0x44..vtx + 0x48].copy_from_slice(&1_u32.to_be_bytes());
+        bytes[vtx + 0x48..vtx + 0x4c].copy_from_slice(&4_u32.to_be_bytes());
+        for (index, value) in [-2.0_f32, 3.0, 5.0, 7.0, -11.0, 13.0]
+            .into_iter()
+            .enumerate()
+        {
+            let offset = vtx + 0x50 + index * 4;
+            bytes[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+
+        let jnt = 0xc0;
+        bytes[jnt..jnt + 4].copy_from_slice(b"JNT1");
+        bytes[jnt + 4..jnt + 8].copy_from_slice(&0x60_u32.to_be_bytes());
+        bytes[jnt + 8..jnt + 10].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[jnt + 12..jnt + 16].copy_from_slice(&0x18_u32.to_be_bytes());
+        for (axis, value) in [17.0_f32, 19.0, -23.0].into_iter().enumerate() {
+            let offset = jnt + 0x18 + 0x18 + axis * 4;
+            bytes[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+        bytes
+    }
+
     #[test]
     fn inventories_typed_stage_records_without_coordinate_guessing() {
         let report = parse_stage(&fixture_stage()).unwrap();
@@ -377,5 +744,45 @@ mod tests {
         let mut non_finite = fixture_stage();
         non_finite[0x34..0x38].copy_from_slice(&f32::NAN.to_bits().to_be_bytes());
         assert!(parse_stage(&non_finite).is_err());
+    }
+
+    #[test]
+    fn proves_asymmetric_j3d_axis_order_without_remapping() {
+        let report = parse_j3d_model(&fixture_j3d()).unwrap();
+        assert_eq!(report.magic, "J3D2bmd3");
+        assert_eq!(report.sections.len(), 3);
+        assert_eq!(report.declared_vertices, Some(2));
+        assert_eq!(report.vertex_arrays[0].attribute, "position");
+        assert_eq!(
+            report.source_position_bounds,
+            Some(Bounds3 {
+                min: [-2.0, -11.0, 5.0],
+                max: [7.0, 3.0, 13.0],
+            })
+        );
+        assert_eq!(
+            report.canonical_position_bounds,
+            report.source_position_bounds
+        );
+        assert_eq!(
+            report
+                .joints
+                .unwrap()
+                .source_translation_bounds
+                .unwrap()
+                .min,
+            [17.0, 19.0, -23.0]
+        );
+    }
+
+    #[test]
+    fn rejects_truncated_and_non_finite_j3d_models() {
+        let mut truncated = fixture_j3d();
+        truncated.truncate(0x110);
+        assert!(parse_j3d_model(&truncated).is_err());
+
+        let mut non_finite = fixture_j3d();
+        non_finite[0x90..0x94].copy_from_slice(&f32::NAN.to_bits().to_be_bytes());
+        assert!(parse_j3d_model(&non_finite).is_err());
     }
 }

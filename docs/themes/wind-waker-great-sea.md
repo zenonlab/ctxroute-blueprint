@@ -4,8 +4,8 @@
 
 - Direction artistique Grande Mer acceptée ; génération privée autorisée.
 - Source retenue : édition GameCube PAL uniquement (`GZLP01`, révision 0).
-- Passe d'audit locale du 12 septembre 2026 achevée ; l'inventaire privé est ouvert,
-  mais aucune activation n'a été réalisée.
+- Passe d'audit locale du 12 septembre 2026 achevée ; l'inventaire et le repère J3D
+  privés sont qualifiés, mais aucune activation n'a été réalisée.
 - Aucun asset commercial n'est inclus dans ce dépôt.
 - Les noms de ressources, coordonnées, musiques, acteurs et relations définitifs
   doivent venir de l'inventaire privé de la copie locale du jeu.
@@ -256,11 +256,17 @@ remplacée silencieusement par le premier choix.
 
 ## Audit animation GameCube — passe lecture seule
 
-Le dépôt sait aujourd’hui inventorier et convertir le corpus Mario Kart Wii
-(`Yaz0/U8/BRRES`), mais ne contient pas encore d’adaptateur GameCube/J3D qualifié.
-Le viewer Bevy générique ne comble pas cette absence. La copie locale permet
-maintenant de confirmer les familles et les relations, mais les durées, pistes,
-bounds et raccords restent à mesurer avant toute génération.
+Le dépôt sait aujourd’hui inventorier le placement GameCube et la structure J3D avec
+des entrées bornées. Une fixture libre asymétrique qualifie le repère droitier Y-up,
+l'ordre XYZ, les translations de joints et la conservation du winding vers le contrat
+canonique. Le même lecteur passe sur le modèle principal de l'île de l'Aurore et le
+corps du bateau. Les durées, pistes, matériaux, dépendances et raccords restent à
+fermer avant toute génération rendable.
+
+Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
+mais il est rejeté comme convertisseur : extraction de textures indisponible sur
+macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non
+qualifiée. Aucun GLB issu de cette voie ne devient un asset candidat.
 
 Deux révisions publiques sont figées pour guider l’audit, sans fournir d’asset :
 
