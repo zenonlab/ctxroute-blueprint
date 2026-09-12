@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "BLOCKED",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6823,29 +6823,41 @@
         },
         {
           "id": "step-8",
-          "title": "Publish approved artifacts and verify installed rendering",
-          "status": "BLOCKED",
+          "title": "Publish the WebBridge v4 library projection release",
+          "status": "DONE",
           "acceptance": [
-            "Gate publishes only versioned ZIPs and matching Worker assets",
-            "Public hashes equal tested artifacts",
-            "Live cover rendering verified and reload outcome recorded"
+            "Commit e79edec and its prerequisite release branch history are published through PR 23 and merge d6ebdc672706a28df3b0afe33bf5bd85c624d901",
+            "The exact Chrome and Firefox 1.0.16 archives are published under immutable versioned R2 keys and match their local SHA256 hashes",
+            "The Worker and static site expose WebBridge v4 and advertise the 1.0.16 downloads at 100 percent traffic",
+            "Production home library agenda download privacy and unknown routes return their expected statuses and the production Playwright suite passes",
+            "Worker version 1ac73214-008b-4d56-a3d3-be7c1162ba9d and the 1.0.14 downloads remain rollback references",
+            "No D1 migration deletion secret change or cover population occurs"
           ],
           "files": [
-            ".ctxroute/state/pipeline-release-cloudflare.json",
+            "apps/web/e2e/packaged-extension.spec.ts",
             "docs/release.md",
-            "apps/extension/.output"
+            ".project/progress.json",
+            "docs/progress.md"
           ],
           "commands": [
-            "npm run infra:inspect",
-            "npm run infra:plan",
-            "npm run infra:apply",
-            "Browser reload and image inspection",
-            "git diff --check"
+            "git push -u origin release/merge-library-metadata-facets",
+            "gh pr create --base main --head release/merge-library-metadata-facets",
+            "gh pr checks --watch",
+            "gh pr merge --merge --admin --delete-branch=false",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.16.zip --operation r2-publish:tobirink-firefox-mv3-1.0.16.zip --operation worker-deploy",
+            "npm run infra:apply -- --plan .ctxroute/state/deploy-1.0.16-local-first-plan.json --approve 47e88cad87a5fe48e0b75da58c76f1c7e9366f314ef78461a35c683ac3fe1127 --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.16.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.16.zip --allow worker:tobirink-public-api",
+            "PLAYWRIGHT_BASE_URL=https://tobirink.com npm run test:e2e --workspace @tobirink/web",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m \"test(release): certify 1.0.16 publication\""
           ],
           "evidence": [
-            "Gate 45d191ea218c83a1832adbbd8338da5a09ad4a07627fdd76fa16e73e0a7d6070 published 1.0.11 ZIPs and Worker 6d02c19a-9760-44ae-ab89-26e82bbc77e0; no D1 migration; previous Worker retained as rollback reference",
-            "Public Chrome SHA256 66c467b1e11f89bc9f18ddc7c57a9c996db4ae53b494a7740ec41ce1315529ea and Firefox SHA256 69e5ff42bf685e6ff1366fd1e08054db00c06101267d6ce549ebf5fce891b2bb equal reproducible artifacts; download advertises 1.0.11; library HTTP 200",
-            "external: User library DOM is empty; browser control cannot access internal extension manager. Installed version, queue diagnostics and actual private-library recovery remain unverified; user asked to open Options"
+            "PR 23 merged as d6ebdc672706a28df3b0afe33bf5bd85c624d901 after local and push gates; GitHub hosted jobs were unable to start because of the account billing or Actions spending limit",
+            "Cloudflare gate 47e88cad87a5fe48e0b75da58c76f1c7e9366f314ef78461a35c683ac3fe1127 published Worker f000c895-35a5-480c-b913-8e6b041f49f8 at 100 percent and only the two 1.0.16 ZIP keys; no D1 migration or deletion",
+            "Public Chrome b565e7d517a612cb1180365d8ce6be61b1de1ec40bb9049da5790e6d83408dc1 and Firefox cdcf41bff28fa22a3c5b00a3e73fe617a583c0e7a3debceb2a8b6a0c1ca22a1c SHA256 values match the reproducible local archives",
+            "Production routes return the expected 200 HTML and 404 JSON statuses; Playwright production suite passes 7 of 7 including packaged multi-provider resolution and offline reload",
+            "npm run verify passes all validation typechecks workspace tests parser equivalence performance CRG integration zero-vulnerability audit and Archify showcase 9 of 9"
           ]
         },
         {

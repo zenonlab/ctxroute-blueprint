@@ -2,8 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.14`. The locally verified candidate is
-`1.0.16`.
+The current production release is `1.0.16`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -58,8 +57,26 @@ zero Reviews at import. The current deterministic artifacts are:
 - Chrome: 288483 bytes, SHA-256 `b565e7d517a612cb1180365d8ce6be61b1de1ec40bb9049da5790e6d83408dc1`.
 - Firefox: 288528 bytes, SHA-256 `cdcf41bff28fa22a3c5b00a3e73fe617a583c0e7a3debceb2a8b6a0c1ca22a1c`.
 
-This candidate is local. WebBridge v4 requires the extension and site update to
-be published together through a separately approved release operation.
+PR #23 merged the release branch into `main` as
+`d6ebdc672706a28df3b0afe33bf5bd85c624d901`. GitHub did not start its hosted
+jobs because account payments or the Actions spending limit require attention;
+the administrative merge used the passing local verification and repository
+push hooks as evidence instead.
+
+Approved Cloudflare gate plan
+`47e88cad87a5fe48e0b75da58c76f1c7e9366f314ef78461a35c683ac3fe1127`
+published only the two versioned archives and Worker
+`f000c895-35a5-480c-b913-8e6b041f49f8` at 100 percent traffic. Both public
+downloads return HTTP 200 and match the hashes above. `/download` advertises
+1.0.16; `/`, `/library`, `/agenda`, `/download` and `/privacy` return HTML 200,
+and an unknown route returns JSON 404. The seven production Playwright journeys
+pass, including the packaged extension's multi-provider resolution and offline
+reload.
+
+No D1 migration, deletion, secret change or R2 cover population occurred.
+Worker `1ac73214-008b-4d56-a3d3-be7c1162ba9d` and the immutable 1.0.14 archives
+remain rollback references. An unpacked browser installation still requires a
+manual reload or replacement with the 1.0.16 package.
 
 ### Durable continuation candidate — 2026-09-12
 
