@@ -979,6 +979,17 @@ La pagination MangaDex utilise les champs officiels `limit`, `offset` et
 `total`; toute page incohérente reste réessayable. Une limite locale de
 candidats ne constitue jamais une preuve de fin de recherche.
 
+Le parser v4 relie structurellement le nom du favori au slug stable. Quand le
+nom contient plusieurs segments, l'unique segment humain dont la forme
+normalisée correspond au slug devient l'identité; progression, marque du
+lecteur et texte marketing restent hors du titre sans liste de sites écrite en
+dur. Un préfixe numérique de routage long n'est retiré qu'avec une sortie
+prouvée par l'URL et la même identité corroborée par le nom. Les nombres
+intrinsèques sont conservés. Un slug opaque accompagné de plusieurs segments
+humains non concordants reste sans identité plutôt que de choisir arbitrairement.
+Le titre et le slug bruts restent dans l'artefact local pour expliquer la
+décision et permettre un reparsing versionné.
+
 Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
 références publiques validées et utilisés pour hydrater exactement la source
 principale. Les anciens IDs décimaux ne sont pas convertis en IDs API.

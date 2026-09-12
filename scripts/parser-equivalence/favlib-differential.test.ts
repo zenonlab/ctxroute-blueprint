@@ -86,12 +86,19 @@ function projectTobiRink(fixture: DifferentialCase) {
   return { progress: artifact.progress === undefined ? undefined : { kind: artifact.progress.kind, value: artifact.progress.value }, status: artifact.status, title: artifact.displayTitle };
 }
 
+function normalizedTitle(value: string | undefined): string | undefined {
+  return value?.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
 describe.runIf(available)('readonly FavLib differential oracle', () => {
   it('executes the pinned reference and classifies every synthetic difference', () => {
     const reference = loadReferenceParser();
     const results = cases.map((fixture) => ({ fixture, reference: projectReference(reference, fixture), tobirink: projectTobiRink(fixture) }));
     for (const result of results) {
-      if (result.fixture.classification === 'retained-behavior') expect(result.tobirink).toEqual(result.reference);
+      if (result.fixture.classification === 'retained-behavior') {
+        expect({ ...result.tobirink, title: normalizedTitle(result.tobirink.title) })
+          .toEqual({ ...result.reference, title: normalizedTitle(result.reference.title) });
+      }
       else {
         expect(result.fixture.id).toBe('routing-suffix');
         expect(result.reference.title).toBe('synthetic shadow chronicle 006');
@@ -102,6 +109,17 @@ describe.runIf(available)('readonly FavLib differential oracle', () => {
       ['chapter', 'retained-behavior'], ['routing-prefix', 'retained-behavior'], ['routing-suffix', 'intentional-improvement'],
       ['intrinsic-number', 'retained-behavior'], ['episode', 'retained-behavior'], ['opaque-route', 'retained-behavior'],
     ]);
+  });
+
+  it.each([
+    { id: 'chapter-brand', stableSlug: 'synthetic-hero-return', title: 'Chapter 51 | Synthetic Hero Return | Reader Harbor' },
+    { id: 'special-marketing', stableSlug: 'synthetic-golden-courier', title: 'Synthetic Golden Courier | Special Episode 2 [END] | Read Free Comics Online' },
+    { id: 'chapter-source', stableSlug: 'synthetic-artifact-appraiser', title: 'Synthetic Artifact Appraiser | Chapter 18 | Void Reader' },
+  ])('keeps the FavLib identity while excluding unrelated title segments: $id', ({ id, stableSlug, title }) => {
+    const reference = loadReferenceParser();
+    const fixture: DifferentialCase = { classification: 'retained-behavior', id, mediaKind: 'MANGA', rawSlug: stableSlug, stableSlug, title, url: `https://reader.invalid/series/${stableSlug}/chapter-51`, release: { kind: 'chapter', raw: 'chapter-51', value: 51 } };
+    expect(normalizedTitle(projectTobiRink(fixture).title)).toBe(normalizedTitle(projectReference(reference, fixture).title));
+    expect(normalizedTitle(projectTobiRink(fixture).title)).toBe(normalizedTitle(stableSlug));
   });
 });
 

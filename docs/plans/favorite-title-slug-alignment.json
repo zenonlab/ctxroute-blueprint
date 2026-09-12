@@ -1,0 +1,43 @@
+{
+  "goalId": "goal-favorite-title-slug-alignment",
+  "title": "Aligner universellement le nom favori et le slug",
+  "approved": true,
+  "validationEvidence": [
+    "Quatre regressions reelles reproduites en lecture seule",
+    "Comparaison du parseur FavLib 3267de2",
+    "Approbation explicite de la liaison nom favori et slug"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Corriger et certifier l alignement structurel titre slug",
+      "acceptance": [
+        "Un seul segment du favori aligne avec le slug devient l identite",
+        "Les segments de progression marque et marketing non alignes ne contaminent pas l identite",
+        "Un identifiant de routage long est retire seulement avec progression URL et corroboration exacte",
+        "Les nombres intrinseques et les titres multi segments ambigus restent preserves",
+        "Les artefacts existants sont reparses par une nouvelle version du parseur"
+      ],
+      "files": [
+        "packages/application/src/favorites/favorite-parser.ts",
+        "packages/application/src/favorites/favorite-parser.test.ts",
+        "packages/application/src/favorites/source-evidence.ts",
+        "packages/application/src/favorites/source-evidence.test.ts",
+        "scripts/parser-equivalence/favlib-differential.test.ts",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/architecture/src/favorite-resolution.lifecycle.json"
+      ],
+      "commands": [
+        "Tests favoris cibles",
+        "npm run test:parser-equivalence",
+        "Tests application et extension",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "npm run archify:validate -- favorite-resolution.lifecycle",
+        "git diff --check",
+        "git commit -m fix(parser): align favorite titles with source slugs"
+      ]
+    }
+  ]
+}

@@ -21,7 +21,7 @@ const anilistAdapter: FavoriteSourceAdapter = {
 
 describe('favorite source evidence U-01…U-10', () => {
   it('separates an attached chapter and a long routing prefix from a root work slug', () => {
-    expect(extractFavoriteSourceEvidence(input('routing-prefix', 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/'))).toMatchObject({
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-routing-prefix', title: '0906168628 Genius of the Unique Lineage', url: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/' })).toMatchObject({
       canonicalUrl: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage',
       identityTransformations: ['numeric-routing-prefix'],
       rawSlug: '0906168628-genius-of-the-unique-lineage-chapter-31',
@@ -29,6 +29,15 @@ describe('favorite source evidence U-01…U-10', () => {
       stableSlug: 'genius-of-the-unique-lineage',
       title: 'genius of the unique lineage',
     });
+  });
+
+  it('removes a non-zero long routing prefix only when the same route proves a release', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-nonzero-routing-prefix', title: '1674484774 Skeleton Soldier Couldnt Protect the Dungeon', url: 'https://reader.invalid/1674484774-skeleton-soldier-couldnt-protect-the-dungeon-chapter-51' })).toMatchObject({
+      identityTransformations: ['numeric-routing-prefix'],
+      release: { kind: 'chapter', value: 51 },
+      stableSlug: 'skeleton-soldier-couldnt-protect-the-dungeon',
+    });
+    expect(extractFavoriteSourceEvidence(input('unproven-numeric-title', 'https://reader.invalid/1674484774-skeleton-soldier-couldnt-protect-the-dungeon'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED' });
   });
 
   it.each(['86-eighty-six', '91-days', 'area-88', '100000-money-game'])('preserves an intrinsic numeric work identity: %s', (slug) => {

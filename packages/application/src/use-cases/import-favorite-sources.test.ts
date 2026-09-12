@@ -28,7 +28,7 @@ describe('importFavoriteSources', () => {
     const [after] = await storage.listFavoriteSources({ limit: 1 });
     const newArtifact = after === undefined ? undefined : await storage.getFavoriteParseArtifact(after.id);
     expect(after?.id).toBe(before?.id);
-    expect(newArtifact?.artifact).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', parserVersion: 'favorite-parser-v3', progress: { value: 66.1 }, transformations: ['numeric-routing-suffix'] });
+    expect(newArtifact?.artifact).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', parserVersion: 'favorite-parser-v4', progress: { value: 66.1 }, transformations: ['numeric-routing-suffix'] });
     expect(after && await storage.getFavoriteResolutionTask(after.id.replace(/^source_/u, 'favorite-resolution_'))).toMatchObject({ state: 'READY' });
   });
 

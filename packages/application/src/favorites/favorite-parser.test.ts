@@ -25,5 +25,19 @@ describe('favorite identity parser I-01…I-07', () => {
     observation('0906168628 Genius of the Unique Lineage'),
     evidence({ identityTransformations: ['numeric-routing-prefix'], mediaKind: 'UNKNOWN', rawSlug: '0906168628-genius-of-the-unique-lineage-chapter-31', release: { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', raw: 'chapter-31', value: 31 }, releaseSuffix: 'chapter-31', stableSlug: 'genius-of-the-unique-lineage' }),
   )).toMatchObject({ aliases: [{ provenance: 'stable-url-slug', value: 'Genius of the Unique Lineage' }], displayTitle: 'Genius of the Unique Lineage', identityKey: 'genius of the unique lineage', progress: { kind: 'chapter', value: 31 }, transformations: ['numeric-routing-prefix'] }));
+  it.each([
+    ['Chapitre 51 | The Hero Returns | LegacyScans', 'the-hero-returns', 'The Hero Returns', 'the hero returns'],
+    ['A Wannabe Golden Gangster | Special Episode 2 [END] | Read Free Manga Online', 'a-wannabe-golden-gangster', 'A Wannabe Golden Gangster', 'a wannabe golden gangster'],
+    ['Artifact Reading Appraiser | Chapter 18 | Void Scans', 'artifact-reading-appraiser', 'Artifact Reading Appraiser', 'artifact reading appraiser'],
+  ])('uses the unique bookmark segment aligned with the source slug: %s', (title, stableSlug, displayTitle, identityKey) => {
+    expect(parseFavoriteObservation(observation(title), evidence({ mediaKind: 'MANGA', rawSlug: stableSlug, stableSlug }))).toMatchObject({ displayTitle, identityKey });
+  });
+  it('removes a corroborated long routing prefix without a site-specific title rule', () => expect(parseFavoriteObservation(
+    observation('1674484774 Skeleton Soldier Couldnt Protect the Dungeon'),
+    evidence({ identityTransformations: ['numeric-routing-prefix'], mediaKind: 'MANGA', rawSlug: '1674484774-skeleton-soldier-couldnt-protect-the-dungeon', release: { kind: 'chapter', provenance: 'URL_PATH', raw: 'chapter-51', value: 51 }, stableSlug: 'skeleton-soldier-couldnt-protect-the-dungeon' }),
+  )).toMatchObject({ displayTitle: 'Skeleton Soldier Couldnt Protect the Dungeon', identityKey: 'skeleton soldier couldnt protect the dungeon', progress: { kind: 'chapter', value: 51 } }));
+  it('does not select one unrelated human segment for an opaque source slug', () => expect(parseFavoriteObservation(
+    observation('First Candidate | Second Candidate'), evidence({ rawSlug: 'route-zx731904', stableSlug: 'route-zx731904' }),
+  )).toMatchObject({ diagnostics: ['OPAQUE_IDENTITY_UNCORROBORATED'], status: 'identity-missing' }));
   it('is deeply deterministic and immutable', () => { const first = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); const second = parseFavoriteObservation(observation('Frieren'), evidence({ stableSlug: 'frieren' })); expect(first).toEqual(second); expect(Object.isFrozen(first)).toBe(true); expect(Object.isFrozen(first.segments)).toBe(true); });
 });

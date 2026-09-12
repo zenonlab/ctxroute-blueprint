@@ -2,6 +2,7 @@ import { createSourceEvidence } from '@tobirink/domain';
 import type { FavoriteMediaKind, FavoriteUrlDisposition, SourceEvidence } from '@tobirink/domain';
 import { qualifyFavoriteUrl } from './eligibility';
 import type { EligibleFavoriteUrl } from './eligibility';
+import { normalizeFavoriteTitle } from './title-normalization';
 import { segmentFavoriteTitle } from './title-segmentation';
 
 export interface FavoriteSourceEvidenceInput {
@@ -30,11 +31,20 @@ const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostf
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
 
-function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release']): StructuralIdentity {
+function comparableIdentity(value: string): string {
+  return normalizeFavoriteTitle(value).normalized;
+}
+
+function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release'], observedTitle: string): StructuralIdentity {
   if (release === undefined) return { slug, transformed: false };
-  const match = /^(0\d{5,11})[-_.]+(.+)$/u.exec(slug);
+  const match = /^(\d{6,12})[-_.]+(.+)$/u.exec(slug);
+  const prefix = match?.[1];
   const remainder = match?.[2];
-  return remainder !== undefined && /\p{L}/u.test(remainder)
+  const remainderKey = comparableIdentity(remainder ?? '');
+  const corroborated = prefix !== undefined && remainder !== undefined && segmentFavoriteTitle(observedTitle).segments
+    .filter((segment) => !segment.excluded)
+    .some((segment) => comparableIdentity(segment.cleaned).replace(new RegExp(`^${prefix}\\s+`, 'u'), '') === remainderKey);
+  return corroborated && /\p{L}/u.test(remainder ?? '')
     ? { slug: remainder, transformed: true }
     : { slug, transformed: false };
 }
@@ -119,7 +129,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   }
   const structuralIdentity = stableSlug === undefined
     ? { slug: '', transformed: false }
-    : stripLeadingRoutingIdentifier(stableSlug, release);
+    : stripLeadingRoutingIdentifier(stableSlug, release, input.title);
   stableSlug = structuralIdentity.slug || stableSlug;
   const normalizedSlug = stableSlug?.toLowerCase();
   if (stableSlug === undefined || observedSlug === undefined || normalizedSlug === undefined || /^\d+$/u.test(normalizedSlug) || structuralSegments.has(normalizedSlug)) {

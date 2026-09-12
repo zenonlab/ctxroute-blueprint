@@ -4,9 +4,10 @@ import { extractFavoriteProgression } from './progression-extraction';
 import { extractFavoriteSeason } from './season-extraction';
 import { normalizeFavoriteTitle } from './title-normalization';
 import { segmentFavoriteTitle } from './title-segmentation';
+import type { FavoriteTitleAnalysis } from './title-segmentation';
 import { favoriteMatcherVersion } from './provider-matcher';
 
-export const favoriteParserVersion = 'favorite-parser-v3';
+export const favoriteParserVersion = 'favorite-parser-v4';
 interface MutableFavoriteAlias { provenance: 'aligned-bookmark-segment' | 'stable-url-slug'; value: string }
 
 function fingerprint(parts: readonly string[]): string {
@@ -33,23 +34,39 @@ function containsRoutingIdentifier(value: string, evidence: SourceEvidence): boo
   return normalizeFavoriteTitle(value).compact === normalizeFavoriteTitle(rawSlugTitle).compact;
 }
 
-function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transformations: FavoriteTransformation[]): string | undefined {
+function uniqueHumanSegments(analysis: FavoriteTitleAnalysis): readonly string[] {
+  return [...new Map(analysis.segments
+    .filter((segment) => !segment.excluded)
+    .map((segment) => [normalizeFavoriteTitle(segment.cleaned).normalized, segment.cleaned] as const)).values()];
+}
+
+function alignedHumanSegment(slug: string, analysis: FavoriteTitleAnalysis): string | undefined {
+  if (analysis.segments.length < 2) return undefined;
+  const slugKey = normalizeFavoriteTitle(slug.replace(/[-_.]+/gu, ' ')).compact;
+  const matches = uniqueHumanSegments(analysis).filter((segment) => normalizeFavoriteTitle(segment).compact === slugKey);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function identityFrom(evidence: SourceEvidence, titleAnalysis: FavoriteTitleAnalysis, transformations: FavoriteTransformation[]): string | undefined {
   if (evidence.disposition !== undefined) return undefined;
   const slug = evidence.stableSlug ?? evidence.title;
   if (slug === undefined) return undefined;
-  const human = cleanedTitle.trim();
   const slugTitle = slug.replace(/[-_.]+/gu, ' ').trim();
+  const alignedHuman = alignedHumanSegment(slug, titleAnalysis);
+  const humanSegments = uniqueHumanSegments(titleAnalysis);
+  const human = alignedHuman ?? titleAnalysis.cleanedTitle.trim();
   const slugParts = slug.split(/[-_.]+/u).filter(Boolean);
   const opaqueToken = (value: string) => value.length >= 6 && /^[\p{L}\d]+$/u.test(value) && /\p{L}/u.test(value) && /\d/u.test(value)
     && !/^(?=.*\p{L}{4,})(?=.*\d{1,2}$)[\p{L}\d]+$/u.test(value);
   const opaque = /^[a-f\d]{8,}$/iu.test(slug.replace(/[-_.]/gu, '')) || opaqueToken(slug)
     || (slugParts.length > 1 && slugParts.slice(0, -1).every((part) => /^\p{L}{2,16}$/u.test(part)) && opaqueToken(slugParts.at(-1) ?? ''));
   if (opaque) {
-    if (human.length === 0 || normalizeFavoriteTitle(human).compact === normalizeFavoriteTitle(slugTitle).compact) return undefined;
-    transformations.push('opaque-url-slug-replaced'); return human;
+    const corroboratedHuman = alignedHuman ?? (humanSegments.length === 1 ? humanSegments[0] : undefined);
+    if (corroboratedHuman === undefined || normalizeFavoriteTitle(corroboratedHuman).compact === normalizeFavoriteTitle(slugTitle).compact) return undefined;
+    transformations.push('opaque-url-slug-replaced'); return corroboratedHuman;
   }
   const bracket = human.match(/\[([^\]]+)\]\s*$/u)?.[1];
-  let reconciled = slugTitle;
+  let reconciled = alignedHuman ?? slugTitle;
   const withoutPrefix = reconciled.replace(/^\d+\s+(?:vostfr|vf|vo|sub|dub)\s+/iu, '');
   if (withoutPrefix !== reconciled && normalizeFavoriteTitle(withoutPrefix).compact.includes(normalizeFavoriteTitle(human.replace(/\s*\[[^\]]+\]\s*$/u, '')).compact)) {
     reconciled = withoutPrefix; transformations.push('numeric-routing-prefix', 'language-marker');
@@ -63,7 +80,7 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
   }
   const routingTransformations = evidence.identityTransformations ?? [];
   let corroboratingHuman = human;
-  if (routingTransformations.includes('numeric-routing-prefix')) corroboratingHuman = corroboratingHuman.replace(/^0\d{5,11}\s+/u, '');
+  if (routingTransformations.includes('numeric-routing-prefix')) corroboratingHuman = corroboratingHuman.replace(/^\d{6,12}\s+/u, '');
   if (routingTransformations.includes('numeric-routing-suffix')) corroboratingHuman = corroboratingHuman.replace(/\s+0\d{2,4}$/u, '');
   if (routingTransformations.length > 0 && normalizeFavoriteTitle(reconciled).compact === normalizeFavoriteTitle(corroboratingHuman).compact) return corroboratingHuman;
   return reconciled;
@@ -73,7 +90,7 @@ export function parseFavoriteObservation(observation: FavoriteObservation, evide
   const titleAnalysis = segmentFavoriteTitle(observation.title, hostname(evidence));
   const seasonEvidence = extractFavoriteSeason(observation.title, evidence);
   const transformations = [...titleAnalysis.transformations, ...(evidence.identityTransformations ?? [])];
-  const identity = identityFrom(evidence, titleAnalysis.cleanedTitle, transformations);
+  const identity = identityFrom(evidence, titleAnalysis, transformations);
   const diagnostics = [...evidence.diagnostics];
   if (identity === undefined) diagnostics.push(evidence.rawSlug === undefined ? 'URL_IDENTITY_MISSING' : 'OPAQUE_IDENTITY_UNCORROBORATED');
   const aliases: MutableFavoriteAlias[] = identity === undefined || containsRelease(identity) ? [] : [{ provenance: 'stable-url-slug', value: identity }];

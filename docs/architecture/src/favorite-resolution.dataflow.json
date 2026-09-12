@@ -118,7 +118,7 @@
       "stage": 1,
       "row": 4,
       "width": 150,
-      "tag": "route média + titre · versionné"
+      "tag": "route + alignement titre/slug · v4"
     },
     {
       "id": "parseArtifact",

@@ -388,3 +388,7 @@
 ## Publier et verifier la persistance utilisateur 1.0.21 — DONE
 
 - [x] **Publier les archives 1.0.21 et le Worker puis verifier la production** — DONE _(evidence: Cloudflare gates 1bd21ee1 and e9b7d958 published only the two immutable 1.0.21 R2 archives and the Worker; no D1 action ran, Worker c1eef241-0eed-4f2c-b389-598f0106763d is at 100 percent, no D1 migration is pending, and the production download page advertises both 1.0.21 links, Both public downloads return 200 with immutable caching and exact certified SHA-256 hashes; five production Playwright journeys, docs validation, production-publication Archify showcase 9/9 and git diff check pass)_
+
+## Aligner universellement le nom favori et le slug — DONE
+
+- [x] **Corriger et certifier l alignement structurel titre slug** — DONE _(evidence: Parser v4 resolves the four reported title forms through unique normalized bookmark-segment to stable-slug alignment; long numeric prefixes require release and title corroboration while intrinsic numbers remain unchanged., Application 344/344, extension 151/151 and pinned readonly FavLib synthetic differential 5/5 pass; the 82-case oracle snapshot changed only parser version and semantic fingerprints., npm run verify passed all repository gates with zero dependency vulnerabilities; favorite-resolution dataflow and lifecycle each pass Archify showcase 9/9 with zero errors and warnings.)_

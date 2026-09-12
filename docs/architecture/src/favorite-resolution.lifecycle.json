@@ -7,7 +7,7 @@
     "quality_profile": "showcase",
     "viewBox": [1080, 790],
     "views": [
-      { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Les alarmes reprennent chaque lot sans clic manuel; les titres deviennent visibles avant l’hydratation." },
+      { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Les alarmes reprennent chaque lot sans clic manuel; l’alignement titre/slug v4 rend les identités locales visibles avant l’hydratation." },
       { "id": "automatic-recovery", "label": "Reprise automatique", "focus": ["inventory", "scheduled", "resolving"], "note": "Checkpoint, tâche et échéance persistent avant chaque suspension MV3; un réveil scanne jusqu’à seize pages synchronisables." },
       { "id": "user-control", "label": "Contrôle utilisateur", "focus": ["resolving", "paused", "userAction"], "note": "Pause et limite de tentatives sont visibles; une reprise explicite conserve les données." }
     ]
