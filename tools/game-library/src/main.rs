@@ -5,9 +5,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
     gcn::{
-        inspect_bti_texture, inspect_j3d_animation, inspect_j3d_material_animation,
-        inspect_j3d_material_table, inspect_j3d_model, inspect_jai_animation_sound, inspect_rarc,
-        inspect_stage,
+        inspect_bti_texture, inspect_dzb_collision, inspect_j3d_animation,
+        inspect_j3d_material_animation, inspect_j3d_material_table, inspect_j3d_model,
+        inspect_jai_animation_sound, inspect_rarc, inspect_stage,
     },
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
@@ -97,6 +97,10 @@ enum Command {
         input: PathBuf,
     },
     InspectJ3dMaterialTable {
+        #[arg(long)]
+        input: PathBuf,
+    },
+    InspectDzbCollision {
         #[arg(long)]
         input: PathBuf,
     },
@@ -207,6 +211,10 @@ fn main() -> Result<()> {
         }
         Command::InspectJ3dMaterialTable { input } => {
             let result = inspect_j3d_material_table(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectDzbCollision { input } => {
+            let result = inspect_dzb_collision(&input)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::InspectPpcResourceCalls {

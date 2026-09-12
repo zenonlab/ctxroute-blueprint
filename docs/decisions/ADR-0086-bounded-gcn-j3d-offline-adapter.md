@@ -79,6 +79,12 @@ bindings qui restent externes. Le nombre de sections déclaré et le nombre rée
 stocké demeurent deux faits distincts : un fichier auto-borné peut être inventorié
 avec `declaration_complete: false`, mais cet écart ne peut fermer une qualification.
 
+La collision DZB reste une famille indépendante du mesh rendu. Son lecteur préserve
+les six tables sources — sommets, triangles, blocs, arbre, groupes et propriétés —,
+valide toutes leurs références et expose hiérarchie, transforms et bornes. Aucun code
+runtime ne déduit une logique de jeu d'un bit de propriété non encore relié à son
+contrôleur source.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans

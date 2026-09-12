@@ -90,6 +90,9 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-material-table --input private/source/material-table.bmt
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-dzb-collision --input private/source/collision.dzb
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-ppc-resource-calls \
   --input private/source/linked.elf \
   --module actor-controller \
@@ -137,6 +140,12 @@ indices de textures, puis applique le même lecteur BTI aux entrées TEX1. Le ra
 distingue les bindings externes et une déclaration de sections incomplète. Il ne
 qualifie pas encore les opérations TEV, blend, alpha, fog ou depth référencées par
 les tables MAT3.
+
+Le lecteur DZB conserve sommets, triangles, propriétés, blocs, arbre spatial et
+hiérarchie de groupes en repère source. Il vérifie chaque référence croisée, les noms,
+les transforms finies et les bornes asymétriques. Ce reçu qualifie la structure de
+collision ; il ne transforme pas automatiquement une propriété physique en matériau
+visuel ou en comportement de thème.
 
 L'inspection PPC complète cette preuve quand le source exporté est incomplet. Elle
 lit un ELF32 big-endian borné, limite l'analyse à une plage exécutable explicite ou

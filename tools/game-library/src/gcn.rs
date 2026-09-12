@@ -318,6 +318,37 @@ pub struct J3dNamedTexture {
     pub texture: BtiTexture,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct DzbCollisionReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub byte_order: &'static str,
+    pub vertices: usize,
+    pub triangles: usize,
+    pub blocks: usize,
+    pub tree_nodes: usize,
+    pub groups: Vec<DzbGroup>,
+    pub property_records: usize,
+    pub source_bounds: Option<Bounds3>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct DzbGroup {
+    pub name: String,
+    pub source_scale: [f32; 3],
+    pub source_rotation: [i16; 3],
+    pub source_translation: [f32; 3],
+    pub parent: Option<u16>,
+    pub next_sibling: Option<u16>,
+    pub first_child: Option<u16>,
+    pub room_id: u16,
+    pub first_vertex: u16,
+    pub tree_root: Option<u16>,
+    pub flags: String,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -436,6 +467,201 @@ pub fn inspect_j3d_material_table(path: &Path) -> Result<J3dMaterialTableReport>
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_j3d_material_table(&bytes)
+}
+
+pub fn inspect_dzb_collision(path: &Path) -> Result<DzbCollisionReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "DZB input must be a regular file"
+    );
+    ensure!(
+        metadata.len() >= 0x34 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "DZB input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_dzb_collision(&bytes)
+}
+
+pub fn parse_dzb_collision(bytes: &[u8]) -> Result<DzbCollisionReport> {
+    ensure!(
+        bytes.len() >= 0x34 && bytes.len() <= MAX_J3D_BYTES,
+        "DZB input exceeds the bounded size"
+    );
+    let counts = [0, 8, 0x10, 0x18, 0x20, 0x28]
+        .map(|offset| read_u32(bytes, offset).map(|value| value as usize));
+    let counts: [usize; 6] = counts
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?
+        .try_into()
+        .expect("six DZB counts");
+    for count in counts {
+        ensure!(count <= MAX_J3D_VALUES, "DZB table count exceeds the limit");
+    }
+    let offsets = [4, 0x0c, 0x14, 0x1c, 0x24, 0x2c]
+        .map(|offset| read_u32(bytes, offset).map(|value| value as usize));
+    let offsets: [usize; 6] = offsets
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?
+        .try_into()
+        .expect("six DZB offsets");
+    for ((count, offset), (stride, tag)) in counts.into_iter().zip(offsets).zip([
+        (12, "vertices"),
+        (10, "triangles"),
+        (2, "blocks"),
+        (20, "tree nodes"),
+        (52, "groups"),
+        (16, "properties"),
+    ]) {
+        ensure_counted_span(bytes, offset, count, stride, &format!("DZB {tag}"))?;
+    }
+
+    let mut bounds: Option<Bounds3> = None;
+    for index in 0..counts[0] {
+        let offset = offsets[0] + index * 12;
+        let point = [
+            read_f32(bytes, offset)?,
+            read_f32(bytes, offset + 4)?,
+            read_f32(bytes, offset + 8)?,
+        ];
+        if let Some(current) = &mut bounds {
+            for (axis, value) in point.into_iter().enumerate() {
+                current.min[axis] = current.min[axis].min(value);
+                current.max[axis] = current.max[axis].max(value);
+            }
+        } else {
+            bounds = Some(Bounds3 {
+                min: point,
+                max: point,
+            });
+        }
+    }
+    for index in 0..counts[1] {
+        let offset = offsets[1] + index * 10;
+        for axis in 0..3 {
+            ensure!(
+                usize::from(read_u16(bytes, offset + axis * 2)?) < counts[0],
+                "DZB triangle vertex exceeds table"
+            );
+        }
+        ensure!(
+            usize::from(read_u16(bytes, offset + 6)?) < counts[5],
+            "DZB triangle property exceeds table"
+        );
+        ensure!(
+            usize::from(read_u16(bytes, offset + 8)?) < counts[4],
+            "DZB triangle group exceeds table"
+        );
+    }
+    for index in 0..counts[2] {
+        ensure!(
+            usize::from(read_u16(bytes, offsets[2] + index * 2)?) <= counts[1],
+            "DZB block start exceeds triangles"
+        );
+    }
+    for index in 0..counts[3] {
+        let offset = offsets[3] + index * 20;
+        let leaf = read_u16(bytes, offset)? & 1 != 0;
+        let references = if leaf { 1 } else { 8 };
+        let limit = if leaf { counts[2] } else { counts[3] };
+        for child in 0..references {
+            validate_optional_index(
+                read_u16(bytes, offset + 4 + child * 2)?,
+                limit,
+                "DZB tree reference",
+            )?;
+        }
+    }
+    let mut groups = Vec::with_capacity(counts[4]);
+    for index in 0..counts[4] {
+        let offset = offsets[4] + index * 52;
+        let name_offset = read_u32(bytes, offset)? as usize;
+        let name = parse_c_string(bytes, name_offset, "DZB group")?;
+        let parent = optional_index(
+            read_u16(bytes, offset + 0x24)?,
+            counts[4],
+            "DZB group parent",
+        )?;
+        let next_sibling = optional_index(
+            read_u16(bytes, offset + 0x26)?,
+            counts[4],
+            "DZB group sibling",
+        )?;
+        let first_child = optional_index(
+            read_u16(bytes, offset + 0x28)?,
+            counts[4],
+            "DZB group child",
+        )?;
+        let tree_root =
+            optional_index(read_u16(bytes, offset + 0x2e)?, counts[3], "DZB group tree")?;
+        let first_vertex = read_u16(bytes, offset + 0x2c)?;
+        ensure!(
+            usize::from(first_vertex) <= counts[0],
+            "DZB group vertex exceeds table"
+        );
+        groups.push(DzbGroup {
+            name,
+            source_scale: [
+                read_f32(bytes, offset + 4)?,
+                read_f32(bytes, offset + 8)?,
+                read_f32(bytes, offset + 12)?,
+            ],
+            source_rotation: [
+                read_i16(bytes, offset + 0x10)?,
+                read_i16(bytes, offset + 0x12)?,
+                read_i16(bytes, offset + 0x14)?,
+            ],
+            source_translation: [
+                read_f32(bytes, offset + 0x18)?,
+                read_f32(bytes, offset + 0x1c)?,
+                read_f32(bytes, offset + 0x20)?,
+            ],
+            parent,
+            next_sibling,
+            first_child,
+            room_id: read_u16(bytes, offset + 0x2a)?,
+            first_vertex,
+            tree_root,
+            flags: format!("0x{:08x}", read_u32(bytes, offset + 0x30)?),
+        });
+    }
+    Ok(DzbCollisionReport {
+        format: "orbite.dzb-collision-index/1",
+        adapter: "gcn.dzb-collision",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        byte_order: "big-endian",
+        vertices: counts[0],
+        triangles: counts[1],
+        blocks: counts[2],
+        tree_nodes: counts[3],
+        groups,
+        property_records: counts[5],
+        source_bounds: bounds,
+    })
+}
+
+fn optional_index(value: u16, limit: usize, tag: &str) -> Result<Option<u16>> {
+    if value == u16::MAX {
+        return Ok(None);
+    }
+    ensure!(usize::from(value) < limit, "{tag} exceeds table");
+    Ok(Some(value))
+}
+
+fn validate_optional_index(value: u16, limit: usize, tag: &str) -> Result<()> {
+    optional_index(value, limit, tag).map(|_| ())
+}
+
+fn parse_c_string(bytes: &[u8], offset: usize, tag: &str) -> Result<String> {
+    ensure!(offset < bytes.len(), "{tag} name exceeds input");
+    let end = bytes[offset..]
+        .iter()
+        .position(|byte| *byte == 0)
+        .context("unterminated name")?;
+    ensure!(end > 0, "empty {tag} name");
+    String::from_utf8(bytes[offset..offset + end].to_vec()).context("non-UTF-8 name")
 }
 
 pub fn parse_j3d_material_table(bytes: &[u8]) -> Result<J3dMaterialTableReport> {
@@ -2608,6 +2834,45 @@ mod tests {
         bytes
     }
 
+    fn fixture_dzb() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0xc1];
+        for (field, count, offset) in [
+            (0, 3_u32, 0x34_u32),
+            (8, 1, 0x58),
+            (0x10, 1, 0x86),
+            (0x18, 1, 0x62),
+            (0x20, 1, 0x88),
+            (0x28, 1, 0x76),
+        ] {
+            bytes[field..field + 4].copy_from_slice(&count.to_be_bytes());
+            bytes[field + 4..field + 8].copy_from_slice(&offset.to_be_bytes());
+        }
+        for (index, point) in [[-2.0_f32, 1.0, 5.0], [7.0, 3.0, -4.0], [1.0, -6.0, 9.0]]
+            .into_iter()
+            .enumerate()
+        {
+            for (axis, value) in point.into_iter().enumerate() {
+                let offset = 0x34 + index * 12 + axis * 4;
+                bytes[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+            }
+        }
+        bytes[0x5a..0x5c].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x5c..0x5e].copy_from_slice(&2_u16.to_be_bytes());
+        bytes[0x62..0x64].copy_from_slice(&1_u16.to_be_bytes());
+        let group = 0x88;
+        bytes[group..group + 4].copy_from_slice(&0xbc_u32.to_be_bytes());
+        for offset in [4, 8, 12] {
+            bytes[group + offset..group + offset + 4]
+                .copy_from_slice(&1.0_f32.to_bits().to_be_bytes());
+        }
+        for offset in [0x24, 0x26, 0x28] {
+            bytes[group + offset..group + offset + 2].copy_from_slice(&u16::MAX.to_be_bytes());
+        }
+        bytes[group + 0x2a..group + 0x2c].copy_from_slice(&2_u16.to_be_bytes());
+        bytes[0xbc..].copy_from_slice(b"root\0");
+        bytes
+    }
+
     fn fixture_bck_with_embedded_sound() -> Vec<u8> {
         let mut bytes = fixture_bck();
         bytes.resize(0x120, 0);
@@ -2836,6 +3101,27 @@ mod tests {
         let mut invalid = fixture_bmt(true);
         invalid[0x20 + 0x1e0..0x20 + 0x1e2].copy_from_slice(&9_u16.to_be_bytes());
         assert!(parse_j3d_material_table(&invalid).is_err());
+    }
+
+    #[test]
+    fn inventories_dzb_collision_topology_groups_and_asymmetric_bounds() {
+        let report = parse_dzb_collision(&fixture_dzb()).unwrap();
+        assert_eq!(report.vertices, 3);
+        assert_eq!(report.triangles, 1);
+        assert_eq!(report.groups[0].name, "root");
+        assert_eq!(report.groups[0].room_id, 2);
+        assert_eq!(report.source_bounds.unwrap().min, [-2.0, -6.0, -4.0]);
+    }
+
+    #[test]
+    fn rejects_dzb_triangle_and_tree_references_outside_tables() {
+        let mut triangle = fixture_dzb();
+        triangle[0x58..0x5a].copy_from_slice(&3_u16.to_be_bytes());
+        assert!(parse_dzb_collision(&triangle).is_err());
+
+        let mut tree = fixture_dzb();
+        tree[0x66..0x68].copy_from_slice(&1_u16.to_be_bytes());
+        assert!(parse_dzb_collision(&tree).is_err());
     }
 
     #[test]

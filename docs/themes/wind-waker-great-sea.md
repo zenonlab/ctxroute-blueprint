@@ -297,6 +297,12 @@ le reçu les marque `declaration_complete: false`. Les tables TEV, alpha, blend,
 depth ne sont pas encore traduites : ni ces trois écarts ni la seule fermeture des
 textures ne permettent de passer le gate de dépendances.
 
+Les 25 DZB de cette fermeture acteur passent ensuite le lecteur de collision : 2 808
+sommets, 4 204 triangles et 129 groupes, avec références de propriétés et arbres
+spatiaux contrôlés. Le total atteint 570 inspections sur 570. La structure physique
+est donc inventoriée, mais les significations détaillées des propriétés et les tables
+MAT3/TEV restent à relier avant de fermer la dépendance transitive.
+
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
 macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non
