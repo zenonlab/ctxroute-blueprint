@@ -5,9 +5,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
     gcn::{
-        inspect_bti_texture, inspect_dzb_collision, inspect_j3d_animation,
-        inspect_j3d_material_animation, inspect_j3d_material_table, inspect_j3d_model,
-        inspect_jai_animation_sound, inspect_rarc, inspect_stage,
+        FixedRecordTableOptions, GxRawTextureOptions, RecordCountEncoding, inspect_bti_texture,
+        inspect_dzb_collision, inspect_fixed_record_table, inspect_gx_raw_texture,
+        inspect_j3d_animation, inspect_j3d_material_animation, inspect_j3d_material_table,
+        inspect_j3d_model, inspect_jai_animation_sound, inspect_rarc, inspect_stage,
     },
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
@@ -96,6 +97,40 @@ enum Command {
         #[arg(long)]
         input: PathBuf,
     },
+    InspectGxRawTexture {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        format: String,
+        #[arg(long)]
+        width: u16,
+        #[arg(long)]
+        height: u16,
+        #[arg(long)]
+        wrap_s: String,
+        #[arg(long)]
+        wrap_t: String,
+        #[arg(long, default_value_t = 1)]
+        mipmap_count: u8,
+        #[arg(long)]
+        palette_format: Option<String>,
+        #[arg(long, default_value_t = 0)]
+        palette_colors: u16,
+    },
+    InspectFixedRecordTable {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        magic: String,
+        #[arg(long)]
+        count_offset: usize,
+        #[arg(long, value_enum)]
+        count_encoding: CliRecordCountEncoding,
+        #[arg(long)]
+        records_offset: usize,
+        #[arg(long)]
+        record_size: usize,
+    },
     InspectJ3dMaterialTable {
         #[arg(long)]
         input: PathBuf,
@@ -128,6 +163,15 @@ enum Adapter {
     GcnJ3d,
     Zelda64,
     Mkw,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CliRecordCountEncoding {
+    U8,
+    U16Be,
+    U16Le,
+    U32Be,
+    U32Le,
 }
 
 fn main() -> Result<()> {
@@ -207,6 +251,58 @@ fn main() -> Result<()> {
         }
         Command::InspectBtiTexture { input } => {
             let result = inspect_bti_texture(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectGxRawTexture {
+            input,
+            format,
+            width,
+            height,
+            wrap_s,
+            wrap_t,
+            mipmap_count,
+            palette_format,
+            palette_colors,
+        } => {
+            let result = inspect_gx_raw_texture(
+                &input,
+                &GxRawTextureOptions {
+                    gx_format: format,
+                    width,
+                    height,
+                    wrap_s,
+                    wrap_t,
+                    mipmap_count,
+                    palette_format,
+                    palette_colors,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectFixedRecordTable {
+            input,
+            magic,
+            count_offset,
+            count_encoding,
+            records_offset,
+            record_size,
+        } => {
+            let result = inspect_fixed_record_table(
+                &input,
+                &FixedRecordTableOptions {
+                    expected_magic: magic.into_bytes(),
+                    count_offset,
+                    count_encoding: match count_encoding {
+                        CliRecordCountEncoding::U8 => RecordCountEncoding::U8,
+                        CliRecordCountEncoding::U16Be => RecordCountEncoding::U16BigEndian,
+                        CliRecordCountEncoding::U16Le => RecordCountEncoding::U16LittleEndian,
+                        CliRecordCountEncoding::U32Be => RecordCountEncoding::U32BigEndian,
+                        CliRecordCountEncoding::U32Le => RecordCountEncoding::U32LittleEndian,
+                    },
+                    records_offset,
+                    record_size,
+                },
+            )?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::InspectJ3dMaterialTable { input } => {

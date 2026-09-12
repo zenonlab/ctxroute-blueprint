@@ -303,6 +303,14 @@ spatiaux contrôlés. Le total atteint 570 inspections sur 570. La structure phy
 est donc inventoriée, mais les significations détaillées des propriétés et les tables
 MAT3/TEV restent à relier avant de fermer la dépendance transitive.
 
+Trois payloads bruts supplémentaires sont désormais reliés au source épinglé puis
+inspectés sans règle propre au jeu : une table à 7 enregistrements de 16 octets, un
+masque GX I4 128×128 et une texture GX I8 64×64. Le total atteint 573 inspections
+réussies sur 573 tentées. Deux ressources C4 restent hors inspection : le source
+confirme leur identité et leur famille, mais pas encore leurs dimensions, format de
+palette, disposition de palette ou sampler. Leur taille seule n'est pas une preuve ;
+la fermeture des dépendances reste donc à 573 payloads qualifiés sur 575.
+
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
 macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non

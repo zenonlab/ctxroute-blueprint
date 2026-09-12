@@ -87,6 +87,15 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-bti-texture --input private/source/texture.bti
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-gx-raw-texture --input private/source/texture.raw \
+  --format i8 --width 64 --height 64 --wrap-s clamp --wrap-t clamp
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-fixed-record-table --input private/source/table.bin \
+  --magic FREE_TABLE --count-offset 10 --count-encoding u16-be \
+  --records-offset 16 --record-size 8
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-material-table --input private/source/material-table.bmt
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
@@ -133,6 +142,17 @@ de taille suit les tuiles GX propres à chaque format, y compris RGBA8 et CMPR. 
 incohérence format indexé/palette, un niveau impossible ou une plage tronquée ferme
 l'inspection ; le lecteur n'effectue encore ni décodage RGBA ni approximation de
 matériau.
+
+Les textures GX sans en-tête sont inspectées par le même calcul de tuiles, mais leur
+format, leurs dimensions, leurs wraps, leurs mipmaps et leur éventuelle palette sont
+des arguments obligatoirement fournis par une relation source privée. Le lecteur
+exige que l'image et la palette terminale explicitement déclarée expliquent exactement
+tous les octets. Il ne déduit aucun paramètre du nom ou de la taille du fichier.
+
+Le lecteur de tables fixes est lui aussi configuré : magic attendu, offset et largeur
+du compteur, endian, début et taille des enregistrements. Il vérifie que le compteur
+explique exactement le payload et publie seulement les empreintes des enregistrements,
+sans inventer la sémantique de leurs champs.
 
 L'inspection BMT accepte les compositions `MAT3`, `TEX1` ou les deux, comme le loader
 J3D source. Elle résout les remaps de matériaux, noms, modes et huit slots vers les

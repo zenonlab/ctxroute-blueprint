@@ -72,6 +72,14 @@ anisotropie, palette et offsets. Les tailles de payload sont recalculées avec l
 dimensions de tuiles GX puis comparées aux plages physiques ; une texture lisible ne
 vaut toutefois pas encore qualification de son matériau TEV.
 
+Un payload GX sans en-tête n'est accepté qu'avec une relation source privée donnant
+explicitement format, dimensions, sampler, mipmaps et palette. L'adaptateur réutilise
+le calcul de tuiles BTI et exige que l'image puis la palette terminale déclarée
+expliquent exactement le fichier. Le nom et la taille ne deviennent jamais une
+preuve de disposition. Les tables binaires simples suivent la même règle : un lecteur
+générique reçoit magic, compteur, endian, offset et taille des records, borne toutes
+les plages et expose des empreintes sans interpréter les champs propres au jeu.
+
 Une table BMT est lue comme une composition de sections optionnelles `MAT3` et
 `TEX1`. L'adaptateur matérialise les remaps de matériaux et les bindings de slots,
 réutilise exactement le lecteur BTI pour les textures embarquées et compte les

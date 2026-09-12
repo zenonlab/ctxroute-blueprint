@@ -247,6 +247,81 @@ pub struct BtiTextureReport {
     pub texture: BtiTexture,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct GxRawTextureOptions {
+    pub gx_format: String,
+    pub width: u16,
+    pub height: u16,
+    pub wrap_s: String,
+    pub wrap_t: String,
+    pub mipmap_count: u8,
+    pub palette_format: Option<String>,
+    pub palette_colors: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct GxRawTextureReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub byte_order: &'static str,
+    pub gx_format: String,
+    pub width: u16,
+    pub height: u16,
+    pub wrap_s: String,
+    pub wrap_t: String,
+    pub indexed: bool,
+    pub mipmap_count: u8,
+    pub image_offset: usize,
+    pub image_bytes: usize,
+    pub palette_format: Option<String>,
+    pub palette_colors: u16,
+    pub palette_offset: Option<usize>,
+    pub palette_bytes: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RecordCountEncoding {
+    U8,
+    U16BigEndian,
+    U16LittleEndian,
+    U32BigEndian,
+    U32LittleEndian,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FixedRecordTableOptions {
+    pub expected_magic: Vec<u8>,
+    pub count_offset: usize,
+    pub count_encoding: RecordCountEncoding,
+    pub records_offset: usize,
+    pub record_size: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct FixedRecordTableReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub magic_hex: String,
+    pub count_encoding: &'static str,
+    pub record_count: usize,
+    pub records_offset: usize,
+    pub record_size: usize,
+    pub header_sha256: String,
+    pub records: Vec<FixedRecord>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct FixedRecord {
+    pub index: usize,
+    pub offset: usize,
+    pub bytes: usize,
+    pub sha256: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BtiTexture {
     pub gx_format: &'static str,
@@ -452,6 +527,42 @@ pub fn inspect_bti_texture(path: &Path) -> Result<BtiTextureReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_bti_texture(&bytes)
+}
+
+pub fn inspect_gx_raw_texture(
+    path: &Path,
+    options: &GxRawTextureOptions,
+) -> Result<GxRawTextureReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "raw GX texture input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "raw GX texture input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_gx_raw_texture(&bytes, options)
+}
+
+pub fn inspect_fixed_record_table(
+    path: &Path,
+    options: &FixedRecordTableOptions,
+) -> Result<FixedRecordTableReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "fixed-record table input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "fixed-record table input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_fixed_record_table(&bytes, options)
 }
 
 pub fn inspect_j3d_material_table(path: &Path) -> Result<J3dMaterialTableReport> {
@@ -865,6 +976,228 @@ fn parse_tex1(section: &[u8]) -> Result<Vec<J3dNamedTexture>> {
         .collect()
 }
 
+pub fn parse_gx_raw_texture(
+    bytes: &[u8],
+    options: &GxRawTextureOptions,
+) -> Result<GxRawTextureReport> {
+    ensure!(
+        !bytes.is_empty() && bytes.len() <= MAX_J3D_BYTES,
+        "raw GX texture input exceeds the bounded size"
+    );
+    ensure!(
+        options.width > 0 && options.height > 0,
+        "raw GX texture dimensions must be non-zero"
+    );
+    ensure!(
+        options.mipmap_count > 0,
+        "raw GX texture mipmap count must be non-zero"
+    );
+    let (tile_width, tile_height, tile_bytes, indexed) = gx_texture_layout(&options.gx_format)?;
+    let wrap_s = parse_gx_wrap_name(&options.wrap_s)?;
+    let wrap_t = parse_gx_wrap_name(&options.wrap_t)?;
+    let image_bytes = gx_image_bytes(
+        options.width,
+        options.height,
+        options.mipmap_count,
+        tile_width,
+        tile_height,
+        tile_bytes,
+        "raw GX texture",
+    )?;
+    let palette_bytes = usize::from(options.palette_colors)
+        .checked_mul(2)
+        .context("raw GX texture palette size overflow")?;
+    if indexed {
+        ensure!(
+            options.palette_format.is_some() && options.palette_colors > 0,
+            "indexed raw GX texture requires an explicit palette"
+        );
+        ensure!(
+            options.palette_colors <= gx_palette_limit(&options.gx_format)?,
+            "raw GX texture palette exceeds the format limit"
+        );
+    } else {
+        ensure!(
+            options.palette_format.is_none() && options.palette_colors == 0,
+            "non-indexed raw GX texture cannot declare a palette"
+        );
+    }
+    let palette_format = options
+        .palette_format
+        .as_deref()
+        .map(parse_gx_palette_name)
+        .transpose()?;
+    let expected_bytes = image_bytes
+        .checked_add(palette_bytes)
+        .context("raw GX texture size overflow")?;
+    ensure!(
+        bytes.len() == expected_bytes,
+        "raw GX texture size does not match its declared layout"
+    );
+    Ok(GxRawTextureReport {
+        format: "orbite.gx-raw-texture-index/1",
+        adapter: "gcn.gx-raw-texture",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        byte_order: "big-endian",
+        gx_format: options.gx_format.to_ascii_lowercase(),
+        width: options.width,
+        height: options.height,
+        wrap_s: wrap_s.to_owned(),
+        wrap_t: wrap_t.to_owned(),
+        indexed,
+        mipmap_count: options.mipmap_count,
+        image_offset: 0,
+        image_bytes,
+        palette_format: palette_format.map(str::to_owned),
+        palette_colors: options.palette_colors,
+        palette_offset: (palette_bytes > 0).then_some(image_bytes),
+        palette_bytes,
+    })
+}
+
+pub fn parse_fixed_record_table(
+    bytes: &[u8],
+    options: &FixedRecordTableOptions,
+) -> Result<FixedRecordTableReport> {
+    ensure!(
+        !bytes.is_empty() && bytes.len() <= MAX_J3D_BYTES,
+        "fixed-record table input exceeds the bounded size"
+    );
+    ensure!(
+        !options.expected_magic.is_empty() && options.expected_magic.len() <= 64,
+        "fixed-record table magic length is invalid"
+    );
+    ensure!(
+        options.record_size > 0 && options.record_size <= MAX_J3D_BYTES,
+        "fixed-record table record size is invalid"
+    );
+    let count_bytes = match options.count_encoding {
+        RecordCountEncoding::U8 => 1,
+        RecordCountEncoding::U16BigEndian | RecordCountEncoding::U16LittleEndian => 2,
+        RecordCountEncoding::U32BigEndian | RecordCountEncoding::U32LittleEndian => 4,
+    };
+    ensure!(
+        options.expected_magic.len() <= options.records_offset
+            && options
+                .count_offset
+                .checked_add(count_bytes)
+                .is_some_and(|end| end <= options.records_offset),
+        "fixed-record table header fields overlap records"
+    );
+    ensure_span(
+        bytes,
+        0,
+        1,
+        options.expected_magic.len(),
+        "fixed-record table magic",
+    )?;
+    ensure!(
+        bytes.starts_with(&options.expected_magic),
+        "fixed-record table magic mismatch"
+    );
+    let (record_count, count_encoding) = match options.count_encoding {
+        RecordCountEncoding::U8 => {
+            ensure_span(
+                bytes,
+                options.count_offset,
+                1,
+                1,
+                "fixed-record table count",
+            )?;
+            (usize::from(bytes[options.count_offset]), "u8")
+        }
+        RecordCountEncoding::U16BigEndian => (
+            usize::from(read_u16(bytes, options.count_offset)?),
+            "u16-big-endian",
+        ),
+        RecordCountEncoding::U16LittleEndian => {
+            ensure_span(
+                bytes,
+                options.count_offset,
+                1,
+                2,
+                "fixed-record table count",
+            )?;
+            (
+                usize::from(u16::from_le_bytes(
+                    bytes[options.count_offset..options.count_offset + 2]
+                        .try_into()
+                        .expect("validated u16 span"),
+                )),
+                "u16-little-endian",
+            )
+        }
+        RecordCountEncoding::U32BigEndian => (
+            usize::try_from(read_u32(bytes, options.count_offset)?)?,
+            "u32-big-endian",
+        ),
+        RecordCountEncoding::U32LittleEndian => {
+            ensure_span(
+                bytes,
+                options.count_offset,
+                1,
+                4,
+                "fixed-record table count",
+            )?;
+            (
+                usize::try_from(u32::from_le_bytes(
+                    bytes[options.count_offset..options.count_offset + 4]
+                        .try_into()
+                        .expect("validated u32 span"),
+                ))?,
+                "u32-little-endian",
+            )
+        }
+    };
+    ensure!(
+        record_count <= MAX_RECORDS_PER_CHUNK,
+        "fixed-record table count exceeds the limit"
+    );
+    ensure_counted_span(
+        bytes,
+        options.records_offset,
+        record_count,
+        options.record_size,
+        "fixed-record table records",
+    )?;
+    let records_bytes = record_count
+        .checked_mul(options.record_size)
+        .context("fixed-record table size overflow")?;
+    let expected_bytes = options
+        .records_offset
+        .checked_add(records_bytes)
+        .context("fixed-record table size overflow")?;
+    ensure!(
+        bytes.len() == expected_bytes,
+        "fixed-record table has trailing or missing bytes"
+    );
+    let records = (0..record_count)
+        .map(|index| {
+            let offset = options.records_offset + index * options.record_size;
+            FixedRecord {
+                index,
+                offset,
+                bytes: options.record_size,
+                sha256: hex::encode(Sha256::digest(&bytes[offset..offset + options.record_size])),
+            }
+        })
+        .collect();
+    Ok(FixedRecordTableReport {
+        format: "orbite.fixed-record-table-index/1",
+        adapter: "binary.fixed-record-table",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        magic_hex: hex::encode(&options.expected_magic),
+        count_encoding,
+        record_count,
+        records_offset: options.records_offset,
+        record_size: options.record_size,
+        header_sha256: hex::encode(Sha256::digest(&bytes[..options.records_offset])),
+        records,
+    })
+}
+
 pub fn parse_bti_texture(bytes: &[u8]) -> Result<BtiTextureReport> {
     ensure!(
         bytes.len() >= 0x20 && bytes.len() <= MAX_J3D_BYTES,
@@ -883,20 +1216,21 @@ pub fn parse_bti_texture(bytes: &[u8]) -> Result<BtiTextureReport> {
 fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
     ensure_span(bytes, header, 1, 0x20, "BTI header")?;
     let source_format = bytes[header];
-    let (gx_format, tile_width, tile_height, tile_bytes, indexed) = match source_format {
-        0 => ("i4", 8, 8, 32, false),
-        1 => ("i8", 8, 4, 32, false),
-        2 => ("ia4", 8, 4, 32, false),
-        3 => ("ia8", 4, 4, 32, false),
-        4 => ("rgb565", 4, 4, 32, false),
-        5 => ("rgb5a3", 4, 4, 32, false),
-        6 => ("rgba8", 4, 4, 64, false),
-        8 => ("c4", 8, 8, 32, true),
-        9 => ("c8", 8, 4, 32, true),
-        10 => ("c14x2", 4, 4, 32, true),
-        14 => ("cmpr", 8, 8, 32, false),
+    let gx_format = match source_format {
+        0 => "i4",
+        1 => "i8",
+        2 => "ia4",
+        3 => "ia8",
+        4 => "rgb565",
+        5 => "rgb5a3",
+        6 => "rgba8",
+        8 => "c4",
+        9 => "c8",
+        10 => "c14x2",
+        14 => "cmpr",
         value => bail!("unsupported BTI GX texture format {value}"),
     };
+    let (tile_width, tile_height, tile_bytes, indexed) = gx_texture_layout(gx_format)?;
     let width = read_u16(bytes, header + 2)?;
     let height = read_u16(bytes, header + 4)?;
     ensure!(width > 0 && height > 0, "BTI dimensions must be non-zero");
@@ -933,23 +1267,15 @@ fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
         mipmap_count <= max_levels,
         "BTI mipmap count exceeds dimensions"
     );
-    let mut level_width = usize::from(width);
-    let mut level_height = usize::from(height);
-    let mut image_bytes = 0_usize;
-    for _ in 0..mipmap_count {
-        let columns = level_width.div_ceil(tile_width);
-        let rows = level_height.div_ceil(tile_height);
-        image_bytes = image_bytes
-            .checked_add(
-                columns
-                    .checked_mul(rows)
-                    .and_then(|tiles| tiles.checked_mul(tile_bytes))
-                    .context("BTI image size overflow")?,
-            )
-            .context("BTI image size overflow")?;
-        level_width = (level_width / 2).max(1);
-        level_height = (level_height / 2).max(1);
-    }
+    let image_bytes = gx_image_bytes(
+        width,
+        height,
+        mipmap_count,
+        tile_width,
+        tile_height,
+        tile_bytes,
+        "BTI",
+    )?;
     let image_offset = header
         .checked_add(read_u32(bytes, header + 28)? as usize)
         .context("BTI image offset overflow")?;
@@ -997,6 +1323,81 @@ fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
         palette_offset,
         palette_bytes,
     })
+}
+
+fn gx_texture_layout(format: &str) -> Result<(usize, usize, usize, bool)> {
+    match format.to_ascii_lowercase().as_str() {
+        "i4" => Ok((8, 8, 32, false)),
+        "i8" | "ia4" => Ok((8, 4, 32, false)),
+        "ia8" | "rgb565" | "rgb5a3" => Ok((4, 4, 32, false)),
+        "rgba8" => Ok((4, 4, 64, false)),
+        "c4" => Ok((8, 8, 32, true)),
+        "c8" => Ok((8, 4, 32, true)),
+        "c14x2" => Ok((4, 4, 32, true)),
+        "cmpr" => Ok((8, 8, 32, false)),
+        value => bail!("unsupported GX texture format {value}"),
+    }
+}
+
+fn gx_palette_limit(format: &str) -> Result<u16> {
+    match format.to_ascii_lowercase().as_str() {
+        "c4" => Ok(16),
+        "c8" => Ok(256),
+        "c14x2" => Ok(16_384),
+        value => bail!("GX texture format {value} is not indexed"),
+    }
+}
+
+fn gx_image_bytes(
+    width: u16,
+    height: u16,
+    mipmap_count: u8,
+    tile_width: usize,
+    tile_height: usize,
+    tile_bytes: usize,
+    tag: &str,
+) -> Result<usize> {
+    let max_levels = u8::try_from(u16::BITS - width.max(height).leading_zeros())?;
+    ensure!(
+        mipmap_count <= max_levels,
+        "{tag} mipmap count exceeds dimensions"
+    );
+    let mut level_width = usize::from(width);
+    let mut level_height = usize::from(height);
+    let mut image_bytes = 0_usize;
+    for _ in 0..mipmap_count {
+        let columns = level_width.div_ceil(tile_width);
+        let rows = level_height.div_ceil(tile_height);
+        image_bytes = image_bytes
+            .checked_add(
+                columns
+                    .checked_mul(rows)
+                    .and_then(|tiles| tiles.checked_mul(tile_bytes))
+                    .with_context(|| format!("{tag} image size overflow"))?,
+            )
+            .with_context(|| format!("{tag} image size overflow"))?;
+        level_width = (level_width / 2).max(1);
+        level_height = (level_height / 2).max(1);
+    }
+    Ok(image_bytes)
+}
+
+fn parse_gx_wrap_name(value: &str) -> Result<&'static str> {
+    match value.to_ascii_lowercase().as_str() {
+        "clamp" => Ok("clamp"),
+        "repeat" => Ok("repeat"),
+        "mirror" => Ok("mirror"),
+        value => bail!("unsupported GX wrap mode {value}"),
+    }
+}
+
+fn parse_gx_palette_name(value: &str) -> Result<&'static str> {
+    match value.to_ascii_lowercase().as_str() {
+        "ia8" => Ok("ia8"),
+        "rgb565" => Ok("rgb565"),
+        "rgb5a3" => Ok("rgb5a3"),
+        value => bail!("unsupported GX palette format {value}"),
+    }
 }
 
 fn parse_bti_wrap(value: u8) -> Result<&'static str> {
@@ -3078,6 +3479,87 @@ mod tests {
         let mut truncated = fixture_bti();
         truncated.truncate(40);
         assert!(parse_bti_texture(&truncated).is_err());
+    }
+
+    #[test]
+    fn inventories_headerless_gx_texture_from_explicit_layout() {
+        let mut bytes = vec![0x11; 128];
+        bytes.extend_from_slice(&[0x7f; 32]);
+        let report = parse_gx_raw_texture(
+            &bytes,
+            &GxRawTextureOptions {
+                gx_format: "c4".into(),
+                width: 16,
+                height: 16,
+                wrap_s: "clamp".into(),
+                wrap_t: "repeat".into(),
+                mipmap_count: 1,
+                palette_format: Some("rgb5a3".into()),
+                palette_colors: 16,
+            },
+        )
+        .unwrap();
+        assert!(report.indexed);
+        assert_eq!(report.image_bytes, 128);
+        assert_eq!(report.palette_offset, Some(128));
+        assert_eq!(report.palette_bytes, 32);
+    }
+
+    #[test]
+    fn rejects_headerless_gx_texture_guesses_that_do_not_match_bytes() {
+        let options = GxRawTextureOptions {
+            gx_format: "i4".into(),
+            width: 8,
+            height: 8,
+            wrap_s: "clamp".into(),
+            wrap_t: "clamp".into(),
+            mipmap_count: 1,
+            palette_format: None,
+            palette_colors: 0,
+        };
+        assert!(parse_gx_raw_texture(&[0; 31], &options).is_err());
+
+        let indexed_without_palette = GxRawTextureOptions {
+            gx_format: "c4".into(),
+            ..options
+        };
+        assert!(parse_gx_raw_texture(&[0; 32], &indexed_without_palette).is_err());
+    }
+
+    #[test]
+    fn inventories_configured_fixed_records_without_interpreting_payloads() {
+        let mut bytes = b"FREE_TABLE".to_vec();
+        bytes.extend_from_slice(&2_u16.to_be_bytes());
+        bytes.extend_from_slice(&[0; 4]);
+        bytes.extend_from_slice(&[1; 8]);
+        bytes.extend_from_slice(&[2; 8]);
+        let report = parse_fixed_record_table(
+            &bytes,
+            &FixedRecordTableOptions {
+                expected_magic: b"FREE_TABLE".to_vec(),
+                count_offset: 10,
+                count_encoding: RecordCountEncoding::U16BigEndian,
+                records_offset: 16,
+                record_size: 8,
+            },
+        )
+        .unwrap();
+        assert_eq!(report.record_count, 2);
+        assert_eq!(report.records[1].offset, 24);
+        assert_ne!(report.records[0].sha256, report.records[1].sha256);
+    }
+
+    #[test]
+    fn rejects_fixed_record_tables_with_bad_magic_or_unaccounted_bytes() {
+        let options = FixedRecordTableOptions {
+            expected_magic: b"TABLE".to_vec(),
+            count_offset: 5,
+            count_encoding: RecordCountEncoding::U8,
+            records_offset: 6,
+            record_size: 2,
+        };
+        assert!(parse_fixed_record_table(b"OTHER\x01xx", &options).is_err());
+        assert!(parse_fixed_record_table(b"TABLE\x01xxx", &options).is_err());
     }
 
     #[test]
