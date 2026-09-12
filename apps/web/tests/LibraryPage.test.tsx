@@ -37,4 +37,18 @@ describe('live local library', () => {
     expect(read).toHaveBeenLastCalledWith({ ...query, cursor: 'offset:24' });
     expect(window.location.search).toBe('');
   });
+
+  it('keeps the current facet options mounted while a changed query loads', async () => {
+    const initial = { ...page, facets: { ...page.facets, type: [{ count: 2, label: 'Manga', value: 'MANGA' }] }, total: 2 };
+    let finish: ((value: WebLibraryPage) => void) | undefined;
+    const read = vi.fn()
+      .mockResolvedValueOnce(initial)
+      .mockImplementationOnce(() => new Promise<WebLibraryPage>((resolve) => { finish = resolve; }));
+    const view = renderHook(({ currentQuery }) => useLibraryRefresh(read, true, currentQuery, 0), { initialProps: { currentQuery: query } });
+    await act(async () => { await Promise.resolve(); });
+    view.rerender({ currentQuery: { ...query, facets: { type: { MANGA: 'include' } } } });
+    await act(async () => { await Promise.resolve(); });
+    expect(view.result.current.page).toBe(initial);
+    await act(async () => { finish?.({ ...initial, query: { ...query, facets: { type: { MANGA: 'include' } } } }); });
+  });
 });

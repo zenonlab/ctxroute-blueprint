@@ -47,7 +47,7 @@ function LibrarySurface() {
     if (value.sort !== 'ADDED_DESC') params.set('sort', value.sort);
     for (const facet of facetNames) for (const [option, selection] of Object.entries(value[facet])) params.append(`f.${facet}`, `${selection}:${option}`);
     setFilters(value);
-    window.history.replaceState(null, '', params.size > 0 ? `/library?${params.toString()}` : '/library');
+    History.prototype.replaceState.call(window.history, null, '', params.size > 0 ? `/library?${params.toString()}` : '/library');
   };
 
   const { page, loading, failed, loadMore } = useLibraryRefresh(readLibrary, status === 'connected', query, retryCount);

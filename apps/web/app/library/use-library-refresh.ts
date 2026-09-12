@@ -15,7 +15,6 @@ export function useLibraryRefresh(readLibrary: (query: WebLibraryQuery) => Promi
     const currentGeneration = generation.current;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    setPage(undefined);
     setLoading(true);
     setFailed(false);
     const refresh = async () => {
