@@ -54,6 +54,9 @@ Un compilateur JPC séparé matérialise une sélection explicite d'émetteurs d
 `orbite.resolved-effects/1`. Il conserve les IDs comme valeurs opaques, décode les
 textures GX IA4/IA8, résout le mélange TEV primaire/environnement attesté et
 normalise les paramètres dynamiques dans le contrat de sprites du renderer commun.
+La taille résolue reproduit le facteur global `25` appliqué par
+`JPADraw::setParticleClipBoard` aux dimensions `BSP1`, au lieu de demander une
+compensation empirique dans une recette de thème.
 Les types de volume suivent l'enum et les fonctions d'échantillonnage du loader
 JParticle ; point, ligne, cercle et sphère ont une projection portable distincte.
 Les formes de ruban deviennent une projection portable `surface-stripe` distincte

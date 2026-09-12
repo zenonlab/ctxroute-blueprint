@@ -254,7 +254,8 @@ fn resolve_effect(
         [aspect, 1.0]
     } else {
         [1.0, 1.0 / aspect]
-    };
+    }
+    .map(|value| value * 25.0);
     ensure!(
         size.iter().all(|value| value.is_finite() && *value > 0.0),
         "invalid JPC sprite projection size"
@@ -564,6 +565,10 @@ mod tests {
             serde_json::json!([255, 255, 255, 255])
         );
         assert_eq!(pack["effects"][0]["particle"]["projection"], "billboard");
+        assert_eq!(
+            pack["effects"][0]["particle"]["size"],
+            serde_json::json!([25.0, 50.0])
+        );
         assert_eq!(pack["textures"][0]["width"], 8);
         assert_eq!(fs::read_dir(output.join("textures")).unwrap().count(), 1);
     }
