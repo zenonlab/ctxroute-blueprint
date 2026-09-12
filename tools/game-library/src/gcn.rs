@@ -6,10 +6,13 @@ use sha2::{Digest, Sha256};
 
 const MAX_STAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_J3D_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RARC_BYTES: usize = 128 * 1024 * 1024;
 const MAX_CHUNKS: usize = 256;
 const MAX_RECORDS_PER_CHUNK: usize = 65_536;
 const MAX_J3D_SECTIONS: usize = 64;
 const MAX_J3D_VALUES: usize = 8_000_000;
+const MAX_RARC_NODES: usize = 65_536;
+const MAX_RARC_ENTRIES: usize = 262_144;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct StageIndexReport {
@@ -106,6 +109,28 @@ pub struct J3dJointSummary {
     pub source_translation_bounds: Option<Bounds3>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RarcReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub byte_order: &'static str,
+    pub nodes: usize,
+    pub entries: usize,
+    pub files: Vec<RarcFile>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct RarcFile {
+    pub path: String,
+    pub file_id: u16,
+    pub flags: u8,
+    pub compression: &'static str,
+    pub stored_bytes: usize,
+    pub stored_sha256: String,
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -134,6 +159,238 @@ pub fn inspect_j3d_model(path: &Path) -> Result<J3dModelReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_j3d_model(&bytes)
+}
+
+pub fn inspect_rarc(path: &Path) -> Result<RarcReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "RARC input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_RARC_BYTES as u64,
+        "RARC input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_rarc(&bytes)
+}
+
+pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
+    ensure!(
+        bytes.len() >= 0x40 && bytes.len() <= MAX_RARC_BYTES,
+        "RARC input exceeds the bounded size"
+    );
+    ensure!(bytes.get(0..4) == Some(b"RARC"), "invalid RARC magic");
+    ensure!(
+        read_u32(bytes, 4)? as usize == bytes.len(),
+        "RARC declared size mismatch"
+    );
+    let header_length = read_u32(bytes, 8)? as usize;
+    let data_offset = read_u32(bytes, 12)? as usize;
+    ensure!(header_length >= 0x20, "invalid RARC header length");
+    let info = header_length;
+    ensure!(info + 0x20 <= bytes.len(), "truncated RARC data header");
+    let node_count = read_u32(bytes, info)? as usize;
+    let node_offset = info
+        .checked_add(read_u32(bytes, info + 4)? as usize)
+        .context("RARC node offset overflow")?;
+    let entry_count = read_u32(bytes, info + 8)? as usize;
+    let entry_offset = info
+        .checked_add(read_u32(bytes, info + 12)? as usize)
+        .context("RARC entry offset overflow")?;
+    let string_length = read_u32(bytes, info + 16)? as usize;
+    let string_offset = info
+        .checked_add(read_u32(bytes, info + 20)? as usize)
+        .context("RARC string offset overflow")?;
+    let file_data = header_length
+        .checked_add(data_offset)
+        .context("RARC data offset overflow")?;
+    ensure!(
+        node_count > 0 && node_count <= MAX_RARC_NODES,
+        "RARC node count exceeds the limit"
+    );
+    ensure!(
+        entry_count <= MAX_RARC_ENTRIES,
+        "RARC entry count exceeds the limit"
+    );
+    ensure_span(bytes, node_offset, node_count, 0x10, "RARC nodes")?;
+    ensure_span(bytes, entry_offset, entry_count, 0x14, "RARC entries")?;
+    ensure_span(bytes, string_offset, string_length, 1, "RARC strings")?;
+    ensure!(file_data <= bytes.len(), "RARC file data exceeds input");
+
+    let mut files = Vec::new();
+    let mut recursion_stack = vec![false; node_count];
+    let mut reached_nodes = vec![false; node_count];
+    let mut reached_entries = vec![false; entry_count];
+    walk_rarc_node(
+        bytes,
+        0,
+        "",
+        node_offset,
+        node_count,
+        entry_offset,
+        entry_count,
+        string_offset,
+        string_length,
+        file_data,
+        &mut recursion_stack,
+        &mut reached_nodes,
+        &mut reached_entries,
+        &mut files,
+    )?;
+    ensure!(
+        reached_nodes.into_iter().all(|value| value),
+        "RARC contains unreachable nodes"
+    );
+    ensure!(
+        reached_entries.into_iter().all(|value| value),
+        "RARC contains unreachable entries"
+    );
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(RarcReport {
+        format: "orbite.rarc-index/1",
+        adapter: "gcn.rarc",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        byte_order: "big-endian",
+        nodes: node_count,
+        entries: entry_count,
+        files,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn walk_rarc_node(
+    bytes: &[u8],
+    node_index: usize,
+    parent: &str,
+    node_offset: usize,
+    node_count: usize,
+    entry_offset: usize,
+    entry_count: usize,
+    string_offset: usize,
+    string_length: usize,
+    file_data: usize,
+    recursion_stack: &mut [bool],
+    reached_nodes: &mut [bool],
+    reached_entries: &mut [bool],
+    files: &mut Vec<RarcFile>,
+) -> Result<()> {
+    ensure!(
+        node_index < node_count,
+        "RARC directory points outside node table"
+    );
+    ensure!(
+        !recursion_stack[node_index],
+        "RARC directory cycle detected"
+    );
+    recursion_stack[node_index] = true;
+    reached_nodes[node_index] = true;
+    let node = node_offset + node_index * 0x10;
+    let count = read_u16(bytes, node + 10)? as usize;
+    let first = read_u32(bytes, node + 12)? as usize;
+    ensure!(
+        first
+            .checked_add(count)
+            .context("RARC entry range overflow")?
+            <= entry_count,
+        "RARC node entry range exceeds table"
+    );
+    for index in first..first + count {
+        reached_entries[index] = true;
+        let entry = entry_offset + index * 0x14;
+        let file_id = read_u16(bytes, entry)?;
+        let packed_name = read_u32(bytes, entry + 4)?;
+        let flags = (packed_name >> 24) as u8;
+        let name = read_c_string(
+            bytes,
+            string_offset,
+            string_length,
+            (packed_name & 0x00ff_ffff) as usize,
+        )?;
+        if name == "." || name == ".." {
+            continue;
+        }
+        ensure!(
+            !name.contains('/') && !name.is_empty(),
+            "unsafe RARC entry name"
+        );
+        let path = if parent.is_empty() {
+            name.to_owned()
+        } else {
+            format!("{parent}/{name}")
+        };
+        let data_offset = read_u32(bytes, entry + 8)? as usize;
+        let data_size = read_u32(bytes, entry + 12)? as usize;
+        if flags & 0x02 != 0 {
+            walk_rarc_node(
+                bytes,
+                data_offset,
+                &path,
+                node_offset,
+                node_count,
+                entry_offset,
+                entry_count,
+                string_offset,
+                string_length,
+                file_data,
+                recursion_stack,
+                reached_nodes,
+                reached_entries,
+                files,
+            )?;
+            continue;
+        }
+        let start = file_data
+            .checked_add(data_offset)
+            .context("RARC file offset overflow")?;
+        let end = start
+            .checked_add(data_size)
+            .context("RARC file span overflow")?;
+        ensure!(end <= bytes.len(), "RARC file exceeds data region");
+        files.push(RarcFile {
+            path,
+            file_id,
+            flags,
+            compression: if flags & 0x04 == 0 {
+                "none"
+            } else if flags & 0x80 != 0 {
+                "yaz0"
+            } else {
+                "yay0"
+            },
+            stored_bytes: data_size,
+            stored_sha256: hex::encode(Sha256::digest(&bytes[start..end])),
+        });
+    }
+    recursion_stack[node_index] = false;
+    Ok(())
+}
+
+fn read_c_string(
+    bytes: &[u8],
+    table_offset: usize,
+    table_length: usize,
+    relative: usize,
+) -> Result<&str> {
+    ensure!(
+        relative < table_length,
+        "RARC name offset exceeds string table"
+    );
+    let start = table_offset + relative;
+    let table_end = table_offset + table_length;
+    let end = bytes[start..table_end]
+        .iter()
+        .position(|byte| *byte == 0)
+        .map(|length| start + length)
+        .context("unterminated RARC name")?;
+    let value = std::str::from_utf8(&bytes[start..end]).context("non-UTF-8 RARC name")?;
+    ensure!(
+        !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_graphic()),
+        "invalid RARC name"
+    );
+    Ok(value)
 }
 
 pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
@@ -723,6 +980,52 @@ mod tests {
         bytes
     }
 
+    fn fixture_rarc() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0xe7];
+        bytes[0..4].copy_from_slice(b"RARC");
+        bytes[4..8].copy_from_slice(&0xe7_u32.to_be_bytes());
+        bytes[8..12].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[12..16].copy_from_slice(&0xc0_u32.to_be_bytes());
+        bytes[16..20].copy_from_slice(&7_u32.to_be_bytes());
+
+        let info = 0x20;
+        bytes[info..info + 4].copy_from_slice(&2_u32.to_be_bytes());
+        bytes[info + 4..info + 8].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[info + 8..info + 12].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[info + 12..info + 16].copy_from_slice(&0x40_u32.to_be_bytes());
+        bytes[info + 16..info + 20].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[info + 20..info + 24].copy_from_slice(&0x80_u32.to_be_bytes());
+
+        let nodes = 0x40;
+        bytes[nodes + 10..nodes + 12].copy_from_slice(&2_u16.to_be_bytes());
+        bytes[nodes + 12..nodes + 16].copy_from_slice(&0_u32.to_be_bytes());
+        bytes[nodes + 0x10 + 10..nodes + 0x10 + 12].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[nodes + 0x10 + 12..nodes + 0x10 + 16].copy_from_slice(&2_u32.to_be_bytes());
+
+        write_rarc_entry(&mut bytes, 0x60, 0xffff, 0x02, 5, 1, 0);
+        write_rarc_entry(&mut bytes, 0x74, 1, 0x01, 9, 0, 3);
+        write_rarc_entry(&mut bytes, 0x88, 2, 0x85, 15, 3, 4);
+        bytes[0xa0..0xb5].copy_from_slice(b"root\0sub\0a.bin\0b.bin\0");
+        bytes[0xe0..0xe7].copy_from_slice(b"abcdefg");
+        bytes
+    }
+
+    fn write_rarc_entry(
+        bytes: &mut [u8],
+        offset: usize,
+        file_id: u16,
+        flags: u8,
+        name_offset: u32,
+        data_offset: u32,
+        data_size: u32,
+    ) {
+        bytes[offset..offset + 2].copy_from_slice(&file_id.to_be_bytes());
+        bytes[offset + 4..offset + 8]
+            .copy_from_slice(&((u32::from(flags) << 24) | name_offset).to_be_bytes());
+        bytes[offset + 8..offset + 12].copy_from_slice(&data_offset.to_be_bytes());
+        bytes[offset + 12..offset + 16].copy_from_slice(&data_size.to_be_bytes());
+    }
+
     #[test]
     fn inventories_typed_stage_records_without_coordinate_guessing() {
         let report = parse_stage(&fixture_stage()).unwrap();
@@ -784,5 +1087,28 @@ mod tests {
         let mut non_finite = fixture_j3d();
         non_finite[0x90..0x94].copy_from_slice(&f32::NAN.to_bits().to_be_bytes());
         assert!(parse_j3d_model(&non_finite).is_err());
+    }
+
+    #[test]
+    fn inventories_nested_rarc_files_and_compression_without_extracting() {
+        let report = parse_rarc(&fixture_rarc()).unwrap();
+        assert_eq!(report.nodes, 2);
+        assert_eq!(report.entries, 3);
+        assert_eq!(report.files[0].path, "a.bin");
+        assert_eq!(report.files[0].compression, "none");
+        assert_eq!(report.files[1].path, "sub/b.bin");
+        assert_eq!(report.files[1].compression, "yaz0");
+        assert_eq!(report.files[1].stored_bytes, 4);
+    }
+
+    #[test]
+    fn rejects_rarc_traversal_names_and_invalid_directory_targets() {
+        let mut traversal = fixture_rarc();
+        traversal[0xa9..0xae].copy_from_slice(b"../x\0");
+        assert!(parse_rarc(&traversal).is_err());
+
+        let mut invalid_directory = fixture_rarc();
+        invalid_directory[0x68..0x6c].copy_from_slice(&99_u32.to_be_bytes());
+        assert!(parse_rarc(&invalid_directory).is_err());
     }
 }

@@ -263,6 +263,12 @@ canonique. Le même lecteur passe sur le modèle principal de l'île de l'Aurore
 corps du bateau. Les durées, pistes, matériaux, dépendances et raccords restent à
 fermer avant toute génération rendable.
 
+Le même adaptateur inventorie aussi les conteneurs RARC sans les extraire. Les 101
+archives de la Grande Mer — fond marin, 49 rooms, 49 LOD, LOD global et stage commun —
+passent le lecteur avec arbre, tailles, compression et empreintes contrôlés. Cette
+couverture ferme l'enveloppe des secteurs, mais pas encore leurs dépendances vers les
+archives d'acteurs et banques globales ; le gate de dépendances reste donc fermé.
+
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
 macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non

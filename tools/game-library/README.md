@@ -70,4 +70,12 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-model --input private/source/model.bdl
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-rarc --input private/source/archive.arc
 ```
+
+L'inspection RARC reconstruit l'arbre logique, calcule l'empreinte de chaque payload
+et expose les drapeaux de compression sans matérialiser les fichiers. Les noms avec
+traversée, les cycles, les plages hors limites et les cardinalités excessives sont
+refusés.
