@@ -33,11 +33,14 @@ const choicesSql = `INSERT INTO favorite_choices(owner_id, key_id, identity_hash
 const decisionsSql = `INSERT OR IGNORE INTO favorite_decisions(owner_id, nonce, choices_json)
   SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?1 AND nonce = ?2 AND execution_id = ?4)`;
 const publicCacheSql = `INSERT OR IGNORE INTO favorite_public_cache(
-    fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, candidate_json, created_at)
+    fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, metadata_json, created_at)
   SELECT json_extract(value, '$.key.fingerprint'), json_extract(value, '$.mediaKind'), json_extract(value, '$.identityHash'),
     json_extract(value, '$.key.parserVersion'), json_extract(value, '$.key.siteRulesVersion'), json_extract(value, '$.references'),
-    json_extract(value, '$.candidate'), ?5 FROM json_each(?1)
-  WHERE json_type(value, '$.candidate') = 'object'
+    json_extract(value, '$.metadata'), ?5 FROM json_each(?1)
+  WHERE json_type(value, '$.metadata') = 'object'
+    AND EXISTS (SELECT 1 FROM favorite_confirmations confirmation
+      WHERE confirmation.key_id = json_extract(value, '$.keyId')
+        AND confirmation.identity_hash = json_extract(value, '$.identityHash') AND confirmation.owner_count >= 2)
     AND EXISTS (SELECT 1 FROM favorite_receipts WHERE owner_id = ?2 AND nonce = ?3 AND execution_id = ?4)`;
 
 // Each key reads one owner row or at most two indexed, active shared identities.
@@ -125,12 +128,12 @@ export class D1FavoriteCollectiveAdapter implements FavoriteCollectiveServicePor
     if (command.operation === 'contribute') {
       const choices = await Promise.all(command.choices.map(async (choice) => {
         const references = [...choice.references].sort((a, b) => a.provider < b.provider ? -1 : 1);
-        return { ...choice, references, keyId: await collectiveDigest(JSON.stringify([1, choice.key.mediaKind, choice.key.fingerprint])), identityHash: await collectiveDigest(JSON.stringify([choice.mediaKind, references])) };
+        return { ...choice, references, keyId: await collectiveDigest(JSON.stringify([2, choice.key.mediaKind, choice.key.fingerprint, choice.key.parserVersion, choice.key.siteRulesVersion])), identityHash: await collectiveDigest(JSON.stringify([choice.mediaKind, references])) };
       }));
       const payload = JSON.stringify(choices);
       statements.push(this.database.prepare(keysSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(choicesSql).bind(payload, ownerId, command.nonce, executionId), this.database.prepare(decisionsSql).bind(ownerId, command.nonce, payload, executionId), this.database.prepare(publicCacheSql).bind(payload, ownerId, command.nonce, executionId, now));
     } else if (command.operation === 'lookup') {
-      const keys = await Promise.all(command.keys.map(async (key) => ({ ...key, keyId: await collectiveDigest(JSON.stringify([1, key.mediaKind, key.fingerprint])) })));
+      const keys = await Promise.all(command.keys.map(async (key) => ({ ...key, keyId: await collectiveDigest(JSON.stringify([2, key.mediaKind, key.fingerprint, key.parserVersion, key.siteRulesVersion])) })));
       statements.push(this.database.prepare(favoriteLookupReceiptSql).bind(ownerId, command.nonce, executionId, JSON.stringify(keys)));
     } else if (command.operation === 'pair') {
       statements.push(this.database.prepare(`INSERT OR IGNORE INTO favorite_pairings(owner_id, token_hash, expires_at)

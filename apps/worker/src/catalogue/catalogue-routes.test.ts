@@ -52,17 +52,24 @@ describe('public D1 catalogue', () => {
     expect(boundedWork.work.titles).toHaveLength(32);
   });
 
-  it('returns one public cached candidate and refuses an ambiguous fingerprint', async () => {
+  it('returns one confirmed title-free public identity and refuses an ambiguous fingerprint', async () => {
     const fingerprint = 'a'.repeat(64);
-    const candidate = { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] };
+    const identity = { mediaKind: 'ANIME', metadata: { genres: ['Adventure'], preSerialization: false, startYear: 2023 }, references: [{ provider: 'anilist', externalId: '154587' }] };
+    await env.COLLECTIVE_DB.prepare('INSERT INTO favorite_keys(key_id, fingerprint, media_kind, parser_version, rules_version) VALUES (?1, ?2, ?3, ?4, ?5)').bind('cache-key', fingerprint, 'UNKNOWN', 'parser-v4', 'rules-v3').run();
+    await env.COLLECTIVE_DB.prepare('INSERT INTO favorite_confirmations(key_id, identity_hash, media_kind, references_json, owner_count) VALUES (?1, ?2, ?3, ?4, 2)').bind('cache-key', 'b'.repeat(64), 'ANIME', JSON.stringify(identity.references)).run();
     const insert = env.COLLECTIVE_DB.prepare(`INSERT INTO favorite_public_cache
-      (fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, candidate_json, created_at)
+      (fingerprint, media_kind, identity_hash, parser_version, rules_version, references_json, metadata_json, created_at)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`);
-    await insert.bind(fingerprint, 'ANIME', 'b'.repeat(64), 'parser-v4', 'rules-v3', '[{"provider":"anilist","externalId":"154587"}]', JSON.stringify(candidate), 1).run();
+    await insert.bind(fingerprint, 'ANIME', 'b'.repeat(64), 'parser-v4', 'rules-v3', JSON.stringify(identity.references), JSON.stringify(identity.metadata), 1).run();
     const url = new URL('https://tobirink.test/v1/catalogue/favorites/resolve');
     for (const [name, value] of Object.entries({ fingerprint, mediaKind: 'ANIME', parserVersion: 'parser-v4', siteRulesVersion: 'rules-v3' })) url.searchParams.set(name, value);
-    expect(await (await SELF.fetch(url)).json()).toEqual({ candidate });
-    await insert.bind(fingerprint, 'ANIME', 'c'.repeat(64), 'parser-v4', 'rules-v3', '[{"provider":"kitsu-anime","externalId":"1"}]', JSON.stringify({ ...candidate, externalId: '1', provider: 'kitsu-anime' }), 1).run();
+    expect(await (await SELF.fetch(url)).json()).toEqual({ identity });
+    url.searchParams.set('mediaKind', 'UNKNOWN');
+    expect(await (await SELF.fetch(url)).json()).toEqual({ identity });
+    url.searchParams.set('mediaKind', 'ANIME');
+    const alternateReferences = [{ provider: 'kitsu-anime', externalId: '1' }];
+    await env.COLLECTIVE_DB.prepare('INSERT INTO favorite_confirmations(key_id, identity_hash, media_kind, references_json, owner_count) VALUES (?1, ?2, ?3, ?4, 2)').bind('cache-key', 'c'.repeat(64), 'ANIME', JSON.stringify(alternateReferences)).run();
+    await insert.bind(fingerprint, 'ANIME', 'c'.repeat(64), 'parser-v4', 'rules-v3', JSON.stringify(alternateReferences), JSON.stringify({ preSerialization: false }), 1).run();
     expect((await SELF.fetch(url)).status).toBe(404);
   });
 

@@ -5,9 +5,9 @@ CREATE TABLE favorite_public_cache (
   parser_version TEXT NOT NULL,
   rules_version TEXT NOT NULL,
   references_json TEXT NOT NULL CHECK (json_valid(references_json)),
-  candidate_json TEXT NOT NULL CHECK (json_valid(candidate_json)),
+  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json)),
   created_at INTEGER NOT NULL CHECK (created_at >= 0),
-  PRIMARY KEY (fingerprint, media_kind, identity_hash)
+  PRIMARY KEY (fingerprint, media_kind, parser_version, rules_version, identity_hash)
 ) STRICT;
 
 CREATE INDEX favorite_public_cache_lookup

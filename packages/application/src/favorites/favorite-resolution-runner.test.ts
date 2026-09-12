@@ -87,7 +87,7 @@ describe('runFavoriteResolutionSlice', () => {
     const result = await runFavoriteResolutionSlice({
       candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
-      publicCache: { findFavoriteCandidate: async () => candidate }, storage, token: () => 'public-cache',
+      publicCache: { findFavoriteIdentity: async () => ({ mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ provider: 'anilist', externalId: candidate.externalId }] }) }, storage, token: () => 'public-cache',
     });
     expect(result).toMatchObject({ completed: 1, retried: 0 });
     expect(search).not.toHaveBeenCalled(); expect(hydrate).not.toHaveBeenCalled();

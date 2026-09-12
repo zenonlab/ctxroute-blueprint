@@ -2,23 +2,42 @@ import { z } from 'zod';
 import { favoriteCollectiveKeySchema, favoriteCollectiveLookupQuerySchema, favoriteCollectiveLookupResultSchema, favoritePublicReferenceSchema } from './favorite-collective-lookup';
 import { favoriteSiteRulesSchema } from '../favorites/site-rules';
 import type { FavoriteSiteRules } from '../favorites/site-rules';
-import { providerCandidateSchema } from '../favorites/provider-search-checkpoint';
+import type { ProviderCandidate } from '@tobirink/domain';
 
 export const collectiveOpaqueIdSchema = z.uuid();
 export const collectiveTokenSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 export const favoriteOwnerCredentialsSchema = z.strictObject({ ownerId: collectiveOpaqueIdSchema, installationId: collectiveOpaqueIdSchema, token: collectiveTokenSchema });
 export type FavoriteOwnerCredentials = z.infer<typeof favoriteOwnerCredentialsSchema>;
 export const favoriteOwnerRegistrationSchema = favoriteOwnerCredentialsSchema.extend({ consent: z.literal(true), revokeToken: collectiveTokenSchema });
+const boundedMetadataText = z.string().trim().min(1).max(1024);
+const boundedCount = z.number().int().nonnegative();
+export const favoritePublicMetadataSchema = z.strictObject({
+  categories: z.array(boundedMetadataText).max(16).optional(),
+  chapterCount: boundedCount.optional(), endYear: z.number().int().min(1800).max(3000).optional(),
+  editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
+  episodeCount: boundedCount.optional(), format: boundedMetadataText.optional(), genres: z.array(boundedMetadataText).max(16).optional(),
+  popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: boundedCount }).optional(),
+  preSerialization: z.boolean(), startYear: z.number().int().min(1800).max(3000).optional(), volumeCount: boundedCount.optional(),
+});
+export type FavoritePublicMetadata = z.infer<typeof favoritePublicMetadataSchema>;
+export const favoritePublicCacheEntrySchema = z.strictObject({
+  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
+  metadata: favoritePublicMetadataSchema,
+  references: z.array(favoritePublicReferenceSchema).min(1).max(5).refine((refs) => new Set(refs.map((ref) => ref.provider)).size === refs.length),
+});
+export type FavoritePublicCacheEntry = z.infer<typeof favoritePublicCacheEntrySchema>;
+export function favoritePublicMetadata(candidate: ProviderCandidate): FavoritePublicMetadata {
+  const { categories, chapterCount, editorialStatus, endYear, episodeCount, format, genres, popularity, preSerialization, startYear, volumeCount } = candidate;
+  return favoritePublicMetadataSchema.parse({ categories, chapterCount, editorialStatus, endYear, episodeCount, format, genres, popularity, preSerialization, startYear, volumeCount });
+}
 export const favoriteCollectiveChoiceSchema = z.strictObject({
   key: favoriteCollectiveKeySchema,
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
   references: z.array(favoritePublicReferenceSchema).min(1).max(5).refine((refs) => new Set(refs.map((ref) => ref.provider)).size === refs.length),
   confirmed: z.boolean(),
-  candidate: providerCandidateSchema.optional(),
+  metadata: favoritePublicMetadataSchema.optional(),
 }).refine((choice) => choice.key.mediaKind === 'UNKNOWN' || choice.key.mediaKind === choice.mediaKind)
-  .refine((choice) => choice.references.every((ref) => choice.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'].includes(ref.provider) : ref.provider !== 'kitsu-anime'))
-  .refine((choice) => choice.candidate === undefined || choice.candidate.mediaKind === choice.mediaKind)
-  .refine((choice) => choice.candidate === undefined || choice.references.some((reference) => reference.provider === choice.candidate?.provider && reference.externalId === choice.candidate.externalId));
+  .refine((choice) => choice.references.every((ref) => choice.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'].includes(ref.provider) : ref.provider !== 'kitsu-anime'));
 export const favoriteCollectiveCommandSchema = z.discriminatedUnion('operation', [
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('lookup'), nonce: collectiveOpaqueIdSchema, keys: favoriteCollectiveLookupQuerySchema }),
   z.strictObject({ schemaVersion: z.literal(2), operation: z.literal('contribute'), nonce: collectiveOpaqueIdSchema, choices: z.array(favoriteCollectiveChoiceSchema).min(1).max(50).refine((choices) => new Set(choices.map(({ key }) => key.fingerprint)).size === choices.length) }),

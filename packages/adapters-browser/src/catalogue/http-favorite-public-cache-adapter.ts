@@ -1,4 +1,4 @@
-import { favoriteCollectiveKeySchema, providerCandidateSchema } from '@tobirink/application';
+import { favoriteCollectiveKeySchema, favoritePublicCacheEntrySchema } from '@tobirink/application';
 import type { FavoriteCollectiveKey, FavoritePublicCacheReadPort } from '@tobirink/application';
 import { z } from 'zod';
 
@@ -14,7 +14,7 @@ export class HttpFavoritePublicCacheAdapter implements FavoritePublicCacheReadPo
   private readonly origin: string;
   constructor(origin: string, private readonly fetcher: FavoritePublicCacheFetch = fetch) { this.origin = exactHttpsOrigin(origin); }
 
-  async findFavoriteCandidate(input: FavoriteCollectiveKey) {
+  async findFavoriteIdentity(input: FavoriteCollectiveKey) {
     const key = favoriteCollectiveKeySchema.parse(input);
     const url = new URL('/v1/catalogue/favorites/resolve', this.origin);
     url.searchParams.set('fingerprint', key.fingerprint);
@@ -27,6 +27,6 @@ export class HttpFavoritePublicCacheAdapter implements FavoritePublicCacheReadPo
     if (!response.ok) throw new Error(`Favorite cache request failed with status ${response.status}.`);
     const body = await response.text();
     if (new TextEncoder().encode(body).byteLength > 64 * 1024) throw new Error('Favorite cache response exceeds its byte limit.');
-    return z.strictObject({ candidate: providerCandidateSchema }).parse(JSON.parse(body)).candidate;
+    return z.strictObject({ identity: favoritePublicCacheEntrySchema }).parse(JSON.parse(body)).identity;
   }
 }

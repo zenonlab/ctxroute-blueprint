@@ -23,14 +23,19 @@ async function results(adapter: D1FavoriteCollectiveAdapter, credentials: Favori
 }
 
 describe('favorite owner SQL index', () => {
-  it('ingests validated public candidate metadata idempotently through an authenticated contribution', async () => {
-    const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB); const credentials = await owner(adapter);
-    const candidate = { externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic public title'], genres: ['Adventure'], startYear: 2026 };
-    const command: FavoriteCollectiveCommand = { schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [{ key, mediaKind: 'ANIME', references: [{ provider: 'anilist', externalId: '1' }], candidate, confirmed: false }] };
-    expect((await adapter.execute(credentials, command, 100)).kind).toBe('ACCEPTED');
-    expect((await adapter.execute(credentials, command, 100)).kind).toBe('ACCEPTED');
-    const rows = await env.COLLECTIVE_DB.prepare('SELECT candidate_json AS candidate FROM favorite_public_cache WHERE fingerprint = ?1').bind(key.fingerprint).all<{ candidate: string }>();
-    expect(rows.results.map((row) => JSON.parse(row.candidate))).toEqual([candidate]);
+  it('publishes title-free facet metadata only after two distinct human confirmations', async () => {
+    const adapter = new D1FavoriteCollectiveAdapter(env.COLLECTIVE_DB);
+    const first = await owner(adapter); const second = await owner(adapter);
+    const choice = { key, mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '1' }], metadata: { genres: ['Adventure'], preSerialization: false, startYear: 2026 } };
+    const contributeChoice = (confirmed: boolean): FavoriteCollectiveCommand => ({ schemaVersion: 2, operation: 'contribute', nonce: crypto.randomUUID(), choices: [{ ...choice, confirmed }] });
+    expect((await adapter.execute(first, contributeChoice(false), 100)).kind).toBe('ACCEPTED');
+    expect((await env.COLLECTIVE_DB.prepare('SELECT COUNT(*) AS count FROM favorite_public_cache').first<{ count: number }>())?.count).toBe(0);
+    expect((await adapter.execute(first, contributeChoice(true), 100)).kind).toBe('ACCEPTED');
+    expect((await env.COLLECTIVE_DB.prepare('SELECT COUNT(*) AS count FROM favorite_public_cache').first<{ count: number }>())?.count).toBe(0);
+    expect((await adapter.execute(second, contributeChoice(true), 100)).kind).toBe('ACCEPTED');
+    const rows = await env.COLLECTIVE_DB.prepare('SELECT metadata_json AS metadataJson, references_json AS referencesJson FROM favorite_public_cache WHERE fingerprint = ?1').bind(key.fingerprint).all<{ metadataJson: string; referencesJson: string }>();
+    expect(rows.results.map((row) => ({ metadata: JSON.parse(row.metadataJson), references: JSON.parse(row.referencesJson) }))).toEqual([{ metadata: choice.metadata, references: choice.references }]);
+    expect(JSON.stringify(rows.results)).not.toMatch(/title|url/u);
   });
 
   it('enforces the quota atomically under distinct concurrent nonces', async () => {
@@ -65,7 +70,7 @@ describe('favorite owner SQL index', () => {
     expect((await adapter.execute(first, contribute(), 100)).kind).toBe('ACCEPTED');
     expect(await results(adapter, first)).toMatchObject([{ kind: 'FOUND', scope: 'owner' }]);
     const alternateRoute = await adapter.execute(first, { schemaVersion: 2, operation: 'lookup', nonce: crypto.randomUUID(), keys: [{ ...key, siteRulesVersion: 'another-site-route' }] }, 100);
-    expect(alternateRoute).toMatchObject({ kind: 'ACCEPTED', receipt: { results: [{ kind: 'FOUND', scope: 'owner' }] } });
+    expect(alternateRoute).toMatchObject({ kind: 'ACCEPTED', receipt: { results: [{ kind: 'MISS' }] } });
     await adapter.execute(first, contribute('99', false), 100);
     expect(await results(adapter, first)).toMatchObject([{ references: [{ externalId: '1' }] }]);
     expect(await results(adapter, observer)).toEqual([{ kind: 'MISS', fingerprint: key.fingerprint }]);
@@ -94,7 +99,7 @@ describe('favorite owner SQL index', () => {
     const readCommand = lookup(); const before = await adapter.execute(credentials, readCommand, 2);
     expect((await adapter.execute(credentials, contribute('3'), 2)).kind).toBe('QUOTA_EXCEEDED');
     expect(await adapter.execute(credentials, readCommand, 2)).toEqual(before);
-    const counts = await env.COLLECTIVE_DB.prepare('SELECT owner_count FROM favorite_confirmations WHERE key_id = ?1').bind(await collectiveDigest(JSON.stringify([1, key.mediaKind, key.fingerprint]))).first<{ owner_count: number }>();
+    const counts = await env.COLLECTIVE_DB.prepare('SELECT owner_count FROM favorite_confirmations WHERE key_id = ?1').bind(await collectiveDigest(JSON.stringify([2, key.mediaKind, key.fingerprint, key.parserVersion, key.siteRulesVersion]))).first<{ owner_count: number }>();
     expect(counts?.owner_count).toBe(1);
   });
 

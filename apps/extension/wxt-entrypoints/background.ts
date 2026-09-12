@@ -100,7 +100,7 @@ export default defineBackground({
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const reconcileFavorites = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
-        await ownerRuntime?.enable().catch(() => undefined);
+        await ownerRuntime?.refreshRules().catch(() => undefined);
         await ownerRuntime?.maintain().catch(() => undefined);
       },
       collective: ownerRuntime,

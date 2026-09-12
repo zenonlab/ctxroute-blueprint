@@ -356,7 +356,7 @@
 ## Corriger et certifier la pipeline FavLib vers TobiRink — ACTIVE
 
 - [x] **Rendre la résolution fournisseur bornée et indépendante du collectif** — DONE _(evidence: Kitsu live anime and manga probes return HTTP 200 with expected identities, Adapters-browser 70/70 and application 331/331 tests pass, npm run verify and favorite-resolution Archify showcase 9/9 pass)_
-- [ ] **Corriger le consentement et le cache collectif D1** — PENDING
+- [x] **Corriger le consentement et le cache collectif D1** — DONE _(evidence: Worker 43/43, extension 138/138, adapters-browser 70/70 and application 331/331 pass, Five affected workspace typechecks plus docs and ADR validation pass, favorite-resolution dataflow passes Archify showcase 9/9; D1 cache requires two distinct human confirmations and excludes private text)_
 - [ ] **Rendre reconstruction sync scans et couvertures réellement durables** — PENDING
 - [ ] **Remplacer le faux oracle par un différentiel FavLib réel et anonymisé** — PENDING
 - [ ] **Certifier une release locale installable sans déployer** — PENDING

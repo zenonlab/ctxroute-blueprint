@@ -1,4 +1,4 @@
-import { bundledFavoriteSiteRules, collectiveDigest, favoriteCollectiveChoiceSchema, favoriteCollectiveKey, favoriteOwnerCredentialsSchema, favoriteOwnerLocalStateSchema, favoritePairRedemptionSchema } from '@tobirink/application';
+import { bundledFavoriteSiteRules, collectiveDigest, favoriteCollectiveChoiceSchema, favoriteCollectiveKey, favoriteOwnerCredentialsSchema, favoriteOwnerLocalStateSchema, favoritePairRedemptionSchema, favoritePublicMetadata } from '@tobirink/application';
 import type { FavoriteCollectiveCommand, FavoriteCollectiveKey, FavoriteCollectiveLookupPort, FavoriteOwnerLocalState, FavoriteOwnerLocalStatePort, StoragePort } from '@tobirink/application';
 import type { HttpFavoriteCollectiveAdapter } from '@tobirink/adapters-browser';
 import { favoriteSourceId } from '@tobirink/domain';
@@ -8,6 +8,7 @@ type Choice = z.infer<typeof favoriteCollectiveChoiceSchema>;
 function secretToken() { return [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, '0')).join(''); }
 export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
   private active: Promise<void> = Promise.resolve();
+  private rulesReadAt = 0;
   rules = bundledFavoriteSiteRules;
   constructor(private readonly local: FavoriteOwnerLocalStatePort, private readonly http: HttpFavoriteCollectiveAdapter, private readonly storage: StoragePort) {}
 
@@ -59,6 +60,23 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
     await this.local.save(pending);
     return this.flush(pending);
   }
+  private async updateRules(state?: FavoriteOwnerLocalState) {
+    this.rules = state?.rules !== undefined && state.rules.version > bundledFavoriteSiteRules.version ? state.rules : bundledFavoriteSiteRules;
+    const now = Date.now();
+    if (now - (state?.rulesReadAt ?? this.rulesReadAt) <= 86400000) return state;
+    try {
+      const rules = await this.http.readRules();
+      if (rules.version >= this.rules.version) this.rules = rules;
+      this.rulesReadAt = now;
+      if (state !== undefined) {
+        const updated = { ...state, rules: this.rules, rulesReadAt: now };
+        await this.local.save(updated);
+        return updated;
+      }
+    } catch { /* Keep the last validated declarative rule set. */ }
+    return state;
+  }
+  refreshRules() { return this.serial(async () => { await this.updateRules(await this.local.read()); }); }
   revoke() {
     return this.serial(async () => {
       const stored = await this.local.read();
@@ -114,15 +132,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
       if (stored === undefined || stored.status === 'revoked') return;
       let state = await this.flush(stored.status === 'pending' ? await this.activate(stored) : stored);
       if (state.status !== 'enabled') return;
-      this.rules = state.rules !== undefined && state.rules.version > bundledFavoriteSiteRules.version ? state.rules : bundledFavoriteSiteRules;
-      if (Date.now() - (state.rulesReadAt ?? 0) > 86400000) {
-        try {
-          const rules = await this.http.readRules();
-          if (rules.version >= this.rules.version) this.rules = rules;
-          state = { ...state, rules: this.rules, rulesReadAt: Date.now() };
-          await this.local.save(state);
-        } catch { /* Keep the last validated declarative rule set. */ }
-      }
+      state = await this.updateRules(state) ?? state;
       const page = await this.storage.listFavoriteSources(state.scanAfter === undefined ? { limit: 50 } : { afterId: favoriteSourceId(state.scanAfter), limit: 50 });
       const choices = new Map<string, Choice>();
       const pendingKeys = new Map<string, FavoriteCollectiveKey>();
@@ -140,7 +150,7 @@ export class FavoriteOwnerRuntime implements FavoriteCollectiveLookupPort {
         const work = await this.storage.getWork(id);
         if (work?.hydration === undefined || record?.artifact.identityKey === undefined) continue;
         const key = await favoriteCollectiveKey(record.artifact);
-        const choice = favoriteCollectiveChoiceSchema.safeParse({ key, mediaKind: work.hydration.candidate.mediaKind, references: work.externalReferences, candidate: work.hydration.candidate, confirmed: review?.status === 'resolved' && review.decisionOrigin === 'human' });
+        const choice = favoriteCollectiveChoiceSchema.safeParse({ key, mediaKind: work.hydration.candidate.mediaKind, references: work.externalReferences, metadata: favoritePublicMetadata(work.hydration.candidate), confirmed: review?.status === 'resolved' && review.decisionOrigin === 'human' });
         if (!choice.success) continue;
         const keyId = await collectiveDigest(JSON.stringify(key));
         if (state.sent[keyId] !== await collectiveDigest(JSON.stringify(choice.data))) choices.set(keyId, choice.data);

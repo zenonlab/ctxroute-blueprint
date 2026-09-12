@@ -69,7 +69,7 @@
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync v2 : empreinte→IDs sans titres. D1 : cache public avant fournisseur, choix owner et reçus SQL atomiques."
+        "note": "Sync v2 : empreinte→IDs sans titres. D1 : IDs et facettes sans titres ni URL, publiés après deux confirmations humaines distinctes."
       }
     ]
   },
@@ -199,7 +199,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "cache public / owner · lots bornés"
+      "tag": "règles publiques · collectif opt-in"
     },
     {
       "id": "collectiveD1",
@@ -209,7 +209,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "fiches publiques / clés / choix"
+      "tag": "IDs / facettes / choix confirmés"
     },
     {
       "id": "operationalMedia",

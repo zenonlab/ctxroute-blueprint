@@ -7748,7 +7748,7 @@
         {
           "id": "step-2",
           "title": "Corriger le consentement et le cache collectif D1",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Public parsing rules are readable without owner registration or contribution consent",
             "Public cache publication requires the documented trust threshold and versioned key semantics",
@@ -7774,7 +7774,11 @@
             "npm run verify",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 43/43, extension 138/138, adapters-browser 70/70 and application 331/331 pass",
+            "Five affected workspace typechecks plus docs and ADR validation pass",
+            "favorite-resolution dataflow passes Archify showcase 9/9; D1 cache requires two distinct human confirmations and excludes private text"
+          ]
         },
         {
           "id": "step-3",

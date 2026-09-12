@@ -56,19 +56,21 @@ décision ou secret n’entre dans `storage.sync`.
 
 Le Worker expose un cache public borné. Une lecture par empreinte ou référence
 précède les API fournisseurs. Une contribution contient seulement empreinte,
-versions, type, références et fiche publique déjà validée par les schémas
-fournisseur. Le Worker l’enregistre comme job idempotent, puis effectue des
-upserts préparés dans les tables de catalogue et de clés. Les conflits de même
-empreinte restent non résolus jusqu’à une preuve unique; aucun premier résultat
-ne gagne. Les requêtes et écritures sont limitées par lot, taille et quota.
+versions, type, références et facettes de tri. Le Worker effectue des upserts
+préparés après deux confirmations humaines provenant de propriétaires distincts.
+Les conflits de même empreinte restent non résolus; aucun premier résultat ne
+gagne. Les requêtes et écritures sont limitées par lot, taille et quota.
 
-D1 peut conserver les titres et aliases publics d’une fiche fournisseur ainsi
-que les genres, année, format, statut, totaux et popularité nécessaires au
-tri. Ces données décrivent l’œuvre publique, jamais l’appartenance d’un
-utilisateur. Les URL de favoris, dossiers, progression personnelle, décisions,
-diagnostics et secrets restent exclusivement locaux. Les jaquettes conservent
-la politique de droits de l’ADR-0026 : une URL publique peut être référencée,
-mais R2 n’est alimenté que par la gate média autorisée.
+D1 conserve les identifiants fournisseurs publics et les facettes utiles au tri
+seulement : format, genres, catégories, statut, années, comptages, popularité et
+pré-sérialisation. Il ne conserve aucun titre, alias, URL, couverture, source,
+dossier, progression, décision privée ou secret. L’extension garde son titre
+local et hydrate ensuite par identifiant lorsque les détails manquent. Les
+jaquettes conservent la politique de droits de l’ADR-0026 et restent dans R2.
+
+La route déclarative des règles reste publique et peut être rafraîchie sans
+créer de propriétaire. Inscription, lookup propriétaire et contribution ne
+s’exécutent qu’après activation explicite du collectif dans les réglages.
 
 La publication vers le cache ne bloque jamais le commit IndexedDB. Une panne D1
 laisse un job local réessayable et n’autorise aucun fallback de décision. Une

@@ -29,6 +29,15 @@ function fixture() {
 }
 
 describe('owner background recovery', () => {
+  it('refreshes public rules without creating owner credentials', async () => {
+    const test = fixture(); const runtime = test.runtime();
+    await runtime.refreshRules();
+    await runtime.refreshRules();
+    expect(runtime.rules).toEqual(bundledFavoriteSiteRules);
+    expect(await test.local.read()).toBeUndefined();
+    expect(test.fetcher).toHaveBeenCalledTimes(1);
+    expect(test.commands).toEqual([]);
+  });
   it('keeps newer bundled rules when the owner cache is older and still fresh', async () => {
     const test = fixture();
     await test.runtime().enable();
@@ -77,8 +86,8 @@ describe('owner background recovery', () => {
     expect(test.commands).toEqual([pending, pending]);
     await test.runtime().maintain(); expect(test.commands).toHaveLength(2);
     const payload = JSON.stringify(pending);
-    expect(payload).toContain('Synthetic Series');
-    expect(payload).not.toMatch(/Private synthetic folder|reader\.example/u);
+    expect(payload).not.toMatch(/Synthetic Series|Private synthetic folder|reader\.example/u);
+    expect(payload).toContain('"metadata":{"preSerialization":false}');
     expect(payload).toContain('"confirmed":false');
   });
 

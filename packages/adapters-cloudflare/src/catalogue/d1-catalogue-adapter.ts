@@ -1,3 +1,4 @@
+import { favoritePublicCacheEntrySchema } from '@tobirink/application';
 import type {
   FavoriteCollectiveKey,
   PublicCatalogueReadPort,
@@ -5,7 +6,6 @@ import type {
   PublicCatalogueTitle,
   PublicCatalogueWork,
 } from '@tobirink/application';
-import { providerCandidateSchema } from '@tobirink/application';
 
 type SqlValue = null | number | string;
 
@@ -87,15 +87,23 @@ export class D1PublicCatalogueAdapter implements PublicCatalogueReadPort {
     `).bind(workId, limit).all<PublicCatalogueReference>();
     return result.results;
   }
-  async findFavoriteCandidate(key: FavoriteCollectiveKey) {
+  async findFavoriteIdentity(key: FavoriteCollectiveKey) {
     const rows = await this.database.prepare(`
-      SELECT candidate_json AS candidate FROM favorite_public_cache
-      WHERE fingerprint = ?1 AND (?2 = 'UNKNOWN' OR media_kind = ?2)
-        AND parser_version = ?3 AND rules_version = ?4
-      ORDER BY identity_hash LIMIT 2
-    `).bind(key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion).all<{ candidate: string }>();
+      SELECT cache.media_kind AS mediaKind, cache.references_json AS referencesJson, cache.metadata_json AS metadataJson
+      FROM favorite_public_cache cache
+      WHERE cache.fingerprint = ?1 AND (?2 = 'UNKNOWN' OR cache.media_kind = ?2)
+        AND cache.parser_version = ?3 AND cache.rules_version = ?4
+        AND EXISTS (SELECT 1 FROM favorite_keys AS favorite_key
+          JOIN favorite_confirmations confirmation ON confirmation.key_id = favorite_key.key_id
+            AND confirmation.identity_hash = cache.identity_hash AND confirmation.owner_count >= 2
+          WHERE favorite_key.fingerprint = cache.fingerprint
+            AND (favorite_key.media_kind = cache.media_kind OR favorite_key.media_kind = 'UNKNOWN')
+            AND favorite_key.parser_version = cache.parser_version AND favorite_key.rules_version = cache.rules_version)
+      ORDER BY cache.identity_hash LIMIT 2
+    `).bind(key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion).all<{ mediaKind: string; metadataJson: string; referencesJson: string }>();
     if (rows.results.length !== 1) return undefined;
-    try { return providerCandidateSchema.parse(JSON.parse(rows.results[0]?.candidate ?? 'null')); }
+    const row = rows.results[0];
+    try { return favoritePublicCacheEntrySchema.parse({ mediaKind: row?.mediaKind, metadata: JSON.parse(row?.metadataJson ?? 'null'), references: JSON.parse(row?.referencesJson ?? 'null') }); }
     catch { return undefined; }
   }
 }

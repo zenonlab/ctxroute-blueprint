@@ -4,6 +4,7 @@ import type { StoragePort } from '../ports/storage-port';
 import { favoriteCollectiveKey, favoritePublicReferenceSchema, resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
 import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
 import type { FavoritePublicCacheReadPort } from '../ports/cloud-data-ports';
+import type { FavoritePublicCacheEntry } from '../collective-index/favorite-collective-protocol';
 import { parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
@@ -85,6 +86,7 @@ export interface FavoriteResolutionSliceResult {
 }
 
 type MutableFavoriteTitleMatchQuery = { -readonly [Key in keyof FavoriteTitleMatchQuery]: FavoriteTitleMatchQuery[Key] };
+type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 
 function timestamp(value: string): number {
   const parsed = new Date(value);
@@ -102,6 +104,23 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   const titles = [artifact.displayTitle, ...(artifact.aliases ?? []).map((alias) => alias.value)]
     .filter((title): title is string => title !== undefined);
   return Object.freeze([...new Set(titles)]);
+}
+
+function publicCacheCandidate(entry: FavoritePublicCacheEntry, artifact: FavoriteParseArtifact): ProviderCandidate {
+  const priorities = entry.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
+  const primary = priorities.flatMap((provider) => entry.references.filter((reference) => reference.provider === provider))[0];
+  if (primary === undefined) throw new Error('PUBLIC_CACHE_IDENTITY_HAS_NO_SUPPORTED_REFERENCE');
+  const value: MutableProviderCandidate = {
+    externalId: primary.externalId,
+    mediaKind: entry.mediaKind,
+    preSerialization: entry.metadata.preSerialization,
+    provider: primary.provider,
+    titles: providerTitles(artifact),
+  };
+  Object.assign(value, entry.metadata);
+  const linkedReferences = entry.references.filter((reference) => reference.provider !== primary.provider);
+  if (linkedReferences.length > 0) value.linkedReferences = linkedReferences;
+  return createProviderCandidate(value, primary.provider);
 }
 
 function hydrationRetryAt(retryAt: number | undefined, now: string): number {
@@ -287,7 +306,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   if (dependencies.publicCache !== undefined) {
     try {
-      const cached = await dependencies.publicCache.findFavoriteCandidate(collectiveKey);
+      const entry = await dependencies.publicCache.findFavoriteIdentity(collectiveKey);
+      const cached = entry === undefined ? undefined : publicCacheCandidate(entry, artifact);
       if (cached !== undefined && !hasExactBlockedProviderTaxonomy(cached) && isProviderCandidateCompatible(matchQuery, cached)) {
         const references = [{ provider: cached.provider, externalId: cached.externalId }, ...(cached.linkedReferences ?? [])]
           .flatMap((reference) => {
