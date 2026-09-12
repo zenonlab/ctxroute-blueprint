@@ -7302,6 +7302,50 @@
             "Two isolated builds reproduce Chrome 98811bff45e3670c7eda5f62aee211dd64abe0460c4832ed2ded9d4419e8cf1d and Firefox 3587e5c305fd69ae503b28b664d27e6ee5ffff6438ed79a2f2f9ee540c8ca04a; installed Chromium diagnostic toggle passes",
             "Cloudflare plan f3c49715496e45632b8d2889b434e6257b7afe49113801a2ab83cbe3041454fe published exact ZIPs and Worker 1ac73214-008b-4d56-a3d3-be7c1162ba9d with no D1 migration; public 7 of 7 and correlated tail pass"
           ]
+        },
+        {
+          "id": "step-21",
+          "title": "Resume bounded favorite reconciliation until convergence",
+          "status": "DONE",
+          "acceptance": [
+            "More than 800 bookmarks converge over durable MV3 continuations without resetting the checkpoint",
+            "A named one-shot alarm is replaced rather than multiplied and stops after the final empty slice",
+            "Run diagnostics remain retryable until inventory and queued resolution work converge",
+            "Extension tests typechecks full verification Archify and reproducible packages pass"
+          ],
+          "files": [
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/extension",
+            "npm test --workspace @tobirink/application",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run verify",
+            "npm run package:extension",
+            "npm run test:extension:installed",
+            "git diff --check",
+            "git commit -m \"fix(extension): resume favorite reconciliation\""
+          ],
+          "evidence": [
+            "1401-bookmark runtime test resumes at cursor 800 and completes 15 batches with one continuation; wake-budget exhaustion also requests continuation",
+            "npm run verify passes 132 extension 312 application and all workspace governance IndexedDB performance integration dependency and Archify checks",
+            "Chromium 153 installed ZIP passes; two packages reproduce Chrome 6d433a07e6e5e5b41de8d31eaaccb193764f4394ca58391537bc27a099dc2687 and Firefox e715b8f4ca092603f82db7c072f9eafaf3b4c598d4ba51c12e8c3f65a5b3aab1"
+          ]
         }
       ]
     }

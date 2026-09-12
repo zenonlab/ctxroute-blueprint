@@ -77,6 +77,7 @@ export interface FavoriteResolutionRunnerDependencies {
 export interface FavoriteResolutionSliceResult {
   readonly blocked: number;
   readonly completed: number;
+  readonly continuationRequired: boolean;
   readonly retried: number;
 }
 
@@ -357,9 +358,10 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
 export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutionRunnerDependencies): Promise<FavoriteResolutionSliceResult> {
   const startedAt = timestamp(dependencies.now());
   let blocked = 0; let completed = 0; let retried = 0;
+  let continuationRequired = false;
   for (let index = 0; index < favoriteResolutionSliceLimit; index += 1) {
     const claimedAt = dependencies.now();
-    if (timestamp(claimedAt) - startedAt >= favoriteResolutionWakeBudgetMs) break;
+    if (timestamp(claimedAt) - startedAt >= favoriteResolutionWakeBudgetMs) { continuationRequired = true; break; }
     const token = dependencies.token();
     const task = await dependencies.outbox.claimNext({
       claimedAt,
@@ -393,9 +395,10 @@ export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutio
         return true;
       });
       if (changed) retried += 1;
-      else break;
+      else { continuationRequired = true; break; }
     }
+    if (index === favoriteResolutionSliceLimit - 1) continuationRequired = true;
   }
   await dependencies.outbox.compactCommitted?.({ before: new Date(startedAt - favoriteResolutionTaskRetentionMs).toISOString(), limit: favoriteResolutionSliceLimit });
-  return Object.freeze({ blocked, completed, retried });
+  return Object.freeze({ blocked, completed, continuationRequired, retried });
 }

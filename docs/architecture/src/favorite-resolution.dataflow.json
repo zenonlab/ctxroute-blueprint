@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction 1.0.14",
+    "title": "TobiRink — résolution et reconstruction 1.0.15",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -45,7 +45,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Projection depuis les favoris observés; bibliothèque entière par lots de 100; lecture UI de 24 entrées actualisée sans chevauchement."
+        "note": "Inventaire par huit lots de 100; alarme ponctuelle à 30 secondes jusqu’au checkpoint final; résolution et lecture UI restent bornées."
       },
       {
         "id": "cover-rights",
@@ -134,7 +134,7 @@
       "stage": 2,
       "row": 4,
       "width": 150,
-      "tag": "100 tâches / 20 s"
+      "tag": "100 tâches / 20 s · reprise 30 s"
     },
     {
       "id": "providerAdapters",
@@ -428,6 +428,7 @@
       "items": [
         "Routes Comix manga; source et artefact atomiques",
         "Curseurs, reçus et cadences survivent à MV3",
+        "Alarme nommée jusqu’au checkpoint final; aucun réveil concurrent",
         "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
         "API MU sans Origin; panne, 403 ou page incomplète : RETRYABLE",
         "Kitsu suit seulement NO_MATCH principal complet"

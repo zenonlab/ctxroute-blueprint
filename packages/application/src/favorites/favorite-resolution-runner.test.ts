@@ -176,7 +176,7 @@ describe('runFavoriteResolutionSlice', () => {
     const pending = copy === undefined ? undefined : await storage.getFavoriteResolutionTask(copy.id.replace(/^source_/u, 'favorite-resolution_'));
     if (pending === undefined) throw new Error('Expected copied favorite task.');
     const result = await runFavoriteResolutionSlice({ ...dependencies, outbox: new MemoryOutbox(storage, pending.id) });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(searches).toBe(1);
     expect(hydrations).toBe(expired ? 2 : 1);
     const sources = await storage.listFavoriteSources({ limit: 100 });
@@ -197,7 +197,7 @@ describe('runFavoriteResolutionSlice', () => {
       storage,
       token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:anilist:154587', state: 'COMMITTED' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source && await storage.getFavoriteResolutionReceipt(`${source.id}:favorite-resolution`)).toMatchObject({ effectDigest: 'resolved:anilist:154587', idempotencyKey: task.idempotencyKey });
@@ -215,7 +215,7 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: hydrationPorts({ hydrate: async () => ({ ...candidate, externalId: 'wrong-id' }) }),
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'invariant-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', availableAt: '2026-09-07T12:00:30.000Z', blockedReason: 'INTERNAL_RESOLUTION_FAILURE' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
@@ -258,7 +258,7 @@ describe('runFavoriteResolutionSlice', () => {
       storage,
       token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
@@ -284,7 +284,7 @@ describe('runFavoriteResolutionSlice', () => {
       },
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'resolved:kitsu-anime:46474', state: 'COMMITTED' });
   });
 
@@ -303,7 +303,7 @@ describe('runFavoriteResolutionSlice', () => {
     });
 
     expect(providerCalls).toBe(0);
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ effectRecord: 'source:detached', state: 'COMMITTED' });
   });
 
@@ -330,7 +330,7 @@ describe('runFavoriteResolutionSlice', () => {
     });
 
     expect(searches).toBe(0);
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
     expect(source?.reviewId).toBeUndefined();
@@ -353,7 +353,7 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => { throw new Error('Favorite provider request failed with HTTP 405.'); } } },
       libraryId: libraryId('library_primary'), now: () => now, outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'mu-token',
     });
-    expect(result).toEqual({ blocked: 0, completed: 1, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 1, continuationRequired: false, retried: 0 });
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RESOLVED' });
     expect(source?.reviewId).toBeUndefined();
@@ -390,7 +390,7 @@ describe('runFavoriteResolutionSlice', () => {
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'claim-token',
     });
 
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 1 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: false, retried: 1 });
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
   });
 
@@ -445,7 +445,7 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toEqual(claimed);
   });
 
-  it('leaves an expired request reclaimable instead of blocking a newer task', async () => {
+  it('requests a continuation when a provider call exhausts the wake budget', async () => {
     const { outbox, storage, task } = await fixture();
     let clock = now;
     const result = await runFavoriteResolutionSlice({
@@ -456,7 +456,7 @@ describe('runFavoriteResolutionSlice', () => {
       hydration: hydrationPorts({ hydrate: async () => candidate }),
       libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'expired-request',
     });
-    expect(result).toEqual({ blocked: 0, completed: 0, retried: 0 });
+    expect(result).toEqual({ blocked: 0, completed: 0, continuationRequired: true, retried: 0 });
     const current = await storage.getFavoriteResolutionTask(task.id);
     expect(current?.state).toBe('CLAIMED');
     expect(current && isTaskAvailable(current, clock)).toBe(true);

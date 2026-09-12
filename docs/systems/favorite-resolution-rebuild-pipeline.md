@@ -595,7 +595,10 @@ réactive la source sans perdre l’historique.
 
 Chaque étape reprend depuis IndexedDB. Hors ligne, aucune donnée autoritaire
 n’est effacée et les tâches réseau reçoivent une échéance. Le runner s’arrête
-après son lot, programme une alarme et libère le service worker.
+après son lot, programme une alarme ponctuelle nommée à 30 secondes et libère
+le service worker. Le même nom remplace toute reprise déjà programmée. Le
+diagnostic global reste `retryable` tant que le checkpoint d’inventaire est
+actif ou que les 100 créneaux de résolution ont été consommés.
 
 ### Retry manuel
 
@@ -830,6 +833,12 @@ identités réellement inexploitable.
 ## Définition de terminé
 
 ### Diagnostic verrouillé de la file
+
+La version 1.0.15 relie le checkpoint actif à une continuation MV3 durable.
+Chaque réveil lit au plus huit lots de 100 favoris et traite au plus 100 tâches
+ou 20 secondes. Un inventaire incomplet ou une tranche saturée remplace
+`tobirink-favorite-resolution-continuation-v1`; l’alarme reprend 30 secondes
+plus tard. Le dernier lot ne recrée pas l’alarme.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils

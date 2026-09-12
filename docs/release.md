@@ -2,7 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.14`.
+The current production release is `1.0.14`. The locally verified candidate is
+`1.0.15`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -36,6 +37,24 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Durable continuation candidate — 2026-09-12
+
+Candidate `1.0.15` schedules one named 30-second MV3 alarm when an inventory
+wake stops before its final checkpoint, a resolution wake consumes all 100
+slots, or provider work exhausts its 20-second budget. The next wake resumes
+the IndexedDB cursor, replaces any pending alarm with the same name and stops
+scheduling after convergence. The run diagnostic therefore reports
+`retryable` after the 800-item or time boundary and `complete` only after the
+final batch. This candidate remains local; publication is approved separately.
+
+La gate complète passe avec 132 tests extension et 312 tests application. Le
+parcours Chromium 153 installé depuis le ZIP valide la santé, l’isolation d’une
+panne fournisseur, zéro Review créée à l’import et le verrou de diagnostic.
+Deux fabrications successives reproduisent exactement :
+
+- Chrome : 286956 octets, SHA-256 `6d433a07e6e5e5b41de8d31eaaccb193764f4394ca58391537bc27a099dc2687`.
+- Firefox : 287001 octets, SHA-256 `e715b8f4ca092603f82db7c072f9eafaf3b4c598d4ba51c12e8c3f65a5b3aab1`.
 
 ### Locked diagnostics candidate — 2026-09-12
 

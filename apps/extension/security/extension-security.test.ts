@@ -110,6 +110,8 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/WebExtensionBookmarkEventAdapter\(browser\.bookmarks\)/);
     expect(background).toMatch(/DexieFavoriteResolutionOutbox\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/createFavoriteResolutionRuntime/);
+    expect(background).toMatch(/scheduleFavoriteResolutionContinuation\(browser\.alarms\)/);
+    expect(background).toMatch(/alarm\.name === favoriteResolutionContinuationAlarmName/);
     expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
     expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);
     expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);

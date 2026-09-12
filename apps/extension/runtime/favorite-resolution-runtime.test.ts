@@ -3,6 +3,7 @@ import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 import type { ExtensionDiagnosticInput } from './extension-diagnostics';
+import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationDelayMinutes, scheduleFavoriteResolutionContinuation } from './favorite-resolution-continuation';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -16,6 +17,52 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
+  it('replaces one named alarm at the supported 30-second boundary', async () => {
+    const create = vi.fn(async () => undefined);
+    await scheduleFavoriteResolutionContinuation({ create });
+    expect(create).toHaveBeenCalledWith(favoriteResolutionContinuationAlarmName, { delayInMinutes: favoriteResolutionContinuationDelayMinutes });
+    expect(favoriteResolutionContinuationDelayMinutes).toBe(0.5);
+  });
+
+  it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {
+    const records = Array.from({ length: 1401 }, (_, index) => ({
+      bookmarkId: `ordinary-${index}`, folderPath: [], order: index, title: `Ordinary video ${index}`,
+      url: `https://www.youtube.com/watch?v=fixture-${index}`,
+    }));
+    const readBookmarkBatch = vi.fn(async (cursor: { frames: readonly { nextChildIndex: number }[] } | undefined, limit: number) => {
+      const start = cursor?.frames[0]?.nextChildIndex ?? 0;
+      const end = Math.min(records.length, start + limit);
+      const complete = end === records.length;
+      return {
+        complete,
+        cursor: complete ? undefined : { frames: [{ folderId: '0', folderPath: [], nextChildIndex: end }], rootId: '0' },
+        records: records.slice(start, end),
+      };
+    });
+    const events: ExtensionDiagnosticInput[] = [];
+    const scheduleContinuation = vi.fn(async () => undefined);
+    const storage = new MemoryStoragePort();
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch }, candidates: unavailableCandidates,
+      diagnostics: { record: async (event) => { events.push(event); } },
+      ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
+      libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
+      outbox: { block: vi.fn(), claimNext: async () => undefined, retry: vi.fn() },
+      scheduleContinuation, sourceAdapters: [], storage, token: () => 'large-inventory-run',
+    });
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ cursor: { frames: [{ nextChildIndex: 800 }] }, status: 'active' });
+    expect(scheduleContinuation).toHaveBeenCalledOnce();
+    expect(events.at(-1)).toMatchObject({ outcome: 'retryable', stage: 'run' });
+
+    await reconcile();
+    expect(await storage.getFavoriteInventoryCheckpoint()).toMatchObject({ status: 'complete' });
+    expect(readBookmarkBatch).toHaveBeenCalledTimes(15);
+    expect(scheduleContinuation).toHaveBeenCalledOnce();
+    expect(events.at(-1)).toMatchObject({ outcome: 'complete', stage: 'run' });
+  });
+
   it.each(['PENDING', 'RETRYABLE'] as const)('continues bounded resolution while identity restoration is %s', async (status) => {
     const prepare = vi.fn(async (): Promise<'READY' | 'PENDING' | 'RETRYABLE'> => 'READY').mockResolvedValueOnce(status);
     const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));

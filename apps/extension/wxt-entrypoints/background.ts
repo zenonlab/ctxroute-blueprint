@@ -34,6 +34,7 @@ import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentityS
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
+import { favoriteResolutionContinuationAlarmName, scheduleFavoriteResolutionContinuation } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
 
@@ -93,6 +94,7 @@ export default defineBackground({
       identityRecovery,
       now,
       outbox: resolutionOutbox,
+      scheduleContinuation: () => scheduleFavoriteResolutionContinuation(browser.alarms),
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
@@ -124,6 +126,7 @@ export default defineBackground({
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), reconcileFavorites()]).catch(() => undefined);
+      if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
