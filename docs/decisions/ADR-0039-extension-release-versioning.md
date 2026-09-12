@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
-- Revised: 2026-09-11
+- Revised: 2026-09-12
 
 ## Context
 
@@ -34,7 +34,9 @@ title/chapter routes as manga and prevents cached site-rule downgrade;
 `1.0.12` restores durable recovery, honest provider pagination, primary linked
 identities, complete library projection and bounded Worker cover recovery;
 `1.0.13` exposes inventory state and a trusted bounded reconciliation action;
-`1.0.14` adds bounded, disableable local diagnostics).
+`1.0.14` adds bounded, disableable local diagnostics; `1.0.15` hardens the
+first-install continuation, `1.0.16` projects parsed favorites before
+hydration, and `1.0.17` restores cache-first sync and D1 reconstruction).
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

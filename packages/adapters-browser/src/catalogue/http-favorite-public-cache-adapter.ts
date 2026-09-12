@@ -21,7 +21,8 @@ export class HttpFavoritePublicCacheAdapter implements FavoritePublicCacheReadPo
     url.searchParams.set('mediaKind', key.mediaKind);
     url.searchParams.set('parserVersion', key.parserVersion);
     url.searchParams.set('siteRulesVersion', key.siteRulesVersion);
-    const response = await this.fetcher(url.toString(), { cache: 'default', credentials: 'omit', headers: { Accept: 'application/json' }, method: 'GET', redirect: 'error', referrerPolicy: 'no-referrer' });
+    const fetcher = this.fetcher;
+    const response = await fetcher(url.toString(), { cache: 'default', credentials: 'omit', headers: { Accept: 'application/json' }, method: 'GET', redirect: 'error', referrerPolicy: 'no-referrer' });
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`Favorite cache request failed with status ${response.status}.`);
     const body = await response.text();

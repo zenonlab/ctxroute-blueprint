@@ -6572,7 +6572,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-end-to-end-remediation",
       "title": "Restore the complete local favorite-to-library pipeline",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -7607,7 +7607,7 @@
         {
           "id": "step-27",
           "title": "Certify cache-first reinstall convergence",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A fresh installed profile with 1400 favorites projects the complete parsed inventory before hydration finishes",
             "A second installation restores known associations without provider title searches",
@@ -7616,22 +7616,33 @@
             "Production publication remains unapplied pending its separate Cloudflare gate"
           ],
           "files": [
+            "apps/extension/package.json",
             "apps/extension/scripts/installed-review.mjs",
-            "apps/web/e2e/packaged-extension.spec.ts",
+            "packages/adapters-browser/src/catalogue/http-favorite-public-cache-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-favorite-public-cache-adapter.test.ts",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
             "docs/release.md",
+            "package-lock.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
           "commands": [
             "npm run verify",
-            "npm run package:extension -- --verify-isolated",
+            "npm run package:extension",
             "node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.17.zip",
             "npm run test:e2e --workspace @tobirink/web -- --grep \"packaged Chrome extension\"",
+            "npm run test:d1",
+            "npm run test:migrations",
             "npm run archify:validate -- favorite-resolution.dataflow",
             "git diff --check",
             "git commit -m \"test(recovery): certify cache-first reinstall\""
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed all governance, typecheck, 783 product/workspace tests, Chromium IndexedDB contract, performance, CRG, integration, zero-vulnerability audit and Archify showcase checks.",
+            "Installed Chromium 153 processed 1404 bookmarks with one D1 cache read before zero provider title searches, 1401 unsupported ordinary links, two durable retries and zero imported Reviews; packaged WebBridge E2E passed.",
+            "Chrome and Firefox 1.0.17 packages reproduce SHA-256 bd12bc3efa47cfc4760bc266b92b5e81b16f7d11ff68898bc1aa04fd862af464 and 7d958eec497af9541a96e2b893320ee3d2b6996f2462ce13f5f754ed16e4a198; D1 6/6 and Chromium migrations passed."
+          ]
         }
       ]
     }

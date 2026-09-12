@@ -37,6 +37,29 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### Cache-first reconstruction candidate — 2026-09-12
+
+Candidate `1.0.17` adds un manifeste `storage.sync` v2 qui relie les empreintes
+normalisées aux identifiants fournisseurs publics tout en relisant les
+générations v1. Chaque restauration, scan de publication et écriture fragmentée
+incomplète programme son prochain réveil MV3. La résolution consulte
+l’association synchronisée et le cache D1 public avant la recherche fournisseur.
+Les batches authentifiés et idempotents alimentent la table additive
+`favorite_public_cache` avec une fiche publique validée; deux identités pour la
+même empreinte restent non résolues.
+
+La certification locale crée 1 404 favoris. Elle projette les trois liens média,
+laisse 1 401 liens YouTube ordinaires hors prise en charge, résout un titre
+générique depuis le cache D1 simulé avec zéro recherche de titre fournisseur,
+conserve deux pannes exactes en reprise, programme l’alarme durable et crée zéro
+Review à l’import. Deux constructions isolées reproduisent exactement :
+
+- Chrome : 289689 octets, SHA-256 `bd12bc3efa47cfc4760bc266b92b5e81b16f7d11ff68898bc1aa04fd862af464`.
+- Firefox : 289734 octets, SHA-256 `7d958eec497af9541a96e2b893320ee3d2b6996f2462ce13f5f754ed16e4a198`.
+
+La production sert encore `1.0.16`; la migration `0005`, le
+Worker et les ZIP relèvent de la gate Cloudflare séparée.
+
 ### Local-first library candidate — 2026-09-12
 
 Candidate `1.0.16` restores the FavLib property that a parsed browser favorite

@@ -6,7 +6,10 @@ const candidate = { externalId: '154587', mediaKind: 'ANIME' as const, preSerial
 
 describe('HTTP favorite public cache', () => {
   it('reads a bounded strict public candidate without credentials', async () => {
-    const fetcher = vi.fn(async () => Response.json({ candidate }));
+    const fetcher = vi.fn(async function (this: void) {
+      expect(this).toBeUndefined();
+      return Response.json({ candidate });
+    });
     const adapter = new HttpFavoritePublicCacheAdapter('https://tobirink.test', fetcher);
     await expect(adapter.findFavoriteCandidate(key)).resolves.toEqual(candidate);
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/v1/catalogue/favorites/resolve?'), expect.objectContaining({ credentials: 'omit', method: 'GET' }));
