@@ -1,0 +1,40 @@
+{
+  "goalId": "goal-publish-user-persistence-1-0-21",
+  "title": "Publier et verifier la persistance utilisateur 1.0.21",
+  "approved": true,
+  "validationEvidence": [
+    "Demande explicite de deploiement de la candidate certifiee 1.0.21",
+    "Inspection Cloudflare sans migration D1 en attente",
+    "Rollback Worker 9883cbfe-b776-4199-96b5-71ff0bfde881 identifie"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Publier les archives 1.0.21 et le Worker puis verifier la production",
+      "acceptance": [
+        "Seuls les deux objets R2 1.0.21 et le Worker public sont modifies",
+        "Aucune migration D1 ni suppression n est executee",
+        "Le Worker est deploye a 100 pour cent et les pages publiques repondent",
+        "Les ZIP distants correspondent exactement aux hashes locaux certifies",
+        "Les parcours de production passent et la preuve de publication est documentee"
+      ],
+      "files": [
+        "docs/release.md",
+        ".project/progress.json",
+        "docs/progress.md",
+        "build/operations/**"
+      ],
+      "commands": [
+        "npm run infra:inspect",
+        "npm run infra:plan avec les deux operations R2 1.0.21 et worker-deploy",
+        "npm run infra:apply avec digest et allowlist exacts",
+        "Verification Wrangler du deploiement et des migrations",
+        "Verification HTTP et SHA-256 des deux archives",
+        "Tests Playwright de production",
+        "npm run validate:docs -- --all",
+        "git diff --check",
+        "git commit -m chore(release): publish persistence 1.0.21"
+      ]
+    }
+  ]
+}

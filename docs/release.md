@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production release remains `1.0.19`. The verified local candidate
-is `1.0.21`; it is not published.
+The current production release is `1.0.21`; its published archives match the
+verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -38,7 +38,7 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
-### Persistent recovery candidate — 2026-09-12
+### Persistent recovery release — 2026-09-12
 
 Candidate `1.0.21` publishes a validated `storage.sync` v2 snapshot for a
 1,406-source inventory during one bounded MV3 wake, then reconstructs an empty
@@ -58,6 +58,21 @@ The deterministic 21-file candidates are:
 
 - Chrome: 298029 bytes, SHA-256 `c0c93e66d560660e1d8f6383813f800e4249cf4844c45784badfdec134a441b1`.
 - Firefox: 298066 bytes, SHA-256 `c22b612d6f2186fd41a1c0deead265a17dfb94a3b9e26996c2344f31d603a447`.
+
+After the explicit publication request, Cloudflare gate plan
+`1bd21ee11f893acffd30c7db5befeadf4217eb9ac2fdfe3603be467ac0f85b02`
+uploaded only those two immutable R2 objects and deployed the release Worker.
+The first production probe found that its static `/download` asset still
+advertised 1.0.19. The site was rebuilt from the committed 1.0.21 source, then
+the Worker-only gate
+`e9b7d95843498721b75b04407ccd826aa64f5022dee37251ba507abdd065901c`
+deployed Worker `c1eef241-0eed-4f2c-b389-598f0106763d` at 100 percent with 28
+updated assets. The final page advertises both 1.0.21 archive links. The final
+inspection reported no pending D1 migration, both public downloads returned
+200 with immutable caching and their certified hashes, and all five production
+Playwright journeys passed. Worker
+`9883cbfe-b776-4199-96b5-71ff0bfde881` remains the pre-release rollback
+reference.
 
 ### Cache-batched automatic convergence candidate — 2026-09-12
 

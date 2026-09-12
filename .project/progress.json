@@ -8262,6 +8262,50 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-user-persistence-1-0-21",
+      "title": "Publier et verifier la persistance utilisateur 1.0.21",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Publier les archives 1.0.21 et le Worker puis verifier la production",
+          "status": "DONE",
+          "acceptance": [
+            "Seuls les deux objets R2 1.0.21 et le Worker public sont modifies",
+            "Aucune migration D1 ni suppression n est executee",
+            "Le Worker est deploye a 100 pour cent et les pages publiques repondent",
+            "Les ZIP distants correspondent exactement aux hashes locaux certifies",
+            "Les parcours de production passent et la preuve de publication est documentee"
+          ],
+          "files": [
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md",
+            "build/operations/**"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan avec les deux operations R2 1.0.21 et worker-deploy",
+            "npm run infra:apply avec digest et allowlist exacts",
+            "Verification Wrangler du deploiement et des migrations",
+            "Verification HTTP et SHA-256 des deux archives",
+            "Tests Playwright de production",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m chore(release): publish persistence 1.0.21"
+          ],
+          "evidence": [
+            "Cloudflare gates 1bd21ee1 and e9b7d958 published only the two immutable 1.0.21 R2 archives and the Worker; no D1 action ran",
+            "Worker c1eef241-0eed-4f2c-b389-598f0106763d is at 100 percent, no D1 migration is pending, and the production download page advertises both 1.0.21 links",
+            "Both public downloads return 200 with immutable caching and exact certified SHA-256 hashes; five production Playwright journeys, docs validation, production-publication Archify showcase 9/9 and git diff check pass"
+          ]
+        }
+      ]
     }
   ]
 }
