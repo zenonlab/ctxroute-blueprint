@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orbite.local/schemas/animation-semantics-v1.json",
+  "title": "Orbite source-neutral animation semantics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "status", "source_revision", "clips", "transitions"],
+  "properties": {
+    "format": { "const": "orbite.animation-semantics/1" },
+    "status": { "enum": ["researching", "qualified", "blocked"] },
+    "source_revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine_id", "input_sha256", "evidence_ids"],
+      "properties": {
+        "engine_id": { "$ref": "#/$defs/id" },
+        "input_sha256": { "$ref": "#/$defs/sha256" },
+        "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+      }
+    },
+    "clips": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8192,
+      "items": { "$ref": "#/$defs/clip" }
+    },
+    "transitions": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": { "$ref": "#/$defs/transition" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "clip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "resource_id", "target_kind", "status", "evidence_ids", "source", "timing", "playback", "root_motion", "seam", "events", "probes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "resource_id": { "$ref": "#/$defs/id" },
+        "target_kind": { "enum": ["skeleton", "material_color", "texture_transform", "texture_pattern", "visibility", "vertex_color", "cluster", "camera", "morph"] },
+        "status": { "enum": ["qualified", "unresolved", "unsupported", "not_applicable"] },
+        "evidence_ids": { "$ref": "#/$defs/evidenceIds" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format_id", "animation_id", "controller_symbol", "playback_value"],
+          "properties": {
+            "format_id": { "$ref": "#/$defs/id" },
+            "animation_id": { "$ref": "#/$defs/id" },
+            "controller_symbol": { "type": ["string", "null"], "maxLength": 256 },
+            "playback_value": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ticks_per_second_numerator", "ticks_per_second_denominator", "start_tick", "end_tick", "endpoint_policy"],
+          "properties": {
+            "ticks_per_second_numerator": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "ticks_per_second_denominator": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "start_tick": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+            "end_tick": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
+            "endpoint_policy": { "enum": ["exclusive", "inclusive"] }
+          }
+        },
+        "playback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "repeat_start_tick", "rate", "completion"],
+          "properties": {
+            "mode": { "enum": ["once", "once_reset", "loop", "reverse_once", "ping_pong_once", "ping_pong_loop"] },
+            "repeat_start_tick": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000000000 },
+            "rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1024 },
+            "completion": { "enum": ["hold", "reset", "transition", "stop", "not_applicable"] }
+          }
+        },
+        "root_motion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["owner", "applied_by", "channels"],
+          "properties": {
+            "owner": { "enum": ["clip", "path", "parent", "none"] },
+            "applied_by": { "type": ["string", "null"], "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$" },
+            "channels": { "type": "array", "maxItems": 6, "uniqueItems": true, "items": { "enum": ["translation_x", "translation_y", "translation_z", "rotation_x", "rotation_y", "rotation_z"] } }
+          }
+        },
+        "seam": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "maximum", "measured"],
+          "properties": {
+            "status": { "enum": ["pass", "fail", "not_applicable"] },
+            "maximum": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/seamMetrics" }] },
+            "measured": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/seamMetrics" }] }
+          }
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "tick", "delivery", "evidence_ids"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "tick": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+              "delivery": { "enum": ["once_per_crossing", "once_per_cycle", "once_per_activation"] },
+              "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+            }
+          }
+        },
+        "probes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["phase", "tick", "state_sha256"],
+            "properties": {
+              "phase": { "enum": ["start", "repeat_start", "pre_end", "endpoint", "post_wrap"] },
+              "tick": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+              "state_sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      }
+    },
+    "seamMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["translation", "rotation_degrees", "scale", "material"],
+      "properties": {
+        "translation": { "type": "number", "minimum": 0, "maximum": 1000000000 },
+        "rotation_degrees": { "type": "number", "minimum": 0, "maximum": 360 },
+        "scale": { "type": "number", "minimum": 0, "maximum": 1000000 },
+        "material": { "type": "number", "minimum": 0, "maximum": 1000000 }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from_clip_id", "to_clip_id", "trigger", "event_id", "blend_ticks", "interruption", "evidence_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from_clip_id": { "$ref": "#/$defs/id" },
+        "to_clip_id": { "$ref": "#/$defs/id" },
+        "trigger": { "enum": ["clip_end", "event", "state_change"] },
+        "event_id": { "type": ["string", "null"], "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$" },
+        "blend_ticks": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "interruption": { "enum": ["forbidden", "source_boundary", "immediate"] },
+        "evidence_ids": { "$ref": "#/$defs/evidenceIds" }
+      }
+    }
+  }
+}

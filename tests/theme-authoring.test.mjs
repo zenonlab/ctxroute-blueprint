@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { verifyAnimationSemantics } from '../scripts/verify-animation-semantics.mjs';
 import { verifyGameThemeAuthoringRun } from '../scripts/verify-game-theme-authoring-run.mjs';
 import { verifyWallpaperConcept } from '../scripts/verify-wallpaper-concept.mjs';
 
@@ -14,13 +15,15 @@ async function fixture() {
 
 async function authoringFixture() {
   const root = await mkdtemp(join(tmpdir(), 'orbite-theme-authoring-'));
-  const [concept, run] = await Promise.all([
+  const [concept, run, animations] = await Promise.all([
     readFile('docs/templates/wallpaper-concept.example.json', 'utf8'),
-    readFile('docs/templates/game-theme-authoring-run.example.json', 'utf8')
+    readFile('docs/templates/game-theme-authoring-run.example.json', 'utf8'),
+    readFile('docs/templates/animation-semantics.example.json', 'utf8')
   ]);
   const evidence = await readFile('docs/templates/game-theme-authoring-evidence.example.json', 'utf8');
   await Promise.all([
     writeFile(join(root, 'wallpaper-concept.example.json'), concept),
+    writeFile(join(root, 'animation-semantics.example.json'), animations),
     writeFile(join(root, 'game-theme-authoring-evidence.example.json'), evidence),
     writeFile(join(root, 'run.json'), run)
   ]);
@@ -179,6 +182,36 @@ test('authoring run qualifies a candidate without touching the active installati
   });
 });
 
+test('animation semantics prove playback, seams, root motion and transitions', async () => {
+  const result = await verifyAnimationSemantics('docs/templates/animation-semantics.example.json', [
+    'format-doc', 'local-index'
+  ]);
+  assert.deepEqual(result, {
+    ok: true, status: 'qualified', clips: 2, transitions: 2, unresolved: [], qualified: true
+  });
+});
+
+test('animation semantics reject guessed loops and ambiguous motion ownership', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'orbite-animation-semantics-'));
+  const source = JSON.parse(await readFile('docs/templates/animation-semantics.example.json', 'utf8'));
+  const path = join(root, 'animations.json');
+
+  const seam = structuredClone(source);
+  seam.clips[0].seam.measured.translation = 0.02;
+  await writeFile(path, JSON.stringify(seam));
+  await assert.rejects(verifyAnimationSemantics(path), /seam translation exceeds/);
+
+  const motion = structuredClone(source);
+  motion.clips[0].root_motion.applied_by = null;
+  await writeFile(path, JSON.stringify(motion));
+  await assert.rejects(verifyAnimationSemantics(path), /requires exactly one named applier/);
+
+  const loop = structuredClone(source);
+  loop.clips[1].playback.mode = 'loop';
+  await writeFile(path, JSON.stringify(loop));
+  await assert.rejects(verifyAnimationSemantics(path), /loop requires repeat_start_tick/);
+});
+
 test('authoring run rejects premature activation and a fake witness scene', async () => {
   const first = await authoringFixture();
   const { path, sha256 } = first.document.gates[0].evidence;
@@ -242,7 +275,7 @@ test('authoring gates require the matching typed record and gate-specific checks
     }
   }
   await writeFile(incomplete.path, JSON.stringify(incomplete.document));
-  await assert.rejects(verifyGameThemeAuthoringRun(incomplete.path), /missing required checks: endpoint, root_motion/);
+  await assert.rejects(verifyGameThemeAuthoringRun(incomplete.path), /missing required checks: clip_manifest/);
 });
 
 test('the same authoring pipeline qualifies an unrelated engine and object vocabulary', async () => {

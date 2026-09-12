@@ -6,6 +6,10 @@
     "path": "wallpaper-concept.example.json",
     "sha256": "7c66333f45ece1588c2f5f75b79eaa88e933a2eb3996464eec112688e472ae81"
   },
+  "animation_manifest": {
+    "path": "animation-semantics.example.json",
+    "sha256": "27ddbd69439db4f2890b78fa9bbdec871befa71f85cda71af719ee7c17f6d740"
+  },
   "workspace": {
     "candidate_root": "private/candidates/fixture-island-first-pass",
     "active_artifact_reference": null,
@@ -57,22 +61,22 @@
     "runtime_changes_for_witness": false
   },
   "gates": [
-    { "id": "input_integrity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "input" } },
-    { "id": "engine_research", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "research" } },
-    { "id": "inventory_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "inventory" } },
-    { "id": "coordinate_probe", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "coordinates" } },
-    { "id": "dependency_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "dependencies" } },
-    { "id": "source_relations", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "relations" } },
-    { "id": "conversion_determinism", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "determinism" } },
-    { "id": "witness_scene", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "witness" } },
-    { "id": "animation_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "animation" } },
-    { "id": "effect_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "effects" } },
-    { "id": "ui_generation", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "ui" } },
-    { "id": "session_identity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "sessions" } },
-    { "id": "isolated_runtime", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "isolation" } },
-    { "id": "visual_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "visual" } },
-    { "id": "interaction_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "interaction" } },
-    { "id": "pause_occlusion", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "f0b84dd13d04c73d361d3a2640ed5a0b6cadcfbbb8a05033b884e12789de84c9", "record_id": "pacing" } },
+    { "id": "input_integrity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "input" } },
+    { "id": "engine_research", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "research" } },
+    { "id": "inventory_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "inventory" } },
+    { "id": "coordinate_probe", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "coordinates" } },
+    { "id": "dependency_closure", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "dependencies" } },
+    { "id": "source_relations", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "relations" } },
+    { "id": "conversion_determinism", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "determinism" } },
+    { "id": "witness_scene", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "witness" } },
+    { "id": "animation_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "animation" } },
+    { "id": "effect_semantics", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "effects" } },
+    { "id": "ui_generation", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "ui" } },
+    { "id": "session_identity", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "sessions" } },
+    { "id": "isolated_runtime", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "isolation" } },
+    { "id": "visual_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "visual" } },
+    { "id": "interaction_matrix", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "interaction" } },
+    { "id": "pause_occlusion", "status": "pass", "evidence": { "path": "game-theme-authoring-evidence.example.json", "sha256": "e859055c80a89ede92040e6e27b0a93e4e964494a16a55e978c11908cd03ee47", "record_id": "pacing" } },
     { "id": "native_activation", "status": "pending", "evidence": null }
   ],
   "activation": {

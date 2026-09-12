@@ -85,6 +85,12 @@ minimales de relations source, des axes haut/avant distincts et une seconde scè
 convertie par le même adaptateur sans modification du runtime. Les gates échoués ou
 bloqués conservent un chemin de preuve ; seul `pending` n'en porte pas.
 
+Le ledger référence obligatoirement un `orbite.animation-semantics/1`. La commande
+`node scripts/verify-animation-semantics.mjs <animations.json>` contrôle les domaines,
+points de répétition, propriétaires de root motion, marqueurs, transitions et sondes
+de raccord. Un clip en boucle doit fournir quatre phases de sonde et respecter ses
+limites mesurées ; un clip ponctuel doit fournir sa borne finale sans couture fictive.
+
 L'activation native reste interdite jusqu'à ce que les seize gates précédents soient
 `pass`, que le concept accepté permette la génération et que le candidat ait été
 construit hors de l'installation active. Le test de la fixture vérifie aussi le refus

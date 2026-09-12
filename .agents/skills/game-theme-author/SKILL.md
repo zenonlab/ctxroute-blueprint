@@ -2,7 +2,7 @@
 name: game-theme-author
 description: Research a local game's engine and corpus, propose a source-grounded wallpaper concept for user acceptance, then prepare a portable theme without game-specific runtime hardcode or untracked commercial assets.
 metadata:
-  blueprint-version: "1.2.0"
+  blueprint-version: "1.3.0"
   execution-authority: primary-or-orchestrator
 ---
 
@@ -128,6 +128,21 @@ endpoint policy, root-motion owner and required event markers. Do not infer loop
 from clip duration or repeat the last-to-first discontinuity. Effects record source
 emitter cardinality and explicit nullable sockets; one source emitter is never cloned
 to fill a two-sided runtime representation.
+
+Materialize every selected clip in `orbite.animation-semantics/1` and validate it:
+
+```bash
+node scripts/verify-animation-semantics.mjs /path/to/animations.json
+```
+
+Treat skeletal, material-color, texture-transform, texture-pattern, visibility,
+vertex-color, cluster, camera and morph tracks as separate target families. Read the
+file metadata, then the actor/controller table or code that selects mode, speed,
+repeat point, transition and event frames. A filename, duration or plausible preview
+never supplies those semantics. A qualified loop needs deterministic start,
+repeat-start, pre-end and post-wrap probes plus measured seam limits. A non-loop needs
+an endpoint probe and no artificial seam. Name exactly one applier for every root-motion
+channel; a path or parent owner excludes a second clip application.
 
 Menus are projections of qualified catalog axes. Their order, labels, previews,
 compatibility and reset values are data. A menu cannot contain a choice whose model,

@@ -4,6 +4,7 @@ import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { verifyAnimationSemantics } from './verify-animation-semantics.mjs';
 import { verifyWallpaperConcept } from './verify-wallpaper-concept.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,7 +27,7 @@ const REQUIRED_CHECKS = Object.freeze({
   source_relations: ['matrix_complete'],
   conversion_determinism: ['canonical_hash_match'],
   witness_scene: ['distinct_scene', 'runtime_hash_match'],
-  animation_semantics: ['timing', 'endpoint', 'root_motion'],
+  animation_semantics: ['clip_manifest', 'timing', 'playback', 'endpoint', 'seam', 'root_motion', 'events', 'transitions'],
   effect_semantics: ['cardinality', 'sockets', 'timing'],
   ui_generation: ['catalog_projection', 'unresolved_choices'],
   session_identity: ['stable_identity', 'typed_intents'],
@@ -85,6 +86,14 @@ export async function verifyGameThemeAuthoringRun(path) {
   const conceptHash = crypto.createHash('sha256').update(conceptBytes).digest('hex');
   if (conceptHash !== document.concept.sha256) throw new Error('concept sha256 mismatch');
   const concept = await verifyWallpaperConcept(conceptPath);
+  const sourceIds = new Set(conceptDocument.research.sources.map(source => source.id));
+
+  const animationPath = await linked(root, document.animation_manifest.path);
+  const { bytes: animationBytes } = await regularJSON(animationPath);
+  if (crypto.createHash('sha256').update(animationBytes).digest('hex') !== document.animation_manifest.sha256) {
+    throw new Error('animation manifest sha256 mismatch');
+  }
+  const animation = await verifyAnimationSemantics(animationPath, sourceIds);
 
   const gateIds = document.gates.map(gate => gate.id);
   if (JSON.stringify(gateIds) !== JSON.stringify(REQUIRED_GATES)) {
@@ -138,7 +147,6 @@ export async function verifyGameThemeAuthoringRun(path) {
       }
     }
   }
-  const sourceIds = new Set(conceptDocument.research.sources.map(source => source.id));
   for (const evidenceId of document.engine_profile.evidence_ids) {
     if (!sourceIds.has(evidenceId)) throw new Error(`engine profile references unknown evidence ${evidenceId}`);
   }
@@ -172,7 +180,11 @@ export async function verifyGameThemeAuthoringRun(path) {
   const preActivation = document.gates.slice(0, -1);
   const relationsComplete = document.relations.every(item => ['qualified', 'not_applicable'].includes(item.status));
   const qualified = concept.generation_allowed && closure.status === 'complete' && relationsComplete &&
-    preActivation.every(gate => gate.status === 'pass');
+    animation.qualified && preActivation.every(gate => gate.status === 'pass');
+  const animationGate = document.gates.find(gate => gate.id === 'animation_semantics');
+  if (animationGate.status === 'pass' && !animation.qualified) {
+    throw new Error('animation semantics gate passed with unresolved clips');
+  }
   const activationGate = document.gates.at(-1);
   if (document.activation.attempted && !qualified) {
     throw new Error('native activation attempted before candidate qualification');

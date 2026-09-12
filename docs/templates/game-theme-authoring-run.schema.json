@@ -4,12 +4,21 @@
   "title": "Orbite game theme authoring run",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "id", "status", "concept", "workspace", "engine_profile", "relations", "scenes", "gates", "activation"],
+  "required": ["format", "id", "status", "concept", "animation_manifest", "workspace", "engine_profile", "relations", "scenes", "gates", "activation"],
   "properties": {
     "format": { "const": "orbite.game-theme-authoring-run/1" },
     "id": { "$ref": "#/$defs/id" },
     "status": { "enum": ["researching", "proposed", "accepted", "converting", "candidate", "qualified", "activated", "failed", "blocked"] },
     "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativeJsonPath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "animation_manifest": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],

@@ -1,0 +1,57 @@
+{
+  "format": "orbite.animation-semantics/1",
+  "status": "qualified",
+  "source_revision": {
+    "engine_id": "fixture.engine",
+    "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence_ids": ["format-doc", "local-index"]
+  },
+  "clips": [
+    {
+      "id": "clip.carrier_idle",
+      "resource_id": "object.carrier",
+      "target_kind": "skeleton",
+      "status": "qualified",
+      "evidence_ids": ["format-doc", "local-index"],
+      "source": { "format_id": "fixture.joint-key", "animation_id": "idle", "controller_symbol": "FixtureActor::setAnimation", "playback_value": "repeat" },
+      "timing": { "ticks_per_second_numerator": 30, "ticks_per_second_denominator": 1, "start_tick": 0, "end_tick": 30, "endpoint_policy": "exclusive" },
+      "playback": { "mode": "loop", "repeat_start_tick": 0, "rate": 1, "completion": "not_applicable" },
+      "root_motion": { "owner": "parent", "applied_by": "route.carrier", "channels": ["translation_x", "translation_z", "rotation_y"] },
+      "seam": {
+        "status": "pass",
+        "maximum": { "translation": 0.01, "rotation_degrees": 0.1, "scale": 0.001, "material": 0 },
+        "measured": { "translation": 0, "rotation_degrees": 0, "scale": 0, "material": 0 }
+      },
+      "events": [
+        { "id": "event.idle_cycle", "tick": 0, "delivery": "once_per_cycle", "evidence_ids": ["local-index"] }
+      ],
+      "probes": [
+        { "phase": "start", "tick": 0, "state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+        { "phase": "repeat_start", "tick": 0, "state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+        { "phase": "pre_end", "tick": 29, "state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" },
+        { "phase": "post_wrap", "tick": 0, "state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+      ]
+    },
+    {
+      "id": "clip.carrier_signal",
+      "resource_id": "object.carrier",
+      "target_kind": "material_color",
+      "status": "qualified",
+      "evidence_ids": ["format-doc"],
+      "source": { "format_id": "fixture.color-key", "animation_id": "signal", "controller_symbol": null, "playback_value": "once" },
+      "timing": { "ticks_per_second_numerator": 30, "ticks_per_second_denominator": 1, "start_tick": 0, "end_tick": 12, "endpoint_policy": "inclusive" },
+      "playback": { "mode": "once", "repeat_start_tick": null, "rate": 1, "completion": "transition" },
+      "root_motion": { "owner": "none", "applied_by": null, "channels": [] },
+      "seam": { "status": "not_applicable", "maximum": null, "measured": null },
+      "events": [],
+      "probes": [
+        { "phase": "start", "tick": 0, "state_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" },
+        { "phase": "endpoint", "tick": 12, "state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }
+      ]
+    }
+  ],
+  "transitions": [
+    { "id": "transition.idle_signal", "from_clip_id": "clip.carrier_idle", "to_clip_id": "clip.carrier_signal", "trigger": "state_change", "event_id": null, "blend_ticks": 4, "interruption": "source_boundary", "evidence_ids": ["local-index"] },
+    { "id": "transition.signal_idle", "from_clip_id": "clip.carrier_signal", "to_clip_id": "clip.carrier_idle", "trigger": "clip_end", "event_id": null, "blend_ticks": 4, "interruption": "forbidden", "evidence_ids": ["local-index"] }
+  ]
+}

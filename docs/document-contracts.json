@@ -9,6 +9,18 @@
       "source": "docs/templates/wallpaper-concept.schema.json"
     },
     {
+      "id": "animation-semantics",
+      "kind": "product-contract",
+      "format": "json-schema",
+      "source": "docs/templates/animation-semantics.schema.json"
+    },
+    {
+      "id": "game-theme-authoring-run",
+      "kind": "product-contract",
+      "format": "json-schema",
+      "source": "docs/templates/game-theme-authoring-run.schema.json"
+    },
+    {
       "id": "theme-customization",
       "kind": "dataflow-ir",
       "audience": "product",

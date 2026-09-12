@@ -20,7 +20,7 @@ only generic schemas, adapters, tests and free fixtures.
 | source-relation manifests | complete variant matrices with provenance | source relations |
 | deterministic conversion receipt | two fresh outputs with equal canonical hashes | conversion determinism |
 | witness-scene receipt | second scene, same adapter, unchanged runtime hash | witness scene |
-| animation receipt | timing, playback, endpoints, root motion and events | animation semantics |
+| animation manifest | typed clips, timing, playback, seams, root motion, events and transitions | animation semantics |
 | effect receipt | emitter count, sockets, direction, scale, density, color and timing | effect semantics |
 | interface receipt | automatic menus, controls, accessibility and compatibility | UI generation |
 | session receipt | stable identities and typed focus/open intents | session identity |
@@ -66,6 +66,14 @@ generation; it is never filled with repeated generic ambience.
   with an explicit loss report, never a filename match.
 - For each clip, record source frame rate/timebase, inclusive/exclusive end semantics,
   playback mode, endpoint continuity, root-motion owner and event markers.
+- Keep skeletal, material, texture, visibility, vertex, cluster, camera and morph
+  tracks distinct. Inspect controller tables or code after file metadata because the
+  actor may override playback, speed, repeat points, transitions or event frames.
+- Validate `orbite.animation-semantics/1`. A loop requires deterministic probes at
+  start, repeat start, immediately before the end and after wrap, plus measured seam
+  limits. A one-shot requires its endpoint probe and cannot be silently looped.
+- Give each root-motion channel one named applier. Parent/path motion and clip motion
+  cannot both own the same channel; attachment inheritance is not root motion.
 - Build open-axis relation matrices for placements and attachments. No default offset
   may fill a missing cell.
 - Preserve effect emitter cardinality. A missing socket is distinct from an explicit

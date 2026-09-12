@@ -214,6 +214,55 @@ vide n'apparaît pas. Une combinaison dépourvue d'attachement, de rig, de clips
 textures, de preview ou d'action est exclue avec un diagnostic ; elle n'est jamais
 remplacée silencieusement par le premier choix.
 
+## Pré-audit animation avant la ROM
+
+Le dépôt sait aujourd’hui inventorier et convertir le corpus Mario Kart Wii
+(`Yaz0/U8/BRRES`), mais ne contient pas encore d’adaptateur GameCube/J3D qualifié.
+Le viewer Bevy générique ne comble pas cette absence. Avant la copie locale du jeu,
+seuls le contrat, la méthode et les sources publiques peuvent être fermés ; les noms,
+hashes, durées et clips réellement présents restent bloqués.
+
+Deux révisions publiques sont figées pour guider l’audit, sans fournir d’asset :
+
+- ZeldaRET `e3c6c8143b92e948d17b0151b2311c54d1e64d25` pour les contrôleurs et acteurs ;
+- noclip.website `6b16cfda00ef5af3ee2a66d8b928bb0bf700e5b6` comme implémentation de lecture et
+  oracle visuel hors ligne.
+
+L’implémentation J3D publique distingue au moins les pistes de joints `ANK1/ANF1`,
+de transformation de texture `TTK1`, de registres couleur `TRK1`, de motif de texture
+`TPT1` et de visibilité `VAF1`. Elles seront donc inventoriées comme familles séparées,
+jamais aplaties dans un unique « clip de modèle ». Son contrôleur conserve un mode de
+lecture, un début, une fin et un point de répétition distincts ; la borne de fin est
+traitée explicitement plutôt que rejouée comme une pose ordinaire.
+
+Le code public du Lion Rouge prouve aussi que le comportement doit être lu : certaines
+animations de mât sont lancées avec un mode non bouclé, des actions sont franchies à
+une frame précise, une transition inverse reprend la progression complémentaire, et
+des callbacks modifient les matrices de joints du corps, de la tête, du canon et de la
+grue. Ces opérations deviendront des lignes de relations et de transitions portant
+symbole, révision et preuve ; elles ne seront pas recodées sous un nom Wind Waker dans
+le runtime.
+
+À réception de la ROM, l’audit animation suit cet ordre en lecture seule :
+
+1. calculer le hash, identifier région/révision et figer le reçu d’entrée ;
+2. inventorier archives, modèles, squelettes et toutes les familles d’animation sans
+   exporter de pixels ni de maillages ;
+3. fermer modèle → squelette → animation → matériau et recenser les callbacks ;
+4. rechercher pour chaque acteur sélectionné les tables puis les appels du contrôleur
+   qui fixent mode, vitesse, bornes, mélanges, interruptions et marqueurs ;
+5. écrire `orbite.animation-semantics/1` avec une ligne par clip et aucune boucle
+   supposée ;
+6. échantillonner les poses et états matériau aux bornes, mesurer chaque raccord et
+   rejeter tout dépassement ;
+7. comparer frame par frame l’oracle hors ligne et le candidat isolé, y compris après
+   pause, reprise, transition et changement de secteur.
+
+Pour Link sur le bateau, la route et le parent bateau possèdent le déplacement global.
+Le clip de Link ne peut ajouter que les canaux locaux démontrés. La qualification
+échoue si deux propriétaires appliquent la même translation/rotation, si un événement
+est livré deux fois au wrap, ou si un clip ponctuel est transformé en boucle.
+
 ## Capacités génériques à ajouter
 
 - graphe borné de cellules de scène et fenêtre de streaming ;
@@ -249,7 +298,9 @@ La première activation est interdite tant que les preuves suivantes ne passent 
 
 ## Références publiques de recherche
 
-- [Décompilation Wind Waker de ZeldaRET](https://github.com/zeldaret/tww)
-- [Implémentation publique du Lion Rouge](https://github.com/zeldaret/tww/blob/main/src/d/actor/d_a_ship.cpp)
-- [Implémentation publique de la Grande Mer](https://github.com/zeldaret/tww/blob/main/src/d/actor/d_a_sea.cpp)
-- [Extracteur Wind Waker de noclip.website](https://github.com/magcius/noclip.website/blob/main/src/ZeldaWindWaker/tools/zww_extractor.ts), référence de recherche uniquement
+- [Décompilation Wind Waker de ZeldaRET](https://github.com/zeldaret/tww/tree/e3c6c8143b92e948d17b0151b2311c54d1e64d25)
+- [Contrôleur J3DFrameCtrl public](https://github.com/zeldaret/tww/blob/e3c6c8143b92e948d17b0151b2311c54d1e64d25/include/JSystem/J3DGraphAnimator/J3DAnimation.h)
+- [Implémentation publique du Lion Rouge](https://github.com/zeldaret/tww/blob/e3c6c8143b92e948d17b0151b2311c54d1e64d25/src/d/actor/d_a_ship.cpp)
+- [Implémentation publique de la Grande Mer](https://github.com/zeldaret/tww/blob/e3c6c8143b92e948d17b0151b2311c54d1e64d25/src/d/actor/d_a_sea.cpp)
+- [Lecteur et échantillonneur J3D de noclip.website](https://github.com/magcius/noclip.website/blob/6b16cfda00ef5af3ee2a66d8b928bb0bf700e5b6/src/Common/JSYSTEM/J3D/J3DGraphAnimator.ts), référence de recherche uniquement
+- [Extracteur Wind Waker de noclip.website](https://github.com/magcius/noclip.website/blob/6b16cfda00ef5af3ee2a66d8b928bb0bf700e5b6/src/ZeldaWindWaker/tools/zww_extractor.ts), référence de recherche uniquement

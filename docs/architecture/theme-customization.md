@@ -229,6 +229,14 @@ aussi la provenance de la durée d'animation, du bouclage, du root motion, des p
 d'attache, des émetteurs, des matériaux et des dépendances. Une sonde asymétrique
 valide ces conventions avant le premier export visible.
 
+Le résolveur d’animations produit en plus un `orbite.animation-semantics/1` lié au
+ledger par chemin privé et SHA-256. Chaque clip conserve sa famille de cible, sa
+timebase, son domaine d’échantillonnage, sa borne, son mode de lecture source, son
+point de répétition, son unique propriétaire de mouvement, ses marqueurs et ses
+transitions. Une boucle n’est qualifiée qu’avec sondes avant/après raccord et limites
+d’écart mesurées. Le viewer consomme ce résultat canonique ; il ne décide jamais
+qu’un clip boucle parce qu’il a une durée ou un nom particulier.
+
 Les relations minimales `placement`, `attachment`, `effect_origin` et
 `interactive_hit_region` sont planifiées comme matrices ouvertes. Une relation peut
 être prouvée `not_applicable`, mais jamais remplacée par une constante de secours.

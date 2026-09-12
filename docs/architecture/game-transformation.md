@@ -51,6 +51,14 @@ seule et l'outil qui l'a transformé en lignes. Chaque combinaison déclarée po
 cellule ; les inconnues restent bloquantes et le runtime n'applique aucun offset de
 secours. Voir [ADR-0080](../decisions/ADR-0080-source-derived-relation-matrices.md).
 
+Le résolveur d’animations matérialise séparément les décisions qui ne résident pas
+forcément dans le clip : timebase, domaine et borne d’échantillonnage, valeur du
+contrôleur source, point de répétition, événements, transitions et propriétaire du
+mouvement. Son manifeste typé est lié par hash au ledger. Une boucle exige des sondes
+déterministes avant et après raccord ainsi que des limites d’écart mesurées ; le
+renderer ne déduit jamais une boucle d’un nom ou d’une durée. Voir
+[ADR-0085](../decisions/ADR-0085-typed-animation-semantics.md).
+
 Le format de scène n'efface pas le pipeline graphique d'origine. Chaque asset porte
 un `semantic_profile`, un `render_profile` et une `visual_qualification`. Bevy garde
 l'orchestration universelle, tandis qu'un adaptateur de rendu isolé implémente les
