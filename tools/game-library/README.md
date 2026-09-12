@@ -78,6 +78,9 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-animation --input private/source/animation.bck
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-jai-animation-sound --input private/source/animation.bas
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-ppc-resource-calls \
   --input private/source/linked.elf \
   --module actor-controller \
@@ -97,6 +100,12 @@ durée zéro —, le nombre de joints, les cardinalités des tables et les axes 
 translation animés du joint racine. Elle contrôle chaque index et mode de tangente,
 mais ne décide ni d'une transition ni du propriétaire du mouvement global : ces
 deux relations doivent être prouvées par le contrôleur source.
+
+Le lecteur reconnaît aussi les tables sonores JAI/BAS autonomes et celles annexées
+après `ANK1`. Il conserve les identifiants, fenêtres de frames, pitch, flags, volume,
+boucles et panoramique ; les tailles, pointeurs sérialisés, valeurs flottantes et
+octets de bourrage sont validés. Le bloc sonore ne peut donc plus être confondu avec
+une section d'animation corrompue ou ignoré lors de la conversion.
 
 L'inspection PPC complète cette preuve quand le source exporté est incomplet. Elle
 lit un ELF32 big-endian borné, limite l'analyse à une plage exécutable explicite ou

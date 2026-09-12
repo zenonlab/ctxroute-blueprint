@@ -147,6 +147,38 @@ pub struct J3dAnimationReport {
     pub rotation_values: usize,
     pub translation_values: usize,
     pub root_translation_animated: [bool; 3],
+    pub embedded_sound: Option<JaiSoundSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JaiSoundSummary {
+    pub format: &'static str,
+    pub header_value: u16,
+    pub events: Vec<JaiSoundEvent>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JaiSoundEvent {
+    pub sound_id: String,
+    pub start_frame: f32,
+    pub end_frame: f32,
+    pub pitch: f32,
+    pub play_flags: String,
+    pub volume: u8,
+    pub pitch_factor: i8,
+    pub loop_count: u8,
+    pub panning: u8,
+    pub volume_factor: i8,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JaiSoundReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub header_value: u16,
+    pub events: Vec<JaiSoundEvent>,
 }
 
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
@@ -209,6 +241,37 @@ pub fn inspect_j3d_animation(path: &Path) -> Result<J3dAnimationReport> {
     parse_j3d_animation(&bytes)
 }
 
+pub fn inspect_jai_animation_sound(path: &Path) -> Result<JaiSoundReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "animation sound input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "animation sound input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_jai_animation_sound(&bytes)
+}
+
+pub fn parse_jai_animation_sound(bytes: &[u8]) -> Result<JaiSoundReport> {
+    ensure!(
+        !bytes.is_empty() && bytes.len() <= MAX_J3D_BYTES,
+        "animation sound input exceeds the bounded size"
+    );
+    let sound = parse_jai_sound_payload(bytes, 0, false)?;
+    Ok(JaiSoundReport {
+        format: "orbite.jai-animation-sound-index/1",
+        adapter: "gcn.jai-animation-sound",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        header_value: sound.header_value,
+        events: sound.events,
+    })
+}
+
 pub fn parse_j3d_animation(bytes: &[u8]) -> Result<J3dAnimationReport> {
     ensure!(
         bytes.len() >= 0x44 && bytes.len() <= MAX_J3D_BYTES,
@@ -231,13 +294,12 @@ pub fn parse_j3d_animation(bytes: &[u8]) -> Result<J3dAnimationReport> {
         "BCK is missing ANK1"
     );
     let section_size = read_u32(bytes, 0x24)? as usize;
-    ensure!(
-        0x20_usize
-            .checked_add(section_size)
-            .context("ANK1 span overflow")?
-            == bytes.len(),
-        "ANK1 size mismatch"
-    );
+    let section_end = 0x20_usize
+        .checked_add(section_size)
+        .context("ANK1 span overflow")?;
+    ensure!(section_end <= bytes.len(), "ANK1 size mismatch");
+    let animation_bytes = &bytes[..section_end];
+    let embedded_sound = parse_embedded_jai_sound(bytes, section_end)?;
     let playback = match bytes[0x28] {
         0 => "oneshot",
         1 => "oneshot-reset",
@@ -263,17 +325,29 @@ pub fn parse_j3d_animation(bytes: &[u8]) -> Result<J3dAnimationReport> {
     let scale_offset = 0x20 + read_u32(bytes, 0x38)? as usize;
     let rotation_offset = 0x20 + read_u32(bytes, 0x3c)? as usize;
     let translation_offset = 0x20 + read_u32(bytes, 0x40)? as usize;
-    ensure_span(bytes, joint_offset, joints, 0x36, "BCK joint tracks")?;
-    ensure_span(bytes, scale_offset, scale_values, 4, "BCK scale values")?;
     ensure_span(
-        bytes,
+        animation_bytes,
+        joint_offset,
+        joints,
+        0x36,
+        "BCK joint tracks",
+    )?;
+    ensure_span(
+        animation_bytes,
+        scale_offset,
+        scale_values,
+        4,
+        "BCK scale values",
+    )?;
+    ensure_span(
+        animation_bytes,
         rotation_offset,
         rotation_values,
         2,
         "BCK rotation values",
     )?;
     ensure_span(
-        bytes,
+        animation_bytes,
         translation_offset,
         translation_values,
         4,
@@ -322,6 +396,82 @@ pub fn parse_j3d_animation(bytes: &[u8]) -> Result<J3dAnimationReport> {
         rotation_values,
         translation_values,
         root_translation_animated,
+        embedded_sound,
+    })
+}
+
+fn parse_embedded_jai_sound(bytes: &[u8], offset: usize) -> Result<Option<JaiSoundSummary>> {
+    if offset == bytes.len() {
+        return Ok(None);
+    }
+    ensure!(offset < bytes.len(), "embedded sound offset exceeds input");
+    Ok(Some(parse_jai_sound_payload(bytes, offset, true)?))
+}
+
+fn parse_jai_sound_payload(
+    bytes: &[u8],
+    offset: usize,
+    require_aligned_size: bool,
+) -> Result<JaiSoundSummary> {
+    ensure_span(bytes, offset, 1, 8, "animation sound header")?;
+    let count = read_u16(bytes, offset)? as usize;
+    ensure!(
+        count <= MAX_RECORDS_PER_CHUNK,
+        "animation sound event count exceeds the limit"
+    );
+    let header_value = read_u16(bytes, offset + 2)?;
+    ensure!(
+        read_u32(bytes, offset + 4)? == 0,
+        "animation sound serialized pointer must be zero"
+    );
+    let event_bytes = count
+        .checked_mul(0x20)
+        .context("animation sound event span overflow")?;
+    let logical_bytes = 8_usize
+        .checked_add(event_bytes)
+        .context("animation sound span overflow")?;
+    let padded_bytes = logical_bytes
+        .checked_add(0x1f)
+        .context("animation sound padding overflow")?
+        & !0x1f;
+    let available = bytes.len() - offset;
+    ensure!(
+        available == logical_bytes || available == padded_bytes,
+        "animation sound size mismatch"
+    );
+    ensure!(
+        !require_aligned_size || available == padded_bytes,
+        "embedded animation sound must use aligned storage"
+    );
+    ensure!(
+        bytes[offset + logical_bytes..]
+            .iter()
+            .all(|byte| *byte == 0),
+        "animation sound has non-zero padding"
+    );
+    let mut events = Vec::with_capacity(count);
+    for index in 0..count {
+        let event = offset + 8 + index * 0x20;
+        let start_frame = read_f32(bytes, event + 4)?;
+        let end_frame = read_f32(bytes, event + 8)?;
+        let pitch = read_f32(bytes, event + 12)?;
+        events.push(JaiSoundEvent {
+            sound_id: format!("0x{:08x}", read_u32(bytes, event)?),
+            start_frame,
+            end_frame,
+            pitch,
+            play_flags: format!("0x{:08x}", read_u32(bytes, event + 16)?),
+            volume: bytes[event + 20],
+            pitch_factor: bytes[event + 21] as i8,
+            loop_count: bytes[event + 22],
+            panning: bytes[event + 23],
+            volume_factor: bytes[event + 24] as i8,
+        });
+    }
+    Ok(JaiSoundSummary {
+        format: "jai-animation-sound-data",
+        header_value,
+        events,
     })
 }
 
@@ -1209,6 +1359,25 @@ mod tests {
         bytes
     }
 
+    fn fixture_bck_with_embedded_sound() -> Vec<u8> {
+        let mut bytes = fixture_bck();
+        bytes.resize(0x120, 0);
+        bytes[8..12].copy_from_slice(&0x120_u32.to_be_bytes());
+        bytes[0xe0..0xe2].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0xe2..0xe4].copy_from_slice(&12_u16.to_be_bytes());
+        bytes[0xe8..0xec].copy_from_slice(&0x0000_382a_u32.to_be_bytes());
+        bytes[0xec..0xf0].copy_from_slice(&3.5_f32.to_bits().to_be_bytes());
+        bytes[0xf0..0xf4].copy_from_slice(&8.0_f32.to_bits().to_be_bytes());
+        bytes[0xf4..0xf8].copy_from_slice(&1.25_f32.to_bits().to_be_bytes());
+        bytes[0xf8..0xfc].copy_from_slice(&0x40_u32.to_be_bytes());
+        bytes[0xfc..0x101].copy_from_slice(&[100, 2, 1, 64, 0xff]);
+        bytes
+    }
+
+    fn fixture_bas() -> Vec<u8> {
+        fixture_bck_with_embedded_sound()[0xe0..0x108].to_vec()
+    }
+
     fn write_rarc_entry(
         bytes: &mut [u8],
         offset: usize,
@@ -1318,6 +1487,47 @@ mod tests {
         assert_eq!(report.duration_frames, 30);
         assert_eq!(report.joints, 1);
         assert_eq!(report.root_translation_animated, [true, false, false]);
+        assert_eq!(report.embedded_sound, None);
+    }
+
+    #[test]
+    fn inventories_embedded_animation_sound_without_treating_it_as_ank1() {
+        let report = parse_j3d_animation(&fixture_bck_with_embedded_sound()).unwrap();
+        let sound = report.embedded_sound.unwrap();
+        assert_eq!(sound.header_value, 12);
+        assert_eq!(sound.events.len(), 1);
+        assert_eq!(sound.events[0].sound_id, "0x0000382a");
+        assert_eq!(sound.events[0].start_frame, 3.5);
+        assert_eq!(sound.events[0].volume_factor, -1);
+    }
+
+    #[test]
+    fn rejects_malformed_embedded_animation_sound() {
+        let mut bytes = fixture_bck_with_embedded_sound();
+        bytes[0xe4..0xe8].copy_from_slice(&1_u32.to_be_bytes());
+        assert!(parse_j3d_animation(&bytes).is_err());
+
+        let mut bytes = fixture_bck_with_embedded_sound();
+        bytes[0x11f] = 1;
+        assert!(parse_j3d_animation(&bytes).is_err());
+    }
+
+    #[test]
+    fn inventories_standalone_animation_sound_events() {
+        let report = parse_jai_animation_sound(&fixture_bas()).unwrap();
+        assert_eq!(report.header_value, 12);
+        assert_eq!(report.events.len(), 1);
+        assert_eq!(report.events[0].sound_id, "0x0000382a");
+        assert_eq!(report.events[0].end_frame, 8.0);
+    }
+
+    #[test]
+    fn accepts_zero_event_bas_padding_but_rejects_nonzero_padding() {
+        let mut bytes = vec![0_u8; 0x20];
+        bytes[2..4].copy_from_slice(&12_u16.to_be_bytes());
+        assert!(parse_jai_animation_sound(&bytes).is_ok());
+        bytes[0x1f] = 1;
+        assert!(parse_jai_animation_sound(&bytes).is_err());
     }
 
     #[test]

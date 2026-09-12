@@ -50,6 +50,13 @@ inconnue. Le rapport conserve l'empreinte du binaire, la plage, la configuration
 API et chaque adresse d'appel. Ce lecteur reste source-neutre et ne contient aucun
 identifiant propre à une œuvre.
 
+Les animations squelettiques peuvent porter une table sonore JAI/BAS après leur
+section `ANK1`, et les mêmes tables existent comme fichiers autonomes. L'adaptateur
+les traite comme une famille typée distincte : chaque événement conserve son
+identifiant, sa fenêtre temporelle et ses paramètres de lecture. Un suffixe inconnu,
+une taille incohérente, un pointeur sérialisé non nul, un flottant invalide ou un
+bourrage non nul ferme la conversion au lieu d'être assimilé à du padding libre.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans

@@ -280,6 +280,14 @@ preuve ferme la couche acteur sélectionnée, pas le gate global : modèles, pis
 textures, effets, audio et relations internes doivent encore être parcourus avant de
 déclarer la fermeture transitive.
 
+L'expansion de ces dépendances donne 43 archives uniques et 575 payloads. Les 157
+BDL, 5 BMD et 175 BCK passent le lecteur structurel commun. Vingt-deux BCK portent
+un bloc sonore JAI annexé, totalisant 24 événements ; les 50 BAS autonomes totalisent
+28 événements supplémentaires. Les 387 inspections modèles, squelettes et sons sont
+désormais toutes valides. Les familles matériau, texture, collision et animation de
+matériau restent explicitement en attente de lecteurs qualifiés ; cette passe ne
+change donc pas encore le statut du gate global de dépendances.
+
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
 macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non
