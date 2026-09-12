@@ -94,9 +94,10 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
     await expect(optionsPage.getByText('Favoris observés')).toBeVisible();
-    await optionsPage.getByRole('button', { name: 'Relancer l’analyse' }).click();
-    await expect(optionsPage.getByRole('button', { name: 'Relancer l’analyse' })).toBeEnabled({ timeout: 60_000 });
-    await expect(optionsPage.getByText('Complet')).toBeVisible();
+    const reconcileAction = optionsPage.getByRole('button', { name: /^(Commencer l’analyse|Reprendre maintenant|Vérifier à nouveau)$/u });
+    await reconcileAction.click();
+    await expect(reconcileAction).toBeEnabled({ timeout: 60_000 });
+    await expect(optionsPage.getByText('Inventaire vérifié').first()).toBeVisible();
     await expect(optionsPage.locator('dl').getByText('6', { exact: true })).toBeVisible();
     await optionsPage.close();
 
