@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Publication production TobiRink 1.0.18",
+    "title": "Publication production TobiRink 1.0.19",
     "quality_profile": "showcase",
     "viewBox": [1068, 760],
     "views": [
@@ -29,7 +29,7 @@
   ],
   "nodes": [
     { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "5 routes publiques", "stage": 0, "row": 0, "tag": "Next statique" },
-    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.18", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.19", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
     { "id": "releaseSchedule", "type": "backend", "label": "Agenda public", "sublabel": "snapshot + pointeur", "stage": 0, "row": 4, "tag": "schéma strict" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + 4 cibles", "stage": 1, "row": 2, "tag": "appliquée" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP + agenda révisionné", "stage": 2, "row": 3, "tag": "R2" },
@@ -54,8 +54,8 @@
       "dot": "emerald",
       "title": "Résultat",
       "items": [
-        "Le Worker public sert la surface Workbench 1.0.18 sur tobirink.com",
-        "Les deux archives 1.0.18 publiques reproduisent leurs hashes locaux",
+        "Le Worker public sert la surface Workbench 1.0.19 sur tobirink.com",
+        "Les deux archives 1.0.19 publiques reproduisent leurs hashes locaux",
         "L’agenda vide valide répond sans inventer de sortie publique",
         "Les routes inconnues restent en 404"
       ]
@@ -64,7 +64,7 @@
       "dot": "cyan",
       "title": "Limites conservées",
       "items": [
-        "Migration additive 0005 incluse dans la gate et aucune suppression distante",
+        "Migrations additives 0005 et 0006 appliquées sans suppression distante",
         "Chaque objet R2 modifié figure dans l’allowlist exacte",
         "La version Worker précédente reste disponible pour rollback"
       ]

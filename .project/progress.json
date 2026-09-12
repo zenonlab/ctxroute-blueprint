@@ -7976,6 +7976,47 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-library-review-1-0-19",
+      "title": "Publier et vérifier la bibliothèque et Review 1.0.19",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Appliquer la gate Cloudflare 1.0.19 et vérifier la production",
+          "status": "DONE",
+          "acceptance": [
+            "Only migration 0006 both immutable 1.0.19 archives and the public Worker are changed",
+            "The new Worker reaches 100 percent while the prior Worker remains a rollback reference",
+            "Production routes WebBridge and downloads pass with exact certified hashes"
+          ],
+          "files": [
+            "apps/worker/migrations/0006_owner_ambiguity_sets.sql",
+            "apps/worker/wrangler.jsonc",
+            "apps/web/out",
+            "apps/extension/.output/packages/tobirink-chrome-mv3-1.0.19.zip",
+            "apps/extension/.output/packages/tobirink-firefox-mv3-1.0.19.zip",
+            "build/.output/cloudflare-favorite-1.0.19-plan.json",
+            "docs/release.md",
+            "docs/architecture/src/production-publication.dataflow.json"
+          ],
+          "commands": [
+            "npm run package:extension and web production build",
+            "npm run infra:plan for D1 R2 and Worker",
+            "npm run infra:apply with exact digest and allowlist",
+            "remote HTTP hash D1 migration and production browser verification"
+          ],
+          "evidence": [
+            "Cloudflare gate 436dc18f applied additive migration 0006, published both immutable 1.0.19 ZIPs and deployed the release Worker without deleting data or prior artifacts.",
+            "A production-only verification exposed and corrected the facet remount; commit 918ef6c passed npm run verify, 7 local Playwright journeys and Worker-only gate ebbb8d91 deployed version 9883cbfe at 100 percent.",
+            "Wrangler reports no pending migration; five pages plus v2 rules return 200, an unknown route returns 404, 7 production Playwright journeys pass and remote ZIP hashes exactly match local candidates."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -368,3 +368,7 @@
 ## Nettoyer bibliothèque Review et ambiguïtés collectives — DONE
 
 - [x] **Corriger pagination covers Review et cache ambigu D1** — DONE _(evidence: npm run verify passes 811 product tests, 273 governance tests, all typechecks, Chromium IndexedDB, parser differential, performance, CRG, integration, audit zero and Archify showcase 9/9, D1 migration 0006 and 11 Worker SQL tests prove owner isolation, bounded public-ID ambiguity sets, prepared indexed lookup and no private titles URLs progress or cover URLs, Installed Chromium 153 completes the 1405-bookmark journey; Firefox 151 smoke passes; isolated 1.0.19 packages reproduce Chrome 14fb8845...b202 and Firefox 93dcb8d4...485d)_
+
+## Publier et vérifier la bibliothèque et Review 1.0.19 — DONE
+
+- [x] **Appliquer la gate Cloudflare 1.0.19 et vérifier la production** — DONE _(evidence: Cloudflare gate 436dc18f applied additive migration 0006, published both immutable 1.0.19 ZIPs and deployed the release Worker without deleting data or prior artifacts., A production-only verification exposed and corrected the facet remount; commit 918ef6c passed npm run verify, 7 local Playwright journeys and Worker-only gate ebbb8d91 deployed version 9883cbfe at 100 percent., Wrangler reports no pending migration; five pages plus v2 rules return 200, an unknown route returns 404, 7 production Playwright journeys pass and remote ZIP hashes exactly match local candidates.)_

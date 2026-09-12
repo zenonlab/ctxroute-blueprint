@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.18`; the local candidate is `1.0.19`.
+The current production release is `1.0.19`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -37,9 +37,9 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
-### Internal pagination and owner ambiguity candidate — 2026-09-12
+### Internal pagination and owner ambiguity release — 2026-09-12
 
-Candidate `1.0.19` keeps the Library continuation cursor inside React state,
+Release `1.0.19` keeps the Library continuation cursor inside React state,
 appends unique cards to the same grid and leaves the public URL limited to
 user-selected search, sort and facets. Review carries provider covers through
 the local runtime and WebBridge, derives the controlled R2 fallback from the
@@ -50,8 +50,21 @@ Migration `0006_owner_ambiguity_sets.sql` stores two to six competing public
 provider identities for one opaque owner and normalized key. It stores no raw
 title, favorite URL, folder, progress or cover URL. Lookup returns the set only
 to that owner; the extension hydrates it into the private candidate set and
-still requires a human choice. Production remains on `1.0.18` until the
-separate Cloudflare operation is approved.
+still requires a human choice.
+
+Cloudflare gate
+`436dc18fc53d981cbbc81a1522a532f8f453a0b41ad5b7bf6ef858db330b9447`
+applied migration `0006`, published both immutable archives and deployed the
+release Worker. Production verification found that Next remounted the Library
+after a facet URL update, so corrective commit `918ef6c` keeps the current page
+and updates the filtered URL without triggering a route transition. The
+Worker-only gate
+`ebbb8d912bab08e414f6bf74e85f912c192ad26e18e8fae34c039a43bc3e3659`
+deployed Worker `9883cbfe-b776-4199-96b5-71ff0bfde881` at 100%; Worker
+`2262ea78-5dc7-4680-a5f5-e5bb17f7f344` and the former 1.0.18 Worker remain
+rollback references. Wrangler lists no pending migration, all seven production
+Playwright journeys pass, five pages and `/v2/favorites/rules` return HTTP 200,
+and an unknown route returns HTTP 404.
 
 Two isolated builds reproduce 21-file archives byte for byte. Chromium 153
 loads the final Chrome archive and completes the 1,405-bookmark cache-first
