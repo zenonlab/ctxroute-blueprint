@@ -61,8 +61,9 @@ L'adaptateur `gcn-j3d` classe les familles de formats GameCube/JSystem sans conn
 de jeu. La commande suivante lit un placement de scène big-endian de façon bornée et
 émet son inventaire typé en espace source. La seconde inspecte l'enveloppe J3D,
 les sections, les tableaux de sommets, les bornes et les translations de joints.
-Elle explicite le passage vers le repère canonique mais ne prétend pas encore
-convertir les matériaux GX/TEV ni produire un modèle visuellement qualifié.
+Elle réutilise aussi les lecteurs MAT3/TEV et TEX1 pour les matériaux et textures
+embarqués. Elle explicite le passage vers le repère canonique mais ne prétend pas
+encore produire un modèle visuellement qualifié.
 
 ```bash
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
@@ -140,8 +141,9 @@ Le lecteur BTI conserve le format GX, la valeur alpha source, les dimensions, wr
 filtres, niveaux de mipmap, LOD, anisotropie, palette et plages de données. Le calcul
 de taille suit les tuiles GX propres à chaque format, y compris RGBA8 et CMPR. Une
 incohérence format indexé/palette, un niveau impossible ou une plage tronquée ferme
-l'inspection ; le lecteur n'effectue encore ni décodage RGBA ni approximation de
-matériau.
+l'inspection. Le drapeau d'activation des mipmaps et le nombre de niveaux stockés
+restent deux faits indépendants, comme dans `ResTIMG` ; le lecteur n'effectue encore
+ni décodage RGBA ni approximation de matériau.
 
 Les textures GX sans en-tête sont inspectées par le même calcul de tuiles, mais leur
 format, leurs dimensions, leurs wraps, leurs mipmaps et leur éventuelle palette sont

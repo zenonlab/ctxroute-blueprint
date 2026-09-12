@@ -70,6 +70,8 @@ pub struct J3dModelReport {
     pub source_position_bounds: Option<Bounds3>,
     pub canonical_position_bounds: Option<Bounds3>,
     pub joints: Option<J3dJointSummary>,
+    pub materials: Vec<J3dMaterialEntry>,
+    pub textures: Vec<J3dNamedTexture>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -991,7 +993,9 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
         "MAT3 init records",
     )?;
     let tex_no_offset = read_u32(section, 0x48)? as usize;
-    let tex_no_count = mat3_table_count(section, tex_no_offset, 2)?;
+    let tex_no_count = (tex_no_offset != 0)
+        .then(|| mat3_table_count(section, tex_no_offset, 2))
+        .transpose()?;
     let cull_mode_offset = read_u32(section, 0x1c)? as usize;
     let texgen_count_offset = read_u32(section, 0x34)? as usize;
     let tev_stage_count_offset = read_u32(section, 0x58)? as usize;
@@ -1025,6 +1029,7 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
             let tex_no_index = read_u16(section, init + 0x84 + slot * 2)?;
             if tex_no_index != u16::MAX {
                 source_texture_slots += 1;
+                let tex_no_count = tex_no_count.context("MAT3 texture number table is absent")?;
                 ensure!(
                     usize::from(tex_no_index) < tex_no_count,
                     "MAT3 texture number index exceeds table"
@@ -2002,10 +2007,6 @@ fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
     let mipmap_enabled = bytes[header + 16] != 0;
     let mipmap_count = bytes[header + 24];
     ensure!(mipmap_count > 0, "BTI mipmap count must be non-zero");
-    ensure!(
-        mipmap_enabled || mipmap_count == 1,
-        "BTI without mipmaps declares multiple levels"
-    );
     let max_levels = u8::try_from(u16::BITS - width.max(height).leading_zeros())?;
     ensure!(
         mipmap_count <= max_levels,
@@ -3170,6 +3171,8 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
     let mut source_position_bounds = None;
     let mut joints = None;
     let mut declared_vertices = None;
+    let mut materials = None;
+    let mut textures = None;
     for _ in 0..section_count {
         let tag = read_tag(bytes, offset)?;
         let section_size = read_u32(bytes, offset + 4)? as usize;
@@ -3194,6 +3197,14 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
                 source_position_bounds = result.1;
             }
             "JNT1" => joints = Some(parse_jnt1(&bytes[offset..end])?),
+            "MAT3" => {
+                ensure!(materials.is_none(), "duplicate MAT3 section");
+                materials = Some(parse_mat3(&bytes[offset..end])?);
+            }
+            "TEX1" => {
+                ensure!(textures.is_none(), "duplicate TEX1 section");
+                textures = Some(parse_tex1(&bytes[offset..end])?);
+            }
             _ => {}
         }
         sections.push(J3dSection {
@@ -3207,6 +3218,16 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
         offset == bytes.len(),
         "unaccounted bytes after J3D sections"
     );
+    let materials = materials.unwrap_or_default();
+    let textures = textures.unwrap_or_default();
+    for material in &materials {
+        for binding in &material.texture_bindings {
+            ensure!(
+                usize::from(binding.texture_index) < textures.len(),
+                "embedded MAT3 texture binding exceeds TEX1"
+            );
+        }
+    }
 
     // J3D and the canonical renderer are both right-handed and Y-up. Keeping the
     // basis is intentional; a later camera policy decides which local direction is forward.
@@ -3221,7 +3242,7 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
         winding: "preserve",
     };
     Ok(J3dModelReport {
-        format: "orbite.j3d-model-index/1",
+        format: "orbite.j3d-model-index/2",
         adapter: "gcn.j3d",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -3235,6 +3256,8 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
         canonical_position_bounds: source_position_bounds.clone(),
         source_position_bounds,
         joints,
+        materials,
+        textures,
     })
 }
 
@@ -3733,6 +3756,21 @@ mod tests {
         bytes
     }
 
+    fn fixture_j3d_with_materials() -> Vec<u8> {
+        let bmt = fixture_bmt(true);
+        let mat_size = read_u32(&bmt, 0x24).unwrap() as usize;
+        let tex_offset = 0x20 + mat_size;
+        let tex_size = read_u32(&bmt, tex_offset + 4).unwrap() as usize;
+        let size = 0x20 + mat_size + tex_size;
+        let mut bytes = vec![0_u8; size];
+        bytes[0..8].copy_from_slice(b"J3D2bmd3");
+        bytes[8..12].copy_from_slice(&(size as u32).to_be_bytes());
+        bytes[12..16].copy_from_slice(&2_u32.to_be_bytes());
+        bytes[0x20..0x20 + mat_size].copy_from_slice(&bmt[0x20..tex_offset]);
+        bytes[0x20 + mat_size..].copy_from_slice(&bmt[tex_offset..tex_offset + tex_size]);
+        bytes
+    }
+
     fn fixture_rarc() -> Vec<u8> {
         let mut bytes = vec![0_u8; 0xe7];
         bytes[0..4].copy_from_slice(b"RARC");
@@ -4147,6 +4185,20 @@ mod tests {
     }
 
     #[test]
+    fn reuses_mat3_and_tex1_readers_for_embedded_model_materials() {
+        let report = parse_j3d_model(&fixture_j3d_with_materials()).unwrap();
+        assert_eq!(report.materials.len(), 1);
+        assert_eq!(report.materials[0].name, "body");
+        assert_eq!(report.materials[0].tev_stages.len(), 3);
+        assert_eq!(report.textures.len(), 1);
+        assert_eq!(report.textures[0].name, "diffuse");
+
+        let mut invalid = fixture_j3d_with_materials();
+        invalid[0x20 + 0x1e4..0x20 + 0x1e6].copy_from_slice(&9_u16.to_be_bytes());
+        assert!(parse_j3d_model(&invalid).is_err());
+    }
+
+    #[test]
     fn inventories_nested_rarc_files_and_compression_without_extracting() {
         let report = parse_rarc(&fixture_rarc()).unwrap();
         assert_eq!(report.nodes, 2);
@@ -4242,6 +4294,18 @@ mod tests {
         assert_eq!(report.texture.palette_format, Some("rgb5a3"));
         assert_eq!(report.texture.image_bytes, 64);
         assert_eq!(report.texture.palette_bytes, 8);
+    }
+
+    #[test]
+    fn preserves_independent_bti_mipmap_flag_and_stored_level_count() {
+        let mut bytes = fixture_bti();
+        bytes.resize(136, 0);
+        bytes[12..16].copy_from_slice(&0x80_u32.to_be_bytes());
+        bytes[24] = 2;
+        let report = parse_bti_texture(&bytes).unwrap();
+        assert!(!report.texture.mipmap_enabled);
+        assert_eq!(report.texture.mipmap_count, 2);
+        assert_eq!(report.texture.image_bytes, 96);
     }
 
     #[test]
@@ -4410,6 +4474,12 @@ mod tests {
         let mut invalid = fixture_bmt(true);
         invalid[0x20 + 0x1e4..0x20 + 0x1e6].copy_from_slice(&9_u16.to_be_bytes());
         assert!(parse_j3d_material_table(&invalid).is_err());
+
+        let mut no_texture_table = fixture_bmt(false);
+        no_texture_table[0x20 + 0x48..0x20 + 0x4c].fill(0);
+        no_texture_table[0x20 + 0x84 + 0x84..0x20 + 0x84 + 0x94].fill(0xff);
+        let report = parse_j3d_material_table(&no_texture_table).unwrap();
+        assert!(report.materials[0].texture_bindings.is_empty());
     }
 
     #[test]

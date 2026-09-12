@@ -75,6 +75,9 @@ décodage. Le reçu garde format, mode alpha brut, échantillonnage, mipmaps, LO
 anisotropie, palette et offsets. Les tailles de payload sont recalculées avec les
 dimensions de tuiles GX puis comparées aux plages physiques ; une texture lisible ne
 vaut toutefois pas encore qualification de son matériau TEV.
+`mipmapEnabled` et `mipmapCount` restent deux propriétés indépendantes : la première
+reproduit l'activation par JUTTexture, la seconde borne les niveaux physiquement
+stockés. Une différence entre elles est conservée, pas réparée silencieusement.
 
 Un payload GX sans en-tête n'est accepté qu'avec une relation source privée donnant
 explicitement format, dimensions, sampler, mipmaps et palette. L'adaptateur réutilise
@@ -100,6 +103,9 @@ par stage les ordres texture/raster, entrées couleur et alpha, opérations, bia
 scales, clamps, registres de sortie, sélections et couleurs konst, couleurs signées
 et swaps. Les indices absents reproduisent strictement les constructeurs par défaut
 J3D. Les domaines GX et la plage signée 10 bits sont vérifiés avant publication.
+Le lecteur de modèle appelle ces mêmes parseurs sur ses sections MAT3 et TEX1 puis
+contrôle chaque binding contre la table de textures embarquée. Une table `texNo`
+absente n'est acceptée que si tous les slots source portent la sentinelle d'absence.
 
 La collision DZB reste une famille indépendante du mesh rendu. Son lecteur préserve
 les six tables sources — sommets, triangles, blocs, arbre, groupes et propriétés —,

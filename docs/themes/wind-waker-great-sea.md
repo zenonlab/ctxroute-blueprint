@@ -303,6 +303,14 @@ Les deux combinateurs utilisent `add` sur ce sous-corpus. Le fog, l'indirect tex
 et surtout les MAT3 embarqués dans les modèles restent ouverts : cette fermeture
 partielle ne passe pas le gate de dépendances.
 
+Le même lecteur est ensuite appliqué aux MAT3 et TEX1 embarqués dans les 157 BDL et
+5 BMD. Les 162 modèles passent sans exception spécifique, pour 328 matériaux, 587
+textures et 814 stages TEV supplémentaires. Cette passe a aussi confirmé deux
+conventions source : `texNo` peut être absent quand tous les slots sont sentinelles,
+et `mipmapEnabled` peut différer du nombre de niveaux stockés. Au total, les BMT et
+modèles couvrent donc 347 matériaux, 664 textures et 859 stages TEV. Le fog et
+l'indirect texturing restent les deux blocs matériau non résolus.
+
 Les 25 DZB de cette fermeture acteur passent ensuite le lecteur de collision : 2 808
 sommets, 4 204 triangles et 129 groupes, avec références de propriétés et arbres
 spatiaux contrôlés. Le total atteint 570 inspections sur 570. La structure physique
@@ -320,8 +328,7 @@ tables et appelants source des cinq indices dynamiques, prouve toutefois qu'aucu
 deux n'est référencée par les racines sélectionnées. Elles restent non converties et
 sont classées `not_applicable` : les 575 payloads sont ainsi classifiés, 573 par
 inspection et 2 par exclusion sourcée. La dépendance transitive reste fermée tant que
-les MAT3 embarqués, le fog et l'indirect texturing nécessaires au rendu ne sont pas
-qualifiés.
+le fog et l'indirect texturing nécessaires au rendu ne sont pas qualifiés.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
