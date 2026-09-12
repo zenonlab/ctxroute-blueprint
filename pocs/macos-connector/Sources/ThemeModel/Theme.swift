@@ -9,15 +9,14 @@ public enum PortableRole: String, Codable, CaseIterable, Sendable {
 }
 
 public struct AppearanceOverride: Codable, Equatable, Sendable {
-    public var character: String?
-    public var vehicle: String?
+    public var selections: [String: String]?
     public var color: String?
     public var texture: String?
     public var icon: String?
     public var animation: String?
-    public init(character: String? = nil, vehicle: String? = nil, color: String? = nil,
+    public init(selections: [String: String]? = nil, color: String? = nil,
                 texture: String? = nil, icon: String? = nil, animation: String? = nil) {
-        self.character = character; self.vehicle = vehicle; self.color = color
+        self.selections = selections; self.color = color
         self.texture = texture; self.icon = icon; self.animation = animation
     }
 }
@@ -32,8 +31,7 @@ public struct Theme: Codable, Equatable, Sendable {
         public var x: Double?
         public var y: Double?
         public var size: Double?
-        public var character: String?
-        public var vehicle: String?
+        public var selections: [String: String]?
         public var texture: String?
         public var icon: String?
         public var animation: String?
@@ -41,12 +39,12 @@ public struct Theme: Codable, Equatable, Sendable {
         public var role: PortableRole?
         public init(id: String, color: String, phase: Double, label: String? = nil,
                     application: String? = nil, x: Double? = nil, y: Double? = nil, size: Double? = nil,
-                    character: String? = nil, vehicle: String? = nil, texture: String? = nil,
+                    selections: [String: String]? = nil, texture: String? = nil,
                     icon: String? = nil, animation: String? = nil, sessionID: String? = nil,
                     role: PortableRole? = nil) {
             self.id = id; self.color = color; self.phase = phase; self.label = label
             application_bundle_id = application; self.x = x; self.y = y; self.size = size
-            self.character = character; self.vehicle = vehicle; self.texture = texture
+            self.selections = selections; self.texture = texture
             self.icon = icon; self.animation = animation; session_id = sessionID; self.role = role
         }
     }
@@ -85,7 +83,10 @@ public struct Theme: Codable, Equatable, Sendable {
                   && ((object.x == nil && object.y == nil) ||
                       (object.x.map { (0.05...0.95).contains($0) } == true && object.y.map { (0.05...0.95).contains($0) } == true))
                   && (object.size.map { (24...96).contains($0) } ?? true)
-                  && [object.character, object.vehicle, object.animation].allSatisfy({ $0.map(validID) ?? true })
+                  && (object.selections.map { $0.count <= 8 && $0.allSatisfy {
+                      validID($0.key) && validID($0.value)
+                  } } ?? true)
+                  && (object.animation.map(validID) ?? true)
                   && (object.session_id.map(validID) ?? true)
                   && [object.texture, object.icon].allSatisfy({ $0.map(validAssetName) ?? true })
               }),
@@ -104,8 +105,7 @@ public struct Theme: Codable, Equatable, Sendable {
             throw ModelError.invalid("unknown object")
         }
         var result = self
-        if let value = appearance.character { result.objects[index].character = value }
-        if let value = appearance.vehicle { result.objects[index].vehicle = value }
+        if let value = appearance.selections { result.objects[index].selections = value }
         if let value = appearance.color { result.objects[index].color = value }
         if let value = appearance.texture { result.objects[index].texture = value }
         if let value = appearance.icon { result.objects[index].icon = value }

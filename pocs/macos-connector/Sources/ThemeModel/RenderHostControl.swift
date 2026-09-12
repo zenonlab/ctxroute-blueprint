@@ -14,7 +14,7 @@ public struct RenderHostControlState: Codable, Equatable, Sendable {
                 overrides: ThemeInterfaceOverrides? = nil) throws {
         guard audioVolume.isFinite, (0...1).contains(audioVolume),
               brightness.isFinite, (0...1).contains(brightness),
-              overrides.map({ $0.schema_version == 1 }) ?? true else {
+              overrides.map({ $0.schema_version == 2 }) ?? true else {
             throw ModelError.invalid("invalid RenderHost control state")
         }
         schema_version = 2

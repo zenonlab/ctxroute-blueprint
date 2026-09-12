@@ -13,7 +13,9 @@ orbite_stop_agent_children() {
     kill -TERM "$child_pid"
     child_pids+=("$child_pid")
   done < <(pgrep -P "$agent_pid" 2>/dev/null || true)
-  for child_pid in "${child_pids[@]}"; do
+  # Bash 3.2 treats an empty local array expansion as unbound under `set -u`.
+  # PIDs never contain whitespace, so the defaulted scalar expansion is safe.
+  for child_pid in ${child_pids[*]-}; do
     for _ in {1..50}; do
       kill -0 "$child_pid" 2>/dev/null || break
       sleep 0.1

@@ -250,7 +250,7 @@ import AppKit
     }
 }
 
-@MainActor final class VehicleCustomizationPanel: NSObject, NSWindowDelegate {
+@MainActor final class ThemeCustomizationPanel: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var themeID = ""
     private var interface: ResolvedThemeInterface?
@@ -333,7 +333,7 @@ import AppKit
         stack.alignment = .leading
         stack.spacing = 6
         stack.edgeInsets = .init(top: 20, left: 24, bottom: 20, right: 24)
-        stack.addArrangedSubview(NSTextField(labelWithString: "Véhicule dans la scène"))
+        stack.addArrangedSubview(NSTextField(labelWithString: "Objet dans la scène"))
         stack.addArrangedSubview(target)
         stack.addArrangedSubview(selectionStack)
         stack.addArrangedSubview(NSTextField(labelWithString: "Session terminal / processus (optionnel)"))

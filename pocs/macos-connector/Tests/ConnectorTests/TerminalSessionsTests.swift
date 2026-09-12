@@ -62,10 +62,10 @@ final class TerminalSessionsTests: XCTestCase {
     func testAppearanceChangePreservesSessionIdentity() throws {
         var theme = Theme.fixture()
         theme.objects[0].session_id = "session.alpha"
-        let changed = try theme.applying(.init(character: "driver.luigi", vehicle: "kart.standard"),
+        let changed = try theme.applying(.init(selections: ["subject": "subject.green", "carrier": "carrier.standard"]),
                                          to: "orb.a")
         XCTAssertEqual(changed.objects[0].session_id, "session.alpha")
-        XCTAssertEqual(changed.objects[0].character, "driver.luigi")
-        XCTAssertEqual(changed.objects[0].vehicle, "kart.standard")
+        XCTAssertEqual(changed.objects[0].selections,
+                       ["subject": "subject.green", "carrier": "carrier.standard"])
     }
 }

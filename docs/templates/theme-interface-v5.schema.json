@@ -37,6 +37,43 @@
             "type": "array",
             "maxItems": 16,
             "items": { "type": "integer", "minimum": 0, "maximum": 63 }
+          },
+          "hide_parts": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/id" }
+          },
+          "part_offsets": {
+            "type": "object",
+            "maxProperties": 32,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": { "$ref": "#/$defs/vector3" }
+          },
+          "effect_sockets": {
+            "type": "object",
+            "maxProperties": 32,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": {
+              "type": "array",
+              "prefixItems": [
+                { "anyOf": [{ "$ref": "#/$defs/vector3" }, { "type": "null" }] },
+                { "anyOf": [{ "$ref": "#/$defs/vector3" }, { "type": "null" }] }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "footprint": {
+            "type": "array",
+            "prefixItems": [
+              { "type": "number" }, { "type": "number" }, { "type": "number" },
+              { "type": "number" }, { "type": "number" }
+            ],
+            "items": false,
+            "minItems": 5,
+            "maxItems": 5
           }
         }
       }
@@ -157,6 +194,26 @@
         }
       }
     },
+    "placements": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["selections", "part", "translation"],
+        "properties": {
+          "selections": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 8,
+            "propertyNames": { "$ref": "#/$defs/id" },
+            "additionalProperties": { "$ref": "#/$defs/id" }
+          },
+          "part": { "$ref": "#/$defs/id" },
+          "translation": { "$ref": "#/$defs/vector3" }
+        }
+      }
+    },
     "pinning": {
       "type": "object",
       "additionalProperties": false,
@@ -219,6 +276,13 @@
       "items": false,
       "minItems": 2,
       "maxItems": 2
+    },
+    "vector3": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
     }
   }
 }

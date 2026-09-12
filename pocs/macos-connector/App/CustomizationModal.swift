@@ -10,8 +10,7 @@ import UniformTypeIdentifiers
     private let name = NSTextField()
     private let color = NSColorWell()
     private let size = NSSlider(value: 44, minValue: 24, maxValue: 96, target: nil, action: nil)
-    private let character = NSTextField()
-    private let vehicle = NSTextField()
+    private let selections = NSTextField()
     private let texture = NSTextField()
     private let icon = NSTextField()
     private let animation = NSTextField()
@@ -48,8 +47,8 @@ import UniformTypeIdentifiers
         updateApplicationName()
         color.color = NSColor(cgColor: Scene.color(object.color)) ?? .systemBlue
         size.doubleValue = object.size ?? 44
-        character.stringValue = object.character ?? ""
-        vehicle.stringValue = object.vehicle ?? ""
+        selections.stringValue = (object.selections ?? [:]).sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
         texture.stringValue = object.texture ?? ""
         icon.stringValue = object.icon ?? ""
         animation.stringValue = object.animation ?? ""
@@ -69,7 +68,7 @@ import UniformTypeIdentifiers
         for (title, field) in [("Nom", name as NSView), ("Couleur", color), ("Taille", size)] {
             stack.addArrangedSubview(NSTextField(labelWithString: title)); stack.addArrangedSubview(field)
         }
-        let appearanceFields: [(String, NSView)] = [("Personnage", character), ("Véhicule", vehicle),
+        let appearanceFields: [(String, NSView)] = [("Sélections (axe=choix)", selections),
             ("Texture", texture), ("Icône", icon), ("Animation", animation), ("Action", role)]
         for (title, field) in appearanceFields {
             field.setAccessibilityLabel(title); field.widthAnchor.constraint(equalToConstant: 342).isActive = true
@@ -102,13 +101,15 @@ import UniformTypeIdentifiers
     }
     @objc private func submit() {
         guard var value = draft, let rgb = color.color.usingColorSpace(.sRGB) else { return }
+        let parsedSelections: [String: String]
+        do { parsedSelections = try parseSelections(selections.stringValue) }
+        catch { failed("Sélections : utilisez axe=choix, séparés par des virgules."); return }
         value.objects[objectIndex].label = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         value.objects[objectIndex].color = String(format: "%02X%02X%02X", Int((rgb.redComponent * 255).rounded()),
             Int((rgb.greenComponent * 255).rounded()), Int((rgb.blueComponent * 255).rounded()))
         value.objects[objectIndex].size = size.doubleValue
         value.objects[objectIndex].application_bundle_id = applicationID
-        value.objects[objectIndex].character = optional(character.stringValue)
-        value.objects[objectIndex].vehicle = optional(vehicle.stringValue)
+        value.objects[objectIndex].selections = parsedSelections
         value.objects[objectIndex].texture = optional(texture.stringValue)
         value.objects[objectIndex].icon = optional(icon.stringValue)
         value.objects[objectIndex].animation = optional(animation.stringValue)
@@ -128,6 +129,18 @@ import UniformTypeIdentifiers
     private func optional(_ value: String) -> String? {
         let result = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return result.isEmpty ? nil : result
+    }
+    private func parseSelections(_ value: String) throws -> [String: String] {
+        let fields = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        if fields.isEmpty { return [:] }
+        let pairs = try fields.map { field -> (String, String) in
+            let parts = field.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { throw ModelError.invalid("axe=choix requis") }
+            return (parts[0], parts[1])
+        }
+        let result = Dictionary(uniqueKeysWithValues: pairs)
+        guard result.count == pairs.count else { throw ModelError.invalid("axe dupliqué") }
+        return result
     }
     @objc private func close() { panel?.close(); draft = nil; original = nil }
     func windowWillClose(_ notification: Notification) { draft = nil; original = nil }

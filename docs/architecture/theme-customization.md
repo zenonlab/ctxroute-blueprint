@@ -354,6 +354,11 @@ Le manifeste canonique est organisé par domaines stables :
 | `profiles` | budgets de rendu, animation, audio et qualité |
 | `provenance` | auteur, licences, versions, outils et contenu exportable |
 
+Les placements variant avec plusieurs choix utilisent uniquement une table générique
+`selections → part → transform`. Les clés de `selections` sont les catégories ouvertes
+déclarées par les étapes du menu. Le runtime vérifie chaque référence, refuse les
+cellules dupliquées et applique la relation sans connaître le nom ni le métier des axes.
+
 Ce découpage prépare l'import et le design sans figer le schéma JSON final. Les
 identifiants sont portables ; les handles GPU, chemins absolus et types AppKit restent
 hors du manifeste.

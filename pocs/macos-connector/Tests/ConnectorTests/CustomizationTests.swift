@@ -148,8 +148,8 @@ final class CustomizationTests: XCTestCase {
         original.objects[0].role = .sessionFocus
         original.objects[0].application_bundle_id = "com.apple.Terminal"
         let before = original.objects[0]
-        let changed = try original.applying(AppearanceOverride(character: "driver.mario",
-            vehicle: "kart.standard", color: "AA2200", texture: "kart-red.png",
+        let changed = try original.applying(AppearanceOverride(selections: ["subject": "subject.mario",
+            "carrier": "carrier.standard"], color: "AA2200", texture: "object-red.png",
             icon: "portrait-red.png", animation: "drive.active"), to: before.id)
         let after = changed.objects[0]
         XCTAssertEqual(after.id, before.id)
@@ -157,8 +157,7 @@ final class CustomizationTests: XCTestCase {
         XCTAssertEqual(after.x, before.x); XCTAssertEqual(after.y, before.y)
         XCTAssertEqual(after.role, before.role)
         XCTAssertEqual(after.application_bundle_id, before.application_bundle_id)
-        XCTAssertEqual(after.character, "driver.mario")
-        XCTAssertEqual(after.vehicle, "kart.standard")
+        XCTAssertEqual(after.selections, ["subject": "subject.mario", "carrier": "carrier.standard"])
         XCTAssertEqual(after.color, "AA2200")
         XCTAssertNotEqual(changed, original)
         XCTAssertEqual(original.objects[0], before)

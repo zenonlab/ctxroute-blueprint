@@ -233,6 +233,15 @@ final class ModelTests: XCTestCase {
             environment: [ThemeLibraries.environmentKey: second.path], fileManager: .default)
         XCTAssertEqual(Set(roots.map(\.path)), Set([root.path, second.path]))
     }
+    func testThemeLibrariesCollapseNestedRootsBeforeDiscovery() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let nested = root.appendingPathComponent("nested", isDirectory: true)
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "theme-libraries-nested-\(UUID().uuidString)"))
+        defaults.set([nested.path, root.path], forKey: ThemeLibraries.defaultsKey)
+
+        XCTAssertEqual(ThemeLibraries.roots(defaults: defaults, environment: [:]).map(\.path), [root.path])
+    }
     func testCommandsAreCorrelatedIdempotentAndBounded() {
         var session = Session(themeID: "test")
         let now = Date()

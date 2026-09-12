@@ -14,12 +14,17 @@ final class ThemeInterfaceTests: XCTestCase {
         var slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
         slots["session.action.focus"] = asset.id
         slots["session.state.active"] = asset.id
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/2", assets: [asset],
+        let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
+        let carrier = ThemeInterfaceManifest.Choice.Kind(rawValue: "carrier")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
             slots: slots, choices: [
-                .init(id: "driver.fixture", label: "Pilote libre", kind: .character, preview: asset.id),
-                .init(id: "kart.fixture", label: "Kart libre", kind: .vehicle, preview: asset.id,
+                .init(id: "subject.fixture", label: "Sujet libre", kind: subject, preview: asset.id),
+                .init(id: "carrier.fixture", label: "Support libre", kind: carrier, preview: asset.id,
                       appearance: .init(part: "body", material: "mat_body", tint: [1, 0.5, 0.25, 1]))
-            ])
+            ], selection: .init(stages: [
+                .init(id: "subject", label: "Choisir un sujet", kind: subject, columns: 2),
+                .init(id: "carrier", label: "Choisir un support", kind: carrier, columns: 2)
+            ]))
         let manifestURL = root.appendingPathComponent("interface.json")
         try JSONEncoder().encode(manifest).write(to: manifestURL)
 
@@ -35,16 +40,19 @@ final class ThemeInterfaceTests: XCTestCase {
     }
 
     func testControlV2CarriesOneThemeMixBrightnessAndPause() throws {
+        let overrides = ThemeInterfaceOverrides(themeID: "fixture.theme")
         let state = try RenderHostControlState(generation: 7, audioVolume: 0.35,
-            desktopItemsVisible: false, brightness: 0.8, visualPaused: true)
+            desktopItemsVisible: false, brightness: 0.8, visualPaused: true,
+            overrides: overrides)
         XCTAssertEqual(state.schema_version, 2)
         XCTAssertEqual(state.audio_volume, 0.35)
         XCTAssertTrue(state.visual_paused)
+        XCTAssertEqual(state.overrides?.schema_version, 2)
         XCTAssertThrowsError(try RenderHostControlState(generation: 8, audioVolume: 1.1,
             desktopItemsVisible: nil, brightness: 0.8, visualPaused: false))
     }
 
-    func testInterfaceV4AcceptsDigestPinnedModelBinding() throws {
+    func testInterfaceV5AcceptsDigestPinnedModelBinding() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("theme-interface-model-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -57,13 +65,14 @@ final class ThemeInterfaceTests: XCTestCase {
         }
         let asset = ThemeInterfaceManifest.Asset(id: "preview", path: "preview.png", sha256: digest(png))
         let slots = Dictionary(uniqueKeysWithValues: ThemeInterfaceLoader.requiredSlots.map { ($0, asset.id) })
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/4", assets: [asset],
+        let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
             models: [.init(id: "model.driver", path: "driver.glb", sha256: digest(glb),
                            clipIndices: [0, 1, 2])], slots: slots,
-            choices: [.init(id: "driver.fixture", label: "Pilote", kind: .character, preview: asset.id,
+            choices: [.init(id: "subject.fixture", label: "Sujet", kind: subject, preview: asset.id,
                             appearance: .init(part: "driver", model: "model.driver"))],
             selection: .init(stages: [
-                .init(id: "driver", label: "Choisir", kind: .character, columns: 2)
+                .init(id: "subject", label: "Choisir", kind: subject, columns: 2)
             ]))
         let url = root.appendingPathComponent("interface.json")
         try JSONEncoder().encode(manifest).write(to: url)
@@ -83,50 +92,58 @@ final class ThemeInterfaceTests: XCTestCase {
         XCTAssertThrowsError(try ThemeInterfaceLoader.load(url))
     }
 
-    func testVehicleOverridePreservesTargetAndValidatesThemeChoices() throws {
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/1", assets: [], slots: [:],
+    func testGenericOverridePreservesTargetAndValidatesThemeChoices() throws {
+        let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
+        let carrier = ThemeInterfaceManifest.Choice.Kind(rawValue: "carrier")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [], slots: [:],
             choices: [
-                .init(id: "driver.fixture", label: "Pilote", kind: .character, preview: "preview"),
-                .init(id: "kart.fixture", label: "Kart", kind: .vehicle, preview: "preview")
-            ], targets: [.init(id: "vehicle.one", label: "Véhicule", session_id: "session.alpha")])
+                .init(id: "subject.fixture", label: "Sujet", kind: subject, preview: "preview"),
+                .init(id: "carrier.fixture", label: "Support", kind: carrier, preview: "preview")
+            ], targets: [.init(id: "target.one", label: "Objet", session_id: "session.alpha")],
+            selection: .init(stages: [
+                .init(id: "subject", label: "Sujet", kind: subject, columns: 2),
+                .init(id: "carrier", label: "Support", kind: carrier, columns: 2)
+            ]))
         let value = ThemeInterfaceOverrides(themeID: "fixture.theme", targets: [
-            "vehicle.one": .init(character: "driver.fixture", vehicle: "kart.fixture",
-                                 sessionID: "session.beta")
+            "target.one": .init(selections: ["subject": "subject.fixture", "carrier": "carrier.fixture"],
+                                sessionID: "session.beta")
         ])
         XCTAssertNoThrow(try value.validated(for: "fixture.theme", interface: manifest))
-        XCTAssertEqual(value.targets["vehicle.one"]?.session_id, "session.beta")
+        XCTAssertEqual(value.targets["target.one"]?.session_id, "session.beta")
         var invalid = value
-        invalid.targets["vehicle.one"]?.vehicle = "kart.unknown"
+        invalid.targets["target.one"]?.selections["carrier"] = "carrier.unknown"
         XCTAssertThrowsError(try invalid.validated(for: "fixture.theme", interface: manifest))
 
         var normalized = ThemeInterfaceOverrides(themeID: "fixture.theme", targets: [
-            "vehicle.one": .init(character: "driver.fixture")
+            "target.one": .init(selections: ["subject": "subject.fixture"])
         ])
-        normalized.set(.init(), for: "vehicle.one")
+        normalized.set(.init(), for: "target.one")
         XCTAssertTrue(normalized.targets.isEmpty)
     }
 
     func testSelectionPipelineFiltersNextStageByDeclaredAttribute() throws {
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/3", assets: [], slots: [:],
+        let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
+        let carrier = ThemeInterfaceManifest.Choice.Kind(rawValue: "carrier")
+        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [], slots: [:],
             choices: [
-                .init(id: "driver.light", label: "Pilote léger", kind: .character, preview: "driver",
+                .init(id: "subject.light", label: "Sujet léger", kind: subject, preview: "subject",
                       attributes: ["weight": "light"]),
-                .init(id: "driver.heavy", label: "Pilote lourd", kind: .character, preview: "driver",
+                .init(id: "subject.heavy", label: "Sujet lourd", kind: subject, preview: "subject",
                       attributes: ["weight": "heavy"]),
-                .init(id: "vehicle.light", label: "Véhicule léger", kind: .vehicle, preview: "vehicle",
+                .init(id: "carrier.light", label: "Support léger", kind: carrier, preview: "carrier",
                       attributes: ["weight": "light"]),
-                .init(id: "vehicle.heavy", label: "Véhicule lourd", kind: .vehicle, preview: "vehicle",
+                .init(id: "carrier.heavy", label: "Support lourd", kind: carrier, preview: "carrier",
                       attributes: ["weight": "heavy"])
             ], selection: .init(stages: [
-                .init(id: "driver", label: "Choisir un pilote", kind: .character, columns: 6),
-                .init(id: "machine", label: "Choisir un véhicule", kind: .vehicle, columns: 6)
+                .init(id: "subject", label: "Choisir un sujet", kind: subject, columns: 6),
+                .init(id: "carrier", label: "Choisir un support", kind: carrier, columns: 6)
             ], compatibility: [
-                .init(sourceStage: "driver", targetStage: "machine", attribute: "weight")
+                .init(sourceStage: "subject", targetStage: "carrier", attribute: "weight")
             ]))
 
-        XCTAssertEqual(manifest.compatibleChoices(kind: .vehicle,
-            selected: [.character: "driver.light"]).map(\.id), ["vehicle.light"])
-        XCTAssertTrue(manifest.compatibleChoices(kind: .vehicle, selected: [:]).isEmpty)
+        XCTAssertEqual(manifest.compatibleChoices(kind: carrier,
+            selected: [subject: "subject.light"]).map(\.id), ["carrier.light"])
+        XCTAssertTrue(manifest.compatibleChoices(kind: carrier, selected: [:]).isEmpty)
     }
 
     func testInterfaceV5AcceptsArbitraryOrderedMenuKinds() throws {
@@ -172,27 +189,8 @@ final class ThemeInterfaceTests: XCTestCase {
         XCTAssertEqual(try ThemeInterfaceLoader.load(url).manifest.effectiveStages.first?.kind, outfit)
     }
 
-    func testLegacyOverridesMigrateToGenericSelections() throws {
+    func testLegacyOverridesAreRejectedInsteadOfSilentlyMigrated() throws {
         let bytes = Data(#"{"schema_version":1,"theme_id":"fixture.theme","targets":{"target.one":{"character":"driver.one","vehicle":"vehicle.one","session_id":"session.one"}}}"#.utf8)
-        let decoded = try JSONDecoder().decode(ThemeInterfaceOverrides.self, from: bytes)
-        let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [], slots: [:],
-            choices: [
-                .init(id: "driver.one", label: "Pilote", kind: .character, preview: "driver"),
-                .init(id: "vehicle.one", label: "Véhicule", kind: .vehicle, preview: "vehicle")
-            ], targets: [.init(id: "target.one", label: "Cible", session_id: nil)],
-            selection: .init(stages: [
-                .init(id: "driver", label: "Pilote", kind: .character, columns: 2),
-                .init(id: "vehicle", label: "Véhicule", kind: .vehicle, columns: 2)
-            ]))
-
-        let migrated = try decoded.validated(for: "fixture.theme", interface: manifest)
-        XCTAssertEqual(migrated.schema_version, 2)
-        XCTAssertEqual(migrated.targets["target.one"]?.selections,
-                       ["character": "driver.one", "vehicle": "vehicle.one"])
-        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(migrated)) as? [String: Any]
-        let targets = encoded?["targets"] as? [String: [String: Any]]
-        XCTAssertNotNil(targets?["target.one"]?["selections"])
-        XCTAssertNil(targets?["target.one"]?["character"])
-        XCTAssertNil(targets?["target.one"]?["vehicle"])
+        XCTAssertThrowsError(try JSONDecoder().decode(ThemeInterfaceOverrides.self, from: bytes))
     }
 }

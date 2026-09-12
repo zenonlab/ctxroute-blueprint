@@ -18,7 +18,7 @@
     { "id": "research", "type": "security", "label": "Recherche du moteur", "sublabel": "formats · rendu · logique · limites", "stage": 1, "row": 0, "width": 170 },
     { "id": "concept", "type": "frontend", "label": "Proposition de wallpaper", "sublabel": "scène · objets · sessions · contrôles", "stage": 1, "row": 2, "width": 180 },
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "conversion après validation du plan", "stage": 2, "row": 2, "width": 170 },
-    { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · relations · preuves", "stage": 2, "row": 4, "width": 160 },
+    { "id": "library", "type": "database", "label": "Bibliothèque privée", "sublabel": "assets · matrices d’axes · preuves", "stage": 2, "row": 4, "width": 170 },
     { "id": "resolver", "type": "security", "label": "Résolveur", "sublabel": "capacités · compatibilité · digests", "stage": 3, "row": 4, "width": 170 },
     { "id": "runtime", "type": "backend", "label": "Composition du thème", "sublabel": "instances stables · sessions typées", "stage": 3, "row": 2, "width": 180 },
     { "id": "renderer", "type": "frontend", "label": "Wallpaper 2D / 3D", "sublabel": "scène · animation · occlusion", "stage": 4, "row": 0, "width": 160 },
@@ -61,7 +61,8 @@
       "dot": "emerald",
       "title": "Aucun métier dans le runtime",
       "items": [
-        "Objets, sessions et menus viennent du catalogue qualifié",
+        "Objets, sessions, placements et menus viennent du catalogue qualifié",
+        "Chaque placement associe des sélections ouvertes à une partie et un transform",
         "Le connecteur ne connaît aucun jeu, personnage ou véhicule",
         "Les contenus commerciaux restent privés"
       ]

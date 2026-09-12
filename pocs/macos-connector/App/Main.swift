@@ -112,7 +112,7 @@ import os
     private let desktopItems = DesktopItems()
     private let renderHost = RenderHostController()
     private let themeControls = ThemeControlsView()
-    private let customization = VehicleCustomizationPanel()
+    private let customization = ThemeCustomizationPanel()
     private let desktopInput = RenderHostDesktopInput()
     private let interfaceStore = ThemeInterfaceOverrideStore(directory: FileManager.default.urls(
         for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -134,7 +134,7 @@ import os
         renderHost.onTermination = { [weak self] status in
             guard let self else { return }
             self.desktopInput.update(snapshot: nil, desktopItemsVisible: nil)
-            self.statusLabel.stringValue = "RenderHost terminé (code (status)). Réactivez le thème pour reprendre."
+            self.statusLabel.stringValue = "RenderHost terminé (code \(status)). Réactivez le thème pour reprendre."
         }
 
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 16
@@ -166,8 +166,8 @@ import os
         runtime.addArrangedSubview(NSButton(title: "Activer sur le bureau", target: self, action: #selector(activateTheme)))
         runtime.addArrangedSubview(NSButton(title: "Arrêter", target: self, action: #selector(stopTheme)))
         stack.addArrangedSubview(runtime)
-        stack.addArrangedSubview(NSButton(title: "Personnaliser les véhicules…", target: self,
-                                          action: #selector(customizeVehicles)))
+        stack.addArrangedSubview(NSButton(title: "Personnaliser le thème…", target: self,
+                                          action: #selector(customizeTheme)))
         stack.addArrangedSubview(NSButton(title: "Activer les clics du wallpaper…", target: self,
                                           action: #selector(enableWallpaperInput)))
         stack.addArrangedSubview(NSButton(title: "Ouvrir Réglages Fond d’écran…", target: self,
@@ -297,7 +297,7 @@ import os
         statusLabel.stringValue = "Luminosité du thème : \(Int((value * 100).rounded())) %."
     }
 
-    @objc private func customizeVehicles() {
+    @objc private func customizeTheme() {
         presentCustomization(targetID: nil)
     }
 
@@ -413,8 +413,7 @@ import os
                 return ProviderResponse(accepted: false, message: "Unknown external theme")
             }
             do {
-                _ = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
-                try pushRuntimeControls(for: theme)
+                _ = try activate(theme)
                 statusLabel.stringValue = "\(theme.package.display_name) actif depuis Réglages."
                 return ProviderResponse(accepted: true)
             } catch {
@@ -454,11 +453,27 @@ import os
     @objc private func activateTheme() {
         guard let theme = selectedTheme else { statusLabel.stringValue = "Aucun thème détecté."; return }
         do {
-            let launched = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
-            try pushRuntimeControls(for: theme)
+            let launched = try activate(theme)
             statusLabel.stringValue = launched ? "\(theme.package.display_name) actif sur le bureau."
                 : "\(theme.package.display_name) est déjà actif."
         } catch { statusLabel.stringValue = "Activation refusée : \(error.localizedDescription)" }
+    }
+
+    private func activate(_ theme: DiscoveredTheme) throws -> Bool {
+        // Validate all persistent state before changing the visible process.
+        let overrides = try theme.interface.map {
+            try interfaceStore.load(themeID: theme.package.id, interface: $0.manifest)
+        }
+        let launched = try renderHost.activate(RenderHostLaunchRequest.desktop(theme: theme))
+        do {
+            try sendRuntimeControls(for: theme, overrides: overrides)
+            return launched
+        } catch {
+            // Activation is atomic from the caller's perspective: a rejected
+            // control state must not leave an unmanaged wallpaper behind.
+            renderHost.stop()
+            throw error
+        }
     }
 
     @objc private func stopTheme() {

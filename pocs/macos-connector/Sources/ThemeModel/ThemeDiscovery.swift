@@ -173,13 +173,21 @@ public enum ThemeLibraries {
         let conventional = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Orbite/Themes", isDirectory: true)
         if fileManager.fileExists(atPath: conventional.path) { paths.append(conventional.path) }
-        return Array(Set(paths)).sorted().compactMap { path in
+        let candidates = Array(Set(paths)).sorted().compactMap { path -> URL? in
             let url = URL(fileURLWithPath: path, isDirectory: true).resolvingSymlinksInPath()
             guard url.path.hasPrefix("/"),
                   let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                   values.isDirectory == true, values.isSymbolicLink != true else { return nil }
             return url
         }
+        return candidates.sorted { $0.path.count < $1.path.count }.reduce(into: []) { roots, candidate in
+            let candidatePrefix = candidate.path.hasSuffix("/") ? candidate.path : candidate.path + "/"
+            guard !roots.contains(where: { root in
+                let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+                return candidate.path == root.path || candidatePrefix.hasPrefix(rootPrefix)
+            }) else { return }
+            roots.append(candidate)
+        }.sorted { $0.path < $1.path }
     }
 
     public static func add(_ root: URL, defaults: UserDefaults = .standard) throws {

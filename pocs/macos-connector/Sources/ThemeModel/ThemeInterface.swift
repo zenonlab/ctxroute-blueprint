@@ -31,8 +31,6 @@ public struct ThemeInterfaceManifest: Codable, Equatable, Sendable {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-            public static let character = Kind(rawValue: "character")
-            public static let vehicle = Kind(rawValue: "vehicle")
         }
         public struct Appearance: Codable, Equatable, Sendable {
             public let part: String
@@ -179,8 +177,8 @@ public struct ResolvedThemeInterface: Codable, Equatable, Sendable {
 }
 
 public enum ThemeInterfaceLoader {
-    // A placement matrix is still bounded, but can legitimately contain all
-    // character × vehicle bindings for a theme (972 entries in the MKW adapter).
+    // A source-derived relation matrix can contain thousands of combinations;
+    // the connector validates its own bounded projection while the renderer owns transforms.
     private static let manifestLimit = 1_048_576
     public static let requiredSlots = Set([
         "theme.audio", "display.brightness", "slider.track", "slider.thumb",
@@ -192,12 +190,11 @@ public enum ThemeInterfaceLoader {
         let data = try boundedRegularFile(manifestURL, maximum: manifestLimit)
         let manifest = try JSONDecoder().decode(ThemeInterfaceManifest.self, from: data)
         let models = manifest.models ?? []
-        guard ["orbite.theme-interface/2", "orbite.theme-interface/3", "orbite.theme-interface/4",
-               "orbite.theme-interface/5"].contains(manifest.format),
+        guard manifest.format == "orbite.theme-interface/5",
               requiredSlots.isSubset(of: Set(manifest.slots.keys)),
               (1...128).contains(manifest.assets.count), manifest.choices.count <= 64,
               models.count <= 64,
-              ["orbite.theme-interface/4", "orbite.theme-interface/5"].contains(manifest.format) || models.isEmpty,
+              manifest.selection != nil,
               manifest.targets.count <= 16,
               Set(manifest.assets.map(\.id)).count == manifest.assets.count,
               Set(models.map(\.id)).count == models.count,
@@ -236,8 +233,6 @@ public enum ThemeInterfaceLoader {
         }
         guard manifest.slots.values.allSatisfy({ resolved[$0] != nil }),
               manifest.choices.allSatisfy({ validID($0.id) && validID($0.kind.rawValue)
-                  && (manifest.format == "orbite.theme-interface/5"
-                      || [.character, .vehicle].contains($0.kind))
                   && (1...80).contains($0.label.count)
                   && !$0.label.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
                   && resolved[$0.preview] != nil
@@ -262,10 +257,7 @@ public enum ThemeInterfaceLoader {
 
     private static func validateSelection(_ manifest: ThemeInterfaceManifest) throws {
         guard let selection = manifest.selection else {
-            guard manifest.format == "orbite.theme-interface/2" else {
-                throw ModelError.invalid("selection pipeline required")
-            }
-            return
+            throw ModelError.invalid("selection pipeline required")
         }
         let stages = selection.stages
         let stageIDs = Set(stages.map(\.id))
@@ -273,8 +265,6 @@ public enum ThemeInterfaceLoader {
         guard (1...8).contains(stages.count), stageIDs.count == stages.count,
               stageKinds.count == stages.count,
               stages.allSatisfy({ validID($0.id) && validID($0.kind.rawValue)
-                  && (manifest.format == "orbite.theme-interface/5"
-                      || [.character, .vehicle].contains($0.kind))
                   && (1...80).contains($0.label.count)
                   && (2...10).contains($0.columns) }),
               selection.compatibility.count <= 16,
