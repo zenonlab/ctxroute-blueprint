@@ -136,7 +136,8 @@
       ],
       "files": [
         "apps/extension/package.json",
-        "apps/extension/tests/installed-favorite-resolution.test.ts",
+        "apps/extension/scripts/installed-review.mjs",
+        "apps/extension/scripts/installed-firefox.mjs",
         "apps/worker/src/index.test.ts",
         "docs/release.md",
         "docs/browser-support.md",

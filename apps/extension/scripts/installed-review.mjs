@@ -39,9 +39,9 @@ try {
   await context.route('https://tobirink.com/**', (route) => { tobirinkRequests += 1; tobirinkPaths.add(new URL(route.request().url()).pathname); return route.fulfill({ status: 503, body: 'Synthetic collective outage' }); });
   await context.route(/^https:\/\/tobirink\.com\/v1\/catalogue\/favorites\/resolve\?/u, (route) => {
     publicCacheReads += 1;
-    return route.fulfill({ contentType: 'application/json', status: 200, body: JSON.stringify({ candidate: { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Synthetic cache anime'] } }) });
+    return route.fulfill({ contentType: 'application/json', status: 200, body: JSON.stringify({ identity: { mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ externalId: '154587', provider: 'anilist' }] } }) });
   });
-  const page = await context.newPage();
+  let page = await context.newPage();
   const debugging = await context.browser().newBrowserCDPSession();
   const seederPath = await mkdtemp(join(tmpdir(), 'tobirink-bookmark-seeder-'));
   await writeFile(join(seederPath, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'Tobirink bookmark fixture', permissions: ['bookmarks'], version: '1.0.0' }));
@@ -57,6 +57,7 @@ try {
     }
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic anime reference', url: 'https://anilist.co/anime/1233' });
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic pending manga', url: 'https://www.mangaupdates.com/series/abc123/synthetic-pending-manga' });
+    await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic pending manhwa 006', url: 'https://manhwaz.com/webtoon/synthetic-pending-manhwa-006/chapter-66.1' });
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic cache anime', url: 'https://reader.example/anime/synthetic-cache-anime' });
   });
   const { id: extensionId } = await debugging.send('Extensions.loadUnpacked', { path: extensionPath });
@@ -76,16 +77,25 @@ try {
   }
   assert.equal(status?.ok, true);
   assert.equal(status.inventory.status, 'complete');
-  assert.equal(status.counts.observed, 1404);
+  assert.equal(status.counts.observed, 1405);
   assert.equal(status.counts.unsupported, 1401);
   process.stdout.write(`Installed cache diagnostics: cacheReads=${publicCacheReads}, tobirinkRequests=${tobirinkRequests}, paths=${[...tobirinkPaths].join(',')}, titleSearches=${providerTitleSearches}, retryable=${status.counts.retryable}\n`);
-  assert.equal(status.counts.retryable, 2);
+  assert.equal(status.counts.retryable, 3);
   const catalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(catalogue.ok, true);
-  assert.equal(catalogue.snapshot.statistics.total, 3, JSON.stringify(catalogue.snapshot.items));
+  assert.equal(catalogue.snapshot.statistics.total, 4, JSON.stringify(catalogue.snapshot.items));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manga' && item.mediaType === 'manga' && item.state === 'retryable'));
+  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manhwa' && item.mediaType === 'manga' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'ready'));
   assert.equal(providerTitleSearches, 0);
+  const targets = await debugging.send('Target.getTargets');
+  const serviceWorker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith(`chrome-extension://${extensionId}/`));
+  assert.ok(serviceWorker);
+  await debugging.send('Target.closeTarget', { targetId: serviceWorker.targetId });
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+  const restarted = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
+  assert.equal(restarted.ok, true);
+  assert.equal(restarted.snapshot.statistics.total, 4);
   const continuation = await page.evaluate(() => globalThis.chrome.alarms.get('tobirink-favorite-resolution-continuation-v1'));
   assert.ok(Number.isFinite(continuation?.scheduledTime));
   const queue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
@@ -112,7 +122,7 @@ try {
   await page.getByRole('button', { name: 'Activer le diagnostic' }).waitFor();
   const diagnosticLock = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink.extensionDiagnostics'));
   assert.equal(diagnosticLock['tobirink.extensionDiagnostics'], 'off');
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, 1404-bookmark convergence, D1 cache before zero provider title searches, pending manga projection, durable retry alarm, zero imported Review, guided private status UI and diagnostic lock passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, 1405-bookmark convergence across anime/manga/manhwa/unknown, D1 cache before zero provider title searches, durable retries, MV3 restart, zero imported Review, guided private status UI and diagnostic lock passed.\n`);
 } finally {
   await context.close();
 }

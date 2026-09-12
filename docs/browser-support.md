@@ -1,6 +1,6 @@
 # Browser support evidence
 
-Date: 2026-09-08
+Date: 2026-09-12
 
 ## Support target
 
@@ -28,18 +28,19 @@ components do not branch on a browser name.
   six declared entrypoints for both targets.
 - `npm run test:security` validates both generated manifests, their extension
   CSP, exact origin allowlist and Firefox metadata.
-- The extension suite passes 112 Vitest integration, contract and vertical-flow
-  tests across 24 files. Despite the historical `test:e2e` script name, it does
+- The extension suite passes 140 Vitest integration, contract and vertical-flow
+  tests across 31 files. Despite the historical `test:e2e` script name, it does
   not launch a browser and is not evidence of an installed-extension journey.
 - Chromium 153 loaded the extracted Chrome candidate ZIP in an isolated profile:
-  health, ordinary-link exclusion, retryable provider outage, zero imported
-  Review rows and private status UI passed.
+  health, 1 405-favorite convergence across anime, manga, manhwa and unknown,
+  cache-first resolution, ordinary-link exclusion, retryable provider outages,
+  MV3 worker restart, zero imported Review rows and private status UI passed.
 - Firefox 151 loaded the Firefox candidate ZIP temporarily through Marionette:
   health, exclusion of the synthetic ordinary bookmark, empty queue and zero
   imported Review rows passed. Its default bookmarks are preserved; the test
   checks the synthetic source by bookmark ID rather than assuming an empty tree.
-- `node scripts/release/package-extension.mjs --verify-isolated` built each
-  target twice in fresh directories. Both 20-file archives matched byte-for-byte;
+- `node scripts/release/package-extension.mjs --verify-isolated` builds each
+  target twice in fresh directories. Both 21-file archives match byte-for-byte;
   the ignored verification manifest retains SHA-256 values and paths.
 - IndexedDB contracts and additive migrations, including interrupted import
   rollback and Review pagination, pass in Chromium and Firefox 151.
@@ -49,16 +50,16 @@ components do not branch on a browser name.
   notices. Its four warnings point only to bundled Zod JIT detection and guarded
   React DOM internals; the corresponding operations are absent from TobiRink
   sources.
-- `npm run verify` passes end to end, including 665 product tests, 273 repository
-  tests plus one intentional skip, both extension builds, CRG, integration,
+- `npm run verify` passes end to end, including 807 workspace tests, the
+  repository coverage suite, both extension builds, CRG, integration,
   documentation and an audit with zero vulnerabilities.
 
 ## Remaining external limits
 
 The automated browser and package gates are complete. Store review, signing and
-submission remain separate external operations. Historical FavLib parity also
-remains unverified until its encrypted corpus can be read through an explicitly
-authorized read-only restoration.
+submission remain separate external operations. The pinned FavLib parser
+differential runs only on synthetic fixtures; it does not import or claim parity
+with a private historical database.
 
 References: [WXT entrypoints](https://wxt.dev/guide/essentials/entrypoints),
 [Firefox browser-specific settings](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/browser_specific_settings),

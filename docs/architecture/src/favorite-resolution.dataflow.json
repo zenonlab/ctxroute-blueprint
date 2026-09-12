@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction cache-first 1.0.17",
+    "title": "TobiRink — résolution et reconstruction cache-first 1.0.18",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -411,7 +411,7 @@
       "items": [
         "Règles pures versionnées et 30 écarts documentés",
         "Cinq fournisseurs: progression, identité, jaquette attribuée, lien local",
-        "Aucune base, donnée ou exécution FavLib n’est requise"
+        "L’oracle exécute uniquement le parseur FavLib épinglé sur des fixtures synthétiques"
       ]
     },
     {

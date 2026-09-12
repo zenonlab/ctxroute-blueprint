@@ -37,6 +37,34 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### Complete favorite-pipeline candidate — 2026-09-12
+
+Candidate `1.0.18` réunit la résolution fournisseur bornée, le cache collectif
+owner-scoped à consentement explicite, la reprise `storage.sync` courant +
+rollback, les mutations de favoris incrémentales, le curseur durable de
+réparation des couvertures et le différentiel FavLib épinglé sur fixtures
+synthétiques. Aucun contenu privé FavLib n’entre dans le dépôt ou les logs.
+
+L’archive Chrome a convergé depuis un profil vierge sur 1 405 favoris
+synthétiques : anime explicite, manga explicite, manhwa avec suffixe de routage,
+type inconnu résolu par cache D1, trois pannes fournisseur en reprise et 1 401
+liens ordinaires exclus. Elle effectue deux lectures D1 avant recherche, zéro
+recherche AniList par titre, crée zéro Review à l’import et conserve quatre
+entrées après arrêt puis réveil du service worker MV3. Firefox 151 installe
+l’archive distincte, répond au health check, exclut le lien ordinaire et garde
+la Review vide.
+
+Les probes production en lecture seule confirment `1.0.16` sur `/download`, les
+règles publiques en HTTP 200, et les misses cache D1 et cover R2 en JSON 404
+`no-store`. Wrangler liste uniquement `0005_public_favorite_cache.sql` comme
+migration distante en attente. La publication de `1.0.18`, cette migration et
+le nouveau Worker restent une opération Cloudflare séparée.
+
+Deux archives locales déterministes de 21 fichiers ont été produites :
+
+- Chrome : 291468 octets, SHA-256 `823b299be7491414234fcf955051956df68873eb11feea153995587950a5fe33`.
+- Firefox : 291513 octets, SHA-256 `49d9d711e54a3cf67f1f854e22c75ac00607d63ceaa094f5f2172ebf278a1fe2`.
+
 ### Cache-first reconstruction candidate — 2026-09-12
 
 Candidate `1.0.17` adds un manifeste `storage.sync` v2 qui relie les empreintes

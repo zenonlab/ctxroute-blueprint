@@ -7703,7 +7703,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-pipeline-hardening",
       "title": "Corriger et certifier la pipeline FavLib vers TobiRink",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -7853,7 +7853,7 @@
         {
           "id": "step-5",
           "title": "Certifier une release locale installable sans déployer",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Fresh Chromium and Firefox installations converge across anime manga manhwa unknown retry reset and MV3 restart scenarios",
             "Remote read-only probes confirm expected provider Worker D1 and R2 contracts without mutating production",
@@ -7876,7 +7876,12 @@
             "npm audit",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passed all governance documentation architecture security typecheck 807 workspace tests Chromium IndexedDB parser differential performance CRG integration dependency audit and Archify build gates",
+            "Installed Chrome 153 archive converged 1405 synthetic bookmarks across anime manga manhwa unknown D1 cache retry and MV3 restart with zero imported Review; installed Firefox 151 smoke passed",
+            "Local D1 catalogue tests passed 6/6; readonly production probes returned rules 200 bounded cache and cover misses 404 and Wrangler listed only additive migration 0005 pending",
+            "Two isolated builds reproduced Chrome SHA-256 823b299be7491414234fcf955051956df68873eb11feea153995587950a5fe33 and Firefox SHA-256 49d9d711e54a3cf67f1f854e22c75ac00607d63ceaa094f5f2172ebf278a1fe2; both dataflows pass Archify showcase 9/9"
+          ]
         }
       ]
     }
