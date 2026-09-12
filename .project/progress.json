@@ -8022,7 +8022,7 @@
       "schemaVersion": 1,
       "id": "goal-favorite-runtime-reliability",
       "title": "Rendre la pipeline favoris observable, reprenable et bornee",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -8111,7 +8111,7 @@
         {
           "id": "step-3",
           "title": "Certifier la premiere installation et preparer une archive reproductible",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le scenario Chromium installe de plus de 1400 favoris affiche une progression vivante sans clic manuel et converge apres suspensions MV3",
             "Les pannes timeout 429 corruption checkpoint redemarrage pause reprise deblocage et tentatives epuisees sont couvertes",
@@ -8139,7 +8139,11 @@
             "git diff --check",
             "git commit -m test(favorites): certify resilient first install"
           ],
-          "evidence": []
+          "evidence": [
+            "Installed Chromium 153 converged automatically on 1406 bookmarks and Firefox 151 installed successfully",
+            "Chrome and Firefox 1.0.20 archives reproduced the documented SHA-256 hashes",
+            "npm run verify and both Archify showcase validations passed"
+          ]
         }
       ]
     }

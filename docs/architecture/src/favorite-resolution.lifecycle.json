@@ -7,7 +7,7 @@
     "quality_profile": "showcase",
     "viewBox": [1080, 790],
     "views": [
-      { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Chaque lot devient visible localement puis converge sans garder le service worker actif." },
+      { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Les alarmes reprennent chaque lot sans clic manuel; les titres deviennent visibles avant l’hydratation." },
       { "id": "automatic-recovery", "label": "Reprise automatique", "focus": ["inventory", "scheduled", "resolving"], "note": "Checkpoint, tâche et échéance persistent avant chaque suspension MV3." },
       { "id": "user-control", "label": "Contrôle utilisateur", "focus": ["resolving", "paused", "userAction"], "note": "Pause et limite de tentatives sont visibles; une reprise explicite conserve les données." }
     ]

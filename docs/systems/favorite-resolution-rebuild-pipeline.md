@@ -883,6 +883,15 @@ diagnostic est absorbée et ne modifie jamais le résultat de résolution.
 
 ### Corrections de robustesse du 12 septembre 2026
 
+La candidate locale 1.0.20 valide ce flux sur 1 406 favoris installés dans
+Chromium : l'inventaire et la présence convergent par alarmes MV3 sans commande
+manuelle, le cache public est consulté avant les deux aliases de recherche du
+cas `UNKNOWN`, et l'arrêt du service worker conserve cinq projections et son
+alarme. Le résultat compte 1 401 liens ordinaires exclus, une résolution D1,
+quatre reprises fournisseur, zéro traitement résiduel et zéro Review. Firefox
+151 installe l'archive distincte et confirme le health check, l'exclusion d'un
+lien ordinaire et l'absence de Review à l'import.
+
 La version 4 rend la réinstallation cache-first. Chaque favori média parsé est
 projeté dès son lot d’inventaire. Le snapshot sync v2 relie son empreinte
 normalisée aux références fournisseur publiques et reste compatible avec les

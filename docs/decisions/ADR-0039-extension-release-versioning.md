@@ -41,6 +41,9 @@ hydration, `1.0.17` restores cache-first sync and D1 reconstruction, and
 sync and pinned FavLib differential corrections; `1.0.19` keeps Library
 pagination inside the surface, carries Review covers through WebBridge and
 persists bounded owner-only ambiguity references in D1).
+`1.0.20` accepts a cleaned bookmark title only when a generic route proves a
+media release, groups public cache lookups before provider searches, and
+certifies automatic first-install convergence with the corrected batch route.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

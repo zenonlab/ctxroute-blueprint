@@ -2,7 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.19`.
+The current production release remains `1.0.19`. The verified local candidate
+is `1.0.20`; it is not published.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -36,6 +37,42 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Cache-batched automatic convergence candidate — 2026-09-12
+
+Candidate `1.0.20` recovers a cleaned bookmark title only when a generic route
+contains an explicit chapter, episode or volume proof. Ordinary resources and
+utility routes stay unsupported. Before provider title searches, the extension
+deduplicates normalized keys into batches of at most 50 and prepares sync,
+owner-scoped and public D1 caches. The public Worker contract contains only the
+fingerprint, media kind and parser/rules versions. One prepared D1 query returns
+at most two confirmed identities per key; a cache failure remains independent
+from provider retries.
+
+Chromium 153 installed the packaged archive into a fresh profile containing
+1,406 bookmarks. Without a reconciliation click, its MV3 alarms completed the
+inventory and presence phases, then reported 1,401 ordinary links unsupported,
+one D1 resolution, four provider retries, zero pending work and zero Review.
+The local library retained five media projections, including the generic
+opaque release route. Three cache requests preceded the two bounded AniList
+title-alias requests. Pause/resume and an explicit service-worker stop/restart
+preserved the projection and continuation alarm. Firefox 151 installed its
+archive and passed health, ordinary-link exclusion and zero-Review checks.
+
+The focused recovery matrix passes 41 application tests for timeout, HTTP 429,
+incomplete pages, corrupted sync generations, interrupted checkpoints and
+automatic-attempt blocking, plus 16 extension tests for inventory continuation,
+alarm restoration and persisted pause. The pinned synthetic FavLib differential
+passes both suites over its 82 anonymized cases; no private FavLib content is
+read or emitted by this release step.
+
+Two isolated builds reproduce 21-file archives byte for byte:
+
+- Chrome: 294080 bytes, SHA-256 `39ff7a129d6ee068ef33c097128a1f6b12b379cacd23bf09d26eb5c84a7da77a`.
+- Firefox: 294125 bytes, SHA-256 `2140796db5a3eef1d40610fccde6121a7fdbe84e9cb5810ed2614a80212eddcd`.
+
+Publishing these archives and deploying the matching Worker remain a separate
+Cloudflare operation requiring a reviewed allowlist and explicit approval.
 
 ### Internal pagination and owner ambiguity release — 2026-09-12
 
