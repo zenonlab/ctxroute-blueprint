@@ -12,6 +12,7 @@ use walkdir::WalkDir;
 
 pub mod gcn;
 pub mod mkw;
+pub mod ppc;
 
 const SCHEMA_VERSION: u32 = 1;
 

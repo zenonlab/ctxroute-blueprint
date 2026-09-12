@@ -5,6 +5,7 @@ scope:
   - docs/architecture/src/game-transformation.architecture.json
   - docs/architecture/game-transformation.md
 review: on-change
+revised: true
 ---
 # ADR-0086 — Adaptateur hors ligne GameCube/J3D borné
 
@@ -38,6 +39,16 @@ consomme les contrats portables et ne connaît ni extension GameCube, ni nom de 
 ni nom de ressource. Le candidat isolé doit convertir une scène témoin
 structurellement différente sans modification du runtime avant toute activation
 native.
+
+Quand le source exporté ne matérialise pas une relation de ressource, l'adaptateur
+peut analyser un ELF32 PowerPC big-endian lié. La plage de code est explicite ou
+réduite à l'unique section liée ; les adresses des API, le registre d'argument et les
+bases ABI de petites données sont fournis explicitement.
+La propagation de constantes est conservative : elle produit une adresse et un nom
+uniquement quand ils restent prouvables au point d'appel, sinon la relation demeure
+inconnue. Le rapport conserve l'empreinte du binaire, la plage, la configuration des
+API et chaque adresse d'appel. Ce lecteur reste source-neutre et ne contient aucun
+identifiant propre à une œuvre.
 
 ## Conséquences
 

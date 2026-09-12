@@ -7,6 +7,7 @@ use wallpaper_game_library::{
     gcn::{inspect_j3d_animation, inspect_j3d_model, inspect_rarc, inspect_stage},
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
+    ppc::{PpcResourceCallOptions, inspect_ppc_resource_calls, parse_api, parse_hex_u32},
     verify_library,
 };
 
@@ -78,6 +79,22 @@ enum Command {
     InspectJ3dAnimation {
         #[arg(long)]
         input: PathBuf,
+    },
+    InspectPpcResourceCalls {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        module: String,
+        #[arg(long, value_parser = parse_hex_u32)]
+        start: Option<u32>,
+        #[arg(long, value_parser = parse_hex_u32)]
+        end: Option<u32>,
+        #[arg(long, value_parser = parse_hex_u32)]
+        sda2_base: Option<u32>,
+        #[arg(long, value_parser = parse_hex_u32)]
+        sda_base: Option<u32>,
+        #[arg(long = "api", required = true, value_parser = parse_api)]
+        apis: Vec<wallpaper_game_library::ppc::PpcResourceApi>,
     },
 }
 
@@ -154,6 +171,28 @@ fn main() -> Result<()> {
         }
         Command::InspectJ3dAnimation { input } => {
             let result = inspect_j3d_animation(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectPpcResourceCalls {
+            input,
+            module,
+            start,
+            end,
+            sda2_base,
+            sda_base,
+            apis,
+        } => {
+            let result = inspect_ppc_resource_calls(
+                &input,
+                &PpcResourceCallOptions {
+                    module,
+                    start,
+                    end,
+                    sda2_base,
+                    sda_base,
+                    apis,
+                },
+            )?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

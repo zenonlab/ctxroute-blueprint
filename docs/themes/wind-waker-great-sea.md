@@ -269,6 +269,17 @@ passent le lecteur avec arbre, tailles, compression et empreintes contrôlés. C
 couverture ferme l'enveloppe des secteurs, mais pas encore leurs dépendances vers les
 archives d'acteurs et banques globales ; le gate de dépendances reste donc fermé.
 
+La première fermeture contrôleur des 35 types d'acteurs réellement placés sur la
+boucle est terminée en lecture seule. Trente-trois chargent des archives identifiées
+par leurs appels `load/delete/get`, dont les contrôleurs intégrés au DOL ; deux sont
+des acteurs d'effets sans modèle et référencent uniquement des identifiants de
+particules. Le cas `Search`, auparavant ambigu parce que son nom passe par la petite
+zone de données ABI, est résolu comme archive `Search` aux six points d'appel. Les
+archives nouvellement atteintes passent toutes le même inventaire RARC borné. Cette
+preuve ferme la couche acteur sélectionnée, pas le gate global : modèles, pistes,
+textures, effets, audio et relations internes doivent encore être parcourus avant de
+déclarer la fermeture transitive.
+
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur
 macOS, graphe de matériau incompatible, mesh signalé invalide et sémantique TEV non

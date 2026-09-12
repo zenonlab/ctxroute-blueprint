@@ -76,6 +76,14 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-animation --input private/source/animation.bck
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-ppc-resource-calls \
+  --input private/source/linked.elf \
+  --module actor-controller \
+  --start 0x80001000 --end 0x80002000 \
+  --sda2-base 0x80400000 --sda-base 0x803f8000 \
+  --api resource.load=0x80050000:r4
 ```
 
 L'inspection RARC reconstruit l'arbre logique, calcule l'empreinte de chaque payload
@@ -89,3 +97,11 @@ durée zéro —, le nombre de joints, les cardinalités des tables et les axes 
 translation animés du joint racine. Elle contrôle chaque index et mode de tangente,
 mais ne décide ni d'une transition ni du propriétaire du mouvement global : ces
 deux relations doivent être prouvées par le contrôleur source.
+
+L'inspection PPC complète cette preuve quand le source exporté est incomplet. Elle
+lit un ELF32 big-endian borné, limite l'analyse à une plage exécutable explicite ou
+à l'unique section liée et
+résout seulement les chaînes dont l'adresse reste prouvable par propagation de
+constantes. Les adresses d'API, le registre portant le nom et les bases ABI `r2`/`r13`
+sont des entrées de l'adaptateur : aucun nom de jeu ou d'archive n'est codé dans
+l'outil. Un appel ambigu reste `null` et ne peut pas fermer une dépendance.
