@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::gcn::{
     BtiTexture, JpcBaseShape, JpcDynamics, JpcEmitter, JpcExtraShape, JpcField, JpcTexture,
-    parse_jpc,
+    decode_bti_base_level, parse_jpc,
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -479,39 +479,7 @@ fn decode_texture(bytes: &[u8], texture: &BtiTexture) -> Result<Vec<u8>> {
         texture.mipmap_count == 1 && texture.palette_offset.is_none(),
         "only single-level non-paletted JPC textures are supported"
     );
-    let source = &bytes[texture.image_offset..texture.image_offset + texture.image_bytes];
-    let (block_width, block_height, bytes_per_pixel) = match texture.gx_format {
-        "ia4" => (8_usize, 4_usize, 1_usize),
-        "ia8" => (4, 4, 2),
-        other => bail!("unsupported resolved JPC GX texture format {other}"),
-    };
-    let width = usize::from(texture.width);
-    let height = usize::from(texture.height);
-    let mut rgba8 = vec![0_u8; width * height * 4];
-    let mut cursor = 0;
-    for block_y in (0..height).step_by(block_height) {
-        for block_x in (0..width).step_by(block_width) {
-            for y in 0..block_height {
-                for x in 0..block_width {
-                    let (intensity, alpha) = if bytes_per_pixel == 1 {
-                        let value = source[cursor];
-                        cursor += 1;
-                        ((value & 0x0f) * 17, (value >> 4) * 17)
-                    } else {
-                        let value = (source[cursor + 1], source[cursor]);
-                        cursor += 2;
-                        value
-                    };
-                    if block_x + x < width && block_y + y < height {
-                        let target = ((block_y + y) * width + block_x + x) * 4;
-                        rgba8[target..target + 4]
-                            .copy_from_slice(&[intensity, intensity, intensity, alpha]);
-                    }
-                }
-            }
-        }
-    }
-    Ok(rgba8)
+    decode_bti_base_level(bytes, texture)
 }
 
 fn valid_id(value: &str) -> bool {

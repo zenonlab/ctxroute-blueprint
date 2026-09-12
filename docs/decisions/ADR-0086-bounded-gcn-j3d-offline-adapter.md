@@ -110,6 +110,10 @@ vaut toutefois pas encore qualification de son matériau TEV.
 `mipmapEnabled` et `mipmapCount` restent deux propriétés indépendantes : la première
 reproduit l'activation par JUTTexture, la seconde borne les niveaux physiquement
 stockés. Une différence entre elles est conservée, pas réparée silencieusement.
+Le compilateur de texture séparé décode le niveau de base I4, I8, IA4 ou IA8 en
+RGBA8 linéaire tuilé selon GX et conserve le sampler ainsi que le nombre de mipmaps
+source dans `orbite.resolved-texture/1`. Il refuse les formats et palettes non
+qualifiés au lieu de substituer un décodeur heuristique.
 
 Un payload GX sans en-tête n'est accepté qu'avec une relation source privée donnant
 explicitement format, dimensions, sampler, mipmaps et palette. L'adaptateur réutilise

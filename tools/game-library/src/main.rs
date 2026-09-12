@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
     gcn::{
-        FixedRecordTableOptions, GxRawTextureOptions, RecordCountEncoding, extract_rarc,
-        inspect_bti_texture, inspect_dzb_collision, inspect_fixed_record_table,
+        FixedRecordTableOptions, GxRawTextureOptions, RecordCountEncoding, compile_bti_texture,
+        extract_rarc, inspect_bti_texture, inspect_dzb_collision, inspect_fixed_record_table,
         inspect_gx_raw_texture, inspect_j3d_animation, inspect_j3d_material_animation,
         inspect_j3d_material_table, inspect_j3d_model, inspect_jai_animation_sound, inspect_jpc,
         inspect_rarc, inspect_stage,
@@ -116,6 +116,12 @@ enum Command {
     InspectBtiTexture {
         #[arg(long)]
         input: PathBuf,
+    },
+    CompileBtiTexture {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
     },
     InspectGxRawTexture {
         #[arg(long)]
@@ -287,6 +293,10 @@ fn main() -> Result<()> {
         }
         Command::InspectBtiTexture { input } => {
             let result = inspect_bti_texture(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::CompileBtiTexture { input, output } => {
+            let result = compile_bti_texture(&input, &output)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Command::InspectGxRawTexture {

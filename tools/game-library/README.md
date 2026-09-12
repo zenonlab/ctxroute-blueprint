@@ -100,6 +100,10 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-bti-texture --input private/source/texture.bti
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  compile-bti-texture --input private/source/texture.bti \
+  --output private/resolved/texture
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-gx-raw-texture --input private/source/texture.raw \
   --format i8 --width 64 --height 64 --wrap-s clamp --wrap-t clamp
 
@@ -136,6 +140,12 @@ L'inspection JPC 1-00 suit les en-têtes et blocs chargés par JParticle. Elle c
 les IDs d'émetteurs, paramètres dynamiques et de forme, références de textures et
 textures GX embarquées. Les doublons, blocs inconnus, comptes divergents, références
 hors table et octets non expliqués ferment l'inspection.
+
+La compilation BTI matérialise uniquement le niveau de base en RGBA8 linéaire, avec
+empreintes et sampler source dans `orbite.resolved-texture/1`. Les formats intensité
+I4/I8 et intensité-alpha IA4/IA8 sont qualifiés ; les palettes et autres formats
+ferment cette commande tant que leur décodage n'est pas couvert. La sortie doit être
+un répertoire vide situé sous `private/`.
 
 La compilation JPC sélectionne explicitement des IDs opaques et produit le contrat
 portable `orbite.resolved-effects/1`. Elle décode les textures IA4/IA8 embarquées,

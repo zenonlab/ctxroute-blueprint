@@ -410,6 +410,45 @@ pub struct BtiTextureReport {
     pub texture: BtiTexture,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BtiCompileReport {
+    pub schema_version: u32,
+    pub adapter: &'static str,
+    pub output: String,
+    pub manifest_sha256: String,
+    pub pixels_sha256: String,
+    pub width: u16,
+    pub height: u16,
+}
+
+#[derive(Serialize)]
+struct ResolvedBtiTexture<'a> {
+    format: &'static str,
+    adapter: &'static str,
+    source_sha256: String,
+    pixels: ResolvedBtiPixels<'a>,
+    sampler: ResolvedBtiSampler<'a>,
+}
+
+#[derive(Serialize)]
+struct ResolvedBtiPixels<'a> {
+    path: &'a str,
+    sha256: &'a str,
+    width: u16,
+    height: u16,
+    format: &'static str,
+}
+
+#[derive(Serialize)]
+struct ResolvedBtiSampler<'a> {
+    wrap_s: &'a str,
+    wrap_t: &'a str,
+    min_filter: &'a str,
+    mag_filter: &'a str,
+    mipmap_enabled: bool,
+    source_mipmap_count: u8,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct GxRawTextureOptions {
     pub gx_format: String,
@@ -2418,6 +2457,104 @@ pub fn parse_bti_texture(bytes: &[u8]) -> Result<BtiTextureReport> {
         byte_order: "big-endian",
         texture: parse_bti_resource(bytes, 0)?,
     })
+}
+
+pub fn compile_bti_texture(input: &Path, output: &Path) -> Result<BtiCompileReport> {
+    require_private_output(output)?;
+    if output.exists() {
+        ensure!(
+            output.read_dir()?.next().is_none(),
+            "output directory must be absent or empty"
+        );
+    }
+    let bytes = fs::read(input).with_context(|| format!("cannot read {}", input.display()))?;
+    let report = parse_bti_texture(&bytes)?;
+    let pixels = decode_bti_base_level(&bytes, &report.texture)?;
+    let pixels_sha256 = hex::encode(Sha256::digest(&pixels));
+    let resolved = ResolvedBtiTexture {
+        format: "orbite.resolved-texture/1",
+        adapter: "gcn.bti-v1",
+        source_sha256: report.input_sha256,
+        pixels: ResolvedBtiPixels {
+            path: "pixels.rgba8",
+            sha256: &pixels_sha256,
+            width: report.texture.width,
+            height: report.texture.height,
+            format: "rgba8-linear",
+        },
+        sampler: ResolvedBtiSampler {
+            wrap_s: report.texture.wrap_s,
+            wrap_t: report.texture.wrap_t,
+            min_filter: report.texture.min_filter,
+            mag_filter: report.texture.mag_filter,
+            mipmap_enabled: report.texture.mipmap_enabled,
+            source_mipmap_count: report.texture.mipmap_count,
+        },
+    };
+    let manifest = serde_json::to_vec_pretty(&resolved)?;
+    let manifest_sha256 = hex::encode(Sha256::digest(&manifest));
+    fs::create_dir_all(output)?;
+    fs::write(output.join("pixels.rgba8"), pixels)?;
+    fs::write(output.join("texture.json"), manifest)?;
+    Ok(BtiCompileReport {
+        schema_version: 1,
+        adapter: "gcn.bti-v1",
+        output: output.display().to_string(),
+        manifest_sha256,
+        pixels_sha256,
+        width: report.texture.width,
+        height: report.texture.height,
+    })
+}
+
+pub(crate) fn decode_bti_base_level(bytes: &[u8], texture: &BtiTexture) -> Result<Vec<u8>> {
+    ensure!(
+        texture.palette_offset.is_none(),
+        "paletted BTI decoding is not qualified"
+    );
+    let (block_width, block_height) = match texture.gx_format {
+        "i4" => (8_usize, 8_usize),
+        "i8" | "ia4" => (8, 4),
+        "ia8" => (4, 4),
+        other => bail!("unsupported resolved BTI GX texture format {other}"),
+    };
+    let width = usize::from(texture.width);
+    let height = usize::from(texture.height);
+    let mut rgba8 = vec![0_u8; width * height * 4];
+    let mut cursor = texture.image_offset;
+    for block_y in (0..height).step_by(block_height) {
+        for block_x in (0..width).step_by(block_width) {
+            for pixel in 0..block_width * block_height {
+                let (intensity, alpha) = match texture.gx_format {
+                    "i4" => {
+                        let value = bytes[cursor + pixel / 2];
+                        let nibble = if pixel.is_multiple_of(2) {
+                            value >> 4
+                        } else {
+                            value & 0x0f
+                        };
+                        (nibble * 17, 255)
+                    }
+                    "i8" => (bytes[cursor + pixel], 255),
+                    "ia4" => {
+                        let value = bytes[cursor + pixel];
+                        ((value & 0x0f) * 17, (value >> 4) * 17)
+                    }
+                    "ia8" => (bytes[cursor + pixel * 2 + 1], bytes[cursor + pixel * 2]),
+                    _ => unreachable!(),
+                };
+                let x = pixel % block_width;
+                let y = pixel / block_width;
+                if block_x + x < width && block_y + y < height {
+                    let target = ((block_y + y) * width + block_x + x) * 4;
+                    rgba8[target..target + 4]
+                        .copy_from_slice(&[intensity, intensity, intensity, alpha]);
+                }
+            }
+            cursor += 32;
+        }
+    }
+    Ok(rgba8)
 }
 
 fn parse_bti_resource(bytes: &[u8], header: usize) -> Result<BtiTexture> {
@@ -4964,6 +5101,21 @@ pub(crate) mod tests {
         bytes
     }
 
+    fn fixture_intensity_bti(format: u8, width: u16, height: u16, pixels: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0x20 + pixels.len()];
+        bytes[0] = format;
+        bytes[2..4].copy_from_slice(&width.to_be_bytes());
+        bytes[4..6].copy_from_slice(&height.to_be_bytes());
+        bytes[6] = 1;
+        bytes[7] = 1;
+        bytes[20] = 1;
+        bytes[21] = 1;
+        bytes[24] = 1;
+        bytes[28..32].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[0x20..].copy_from_slice(pixels);
+        bytes
+    }
+
     pub(crate) fn fixture_jpc() -> Vec<u8> {
         let texture = fixture_bti();
         let texture_block_size = 0x20 + texture.len();
@@ -5483,6 +5635,40 @@ pub(crate) mod tests {
         assert!(!report.texture.mipmap_enabled);
         assert_eq!(report.texture.mipmap_count, 2);
         assert_eq!(report.texture.image_bytes, 96);
+    }
+
+    #[test]
+    fn decodes_tiled_bti_intensity_formats_without_color_guessing() {
+        let i4 = fixture_intensity_bti(0, 8, 8, &[0x1f; 32]);
+        let i4_report = parse_bti_texture(&i4).unwrap();
+        let i4_pixels = decode_bti_base_level(&i4, &i4_report.texture).unwrap();
+        assert_eq!(&i4_pixels[0..8], &[17, 17, 17, 255, 255, 255, 255, 255]);
+
+        let i8 = fixture_intensity_bti(1, 8, 4, &(0_u8..32).collect::<Vec<_>>());
+        let i8_report = parse_bti_texture(&i8).unwrap();
+        let i8_pixels = decode_bti_base_level(&i8, &i8_report.texture).unwrap();
+        assert_eq!(&i8_pixels[0..4], &[0, 0, 0, 255]);
+        assert_eq!(&i8_pixels[31 * 4..32 * 4], &[31, 31, 31, 255]);
+    }
+
+    #[test]
+    fn compiles_bti_pixels_only_below_private() {
+        let temporary = tempfile::tempdir().unwrap();
+        let input = temporary.path().join("source.bti");
+        fs::write(&input, fixture_intensity_bti(1, 8, 4, &[0x7f; 32])).unwrap();
+        let output = temporary.path().join("private/resolved");
+        let report = compile_bti_texture(&input, &output).unwrap();
+        assert_eq!(report.width, 8);
+        assert_eq!(report.height, 4);
+        assert_eq!(
+            fs::read(output.join("pixels.rgba8")).unwrap().len(),
+            8 * 4 * 4
+        );
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join("texture.json")).unwrap()).unwrap();
+        assert_eq!(manifest["format"], "orbite.resolved-texture/1");
+        assert_eq!(manifest["pixels"]["format"], "rgba8-linear");
+        assert!(compile_bti_texture(&input, &temporary.path().join("resolved")).is_err());
     }
 
     #[test]
