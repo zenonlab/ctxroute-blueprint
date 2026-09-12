@@ -921,6 +921,25 @@ l’identité AniList synchronisée est hydratée par ID exact et aucune recherc
 par titre de cette œuvre n’est émise. Le blob synchronisé ne contient que les
 références publiques, empreintes et versions autorisées.
 
+### Sauvegarde privée locale
+
+`storage.sync` ne remplace pas une sauvegarde de l’historique. La page Options
+peut télécharger un fichier chiffré qui contient les huit agrégats privés et
+l’identité collective opaque. L’export v5 reste compatible en lecture avec les
+versions 1 à 4. AES-GCM protège tout le contenu et PBKDF2-SHA-256 à 310 000
+itérations enveloppe sa clé de données; ni la phrase secrète ni une valeur
+privée ne paraissent dans le JSON extérieur.
+
+La restauration exige un fichier, la phrase et une confirmation explicite.
+Elle valide d’abord le ciphertext, le schéma et toutes les références. Une
+transaction Dexie remplace Works, bibliothèques, progression, agenda, rappels,
+Reviews, sources et organisation, puis laisse l’inventaire recréer les
+artefacts et tâches dérivés. L’écriture de l’identité collective utilise un
+journal `storage.local` et un reçu dans la transaction IndexedDB : après une
+suspension MV3, la présence du reçu termine la restauration et son absence
+remet l’identité précédente. Aucun fichier ou mot de passe n’est transmis au
+site, au Worker, à D1, à R2 ou aux fournisseurs.
+
 Après une première résolution, une contribution publique bornée rejoint une
 outbox locale indépendante du commit de l’œuvre. Le Worker réserve un job
 idempotent et écrit avec SQL préparé la fiche fournisseur publique, ses aliases,

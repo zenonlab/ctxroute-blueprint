@@ -19,7 +19,7 @@ describe('private recovery', () => {
     const source = createFavoriteSource({ bookmarkId: 'bookmark-exported', folderPath: ['Lectures'], id: favoriteSourceId('source_exported'), importedAt: '2026-09-04T09:00:00.000Z', order: 0, reviewId: review.id, title: 'Titre privé', url: 'https://reader.example/private' });
     const organizer = createOrganizerConfiguration({ folders: [{ conditions: { mediaTypes: ['MANGA'] }, id: 'manga', name: 'Manga' }], updatedAt: '2026-09-04T09:30:00.000Z' });
     const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, favoriteSources: [source], organizer, reviews: [review] }), '2026-09-04T10:00:00.000Z');
-    expect(value.version).toBe(4);
+    expect(value.version).toBe(5);
     expect(value.favoriteSources).toEqual([source]);
     expect(value.organizer).toEqual(organizer);
     expect(validatePrivateExport(JSON.stringify(value))).toEqual(value);
@@ -28,7 +28,7 @@ describe('private recovery', () => {
   it('validates everything and requires confirmation before atomic replacement', async () => {
     const store = new MemoryRecoveryStore(empty);
     const value = await createPrivateExport(store, '2026-09-04T10:00:00.000Z');
-    await expect(importPrivateExport(JSON.stringify({ ...value, version: 5 }), store, 'replace-private-state')).rejects.toThrow();
+    await expect(importPrivateExport(JSON.stringify({ ...value, version: 6 }), store, 'replace-private-state')).rejects.toThrow();
     await expect(importPrivateExport(JSON.stringify(value), store, 'no')).rejects.toThrow('confirmation');
     await importPrivateExport(JSON.stringify(value), store, 'replace-private-state');
     expect(store.replaceCount).toBe(1);

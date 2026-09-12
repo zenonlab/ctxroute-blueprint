@@ -8192,7 +8192,7 @@
         {
           "id": "step-2",
           "title": "Brancher le backup chiffre de l historique prive",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le backup chiffre contient bibliotheque progression Review organisation et identite collective",
             "Aucun secret titre ou URL ne parait en clair dans le blob",
@@ -8219,7 +8219,11 @@
             "git diff --check",
             "git commit -m feat(recovery): expose encrypted private backup"
           ],
-          "evidence": []
+          "evidence": [
+            "Installed Chromium 153 exported and restored an AES-GCM private backup after IndexedDB loss, restored the opaque owner token, rejected a wrong passphrase, and exposed the labelled Options controls",
+            "Chromium IndexedDB contract proved v14 transactional replacement, derived-state cleanup, owner-write failure isolation, interrupted rollback without a receipt and committed recovery with a receipt",
+            "Extension 151/151, 55 targeted recovery/security/UI tests, adapters-browser 75/75, Chrome and Firefox security builds, typechecks, lint, docs/UI/ADR validation and both Archify showcase views passed"
+          ]
         },
         {
           "id": "step-3",

@@ -23,6 +23,7 @@ export class TobirinkDatabase extends Dexie {
   readonly reviews!: Table<Review, string>;
   readonly works!: Table<Work, string>;
   readonly providerIdentityRecovery!: Table<ProviderIdentityRecoveryRecord, string>;
+  readonly privateRecoveryReceipts!: Table<{ committedAt: string; id: string }, string>;
 
   constructor(name: string) {
     super(name);
@@ -133,5 +134,6 @@ export class TobirinkDatabase extends Dexie {
     this.version(13).stores({
       works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys, *hydration.candidate.genres, hydration.candidate.editorialStatus, hydration.candidate.format, hydration.candidate.startYear, hydration.candidate.popularity.value',
     });
+    this.version(14).stores({ privateRecoveryReceipts: '&id' });
   }
 }

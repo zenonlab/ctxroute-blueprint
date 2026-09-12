@@ -1,0 +1,8 @@
+.section { padding: var(--space-6); }
+.content, .group, .field { display: grid; }
+.content { gap: var(--space-6); }
+.group { gap: var(--space-3); }
+.field { gap: var(--space-2); }
+.field input { width: 100%; min-height: var(--size-control-touch); padding: var(--space-3); color: var(--color-text); background: var(--color-canvas); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.field input:focus-visible, .confirm input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: var(--space-1); }
+.confirm { display: flex; align-items: flex-start; gap: var(--space-2); }

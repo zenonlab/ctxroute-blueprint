@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { emptySyncedProviderIds, prepareProviderIdentitySnapshot } from '@tobirink/application';
-import { WebExtensionProviderIdentitySyncAdapter, WebExtensionProviderIdentitySyncStateAdapter } from './web-extension-provider-identity-sync-adapter';
+import { WebExtensionPrivateRecoveryJournalAdapter, WebExtensionProviderIdentitySyncAdapter, WebExtensionProviderIdentitySyncStateAdapter } from './web-extension-provider-identity-sync-adapter';
 
 function area() { return { get: vi.fn(async () => ({})), remove: vi.fn(async () => {}), set: vi.fn(async () => {}), setAccessLevel: vi.fn(async () => {}) }; }
 
@@ -56,5 +56,16 @@ describe('trusted extension identity storage adapters', () => {
     expect(storage.set).toHaveBeenCalledWith({ 'tobirink-provider-identity-sync-state-v1': { schemaVersion: 1, lastWriteAt: 10000 } });
     expect(storage.setAccessLevel).toHaveBeenCalledExactlyOnceWith({ accessLevel: 'TRUSTED_CONTEXTS' });
     await expect(adapter.save({ schemaVersion: 1, lastWriteAt: -1 })).rejects.toThrow();
+  });
+
+  it('keeps an interrupted private restoration journal in the restricted local area', async () => {
+    const storage = area();
+    const adapter = new WebExtensionPrivateRecoveryJournalAdapter(storage);
+    const journal = { id: '00000000-0000-4000-8000-000000000001', schemaVersion: 1 as const };
+    await adapter.save(journal);
+    expect(storage.set).toHaveBeenCalledWith({ 'tobirink-private-recovery-journal-v1': journal });
+    await adapter.clear();
+    expect(storage.remove).toHaveBeenCalledWith(['tobirink-private-recovery-journal-v1']);
+    expect(storage.setAccessLevel).toHaveBeenCalledExactlyOnceWith({ accessLevel: 'TRUSTED_CONTEXTS' });
   });
 });

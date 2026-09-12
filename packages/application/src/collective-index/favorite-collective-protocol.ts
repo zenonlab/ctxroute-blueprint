@@ -75,7 +75,7 @@ export const favoriteOwnerLocalStateSchema = z.strictObject({
   rules: favoriteSiteRulesSchema.optional(), rulesReadAt: z.number().int().nonnegative().optional(),
 });
 export type FavoriteOwnerLocalState = z.infer<typeof favoriteOwnerLocalStateSchema>;
-export interface FavoriteOwnerLocalStatePort { read(): Promise<FavoriteOwnerLocalState | undefined>; save(state: FavoriteOwnerLocalState): Promise<void> }
+export interface FavoriteOwnerLocalStatePort { clear?(): Promise<void>; read(): Promise<FavoriteOwnerLocalState | undefined>; save(state: FavoriteOwnerLocalState): Promise<void> }
 export type FavoriteCollectiveResponse = { readonly kind: 'ACCEPTED'; readonly receipt: FavoriteCollectiveReceipt } | { readonly kind: 'UNAUTHORIZED' | 'REPLAY' | 'QUOTA_EXCEEDED' };
 export interface FavoriteCollectiveServicePort {
   readRules(): Promise<FavoriteSiteRules>;

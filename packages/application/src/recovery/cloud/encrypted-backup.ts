@@ -5,7 +5,7 @@ import {
   importPrivateExport,
   validatePrivateExport,
 } from '../private-export';
-import type { PrivateExportV3, PrivateExportV4, RecoveryStorePort } from '../private-export';
+import type { PrivateExportV3, PrivateExportV4, PrivateExportV5, RecoveryStorePort } from '../private-export';
 
 const backupBase64Schema = z.string().min(16).max(16 * 1024 * 1024).regex(/^[A-Za-z0-9+/]+={0,2}$/);
 const backupIvSchema = z.string().length(16).regex(/^[A-Za-z0-9+/]+={0,2}$/);
@@ -83,7 +83,7 @@ export function parseEncryptedBackupBlob(blob: EncryptedBackupBlob): EncryptedBa
 }
 
 export async function encryptPrivateExport(
-  privateExport: PrivateExportV3 | PrivateExportV4,
+  privateExport: PrivateExportV3 | PrivateExportV4 | PrivateExportV5,
   passphrase: string,
 ): Promise<EncryptedBackupBlob> {
   assertPassphrase(passphrase);
@@ -126,7 +126,7 @@ export async function encryptPrivateExport(
 export async function decryptPrivateExport(
   blob: EncryptedBackupBlob,
   passphrase: string,
-): Promise<PrivateExportV4> {
+): Promise<PrivateExportV5> {
   assertPassphrase(passphrase);
   const envelope = parseEncryptedBackupBlob(blob);
   const wrappingKey = await deriveWrappingKey(passphrase, decodeBase64(envelope.kdf.salt));

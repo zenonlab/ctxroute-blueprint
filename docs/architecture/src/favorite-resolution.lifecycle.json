@@ -38,6 +38,6 @@
   "cards": [
     { "dot": "cyan", "title": "État visible", "items": ["L’écran relit l’état pendant tout parcours actif", "Inventaire résolution et attente fournisseur ont des libellés distincts", "L’échéance affichée disparaît dès que la file converge"] },
     { "dot": "amber", "title": "Bornes", "items": ["Huit pages d’inventaire et seize pages de snapshot par réveil", "Une échéance persistante par file et aucune boucle de timers", "Huit échecs automatiques avant intervention explicite"] },
-    { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Une Review apparaît seulement après ambiguïté ou introuvable terminal", "La projection locale reste lisible avant hydratation"] }
+    { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Le reçu IndexedDB termine ou annule une restauration interrompue", "La projection locale reste lisible avant hydratation"] }
   ]
 }

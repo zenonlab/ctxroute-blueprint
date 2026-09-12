@@ -1,4 +1,4 @@
-import { applyConfirmedOrganizerPreview, hydrateAgendaFromPublicReleaseCache, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, createEncryptedBackup, hydrateAgendaFromPublicReleaseCache, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
@@ -14,11 +14,12 @@ import {
   WebExtensionProviderIdentitySyncAdapter,
   WebExtensionProviderIdentitySyncStateAdapter,
   WebExtensionFavoriteOwnerStateAdapter,
+  WebExtensionPrivateRecoveryJournalAdapter,
   HttpFavoriteCollectiveAdapter,
   HttpFavoritePublicCacheAdapter,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -73,7 +74,9 @@ export default defineBackground({
     const trustedLocalStorage = import.meta.env.FIREFOX ? browser.storage.local : nativeStorage?.local;
     const trustedSyncStorage = import.meta.env.FIREFOX ? browser.storage.sync : nativeStorage?.sync;
     if (trustedLocalStorage === undefined || trustedSyncStorage === undefined) throw new Error('Trusted extension storage is unavailable.');
-    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(new WebExtensionFavoriteOwnerStateAdapter(trustedLocalStorage, identityAccessPolicy), new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
+    const ownerState = new WebExtensionFavoriteOwnerStateAdapter(trustedLocalStorage, identityAccessPolicy);
+    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(ownerState, new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
+    const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database, ownerState, new WebExtensionPrivateRecoveryJournalAdapter(trustedLocalStorage, identityAccessPolicy));
     const publicCache = configuredSiteOrigin ? new HttpFavoritePublicCacheAdapter(configuredSiteOrigin) : undefined;
     const identitySync = new WebExtensionProviderIdentitySyncAdapter(trustedSyncStorage, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
@@ -90,6 +93,7 @@ export default defineBackground({
     const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
     const runFavoriteResolution = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
+        await privateRecovery.recoverInterrupted();
         await ownerRuntime?.refreshRules().catch(() => undefined);
         await ownerRuntime?.maintain().catch(() => undefined);
       },
@@ -135,6 +139,7 @@ export default defineBackground({
         return;
       }
       await privateStorage.ensureReady();
+      await privateRecovery.recoverInterrupted();
       const [checkpoint, existing] = await Promise.all([
         privateStorage.storage.getFavoriteInventoryCheckpoint(),
         browser.alarms.get(favoriteResolutionContinuationAlarmName),
@@ -206,6 +211,26 @@ export default defineBackground({
       if (sender.id && sender.id !== browser.runtime.id) return { error: 'invalid-sender', ok: false };
       const parsed = extensionMessageSchema.safeParse(value);
       if (!parsed.success) return { error: 'invalid-message', ok: false };
+      if (parsed.data.type === 'recovery.backup.export' || parsed.data.type === 'recovery.backup.restore') {
+        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
+        try {
+          await privateStorage.ensureReady();
+          await privateRecovery.recoverInterrupted();
+          if (parsed.data.type === 'recovery.backup.export') {
+            const exportedAt = now();
+            const blob = await createEncryptedBackup(privateRecovery, exportedAt, parsed.data.passphrase);
+            return { filename: `tobirink-private-${exportedAt.slice(0, 10)}.tobirink`, ok: true, serialized: blob.serialized, status: 'exported' };
+          }
+          await restoreEncryptedBackup({ format: 'tobirink-encrypted-backup-blob', serialized: parsed.data.serialized }, parsed.data.passphrase, privateRecovery, parsed.data.confirmation);
+          try {
+            await reconcileFavorites(true);
+            await repairLibraryProjection();
+          } catch {
+            await updateFavoriteResolutionContinuation(browser.alarms, new Date(Date.now() + favoriteResolutionContinuationMinimumDelayMs).toISOString());
+          }
+          return { ok: true, status: 'restored' };
+        } catch { return { error: 'private-recovery-unavailable', ok: false }; }
+      }
       if (parsed.data.type === 'owner.action') {
         if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         if (ownerRuntime === undefined) return { ok: true, status: 'unavailable' };

@@ -8,6 +8,7 @@ import { libraryCatalogueMessageSchema } from './library-catalogue-messages';
 import { organizerApplyMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerRestoreMessageSchema } from './organizer-messages';
 import { reviewCandidatesMessageSchema, reviewDecisionMessageSchema, reviewQueueMessageSchema } from './review-messages';
 import { quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema } from './preference-messages';
+import { privateRecoveryMessageSchema } from './private-recovery-messages';
 export { librarySearchResponseSchema, openSearchMessage, readLibrarySearchMessage } from './library-search-messages';
 export type { LibrarySearchResponse } from './library-search-messages';
 export { libraryCatalogueResponseSchema, readLibraryCatalogueMessage } from './library-catalogue-messages';
@@ -61,7 +62,7 @@ const webBridgeRequestMessageSchema = z.strictObject({
   type: z.literal('webbridge.request'),
 });
 
-export const extensionMessageSchema = z.discriminatedUnion('type', [resolutionStatusMessageSchema, ownerMessageSchema, navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, libraryCatalogueMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerApplyMessageSchema, organizerRestoreMessageSchema, webBridgeHandshakeMessageSchema, webBridgeRequestMessageSchema]);
+export const extensionMessageSchema = z.discriminatedUnion('type', [resolutionStatusMessageSchema, ownerMessageSchema, privateRecoveryMessageSchema, navigationMessageSchema, healthMessageSchema, popupContextMessageSchema, reviewQueueMessageSchema, reviewCandidatesMessageSchema, reviewDecisionMessageSchema, libraryPageMessageSchema, libraryCatalogueMessageSchema, librarySearchMessageSchema, searchOpenMessageSchema, agendaPeriodMessageSchema, quickPreferencesReadMessageSchema, quickPreferencesWriteMessageSchema, organizerConfigurationReadMessageSchema, organizerConfigurationWriteMessageSchema, organizerPreviewReadMessageSchema, organizerApplyMessageSchema, organizerRestoreMessageSchema, webBridgeHandshakeMessageSchema, webBridgeRequestMessageSchema]);
 export const popupContextResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({
     ok: z.literal(true),

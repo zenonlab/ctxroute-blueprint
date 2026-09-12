@@ -7,6 +7,7 @@ const read = (relativePath: string) => readFileSync(new URL(relativePath, import
 const extensionSurface = read('../runtime/ExtensionSurface.tsx');
 const reviewNavigationHook = read('../runtime/use-local-review-navigation.ts');
 const organizerSettingsHook = read('../runtime/use-local-organizer-settings.ts');
+const privateRecoveryHook = read('../runtime/use-private-recovery.ts');
 
 const styles = {
   button: read('../../../packages/ui/src/components/button/Button.module.css'),
@@ -18,6 +19,7 @@ const styles = {
   reviewResolver: read('../../../packages/ui/src/features/review/review-resolver/ReviewResolver.module.css'),
   runtime: read('../runtime/runtime.css'),
   settings: read('../entrypoints/options/Settings.module.css'),
+  privateRecovery: read('../entrypoints/options/PrivateRecovery/PrivateRecovery.module.css'),
   agenda: read('../entrypoints/agenda/Agenda.module.css'),
   workCard: read('../../../packages/ui/src/features/library/work-card/WorkCard.module.css'),
 };
@@ -100,6 +102,17 @@ describe('extension accessibility contract', () => {
     expect(organizerSettingsHook).toContain('applyOrganizerPreviewMessage(configuration, expected)');
     expect(organizerSettingsHook).toContain('restoreOrganizerSnapshotMessage()');
     expect(organizerSettingsHook).not.toMatch(/indexedDB|Dexie|browser\.|chrome\.|fetch\(/);
+  });
+
+  it('keeps private recovery behind labelled controls and serialized background messages', () => {
+    const markup = renderToStaticMarkup(<ExtensionSurface name="options" />);
+    expect(markup).toContain('Sauvegarde privée chiffrée');
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('type="password"');
+    expect(privateRecoveryHook).toContain('exportPrivateBackupMessage(passphrase)');
+    expect(privateRecoveryHook).toContain('restorePrivateBackupMessage(await file.text(), passphrase)');
+    expect(privateRecoveryHook).not.toMatch(/indexedDB|Dexie|fetch\(/);
+    expect(styles.privateRecovery).toMatch(/focus-visible/);
   });
 
   it('meets WCAG AA contrast for the production text, muted text, accent and focus pairs', () => {

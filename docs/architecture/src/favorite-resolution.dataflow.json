@@ -65,12 +65,13 @@
         "label": "Sync et collectif",
         "focus": [
           "syncedIds",
+          "privateStore",
           "sourceEvidence",
           "durableQueue",
           "collectiveWorker",
           "collectiveD1"
         ],
-        "note": "Sync v2 checkpointé puis lookup D1 par 50 : empreinte→IDs sans titres. Une panne cache laisse les fournisseurs continuer."
+        "note": "Sync v2 pour les IDs; export local AES-GCM pour l’état privé. Le mot de passe ne quitte pas l’extension."
       }
     ]
   },
@@ -171,7 +172,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "titres locaux puis Work hydraté"
+      "tag": "transaction + export AES-GCM"
     },
     {
       "id": "localDiagnostics",

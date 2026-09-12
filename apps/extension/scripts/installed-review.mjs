@@ -123,6 +123,21 @@ try {
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic rescued manga' && item.mediaType === 'unknown' && item.state === 'retryable'));
   assert.equal(providerTitleSearches, 2);
   assert.ok(resolutionOrder.indexOf('public-cache') < resolutionOrder.indexOf('provider-search'));
+  const backupPassphrase = 'synthetic-local-passphrase';
+  const ownerToken = 'a'.repeat(64);
+  await page.evaluate(({ ownerToken }) => globalThis.chrome.storage.local.set({ 'tobirink-owner-v2': {
+    registration: { consent: true, installationId: '00000000-0000-4000-8000-000000000002', ownerId: '00000000-0000-4000-8000-000000000001', revokeToken: 'b'.repeat(64), token: ownerToken },
+    schemaVersion: 1, sent: {}, status: 'revoked',
+  } }), { ownerToken });
+  const backup = await page.evaluate((passphrase) => globalThis.chrome.runtime.sendMessage({ passphrase, type: 'recovery.backup.export', version: 1 }), backupPassphrase);
+  assert.equal(backup.ok, true);
+  assert.equal(backup.status, 'exported');
+  assert.ok(!backup.serialized.includes('Synthetic cache anime'));
+  assert.ok(!backup.serialized.includes(ownerToken));
+  assert.ok(!backup.serialized.includes(backupPassphrase));
+  const wrongRestore = await page.evaluate(({ serialized }) => globalThis.chrome.runtime.sendMessage({ confirmation: 'replace-private-state', passphrase: 'incorrect-passphrase', serialized, type: 'recovery.backup.restore', version: 1 }), backup);
+  assert.equal(wrongRestore.ok, false);
+  assert.equal((await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }))).snapshot.statistics.total, 5);
   let synchronizedSnapshot;
   for (let pass = 0; pass < 180; pass += 1) {
     synchronizedSnapshot = await page.evaluate(() => globalThis.chrome.storage.sync.get(null));
@@ -159,6 +174,16 @@ try {
   assert.ok(recoveredCatalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'ready'));
   assert.ok(recoveredProviderIds.includes(154587), JSON.stringify(recoveredProviderIds));
   assert.ok(!providerSearchTerms.slice(searchesBeforeRecovery).some((term) => term.toLocaleLowerCase() === 'synthetic cache anime'), JSON.stringify(providerSearchTerms.slice(searchesBeforeRecovery)));
+  await page.evaluate(() => globalThis.chrome.storage.local.remove('tobirink-owner-v2'));
+  const restoredBackup = await page.evaluate(({ passphrase, serialized }) => globalThis.chrome.runtime.sendMessage({ confirmation: 'replace-private-state', passphrase, serialized, type: 'recovery.backup.restore', version: 1 }), { passphrase: backupPassphrase, serialized: backup.serialized });
+  assert.deepEqual(restoredBackup, { ok: true, status: 'restored' });
+  const restoredOwner = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink-owner-v2'));
+  assert.equal(restoredOwner['tobirink-owner-v2'].registration.token, ownerToken);
+  for (let pass = 0; pass < 750; pass += 1) {
+    const restoredStatus = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+    if (restoredStatus.ok && restoredStatus.inventory.status === 'complete' && restoredStatus.counts.processing === 0) break;
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+  }
   const restarted = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(restarted.ok, true);
   assert.equal(restarted.snapshot.statistics.total, 5);
@@ -186,6 +211,9 @@ try {
   assert.equal(resumed.ok, true);
   await page.getByRole('button', { name: 'Actualiser l’état' }).click();
   await page.getByRole('heading', { name: 'Analyse des favoris' }).waitFor();
+  await page.getByRole('heading', { name: 'Sauvegarde privée chiffrée' }).waitFor();
+  await page.getByLabel('Phrase secrète, 12 caractères minimum').waitFor();
+  await page.getByLabel('Archive TobiRink').waitFor();
   await page.getByText('Lire les favoris du navigateur', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Vérifier à nouveau' }).waitFor();
   assert.match(await page.locator('dl').innerText(), /Liens non pris en charge/u);
@@ -193,7 +221,7 @@ try {
   await page.getByRole('button', { name: 'Activer le diagnostic' }).waitFor();
   const diagnosticLock = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink.extensionDiagnostics'));
   assert.equal(diagnosticLock['tobirink.extensionDiagnostics'], 'off');
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1406-bookmark convergence across anime/manga/manhwa/unknown, validated storage.sync v2 reconstruction after IndexedDB loss, batched D1 cache before bounded provider title searches, durable retries, pause/resume, MV3 restart, zero imported Review, guided private status UI and diagnostic lock passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1406-bookmark convergence, storage.sync v2 reconstruction after IndexedDB loss, encrypted private backup with owner identity and wrong-password rejection, cache-first provider routing, durable retries, pause/resume, zero imported Review and private status UI passed.\n`);
 } finally {
   await context.close();
 }
