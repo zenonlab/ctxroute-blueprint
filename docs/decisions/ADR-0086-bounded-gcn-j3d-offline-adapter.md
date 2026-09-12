@@ -49,6 +49,10 @@ uniquement quand ils restent prouvables au point d'appel, sinon la relation deme
 inconnue. Le rapport conserve l'empreinte du binaire, la plage, la configuration des
 API et chaque adresse d'appel. Ce lecteur reste source-neutre et ne contient aucun
 identifiant propre à une œuvre.
+Une API peut déclarer un second registre d'argument. Le reçu conserve alors sa valeur
+hexadécimale et, si elle pointe dans une section matérialisée, la chaîne ASCII bornée.
+Cette preuve couvre aussi bien les surcharges archive/index que archive/nom sans
+spécialiser l'analyseur pour une table de ressources donnée.
 
 Les animations squelettiques peuvent porter une table sonore JAI/BAS après leur
 section `ANK1`, et les mêmes tables existent comme fichiers autonomes. L'adaptateur

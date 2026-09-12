@@ -107,7 +107,7 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   --module actor-controller \
   --start 0x80001000 --end 0x80002000 \
   --sda2-base 0x80400000 --sda-base 0x803f8000 \
-  --api resource.load=0x80050000:r4
+  --api resource.load=0x80050000:r4,r5
 ```
 
 L'inspection RARC reconstruit l'arbre logique, calcule l'empreinte de chaque payload
@@ -174,3 +174,7 @@ résout seulement les chaînes dont l'adresse reste prouvable par propagation de
 constantes. Les adresses d'API, le registre portant le nom et les bases ABI `r2`/`r13`
 sont des entrées de l'adaptateur : aucun nom de jeu ou d'archive n'est codé dans
 l'outil. Un appel ambigu reste `null` et ne peut pas fermer une dépendance.
+Le premier registre d'une déclaration `--api` porte l'adresse du nom ; un second
+registre optionnel conserve à la fois sa valeur brute et la chaîne pointée lorsqu'elle
+est lisible. Cela permet de relier un archive et son index, ou un archive et un nom de
+payload, sans enseigner leur vocabulaire à l'analyseur.

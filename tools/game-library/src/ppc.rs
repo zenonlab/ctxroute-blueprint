@@ -23,6 +23,7 @@ pub struct PpcResourceApi {
     pub kind: String,
     pub address: u32,
     pub name_register: u8,
+    pub value_register: Option<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -55,6 +56,7 @@ pub struct PpcResourceApiReport {
     pub kind: String,
     pub address: String,
     pub name_register: u8,
+    pub value_register: Option<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -63,6 +65,8 @@ pub struct PpcResourceCall {
     pub call_address: String,
     pub resource_address: Option<String>,
     pub resource_name: Option<String>,
+    pub resource_value: Option<String>,
+    pub resource_value_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -118,6 +122,10 @@ pub fn parse_ppc_resource_calls(
             ensure!(
                 api.name_register < 32,
                 "API register must be r0 through r31"
+            );
+            ensure!(
+                api.value_register.is_none_or(|register| register < 32),
+                "API value register must be r0 through r31"
             );
             Ok((api.address, api))
         })
@@ -195,11 +203,17 @@ pub fn parse_ppc_resource_calls(
                     "resource call count exceeds the limit"
                 );
                 let resource_address = registers.get(&api.name_register).copied();
+                let resource_value = api
+                    .value_register
+                    .and_then(|register| registers.get(&register).copied());
                 calls.push(PpcResourceCall {
                     kind: api.kind.clone(),
                     call_address: hex_address(address),
                     resource_address: resource_address.map(hex_address),
                     resource_name: resource_address
+                        .and_then(|value| read_ascii_c_string(bytes, &sections, value)),
+                    resource_value: resource_value.map(hex_address),
+                    resource_value_name: resource_value
                         .and_then(|value| read_ascii_c_string(bytes, &sections, value)),
                 });
             }
@@ -233,6 +247,7 @@ pub fn parse_ppc_resource_calls(
                 kind: api.kind.clone(),
                 address: hex_address(api.address),
                 name_register: api.name_register,
+                value_register: api.value_register,
             })
             .collect(),
         calls,
@@ -455,20 +470,34 @@ pub fn parse_hex_u32(value: &str) -> Result<u32> {
 pub fn parse_api(value: &str) -> Result<PpcResourceApi> {
     let (kind, tail) = value
         .split_once('=')
-        .context("API must use KIND=ADDRESS:rN")?;
-    let (address, register) = tail
+        .context("API must use KIND=ADDRESS:rN or KIND=ADDRESS:rN,rN")?;
+    let (address, registers) = tail
         .rsplit_once(':')
-        .context("API must use KIND=ADDRESS:rN")?;
-    let register = register
+        .context("API must use KIND=ADDRESS:rN or KIND=ADDRESS:rN,rN")?;
+    let (name_register, value_register) = registers
+        .split_once(',')
+        .map_or((registers, None), |(name, value)| (name, Some(value)));
+    let name_register = name_register
         .strip_prefix('r')
         .context("API register must use rN")?;
-    let name_register: u8 = register.parse().context("invalid API register")?;
+    let name_register: u8 = name_register.parse().context("invalid API register")?;
     ensure!(name_register < 32, "API register must be r0 through r31");
+    let value_register = value_register
+        .map(|register| {
+            let register = register
+                .strip_prefix('r')
+                .context("API value register must use rN")?;
+            let register: u8 = register.parse().context("invalid API value register")?;
+            ensure!(register < 32, "API value register must be r0 through r31");
+            Ok(register)
+        })
+        .transpose()?;
     ensure!(!kind.trim().is_empty(), "API kind must not be empty");
     Ok(PpcResourceApi {
         kind: kind.to_owned(),
         address: parse_hex_u32(address)?,
         name_register,
+        value_register,
     })
 }
 
@@ -494,7 +523,7 @@ mod tests {
         for (offset, instruction) in [
             (0x100, 0x3862_f000_u32),
             (0x104, 0x3c80_0000_u32),
-            (0x108, 0x3884_3000_u32),
+            (0x108, 0x3884_2000_u32),
             (0x10c, 0x4800_0ff5_u32),
         ] {
             bytes[offset..offset + 4].copy_from_slice(&instruction.to_be_bytes());
@@ -527,6 +556,7 @@ mod tests {
                 kind: "resource.load".into(),
                 address: 0x2000,
                 name_register: 3,
+                value_register: Some(4),
             }],
         }
     }
@@ -540,6 +570,14 @@ mod tests {
             Some("0x00002000")
         );
         assert_eq!(report.calls[0].resource_name.as_deref(), Some("Search"));
+        assert_eq!(
+            report.calls[0].resource_value.as_deref(),
+            Some("0x00002000")
+        );
+        assert_eq!(
+            report.calls[0].resource_value_name.as_deref(),
+            Some("Search")
+        );
     }
 
     #[test]
@@ -555,12 +593,19 @@ mod tests {
     #[test]
     fn parses_typed_api_arguments() {
         assert_eq!(
-            parse_api("resource.load=0x80057170:r4").unwrap(),
+            parse_api("resource.load=0x80057170:r4,r5").unwrap(),
             PpcResourceApi {
                 kind: "resource.load".into(),
                 address: 0x8005_7170,
                 name_register: 4,
+                value_register: Some(5),
             }
+        );
+        assert_eq!(
+            parse_api("resource.load=0x80057170:r4")
+                .unwrap()
+                .value_register,
+            None
         );
         assert!(parse_api("resource.load:80057170:4").is_err());
     }
