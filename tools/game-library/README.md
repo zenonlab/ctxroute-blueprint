@@ -140,7 +140,7 @@ hors table et octets non expliqués ferment l'inspection.
 La compilation JPC sélectionne explicitement des IDs opaques et produit le contrat
 portable `orbite.resolved-effects/1`. Elle décode les textures IA4/IA8 embarquées,
 résout le mélange TEV primaire/environnement dans la texture portable, préserve
-cardinalité, temps, volume, vélocité, direction et champs de gravité constants, puis projette les formes JParticle
+cardinalité, temps, volume, vélocité, direction, courbes `ESP1` et champs de gravité constants, puis projette les formes JParticle
 sur les sprites bornés du renderer commun. Les volumes point, ligne, cercle et sphère
 suivent les types effectifs du loader JParticle. Une texture indexée, un volume sans
 projection portable, un champ dynamique non représentable ou une dépendance absente

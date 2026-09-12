@@ -9,7 +9,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::gcn::{
-    BtiTexture, JpcBaseShape, JpcDynamics, JpcEmitter, JpcField, JpcTexture, parse_jpc,
+    BtiTexture, JpcBaseShape, JpcDynamics, JpcEmitter, JpcExtraShape, JpcField, JpcTexture,
+    parse_jpc,
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -95,15 +96,32 @@ struct Particle {
     size: [f32; 2],
     scale: [f32; 2],
     rotation: [f32; 3],
+    scale_randomness: f32,
+    rotation_randomness: f32,
+    spin: f32,
+    spin_randomness: f32,
+    spin_direction_probability: f32,
     shape: u8,
     projection: &'static str,
 }
 
 #[derive(Default, Serialize)]
 struct Animation {
-    size: Option<()>,
-    scale: Option<()>,
-    alpha: Option<()>,
+    size: Option<Vec2Track>,
+    scale: Option<Vec2Track>,
+    alpha: Option<U8Track>,
+}
+
+#[derive(Serialize)]
+struct Vec2Track {
+    repeat: bool,
+    values: Vec<[f32; 2]>,
+}
+
+#[derive(Serialize)]
+struct U8Track {
+    repeat: bool,
+    values: Vec<u8>,
 }
 
 pub fn compile_jpc_effect_pack(
@@ -241,6 +259,7 @@ fn resolve_effect(
         size.iter().all(|value| value.is_finite() && *value > 0.0),
         "invalid JPC sprite projection size"
     );
+    let extra = emitter.extra_shape.as_ref();
     Ok(Effect {
         id,
         source_sha256: emitter.source_sha256.clone(),
@@ -279,6 +298,25 @@ fn resolve_effect(
             size,
             scale: [1.0, 1.0],
             rotation: [0.0, 0.0, 0.0],
+            scale_randomness: extra
+                .filter(|shape| shape.flags & 0x100 != 0)
+                .map_or(0.0, |shape| shape.random_scale),
+            rotation_randomness: extra
+                .filter(|shape| shape.flags & 0x0100_0000 != 0)
+                .map_or(0.0, |shape| {
+                    shape.rotate_random_angle * std::f32::consts::TAU
+                }),
+            spin: extra
+                .filter(|shape| shape.flags & 0x0100_0000 != 0)
+                .map_or(0.0, |shape| {
+                    shape.rotate_speed * std::f32::consts::PI * 60.0
+                }),
+            spin_randomness: extra
+                .filter(|shape| shape.flags & 0x0100_0000 != 0)
+                .map_or(0.0, |shape| shape.rotate_random_speed),
+            spin_direction_probability: extra
+                .filter(|shape| shape.flags & 0x0100_0000 != 0)
+                .map_or(1.0, |shape| shape.rotate_direction),
             shape: if matches!(emitter.base_shape.shape_type, 3 | 4 | 5 | 6 | 9) {
                 4
             } else {
@@ -290,10 +328,64 @@ fn resolve_effect(
                 _ => "billboard",
             },
         },
-        animation: Animation::default(),
+        animation: resolve_animation(extra, dynamics.lifetime)?,
         source_track_count: usize::from(emitter.key_blocks) + usize::from(emitter.field_blocks),
         source_tracks_sha256: emitter.source_sha256.clone(),
     })
+}
+
+fn resolve_animation(extra: Option<&JpcExtraShape>, lifetime: i16) -> Result<Animation> {
+    let Some(extra) = extra else {
+        return Ok(Animation::default());
+    };
+    ensure!(
+        extra.flags & 0x02 == 0,
+        "JPC sinusoidal alpha has no portable resolved track"
+    );
+    ensure!(
+        (0.0..=1.0).contains(&extra.alpha_in_timing)
+            && (0.0..=1.0).contains(&extra.alpha_out_timing)
+            && (0.0..=1.0).contains(&extra.alpha_in_value)
+            && (0.0..=1.0).contains(&extra.alpha_base_value)
+            && (0.0..=1.0).contains(&extra.alpha_out_value)
+            && (0.0..=1.0).contains(&extra.random_scale)
+            && (0.0..=1.0).contains(&extra.rotate_direction),
+        "JPC extra-shape normalized parameter is outside its domain"
+    );
+    let frames = usize::try_from(lifetime)?.max(1);
+    let alpha = (extra.flags & 0x01 != 0).then(|| U8Track {
+        repeat: false,
+        values: (0..frames)
+            .map(|frame| {
+                let time = frame as f32 / frames.saturating_sub(1).max(1) as f32;
+                let value = if time < extra.alpha_in_timing {
+                    interpolate(
+                        extra.alpha_in_value,
+                        extra.alpha_base_value,
+                        time / extra.alpha_in_timing.max(f32::EPSILON),
+                    )
+                } else if time > extra.alpha_out_timing {
+                    interpolate(
+                        extra.alpha_base_value,
+                        extra.alpha_out_value,
+                        (time - extra.alpha_out_timing)
+                            / (1.0 - extra.alpha_out_timing).max(f32::EPSILON),
+                    )
+                } else {
+                    extra.alpha_base_value
+                };
+                (value.clamp(0.0, 1.0) * 255.0).round() as u8
+            })
+            .collect(),
+    });
+    Ok(Animation {
+        alpha,
+        ..Default::default()
+    })
+}
+
+fn interpolate(start: f32, end: f32, amount: f32) -> f32 {
+    start + (end - start) * amount.clamp(0.0, 1.0)
 }
 
 fn gravity_acceleration(fields: &[JpcField]) -> Result<[f32; 3]> {
@@ -537,5 +629,31 @@ mod tests {
             ..gravity
         };
         assert!(gravity_acceleration(&[unsupported]).is_err());
+    }
+
+    #[test]
+    fn resolves_linear_source_alpha_without_repeating_the_last_frame() {
+        let extra = JpcExtraShape {
+            flags: 1,
+            alpha_in_timing: 0.0,
+            alpha_out_timing: 0.5,
+            alpha_in_value: 0.0,
+            alpha_base_value: 1.0,
+            alpha_out_value: 0.0,
+            scale_in_timing: 0.0,
+            scale_out_timing: 1.0,
+            scale_in_value: [1.0; 2],
+            scale_out_value: [1.0; 2],
+            random_scale: 0.0,
+            rotate_angle: 0.0,
+            rotate_speed: 0.0,
+            rotate_random_angle: 0.0,
+            rotate_random_speed: 0.0,
+            rotate_direction: 1.0,
+        };
+        let animation = resolve_animation(Some(&extra), 5).unwrap();
+        let alpha = animation.alpha.unwrap();
+        assert_eq!(alpha.values, [255, 255, 255, 128, 0]);
+        assert!(!alpha.repeat);
     }
 }

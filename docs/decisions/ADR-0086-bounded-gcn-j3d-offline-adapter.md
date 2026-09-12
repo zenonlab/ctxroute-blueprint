@@ -63,6 +63,9 @@ Bevy.
 Les champs `FLD1` de gravité locale constante deviennent un vecteur d'accélération
 portable. Tout autre type de champ, mode de vélocité, portée ou temporisation non
 représentable ferme la compilation au lieu d'inventer une approximation silencieuse.
+Les enveloppes `ESP1` deviennent des pistes d'alpha finies ; leurs dispersions de
+taille, d'angle et de rotation restent des paramètres bornés par particule. Une onde
+sinusoïdale non représentable ferme la compilation.
 Les formats GX non qualifiés et les dépendances multiples non représentables sont
 refusés au lieu de recevoir une texture ou un réglage inventé.
 

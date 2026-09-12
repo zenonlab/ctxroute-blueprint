@@ -176,7 +176,28 @@ pub struct JpcEmitter {
     pub blocks: Vec<JpcBlock>,
     pub dynamics: JpcDynamics,
     pub base_shape: JpcBaseShape,
+    pub extra_shape: Option<JpcExtraShape>,
     pub fields: Vec<JpcField>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcExtraShape {
+    pub flags: u32,
+    pub alpha_in_timing: f32,
+    pub alpha_out_timing: f32,
+    pub alpha_in_value: f32,
+    pub alpha_base_value: f32,
+    pub alpha_out_value: f32,
+    pub scale_in_timing: f32,
+    pub scale_out_timing: f32,
+    pub scale_in_value: [f32; 2],
+    pub scale_out_value: [f32; 2],
+    pub random_scale: f32,
+    pub rotate_angle: f32,
+    pub rotate_speed: f32,
+    pub rotate_random_angle: f32,
+    pub rotate_random_speed: f32,
+    pub rotate_direction: f32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -3379,6 +3400,7 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
         let mut blocks = Vec::with_capacity(block_count);
         let mut dynamics = None;
         let mut base_shape = None;
+        let mut extra_shape = None;
         let mut texture_indices = None;
         let mut actual_key_blocks = 0_usize;
         let mut actual_field_blocks = 0_usize;
@@ -3422,7 +3444,14 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
                     actual_field_blocks += 1;
                     fields.push(parse_jpc_field(bytes, offset, size)?);
                 }
-                "ESP1" | "SSP1" | "ETX1" => {
+                "ESP1" => {
+                    ensure!(
+                        optional_blocks.insert(tag.clone()),
+                        "duplicate JPC optional singleton block"
+                    );
+                    extra_shape = Some(parse_jpc_extra_shape(bytes, offset, size)?);
+                }
+                "SSP1" | "ETX1" => {
                     ensure!(
                         optional_blocks.insert(tag.clone()),
                         "duplicate JPC optional singleton block"
@@ -3463,6 +3492,7 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
             blocks,
             dynamics: dynamics.context("JPC emitter lacks BEM1 dynamics")?,
             base_shape: base_shape.context("JPC emitter lacks BSP1 base shape")?,
+            extra_shape,
             fields,
         });
     }
@@ -3525,6 +3555,55 @@ pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
         emitters,
         textures,
     })
+}
+
+fn parse_jpc_extra_shape(bytes: &[u8], block: usize, size: usize) -> Result<JpcExtraShape> {
+    ensure!(size >= 0x6c, "JPC ESP1 block is truncated");
+    let data = block + 0x0c;
+    let float_at = |relative| read_f32(bytes, data + relative);
+    let shape = JpcExtraShape {
+        flags: read_u32(bytes, data)?,
+        alpha_in_timing: float_at(0x08)?,
+        alpha_out_timing: float_at(0x0c)?,
+        alpha_in_value: float_at(0x10)?,
+        alpha_base_value: float_at(0x14)?,
+        alpha_out_value: float_at(0x18)?,
+        scale_in_timing: float_at(0x2c)?,
+        scale_out_timing: float_at(0x30)?,
+        scale_in_value: [float_at(0x34)?, float_at(0x3c)?],
+        scale_out_value: [float_at(0x38)?, float_at(0x40)?],
+        random_scale: float_at(0x44)?,
+        rotate_angle: float_at(0x4c)?,
+        rotate_speed: float_at(0x50)?,
+        rotate_random_angle: float_at(0x54)?,
+        rotate_random_speed: float_at(0x58)?,
+        rotate_direction: float_at(0x5c)?,
+    };
+    ensure!(
+        [
+            shape.alpha_in_timing,
+            shape.alpha_out_timing,
+            shape.alpha_in_value,
+            shape.alpha_base_value,
+            shape.alpha_out_value,
+            shape.scale_in_timing,
+            shape.scale_out_timing,
+            shape.scale_in_value[0],
+            shape.scale_in_value[1],
+            shape.scale_out_value[0],
+            shape.scale_out_value[1],
+            shape.random_scale,
+            shape.rotate_angle,
+            shape.rotate_speed,
+            shape.rotate_random_angle,
+            shape.rotate_random_speed,
+            shape.rotate_direction,
+        ]
+        .iter()
+        .all(|value| value.is_finite()),
+        "JPC extra shape contains non-finite values"
+    );
+    Ok(shape)
 }
 
 fn parse_jpc_dynamics(bytes: &[u8], block: usize, size: usize) -> Result<JpcDynamics> {
@@ -5072,6 +5151,33 @@ pub(crate) mod tests {
         let mut trailing = fixture_jpc();
         trailing.push(0);
         assert!(parse_jpc(&trailing).is_err());
+    }
+
+    #[test]
+    fn decodes_jpc_extra_shape_alpha_scale_and_rotation() {
+        let mut block = vec![0_u8; 0x80];
+        block[..4].copy_from_slice(b"ESP1");
+        block[4..8].copy_from_slice(&0x80_u32.to_be_bytes());
+        block[0x0c..0x10].copy_from_slice(&0x0101_4101_u32.to_be_bytes());
+        for (offset, value) in [
+            (0x14, 0.0_f32),
+            (0x18, 0.8),
+            (0x1c, 0.0),
+            (0x20, 1.0),
+            (0x24, 0.0),
+            (0x50, 0.25),
+            (0x5c, 0.02),
+            (0x60, 1.0),
+            (0x64, 0.25),
+        ] {
+            block[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+        let shape = parse_jpc_extra_shape(&block, 0, block.len()).unwrap();
+        assert_eq!(shape.alpha_out_timing, 0.8);
+        assert_eq!(shape.random_scale, 0.25);
+        assert_eq!(shape.rotate_speed, 0.02);
+        assert_eq!(shape.rotate_random_angle, 1.0);
+        assert_eq!(shape.rotate_random_speed, 0.25);
     }
 
     #[test]
