@@ -80,6 +80,9 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   --output private/source/archive-contents
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-jpc --input private/source/particle-bank.jpc
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-j3d-animation --input private/source/animation.bck
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
@@ -123,6 +126,11 @@ refusés.
 L'extraction RARC réutilise exactement ce parcours borné, refuse les sorties hors de
 `private/`, les répertoires non vides, les traversées de liens symboliques et les
 payloads compressés tant que leur décodeur n'est pas qualifié.
+
+L'inspection JPC 1-00 suit les en-têtes et blocs chargés par JParticle. Elle conserve
+les IDs d'émetteurs, paramètres dynamiques et de forme, références de textures et
+textures GX embarquées. Les doublons, blocs inconnus, comptes divergents, références
+hors table et octets non expliqués ferment l'inspection.
 
 L'inspection d'animation lit actuellement les pistes squelettiques BCK/ANK1. Elle
 conserve l'attribut de lecture source, la durée — y compris une pose statique de

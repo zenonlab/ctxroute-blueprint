@@ -8,7 +8,7 @@
   },
   "components": [
     { "id": "game", "type": "external", "label": "Entrée locale vérifiée", "sublabel": "ROM ou archive privée", "pos": [40, 70], "size": [220, 80] },
-    { "id": "readers", "type": "backend", "label": "Lecteurs source interchangeables", "sublabel": "Parseurs bornés · extraction privée", "pos": [340, 70], "size": [230, 80] },
+    { "id": "readers", "type": "backend", "label": "Lecteurs source interchangeables", "sublabel": "J3D · JPC · extraction privée", "pos": [340, 70], "size": [230, 80] },
     { "id": "observer", "type": "backend", "label": "Oracle source hors ligne", "sublabel": "Vues et frames déterministes", "pos": [660, 70], "size": [230, 80] },
     { "id": "library", "type": "database", "label": "Bibliothèque canonique", "sublabel": "Ressources liées · blobs privés", "pos": [990, 70], "size": [260, 80] },
     { "id": "engine-profile", "type": "database", "label": "Profil moteur résolu", "sublabel": "Repères · états GPU · provenance", "pos": [40, 270], "size": [220, 80] },

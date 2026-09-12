@@ -10,12 +10,14 @@ use sha2::{Digest, Sha256};
 const MAX_STAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_J3D_BYTES: usize = 64 * 1024 * 1024;
 const MAX_RARC_BYTES: usize = 128 * 1024 * 1024;
+const MAX_JPC_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CHUNKS: usize = 256;
 const MAX_RECORDS_PER_CHUNK: usize = 65_536;
 const MAX_J3D_SECTIONS: usize = 64;
 const MAX_J3D_VALUES: usize = 8_000_000;
 const MAX_RARC_NODES: usize = 65_536;
 const MAX_RARC_ENTRIES: usize = 262_144;
+const MAX_JPC_RESOURCES: usize = 65_536;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct StageIndexReport {
@@ -152,6 +154,73 @@ struct RarcPayload {
     start: usize,
     end: usize,
     compression: &'static str,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub emitters: Vec<JpcEmitter>,
+    pub textures: Vec<JpcTexture>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcEmitter {
+    pub resource_id: u16,
+    pub key_blocks: u8,
+    pub field_blocks: u8,
+    pub texture_indices: Vec<u16>,
+    pub blocks: Vec<JpcBlock>,
+    pub dynamics: JpcDynamics,
+    pub base_shape: JpcBaseShape,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcBlock {
+    pub tag: String,
+    pub bytes: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcDynamics {
+    pub flags: u32,
+    pub volume_type: u8,
+    pub volume_size: u16,
+    pub division_count: u16,
+    pub emission_rate: f32,
+    pub emission_rate_randomness: f32,
+    pub rate_step: u8,
+    pub max_frame: i16,
+    pub start_frame: i16,
+    pub lifetime: i16,
+    pub lifetime_randomness: f32,
+    pub emitter_scale: [f32; 3],
+    pub emitter_translation: [f32; 3],
+    pub emitter_direction: [f32; 3],
+    pub emitter_rotation: [i16; 3],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcBaseShape {
+    pub flags: u32,
+    pub shape_type: u8,
+    pub base_size: [f32; 2],
+    pub blend_flags: u16,
+    pub alpha_flags: u8,
+    pub z_flags: u8,
+    pub texture_flags: u8,
+    pub texture_index: u8,
+    pub primary_color: [u8; 4],
+    pub environment_color: [u8; 4],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JpcTexture {
+    pub index: u16,
+    pub name: String,
+    pub texture: BtiTexture,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -635,6 +704,21 @@ pub fn inspect_rarc(path: &Path) -> Result<RarcReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_rarc(&bytes)
+}
+
+pub fn inspect_jpc(path: &Path) -> Result<JpcReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "JPC input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_JPC_BYTES as u64,
+        "JPC input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_jpc(&bytes)
 }
 
 pub fn inspect_j3d_animation(path: &Path) -> Result<J3dAnimationReport> {
@@ -3233,6 +3317,241 @@ fn validate_bck_track(count: usize, first: usize, tangent: u16, available: usize
     Ok(())
 }
 
+pub fn parse_jpc(bytes: &[u8]) -> Result<JpcReport> {
+    ensure!(
+        bytes.len() >= 0x20 && bytes.len() <= MAX_JPC_BYTES,
+        "JPC input exceeds the bounded size"
+    );
+    ensure!(
+        bytes.get(0..8) == Some(b"JPAC1-00"),
+        "unsupported JPC magic or version"
+    );
+    let emitter_count = usize::from(read_u16(bytes, 8)?);
+    let texture_count = usize::from(read_u16(bytes, 10)?);
+    ensure!(
+        emitter_count <= MAX_JPC_RESOURCES && texture_count <= MAX_JPC_RESOURCES,
+        "JPC resource count exceeds the limit"
+    );
+    let mut offset = 0x20_usize;
+    let mut emitters = Vec::with_capacity(emitter_count);
+    let mut resource_ids = std::collections::BTreeSet::new();
+    for _ in 0..emitter_count {
+        ensure_counted_span(bytes, offset, 1, 0x20, "JPC emitter header")?;
+        ensure!(
+            bytes.get(offset..offset + 8) == Some(b"JEFFjpa1"),
+            "invalid JPC emitter header"
+        );
+        let block_count = read_u32(bytes, offset + 0x0c)? as usize;
+        ensure!(
+            block_count <= 64,
+            "JPC emitter block count exceeds the limit"
+        );
+        let key_blocks = bytes[offset + 0x14];
+        let field_blocks = bytes[offset + 0x15];
+        let texture_references = usize::from(bytes[offset + 0x16]);
+        let resource_id = read_u16(bytes, offset + 0x18)?;
+        ensure!(
+            resource_ids.insert(resource_id),
+            "duplicate JPC emitter resource ID"
+        );
+        offset += 0x20;
+        let mut blocks = Vec::with_capacity(block_count);
+        let mut dynamics = None;
+        let mut base_shape = None;
+        let mut texture_indices = None;
+        let mut actual_key_blocks = 0_usize;
+        let mut actual_field_blocks = 0_usize;
+        let mut optional_blocks = std::collections::BTreeSet::new();
+        for _ in 0..block_count {
+            ensure_counted_span(bytes, offset, 1, 0x0c, "JPC block header")?;
+            let tag = read_tag(bytes, offset)?;
+            let size = read_u32(bytes, offset + 4)? as usize;
+            ensure!(size >= 0x0c, "JPC block is smaller than its header");
+            ensure_counted_span(bytes, offset, size, 1, "JPC block")?;
+            match tag.as_str() {
+                "BEM1" => {
+                    ensure!(dynamics.is_none(), "duplicate JPC dynamics block");
+                    dynamics = Some(parse_jpc_dynamics(bytes, offset, size)?);
+                }
+                "BSP1" => {
+                    ensure!(base_shape.is_none(), "duplicate JPC base shape block");
+                    base_shape = Some(parse_jpc_base_shape(bytes, offset, size)?);
+                }
+                "TDB1" => {
+                    ensure!(
+                        texture_indices.is_none(),
+                        "duplicate JPC texture database block"
+                    );
+                    ensure_counted_span(
+                        bytes,
+                        offset + 0x0c,
+                        texture_references,
+                        2,
+                        "JPC texture references",
+                    )?;
+                    texture_indices = Some(
+                        (0..texture_references)
+                            .map(|index| read_u16(bytes, offset + 0x0c + index * 2))
+                            .collect::<Result<Vec<_>>>()?,
+                    );
+                }
+                "KFA1" => actual_key_blocks += 1,
+                "FLD1" => actual_field_blocks += 1,
+                "ESP1" | "SSP1" | "ETX1" => {
+                    ensure!(
+                        optional_blocks.insert(tag.clone()),
+                        "duplicate JPC optional singleton block"
+                    );
+                }
+                _ => bail!("unsupported JPC block {tag}"),
+            }
+            blocks.push(JpcBlock { tag, bytes: size });
+            offset = offset
+                .checked_add(size)
+                .context("JPC block offset overflow")?;
+        }
+        ensure!(
+            actual_key_blocks == usize::from(key_blocks),
+            "JPC key block count mismatch"
+        );
+        ensure!(
+            actual_field_blocks == usize::from(field_blocks),
+            "JPC field block count mismatch"
+        );
+        let texture_indices = texture_indices.unwrap_or_default();
+        ensure!(
+            texture_indices.len() == texture_references,
+            "JPC texture database is missing"
+        );
+        ensure!(
+            texture_indices
+                .iter()
+                .all(|index| usize::from(*index) < texture_count),
+            "JPC emitter texture index exceeds texture table"
+        );
+        emitters.push(JpcEmitter {
+            resource_id,
+            key_blocks,
+            field_blocks,
+            texture_indices,
+            blocks,
+            dynamics: dynamics.context("JPC emitter lacks BEM1 dynamics")?,
+            base_shape: base_shape.context("JPC emitter lacks BSP1 base shape")?,
+        });
+    }
+    let mut textures = Vec::with_capacity(texture_count);
+    let mut texture_names = std::collections::BTreeSet::new();
+    for index in 0..texture_count {
+        ensure_counted_span(bytes, offset, 1, 0x40, "JPC texture block")?;
+        ensure!(
+            bytes.get(offset..offset + 4) == Some(b"TEX1"),
+            "invalid JPC texture block"
+        );
+        let size = read_u32(bytes, offset + 4)? as usize;
+        ensure!(size >= 0x40, "JPC texture block is truncated");
+        ensure_counted_span(bytes, offset, size, 1, "JPC texture block")?;
+        let name_bytes = &bytes[offset + 0x0c..offset + 0x20];
+        let name_length = name_bytes
+            .iter()
+            .position(|byte| *byte == 0)
+            .context("unterminated JPC texture name")?;
+        ensure!(name_length > 0, "empty JPC texture name");
+        let name = std::str::from_utf8(&name_bytes[..name_length])
+            .context("non-UTF-8 JPC texture name")?;
+        ensure!(
+            name.bytes().all(|byte| byte.is_ascii_graphic()),
+            "invalid JPC texture name"
+        );
+        ensure!(
+            texture_names.insert(name.to_owned()),
+            "duplicate JPC texture name"
+        );
+        let texture = parse_bti_resource(bytes, offset + 0x20)?;
+        ensure!(
+            texture.image_offset + texture.image_bytes <= offset + size,
+            "JPC texture image exceeds its block"
+        );
+        if let Some(palette_offset) = texture.palette_offset {
+            ensure!(
+                palette_offset + texture.palette_bytes <= offset + size,
+                "JPC texture palette exceeds its block"
+            );
+        }
+        textures.push(JpcTexture {
+            index: u16::try_from(index)?,
+            name: name.to_owned(),
+            texture,
+        });
+        offset = offset
+            .checked_add(size)
+            .context("JPC texture offset overflow")?;
+    }
+    ensure!(
+        offset == bytes.len(),
+        "JPC contains unaccounted trailing bytes"
+    );
+    Ok(JpcReport {
+        format: "orbite.jpc-particle-index/1",
+        adapter: "gcn.jpc-v1",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        emitters,
+        textures,
+    })
+}
+
+fn parse_jpc_dynamics(bytes: &[u8], block: usize, size: usize) -> Result<JpcDynamics> {
+    ensure!(size >= 0x8c, "JPC BEM1 block is truncated");
+    let data = block + 0x0c;
+    let flags = read_u32(bytes, data)?;
+    let volume_type = ((flags >> 8) & 0x07) as u8;
+    let float_at = |relative| read_f32(bytes, data + relative);
+    let emitter_scale = [float_at(0x54)?, float_at(0x58)?, float_at(0x5c)?];
+    let emitter_translation = [float_at(0x60)?, float_at(0x64)?, float_at(0x68)?];
+    let emitter_direction = [float_at(0x6c)?, float_at(0x70)?, float_at(0x74)?];
+    Ok(JpcDynamics {
+        flags,
+        volume_type,
+        volume_size: read_u16(bytes, data + 0x0c)?,
+        division_count: read_u16(bytes, data + 0x0e)?,
+        emission_rate: float_at(0x10)?,
+        emission_rate_randomness: float_at(0x14)?,
+        rate_step: bytes[data + 0x18],
+        max_frame: read_i16(bytes, data + 0x1a)?,
+        start_frame: read_i16(bytes, data + 0x1c)?,
+        lifetime: read_i16(bytes, data + 0x1e)?,
+        lifetime_randomness: float_at(0x20)?,
+        emitter_scale,
+        emitter_translation,
+        emitter_direction,
+        emitter_rotation: [
+            read_i16(bytes, data + 0x78)?,
+            read_i16(bytes, data + 0x7a)?,
+            read_i16(bytes, data + 0x7c)?,
+        ],
+    })
+}
+
+fn parse_jpc_base_shape(bytes: &[u8], block: usize, size: usize) -> Result<JpcBaseShape> {
+    ensure!(size >= 0x60, "JPC BSP1 block is truncated");
+    let data = block + 0x0c;
+    let flags = read_u32(bytes, data)?;
+    let shape_type = (flags & 0x0f) as u8;
+    ensure!(shape_type <= 10, "JPC base shape type exceeds source enum");
+    Ok(JpcBaseShape {
+        flags,
+        shape_type,
+        base_size: [read_f32(bytes, data + 8)?, read_f32(bytes, data + 0x0c)?],
+        blend_flags: read_u16(bytes, data + 0x12)?,
+        alpha_flags: bytes[data + 0x14],
+        z_flags: bytes[data + 0x17],
+        texture_flags: bytes[data + 0x18],
+        texture_index: bytes[data + 0x1a],
+        primary_color: bytes[data + 0x20..data + 0x24].try_into()?,
+        environment_color: bytes[data + 0x24..data + 0x28].try_into()?,
+    })
+}
+
 pub fn extract_rarc(input: &Path, output: &Path) -> Result<RarcExtractReport> {
     require_private_output(output)?;
     ensure!(input.is_file(), "RARC input must be a regular file");
@@ -4352,6 +4671,52 @@ mod tests {
         bytes
     }
 
+    fn fixture_jpc() -> Vec<u8> {
+        let texture = fixture_bti();
+        let texture_block_size = 0x20 + texture.len();
+        let total = 0x20 + 0x20 + 0xa0 + 0x60 + 0x20 + texture_block_size;
+        let mut bytes = vec![0_u8; total];
+        bytes[0..8].copy_from_slice(b"JPAC1-00");
+        bytes[8..10].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[10..12].copy_from_slice(&1_u16.to_be_bytes());
+        let emitter = 0x20;
+        bytes[emitter..emitter + 8].copy_from_slice(b"JEFFjpa1");
+        bytes[emitter + 0x0c..emitter + 0x10].copy_from_slice(&3_u32.to_be_bytes());
+        bytes[emitter + 0x16] = 1;
+        bytes[emitter + 0x18..emitter + 0x1a].copy_from_slice(&0x33_u16.to_be_bytes());
+
+        let bem = emitter + 0x20;
+        bytes[bem..bem + 4].copy_from_slice(b"BEM1");
+        bytes[bem + 4..bem + 8].copy_from_slice(&0xa0_u32.to_be_bytes());
+        bytes[bem + 0x0c..bem + 0x10].copy_from_slice(&0x404_u32.to_be_bytes());
+        bytes[bem + 0x1c..bem + 0x20].copy_from_slice(&12.5_f32.to_bits().to_be_bytes());
+        bytes[bem + 0x2a..bem + 0x2c].copy_from_slice(&30_i16.to_be_bytes());
+        for (index, value) in [1.0_f32, 2.0, 3.0].into_iter().enumerate() {
+            let offset = bem + 0x0c + 0x54 + index * 4;
+            bytes[offset..offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+
+        let bsp = bem + 0xa0;
+        bytes[bsp..bsp + 4].copy_from_slice(b"BSP1");
+        bytes[bsp + 4..bsp + 8].copy_from_slice(&0x60_u32.to_be_bytes());
+        bytes[bsp + 0x0c..bsp + 0x10].copy_from_slice(&2_u32.to_be_bytes());
+        bytes[bsp + 0x14..bsp + 0x18].copy_from_slice(&1.0_f32.to_bits().to_be_bytes());
+        bytes[bsp + 0x18..bsp + 0x1c].copy_from_slice(&2.0_f32.to_bits().to_be_bytes());
+        bytes[bsp + 0x0c + 0x18] = 2;
+
+        let tdb = bsp + 0x60;
+        bytes[tdb..tdb + 4].copy_from_slice(b"TDB1");
+        bytes[tdb + 4..tdb + 8].copy_from_slice(&0x20_u32.to_be_bytes());
+        bytes[tdb + 0x0c..tdb + 0x0e].copy_from_slice(&0_u16.to_be_bytes());
+
+        let tex = tdb + 0x20;
+        bytes[tex..tex + 4].copy_from_slice(b"TEX1");
+        bytes[tex + 4..tex + 8].copy_from_slice(&(texture_block_size as u32).to_be_bytes());
+        bytes[tex + 0x0c..tex + 0x16].copy_from_slice(b"smoke_test");
+        bytes[tex + 0x20..tex + 0x20 + texture.len()].copy_from_slice(&texture);
+        bytes
+    }
+
     fn fixture_bmt(include_texture: bool) -> Vec<u8> {
         let mat_size = 0x3a0_usize;
         let tex_size = if include_texture { 0x90 } else { 0 };
@@ -4621,6 +4986,27 @@ mod tests {
         assert_eq!(report.files[1].path, "sub/b.bin");
         assert_eq!(report.files[1].compression, "yaz0");
         assert_eq!(report.files[1].stored_bytes, 4);
+    }
+
+    #[test]
+    fn inventories_jpc_emitters_blocks_and_embedded_textures() {
+        let report = parse_jpc(&fixture_jpc()).unwrap();
+        assert_eq!(report.emitters.len(), 1);
+        assert_eq!(report.emitters[0].resource_id, 0x33);
+        assert_eq!(report.emitters[0].texture_indices, [0]);
+        assert_eq!(report.emitters[0].dynamics.emission_rate, 12.5);
+        assert_eq!(report.emitters[0].dynamics.emitter_scale, [1.0, 2.0, 3.0]);
+        assert_eq!(report.emitters[0].base_shape.shape_type, 2);
+        assert_eq!(report.textures[0].name, "smoke_test");
+        assert_eq!(report.textures[0].texture.gx_format, "c8");
+
+        let mut bad_reference = fixture_jpc();
+        bad_reference[0x14c..0x14e].copy_from_slice(&1_u16.to_be_bytes());
+        assert!(parse_jpc(&bad_reference).is_err());
+
+        let mut trailing = fixture_jpc();
+        trailing.push(0);
+        assert!(parse_jpc(&trailing).is_err());
     }
 
     #[test]

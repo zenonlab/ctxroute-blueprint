@@ -45,6 +45,11 @@ hors de `private/`, une destination non vide, une traversée de parent ou de lie
 symbolique. Elle refuse aussi un payload compressé tant que son décodeur n'est pas
 qualifié dans cet adaptateur, au lieu de publier ses octets stockés comme contenu.
 
+Les banques JPC `1-00` sont parcourues selon le loader JParticle : chaque ressource
+`JEFF`, ses blocs typés, son ID, ses paramètres dynamiques et de forme, sa table de
+textures et chaque `TEX1` GX sont bornés et reliés. Un bloc inconnu, un doublon, un
+compte divergent ou une référence hors table ferme l'inspection.
+
 Quand le source exporté ne matérialise pas une relation de ressource, l'adaptateur
 peut analyser un ELF32 PowerPC big-endian lié. La plage de code est explicite ou
 réduite à l'unique section liée ; les adresses des API, le registre d'argument et les
