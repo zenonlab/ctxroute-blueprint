@@ -166,7 +166,9 @@ du factory J3D. Les enums et booléens GX invalides sont refusés. Les opératio
 stages TEV sont également résolues : ordre texture/raster, entrées couleur et alpha,
 opération, bias, scale, clamp, registre de sortie, sélections konst, couleurs signées
 et tables de swap. Les valeurs source et les fallbacks J3D restent distincts. Le fog
-et l'indirect texturing ne sont pas encore qualifiés.
+conserve type, distances, couleur et table d'ajustement. L'indirect texturing conserve
+ordres, scales, matrices et état par stage TEV. Les flottants, capacités, enums et
+booléens de ces deux blocs sont bornés comme le reste du matériau.
 
 Le lecteur DZB conserve sommets, triangles, propriétés, blocs, arbre spatial et
 hiérarchie de groupes en repère source. Il vérifie chaque référence croisée, les noms,

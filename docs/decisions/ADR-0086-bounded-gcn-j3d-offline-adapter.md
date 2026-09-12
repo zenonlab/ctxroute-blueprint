@@ -106,6 +106,10 @@ J3D. Les domaines GX et la plage signée 10 bits sont vérifiés avant publicati
 Le lecteur de modèle appelle ces mêmes parseurs sur ses sections MAT3 et TEX1 puis
 contrôle chaque binding contre la table de textures embarquée. Une table `texNo`
 absente n'est acceptée que si tous les slots source portent la sentinelle d'absence.
+Le fog matérialise type, ajustement de portée, distances, couleur et table de dix
+coefficients. Le bloc indirect conserve activation, ordres texture, échelles,
+matrices 2×3, exposant et paramètres de chaque stage TEV. Il suit l'index logique du
+matériau utilisé par le factory, indépendamment du remap des données d'initialisation.
 
 La collision DZB reste une famille indépendante du mesh rendu. Son lecteur préserve
 les six tables sources — sommets, triangles, blocs, arbre, groupes et propriétés —,

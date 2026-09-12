@@ -309,7 +309,11 @@ textures et 814 stages TEV supplémentaires. Cette passe a aussi confirmé deux
 conventions source : `texNo` peut être absent quand tous les slots sont sentinelles,
 et `mipmapEnabled` peut différer du nombre de niveaux stockés. Au total, les BMT et
 modèles couvrent donc 347 matériaux, 664 textures et 859 stages TEV. Le fog et
-l'indirect texturing restent les deux blocs matériau non résolus.
+l'indirect texturing sont ensuite résolus sur le même ensemble : 270 matériaux
+utilisent un fog linéaire, 77 aucun fog, et 28 activent un stage texture indirect
+relié à 82 stages TEV. Aucun enum, flottant ou index inconnu ne subsiste dans ces
+MAT3. La fermeture du pipeline matériau ne remplace toutefois pas le graphe de
+dépendances : le ledger reste `partial` jusqu'à sa reconstruction avec ces reçus.
 
 Les 25 DZB de cette fermeture acteur passent ensuite le lecteur de collision : 2 808
 sommets, 4 204 triangles et 129 groupes, avec références de propriétés et arbres
@@ -327,8 +331,9 @@ L'analyse des 185 appels PowerPC aux deux surcharges de chargement, complétée 
 tables et appelants source des cinq indices dynamiques, prouve toutefois qu'aucune des
 deux n'est référencée par les racines sélectionnées. Elles restent non converties et
 sont classées `not_applicable` : les 575 payloads sont ainsi classifiés, 573 par
-inspection et 2 par exclusion sourcée. La dépendance transitive reste fermée tant que
-le fog et l'indirect texturing nécessaires au rendu ne sont pas qualifiés.
+inspection et 2 par exclusion sourcée. Le pipeline matériau de ce sous-corpus est
+qualifié structurellement, mais la dépendance transitive reste fermée tant que le
+graphe global du ledger n'est pas reconstruit avec zéro référence non résolue.
 
 Un essai isolé Blender 5.0.1 + J3DBlend a correctement révélé la structure générale,
 mais il est rejeté comme convertisseur : extraction de textures indisponible sur

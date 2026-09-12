@@ -394,6 +394,8 @@ pub struct J3dMaterialEntry {
     pub depth: J3dDepth,
     pub z_compare_before_texture: bool,
     pub dither: bool,
+    pub fog: J3dFog,
+    pub indirect: J3dIndirect,
     pub texture_bindings: Vec<J3dTextureBinding>,
     pub tev_colors: Vec<J3dTevColor>,
     pub tev_konst_colors: Vec<J3dTevKonstColor>,
@@ -425,6 +427,53 @@ pub struct J3dDepth {
     pub compare_enabled: bool,
     pub function: &'static str,
     pub update_enabled: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dFog {
+    pub source_index: Option<u16>,
+    pub fog_type: &'static str,
+    pub range_adjustment_enabled: bool,
+    pub center: u16,
+    pub start_z: f32,
+    pub end_z: f32,
+    pub near_z: f32,
+    pub far_z: f32,
+    pub color: [u8; 4],
+    pub adjustment_table: [u16; 10],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dIndirect {
+    pub source_present: bool,
+    pub enabled: bool,
+    pub texture_stages: Vec<J3dIndirectTextureStage>,
+    pub tev_stages: Vec<J3dIndirectTevStage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dIndirectTextureStage {
+    pub stage: u8,
+    pub texture_coordinate: u8,
+    pub texture_map: u8,
+    pub scale_s: &'static str,
+    pub scale_t: &'static str,
+    pub matrix: [[f32; 3]; 2],
+    pub matrix_scale_exponent: i8,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dIndirectTevStage {
+    pub tev_stage: u8,
+    pub indirect_stage: u8,
+    pub format: &'static str,
+    pub bias: &'static str,
+    pub matrix: &'static str,
+    pub wrap_s: &'static str,
+    pub wrap_t: &'static str,
+    pub add_previous: bool,
+    pub unmodified_lod: bool,
+    pub alpha_selection: &'static str,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -948,7 +997,7 @@ pub fn parse_j3d_material_table(bytes: &[u8]) -> Result<J3dMaterialTableReport> 
         }
     }
     Ok(J3dMaterialTableReport {
-        format: "orbite.j3d-material-table-index/3",
+        format: "orbite.j3d-material-table-index/4",
         adapter: "gcn.j3d-material-table",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -974,6 +1023,7 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
     let init_offset = read_u32(section, 0x0c)? as usize;
     let ids_offset = read_u32(section, 0x10)? as usize;
     let names_offset = read_u32(section, 0x14)? as usize;
+    let indirect_init_offset = read_u32(section, 0x18)? as usize;
     ensure_counted_span(section, ids_offset, material_count, 2, "MAT3 material IDs")?;
     let names = parse_name_table(section, names_offset, material_count, "MAT3")?;
     let mut material_ids = Vec::with_capacity(material_count);
@@ -1005,6 +1055,7 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
     let tev_stage_offset = read_u32(section, 0x5c)? as usize;
     let tev_swap_mode_offset = read_u32(section, 0x60)? as usize;
     let tev_swap_table_offset = read_u32(section, 0x64)? as usize;
+    let fog_offset = read_u32(section, 0x68)? as usize;
     let alpha_compare_offset = read_u32(section, 0x6c)? as usize;
     let blend_offset = read_u32(section, 0x70)? as usize;
     let z_mode_offset = read_u32(section, 0x74)? as usize;
@@ -1077,6 +1128,8 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
             "Z compare location",
         )?;
         let dither = mat3_indexed_bool(section, dither_offset, dither_index, true, "dither")?;
+        let fog = mat3_fog(section, fog_offset, fog_index)?;
+        let indirect = mat3_indirect(section, indirect_init_offset, index, allocated_tev_stages)?;
         let tev_colors = (0..4)
             .map(|register| {
                 let source_index = read_u16(section, init + 0xdc + register * 2)?;
@@ -1135,6 +1188,8 @@ fn parse_mat3(section: &[u8]) -> Result<Vec<J3dMaterialEntry>> {
             depth,
             z_compare_before_texture,
             dither,
+            fog,
+            indirect,
             texture_bindings,
             tev_colors,
             tev_konst_colors,
@@ -1176,6 +1231,233 @@ fn mat3_tev_color(
         register: u8::try_from(register)?,
         source_index,
         rgba_s10,
+    })
+}
+
+fn mat3_fog(section: &[u8], table_offset: usize, index: u16) -> Result<J3dFog> {
+    let source_index = (index != u16::MAX).then_some(index);
+    let mut fog = if let Some(index) = source_index {
+        let count = mat3_table_count(section, table_offset, 0x2c)?;
+        ensure!(usize::from(index) < count, "MAT3 fog index exceeds table");
+        let offset = table_offset + usize::from(index) * 0x2c;
+        let range_adjustment = section[offset + 1];
+        ensure!(
+            range_adjustment <= 1,
+            "MAT3 fog range adjustment is not a GX boolean"
+        );
+        let mut adjustment_table = [0_u16; 10];
+        for (entry, value) in adjustment_table.iter_mut().enumerate() {
+            *value = read_u16(section, offset + 0x18 + entry * 2)?;
+        }
+        J3dFog {
+            source_index,
+            fog_type: gx_fog_type(section[offset])?,
+            range_adjustment_enabled: range_adjustment != 0,
+            center: read_u16(section, offset + 2)?,
+            start_z: read_f32(section, offset + 4)?,
+            end_z: read_f32(section, offset + 8)?,
+            near_z: read_f32(section, offset + 0x0c)?,
+            far_z: read_f32(section, offset + 0x10)?,
+            color: section[offset + 0x14..offset + 0x18].try_into()?,
+            adjustment_table,
+        }
+    } else {
+        J3dFog {
+            source_index,
+            fog_type: "none",
+            range_adjustment_enabled: false,
+            center: 0x140,
+            start_z: 0.0,
+            end_z: 0.0,
+            near_z: 0.1,
+            far_z: 10_000.0,
+            color: [u8::MAX, u8::MAX, u8::MAX, 0],
+            adjustment_table: [0; 10],
+        }
+    };
+    for value in [
+        &mut fog.start_z,
+        &mut fog.end_z,
+        &mut fog.near_z,
+        &mut fog.far_z,
+    ] {
+        ensure!(value.is_finite(), "MAT3 fog distance is not finite");
+        if *value == 0.0 {
+            *value = 0.0;
+        }
+    }
+    Ok(fog)
+}
+
+fn mat3_indirect(
+    section: &[u8],
+    table_offset: usize,
+    material_index: usize,
+    tev_stage_count: u8,
+) -> Result<J3dIndirect> {
+    if table_offset == 0 {
+        return Ok(J3dIndirect {
+            source_present: false,
+            enabled: false,
+            texture_stages: Vec::new(),
+            tev_stages: Vec::new(),
+        });
+    }
+    ensure_counted_span(
+        section,
+        table_offset,
+        material_index + 1,
+        0x138,
+        "MAT3 indirect init records",
+    )?;
+    let offset = table_offset + material_index * 0x138;
+    let enabled = section[offset];
+    ensure!(
+        enabled <= 1,
+        "MAT3 indirect enabled flag is not a GX boolean"
+    );
+    if enabled == 0 {
+        return Ok(J3dIndirect {
+            source_present: true,
+            enabled: false,
+            texture_stages: Vec::new(),
+            tev_stages: Vec::new(),
+        });
+    }
+    let texture_stage_count = section[offset + 1];
+    ensure!(
+        texture_stage_count <= 3,
+        "MAT3 indirect texture stage count exceeds J3D capacity"
+    );
+    let texture_stages = (0..usize::from(texture_stage_count))
+        .map(|stage| mat3_indirect_texture_stage(section, offset, stage))
+        .collect::<Result<Vec<_>>>()?;
+    let tev_stages = (0..usize::from(tev_stage_count))
+        .map(|stage| mat3_indirect_tev_stage(section, offset, stage))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(J3dIndirect {
+        source_present: true,
+        enabled: true,
+        texture_stages,
+        tev_stages,
+    })
+}
+
+fn mat3_indirect_texture_stage(
+    section: &[u8],
+    init: usize,
+    stage: usize,
+) -> Result<J3dIndirectTextureStage> {
+    let order = init + 4 + stage * 4;
+    let texture_coordinate = section[order];
+    let texture_map = section[order + 1];
+    ensure!(
+        texture_coordinate < 8,
+        "MAT3 indirect texture coordinate exceeds GX capacity"
+    );
+    ensure!(
+        texture_map < 8,
+        "MAT3 indirect texture map exceeds GX capacity"
+    );
+    let matrix_offset = init + 0x14 + stage * 0x1c;
+    let mut matrix = [[0.0_f32; 3]; 2];
+    for (row, values) in matrix.iter_mut().enumerate() {
+        for (column, value) in values.iter_mut().enumerate() {
+            *value = read_f32(section, matrix_offset + (row * 3 + column) * 4)?;
+            ensure!(
+                value.is_finite(),
+                "MAT3 indirect matrix value is not finite"
+            );
+            if *value == 0.0 {
+                *value = 0.0;
+            }
+        }
+    }
+    let scale_offset = init + 0x68 + stage * 4;
+    Ok(J3dIndirectTextureStage {
+        stage: u8::try_from(stage)?,
+        texture_coordinate,
+        texture_map,
+        scale_s: gx_indirect_scale(section[scale_offset])?,
+        scale_t: gx_indirect_scale(section[scale_offset + 1])?,
+        matrix,
+        matrix_scale_exponent: section[matrix_offset + 0x18] as i8,
+    })
+}
+
+fn mat3_indirect_tev_stage(
+    section: &[u8],
+    init: usize,
+    stage: usize,
+) -> Result<J3dIndirectTevStage> {
+    let offset = init + 0x78 + stage * 0x0c;
+    ensure!(
+        section[offset] < 4,
+        "MAT3 indirect stage exceeds GX capacity"
+    );
+    ensure!(
+        section[offset + 1] < 4,
+        "MAT3 indirect format exceeds GX capacity"
+    );
+    ensure!(
+        section[offset + 2] < 8,
+        "MAT3 indirect bias exceeds GX capacity"
+    );
+    ensure!(
+        section[offset + 3] < 12,
+        "MAT3 indirect matrix selector exceeds GX capacity"
+    );
+    ensure!(
+        section[offset + 4] < 7 && section[offset + 5] < 7,
+        "MAT3 indirect wrap exceeds GX capacity"
+    );
+    ensure!(
+        section[offset + 6] <= 1 && section[offset + 7] <= 1,
+        "MAT3 indirect flags are not GX booleans"
+    );
+    ensure!(
+        section[offset + 8] < 4,
+        "MAT3 indirect alpha selection exceeds GX capacity"
+    );
+    Ok(J3dIndirectTevStage {
+        tev_stage: u8::try_from(stage)?,
+        indirect_stage: section[offset],
+        format: ["8-bit", "5-bit", "4-bit", "3-bit"][usize::from(section[offset + 1])],
+        bias: ["none", "s", "t", "st", "u", "su", "tu", "stu"][usize::from(section[offset + 2])],
+        matrix: [
+            "off", "matrix-0", "matrix-1", "matrix-2", "matrix-3", "s-0", "s-1", "s-2", "s-3",
+            "t-0", "t-1", "t-2",
+        ][usize::from(section[offset + 3])],
+        wrap_s: ["off", "256", "128", "64", "32", "16", "zero"][usize::from(section[offset + 4])],
+        wrap_t: ["off", "256", "128", "64", "32", "16", "zero"][usize::from(section[offset + 5])],
+        add_previous: section[offset + 6] != 0,
+        unmodified_lod: section[offset + 7] != 0,
+        alpha_selection: ["off", "s", "t", "u"][usize::from(section[offset + 8])],
+    })
+}
+
+fn gx_indirect_scale(value: u8) -> Result<&'static str> {
+    const VALUES: [&str; 9] = ["1", "2", "4", "8", "16", "32", "64", "128", "256"];
+    VALUES
+        .get(usize::from(value))
+        .copied()
+        .context("MAT3 indirect scale exceeds GXIndTexScale")
+}
+
+fn gx_fog_type(value: u8) -> Result<&'static str> {
+    Ok(match value {
+        0 => "none",
+        2 => "perspective-linear",
+        4 => "perspective-exponential",
+        5 => "perspective-exponential-squared",
+        6 => "perspective-reverse-exponential",
+        7 => "perspective-reverse-exponential-squared",
+        10 => "orthographic-linear",
+        12 => "orthographic-exponential",
+        13 => "orthographic-exponential-squared",
+        14 => "orthographic-reverse-exponential",
+        15 => "orthographic-reverse-exponential-squared",
+        _ => bail!("MAT3 fog type is outside GXFogType"),
     })
 }
 
@@ -3242,7 +3524,7 @@ pub fn parse_j3d_model(bytes: &[u8]) -> Result<J3dModelReport> {
         winding: "preserve",
     };
     Ok(J3dModelReport {
-        format: "orbite.j3d-model-index/2",
+        format: "orbite.j3d-model-index/3",
         adapter: "gcn.j3d",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -3970,7 +4252,7 @@ mod tests {
     }
 
     fn fixture_bmt(include_texture: bool) -> Vec<u8> {
-        let mat_size = 0x260_usize;
+        let mat_size = 0x3a0_usize;
         let tex_size = if include_texture { 0x90 } else { 0 };
         let size = 0x20 + mat_size + tex_size;
         let mut bytes = vec![0_u8; size];
@@ -3985,6 +4267,7 @@ mod tests {
             (0x0c, 0x84_u32),
             (0x10, 0x1d0),
             (0x14, 0x1d4),
+            (0x18, 0x268),
             (0x1c, 0x1e8),
             (0x34, 0x1ec),
             (0x48, 0x1e4),
@@ -3995,6 +4278,7 @@ mod tests {
             (0x5c, 0x220),
             (0x60, 0x234),
             (0x64, 0x238),
+            (0x68, 0x23c),
             (0x6c, 0x1f8),
             (0x70, 0x200),
             (0x74, 0x204),
@@ -4027,6 +4311,34 @@ mod tests {
         ]);
         bytes[mat + 0x234..mat + 0x238].copy_from_slice(&[3, 2, 0, 0]);
         bytes[mat + 0x238..mat + 0x23c].copy_from_slice(&[3, 2, 1, 0]);
+        bytes[mat + 0x23c..mat + 0x240].copy_from_slice(&[2, 1, 1, 65]);
+        for (offset, value) in [
+            (0x240, 1.5_f32),
+            (0x244, 20.0),
+            (0x248, 0.25),
+            (0x24c, 100.0),
+        ] {
+            bytes[mat + offset..mat + offset + 4].copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+        bytes[mat + 0x250..mat + 0x254].copy_from_slice(&[10, 20, 30, 40]);
+        for entry in 0..10 {
+            bytes[mat + 0x254 + entry * 2..mat + 0x256 + entry * 2]
+                .copy_from_slice(&(u16::try_from(entry).unwrap() * 17).to_be_bytes());
+        }
+        let indirect = mat + 0x268;
+        bytes[indirect] = 1;
+        bytes[indirect + 1] = 1;
+        bytes[indirect + 4..indirect + 8].copy_from_slice(&[3, 2, 0, 0]);
+        for (entry, value) in [1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0].into_iter().enumerate() {
+            bytes[indirect + 0x14 + entry * 4..indirect + 0x18 + entry * 4]
+                .copy_from_slice(&value.to_bits().to_be_bytes());
+        }
+        bytes[indirect + 0x2c] = (-2_i8) as u8;
+        bytes[indirect + 0x68..indirect + 0x6c].copy_from_slice(&[2, 3, 0, 0]);
+        for stage in 0..3 {
+            let offset = indirect + 0x78 + stage * 0x0c;
+            bytes[offset..offset + 0x0c].copy_from_slice(&[0, 1, 3, 2, 4, 5, 1, 0, 2, 0, 0, 0]);
+        }
 
         if include_texture {
             let tex = mat + mat_size;
@@ -4429,6 +4741,22 @@ mod tests {
         assert!(!report.materials[0].depth.update_enabled);
         assert!(report.materials[0].z_compare_before_texture);
         assert!(!report.materials[0].dither);
+        assert_eq!(report.materials[0].fog.fog_type, "perspective-linear");
+        assert_eq!(report.materials[0].fog.center, 321);
+        assert_eq!(report.materials[0].fog.color, [10, 20, 30, 40]);
+        assert!(report.materials[0].indirect.enabled);
+        assert_eq!(report.materials[0].indirect.texture_stages.len(), 1);
+        assert_eq!(
+            report.materials[0].indirect.texture_stages[0].texture_coordinate,
+            3
+        );
+        assert_eq!(
+            report.materials[0].indirect.texture_stages[0].matrix[1],
+            [4.0, 5.0, 6.0]
+        );
+        assert_eq!(report.materials[0].indirect.tev_stages.len(), 3);
+        assert_eq!(report.materials[0].indirect.tev_stages[0].bias, "st");
+        assert!(report.materials[0].indirect.tev_stages[0].add_previous);
         assert_eq!(report.materials[0].tev_colors[0].rgba_s10, [1, -2, 3, -4]);
         assert_eq!(
             report.materials[0].tev_konst_colors[0].rgba,
@@ -4511,6 +4839,19 @@ mod tests {
         let mut bad_s10_color = fixture_bmt(true);
         bad_s10_color[0x20 + 0x214..0x20 + 0x216].copy_from_slice(&1024_i16.to_be_bytes());
         assert!(parse_j3d_material_table(&bad_s10_color).is_err());
+
+        let mut bad_fog = fixture_bmt(true);
+        bad_fog[0x20 + 0x23c] = 1;
+        assert!(parse_j3d_material_table(&bad_fog).is_err());
+
+        let mut bad_indirect_flag = fixture_bmt(true);
+        bad_indirect_flag[0x20 + 0x268] = 2;
+        assert!(parse_j3d_material_table(&bad_indirect_flag).is_err());
+
+        let mut bad_indirect_matrix = fixture_bmt(true);
+        bad_indirect_matrix[0x20 + 0x27c..0x20 + 0x280]
+            .copy_from_slice(&f32::NAN.to_bits().to_be_bytes());
+        assert!(parse_j3d_material_table(&bad_indirect_matrix).is_err());
     }
 
     #[test]
@@ -4525,6 +4866,9 @@ mod tests {
             bytes[mat + offset..mat + offset + 4].fill(0);
         }
         bytes[init + 0x146..init + 0x14a].fill(0xff);
+        bytes[init + 0x144..init + 0x146].fill(0xff);
+        bytes[mat + 0x18..mat + 0x1c].fill(0);
+        bytes[mat + 0x68..mat + 0x6c].fill(0);
         for range in [
             0x94..0x9c,
             0xbc..0xdc,
@@ -4553,6 +4897,9 @@ mod tests {
         assert_eq!(material.depth.function, "less-or-equal");
         assert!(!material.z_compare_before_texture);
         assert!(material.dither);
+        assert_eq!(material.fog.source_index, None);
+        assert_eq!(material.fog.near_z, 0.1);
+        assert!(!material.indirect.source_present);
         assert_eq!(material.tev_colors[0].rgba_s10, [0; 4]);
         assert_eq!(material.tev_konst_colors[0].rgba, [u8::MAX; 4]);
         assert_eq!(material.tev_swap_tables[0].rgba_sources, [0, 1, 2, 3]);
