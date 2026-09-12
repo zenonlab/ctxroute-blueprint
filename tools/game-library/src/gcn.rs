@@ -131,6 +131,24 @@ pub struct RarcFile {
     pub stored_sha256: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct J3dAnimationReport {
+    pub format: &'static str,
+    pub adapter: &'static str,
+    pub input_sha256: String,
+    pub input_bytes: usize,
+    pub magic: String,
+    pub track_family: &'static str,
+    pub source_playback: &'static str,
+    pub duration_frames: u16,
+    pub angle_multiplier: u8,
+    pub joints: usize,
+    pub scale_values: usize,
+    pub rotation_values: usize,
+    pub translation_values: usize,
+    pub root_translation_animated: [bool; 3],
+}
+
 pub fn inspect_stage(path: &Path) -> Result<StageIndexReport> {
     let metadata =
         fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
@@ -174,6 +192,158 @@ pub fn inspect_rarc(path: &Path) -> Result<RarcReport> {
     );
     let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
     parse_rarc(&bytes)
+}
+
+pub fn inspect_j3d_animation(path: &Path) -> Result<J3dAnimationReport> {
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("cannot inspect {}", path.display()))?;
+    ensure!(
+        metadata.file_type().is_file(),
+        "J3D animation input must be a regular file"
+    );
+    ensure!(
+        metadata.len() > 0 && metadata.len() <= MAX_J3D_BYTES as u64,
+        "J3D animation input exceeds the bounded size"
+    );
+    let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    parse_j3d_animation(&bytes)
+}
+
+pub fn parse_j3d_animation(bytes: &[u8]) -> Result<J3dAnimationReport> {
+    ensure!(
+        bytes.len() >= 0x44 && bytes.len() <= MAX_J3D_BYTES,
+        "J3D animation input exceeds the bounded size"
+    );
+    ensure!(
+        bytes.get(0..8) == Some(b"J3D1bck1"),
+        "unsupported J3D animation magic"
+    );
+    ensure!(
+        read_u32(bytes, 8)? as usize == bytes.len(),
+        "J3D animation declared size mismatch"
+    );
+    ensure!(
+        read_u32(bytes, 12)? == 1,
+        "BCK must contain exactly one section"
+    );
+    ensure!(
+        bytes.get(0x20..0x24) == Some(b"ANK1"),
+        "BCK is missing ANK1"
+    );
+    let section_size = read_u32(bytes, 0x24)? as usize;
+    ensure!(
+        0x20_usize
+            .checked_add(section_size)
+            .context("ANK1 span overflow")?
+            == bytes.len(),
+        "ANK1 size mismatch"
+    );
+    let playback = match bytes[0x28] {
+        0 => "oneshot",
+        1 => "oneshot-reset",
+        2 => "loop",
+        3 => "ping-pong-once",
+        4 => "ping-pong-loop",
+        value => bail!("unsupported BCK playback attribute {value}"),
+    };
+    let angle_multiplier = bytes[0x29];
+    let duration_frames = read_u16(bytes, 0x2a)?;
+    let joints = read_u16(bytes, 0x2c)? as usize;
+    let scale_values = read_u16(bytes, 0x2e)? as usize;
+    let rotation_values = read_u16(bytes, 0x30)? as usize;
+    let translation_values = read_u16(bytes, 0x32)? as usize;
+    ensure!(
+        joints <= MAX_RECORDS_PER_CHUNK,
+        "BCK joint count exceeds the limit"
+    );
+    for count in [scale_values, rotation_values, translation_values] {
+        ensure!(count <= MAX_J3D_VALUES, "BCK value count exceeds the limit");
+    }
+    let joint_offset = 0x20 + read_u32(bytes, 0x34)? as usize;
+    let scale_offset = 0x20 + read_u32(bytes, 0x38)? as usize;
+    let rotation_offset = 0x20 + read_u32(bytes, 0x3c)? as usize;
+    let translation_offset = 0x20 + read_u32(bytes, 0x40)? as usize;
+    ensure_span(bytes, joint_offset, joints, 0x36, "BCK joint tracks")?;
+    ensure_span(bytes, scale_offset, scale_values, 4, "BCK scale values")?;
+    ensure_span(
+        bytes,
+        rotation_offset,
+        rotation_values,
+        2,
+        "BCK rotation values",
+    )?;
+    ensure_span(
+        bytes,
+        translation_offset,
+        translation_values,
+        4,
+        "BCK translation values",
+    )?;
+
+    let mut root_translation_animated = [false; 3];
+    if joints > 0 {
+        for (axis, animated) in root_translation_animated.iter_mut().enumerate() {
+            let index = joint_offset + axis * 0x12 + 0x0c;
+            let count = read_u16(bytes, index)? as usize;
+            let first = read_u16(bytes, index + 2)? as usize;
+            let tangent = read_u16(bytes, index + 4)?;
+            validate_bck_track(count, first, tangent, translation_values)?;
+            *animated = count > 1;
+        }
+    }
+    for joint in 0..joints {
+        for axis in 0..3 {
+            for (component, available) in [scale_values, rotation_values, translation_values]
+                .into_iter()
+                .enumerate()
+            {
+                let index = joint_offset + joint * 0x36 + axis * 0x12 + component * 6;
+                validate_bck_track(
+                    read_u16(bytes, index)? as usize,
+                    read_u16(bytes, index + 2)? as usize,
+                    read_u16(bytes, index + 4)?,
+                    available,
+                )?;
+            }
+        }
+    }
+    Ok(J3dAnimationReport {
+        format: "orbite.j3d-animation-index/1",
+        adapter: "gcn.j3d-animation",
+        input_sha256: hex::encode(Sha256::digest(bytes)),
+        input_bytes: bytes.len(),
+        magic: "J3D1bck1".into(),
+        track_family: "skeletal-transform-key",
+        source_playback: playback,
+        duration_frames,
+        angle_multiplier,
+        joints,
+        scale_values,
+        rotation_values,
+        translation_values,
+        root_translation_animated,
+    })
+}
+
+fn validate_bck_track(count: usize, first: usize, tangent: u16, available: usize) -> Result<()> {
+    ensure!(count > 0, "empty BCK component track");
+    ensure!(matches!(tangent, 0 | 1), "unsupported BCK tangent mode");
+    let stride = if count == 1 {
+        1
+    } else if tangent == 0 {
+        3
+    } else {
+        4
+    };
+    let required = first
+        .checked_add(
+            count
+                .checked_mul(stride)
+                .context("BCK track span overflow")?,
+        )
+        .context("BCK track span overflow")?;
+    ensure!(required <= available, "BCK track exceeds value table");
+    Ok(())
 }
 
 pub fn parse_rarc(bytes: &[u8]) -> Result<RarcReport> {
@@ -1010,6 +1180,35 @@ mod tests {
         bytes
     }
 
+    fn fixture_bck() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0xe0];
+        bytes[0..8].copy_from_slice(b"J3D1bck1");
+        bytes[8..12].copy_from_slice(&0xe0_u32.to_be_bytes());
+        bytes[12..16].copy_from_slice(&1_u32.to_be_bytes());
+        bytes[0x20..0x24].copy_from_slice(b"ANK1");
+        bytes[0x24..0x28].copy_from_slice(&0xc0_u32.to_be_bytes());
+        bytes[0x28] = 2;
+        bytes[0x29] = 1;
+        bytes[0x2a..0x2c].copy_from_slice(&30_u16.to_be_bytes());
+        bytes[0x2c..0x2e].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x2e..0x30].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x30..0x32].copy_from_slice(&1_u16.to_be_bytes());
+        bytes[0x32..0x34].copy_from_slice(&7_u16.to_be_bytes());
+        for (offset, value) in [(0x34, 0x40_u32), (0x38, 0x80), (0x3c, 0x90), (0x40, 0xa0)] {
+            bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+        }
+        for component in 0..9 {
+            let offset = 0x60 + component * 6;
+            bytes[offset..offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        }
+        bytes[0x60 + 0x0c..0x60 + 0x0e].copy_from_slice(&2_u16.to_be_bytes());
+        for axis in 1..3 {
+            let offset = 0x60 + axis * 0x12 + 0x0c;
+            bytes[offset + 2..offset + 4].copy_from_slice(&6_u16.to_be_bytes());
+        }
+        bytes
+    }
+
     fn write_rarc_entry(
         bytes: &mut [u8],
         offset: usize,
@@ -1110,5 +1309,38 @@ mod tests {
         let mut invalid_directory = fixture_rarc();
         invalid_directory[0x68..0x6c].copy_from_slice(&99_u32.to_be_bytes());
         assert!(parse_rarc(&invalid_directory).is_err());
+    }
+
+    #[test]
+    fn inventories_bck_source_playback_and_root_motion_channels() {
+        let report = parse_j3d_animation(&fixture_bck()).unwrap();
+        assert_eq!(report.source_playback, "loop");
+        assert_eq!(report.duration_frames, 30);
+        assert_eq!(report.joints, 1);
+        assert_eq!(report.root_translation_animated, [true, false, false]);
+    }
+
+    #[test]
+    fn rejects_bck_tracks_outside_their_value_table() {
+        let mut bytes = fixture_bck();
+        bytes[0x60 + 0x0e..0x60 + 0x10].copy_from_slice(&99_u16.to_be_bytes());
+        assert!(parse_j3d_animation(&bytes).is_err());
+    }
+
+    #[test]
+    fn preserves_a_source_authored_zero_duration_pose() {
+        let mut bytes = fixture_bck();
+        bytes[0x28] = 0;
+        bytes[0x2a..0x2c].copy_from_slice(&0_u16.to_be_bytes());
+        let report = parse_j3d_animation(&bytes).unwrap();
+        assert_eq!(report.source_playback, "oneshot");
+        assert_eq!(report.duration_frames, 0);
+    }
+
+    #[test]
+    fn rejects_an_unknown_bck_playback_attribute() {
+        let mut bytes = fixture_bck();
+        bytes[0x28] = 5;
+        assert!(parse_j3d_animation(&bytes).is_err());
     }
 }

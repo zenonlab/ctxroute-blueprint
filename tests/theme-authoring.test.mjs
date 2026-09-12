@@ -212,6 +212,27 @@ test('animation semantics reject guessed loops and ambiguous motion ownership', 
   await assert.rejects(verifyAnimationSemantics(path), /loop requires repeat_start_tick/);
 });
 
+test('animation semantics accept a source-authored zero-duration static pose', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'orbite-animation-static-pose-'));
+  const source = JSON.parse(await readFile('docs/templates/animation-semantics.example.json', 'utf8'));
+  const pose = source.clips[1];
+  pose.timing.end_tick = 0;
+  pose.probes[1].tick = 0;
+  pose.playback.completion = 'hold';
+  source.transitions = source.transitions.filter(transition => transition.from_clip_id !== pose.id);
+  const path = join(root, 'animations.json');
+  await writeFile(path, JSON.stringify(source));
+
+  const result = await verifyAnimationSemantics(path, ['format-doc', 'local-index']);
+  assert.equal(result.ok, true);
+
+  pose.playback.mode = 'loop';
+  pose.playback.repeat_start_tick = 0;
+  pose.playback.completion = 'not_applicable';
+  await writeFile(path, JSON.stringify(source));
+  await assert.rejects(verifyAnimationSemantics(path, ['format-doc', 'local-index']), /non-empty sample domain/);
+});
+
 test('authoring run rejects premature activation and a fake witness scene', async () => {
   const first = await authoringFixture();
   const { path, sha256 } = first.document.gates[0].evidence;

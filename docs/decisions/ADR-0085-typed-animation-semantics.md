@@ -8,6 +8,7 @@ scope:
   - docs/architecture/src/game-transformation.architecture.json
   - .agents/skills/game-theme-author/
 review: on-change
+revised: true
 ---
 # ADR-0085 — Sémantique d’animation typée avant conversion
 
@@ -30,6 +31,11 @@ Chaque campagne d’adaptation lie son ledger par SHA-256 à un manifeste
 famille de cible, identités source, timebase rationnelle, domaine d’échantillonnage,
 politique de borne, mode de lecture, point de répétition, propriétaire unique du
 mouvement, événements, transitions et preuves déterministes.
+
+Le domaine peut contenir une seule pose avec `start_tick == end_tick` lorsqu'une
+source fournit explicitement une animation non bouclée de durée zéro. Une boucle
+conserve obligatoirement un domaine non vide ; le pipeline ne fabrique jamais une
+frame supplémentaire pour contourner cette différence.
 
 Une boucle qualifiée exige quatre sondes (`start`, `repeat_start`, `pre_end`,
 `post_wrap`) et des écarts mesurés inférieurs aux limites déclarées. Un clip non

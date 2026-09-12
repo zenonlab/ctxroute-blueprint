@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use wallpaper_game_library::{
     IndexOptions,
-    gcn::{inspect_j3d_model, inspect_rarc, inspect_stage},
+    gcn::{inspect_j3d_animation, inspect_j3d_model, inspect_rarc, inspect_stage},
     index_library,
     mkw::{compile_effect_pack, extract_course, inspect_effect_catalog},
     verify_library,
@@ -72,6 +72,10 @@ enum Command {
         input: PathBuf,
     },
     InspectRarc {
+        #[arg(long)]
+        input: PathBuf,
+    },
+    InspectJ3dAnimation {
         #[arg(long)]
         input: PathBuf,
     },
@@ -146,6 +150,10 @@ fn main() -> Result<()> {
         }
         Command::InspectRarc { input } => {
             let result = inspect_rarc(&input)?;
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Command::InspectJ3dAnimation { input } => {
+            let result = inspect_j3d_animation(&input)?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
     }

@@ -73,9 +73,19 @@ cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
 
 cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
   inspect-rarc --input private/source/archive.arc
+
+cargo run --release --manifest-path tools/game-library/Cargo.toml -- \
+  inspect-j3d-animation --input private/source/animation.bck
 ```
 
 L'inspection RARC reconstruit l'arbre logique, calcule l'empreinte de chaque payload
 et expose les drapeaux de compression sans matérialiser les fichiers. Les noms avec
 traversée, les cycles, les plages hors limites et les cardinalités excessives sont
 refusés.
+
+L'inspection d'animation lit actuellement les pistes squelettiques BCK/ANK1. Elle
+conserve l'attribut de lecture source, la durée — y compris une pose statique de
+durée zéro —, le nombre de joints, les cardinalités des tables et les axes de
+translation animés du joint racine. Elle contrôle chaque index et mode de tangente,
+mais ne décide ni d'une transition ni du propriétaire du mouvement global : ces
+deux relations doivent être prouvées par le contrôleur source.

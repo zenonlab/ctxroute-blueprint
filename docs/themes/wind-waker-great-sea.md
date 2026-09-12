@@ -314,6 +314,24 @@ emploient respectivement `ship_jump1` et `ship_jump2`. Le mode de lecture vient 
 l'attribut BCK transmis au contrôleur de frames : aucun nom de clip ne suffit pour
 décider qu'il boucle.
 
+La lecture bornée des trois BCK ferme maintenant leurs métadonnées brutes :
+`voyage1` est une boucle de 40 frames, `ship_jump1` une pose statique one-shot de
+durée zéro et `ship_jump2` un atterrissage one-shot de 15 frames. Les trois ciblent
+42 joints. Le joint racine possède une translation Y animée dans `voyage1`, X/Y
+dans `ship_jump2` et aucune piste de translation animée dans `ship_jump1` ; ces
+canaux restent locaux au squelette tant que leur échantillonnage n'a pas prouvé une
+autre propriété. Le contrat accepte donc explicitement les poses source de durée
+zéro au lieu de fabriquer une frame ou une boucle.
+
+Le contrôleur confirme la causalité du saut. En navigation normale, `voyage1`
+réagit au vent, à la vitesse et à l'angle de barre. Le bateau n'arme le saut qu'en
+mode voile, hors vol et hors contrôle forcé, avec une vitesse avant supérieure à
+16,5 et une puissance de vent d'au moins 11 ; l'action dédiée déclenche ensuite
+l'état `JUMP`. Cet état sélectionne `ship_jump1`. Le contact avec la hauteur d'eau
+déclenche `LAND`, sélectionne `ship_jump2`, puis le contrôleur tient la fin tant que
+le bateau vole ou revient vers `voyage1` une fois posé. Une simple oscillation de
+la mer ne peut donc jamais devenir un saut.
+
 Les effets du bateau sont eux aussi conditionnels et asymétriques. Le code source
 arrête sillage, vagues et éclaboussures lorsque le bateau vole au-dessus de l'eau ou
 n'avance plus. Les deux vagues apparaissent seulement au-delà des seuils de vitesse,

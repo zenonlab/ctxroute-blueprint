@@ -47,8 +47,9 @@ export async function verifyAnimationSemantics(path, allowedEvidenceIds = null) 
   for (const clip of document.clips) {
     knownEvidence(clip.evidence_ids, evidence, clip.id);
     const { start_tick: start, end_tick: end } = clip.timing;
-    if (end <= start) throw new Error(`${clip.id} end_tick must be greater than start_tick`);
     const looping = LOOP_MODES.has(clip.playback.mode);
+    if (end < start) throw new Error(`${clip.id} end_tick must not precede start_tick`);
+    if (looping && end === start) throw new Error(`${clip.id} loop requires a non-empty sample domain`);
     const repeat = clip.playback.repeat_start_tick;
     if (looping && (repeat === null || repeat < start || repeat >= end)) {
       throw new Error(`${clip.id} loop requires repeat_start_tick inside its sample domain`);
