@@ -30,6 +30,9 @@ pub struct StageIndexReport {
     pub chunks: Vec<StageChunk>,
     pub actors: Vec<ActorPlacement>,
     pub sounds: Vec<SoundPlacement>,
+    pub environments: Vec<StageEnvironmentSelection>,
+    pub palette_selections: Vec<StagePaletteSelection>,
+    pub palettes: Vec<StagePalette>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -57,6 +60,33 @@ pub struct SoundPlacement {
     pub resource_id: String,
     pub source_position: [f32; 3],
     pub parameters: [u8; 7],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StageEnvironmentSelection {
+    pub palette_selection_ids: [u8; 8],
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StagePaletteSelection {
+    pub palette_ids: [u8; 8],
+    pub change_rate: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StagePalette {
+    pub actor_color: StageColorPair,
+    pub background_colors: [StageColorPair; 4],
+    pub fog_color: [u8; 3],
+    pub virtual_index: u8,
+    pub fog_start: f32,
+    pub fog_end: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StageColorPair {
+    pub color: [u8; 3],
+    pub konst: [u8; 3],
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -4292,6 +4322,9 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
     let mut chunks = Vec::with_capacity(chunk_count);
     let mut actors = Vec::new();
     let mut sounds = Vec::new();
+    let mut environments = Vec::new();
+    let mut palette_selections = Vec::new();
+    let mut palettes = Vec::new();
     for index in 0..chunk_count {
         let header = 4 + index * 12;
         let tag = read_tag(bytes, header)?;
@@ -4325,6 +4358,31 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
                     sounds.push(parse_sound(bytes, offset + record * stride)?);
                 }
             }
+            RecordKind::EnvironmentSelection => {
+                let stride = 0x08;
+                ensure_span(bytes, offset, records, stride, &tag)?;
+                for record in 0..records {
+                    environments.push(parse_environment_selection(
+                        bytes,
+                        offset + record * stride,
+                    )?);
+                }
+            }
+            RecordKind::PaletteSelection => {
+                let stride = 0x0c;
+                ensure_span(bytes, offset, records, stride, &tag)?;
+                for record in 0..records {
+                    palette_selections
+                        .push(parse_palette_selection(bytes, offset + record * stride)?);
+                }
+            }
+            RecordKind::Palette => {
+                let stride = 0x2c;
+                ensure_span(bytes, offset, records, stride, &tag)?;
+                for record in 0..records {
+                    palettes.push(parse_stage_palette(bytes, offset + record * stride)?);
+                }
+            }
             RecordKind::Other => {}
         }
         chunks.push(StageChunk {
@@ -4336,7 +4394,7 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
     }
 
     Ok(StageIndexReport {
-        format: "orbite.gcn-stage-index/1",
+        format: "orbite.gcn-stage-index/2",
         adapter: "gcn.stage",
         input_sha256: hex::encode(Sha256::digest(bytes)),
         input_bytes: bytes.len(),
@@ -4345,6 +4403,9 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
         chunks,
         actors,
         sounds,
+        environments,
+        palette_selections,
+        palettes,
     })
 }
 
@@ -4352,6 +4413,9 @@ pub fn parse_stage(bytes: &[u8]) -> Result<StageIndexReport> {
 enum RecordKind {
     Actor { scaled: bool, layer: Option<u8> },
     Sound,
+    EnvironmentSelection,
+    PaletteSelection,
+    Palette,
     Other,
 }
 
@@ -4361,6 +4425,9 @@ impl RecordKind {
             Self::Actor { scaled: false, .. } => "actor",
             Self::Actor { scaled: true, .. } => "scaled_actor",
             Self::Sound => "sound",
+            Self::EnvironmentSelection => "environment_selection",
+            Self::PaletteSelection => "palette_selection",
+            Self::Palette => "palette",
             Self::Other => "opaque",
         }
     }
@@ -4394,7 +4461,62 @@ fn record_kind(tag: &str) -> RecordKind {
     if tag == "SOND" {
         return RecordKind::Sound;
     }
+    if tag == "EnvR" {
+        return RecordKind::EnvironmentSelection;
+    }
+    if tag == "Colo" {
+        return RecordKind::PaletteSelection;
+    }
+    if tag == "Pale" {
+        return RecordKind::Palette;
+    }
     RecordKind::Other
+}
+
+fn parse_environment_selection(bytes: &[u8], offset: usize) -> Result<StageEnvironmentSelection> {
+    Ok(StageEnvironmentSelection {
+        palette_selection_ids: read_u8_array(bytes, offset)?,
+    })
+}
+
+fn parse_palette_selection(bytes: &[u8], offset: usize) -> Result<StagePaletteSelection> {
+    Ok(StagePaletteSelection {
+        palette_ids: read_u8_array(bytes, offset)?,
+        change_rate: read_f32(bytes, offset + 8)?,
+    })
+}
+
+fn parse_stage_palette(bytes: &[u8], offset: usize) -> Result<StagePalette> {
+    let pair = |pair_offset| -> Result<StageColorPair> {
+        Ok(StageColorPair {
+            color: read_rgb(bytes, pair_offset)?,
+            konst: read_rgb(bytes, pair_offset + 3)?,
+        })
+    };
+    Ok(StagePalette {
+        actor_color: pair(offset)?,
+        background_colors: [
+            pair(offset + 6)?,
+            pair(offset + 12)?,
+            pair(offset + 18)?,
+            pair(offset + 24)?,
+        ],
+        fog_color: read_rgb(bytes, offset + 30)?,
+        virtual_index: *bytes.get(offset + 33).context("truncated stage palette")?,
+        fog_start: read_f32(bytes, offset + 36)?,
+        fog_end: read_f32(bytes, offset + 40)?,
+    })
+}
+
+fn read_u8_array<const N: usize>(bytes: &[u8], offset: usize) -> Result<[u8; N]> {
+    Ok(bytes
+        .get(offset..offset + N)
+        .context("truncated byte array")?
+        .try_into()?)
+}
+
+fn read_rgb(bytes: &[u8], offset: usize) -> Result<[u8; 3]> {
+    read_u8_array(bytes, offset)
 }
 
 fn layered_tag(tag: &str, prefix: &str) -> Option<u8> {
@@ -4547,6 +4669,33 @@ pub(crate) mod tests {
                 .copy_from_slice(&value.to_bits().to_be_bytes());
         }
         bytes[0x80..0x87].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7]);
+        bytes
+    }
+
+    fn fixture_stage_environment() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 0x70];
+        bytes[0..4].copy_from_slice(&3_u32.to_be_bytes());
+        for (index, (tag, offset)) in [
+            (*b"EnvR", 0x28_u32),
+            (*b"Colo", 0x30_u32),
+            (*b"Pale", 0x3c_u32),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let header = 4 + index * 12;
+            bytes[header..header + 4].copy_from_slice(&tag);
+            bytes[header + 4..header + 8].copy_from_slice(&1_u32.to_be_bytes());
+            bytes[header + 8..header + 12].copy_from_slice(&offset.to_be_bytes());
+        }
+        bytes[0x28..0x30].copy_from_slice(&[7, 6, 5, 4, 3, 2, 1, 0]);
+        bytes[0x30..0x38].copy_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        bytes[0x38..0x3c].copy_from_slice(&0.2_f32.to_be_bytes());
+        for (index, value) in (1_u8..=33).enumerate() {
+            bytes[0x3c + index] = value;
+        }
+        bytes[0x60..0x64].copy_from_slice(&10.0_f32.to_be_bytes());
+        bytes[0x64..0x68].copy_from_slice(&20_000.0_f32.to_be_bytes());
         bytes
     }
 
@@ -5053,6 +5202,41 @@ pub(crate) mod tests {
         assert_eq!(report.actors[1].layer, Some(10));
         assert_eq!(report.actors[1].source_scale, Some([10, 20, 30]));
         assert_eq!(report.sounds[0].source_position, [7.0, 8.0, 9.0]);
+    }
+
+    #[test]
+    fn inventories_stage_environment_palette_relations() {
+        let report = parse_stage(&fixture_stage_environment()).unwrap();
+        assert_eq!(report.format, "orbite.gcn-stage-index/2");
+        assert_eq!(
+            report.environments[0].palette_selection_ids,
+            [7, 6, 5, 4, 3, 2, 1, 0]
+        );
+        assert_eq!(
+            report.palette_selections[0].palette_ids,
+            [0, 1, 2, 3, 4, 5, 6, 7]
+        );
+        assert_eq!(report.palette_selections[0].change_rate, 0.2);
+        assert_eq!(report.palettes[0].actor_color.color, [1, 2, 3]);
+        assert_eq!(report.palettes[0].background_colors[1].color, [13, 14, 15]);
+        assert_eq!(report.palettes[0].background_colors[1].konst, [16, 17, 18]);
+        assert_eq!(report.palettes[0].fog_color, [31, 32, 33]);
+        assert_eq!(report.palettes[0].fog_start, 10.0);
+        assert_eq!(report.palettes[0].fog_end, 20_000.0);
+        assert_eq!(report.chunks[0].record_kind, "environment_selection");
+        assert_eq!(report.chunks[1].record_kind, "palette_selection");
+        assert_eq!(report.chunks[2].record_kind, "palette");
+    }
+
+    #[test]
+    fn rejects_truncated_and_non_finite_stage_palettes() {
+        let mut truncated = fixture_stage_environment();
+        truncated.truncate(0x65);
+        assert!(parse_stage(&truncated).is_err());
+
+        let mut non_finite = fixture_stage_environment();
+        non_finite[0x38..0x3c].copy_from_slice(&f32::INFINITY.to_be_bytes());
+        assert!(parse_stage(&non_finite).is_err());
     }
 
     #[test]

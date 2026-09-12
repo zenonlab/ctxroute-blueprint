@@ -67,6 +67,12 @@ restent sous `private/` et une scène témoin différente doit passer sans modif
 du runtime. Voir
 [ADR-0086](../decisions/ADR-0086-bounded-gcn-j3d-offline-adapter.md).
 
+Les scènes DZS conservent aussi la chaîne d'environnement `EnvR` → `Colo` → `Pale` :
+sélections temporelles, paires couleur/konst des quatre groupes de fond, brouillard
+et distances restent des données typées source. Un matériau ambiant résolu choisit
+ces valeurs par relation ; ni le convertisseur ni le renderer ne les remplacent par
+une couleur supposée depuis une capture.
+
 Le format de scène n'efface pas le pipeline graphique d'origine. Chaque asset porte
 un `semantic_profile`, un `render_profile` et une `visual_qualification`. Bevy garde
 l'orchestration universelle, tandis qu'un adaptateur de rendu isolé implémente les

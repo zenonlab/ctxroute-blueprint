@@ -149,6 +149,17 @@ valide toutes leurs références et expose hiérarchie, transforms et bornes. Au
 runtime ne déduit une logique de jeu d'un bit de propriété non encore relié à son
 contrôleur source.
 
+Le lecteur de scène traite les tables d'environnement DZS comme des relations
+typées : `EnvR` conserve ses huit sélecteurs, `Colo` ses huit palettes et sa vitesse
+de transition, et `Pale` les paires couleur/konst acteur et fond, le brouillard,
+l'index virtuel et ses distances. Les octets réservés restent ignorés uniquement
+quand la structure source les déclare ainsi. Les flottants non finis et les plages
+tronquées ferment l'inspection. La sélection effective demeure une étape de
+résolution séparée liée au contrôleur d'environnement ; le lecteur n'invente pas une
+heure du jour ni une couleur à partir d'une image.
+L'ajout est publié par `orbite.gcn-stage-index/2` afin qu'un consommateur de la
+première enveloppe ne confonde pas absence de tables et absence de capacité.
+
 ## Conséquences
 
 Le lecteur pourra être réutilisé par plusieurs titres partageant ces familles sans
