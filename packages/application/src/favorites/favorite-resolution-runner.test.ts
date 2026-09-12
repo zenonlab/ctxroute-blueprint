@@ -10,6 +10,7 @@ import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './
 import { FavoriteProviderRetryError } from './provider-ports';
 import type { FavoriteProviderSearchQuery } from './provider-ports';
 import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from './site-rules';
 
 const now = '2026-09-07T12:00:00.000Z';
 const favorite = { bookmarkId: 'runner', folderPath: ['Anime'], order: 0, state: 'eligible' as const, title: 'Frieren', url: 'https://reader.example/anime/frieren' };
@@ -54,6 +55,31 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('sends a structurally cleaned Manhwaz identity to MangaUpdates', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{
+      ...favorite, bookmarkId: 'manhwaz-routing', folderPath: ['Manga'], title: 'kage no jitsuryokusha ni naritakute 006',
+      url: 'https://manhwaz.com/webtoon/kage-no-jitsuryokusha-ni-naritakute-006/chapter-66.1',
+    }], storage, now, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    const task = source === undefined ? undefined : await storage.getFavoriteResolutionTask(source.id.replace(/^source_/u, 'favorite-resolution_'));
+    if (task === undefined) throw new Error('Expected Manhwaz resolution task.');
+    const manga = { externalId: '12345', mediaKind: 'MANHWA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['kage no jitsuryokusha ni naritakute'] };
+    const queries: FavoriteProviderSearchQuery[] = [];
+    const result = await runFavoriteResolutionSlice({
+      candidates: { ...candidatePorts(unusedSearch), mangaupdates: { search: async (query) => {
+        queries.push(query);
+        return createProviderCandidateEnvelope({ candidates: [manga], complete: true, digest: 'clean-title', provider: 'mangaupdates', truncated: false });
+      } } },
+      hydration: { ...hydrationPorts(unusedHydration), mangaupdates: { hydrate: async () => manga } },
+      libraryId: libraryId('library_primary'), now: () => now, outbox: new MemoryOutbox(storage, task.id), storage, token: () => 'clean-title',
+    });
+    expect(queries[0]?.titles).toEqual(['kage no jitsuryokusha ni naritakute']);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+    expect(result).toMatchObject({ completed: 1, retried: 0 });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' } });
+  });
+
   it('commits a D1 public cache hit before any provider search or hydration', async () => {
     const { storage, outbox } = await fixture();
     const search = vi.fn(async () => { throw new Error('provider search must not run'); });

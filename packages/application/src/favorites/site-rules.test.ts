@@ -6,6 +6,16 @@ const adapters = createFavoriteSiteAdapters(bundledFavoriteSiteRules);
 function evidence(url: string) { return extractFavoriteSourceEvidence({ sourceKey: 'synthetic-source', title: 'Synthetic Journey', url }, adapters); }
 
 describe('declarative site routes', () => {
+  it.each(['https://manhwaz.com', 'https://www.manhwaz.com'])('removes a proven Manhwaz routing suffix and keeps decimal chapter progress on %s', (origin) => {
+    const result = evidence(`${origin}/webtoon/kage-no-jitsuryokusha-ni-naritakute-006/chapter-66.1`);
+    expect(result).toMatchObject({
+      canonicalUrl: `${origin}/webtoon/kage-no-jitsuryokusha-ni-naritakute-006`,
+      identityTransformations: ['numeric-routing-suffix'], mediaKind: 'MANHWA',
+      rawSlug: 'kage-no-jitsuryokusha-ni-naritakute-006', release: { kind: 'chapter', value: 66.1 },
+      stableSlug: 'kage-no-jitsuryokusha-ni-naritakute', title: 'kage no jitsuryokusha ni naritakute',
+    });
+  });
+
   it.each(['', '/1234567-chapter-101', '/1234567-chapter-12.5', '/1234567-chapter-0'])('extracts a Comix manga identity with route %s', (tail) => {
     const result = evidence(`https://comix.to/title/ab123-synthetic-86-journey${tail}`);
     expect(result).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'synthetic-86-journey', title: 'synthetic 86 journey', canonicalUrl: 'https://comix.to/title/ab123-synthetic-86-journey' });

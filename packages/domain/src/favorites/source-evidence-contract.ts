@@ -1,5 +1,5 @@
 import { favoriteAliasLimit, favoriteDiagnosticLimit, favoriteEvidenceLimit, favoriteTitleByteLimit, favoriteUrlByteLimit, utf8ByteLength } from './limits';
-import type { FavoriteAliasProvenance, FavoriteMediaKind, FavoritePipelineDiagnostic, FavoriteProvider, FavoriteReleaseProvenance, FavoriteRouteProof, FavoriteSourceStrategy, FavoriteUrlDisposition } from './vocabularies';
+import type { FavoriteAliasProvenance, FavoriteIdentityTransformation, FavoriteMediaKind, FavoritePipelineDiagnostic, FavoriteProvider, FavoriteReleaseProvenance, FavoriteRouteProof, FavoriteSourceStrategy, FavoriteUrlDisposition } from './vocabularies';
 
 export interface SourceEvidence {
   readonly aliases: readonly Readonly<{ provenance: FavoriteAliasProvenance; value: string }>[];
@@ -7,6 +7,7 @@ export interface SourceEvidence {
   readonly diagnostics: readonly FavoritePipelineDiagnostic[];
   readonly disposition?: FavoriteUrlDisposition;
   readonly explicitProviderReference?: Readonly<{ externalId: string; provider: FavoriteProvider }>;
+  readonly identityTransformations?: readonly FavoriteIdentityTransformation[];
   readonly key: string;
   readonly mediaKind: FavoriteMediaKind;
   readonly origin?: string;
@@ -40,6 +41,7 @@ export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
   if (input.aliases.length > favoriteAliasLimit) throw new TypeError(`aliases exceeds ${favoriteAliasLimit} entries.`);
   if (input.diagnostics.length > favoriteDiagnosticLimit) throw new TypeError(`diagnostics exceeds ${favoriteDiagnosticLimit} entries.`);
   if (input.proofs.length > favoriteEvidenceLimit) throw new TypeError(`proofs exceeds ${favoriteEvidenceLimit} entries.`);
+  if ((input.identityTransformations?.length ?? 0) > favoriteEvidenceLimit) throw new TypeError(`identityTransformations exceeds ${favoriteEvidenceLimit} entries.`);
   if (input.season !== undefined && (!Number.isSafeInteger(input.season) || input.season <= 0)) throw new TypeError('source season must be a positive safe integer.');
   if (input.release?.value !== undefined && (!Number.isFinite(input.release.value) || input.release.value < 0)) throw new TypeError('release value must be finite and non-negative.');
   const canonicalUrl = input.canonicalUrl === undefined ? undefined : requireWebUrl(input.canonicalUrl, 'canonicalUrl');
@@ -56,10 +58,10 @@ export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
   if (input.disposition !== undefined) {
     const hasActionableEvidence = input.aliases.length > 0
       || input.proofs.length > 0
-      || [input.canonicalUrl, input.explicitProviderReference, input.origin, input.path, input.rawSlug, input.release, input.releaseSuffix, input.season, input.stableSlug, input.title].some((value) => value !== undefined);
+      || [input.canonicalUrl, input.explicitProviderReference, input.identityTransformations, input.origin, input.path, input.rawSlug, input.release, input.releaseSuffix, input.season, input.stableSlug, input.title].some((value) => value !== undefined);
     if (input.mediaKind !== 'UNKNOWN' || hasActionableEvidence) throw new TypeError('rejected source evidence must not contain actionable identity evidence.');
   }
-  const { explicitProviderReference, release, ...values } = input;
+  const { explicitProviderReference, identityTransformations, release, ...values } = input;
   const evidence = {
     ...values,
     aliases: Object.freeze(input.aliases.map((alias, index) => Object.freeze({ ...alias, value: requireValue(alias.value, `aliases[${index}].value`) }))),
@@ -71,5 +73,8 @@ export function createSourceEvidence(input: SourceEvidence): SourceEvidence {
   const withReference = explicitProviderReference === undefined
     ? evidence
     : { ...evidence, explicitProviderReference: Object.freeze({ ...explicitProviderReference }) };
-  return Object.freeze(release === undefined ? withReference : { ...withReference, release: Object.freeze({ ...release }) });
+  const withTransformations = identityTransformations === undefined
+    ? withReference
+    : { ...withReference, identityTransformations: Object.freeze([...identityTransformations]) };
+  return Object.freeze(release === undefined ? withTransformations : { ...withTransformations, release: Object.freeze({ ...release }) });
 }

@@ -20,6 +20,21 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
+  it('separates an attached chapter and a long routing prefix from a root work slug', () => {
+    expect(extractFavoriteSourceEvidence(input('routing-prefix', 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/'))).toMatchObject({
+      canonicalUrl: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage',
+      identityTransformations: ['numeric-routing-prefix'],
+      rawSlug: '0906168628-genius-of-the-unique-lineage-chapter-31',
+      release: { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', value: 31 },
+      stableSlug: 'genius-of-the-unique-lineage',
+      title: 'genius of the unique lineage',
+    });
+  });
+
+  it.each(['86-eighty-six', '91-days', 'area-88', '100000-money-game'])('preserves an intrinsic numeric work identity: %s', (slug) => {
+    expect(extractFavoriteSourceEvidence(input('intrinsic-number', `https://fixtures.tobirink.invalid/manga/${slug}/chapter-1`))).toMatchObject({ stableSlug: slug });
+  });
+
   it.each(['synthetic-series/chapter-12', 'synthetic-series-chapter-12', 'synthetic-series/chapter/12'])('recognizes root release evidence without inventing a media type: %s', path => {
     expect(extractFavoriteSourceEvidence(input('root-release', `https://fixtures.tobirink.invalid/${path}`))).toMatchObject({ mediaKind: 'UNKNOWN', stableSlug: 'synthetic-series', release: { value: 12, kind: 'chapter' } });
   });

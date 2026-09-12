@@ -17,6 +17,21 @@ const favorite: ImportableFavorite = {
 };
 
 describe('importFavoriteSources', () => {
+  it('reparses and requeues a Manhwaz source after structural title rules change', async () => {
+    const storage = new MemoryStoragePort();
+    const input = { ...favorite, bookmarkId: 'manhwaz', title: 'kage no jitsuryokusha ni naritakute 006', url: 'https://manhwaz.com/webtoon/kage-no-jitsuryokusha-ni-naritakute-006/chapter-66.1' };
+    await importFavoriteSources([input], storage, importedAt);
+    const [before] = await storage.listFavoriteSources({ limit: 1 });
+    const oldArtifact = before === undefined ? undefined : await storage.getFavoriteParseArtifact(before.id);
+    expect(oldArtifact?.artifact.displayTitle).toBe('kage no jitsuryokusha ni naritakute 006');
+    await importFavoriteSources([input], storage, importedAt, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
+    const [after] = await storage.listFavoriteSources({ limit: 1 });
+    const newArtifact = after === undefined ? undefined : await storage.getFavoriteParseArtifact(after.id);
+    expect(after?.id).toBe(before?.id);
+    expect(newArtifact?.artifact).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', parserVersion: 'favorite-parser-v3', progress: { value: 66.1 }, transformations: ['numeric-routing-suffix'] });
+    expect(after && await storage.getFavoriteResolutionTask(after.id.replace(/^source_/u, 'favorite-resolution_'))).toMatchObject({ state: 'READY' });
+  });
+
   it('requeues a previously unsupported Comix source after the site rule update', async () => {
     const storage = new MemoryStoragePort();
     const input = { ...favorite, title: 'Synthetic Journey Chapter 101', url: 'https://comix.to/title/ab123-synthetic-journey/1234567-chapter-101' };

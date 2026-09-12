@@ -1,0 +1,49 @@
+{
+  "goalId": "goal-favorite-structural-title-normalization",
+  "title": "Normalize structural routing identifiers before favorite resolution",
+  "approved": true,
+  "validationEvidence": [
+    "Read-only comparison of TobiRink parser and FavLib favorite-parser-v14",
+    "User supplied Manhwaz and AsuraScans failing routes and explicitly approved the bounded correction"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Extract a clean work title from structurally proven routes",
+      "status": "TODO",
+      "acceptance": [
+        "Manhwaz identity is kage no jitsuryokusha ni naritakute and progress is chapter 66.1",
+        "AsuraScans identity is genius of the unique lineage and progress is chapter 31",
+        "Provider search receives only the cleaned identity while raw bookmark title and raw slug remain available",
+        "Numeric works including 86, 91 Days and Area 88 retain intrinsic numbers",
+        "Transformations and parser or rule versions make stale artifacts eligible for deterministic reprocessing",
+        "Application tests parser equivalence complete verification documentation and favorite resolution Archify showcase pass"
+      ],
+      "files": [
+        "packages/domain/src/favorites/source-evidence-contract.ts",
+        "packages/domain/src/favorites/vocabularies.ts",
+        "packages/domain/src/favorites/source-evidence-contract.test.ts",
+        "packages/application/src/favorites/source-evidence.ts",
+        "packages/application/src/favorites/site-rules.ts",
+        "packages/application/src/favorites/site-rules.test.ts",
+        "packages/application/src/favorites/favorite-parser.ts",
+        "packages/application/src/favorites/favorite-parser.test.ts",
+        "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+        "packages/application/src/use-cases/import-favorite-sources.test.ts",
+        "docs/systems/favorite-parsing-resolution-spec.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run test --workspace @tobirink/domain",
+        "npm run test --workspace @tobirink/application",
+        "npm run test:parser-equivalence",
+        "npm run archify:validate -- dataflow",
+        "npm run verify",
+        "git diff --check",
+        "git commit -m fix(parser): normalize structural routing identifiers"
+      ]
+    }
+  ]
+}

@@ -1,12 +1,12 @@
 import { createSourceEvidence } from '@tobirink/domain';
-import type { SourceEvidence } from '@tobirink/domain';
+import type { FavoriteIdentityTransformation, SourceEvidence } from '@tobirink/domain';
 import { z } from 'zod';
 import type { FavoriteSourceAdapter } from './source-evidence';
 
 const segmentText = z.string().min(1).max(80).regex(/^[\p{L}\p{N}._-]+$/u);
 const segmentSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('literal'), values: z.array(segmentText).min(1).max(16) }),
-  z.strictObject({ kind: z.literal('identity'), prefix: z.literal('opaque-5').optional() }),
+  z.strictObject({ kind: z.literal('identity'), prefix: z.literal('opaque-5').optional(), routingSuffixDigits: z.literal(3).optional() }),
   z.strictObject({ kind: z.literal('number'), prefix: segmentText.optional(), format: z.literal('id-chapter').optional(), maximum: z.number().int().min(1).max(100_000) }),
 ]);
 const ruleSchema = z.strictObject({
@@ -41,7 +41,7 @@ function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: strin
   const prefix = segment.prefix ?? '';
   if (!value.startsWith(prefix)) return undefined;
   const raw = value.slice(prefix.length);
-  if (!/^\d{1,6}$/u.test(raw)) return undefined;
+  if (!/^\d{1,6}(?:\.\d{1,3})?$/u.test(raw)) return undefined;
   const number = Number(raw);
   return number > 0 && number <= segment.maximum ? number : undefined;
 }
@@ -51,6 +51,17 @@ function matches(segment: Segment, value: string): boolean {
   if (segment.kind === 'number') return numberValue(segment, value) !== undefined;
   if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{5}-.{2,250}$/u.test(value)) return false;
   return value.length >= 2 && value.length <= 256 && /\p{L}/u.test(value) && !/[\s/?#\\]/u.test(value);
+}
+
+interface RuleIdentityValue { readonly slug: string; readonly transformations: readonly FavoriteIdentityTransformation[] }
+
+function identityValue(segment: Extract<Segment, { kind: 'identity' }>, raw: string): RuleIdentityValue | undefined {
+  const withoutPrefix = segment.prefix === 'opaque-5' ? raw.slice(6) : raw;
+  if (segment.routingSuffixDigits === undefined) return { slug: withoutPrefix, transformations: [] };
+  const match = /^(.+)[-_.](0\d{2})$/u.exec(withoutPrefix);
+  const slug = match?.[1];
+  if (slug === undefined || !/\p{L}/u.test(slug)) return undefined;
+  return { slug, transformations: ['numeric-routing-suffix'] };
 }
 
 export function createFavoriteSiteAdapters(input: FavoriteSiteRules): readonly FavoriteSourceAdapter[] {
@@ -65,11 +76,14 @@ export function createFavoriteSiteAdapters(input: FavoriteSiteRules): readonly F
       const rawSlug = url.decodedSegments[rule.identitySegment];
       if (rawSlug === undefined) return undefined;
       const identitySegment = rule.segments[rule.identitySegment];
-      const slug = identitySegment?.kind === 'identity' && identitySegment.prefix === 'opaque-5' ? rawSlug.slice(6) : rawSlug;
+      if (identitySegment?.kind !== 'identity') return undefined;
+      const identity = identityValue(identitySegment, rawSlug);
+      if (identity === undefined) return undefined;
+      const slug = identity.slug;
       const title = slug.replace(/[-_.]+/gu, ' ').trim();
       const evidence: MutableSourceEvidence = {
         aliases: [{ provenance: 'stable-url-slug', value: title }], canonicalUrl: `${origin}/${url.rawSegments.slice(0, rule.identitySegment + 1).join('/')}`,
-        diagnostics: [], key: source.sourceKey, mediaKind: rule.mediaKind, origin, path: url.pathname,
+        diagnostics: [], identityTransformations: identity.transformations, key: source.sourceKey, mediaKind: rule.mediaKind, origin, path: url.pathname,
         proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: `site-rules-v${snapshot.version}:${rule.id}`,
         stableSlug: slug, strategy: 'exact-origin', title,
       };
@@ -97,7 +111,7 @@ const catalogue = { kind: 'literal', values: ['catalogue'] } as const;
 const identity = { kind: 'identity' } as const;
 const language = { kind: 'literal', values: ['vf', 'vostfr', 'vo'] } as const;
 export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSchema.parse({
-  schemaVersion: 1, version: 2,
+  schemaVersion: 1, version: 3,
   rules: [...['https://anime-sama.fr', 'https://anime-sama.si'].flatMap((origin, index) => [
     { id: `anime-sama-${index}-identity`, identitySegment: 1, mediaKind: 'UNKNOWN', origin, segments: [catalogue, identity] },
     ...[false, true].flatMap((withLanguage) => [
@@ -111,5 +125,12 @@ export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSche
       segments: [{ kind: 'literal', values: ['title'] }, { kind: 'identity', prefix: 'opaque-5' }, ...(withChapter ? [{ kind: 'number', format: 'id-chapter', maximum: 100_000 }] : [])],
     };
     return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
-  })],
+  }),
+  ...['https://manhwaz.com', 'https://www.manhwaz.com'].flatMap((origin, originIndex) => [false, true].map((withChapter) => {
+    const rule = {
+      id: `manhwaz-webtoon-${originIndex}-${withChapter}`, origin, identitySegment: 1, mediaKind: 'MANHWA',
+      segments: [{ kind: 'literal', values: ['webtoon'] }, { kind: 'identity', routingSuffixDigits: 3 }, ...(withChapter ? [{ kind: 'number', maximum: 100_000, prefix: 'chapter-' }] : [])],
+    };
+    return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
+  }))],
 });

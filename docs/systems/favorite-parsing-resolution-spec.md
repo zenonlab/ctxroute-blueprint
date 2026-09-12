@@ -208,7 +208,7 @@ empreinte différente en incrémentant explicitement la version.
 | Décisions de match | `MATCH`, `AMBIGUOUS`, `NO_MATCH` |
 | Preuves de progression | `explicit-marker`, `labelled-url-path`, `separated-release`, `season-divergence`, `bare-number-after-validated-identity`, `numeric-url-segment-after-source-identity` |
 | Rejets de progression | `INCOMPATIBLE_KIND`, `EXPLICIT_EVIDENCE_PRESENT`, `LOWER_QUALITY_EVIDENCE`, `EARLIER_SAME_QUALITY_EVIDENCE` |
-| Transformations d’identité | `numeric-routing-prefix`, `language-marker`, `reader-brand-suffix`, `opaque-url-slug-replaced`, `repeated-human-title` |
+| Transformations d’identité | `numeric-routing-prefix`, `numeric-routing-suffix`, `language-marker`, `reader-brand-suffix`, `opaque-url-slug-replaced`, `repeated-human-title` |
 | Transformations de segment | `excluded_progression`, `excluded_numeric`, `excluded_release_marker`, `excluded_observed_hostname`, `cleaned_generic_suffix` |
 | Provenance d’alias | `stable-url-slug`, `aligned-bookmark-segment` |
 | Diagnostics d’identité | `OPAQUE_IDENTITY_UNCORROBORATED`, `URL_IDENTITY_MISSING` |
@@ -314,6 +314,16 @@ humaine établit l’identité restante :
   `OPAQUE_IDENTITY_UNCORROBORATED` ;
 - un préfixe numérique lisible n’est retiré que si un titre humain unique le
   contredit. Des titres réels commençant par un nombre restent intacts ;
+- un identifiant de routage peut aussi être écarté lorsque la structure URL le
+  prouve sans catalogue de titres : un préfixe zéro-rempli comporte de six à
+  douze chiffres,
+  ou un suffixe comporte exactement trois chiffres zéro-remplis et précède une
+  sortie explicite dans un autre segment. La règle conserve `rawSlug`, exige au
+  moins un token alphabétique restant et consigne `numeric-routing-prefix` ou
+  `numeric-routing-suffix` ;
+- une sortie `chapter-N`, `episode-N` ou `volume-N` attachée au segment racine
+  est séparée avant la même analyse structurelle. Le nombre de sortie devient
+  uniquement une progression et n’entre dans aucun alias ;
 - deux segments humains répétés peuvent corriger un titre source pollué, avec
   transformation `repeated-human-title` ;
 - sans preuve de source suffisante, l’identité reste absente avec

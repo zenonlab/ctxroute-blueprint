@@ -27,6 +27,17 @@ const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\
 const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
 
+interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
+
+function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release']): StructuralIdentity {
+  if (release === undefined) return { slug, transformed: false };
+  const match = /^(0\d{5,11})[-_.]+(.+)$/u.exec(slug);
+  const remainder = match?.[2];
+  return remainder !== undefined && /\p{L}/u.test(remainder)
+    ? { slug: remainder, transformed: true }
+    : { slug, transformed: false };
+}
+
 function releaseKind(value: string): 'chapter' | 'episode' | 'volume' {
   if (['episode', 'ep'].includes(value.toLowerCase())) return 'episode';
   if (['volume', 'vol'].includes(value.toLowerCase())) return 'volume';
@@ -91,6 +102,10 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     release = { kind: releaseKind(attached[2] ?? ''), provenance: 'URL_SLUG_SUFFIX', raw: releaseSuffix, value: Number((attached[3] ?? '').replace(',', '.')) };
     raw[identityIndex] = encodeURIComponent(stableSlug ?? '');
   }
+  const structuralIdentity = stableSlug === undefined
+    ? { slug: '', transformed: false }
+    : stripLeadingRoutingIdentifier(stableSlug, release);
+  stableSlug = structuralIdentity.slug || stableSlug;
   const normalizedSlug = stableSlug?.toLowerCase();
   if (stableSlug === undefined || observedSlug === undefined || normalizedSlug === undefined || /^\d+$/u.test(normalizedSlug) || structuralSegments.has(normalizedSlug)) {
     return rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
@@ -118,14 +133,17 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     mediaKind,
     proofs,
     rawSlug: observedSlug,
-    sourceAdapter: 'generic-url',
+    sourceAdapter: structuralIdentity.transformed ? 'generic-url-structural-v1' : 'generic-url',
     stableSlug,
     strategy: 'generic',
     title,
   } as const;
-  if (release === undefined) return createSourceEvidence(evidence);
-  if (releaseSuffix === undefined) return createSourceEvidence({ ...evidence, release });
-  return createSourceEvidence({ ...evidence, release, releaseSuffix });
+  const transformedEvidence = structuralIdentity.transformed
+    ? { ...evidence, identityTransformations: ['numeric-routing-prefix'] as const }
+    : evidence;
+  if (release === undefined) return createSourceEvidence(transformedEvidence);
+  if (releaseSuffix === undefined) return createSourceEvidence({ ...transformedEvidence, release });
+  return createSourceEvidence({ ...transformedEvidence, release, releaseSuffix });
 }
 
 export function extractFavoriteSourceEvidence(input: FavoriteSourceEvidenceInput, adapters: readonly FavoriteSourceAdapter[] = []): SourceEvidence {

@@ -25,6 +25,14 @@ function containsRelease(value: string): boolean {
   return /\b(?:chapter|chapitre|ch|episode|ep|volume|vol)\s*[-:#.]?\s*\d/iu.test(value) || /\b\d+(?:[.,]\d+)?\s+(?:vostfr|vf|vo|sub|dub)\b/iu.test(value);
 }
 
+function containsRoutingIdentifier(value: string, evidence: SourceEvidence): boolean {
+  if ((evidence.identityTransformations?.length ?? 0) === 0 || evidence.rawSlug === undefined) return false;
+  const attachedRelease = /^(.+?)[-_](?:chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?\d+(?:[.,]\d+)?$/iu.exec(evidence.rawSlug);
+  const identitySlug = evidence.releaseSuffix === undefined ? evidence.rawSlug : (attachedRelease?.[1] ?? evidence.rawSlug);
+  const rawSlugTitle = identitySlug.replace(/[-_.]+/gu, ' ').trim();
+  return normalizeFavoriteTitle(value).compact === normalizeFavoriteTitle(rawSlugTitle).compact;
+}
+
 function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transformations: FavoriteTransformation[]): string | undefined {
   if (evidence.disposition !== undefined) return undefined;
   const slug = evidence.stableSlug ?? evidence.title;
@@ -55,12 +63,12 @@ function identityFrom(evidence: SourceEvidence, cleanedTitle: string, transforma
 export function parseFavoriteObservation(observation: FavoriteObservation, evidence: SourceEvidence, sourceAdapterVersion = `source-adapter-v3:${evidence.sourceAdapter}`): FavoriteParseArtifact {
   const titleAnalysis = segmentFavoriteTitle(observation.title, hostname(evidence));
   const seasonEvidence = extractFavoriteSeason(observation.title, evidence);
-  const transformations = [...titleAnalysis.transformations];
+  const transformations = [...titleAnalysis.transformations, ...(evidence.identityTransformations ?? [])];
   const identity = identityFrom(evidence, titleAnalysis.cleanedTitle, transformations);
   const diagnostics = [...evidence.diagnostics];
   if (identity === undefined) diagnostics.push(evidence.rawSlug === undefined ? 'URL_IDENTITY_MISSING' : 'OPAQUE_IDENTITY_UNCORROBORATED');
   const aliases: MutableFavoriteAlias[] = identity === undefined || containsRelease(identity) ? [] : [{ provenance: 'stable-url-slug', value: identity }];
-  if (identity !== undefined && !containsRelease(titleAnalysis.cleanedTitle) && normalizeFavoriteTitle(identity).compact !== normalizeFavoriteTitle(titleAnalysis.cleanedTitle).compact) aliases.push({ provenance: 'aligned-bookmark-segment', value: titleAnalysis.cleanedTitle });
+  if (identity !== undefined && !containsRelease(titleAnalysis.cleanedTitle) && !containsRoutingIdentifier(titleAnalysis.cleanedTitle, evidence) && normalizeFavoriteTitle(identity).compact !== normalizeFavoriteTitle(titleAnalysis.cleanedTitle).compact) aliases.push({ provenance: 'aligned-bookmark-segment', value: titleAnalysis.cleanedTitle });
   const progression = extractFavoriteProgression({ aliases: aliases.map((alias) => alias.value), evidence, mediaKind: evidence.mediaKind, season: seasonEvidence, title: observation.title, titleAnalysis });
   const artifactInput = {
     aliases,
