@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -104,9 +105,8 @@ test('authoring run qualifies a candidate without touching the active installati
 
 test('authoring run rejects premature activation and a fake witness scene', async () => {
   const first = await authoringFixture();
-  first.document.gates.at(-1).status = 'pass';
-  first.document.gates.at(-1).evidence = first.document.gates[0].evidence;
-  first.document.activation = { attempted: true, active_receipt: first.document.gates[0].evidence };
+  const { path, sha256 } = first.document.gates[0].evidence;
+  first.document.activation = { attempted: true, active_receipt: { path, sha256 } };
   first.document.gates[13] = { id: 'visual_matrix', status: 'pending', evidence: null };
   await writeFile(first.path, JSON.stringify(first.document));
   await assert.rejects(verifyGameThemeAuthoringRun(first.path), /before candidate qualification/);
@@ -143,4 +143,62 @@ test('authoring run rejects forged gate evidence and unknown research evidence',
   unknown.document.engine_profile.evidence_ids = ['not-in-concept'];
   await writeFile(unknown.path, JSON.stringify(unknown.document));
   await assert.rejects(verifyGameThemeAuthoringRun(unknown.path), /unknown evidence/);
+});
+
+test('authoring gates require the matching typed record and gate-specific checks', async () => {
+  const mismatched = await authoringFixture();
+  mismatched.document.gates[0].evidence.record_id = 'research';
+  await writeFile(mismatched.path, JSON.stringify(mismatched.document));
+  await assert.rejects(verifyGameThemeAuthoringRun(mismatched.path), /evidence record mismatch/);
+
+  const incomplete = await authoringFixture();
+  const evidencePath = join(incomplete.root, 'game-theme-authoring-evidence.example.json');
+  const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+  evidence.records.find(record => record.id === 'animation').checks = [
+    { id: 'timing', status: 'pass', detail: 'Timing seul, volontairement incomplet.' }
+  ];
+  const bytes = Buffer.from(JSON.stringify(evidence));
+  await writeFile(evidencePath, bytes);
+  const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+  for (const gate of incomplete.document.gates) {
+    if (gate.evidence?.path === 'game-theme-authoring-evidence.example.json') {
+      gate.evidence.sha256 = sha256;
+    }
+  }
+  await writeFile(incomplete.path, JSON.stringify(incomplete.document));
+  await assert.rejects(verifyGameThemeAuthoringRun(incomplete.path), /missing required checks: endpoint, root_motion/);
+});
+
+test('the same authoring pipeline qualifies an unrelated engine and object vocabulary', async () => {
+  const second = await authoringFixture();
+  const conceptPath = join(second.root, 'wallpaper-concept.example.json');
+  const concept = JSON.parse(await readFile(conceptPath, 'utf8'));
+  concept.id = 'second-engine-concept';
+  concept.research.engine_summary = 'A second fixture engine stores rooms, avatars and mounts in typed resource bundles.';
+  concept.inventory[0].id = 'object.mount';
+  concept.inventory[0].label = 'Orbiting mount';
+  concept.inventory[1].id = 'object.avatar';
+  concept.inventory[1].label = 'Session avatar';
+  concept.proposals[0].id = 'proposal.room-orbit';
+  concept.decision.proposal_id = 'proposal.room-orbit';
+  concept.proposals[0].interactive_object_ids = ['object.mount', 'object.avatar'];
+  concept.proposals[0].session_bindings[0].object_id = 'object.mount';
+  concept.proposals[0].session_bindings[1].object_id = 'object.avatar';
+  concept.proposals[0].pinning.candidate_ids = ['object.mount'];
+  const conceptBytes = Buffer.from(JSON.stringify(concept));
+  await writeFile(conceptPath, conceptBytes);
+  second.document.id = 'second-engine-first-pass';
+  second.document.concept.sha256 = crypto.createHash('sha256').update(conceptBytes).digest('hex');
+  second.document.engine_profile.engine_id = 'second.engine';
+  second.document.engine_profile.revision = 'second-reader@2.0.0';
+  second.document.relations.find(item => item.id === 'attachment').axes = ['avatar', 'mount'];
+  second.document.scenes = {
+    primary: 'scene.room-orbit', witness: 'scene.gallery',
+    same_adapter: true, runtime_changes_for_witness: false
+  };
+  await writeFile(second.path, JSON.stringify(second.document));
+
+  const result = await verifyGameThemeAuthoringRun(second.path);
+  assert.equal(result.activation_allowed, true);
+  assert.equal(result.id, 'second-engine-first-pass');
 });

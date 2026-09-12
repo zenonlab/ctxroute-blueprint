@@ -17,13 +17,36 @@ export const REQUIRED_GATES = Object.freeze([
 const REQUIRED_RELATIONS = Object.freeze([
   'placement', 'attachment', 'effect_origin', 'interactive_hit_region'
 ]);
+const REQUIRED_CHECKS = Object.freeze({
+  input_integrity: ['source_hash'],
+  engine_research: ['primary_source'],
+  inventory_closure: ['inventory_complete'],
+  coordinate_probe: ['asymmetric_transform'],
+  dependency_closure: ['closure_complete'],
+  source_relations: ['matrix_complete'],
+  conversion_determinism: ['canonical_hash_match'],
+  witness_scene: ['distinct_scene', 'runtime_hash_match'],
+  animation_semantics: ['timing', 'endpoint', 'root_motion'],
+  effect_semantics: ['cardinality', 'sockets', 'timing'],
+  ui_generation: ['catalog_projection', 'unresolved_choices'],
+  session_identity: ['stable_identity', 'typed_intents'],
+  isolated_runtime: ['active_untouched', 'candidate_isolated'],
+  visual_matrix: ['matrix_complete'],
+  interaction_matrix: ['matrix_complete'],
+  pause_occlusion: ['zero_submissions'],
+  native_activation: ['active_receipt']
+});
 
-async function regularJSON(path, maximum = 4_194_304) {
+async function regularFile(path, maximum = 4_194_304) {
   const metadata = await lstat(path);
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size < 1 || metadata.size > maximum) {
-    throw new Error(`bounded regular JSON required: ${path}`);
+    throw new Error(`bounded regular file required: ${path}`);
   }
-  const bytes = await readFile(path);
+  return readFile(path);
+}
+
+async function regularJSON(path, maximum = 4_194_304) {
+  const bytes = await regularFile(path, maximum);
   try { return { document: JSON.parse(bytes.toString('utf8')), bytes }; }
   catch { throw new Error(`invalid JSON: ${path}`); }
 }
@@ -45,11 +68,14 @@ async function linked(root, path) {
 export async function verifyGameThemeAuthoringRun(path) {
   const absolute = resolve(path);
   const root = dirname(absolute);
-  const [{ document }, { document: schema }] = await Promise.all([
+  const [{ document }, { document: schema }, { document: evidenceSchema }] = await Promise.all([
     regularJSON(absolute),
-    regularJSON(resolve(repositoryRoot, 'docs/templates/game-theme-authoring-run.schema.json'))
+    regularJSON(resolve(repositoryRoot, 'docs/templates/game-theme-authoring-run.schema.json')),
+    regularJSON(resolve(repositoryRoot, 'docs/templates/game-theme-authoring-evidence.schema.json'))
   ]);
-  const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  const validate = ajv.compile(schema);
+  const validateEvidence = ajv.compile(evidenceSchema);
   if (!validate(document)) {
     throw new Error(`authoring run schema: ${validate.errors.map(error => `${error.instancePath} ${error.message}`).join('; ')}`);
   }
@@ -64,15 +90,51 @@ export async function verifyGameThemeAuthoringRun(path) {
   if (JSON.stringify(gateIds) !== JSON.stringify(REQUIRED_GATES)) {
     throw new Error('authoring gates must be complete and ordered');
   }
+  const evidenceCache = new Map();
   for (const gate of document.gates) {
     if ((gate.status !== 'pending') !== Boolean(gate.evidence)) {
       throw new Error(`${gate.id} status/evidence mismatch`);
     }
     if (gate.evidence) {
       const evidencePath = await linked(root, gate.evidence.path);
-      const { bytes } = await regularJSON(evidencePath);
+      const { document: evidenceDocument, bytes } = await regularJSON(evidencePath);
       if (crypto.createHash('sha256').update(bytes).digest('hex') !== gate.evidence.sha256) {
         throw new Error(`${gate.id} evidence sha256 mismatch`);
+      }
+      let records = evidenceCache.get(evidencePath);
+      if (!records) {
+        if (!validateEvidence(evidenceDocument)) {
+          throw new Error(`${gate.id} typed evidence: ${validateEvidence.errors.map(error => `${error.instancePath} ${error.message}`).join('; ')}`);
+        }
+        records = new Map();
+        for (const record of evidenceDocument.records) {
+          if (records.has(record.id)) throw new Error(`duplicate evidence record ${record.id}`);
+          records.set(record.id, record);
+        }
+        evidenceCache.set(evidencePath, records);
+      }
+      const record = records.get(gate.evidence.record_id);
+      if (!record || record.gate !== gate.id) throw new Error(`${gate.id} evidence record mismatch`);
+      if (record.verdict !== gate.status) throw new Error(`${gate.id} evidence verdict mismatch`);
+      const checkIds = new Set(record.checks.map(check => check.id));
+      if (checkIds.size !== record.checks.length) throw new Error(`${gate.id} evidence checks must be unique`);
+      const missingChecks = REQUIRED_CHECKS[gate.id].filter(id => !checkIds.has(id));
+      if (missingChecks.length) throw new Error(`${gate.id} missing required checks: ${missingChecks.join(', ')}`);
+      if (gate.status === 'pass' && record.checks.some(check => check.status !== 'pass')) {
+        throw new Error(`${gate.id} pass contains a failed check`);
+      }
+      if (gate.status === 'fail' && record.checks.every(check => check.status === 'pass')) {
+        throw new Error(`${gate.id} fail contains no failed check`);
+      }
+      const artifactIds = new Set();
+      for (const artifact of record.artifacts) {
+        if (artifactIds.has(artifact.id)) throw new Error(`${gate.id} artifact ids must be unique`);
+        artifactIds.add(artifact.id);
+        const artifactPath = await linked(root, artifact.path);
+        const artifactBytes = await regularFile(artifactPath);
+        if (crypto.createHash('sha256').update(artifactBytes).digest('hex') !== artifact.sha256) {
+          throw new Error(`${gate.id} artifact sha256 mismatch`);
+        }
       }
     }
   }

@@ -40,7 +40,9 @@ Sur la source locale, les 516 dépendances d'effets se ferment sans référence 
 `orbite.resolved-effects/1`. La conversion corrige la portée BREFT (en-tête ressource
 de 0x20 octets en plus des tailles données par la table), décode I8 et IA8 tuilés vers
 RGBA8, remplace les noms Nintendo par des identifiants opaques et lie chaque fichier
-à son SHA-256. Le profil résolu transporte les paramètres d'émetteur, l'héritage de
+à son SHA-256. La provenance du pack utilise la table générique `source_artifacts` ;
+les noms BREFF/BREFT restent confinés à l'adaptateur. Le profil résolu transporte les
+paramètres d'émetteur, l'héritage de
 translation et les pistes AB de taille, échelle et alpha ; les pistes restantes sont
 comptées et empreintées sans être revendiquées comme exécutées.
 

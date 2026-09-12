@@ -121,7 +121,7 @@
         "properties": {
           "id": { "$ref": "#/$defs/id" },
           "status": { "enum": ["pending", "pass", "fail", "blocked"] },
-          "evidence": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/evidence" }] }
+          "evidence": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/gateEvidence" }] }
         }
       }
     },
@@ -131,7 +131,7 @@
       "required": ["attempted", "active_receipt"],
       "properties": {
         "attempted": { "type": "boolean" },
-        "active_receipt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/evidence" }] }
+        "active_receipt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/artifact" }] }
       }
     }
   },
@@ -140,13 +140,23 @@
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "relativeJsonPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}\\.json$" },
     "relativePath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\:]{1,240}$" },
-    "evidence": {
+    "artifact": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],
       "properties": {
         "path": { "$ref": "#/$defs/relativePath" },
         "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "gateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "record_id"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "record_id": { "$ref": "#/$defs/id" }
       }
     },
     "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },

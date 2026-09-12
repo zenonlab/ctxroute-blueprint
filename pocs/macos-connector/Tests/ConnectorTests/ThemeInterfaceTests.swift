@@ -68,16 +68,41 @@ final class ThemeInterfaceTests: XCTestCase {
         let subject = ThemeInterfaceManifest.Choice.Kind(rawValue: "subject")
         let manifest = ThemeInterfaceManifest(format: "orbite.theme-interface/5", assets: [asset],
             models: [.init(id: "model.driver", path: "driver.glb", sha256: digest(glb),
-                           clipIndices: [0, 1, 2])], slots: slots,
+                           clipIndices: [0, 1, 2], hideParts: ["default.driver"],
+                           partOffsets: ["driver": [0, 1.25, 0]],
+                           effectSockets: ["trail": [[-0.5, 0, 1], [0.5, 0, 1]]],
+                           footprint: [1, 2, 3, 4, 5])], slots: slots,
             choices: [.init(id: "subject.fixture", label: "Sujet", kind: subject, preview: asset.id,
                             appearance: .init(part: "driver", model: "model.driver"))],
+            targets: [.init(id: "object.primary", label: "Objet", session_id: "session.primary")],
             selection: .init(stages: [
                 .init(id: "subject", label: "Choisir", kind: subject, columns: 2)
-            ]))
+            ]), placements: [
+                .init(selections: ["subject": "subject.fixture"], part: "driver", translation: [0, 1, 0])
+            ], pinning: .init(target_ids: ["object.primary"], visibility_scope: "workspace-windows",
+                             same_instance_and_session: true, edit_mode: "transform-frame",
+                             controls: ["position", "size", "brightness", "opacity"],
+                             actions: ["accept", "cancel", "disable"],
+                             limits: .init(size: [0.25, 4], brightness: [0, 1], opacity: [0, 1]),
+                             persistent_per_object_settings: true, atomic_preview: true))
         let url = root.appendingPathComponent("interface.json")
         try JSONEncoder().encode(manifest).write(to: url)
 
-        XCTAssertEqual(try ThemeInterfaceLoader.load(url).manifest.models?.first?.clip_indices, [0, 1, 2])
+        let loaded = try ThemeInterfaceLoader.load(url).manifest
+        XCTAssertEqual(loaded.models?.first?.clip_indices, [0, 1, 2])
+        XCTAssertEqual(loaded.models?.first?.effect_sockets["trail"]?[0], [-0.5, 0, 1])
+        XCTAssertEqual(loaded.placements.first?.translation, [0, 1, 0])
+        XCTAssertEqual(loaded.pinning?.target_ids, ["object.primary"])
+    }
+
+    func testInterfaceV5RejectsUnknownTopLevelFields() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("theme-interface-unknown-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let bytes = Data(#"{"format":"orbite.theme-interface/5","assets":[],"slots":{},"choices":[],"targets":[],"selection":null,"game_specific":true}"#.utf8)
+        let url = root.appendingPathComponent("interface.json")
+        try bytes.write(to: url)
+        XCTAssertThrowsError(try ThemeInterfaceLoader.load(url))
     }
 
     func testInterfaceRejectsMissingSemanticSlotAndTraversal() throws {

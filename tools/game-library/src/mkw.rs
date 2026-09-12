@@ -79,8 +79,7 @@ struct ResolvedEffectPack {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 struct ResolvedSource {
     adapter: &'static str,
-    breff_sha256: String,
-    breft_sha256: String,
+    source_artifacts: BTreeMap<&'static str, String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -308,12 +307,15 @@ pub fn compile_effect_pack(
             .clone();
     }
 
+    let source_artifacts = BTreeMap::from([
+        ("effect-definitions", hex::encode(Sha256::digest(&breff))),
+        ("effect-textures", hex::encode(Sha256::digest(&breft))),
+    ]);
     let pack = ResolvedEffectPack {
         format: "orbite.resolved-effects/1",
         source: ResolvedSource {
             adapter: "mkw.breff-breft",
-            breff_sha256: hex::encode(Sha256::digest(&breff)),
-            breft_sha256: hex::encode(Sha256::digest(&breft)),
+            source_artifacts,
         },
         textures,
         effects,

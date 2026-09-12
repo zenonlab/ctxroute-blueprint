@@ -19,7 +19,7 @@
     { "id": "concept", "type": "frontend", "label": "Proposition de wallpaper", "sublabel": "scène · objets · sessions · contrôles", "stage": 1, "row": 2, "width": 180 },
     { "id": "importer", "type": "backend", "label": "Adaptateur hors ligne", "sublabel": "conversion après validation du plan", "stage": 2, "row": 2, "width": 170 },
     { "id": "library", "type": "database", "label": "Candidat privé isolé", "sublabel": "relations · reçus · témoin", "stage": 2, "row": 4, "width": 180 },
-    { "id": "resolver", "type": "security", "label": "Préflight vérifié", "sublabel": "16 gates avant toute activation native", "stage": 3, "row": 4, "width": 180 },
+    { "id": "resolver", "type": "security", "label": "Préflight typé", "sublabel": "checks par gate · artefacts digestés", "stage": 3, "row": 4, "width": 180 },
     { "id": "runtime", "type": "backend", "label": "Composition isolée", "sublabel": "instances stables · sessions typées", "stage": 3, "row": 2, "width": 180 },
     { "id": "renderer", "type": "frontend", "label": "Wallpaper 2D / 3D", "sublabel": "scène · animation · occlusion", "stage": 4, "row": 0, "width": 160 },
     { "id": "ui", "type": "frontend", "label": "Menus automatiques", "sublabel": "catalogue · contrôles accessibles", "stage": 4, "row": 1, "width": 175 },
@@ -31,7 +31,7 @@
     { "from": "research", "to": "concept", "label": "capacités prouvées", "variant": "emphasis", "labelAt": [315, 270] },
     { "from": "concept", "to": "importer", "label": "plan accepté", "variant": "security", "labelAt": [425, 440] },
     { "from": "importer", "to": "library", "label": "dérivés reproductibles", "variant": "security", "labelAt": [530, 500] },
-    { "from": "library", "to": "resolver", "label": "matrices et reçus", "variant": "dashed", "labelAt": [635, 560] },
+    { "from": "library", "to": "resolver", "label": "reçus typés par gate", "variant": "dashed", "labelAt": [635, 560] },
     { "from": "resolver", "to": "runtime", "label": "candidat qualifié", "variant": "emphasis", "labelAt": [745, 500] },
     { "from": "runtime", "to": "renderer", "label": "scène", "labelAt": [850, 215] },
     { "from": "runtime", "to": "ui", "label": "menus", "labelAt": [900, 330] },
@@ -46,6 +46,7 @@
         "Le moteur et le corpus sont étudiés avant de choisir une conversion",
         "Le plan du wallpaper est présenté à l'utilisateur avant tout asset dérivé",
         "Le candidat reste séparé de l’installation active jusqu’au gate 17",
+        "Chaque gate valide son propre type de preuve et ses checks obligatoires",
         "Une absence reste missing ou unsupported"
       ]
     },

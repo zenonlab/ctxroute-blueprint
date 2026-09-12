@@ -1,22 +1,21 @@
 {
-  "format": "orbite.game-theme-authoring-evidence.fixture/1",
-  "notice": "Free synthetic fixture used only to test linked evidence integrity.",
-  "gates": [
-    "input_integrity",
-    "engine_research",
-    "inventory_closure",
-    "coordinate_probe",
-    "dependency_closure",
-    "source_relations",
-    "conversion_determinism",
-    "witness_scene",
-    "animation_semantics",
-    "effect_semantics",
-    "ui_generation",
-    "session_identity",
-    "isolated_runtime",
-    "visual_matrix",
-    "interaction_matrix",
-    "pause_occlusion"
+  "format": "orbite.game-theme-authoring-evidence/1",
+  "records": [
+    { "id": "input", "gate": "input_integrity", "verdict": "pass", "checks": [{ "id": "source_hash", "status": "pass", "detail": "Immutable synthetic source digest was reproduced." }], "artifacts": [] },
+    { "id": "research", "gate": "engine_research", "verdict": "pass", "checks": [{ "id": "primary_source", "status": "pass", "detail": "Pinned primary sources cover the fixture engine." }], "artifacts": [] },
+    { "id": "inventory", "gate": "inventory_closure", "verdict": "pass", "checks": [{ "id": "inventory_complete", "status": "pass", "detail": "Every synthetic resource class and owner is indexed." }], "artifacts": [] },
+    { "id": "coordinates", "gate": "coordinate_probe", "verdict": "pass", "checks": [{ "id": "asymmetric_transform", "status": "pass", "detail": "Translation, rotation and nonuniform scale preserve the expected axes." }], "artifacts": [] },
+    { "id": "dependencies", "gate": "dependency_closure", "verdict": "pass", "checks": [{ "id": "closure_complete", "status": "pass", "detail": "Discovered and resolved counts match with zero unresolved entries." }], "artifacts": [] },
+    { "id": "relations", "gate": "source_relations", "verdict": "pass", "checks": [{ "id": "matrix_complete", "status": "pass", "detail": "Every declared relation matrix cell is resolved or not applicable." }], "artifacts": [] },
+    { "id": "determinism", "gate": "conversion_determinism", "verdict": "pass", "checks": [{ "id": "canonical_hash_match", "status": "pass", "detail": "Two fresh conversions produced the same canonical tree digest." }], "artifacts": [] },
+    { "id": "witness", "gate": "witness_scene", "verdict": "pass", "checks": [{ "id": "distinct_scene", "status": "pass", "detail": "The witness differs structurally from the primary scene." }, { "id": "runtime_hash_match", "status": "pass", "detail": "Both scenes used the identical runtime digest." }], "artifacts": [] },
+    { "id": "animation", "gate": "animation_semantics", "verdict": "pass", "checks": [{ "id": "timing", "status": "pass", "detail": "Source timebase and duration are retained." }, { "id": "endpoint", "status": "pass", "detail": "Playback and endpoint policy avoid an unqualified seam." }, { "id": "root_motion", "status": "pass", "detail": "Exactly one declared owner applies root motion." }], "artifacts": [] },
+    { "id": "effects", "gate": "effect_semantics", "verdict": "pass", "checks": [{ "id": "cardinality", "status": "pass", "detail": "Runtime emitter count equals the source relation count." }, { "id": "sockets", "status": "pass", "detail": "Present, absent and null sockets remain distinct." }, { "id": "timing", "status": "pass", "detail": "Emitter and particle timing retain their source domains." }], "artifacts": [] },
+    { "id": "ui", "gate": "ui_generation", "verdict": "pass", "checks": [{ "id": "catalog_projection", "status": "pass", "detail": "Stages and choices are projected from qualified catalog axes." }, { "id": "unresolved_choices", "status": "pass", "detail": "No unresolved choice is exposed." }], "artifacts": [] },
+    { "id": "sessions", "gate": "session_identity", "verdict": "pass", "checks": [{ "id": "stable_identity", "status": "pass", "detail": "Appearance changes retain instance and session identities." }, { "id": "typed_intents", "status": "pass", "detail": "Only bounded focus and open intents cross the contract." }], "artifacts": [] },
+    { "id": "isolation", "gate": "isolated_runtime", "verdict": "pass", "checks": [{ "id": "active_untouched", "status": "pass", "detail": "The recorded active artifact remained unchanged." }, { "id": "candidate_isolated", "status": "pass", "detail": "The candidate ran from its isolated private root." }], "artifacts": [] },
+    { "id": "visual", "gate": "visual_matrix", "verdict": "pass", "checks": [{ "id": "matrix_complete", "status": "pass", "detail": "Every visual cell and required assertion passed." }], "artifacts": [] },
+    { "id": "interaction", "gate": "interaction_matrix", "verdict": "pass", "checks": [{ "id": "matrix_complete", "status": "pass", "detail": "Every declared interaction path passed without replay." }], "artifacts": [] },
+    { "id": "pacing", "gate": "pause_occlusion", "verdict": "pass", "checks": [{ "id": "zero_submissions", "status": "pass", "detail": "Pause and confirmed occlusion submitted no new frame." }], "artifacts": [] }
   ]
 }
