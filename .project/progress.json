@@ -9209,7 +9209,7 @@
         {
           "id": "step-11",
           "title": "Certifier la pipeline Agenda complete",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les pannes fournisseurs pagination ETag dates predictions crash et reprise sont couvertes",
             "Un corpus synthetique de mille cinq cents favoris produit un Agenda installe non vide",
@@ -9233,7 +9233,11 @@
             "git diff --check",
             "git commit -m test(agenda): certify complete release pipeline"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify passes all validation, typecheck, workspace tests, parser equivalence, performance, integration, audit and documentation build gates",
+            "Chromium IndexedDB contract passes with 500-work and 1400-entry performance measurements; all extension, Worker, adapters and domain suites pass",
+            "Architecture and dataflow Archify showcases pass 9/9 with zero errors and warnings"
+          ]
         },
         {
           "id": "step-12",

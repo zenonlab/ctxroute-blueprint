@@ -476,6 +476,6 @@ export default defineBackground({
       }
       return { ok: true };
     });
-    void Promise.all([ensureReminderAlarm(), ensureAgendaReconcileAlarm(), ensureAgendaNextAlarm(), restoreFavoriteWake()]).catch(() => undefined);
+    void Promise.all([ensureReminderAlarm(), restoreFavoriteWake()]).then(() => Promise.all([ensureAgendaReconcileAlarm(), ensureAgendaNextAlarm()])).catch(() => undefined);
   },
 });

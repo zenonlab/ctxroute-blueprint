@@ -17,7 +17,7 @@
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "Sole hook orchestrator", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Runnable goals · 96 max · 512 KiB", "pos": [30, 230], "size": [170, 60] },
+    { "id": "progressMcp", "type": "backend", "label": "Progress MCP", "sublabel": "Goals · 96 · 512 KiB", "pos": [30, 230], "size": [170, 60] },
     { "id": "progressDashboard", "type": "frontend", "label": "Progress dashboard", "sublabel": "Autosaved cards + explicit structure", "pos": [30, 410], "size": [190, 60] },
     { "id": "dashboardState", "type": "database", "label": "Dashboard state", "sublabel": "Ignored PID + session markers", "pos": [280, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
