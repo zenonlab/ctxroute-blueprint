@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
-- Revised: 2026-09-12
+- Revised: 2026-09-13
 
 ## Context
 
@@ -55,6 +55,9 @@ sans les promouvoir seules en preuve d'identité, câble explicitement les
 indices OVA et prépublication dans le runner MV3, et invalide les décisions
 automatiques antérieures via `favorite-parser-v5`, `favorite-matcher-v4` et
 `favorite-provider-search-v3`. Les décisions humaines restent préservées.
+`1.0.24` accepte une route numérique courte devant un slug de sortie uniquement
+avec corroboration exacte du nom et remet en résolution les anciennes Reviews
+automatiques dont l'artefact sémantique a changé, en conservant un reçu complet.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

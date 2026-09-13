@@ -38,6 +38,27 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
 
+### Automatic reparse correction — 2026-09-13
+
+Candidate `1.0.24` accepts a bounded numeric routing segment before a
+release-bearing slug only when a human bookmark segment corroborates the
+cleaned identity. When the semantic artifact changes, a resolved automatic
+Review is archived in a correction receipt, detached from the source and
+requeued; human decisions remain authoritative.
+
+Two independent builds reproduce the 21-file archives byte for byte:
+
+- Chrome: 299110 bytes, SHA-256 `28a8b9409cee3580ccee67f4ae48895a657777b5d4c53c7d33ba84a66ad0b8ca`.
+- Firefox: 299147 bytes, SHA-256 `32e55c3317d9b1f247a522e65ea6b797ee3f3ad0001e01232a70efc3e5d1a219`.
+
+Chromium 153 installs the exact Chrome archive and converges 1,408 bookmarks,
+including the reported Asura and Void route shapes, with cache-first routing,
+durable retry, `storage.sync` v2 reconstruction after IndexedDB loss, encrypted
+backup recovery and zero imported Review. Firefox 151 installs the exact
+Firefox archive and passes health, ordinary-link exclusion and zero-Review
+checks. Production remains on 1.0.23 until the separate Cloudflare gate is
+applied.
+
 ### Favorite title/slug alignment release — 2026-09-13
 
 Candidate `1.0.23` ships `favorite-parser-v5`, `favorite-matcher-v4` and

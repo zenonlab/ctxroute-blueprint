@@ -1,0 +1,22 @@
+{
+  "goalId": "goal-publish-legacy-reparse-release-1-0-24",
+  "stepId": "step-1",
+  "status": "DONE",
+  "files": [
+    "apps/extension/package.json",
+    "package-lock.json",
+    "docs/decisions/ADR-0039-extension-release-versioning.md",
+    "docs/release.md",
+    "docs/systems/favorite-resolution-rebuild-pipeline.md",
+    "docs/architecture/src/favorite-resolution.dataflow.json",
+    "docs/plans/publish-legacy-reparse-release-1-0-24.json",
+    "docs/plans/publish-legacy-reparse-release-1-0-24-step-1-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Two independent builds reproduce 1.0.24 exactly: Chrome 28a8b940...0b8ca and Firefox 32e55c33...1a219.",
+    "Exact archives install successfully: Chromium 153 converges 1408 bookmarks with corrected Asura and Void titles, sync recovery and zero imported Review; Firefox 151 passes.",
+    "npm run verify passes all repository gates with zero vulnerabilities; favorite-resolution Archify showcase passes 9/9 with zero errors and warnings."
+  ]
+}

@@ -1017,7 +1017,7 @@ est retenu seulement si un segment humain du favori lui correspond exactement.
 Le titre et le slug bruts restent dans l'artefact local pour expliquer la
 décision et permettre un reparsing versionné.
 
-La candidate locale 1.0.23 distribue `favorite-parser-v5`,
+La candidate locale 1.0.24 distribue `favorite-parser-v5`,
 `favorite-matcher-v4` et `favorite-provider-search-v3` dans les deux manifests.
 Les variantes parenthésées servent à la découverte tout en restant séparées des
 preuves d'identité; les indices OVA et prépublication atteignent désormais le

@@ -8640,6 +8640,86 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-legacy-reparse-release-1-0-24",
+      "title": "Certifier et publier le reparsing automatique 1.0.24",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Construire et certifier les archives 1.0.24",
+          "status": "DONE",
+          "acceptance": [
+            "Les manifests Chrome et Firefox portent 1.0.24",
+            "Les archives sont reproductibles et leurs hashes sont enregistres",
+            "Les parcours installes Chromium et Firefox passent avec les deux titres corriges",
+            "npm run verify et Archify passent",
+            "Aucune ressource Cloudflare n est modifiee"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/plans/publish-legacy-reparse-release-1-0-24.json",
+            "docs/plans/publish-legacy-reparse-release-1-0-24-step-1-completion.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Versionner l extension en 1.0.24 sans installer de dependance",
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs avec archive Chrome 1.0.24",
+            "node apps/extension/scripts/installed-firefox.mjs avec archive Firefox 1.0.24",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m test(favorites): certify automatic reparse release 1.0.24"
+          ],
+          "evidence": [
+            "Two independent builds reproduce 1.0.24 exactly: Chrome 28a8b940...0b8ca and Firefox 32e55c33...1a219.",
+            "Exact archives install successfully: Chromium 153 converges 1408 bookmarks with corrected Asura and Void titles, sync recovery and zero imported Review; Firefox 151 passes.",
+            "npm run verify passes all repository gates with zero vulnerabilities; favorite-resolution Archify showcase passes 9/9 with zero errors and warnings."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Publier les archives et le Worker puis verifier la production",
+          "status": "TODO",
+          "acceptance": [
+            "Seuls les deux objets R2 1.0.24 et le Worker public sont modifies",
+            "Aucune migration D1 suppression cover ou modification de secret n est executee",
+            "Les hashes distants correspondent aux archives certifiees",
+            "Le Worker est sain et la page download annonce 1.0.24",
+            "Les parcours de production passent et main est pousse sans force"
+          ],
+          "files": [
+            "build/operations/publish-legacy-reparse-release-1.0.24.json",
+            "docs/release.md",
+            "docs/plans/publish-legacy-reparse-release-1-0-24.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Charger seulement les variables Cloudflare depuis le fichier env local sans les afficher",
+            "npm run infra:inspect avec le compte 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan pour les deux archives 1.0.24 et worker-deploy",
+            "npm run infra:apply avec digest et allowlist exacts",
+            "Verifier versions Worker migrations D1 pages publiques et hashes distants",
+            "Executer les parcours Playwright de production",
+            "git commit -m chore(release): publish automatic reparse release 1.0.24",
+            "git push origin main"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
