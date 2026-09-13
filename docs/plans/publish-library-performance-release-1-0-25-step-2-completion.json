@@ -1,0 +1,19 @@
+{
+  "goalId": "goal-publish-library-performance-release-1-0-25",
+  "stepId": "step-2",
+  "status": "DONE",
+  "files": [
+    "build/operations/publish-library-performance-release-1.0.25.json",
+    "build/operations/publish-library-performance-release-1.0.25-assets.json",
+    "docs/release.md",
+    "docs/plans/publish-library-performance-release-1-0-25.json",
+    "docs/plans/publish-library-performance-release-1-0-25-step-2-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Cloudflare gates a89336a2 and 9aac711e changed only the two immutable 1.0.25 release objects and Worker a6f03271 at 100 percent; no D1 migration, deletion, cover or secret action ran.",
+    "Production advertises 1.0.25 and both public ZIPs return immutable HTTP 200 responses with exact certified SHA-256 hashes.",
+    "Six HTTP production Playwright journeys pass; versioned rules return 200, bounded misses return 404 and the final inspection reports no pending D1 migration."
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "gateVersion": 1,
+  "driverId": "cloudflare-wrangler",
+  "accountId": "6aef9b2e29d0671c8b5dd36b0b660f4b",
+  "createdAt": "2026-09-13T12:59:45.030Z",
+  "expiresAt": "2026-09-13T13:14:45.030Z",
+  "inspectionDigest": "f23d425fc1bc9d19382f11e5fd735559d6586a72fe7b65645cd660a9bc90341d",
+  "previewDigest": "bec37a838947ceef94b862cca0d91e60be86fe55b8af8ce8ce07eaaa543b84d1",
+  "actions": [
+    {
+      "kind": "r2-publish",
+      "target": "r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.25.zip"
+    },
+    {
+      "kind": "r2-publish",
+      "target": "r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.25.zip"
+    },
+    {
+      "kind": "worker-deploy",
+      "target": "worker:tobirink-public-api"
+    }
+  ],
+  "digest": "a89336a206641aaeaf023deed643a4416ffd378f5c42eed95aab4370324442fa"
+}

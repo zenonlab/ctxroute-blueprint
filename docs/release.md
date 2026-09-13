@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.24`; candidate `1.0.25` is being
-certified before publication.
+The current production release is `1.0.25`; its published archives match the
+verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -58,6 +58,23 @@ routing, durable retries, pause/resume, `storage.sync` v2 reconstruction after
 IndexedDB loss, encrypted backup recovery and zero imported Review. Firefox
 151 installs the exact Firefox archive and passes health, ordinary-link
 exclusion, empty-queue and zero-Review checks.
+
+Cloudflare gate
+`a89336a206641aaeaf023deed643a4416ffd378f5c42eed95aab4370324442fa`
+uploaded only the two immutable 1.0.25 R2 objects and deployed Worker
+`cc8dbe22-e626-42b4-92b4-5c639de1248b`. The production check detected that the
+static download page had not been rebuilt; bounded follow-up gate
+`9aac711ee8cc78b250e1c10053c59d26380dd6310257ed3303ecfdb2af9cf67c`
+then deployed only the rebuilt site and Worker
+`a6f03271-0ec9-4944-81ec-e5b09f611f7b` at 100 percent. Worker
+`586566ea-1092-4820-b32f-c896c2a0edef` remains the pinned rollback reference.
+
+The production download page advertises both 1.0.25 links. Each archive
+returns HTTP 200 with immutable one-year caching and the exact certified hash
+above. The versioned parsing rules return HTTP 200, while cover and unknown
+route misses return 404. The final inspection reports no pending D1 migration
+and an empty covers bucket. All six HTTP production Playwright journeys pass.
+No D1 row, cover, secret, previous archive or migration was modified.
 
 ### Automatic reparse correction — 2026-09-13
 

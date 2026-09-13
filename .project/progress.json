@@ -8645,7 +8645,7 @@
       "schemaVersion": 1,
       "id": "goal-publish-legacy-reparse-release-1-0-24",
       "title": "Certifier et publier le reparsing automatique 1.0.24",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -8767,7 +8767,7 @@
         {
           "id": "step-4",
           "title": "Publier 1.0.25 puis verifier la production",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Seuls les deux objets R2 1.0.25 et le Worker public sont modifies",
             "Aucune migration D1 suppression cover ou modification de secret n est executee",
@@ -8793,7 +8793,11 @@
             "git commit -m chore(release): publish local performance release 1.0.25",
             "git push origin main"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare gates a89336a2 and 9aac711e changed only both immutable 1.0.25 R2 objects and Worker a6f03271 at 100 percent; no D1 migration deletion cover or secret action ran.",
+            "Production advertises 1.0.25; both ZIPs return immutable HTTP 200 with exact certified hashes; versioned rules return 200 and bounded misses return 404.",
+            "Six HTTP production Playwright journeys pass and final inspection reports no pending D1 migration; Worker 586566ea remains available for rollback."
+          ]
         }
       ]
     },
