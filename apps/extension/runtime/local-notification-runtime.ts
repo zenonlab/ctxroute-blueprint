@@ -4,6 +4,9 @@ import type { NotificationPort } from '@tobirink/application';
 
 export const reminderAlarmName = 'tobirink-due-reminders';
 export const reminderAlarmPeriodMinutes = 1;
+export const agendaNextAlarmName = 'tobirink-agenda-next';
+export const agendaReconcileAlarmName = 'tobirink-agenda-reconcile';
+export const agendaReconcileAlarmPeriodMinutes = 360;
 const maximumNotificationsPerWake = 20;
 
 export async function drainDueAgendaNotifications(

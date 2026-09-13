@@ -244,6 +244,12 @@
         "Executer les tests de crash checkpoint retard alarmes et permissions",
         "git diff --check",
         "git commit -m fix(agenda): make mv3 reminders restart safe"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "Stable agenda-next and agenda-reconcile alarms are recreated at MV3 startup and share the existing idempotent drain",
+        "Alarm wakeups resume notifications and favorite continuation without creating duplicate alarm names",
+        "Extension typecheck and Agenda runtime tests pass; architecture/dataflow Archify validation passes"
       ]
     },
     {

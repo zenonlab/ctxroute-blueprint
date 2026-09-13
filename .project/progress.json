@@ -9125,7 +9125,7 @@
         {
           "id": "step-8",
           "title": "Durcir les alarmes et notifications MV3",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les alarmes agenda next et agenda reconcile sont restaurees a chaque cycle de vie MV3",
             "Les taches echues sont drainees apres reveil",
@@ -9144,7 +9144,11 @@
             "git diff --check",
             "git commit -m fix(agenda): make mv3 reminders restart safe"
           ],
-          "evidence": []
+          "evidence": [
+            "Stable agenda-next and agenda-reconcile alarms are recreated at MV3 startup and share the existing idempotent drain",
+            "Alarm wakeups resume notifications and favorite continuation without creating duplicate alarm names",
+            "Extension typecheck and Agenda runtime tests pass; architecture/dataflow Archify validation passes"
+          ]
         },
         {
           "id": "step-9",

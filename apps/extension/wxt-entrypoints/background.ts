@@ -26,7 +26,7 @@ import { repairFavoriteLibraryProjection } from '../runtime/repair-library-proje
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-catalogue-runtime';
-import { drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
+import { agendaNextAlarmName, agendaReconcileAlarmName, agendaReconcileAlarmPeriodMinutes, drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
 const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
@@ -92,6 +92,8 @@ export default defineBackground({
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
+    const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
+    const ensureAgendaNextAlarm = () => browser.alarms.create(agendaNextAlarmName, { delayInMinutes: 1 });
     const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
     const runFavoriteResolution = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
@@ -205,7 +207,7 @@ export default defineBackground({
       void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
+      if (alarm.name === reminderAlarmName || alarm.name === agendaNextAlarmName || alarm.name === agendaReconcileAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
       if (alarm.name === favoriteInventoryAuditAlarmName) void reconcileFavorites(true).then(repairLibraryProjection).catch(() => undefined);
     });
@@ -473,6 +475,6 @@ export default defineBackground({
       }
       return { ok: true };
     });
-    void Promise.all([ensureReminderAlarm(), restoreFavoriteWake()]).catch(() => undefined);
+    void Promise.all([ensureReminderAlarm(), ensureAgendaReconcileAlarm(), ensureAgendaNextAlarm(), restoreFavoriteWake()]).catch(() => undefined);
   },
 });

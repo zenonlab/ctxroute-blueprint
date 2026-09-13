@@ -33,7 +33,7 @@
     { "id": "publicD1", "type": "database", "label": "D1 événements publics", "sublabel": "date · type · ID", "stage": 2, "row": 0, "width": 150, "tag": "sans données privées" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v2/releases", "sublabel": "fenêtre · curseur · ETag", "stage": 2, "row": 1, "width": 150, "tag": "réponse commune" },
     { "id": "releaseCache", "type": "database", "label": "Cache public IndexedDB", "sublabel": "HTTP + génération atomique", "stage": 3, "row": 0, "width": 150, "tag": "dernier snapshot valide" },
-    { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "jointure IDs · DATE / INSTANT", "stage": 4, "row": 0, "width": 150, "tag": "projection privée" },
+    { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "jointure IDs · alarmes MV3", "stage": 4, "row": 0, "width": 150, "tag": "projection privée" },
     { "id": "webBridge", "type": "frontend", "label": "WebBridge", "sublabel": "projection locale", "stage": 4, "row": 1, "width": 150, "tag": "site sans D1" }
   ],
   "flows": [
