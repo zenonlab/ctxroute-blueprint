@@ -1,5 +1,7 @@
 import type { PublicReleaseEventContract } from '@tobirink/application';
 import { publicReleaseEventSchema } from '@tobirink/application';
+import { z } from 'zod';
+const anilistErrorSchema = z.object({ errors: z.array(z.object({ message: z.string().trim().min(1) }).passthrough()).max(1) }).passthrough();
 export interface PublicReleaseCollector { readonly provider: 'anilist' | 'mangaUpdates'; collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]>; }
 export interface PublicReleaseD1Writer { batch(statements: readonly D1PreparedStatement[]): Promise<readonly D1Result[]>; prepare(query: string): D1PreparedStatement; }
 export async function collectPublicReleaseLanes(collectors: readonly PublicReleaseCollector[], window: { from: string; to: string }): Promise<{ events: readonly PublicReleaseEventContract[]; failures: readonly string[] }> {
@@ -21,7 +23,16 @@ export class AniListReleaseCollector implements PublicReleaseCollector {
     const from = Math.floor(Date.parse(`${window.from}T00:00:00.000Z`) / 1000);
     const to = Math.floor(Date.parse(`${window.to}T23:59:59.999Z`) / 1000);
     const response = await this.fetcher('https://graphql.anilist.co', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Origin: 'https://tobirink.com', Referer: 'https://tobirink.com/', 'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)' }, body: JSON.stringify({ query: 'query($from:Int!,$to:Int!){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id}}}}', variables: { from, to } }) });
-    if (!response.ok) throw new Error(`anilist-${response.status}`);
+    if (!response.ok) {
+      const text = (await response.text()).slice(0, 512);
+      let message = text.replace(/\s+/gu, ' ').trim();
+      try {
+        const parsed = anilistErrorSchema.safeParse(JSON.parse(text));
+        const upstream = parsed.success ? parsed.data.errors[0]?.message : undefined;
+        if (upstream !== undefined) message = upstream.slice(0, 384);
+      } catch { /* retain bounded raw text for non-JSON upstream errors */ }
+      throw new Error(`anilist-${response.status}${message ? `:${message}` : ''}`);
+    }
     // SAFETY: AniList's envelope is narrowed by the guards below before any field is used.
     const body = await response.json() as { data?: { Page?: { airingSchedules?: Array<{ airingAt?: number; episode?: number; media?: { id?: number } }> } } };
     const fetchedAt = new Date().toISOString();

@@ -46,7 +46,7 @@
   ],
   "cards": [
     { "dot": "emerald", "title": "Autorité", "items": ["AniList anime prioritaire", "MangaUpdates manga prioritaire", "Kitsu ne produit aucune date", "D1 reste public et minimal"] },
-    { "dot": "cyan", "title": "Résilience", "items": ["ETag et pagination complète", "Génération atomique", "Dernier snapshot valide hors ligne", "Pannes isolées par fournisseur", "DATE civil séparé de INSTANT UTC"] },
+    { "dot": "cyan", "title": "Résilience", "items": ["ETag et pagination complète", "Génération atomique", "Dernier snapshot valide hors ligne", "Pannes isolées par fournisseur", "Réponse upstream 403 bornée et conservée au diagnostic", "DATE civil séparé de INSTANT UTC"] },
     { "dot": "amber", "title": "Vie privée", "items": ["Aucun favori dans D1", "Aucun titre privé dans le calendrier", "Jointure uniquement par IDs résolus", "WebBridge ne touche jamais D1", "Prédictions manga locales et bornées"] }
   ]
 }
