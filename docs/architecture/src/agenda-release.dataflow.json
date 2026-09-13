@@ -2,51 +2,62 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — calendrier public et Agenda local",
+    "title": "TobiRink — collecte publique et Agenda local résilient",
     "quality_profile": "showcase",
-    "viewBox": [1080, 600],
+    "viewBox": [1080, 720],
     "views": [
       {
-        "id": "public-calendar",
-        "label": "Calendrier public",
-        "focus": ["providerLanes", "worker", "publicD1", "releaseApi", "releaseCache"],
-        "note": "Le Worker collecte AniList et MangaUpdates sans recevoir de donnée personnelle, puis publie des pages communes et cacheables."
+        "id": "shared-calendar",
+        "label": "Calendrier partagé",
+        "focus": ["providerApis", "scheduledCollector", "workerIngest", "publicD1", "releaseApi"],
+        "note": "Un collecteur dont l’egress AniList est vérifié transmet seulement des événements publics au Worker, unique auteur D1."
       },
       {
-        "id": "local-agenda",
-        "label": "Projection locale",
-        "focus": ["releaseCache", "localAgenda", "webBridge"],
-        "note": "L'extension joint les événements publics aux IDs fournisseurs déjà résolus; le site ne voit que cette projection locale."
+        "id": "local-fallback",
+        "label": "Repli local",
+        "focus": ["providerApis", "mv3Fallback", "releaseGeneration", "localAgenda"],
+        "note": "Si le calendrier partagé est vide ou périmé, MV3 reprend les pages publiques avec une cadence durable et atomique."
+      },
+      {
+        "id": "private-projection",
+        "label": "Projection privée",
+        "focus": ["releaseGeneration", "localAgenda", "localSurfaces"],
+        "note": "La jointure avec les œuvres et favoris se produit uniquement dans IndexedDB; le site reçoit une projection WebBridge."
       }
     ]
   },
   "stages": [
-    { "label": "Fournisseurs" },
-    { "label": "Worker" },
-    { "label": "Données publiques" },
-    { "label": "Extension et projection" },
-    { "label": "Surfaces locales" }
+    { "label": "Sources publiques" },
+    { "label": "Collecte" },
+    { "label": "Worker et D1" },
+    { "label": "Extension" },
+    { "label": "Projection locale" }
   ],
   "nodes": [
-    { "id": "providerLanes", "type": "external", "label": "Provider lanes", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 0, "width": 120, "tag": "J−1 → J+15" },
-    { "id": "worker", "type": "cloud", "label": "Worker Agenda", "sublabel": "fetch · cron · SQL · diagnostics", "stage": 1, "row": 0, "width": 150, "tag": "D1 seul détenteur" },
-    { "id": "publicD1", "type": "database", "label": "D1 événements publics", "sublabel": "date · type · ID", "stage": 2, "row": 0, "width": 150, "tag": "sans données privées" },
-    { "id": "releaseApi", "type": "backend", "label": "GET /v2/releases", "sublabel": "fenêtre · curseur · ETag", "stage": 2, "row": 1, "width": 150, "tag": "réponse commune" },
-    { "id": "releaseCache", "type": "database", "label": "Cache public IndexedDB", "sublabel": "HTTP + génération atomique", "stage": 3, "row": 0, "width": 150, "tag": "dernier snapshot valide" },
-    { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "jointure IDs · alarmes MV3", "stage": 4, "row": 0, "width": 150, "tag": "projection privée" },
-    { "id": "webBridge", "type": "frontend", "label": "WebBridge", "sublabel": "projection locale", "stage": 4, "row": 1, "width": 150, "tag": "site sans D1" }
+    { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
+    { "id": "scheduledCollector", "type": "backend", "label": "Collecteur planifié", "sublabel": "egress vérifié · pages bornées", "stage": 1, "row": 0, "width": 155, "tag": "hors egress bloqué" },
+    { "id": "mv3Fallback", "type": "backend", "label": "Repli MV3 local", "sublabel": "checkpoint · cadence durable", "stage": 1, "row": 4, "width": 155, "tag": "si cache absent" },
+    { "id": "workerIngest", "type": "security", "label": "Worker d’ingestion", "sublabel": "lot signé · schéma strict", "stage": 2, "row": 0, "width": 155, "tag": "auteur D1 unique" },
+    { "id": "publicD1", "type": "database", "label": "D1 calendrier public", "sublabel": "DATE · INSTANT · provenance", "stage": 2, "row": 1, "width": 155, "tag": "aucune donnée privée" },
+    { "id": "releaseApi", "type": "backend", "label": "GET /v2/releases", "sublabel": "fenêtre · curseur · ETag", "stage": 2, "row": 2, "width": 155, "tag": "pages communes" },
+    { "id": "releaseGeneration", "type": "database", "label": "Génération IndexedDB", "sublabel": "validation puis commit atomique", "stage": 3, "row": 4, "width": 165, "tag": "dernier succès" },
+    { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "jointure provider + ID", "stage": 4, "row": 4, "width": 145, "tag": "projection privée" },
+    { "id": "localSurfaces", "type": "frontend", "label": "Extension et WebBridge", "sublabel": "Agenda · ICS · rappels", "stage": 4, "row": 3, "width": 160, "tag": "lecture locale" }
   ],
   "flows": [
-    { "from": "providerLanes", "to": "worker", "label": "sorties publiques", "classification": "lanes indépendantes", "variant": "security", "route": "straight", "labelAt": [208, 210] },
-    { "from": "worker", "to": "publicD1", "label": "upsert batch préparé", "classification": "public seulement", "variant": "security", "route": "straight", "labelAt": [423, 210] },
-    { "from": "publicD1", "to": "releaseApi", "label": "lookup fenêtre borné", "classification": "pagination stable", "variant": "default", "route": "vertical-channel", "labelAt": [530, 320] },
-    { "from": "releaseApi", "to": "releaseCache", "label": "pages + ETag", "classification": "commit après validation", "variant": "emphasis", "route": "bottom-channel", "labelAt": [638, 430] },
-    { "from": "releaseCache", "to": "localAgenda", "label": "événements publics", "classification": "jointure avec IDs privés locaux", "variant": "default", "route": "straight", "labelAt": [837, 320] },
-    { "from": "localAgenda", "to": "webBridge", "label": "projection Agenda", "classification": "site sans stockage cloud", "variant": "security", "route": "vertical-channel", "labelAt": [960, 430] }
+    { "from": "providerApis", "to": "scheduledCollector", "label": "pages publiques espacées", "classification": "AniList INSTANT · MU DATE", "variant": "emphasis", "route": "auto" },
+    { "from": "scheduledCollector", "to": "workerIngest", "label": "batch signé borné", "classification": "anti-rejeu", "variant": "security", "route": "auto", "labelAt": [423, 200] },
+    { "from": "workerIngest", "to": "publicD1", "label": "transaction préparée", "classification": "upsert idempotent", "variant": "security", "route": "auto", "labelAt": [530, 200] },
+    { "from": "publicD1", "to": "releaseApi", "label": "fenêtre ordonnée", "classification": "curseur occurrence + ID", "variant": "default", "route": "auto", "labelAt": [530, 314] },
+    { "from": "releaseApi", "to": "releaseGeneration", "label": "toutes les pages + ETag", "classification": "commit après validation", "variant": "emphasis", "route": "auto" },
+    { "from": "providerApis", "to": "mv3Fallback", "label": "repli public direct", "classification": "403/429 repris durablement", "variant": "dashed", "route": "auto" },
+    { "from": "mv3Fallback", "to": "releaseGeneration", "label": "génération de secours", "classification": "aucune donnée favorite", "variant": "dashed", "route": "straight" },
+    { "from": "releaseGeneration", "to": "localAgenda", "label": "événements validés", "classification": "jointure locale par ID", "variant": "emphasis", "route": "auto", "labelAt": [858, 656] },
+    { "from": "localAgenda", "to": "localSurfaces", "label": "projection paginée", "classification": "site sans accès D1", "variant": "security", "route": "auto", "labelAt": [960, 542] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Autorité", "items": ["AniList anime prioritaire", "MangaUpdates manga prioritaire", "Kitsu ne produit aucune date", "D1 reste public et minimal"] },
-    { "dot": "cyan", "title": "Résilience", "items": ["ETag et pagination complète", "Génération atomique", "Dernier snapshot valide hors ligne", "Pannes isolées par fournisseur", "Réponse upstream 403 bornée et conservée au diagnostic", "DATE civil séparé de INSTANT UTC"] },
-    { "dot": "amber", "title": "Vie privée", "items": ["Aucun favori dans D1", "Aucun titre privé dans le calendrier", "Jointure uniquement par IDs résolus", "WebBridge ne touche jamais D1", "Prédictions manga locales et bornées"] }
+    { "dot": "cyan", "title": "Temps", "items": ["AniList fournit un instant UTC officiel", "MangaUpdates fournit une date civile confirmée", "time_added reste une provenance d’observation", "Une estimation manga ne fabrique jamais d’heure"] },
+    { "dot": "emerald", "title": "Résilience", "items": ["Pagination fondée sur la réponse fournisseur", "Une page par checkpoint MV3", "Dernière génération valide conservée", "D1 vide ou périmé active le repli local"] },
+    { "dot": "amber", "title": "Frontière privée", "items": ["D1 contient seulement des événements publics", "Aucun titre ou favori dans la collecte", "Les IDs personnels ne quittent pas la projection", "WebBridge lit uniquement l’Agenda local"] }
   ]
 }

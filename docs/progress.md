@@ -440,3 +440,14 @@
 - [x] **Reconstruire l Agenda apres perte IndexedDB** — DONE _(evidence: Existing provider identity recovery scans Works and observed resolved sources with bounded checkpoints and restores from validated storage.sync generations, MV3 startup runs private recovery, identity restoration, public release refresh and local Agenda hydration in cache-first order, Provider identity recovery, private recovery and Chromium IndexedDB migration tests pass)_
 - [x] **Certifier la pipeline Agenda complete** — DONE _(evidence: npm run verify passes all validation, typecheck, workspace tests, parser equivalence, performance, integration, audit and documentation build gates, Chromium IndexedDB contract passes with 500-work and 1400-entry performance measurements; all extension, Worker, adapters and domain suites pass, Architecture and dataflow Archify showcases pass 9/9 with zero errors and warnings)_
 - [ ] **Publier separement la pipeline Agenda certifiee** — PENDING
+
+## Corriger la pipeline Agenda après audit fournisseur — ACTIVE
+
+- [x] **Corriger la doctrine Agenda et matérialiser le plan** — DONE _(evidence: Audit records the Cloudflare AniList 403, incomplete provider pagination, empty MangaUpdates collector, DATE loss, cache mismatch and false-positive loader test, ADR-0045 and the recovery plan define verified-egress shared ingestion, Worker-only D1 writes and a durable private-data-free MV3 fallback, Agenda dataflow passes all 9 Archify showcase checks; documentation, decisions and diff checks pass)_
+- [ ] **Restaurer les contrats DATE INSTANT et numéros de sortie** — PENDING
+- [ ] **Implémenter les collecteurs fournisseur paginés** — PENDING
+- [ ] **Ajouter le repli Agenda local durable** — PENDING
+- [ ] **Rendre le snapshot IndexedDB et l API v2 réellement atomiques** — PENDING
+- [ ] **Restaurer les sorties et prédictions manga** — PENDING
+- [ ] **Certifier la pipeline corrigée contre FavLib** — PENDING
+- [ ] **Publier séparément la pipeline Agenda corrigée** — PENDING

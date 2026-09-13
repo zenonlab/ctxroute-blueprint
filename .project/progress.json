@@ -9264,6 +9264,231 @@
           "evidence": []
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-correct-agenda-provider-pipeline",
+      "title": "Corriger la pipeline Agenda après audit fournisseur",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger la doctrine Agenda et matérialiser le plan",
+          "status": "DONE",
+          "acceptance": [
+            "L'audit documente les défauts réels de pagination, temporalité, cache, jointure et tests",
+            "ADR-0045 sépare collecteur partagé à egress vérifié, Worker auteur D1 et repli MV3 local",
+            "MangaUpdates reste DATE sans heure inventée et time_added reste une provenance",
+            "La vue Agenda Archify passe les neuf contrôles showcase"
+          ],
+          "files": [
+            "docs/systems/agenda-favlib-gap-audit.md",
+            "docs/systems/agenda-recovery-plan.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/plans/correct-agenda-provider-pipeline.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run progress:validate -- docs/plans/correct-agenda-provider-pipeline.json",
+            "npm run progress:approve -- docs/plans/correct-agenda-provider-pipeline.json",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "npm run validate:docs",
+            "npm run validate:decisions",
+            "git diff --check",
+            "git commit -m docs(agenda): correct provider pipeline doctrine"
+          ],
+          "evidence": [
+            "Audit records the Cloudflare AniList 403, incomplete provider pagination, empty MangaUpdates collector, DATE loss, cache mismatch and false-positive loader test",
+            "ADR-0045 and the recovery plan define verified-egress shared ingestion, Worker-only D1 writes and a durable private-data-free MV3 fallback",
+            "Agenda dataflow passes all 9 Archify showcase checks; documentation, decisions and diff checks pass"
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Restaurer les contrats DATE INSTANT et numéros de sortie",
+          "status": "TODO",
+          "acceptance": [
+            "Le fournisseur canonique mangaupdates joint les événements et les Works",
+            "DATE et INSTANT restent une union stricte sans conversion implicite",
+            "Les numéros textuels conservent décimales suffixes et plages",
+            "Les contrats et snapshots v1 restent lisibles"
+          ],
+          "files": [
+            "packages/domain/src/agenda.ts",
+            "packages/application/src/releases/**",
+            "packages/application/src/agenda/**",
+            "packages/contracts/src/**",
+            "packages/adapters-indexeddb/src/**",
+            "apps/worker/migrations/**",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests domain application contracts et IndexedDB ciblés",
+            "Exécuter les migrations locales et le contrat Chromium",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "git diff --check",
+            "git commit -m refactor(agenda): restore civil release contracts"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-3",
+          "title": "Implémenter les collecteurs fournisseur paginés",
+          "status": "TODO",
+          "acceptance": [
+            "AniList suit pageInfo jusqu'à une terminaison complète avec une page par checkpoint",
+            "MangaUpdates utilise page per_page et total_hits réellement retournés",
+            "Les cadences 2,2 secondes et 3 secondes persistent à travers les réveils MV3",
+            "403 429 timeout corruption et interruption ne publient jamais une génération partielle"
+          ],
+          "files": [
+            "packages/application/src/releases/**",
+            "packages/adapters-browser/src/releases/**",
+            "apps/worker/src/releases/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests pagination cadence et reprise fournisseur",
+            "Exécuter les tests Worker et extension ciblés",
+            "git diff --check",
+            "git commit -m fix(agenda): collect complete provider pages"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-4",
+          "title": "Ajouter le repli Agenda local durable",
+          "status": "TODO",
+          "acceptance": [
+            "D1 récent reste prioritaire",
+            "Un D1 vide périmé ou indisponible déclenche les fenêtres publiques directes depuis MV3",
+            "Le repli ne transmet aucun favori titre URL progression ou ensemble d'identifiants au Worker",
+            "Une génération publique complète remplace automatiquement la génération locale"
+          ],
+          "files": [
+            "packages/application/src/agenda/**",
+            "packages/adapters-browser/src/releases/**",
+            "packages/adapters-indexeddb/src/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests D1 vide hors ligne reprise et priorité du cache public",
+            "Exécuter les tests de sécurité extension",
+            "git diff --check",
+            "git commit -m feat(extension): add durable agenda fallback"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-5",
+          "title": "Rendre le snapshot IndexedDB et l API v2 réellement atomiques",
+          "status": "TODO",
+          "acceptance": [
+            "Le cache Agenda quitte storage.local pour une génération IndexedDB transactionnelle",
+            "Le chargeur suit tous les nextCursor et refuse une génération incomplète",
+            "Le curseur D1 ordonne par occurrence puis identifiant",
+            "La révision et l ETag représentent exactement la génération et sa fenêtre"
+          ],
+          "files": [
+            "packages/application/src/agenda/**",
+            "packages/adapters-browser/src/releases/**",
+            "packages/adapters-indexeddb/src/**",
+            "apps/worker/src/releases/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests multipages ETag 304 corruption et concurrence",
+            "Vérifier les plans SQL et les bornes de lecture",
+            "git diff --check",
+            "git commit -m fix(agenda): commit complete release generations"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-6",
+          "title": "Restaurer les sorties et prédictions manga",
+          "status": "TODO",
+          "acceptance": [
+            "Les sorties MangaUpdates confirmées apparaissent comme dates civiles",
+            "Douze observations et huit intervalles bornent une seule prochaine estimation",
+            "Une confirmation remplace l estimation correspondante",
+            "Aucune estimation ni date civile ne fabrique une notification à une heure arbitraire"
+          ],
+          "files": [
+            "packages/domain/src/agenda.ts",
+            "packages/application/src/agenda/**",
+            "apps/extension/runtime/**",
+            "packages/ui/src/**",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests DATE prédiction remplacement notification et ICS",
+            "Exécuter les tests UI Agenda ciblés",
+            "git diff --check",
+            "git commit -m feat(agenda): restore manga release dates"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-7",
+          "title": "Certifier la pipeline corrigée contre FavLib",
+          "status": "TODO",
+          "acceptance": [
+            "Les fixtures couvrent 1501 sorties AniList et 466 sorties MangaUpdates par pages de 40",
+            "Chaque interruption MV3 reprend au dernier checkpoint sans doublon",
+            "Chromium et Firefox reconstruisent un Agenda anime et manga non vide",
+            "Toute différence FavLib est expliquée comme correction ou régression"
+          ],
+          "files": [
+            "scripts/**",
+            "apps/extension/**",
+            "apps/worker/**",
+            "packages/**",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter les tests différentiels et navigateurs installés",
+            "npm run verify",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "git diff --check",
+            "git commit -m test(agenda): certify complete favlib parity"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "step-8",
+          "title": "Publier séparément la pipeline Agenda corrigée",
+          "status": "TODO",
+          "acceptance": [
+            "Une approbation explicite distincte autorise chaque ressource externe exacte",
+            "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
+            "Migration D1 Worker collecteur et deux ZIP sont allowlistés et vérifiés",
+            "Un profil installé affiche un Agenda anime et manga non vide",
+            "Le Worker d498ddc7-55c5-41b0-890a-c1838a1e9dfa reste disponible pour rollback"
+          ],
+          "files": [
+            "build/operations/**",
+            "docs/release.md",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Exécuter l inspection et le plan fournisseur sans mutation",
+            "Appliquer uniquement après approbation explicite du digest et de l allowlist",
+            "Vérifier versions hashes routes D1 et profil installé",
+            "git diff --check",
+            "git commit -m chore(release): record corrected agenda publication"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
