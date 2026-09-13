@@ -51,8 +51,9 @@ the final step of a goal cannot be deleted.
 ## Consequences
 
 Validation is read-only and approval is a separate operation. The contract
-supports up to 64 goals, 30 steps per goal, and 10 evidence references per
-step, with a 512 KiB JSON limit. This preserves the complete project history
+supports up to 96 goals, 30 steps per goal, and 10 evidence references per
+step, with a 512 KiB JSON limit. The higher goal bound preserves a long-lived
+completed project history while the byte limit preserves the aggregate bound.
 without removing the per-goal, per-step, or per-reference bounds. No hook edits
 the checklist automatically.
 Agents must start from the repository root and restart after MCP manifest

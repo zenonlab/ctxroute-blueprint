@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "Plan validated and approved after increasing the bounded Progress history limit from 64 to 96",
+    "FavLib 3267de2 and ADR 0088 compared with the deployed empty v1 release snapshot",
+    "agenda-release.dataflow showcase passes 9/9 with zero errors and warnings",
+    "npm run validate:docs and npm run validate:decisions pass; no product or Cloudflare mutation"
+  ]
+}

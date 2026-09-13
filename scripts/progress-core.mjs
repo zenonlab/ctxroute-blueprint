@@ -4,7 +4,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 export const PROGRESS_PATH = '.project/progress.json';
 export const PROGRESS_VIEW_PATH = 'docs/progress.md';
-export const LIMITS = { bytes: 512 * 1024, goals: 64, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
+export const LIMITS = { bytes: 512 * 1024, goals: 96, steps: 30, references: 30, evidence: 10, text: 500, next: 3 };
 const STATUSES = new Set(['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE']);
 export const EXECUTION_MODES = Object.freeze(['collaborative', 'autonomous']);
 const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization)\s*[:=]/iu;
@@ -175,7 +175,7 @@ export function renderProgress(value) {
   for (const goal of value.goals) { lines.push(`## ${goal.title} — ${goal.status}`, ''); for (const step of goal.steps) { const displayStatus = step.status === 'TODO' ? 'PENDING' : step.status; lines.push(`- [${step.status === 'DONE' ? 'x' : ' '}] **${step.title}** — ${displayStatus}${step.evidence.length ? ` _(evidence: ${step.evidence.slice(0, 3).join(', ')})_` : ''}`); } lines.push(''); }
   if (!value.goals.length) lines.push('_No goals approved yet._', ''); return lines.join('\n');
 }
-function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode: 'collaborative', modeOffered: false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
+function normalizePlan(plan) { return { schemaVersion: 1, id: plan.goalId ?? plan.id, title: plan.title, status: plan.status ?? 'ACTIVE', executionMode: plan.executionMode ?? 'collaborative', modeOffered: plan.modeOffered ?? false, steps: plan.steps.map(step => ({ id: step.id, title: step.title, status: step.status ?? 'TODO', acceptance: step.acceptance, files: step.files, commands: step.commands, evidence: step.evidence ?? [] })) }; }
 function normalizeGoal(goal) { return { schemaVersion: 1, id: goal.id, title: goal.title, status: goal.status, executionMode: goal.executionMode ?? 'collaborative', modeOffered: goal.modeOffered ?? false, steps: goal.steps }; }
 function isId(value) { return value === String(value) && /^[a-z][a-z0-9-]{0,63}$/u.test(value); }
 function text(value) { return value === String(value) && value.trim() && value.length <= LIMITS.text && !SECRET.test(value); }

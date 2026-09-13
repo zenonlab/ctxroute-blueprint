@@ -74,14 +74,18 @@ only after that validated request and delegates to an application query capped
 at 100 pending records. The response is a frozen, serializable snapshot; it
 does not expose Dexie records, browser APIs or a provider client to React.
 
-Agenda reads hydrate the strict public release cache before querying the local
-period. The background never composes the dormant remote loader. A named
-one-minute browser alarm and `runtime.onStartup` both drain the durable task
-store in batches of at most 20. Tasks remain unavailable until their exact
-release time, use the browser notification identifier as their deduplication
-key, and publish only while the persisted native-notification preference is
-enabled. Preference messages expose only the two versioned booleans used by
-Agenda and the popup.
+Agenda reads refresh the common public release calendar when its local
+generation is older than 24 hours, then query only the IndexedDB local
+projection. The background composes the remote loader through a typed HTTP
+port; it never sends a favorite, title, URL, progress value, installation ID,
+or owner credential. All pages are validated and committed as one generation;
+the last valid generation remains usable after a timeout, 429, partial page,
+or service-worker restart. Named `tobirink-agenda-next` and
+`tobirink-agenda-reconcile` alarms restore calendar and durable notification
+work after every MV3 lifecycle event. Tasks remain unavailable until their
+exact release time, claim a delivery before publication, and publish only
+while the persisted native-notification preference is enabled. Estimated
+releases never create native notifications.
 
 Expose the extension accessibility contract through the root
 `npm run test:a11y` gate. The gate renders every packaged surface, checks its

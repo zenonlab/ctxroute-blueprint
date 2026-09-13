@@ -165,21 +165,30 @@ public HTTP: the Cloudflare adapter accepts only already normalized masters,
 checks copying rights before any R2 access, and uses a conditional immutable
 write with a SHA-256 checksum.
 
-## Public release snapshot
+## Public release calendar
 
-`GET /v1/releases` serves one shared, non-personalized snapshot selected by the
-private R2 pointer `releases/current.json`. The referenced immutable object is
-`releases/snapshots/<revision>.json`. A strict schema permits at most 200 public
-entries containing only release ID, canonical work ID, label, date and public
-availability. Unknown fields, duplicate release IDs, malformed dates, query
-parameters and pointer/revision mismatches fail closed.
+The Worker owns a daily public calendar built from independent AniList
+`airingSchedule` and MangaUpdates release lanes. D1 stores only public release
+events, provider work IDs, release kind, `DATE` or `INSTANT` occurrence,
+provenance, schema versions, state, and expiry. It stores no title, URL,
+favorite, progress, owner, installation, or provider payload.
 
-Cookies, authorization headers and installation identifiers never participate
-in lookup or serialization, so every installation receives the same cacheable
-view for a revision. The client adapter receives remote and cache capabilities
-through ports, validates before saving, and marks whether a result came from
-the network or the last valid local snapshot. It performs no browser API or
-storage access directly.
+`GET /v2/releases` accepts only a bounded UTC window, cursor, and limit. It
+returns stable cursor pages, an ETag, and the same result for every
+installation. The extension requests the common window, follows every page,
+and commits a generation to IndexedDB only after all pages agree on its
+revision and window. `304`, offline operation, timeout, 429, or a malformed
+page preserves the last valid generation. `/v1/releases` and its R2 snapshot
+remain available as a compatibility and rollback surface while v2 is proven.
+
+The local Agenda joins public events to locally resolved AniList or
+MangaUpdates IDs through IndexedDB indexes. It never joins by title and never
+contacts a provider while the Agenda is being read. Civil `DATE` values never
+become fake UTC midnights; `INSTANT` values retain their exact UTC instant.
+Official events replace estimates, and estimates never schedule native
+notifications. Manga estimates use at most twelve confirmed observations and
+eight filtered positive intervals, require three valid intervals, and produce
+only the next date.
 
 ## Research anchors
 

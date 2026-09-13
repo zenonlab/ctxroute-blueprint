@@ -1,0 +1,307 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "title": "Restaurer la pipeline Agenda publique et locale",
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "approved": true,
+  "validationEvidence": [
+    "Le goal joint materialise les douze etapes et leurs commits",
+    "L utilisateur a deja confirme le mode autonome pour la correction complete de TobiRink",
+    "La publication Cloudflare et les migrations D1 de production restent une operation separee exigeant une approbation explicite"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Corriger la doctrine Agenda avant le code",
+      "status": "DONE",
+      "acceptance": [
+        "L audit distingue les comportements FavLib utiles des choix rejetes par la doctrine TobiRink",
+        "L ADR definit D1 public Worker seul v2 releases et jointure locale par identifiants fournisseurs",
+        "Le plan de correction couvre collecte cache projection prediction notifications UX reconstruction certification et publication",
+        "La vue Agenda Archify passe les neuf controles showcase sans composant de gouvernance",
+        "La documentation valide et le diff ne contient aucune mutation produit ou Cloudflare"
+      ],
+      "files": [
+        "docs/systems/agenda-favlib-gap-audit.md",
+        "docs/systems/agenda-recovery-plan.md",
+        "docs/decisions/ADR-0031-wxt-extension-shell.md",
+        "docs/decisions/ADR-0045-public-release-calendar.md",
+        "docs/01-technology-decisions.md",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        ".project/project-config.json",
+        "docs/plans/restore-agenda-pipeline.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "evidence": [
+        "Plan validated and approved after increasing the bounded Progress history limit from 64 to 96",
+        "FavLib 3267de2 and ADR 0088 compared with the deployed empty v1 release snapshot",
+        "agenda-release.dataflow showcase passes 9/9 with zero errors and warnings",
+        "npm run validate:docs and npm run validate:decisions pass; no product or Cloudflare mutation"
+      ],
+      "commands": [
+        "npm run progress:validate -- docs/plans/restore-agenda-pipeline.json",
+        "npm run progress:approve -- docs/plans/restore-agenda-pipeline.json",
+        "npm run archify:validate -- agenda-release.dataflow",
+        "npm run archify:visual-check -- agenda-release.dataflow",
+        "npm run validate:docs",
+        "git diff --check",
+        "git commit -m docs(agenda): define complete public release recovery"
+      ]
+    },
+    {
+      "id": "step-2",
+      "title": "Restaurer les contrats temporels et le stockage local additif",
+      "acceptance": [
+        "PublicReleaseEvent LocalReleaseEvidence LocalAgendaEvent et LocalNotificationDelivery sont distincts et stricts",
+        "DATE reste une date civile et INSTANT un instant UTC",
+        "La migration IndexedDB additive conserve les donnees Agenda existantes"
+      ],
+      "files": [
+        "packages/domain/src/agenda.ts",
+        "packages/application/src/releases/**",
+        "packages/application/src/ports/storage-port.ts",
+        "packages/adapters-indexeddb/src/**",
+        "packages/contracts/src/**",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests domain application contracts et IndexedDB cibles",
+        "Executer le contrat de migration Chromium",
+        "npm run archify:validate -- agenda-release.dataflow",
+        "git diff --check",
+        "git commit -m refactor(agenda): restore release evidence contracts"
+      ]
+    },
+    {
+      "id": "step-3",
+      "title": "Construire le calendrier public Worker et D1",
+      "acceptance": [
+        "La migration 0007 ajoute uniquement les tables et index du calendrier public",
+        "AniList et MangaUpdates sont collectes dans des lanes quotidiennes independantes",
+        "Les anciennes donnees restent servies lors d une panne fournisseur",
+        "D1 ne contient aucune donnee de favori titre URL progression owner ou installation"
+      ],
+      "files": [
+        "apps/worker/migrations/0007_public_release_calendar.sql",
+        "apps/worker/src/releases/**",
+        "apps/worker/src/index.ts",
+        "apps/worker/src/composition.ts",
+        "apps/worker/wrangler.jsonc",
+        "apps/worker/worker-configuration.d.ts",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les migrations D1 et tests Worker locaux",
+        "Verifier EXPLAIN QUERY PLAN et les bornes de lignes lues",
+        "npm run archify:validate -- agenda-release.dataflow",
+        "git diff --check",
+        "git commit -m feat(worker): collect public release calendar"
+      ]
+    },
+    {
+      "id": "step-4",
+      "title": "Exposer le calendrier public pagine v2",
+      "acceptance": [
+        "GET v2 releases accepte seulement from to cursor et limit bornes",
+        "La pagination est stable et ETag permet 304",
+        "La reponse est identique pour toutes les installations et ne joint aucune donnee privee",
+        "GET v1 releases reste disponible pour compatibilite et rollback"
+      ],
+      "files": [
+        "apps/worker/src/releases/**",
+        "apps/worker/src/index.ts",
+        "packages/contracts/src/**",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests route Worker pagination ETag securite et quotas",
+        "git diff --check",
+        "git commit -m feat(worker): expose paginated public releases"
+      ]
+    },
+    {
+      "id": "step-5",
+      "title": "Telecharger et conserver atomiquement le calendrier dans l extension",
+      "acceptance": [
+        "L extension charge toutes les pages communes avec If None Match au plus toutes les vingt quatre heures",
+        "Une generation n est publiee localement qu apres validation de toutes ses pages",
+        "Timeout 429 corruption et interruption conservent le dernier snapshot valide",
+        "Le travail MV3 est coalesce borne et repris par alarme"
+      ],
+      "files": [
+        "packages/adapters-browser/src/releases/**",
+        "packages/application/src/releases/**",
+        "packages/adapters-indexeddb/src/**",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "apps/extension/wxt.config.ts",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests cache HTTP pagination ETag panne et reprise MV3",
+        "Executer les tests de securite extension",
+        "git diff --check",
+        "git commit -m fix(extension): hydrate shared release calendar"
+      ]
+    },
+    {
+      "id": "step-6",
+      "title": "Construire la projection Agenda locale indexee",
+      "acceptance": [
+        "Les sorties sont jointes uniquement par provider et providerWorkId resolus",
+        "La lecture Agenda ne declenche aucune recherche fournisseur et aucun scan complet",
+        "Les donnees privees restent dans IndexedDB",
+        "La sortie officielle remplace toute estimation correspondante"
+      ],
+      "files": [
+        "packages/application/src/agenda/**",
+        "packages/adapters-indexeddb/src/**",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests de jointure de periode et de performance IndexedDB",
+        "git diff --check",
+        "git commit -m feat(agenda): build indexed local projection"
+      ]
+    },
+    {
+      "id": "step-7",
+      "title": "Restaurer les predictions manga bornees",
+      "acceptance": [
+        "Douze observations maximum et huit intervalles maximum alimentent la prediction",
+        "Trois intervalles valides sont requis et les valeurs hors demi a double mediane sont exclues",
+        "Une seule prochaine date estimee est produite",
+        "Une estimation ne genere jamais de notification native"
+      ],
+      "files": [
+        "packages/domain/src/agenda.ts",
+        "packages/application/src/agenda/**",
+        "apps/worker/src/releases/**",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests de prediction et de remplacement officiel",
+        "git diff --check",
+        "git commit -m feat(agenda): derive bounded manga estimates"
+      ]
+    },
+    {
+      "id": "step-8",
+      "title": "Durcir les alarmes et notifications MV3",
+      "acceptance": [
+        "Les alarmes agenda next et agenda reconcile sont restaurees a chaque cycle de vie MV3",
+        "Les taches echues sont drainees apres reveil",
+        "La livraison est reclamee avant affichage et dedupliquee apres crash",
+        "Les preferences de badge et notification persistent independamment"
+      ],
+      "files": [
+        "packages/application/src/agenda/**",
+        "apps/extension/runtime/local-notification-runtime.ts",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "packages/adapters-browser/src/notifications/**",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests de crash checkpoint retard alarmes et permissions",
+        "git diff --check",
+        "git commit -m fix(agenda): make mv3 reminders restart safe"
+      ]
+    },
+    {
+      "id": "step-9",
+      "title": "Rendre les etats Agenda actionnables",
+      "acceptance": [
+        "Extension et site distinguent premiere synchronisation cache frais cache ancien partiel vide et panne",
+        "Le bouton reprendre declenche une vraie recuperation distante",
+        "DATE et INSTANT sont presentes correctement dans le fuseau local",
+        "Titres et couvertures proviennent uniquement des Works locaux"
+      ],
+      "files": [
+        "apps/extension/entrypoints/agenda/**",
+        "apps/web/app/agenda/**",
+        "packages/ui/src/**",
+        "apps/extension/runtime/**",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests UI extension WebBridge accessibilite et Playwright",
+        "git diff --check",
+        "git commit -m fix(agenda): expose actionable synchronization states"
+      ]
+    },
+    {
+      "id": "step-10",
+      "title": "Reconstruire l Agenda apres perte IndexedDB",
+      "acceptance": [
+        "Le rescan favoris et le snapshot storage sync restaurent les identifiants publics",
+        "Le cache collectif precede les appels fournisseur",
+        "Le calendrier public restaure la projection et les alarmes sans titre prive distant",
+        "La generation precedente est conservee jusqu a validation complete"
+      ],
+      "files": [
+        "packages/application/src/recovery/**",
+        "packages/adapters-browser/src/recovery/**",
+        "packages/adapters-indexeddb/src/recovery/**",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Executer les tests de reset complet interruption et generation obsoletes Chrome Firefox",
+        "git diff --check",
+        "git commit -m refactor(recovery): rebuild agenda after reinstall"
+      ]
+    },
+    {
+      "id": "step-11",
+      "title": "Certifier la pipeline Agenda complete",
+      "acceptance": [
+        "Les pannes fournisseurs pagination ETag dates predictions crash et reprise sont couvertes",
+        "Un corpus synthetique de mille cinq cents favoris produit un Agenda installe non vide",
+        "Aucune donnee privee ne traverse Worker D1 WebBridge logs ou cache public",
+        "npm run verify Archify packaging reproductible Chromium Firefox et git diff check passent"
+      ],
+      "files": [
+        "apps/extension/scripts/**",
+        "apps/worker/src/**/*.test.ts",
+        "packages/**/*.test.ts",
+        "docs/release.md",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run verify",
+        "npm run archify:validate -- all",
+        "npm run archify:visual-check -- all",
+        "npm run package:extension",
+        "Verifier deux constructions isolees et les installations Chromium Firefox",
+        "git diff --check",
+        "git commit -m test(agenda): certify complete release pipeline"
+      ]
+    },
+    {
+      "id": "step-12",
+      "title": "Publier separement la pipeline Agenda certifiee",
+      "acceptance": [
+        "Une approbation explicite distincte autorise le plan Cloudflare exact",
+        "La migration D1 additive le cron le Worker et les deux ZIP seulement sont allowlistes",
+        "Les hashes distants et un Agenda installe non vide sont verifies",
+        "Le Worker a6f03271-0ec9-4944-81ec-e5b09f611f7b reste disponible pour rollback"
+      ],
+      "files": [
+        "build/operations/**",
+        "docs/release.md",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Demander l approbation explicite du plan Cloudflare exact",
+        "Executer infra inspect plan apply avec digest et allowlist",
+        "Verifier migration cron Worker routes hashes et extensions installees",
+        "git commit -m chore(release): publish agenda pipeline",
+        "git push origin main"
+      ]
+    }
+  ]
+}

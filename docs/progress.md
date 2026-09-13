@@ -425,3 +425,18 @@
 
 - [x] **Rendre le bootstrap et la lecture locale bornes** — DONE _(evidence: Le demarrage normal reprend le checkpoint et les taches dues sans forcer l inventaire ni la reparation globale; installation restauration mutations continuations et audit periodique conservent la convergence., Le bootstrap WebBridge ne lit aucun Work ni aucune page FavoriteSource et son total egale la projection complete pour les etats provisoire resolu et non pris en charge., Les lectures detaillees utilisent exactement 100 operations concurrentes par lot; Chromium mesure 44 ms pour 500 Works et npm run verify passe avec zero vulnerabilite.)_
 - [x] **Lire Works progressions et artefacts par vrais lots** — DONE _(evidence: Dexie utilise bulkGet pour les Work et artefacts et anyOf sur l index workId pour les progressions; les contrats refusent les lots vides ou superieurs a 100., Le benchmark Chromium passe avec 500 Work en 19.60 ms et 1400 entrees mixtes resolues et provisoires en 57.80 ms sous la limite de 500 ms., npm run verify passe avec 366 tests application 151 extension 45 Worker le contrat IndexedDB Chromium les builds Chrome Firefox et zero vulnerabilite.)_
+
+## Restaurer la pipeline Agenda publique et locale — ACTIVE
+
+- [x] **Corriger la doctrine Agenda avant le code** — DONE _(evidence: Plan validated and approved after increasing the bounded Progress history limit from 64 to 96, FavLib 3267de2 and ADR 0088 compared with the deployed empty v1 release snapshot, agenda-release.dataflow showcase passes 9/9 with zero errors and warnings)_
+- [ ] **Restaurer les contrats temporels et le stockage local additif** — PENDING
+- [ ] **Construire le calendrier public Worker et D1** — PENDING
+- [ ] **Exposer le calendrier public pagine v2** — PENDING
+- [ ] **Telecharger et conserver atomiquement le calendrier dans l extension** — PENDING
+- [ ] **Construire la projection Agenda locale indexee** — PENDING
+- [ ] **Restaurer les predictions manga bornees** — PENDING
+- [ ] **Durcir les alarmes et notifications MV3** — PENDING
+- [ ] **Rendre les etats Agenda actionnables** — PENDING
+- [ ] **Reconstruire l Agenda apres perte IndexedDB** — PENDING
+- [ ] **Certifier la pipeline Agenda complete** — PENDING
+- [ ] **Publier separement la pipeline Agenda certifiee** — PENDING
