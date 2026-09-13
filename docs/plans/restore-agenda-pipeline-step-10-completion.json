@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-10",
+  "status": "DONE",
+  "completedAt": "2026-09-13T00:00:00.000Z",
+  "evidence": [
+    "Existing provider identity recovery scans Works and observed resolved sources with bounded checkpoints and restores from validated storage.sync generations",
+    "MV3 startup runs private recovery, identity restoration, public release refresh and local Agenda hydration in cache-first order",
+    "Provider identity recovery, private recovery and Chromium IndexedDB migration tests pass"
+  ]
+}

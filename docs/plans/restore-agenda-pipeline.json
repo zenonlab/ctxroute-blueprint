@@ -300,6 +300,12 @@
         "Executer les tests de reset complet interruption et generation obsoletes Chrome Firefox",
         "git diff --check",
         "git commit -m refactor(recovery): rebuild agenda after reinstall"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "Existing provider identity recovery scans Works and observed resolved sources with bounded checkpoints and restores from validated storage.sync generations",
+        "MV3 startup runs private recovery, identity restoration, public release refresh and local Agenda hydration in cache-first order",
+        "Provider identity recovery, private recovery and Chromium IndexedDB migration tests pass"
       ]
     },
     {

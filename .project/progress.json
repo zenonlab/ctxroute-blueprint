@@ -9181,7 +9181,7 @@
         {
           "id": "step-10",
           "title": "Reconstruire l Agenda apres perte IndexedDB",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le rescan favoris et le snapshot storage sync restaurent les identifiants publics",
             "Le cache collectif precede les appels fournisseur",
@@ -9200,7 +9200,11 @@
             "git diff --check",
             "git commit -m refactor(recovery): rebuild agenda after reinstall"
           ],
-          "evidence": []
+          "evidence": [
+            "Existing provider identity recovery scans Works and observed resolved sources with bounded checkpoints and restores from validated storage.sync generations",
+            "MV3 startup runs private recovery, identity restoration, public release refresh and local Agenda hydration in cache-first order",
+            "Provider identity recovery, private recovery and Chromium IndexedDB migration tests pass"
+          ]
         },
         {
           "id": "step-11",
