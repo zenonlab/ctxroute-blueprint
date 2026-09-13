@@ -15,7 +15,8 @@ export function upsertPublicReleaseEvents(db: PublicReleaseD1Writer, events: rea
 
 export class AniListReleaseCollector implements PublicReleaseCollector {
   readonly provider = 'anilist' as const;
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
+  constructor(fetcher?: typeof fetch) { this.fetcher = fetcher ?? fetch.bind(globalThis); }
+  private readonly fetcher: typeof fetch;
   async collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]> {
     const from = Math.floor(Date.parse(`${window.from}T00:00:00.000Z`) / 1000);
     const to = Math.floor(Date.parse(`${window.to}T23:59:59.999Z`) / 1000);
