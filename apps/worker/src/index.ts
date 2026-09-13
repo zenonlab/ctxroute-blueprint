@@ -58,11 +58,11 @@ app.onError((_error, context) => {
   return context.json({ error: 'internal-error' }, 500);
 });
 
-export default app;
-
 export const scheduled = async (_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> => {
   const now = new Date();
   const from = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
   const to = new Date(now.getTime() + 15 * 86_400_000).toISOString().slice(0, 10);
   await createWorkerServices(env).releaseCalendar.sync({ from, to });
 };
+
+export default { fetch: app.fetch, scheduled };
